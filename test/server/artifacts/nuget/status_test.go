@@ -6,13 +6,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -33,25 +35,25 @@ func nugetStatusFixture(t *testing.T, anonymous bool) http.Handler {
 				t.Fatal(err)
 			}
 		}
-		if err := cfg.Store.Users().Create(t.Context(), types.User{
+		if err := cfg.Store.Users().Create(t.Context(), model.User{
 			Name: "nugetreader", PasswordHash: cheapHash,
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if err := cfg.Store.Permissions().Create(t.Context(), types.Permission{
+		if err := cfg.Store.Permissions().Create(t.Context(), model.Permission{
 			Name: "nuget-read",
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					"nugetreader": types.ActionRead,
+			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{
+					"nugetreader": api.ActionRead,
 				}},
-				Targets: map[string]types.Target{"nuget-local": {Include: []string{"**"}}},
+				Targets: map[string]model.Target{"nuget-local": {Include: []string{"**"}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)
 		}
 		if anonymous {
 			if err := cfg.Store.Settings().
-				Put(t.Context(), types.SettingAnonymousAccess, true); err != nil {
+				Put(t.Context(), settings.SettingAnonymousAccess, true); err != nil {
 				t.Fatal(err)
 			}
 		}

@@ -18,7 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccRegistryResourceValidation(t *testing.T) {
@@ -179,7 +179,7 @@ func TestAccRegistryDescriptorIntegrityAndForeignPolicy(t *testing.T) {
 		t.Fatal("descriptor crossed credential revision")
 	}
 
-	u := item.CacheUpload{Expected: types.Checksums{SHA256: strings.Repeat("a", 64)}}
+	u := item.CacheUpload{Expected: kernel.Checksums{SHA256: strings.Repeat("a", 64)}}
 	if err := c.prepareBlob(
 		source.Permit{},
 		"revision",

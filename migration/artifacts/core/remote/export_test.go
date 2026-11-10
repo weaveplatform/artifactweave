@@ -1,8 +1,8 @@
 package remote
 
 import (
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // These names open the policy's unexported parts to the external tests
@@ -11,16 +11,16 @@ import (
 // test that imports them is an import cycle.
 
 // Kind is the retrieval class the policy gives q.
-func (p *Policy) Kind(q source.Request) types.RemoteKind { return p.kind(q) }
+func (p *Policy) Kind(q source.Request) model.RemoteKind { return p.kind(q) }
 
 // Fresh reports whether the cache entry e still answers q without revalidation.
-func (p *Policy) Fresh(q source.Request, e types.RemoteCacheEntry) bool { return p.fresh(q, e) }
+func (p *Policy) Fresh(q source.Request, e model.RemoteCacheEntry) bool { return p.fresh(q, e) }
 
 // ProbeKey is the key of the policy's shared recovery probe.
 func (p *Policy) ProbeKey(
-	key types.RemoteCacheKey,
+	key model.RemoteCacheKey,
 	permit source.Permit,
-	state types.RemoteSourceState,
+	state model.RemoteSourceState,
 ) string {
 	return p.probeKey(key, permit, state)
 }

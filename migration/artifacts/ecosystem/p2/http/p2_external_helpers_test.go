@@ -10,9 +10,10 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitP2ExternalChildURLRequiresMemberOriginAndSafePath(t *testing.T) {
@@ -60,7 +61,7 @@ func TestUnitP2ExternalChildURLRequiresMemberOriginAndSafePath(t *testing.T) {
 }
 
 func TestUnitP2ExternalDigestBindsSourceParentAndExactQuery(t *testing.T) {
-	id := types.SourceIdentity{ID: "source-A"}
+	id := model.SourceIdentity{ID: "source-A"}
 	first := p2ChildDigest(id, "root/site", "https://child.example/site?revision=1")
 	if len(first) != 64 {
 		t.Fatalf("unexpected child digest %q", first)
@@ -68,7 +69,7 @@ func TestUnitP2ExternalDigestBindsSourceParentAndExactQuery(t *testing.T) {
 	for _, changed := range []string{
 		p2ChildDigest(id, "other/site", "https://child.example/site?revision=1"),
 		p2ChildDigest(id, "root/site", "https://child.example/site?revision=2"),
-		p2ChildDigest(types.SourceIdentity{ID: "source-B"}, "root/site", "https://child.example/site?revision=1"),
+		p2ChildDigest(model.SourceIdentity{ID: "source-B"}, "root/site", "https://child.example/site?revision=1"),
 	} {
 		if changed == first {
 			t.Fatal("source, parent, or exact query mutation retained child route")
@@ -158,7 +159,7 @@ func TestUnitP2ExternalPayloadChecksumsRejectTampering(t *testing.T) {
 	body := []byte("published plugin bytes")
 	sum256 := sha256.Sum256(body)
 	sum512 := sha512.Sum512(body)
-	want := types.Checksums{
+	want := kernel.Checksums{
 		SHA256: hex.EncodeToString(sum256[:]),
 		SHA512: hex.EncodeToString(sum512[:]),
 	}

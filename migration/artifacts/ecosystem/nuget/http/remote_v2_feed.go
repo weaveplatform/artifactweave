@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type remoteV2Version struct {
@@ -55,7 +55,7 @@ func (s *remoteSession) legacyCollect(target, id string) ([]remoteV2Version, err
 				nugetfmt.PackageName(a.entry.meta.ID),
 				nugetfmt.PackageName(b.entry.meta.ID),
 			),
-			types.CompareNuGet(a.entry.meta.Version, b.entry.meta.Version),
+			model.CompareNuGet(a.entry.meta.Version, b.entry.meta.Version),
 		)
 	})
 	return out, nil

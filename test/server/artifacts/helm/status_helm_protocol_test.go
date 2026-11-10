@@ -8,7 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	helmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -59,7 +59,7 @@ func seedHelmIndex(t *testing.T, items *item.Service) {
 	if err := (helmfmt.Handler{}).Work(
 		context.Background(),
 		items.Env(),
-		types.WorkItem{Kind: helmfmt.KindIndex, Key: "helm-local"},
+		work.WorkItem{Kind: helmfmt.KindIndex, Key: "helm-local"},
 	); err != nil {
 		t.Fatal(err)
 	}

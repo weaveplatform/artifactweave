@@ -15,12 +15,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The Builds API (decision 0014, research 22 §3): migration/artifacts/core/build
@@ -34,15 +34,15 @@ const buildsPath = "/artifactory/api/build"
 // and the artifact resource on an artifact's item.
 type buildAccess struct{ itemkit.Access }
 
-func (b buildAccess) Build(repoKey, path string, folder bool, want types.Actions) bool {
+func (b buildAccess) Build(repoKey, path string, folder bool, want accessapi.Actions) bool {
 	t := accessapi.Repo{Key: repoKey, Class: string(repo.Local)}
 	if folder {
-		return b.Decider.AllowsFolder(types.ResourceBuild, t, path, want)
+		return b.Decider.AllowsFolder(accessapi.ResourceBuild, t, path, want)
 	}
-	return b.Decider.Allows(types.ResourceBuild, t, path, want)
+	return b.Decider.Allows(accessapi.ResourceBuild, t, path, want)
 }
 
-func (b buildAccess) Item(c repo.Config, path string, want types.Actions) bool {
+func (b buildAccess) Item(c repo.Config, path string, want accessapi.Actions) bool {
 	return b.File(c, path, want)
 }
 
@@ -75,7 +75,7 @@ func (s ArtifactoryAPI) buildError(
 			strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "),
 		)
 	case errors.Is(err, build.ErrNoRepository):
-		return itemkit.NotFoundRepo(types.BuildInfoRepo(build.ProjectKey(project)))
+		return itemkit.NotFoundRepo(model.BuildInfoRepo(build.ProjectKey(project)))
 	case errors.Is(err, build.ErrConflict):
 		return apierror.New(http.StatusConflict, err.Error())
 	case errors.Is(err, build.ErrNotFound):
@@ -176,7 +176,7 @@ func (s ArtifactoryAPI) UploadBuild(
 // repository than the project's build-info repository, the only one that
 // holds its runs.
 func checkBuildRepo(project string, buildRepo *string) error {
-	want := types.BuildInfoRepo(build.ProjectKey(project))
+	want := model.BuildInfoRepo(build.ProjectKey(project))
 	if httpkit.Deref(buildRepo) != "" && *buildRepo != want {
 		return httpkit.BadRequestf(
 			"The build-info repository '%s' does not hold this project's builds; '%s' does",
@@ -463,7 +463,7 @@ func (s ArtifactoryAPI) PromoteBuild(
 			"The value of property '%s' must be a string or an array of strings", bad)), nil
 	}
 	for k := range props {
-		if err := types.CheckPropertyKeyLength(k); err != nil {
+		if err := model.CheckPropertyKeyLength(k); err != nil {
 			return refusePromotion(err.Error()), nil
 		}
 	}
@@ -539,8 +539,8 @@ func promotionReport(msgs []item.Message) artgen.BuildPromotionResponse {
 // value or an array of values, as the JFrog CLI sends them. A number or a
 // boolean is kept as its JSON text, as a build-info property is. bad names
 // a key whose value is none of these.
-func promotionProperties(in map[string]any) (props types.Properties, bad string) {
-	props = types.Properties{}
+func promotionProperties(in map[string]any) (props model.Properties, bad string) {
+	props = model.Properties{}
 	for k, v := range in {
 		list, ok := v.([]any)
 		if !ok {
@@ -611,7 +611,7 @@ func (s ArtifactoryAPI) ControlBuildRetention(
 // buildInfoProject is the project whose build-info repository key is
 // repoKey (types.BuildInfoRepo).
 func buildInfoProject(repoKey string) (string, bool) {
-	if repoKey == types.BuildInfoRepository {
+	if repoKey == accessapi.BuildInfoRepository {
 		return "", true
 	}
 	p, ok := strings.CutSuffix(repoKey, "-build-info")

@@ -22,15 +22,16 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	sqlitedrv "github.com/weaveplatform/artifactweave/migration/platform/sql/sqlite"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // fixtureStore is what resolverFor builds over: the resolver's store, and
@@ -118,7 +119,7 @@ func putProxy(
 		t.Fatal(err)
 	}
 	if err = st.Configs().
-		Put(t.Context(), types.ConfigDocument{Kind: types.ConfigProxy, Key: key, Enabled: true, Document: b, Secrets: map[string]string{"password": password}}); err != nil {
+		Put(t.Context(), configdoc.ConfigDocument{Kind: configdoc.ConfigProxy, Key: key, Enabled: true, Document: b, Secrets: map[string]string{"password": password}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -428,7 +429,7 @@ func storeIdentity(t *testing.T, st accesstest.Store, alias string, cert tls.Cer
 		t.Fatal(err)
 	}
 	if err = st.Keys().
-		PutCertificate(t.Context(), types.Certificate{Alias: alias, PEM: string(certPEM), PrivateKey: string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: key}))}); err != nil {
+		PutCertificate(t.Context(), api.Certificate{Alias: alias, PEM: string(certPEM), PrivateKey: string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: key}))}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -650,7 +651,7 @@ func TestAccResolverConfigurationFailures(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			st.Keys().
-				PutCertificate(t.Context(), types.Certificate{Alias: "broken", PEM: "broken", PrivateKey: "secret"})
+				PutCertificate(t.Context(), api.Certificate{Alias: "broken", PEM: "broken", PrivateKey: "secret"})
 			changed := c
 			tc.change(&changed)
 			st.Repos().Update(t.Context(), changed)
@@ -693,7 +694,7 @@ func TestAccResolverProxyConfiguration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			st := inmem.New()
 			st.Configs().
-				Put(t.Context(), types.ConfigDocument{Kind: types.ConfigProxy, Key: "proxy", Enabled: tc.enabled, Document: []byte(tc.doc)})
+				Put(t.Context(), configdoc.ConfigDocument{Kind: configdoc.ConfigProxy, Key: "proxy", Enabled: tc.enabled, Document: []byte(tc.doc)})
 			c := repo.Config{Key: "config", Class: repo.Remote, URL: "https://example.com"}
 			if tc.explicit {
 				c.Proxy = "proxy"

@@ -24,11 +24,11 @@ import (
 	"testing/iotest"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // manifestOf is a package.json for name at version.
@@ -112,7 +112,7 @@ func (f *fixture) publish(
 // escapeName is name as npm puts it in a URL: a scope's slash encoded.
 func escapeName(name string) string { return strings.Replace(name, "/", "%2f", 1) }
 
-func (f *fixture) props(t *testing.T, path string) types.Properties {
+func (f *fixture) props(t *testing.T, path string) model.Properties {
 	t.Helper()
 	ctx := context.Background()
 	it, err := f.db.Items().Get(ctx, "npm-local", false, path)
@@ -324,7 +324,7 @@ func TestAccPublishRefusals(t *testing.T) {
 				tc.msg,
 			)
 			if _, err := f.db.Items().Get(context.Background(), "npm-local", false,
-				npmfmt.CanonicalPath("acme", "1.0.0")); !errors.Is(err, store.ErrNotFound) {
+				npmfmt.CanonicalPath("acme", "1.0.0")); !errors.Is(err, kernel.ErrNotFound) {
 				t.Fatalf("stored: %v", err)
 			}
 		})
@@ -354,18 +354,18 @@ func TestAccPublishServerGeneratedChecksums(t *testing.T) {
 	b64 := base64.StdEncoding.EncodeToString
 	for _, tc := range []struct {
 		version, shasum, integrity string
-		expected                   types.Checksums
+		expected                   kernel.Checksums
 	}{
 		{
 			"1.0.0", strings.ToUpper(shasum),
 			"sha1-" + b64(other1[:]) + " sha512-" + b64(other512[:]) + " sha384-x",
-			types.Checksums{SHA1: shasum, SHA512: hex.EncodeToString(other512[:])},
+			kernel.Checksums{SHA1: shasum, SHA512: hex.EncodeToString(other512[:])},
 		},
 		{
 			"1.0.1", "", "sha1-" + b64(other1[:]),
-			types.Checksums{SHA1: hex.EncodeToString(other1[:])},
+			kernel.Checksums{SHA1: hex.EncodeToString(other1[:])},
 		},
-		{"1.0.2", "zz", "sha512-!!! sha256-" + b64([]byte("short")), types.Checksums{}},
+		{"1.0.2", "zz", "sha512-!!! sha256-" + b64([]byte("short")), kernel.Checksums{}},
 	} {
 		tgz := tarball(manifestOf("acme", tc.version))
 		doc := publishDoc("acme", tc.version, tgz, nil)
@@ -476,7 +476,7 @@ func TestAccPublishBodyForms(t *testing.T) {
 	}
 	// Only the tarball is stored.
 	children, _, err := f.db.Items().Children(context.Background(), "npm-local", false, "acme/-",
-		store.Page{})
+		kernel.Page{})
 	if err != nil || len(children) != 1 {
 		t.Fatalf("stored %v %v", children, err)
 	}
@@ -540,7 +540,7 @@ func TestAccPublishSizeLimits(t *testing.T) {
 	wantError(t, f.send("PUT", registry+"acme", "writer", bytes.NewReader(encodeDoc(t, big))),
 		http.StatusRequestEntityTooLarge, "besides its attachments' data")
 	if _, err := f.db.Items().Get(context.Background(), "npm-local", false,
-		npmfmt.CanonicalPath("acme", "1.0.0")); !errors.Is(err, store.ErrNotFound) {
+		npmfmt.CanonicalPath("acme", "1.0.0")); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("stored: %v", err)
 	}
 }

@@ -7,29 +7,29 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitGenericKeepsNoIndex(t *testing.T) {
 	h := For(repo.Generic)
 	ctx := context.Background()
-	if err := h.Deployed(ctx, format.Env{}, repo.Config{}, types.Item{}); err != nil {
+	if err := h.Deployed(ctx, format.Env{}, repo.Config{}, model.Item{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Deleting(ctx, format.Env{}, repo.Config{}, types.Item{}); err != nil {
+	if err := h.Deleting(ctx, format.Env{}, repo.Config{}, model.Item{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.Deleted(
 		ctx,
 		format.Env{},
 		repo.Config{},
-		[]types.Item{{Path: "a/b", Name: "c"}},
+		[]model.Item{{Path: "a/b", Name: "c"}},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -45,17 +45,17 @@ func TestUnitImagesHaveTheirFormat(t *testing.T) {
 		if _, ok := h.(docker.Handler); !ok {
 			t.Fatalf("%s: %T", pt, h)
 		}
-		if err := h.Deployed(ctx, format.Env{}, repo.Config{}, types.Item{}); err != nil {
+		if err := h.Deployed(ctx, format.Env{}, repo.Config{}, model.Item{}); err != nil {
 			t.Fatal(err)
 		}
-		if err := h.Deleting(ctx, format.Env{}, repo.Config{}, types.Item{}); err != nil {
+		if err := h.Deleting(ctx, format.Env{}, repo.Config{}, model.Item{}); err != nil {
 			t.Fatal(err)
 		}
 		if err := h.Deleted(
 			ctx,
 			format.Env{},
 			repo.Config{},
-			[]types.Item{{Name: "x"}},
+			[]model.Item{{Name: "x"}},
 		); err != nil {
 			t.Fatal(err)
 		}

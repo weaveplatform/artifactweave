@@ -12,14 +12,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	boxfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vagrant"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Protocol returns the Vagrant box catalog for the router kit, under
@@ -76,7 +77,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Vagrant metadata query"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	var out catalog
@@ -85,7 +86,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		out, e = h.catalog(
 			r.WithContext(ctx),
 			p.String(),
-			types.Matrix{Props: p.Props, Mandatory: p.Mandatory},
+			model.Matrix{Props: p.Props, Mandatory: p.Mandatory},
 		)
 		return e
 	})
@@ -107,11 +108,11 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h handler) catalog(r *http.Request, name string, matrix types.Matrix) (catalog, error) {
+func (h handler) catalog(r *http.Request, name string, matrix model.Matrix) (catalog, error) {
 	out := catalog{Name: name, Versions: []version{}}
 	c := pkgroute.RequestFrom(r).Repo
 	p, err := h.k.DB().Packages().Find(r.Context(), c.Key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return out, notFound()
 	}
 	if err != nil {
@@ -147,8 +148,8 @@ func (h handler) catalog(r *http.Request, name string, matrix types.Matrix) (cat
 func (h handler) providers(
 	r *http.Request,
 	name string,
-	v types.PackageVersion,
-	matrix types.Matrix,
+	v model.PackageVersion,
+	matrix model.Matrix,
 	remaining *int,
 ) ([]provider, error) {
 	ids, err := h.k.DB().Packages().Files(r.Context(), v.ID)
@@ -160,17 +161,17 @@ func (h handler) providers(
 	}
 	*remaining -= len(ids)
 	c := pkgroute.RequestFrom(r).Repo
-	var items []types.Item
+	var items []model.Item
 	for _, id := range ids {
 		it, err := h.k.DB().Items().GetByID(r.Context(), id)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
 			return nil, fmt.Errorf("vagrant box item: %w", err)
 		}
 		if it.Folder || it.Cached || it.RepoKey != c.Key ||
-			!h.k.Can(r, it.FullPath(), types.ActionRead) ||
+			!h.k.Can(r, it.FullPath(), api.ActionRead) ||
 			generic.CheckDownload(c, it.FullPath(), false) != nil {
 			continue
 		}
@@ -178,7 +179,7 @@ func (h handler) providers(
 	}
 	// Several ordinary item paths may name one provider. Prefer the newest
 	// readable deployment, with a stable path tie-break, without exposing others.
-	slices.SortFunc(items, func(a, b types.Item) int {
+	slices.SortFunc(items, func(a, b model.Item) int {
 		if n := b.Updated.Compare(a.Updated); n != 0 {
 			return n
 		}
@@ -220,7 +221,7 @@ func (h handler) providers(
 	return out, nil
 }
 
-func downloadURL(r *http.Request, it types.Item) string {
+func downloadURL(r *http.Request, it model.Item) string {
 	parts := strings.Split(it.FullPath(), "/")
 	for i := range parts {
 		parts[i] = url.PathEscape(parts[i])

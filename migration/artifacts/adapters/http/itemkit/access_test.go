@@ -8,10 +8,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // errBoom is the failure the scripted authorizer returns.
@@ -49,13 +50,13 @@ func TestUnitAccessForEvaluatesWithoutDecider(t *testing.T) {
 
 	st := inmem.New()
 	c := repo.Config{Key: "libs-local", Class: repo.Local}
-	if err := st.Permissions().Create(ctx, types.Permission{
+	if err := st.Permissions().Create(ctx, model.Permission{
 		Name: "anonymous-reads",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				kernel.AnonymousUser: types.ActionRead,
+		Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]accessapi.Actions{
+				kernel.AnonymousUser: accessapi.ActionRead,
 			}},
-			Targets: map[string]types.Target{c.Key: {Include: []string{"**"}}},
+			Targets: map[string]model.Target{c.Key: {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -66,12 +67,12 @@ func TestUnitAccessForEvaluatesWithoutDecider(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return acc.File(c, "a.txt", types.ActionRead)
+		return acc.File(c, "a.txt", accessapi.ActionRead)
 	}
 	if reads() {
 		t.Error("anonymous reads while the anonymous access setting was never written")
 	}
-	if err := st.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+	if err := st.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)
 	}
 	if !reads() {

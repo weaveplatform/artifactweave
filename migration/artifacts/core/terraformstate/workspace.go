@@ -12,9 +12,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // LatestVersion is the Terraform version of a workspace created without
@@ -65,9 +65,9 @@ const maxRecord = 64 << 10
 // Workspaces lists c's workspaces by name.
 func (s *Service) Workspaces(ctx context.Context, c repo.Config) ([]Workspace, error) {
 	var out []Workspace
-	for page := (store.Page{Limit: store.MaxLimit}); ; {
+	for page := (kernel.Page{Limit: kernel.MaxLimit}); ; {
 		children, next, err := s.store().Items().Children(ctx, c.Key, false, tfbe.Root, page)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			return out, nil
 		}
 		if err != nil {
@@ -136,7 +136,7 @@ func (s *Service) Workspace(ctx context.Context, c repo.Config, name string) (Wo
 	return w, nil
 }
 
-func (s *Service) readRecord(ctx context.Context, it types.Item) (record, error) {
+func (s *Service) readRecord(ctx context.Context, it model.Item) (record, error) {
 	r, _, err := s.Items.Blobs.Open(ctx, it.Actual.SHA256)
 	if err != nil {
 		return record{}, fmt.Errorf("terraformstate: open %s: %w", it.FullPath(), err)
@@ -238,11 +238,11 @@ func (s *Service) DeleteWorkspace(ctx context.Context, c repo.Config, name, by s
 // Lock locks workspace name of c for by. Any lock refuses it with a
 // *LockedError, the caller's own included, as Terraform takes a lock once.
 func (s *Service) Lock(ctx context.Context, c repo.Config, name, by string) (Workspace, error) {
-	return s.changeLock(ctx, c, name, func(lock *Lock) (types.Properties, []string, error) {
+	return s.changeLock(ctx, c, name, func(lock *Lock) (model.Properties, []string, error) {
 		if lock != nil {
 			return nil, nil, &LockedError{Workspace: name, Holder: lock.By}
 		}
-		return types.Properties{
+		return model.Properties{
 			tfbe.PropLockedBy: {by},
 			tfbe.PropLockedAt: {strconv.FormatInt(s.now().UnixMilli(), 10)},
 		}, nil, nil
@@ -252,7 +252,7 @@ func (s *Service) Lock(ctx context.Context, c repo.Config, name, by string) (Wor
 // Unlock releases by's lock on workspace name of c: a *NotLockedError when
 // there is none, and a *LockedError when another user holds it.
 func (s *Service) Unlock(ctx context.Context, c repo.Config, name, by string) (Workspace, error) {
-	return s.changeLock(ctx, c, name, func(lock *Lock) (types.Properties, []string, error) {
+	return s.changeLock(ctx, c, name, func(lock *Lock) (model.Properties, []string, error) {
 		switch {
 		case lock == nil:
 			return nil, nil, &NotLockedError{Workspace: name}
@@ -266,7 +266,7 @@ func (s *Service) Unlock(ctx context.Context, c repo.Config, name, by string) (W
 // ForceUnlock releases anyone's lock on workspace name of c: a
 // *NotLockedError when there is none.
 func (s *Service) ForceUnlock(ctx context.Context, c repo.Config, name string) (Workspace, error) {
-	return s.changeLock(ctx, c, name, func(lock *Lock) (types.Properties, []string, error) {
+	return s.changeLock(ctx, c, name, func(lock *Lock) (model.Properties, []string, error) {
 		if lock == nil {
 			return nil, nil, &NotLockedError{Workspace: name}
 		}
@@ -283,7 +283,7 @@ func (s *Service) changeLock(
 	ctx context.Context,
 	c repo.Config,
 	name string,
-	change func(*Lock) (set types.Properties, remove []string, err error),
+	change func(*Lock) (set model.Properties, remove []string, err error),
 ) (Workspace, error) {
 	err := s.store().Tx(ctx, func(ctx context.Context) error {
 		folder, err := s.holdWorkspace(ctx, c, name)
@@ -317,17 +317,17 @@ func (s *Service) holdWorkspace(
 	ctx context.Context,
 	c repo.Config,
 	name string,
-) (types.Item, error) {
+) (model.Item, error) {
 	folder, err := s.holdFolder(ctx, c, name)
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	rec, err := s.fileAt(ctx, c, tfbe.RecordPath(name))
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	if rec == nil {
-		return types.Item{}, fmt.Errorf("%w: %s in %s", ErrNoWorkspace, name, c.Key)
+		return model.Item{}, fmt.Errorf("%w: %s in %s", ErrNoWorkspace, name, c.Key)
 	}
 	return folder, nil
 }
@@ -338,25 +338,25 @@ func (s *Service) holdWorkspace(
 // what the first committed, which a read alone would not, under READ
 // COMMITTED. SQLite and the in-memory store run one writer at a time
 // anyway.
-func (s *Service) holdFolder(ctx context.Context, c repo.Config, name string) (types.Item, error) {
+func (s *Service) holdFolder(ctx context.Context, c repo.Config, name string) (model.Item, error) {
 	if tfbe.CheckName(name) != nil {
-		return types.Item{}, fmt.Errorf("%w: %q", ErrNoWorkspace, name)
+		return model.Item{}, fmt.Errorf("%w: %q", ErrNoWorkspace, name)
 	}
 	items := s.store().Items()
 	folder, err := items.Get(ctx, c.Key, false, tfbe.Folder(name))
 	switch {
-	case errors.Is(err, store.ErrNotFound) || err == nil && !folder.Folder:
-		return types.Item{}, fmt.Errorf("%w: %s in %s", ErrNoWorkspace, name, c.Key)
+	case errors.Is(err, kernel.ErrNotFound) || err == nil && !folder.Folder:
+		return model.Item{}, fmt.Errorf("%w: %s in %s", ErrNoWorkspace, name, c.Key)
 	case err != nil:
-		return types.Item{}, fmt.Errorf("terraformstate: workspace folder %s: %w", name, err)
+		return model.Item{}, fmt.Errorf("terraformstate: workspace folder %s: %w", name, err)
 	}
 	if folder, err = items.Put(ctx, folder); err != nil {
-		return types.Item{}, fmt.Errorf("terraformstate: hold workspace folder %s: %w", name, err)
+		return model.Item{}, fmt.Errorf("terraformstate: hold workspace folder %s: %w", name, err)
 	}
 	return folder, nil
 }
 
-func (s *Service) lockOf(ctx context.Context, folder types.Item) (*Lock, error) {
+func (s *Service) lockOf(ctx context.Context, folder model.Item) (*Lock, error) {
 	props, err := s.store().Items().Properties(ctx, folder.ID)
 	if err != nil {
 		return nil, fmt.Errorf("terraformstate: lock of %s: %w", folder.FullPath(), err)

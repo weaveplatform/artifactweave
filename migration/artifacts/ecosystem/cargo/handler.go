@@ -9,9 +9,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Serves reports whether t is the Cargo package type.
@@ -97,7 +97,7 @@ func (Handler) Admit(
 // another crate, version or checksum is refused with 400, as is an archive
 // that no longer validates. Folders and files at other paths change
 // nothing.
-func (Handler) Deployed(ctx context.Context, env format.Env, _ repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, _ repo.Config, it model.Item) error {
 	if it.Folder {
 		return nil
 	}
@@ -136,7 +136,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, _ repo.Config, it t
 		return format.Rejectf(http.StatusBadRequest, "invalid Cargo index metadata")
 	}
 	if err := env.Store.Items().PatchProperties(
-		ctx, it.ID, types.Properties{RecordProperty: {line}}, nil, it.Updated,
+		ctx, it.ID, model.Properties{RecordProperty: {line}}, nil, it.Updated,
 	); err != nil {
 		return fmt.Errorf("cargo: update index metadata: %w", err)
 	}
@@ -153,7 +153,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	after := ""
 	for {
 		items, next, err := env.Store.Items().
-			Descendants(ctx, c.Key, false, "", store.Page{After: after, Limit: 100})
+			Descendants(ctx, c.Key, false, "", kernel.Page{After: after, Limit: 100})
 		if err != nil {
 			return fmt.Errorf("cargo: list crates: %w", err)
 		}

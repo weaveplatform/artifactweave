@@ -12,10 +12,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/composer"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func zipPackage(t *testing.T, manifest string) []byte {
@@ -46,7 +46,7 @@ func TestAccHostedAdmissionAndReindex(t *testing.T) {
 		t.Fatal(err)
 	}
 	data := zipPackage(t, `{"name":"acme/widget","version":"1.0.0"}`)
-	deploy := func(path string, body []byte, props types.Properties) error {
+	deploy := func(path string, body []byte, props model.Properties) error {
 		_, err := service.Deploy(
 			ctx,
 			item.Deploy{
@@ -64,13 +64,13 @@ func TestAccHostedAdmissionAndReindex(t *testing.T) {
 	for _, tc := range []struct {
 		path  string
 		body  []byte
-		props types.Properties
+		props model.Properties
 	}{
 		{"other/widget/1.0.0.zip", data, nil},
 		{"acme/widget/1.0.0.tar", data, nil},
-		{"acme/widget/2.0.0.zip", data, types.Properties{"composer.version": {"2.0.0"}}},
+		{"acme/widget/2.0.0.zip", data, model.Properties{"composer.version": {"2.0.0"}}},
 		{"acme/widget/bad.zip", []byte("not a zip"), nil},
-		{"acme/widget/two-props.zip", data, types.Properties{"composer.version": {"1.0.0", "1.0.1"}}},
+		{"acme/widget/two-props.zip", data, model.Properties{"composer.version": {"1.0.0", "1.0.1"}}},
 	} {
 		if err := deploy(tc.path, tc.body, tc.props); err == nil {
 			t.Errorf("accepted %s", tc.path)

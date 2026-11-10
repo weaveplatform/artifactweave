@@ -13,10 +13,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Serves reports whether t is the Terraform backend's package type.
@@ -95,7 +95,7 @@ func (Handler) AdmitAnnotation(
 	ctx context.Context,
 	_ format.Env,
 	c repo.Config,
-	_ types.Item,
+	_ model.Item,
 	a format.Annotation,
 ) error {
 	if _, ok := writingOf(ctx); ok {
@@ -132,7 +132,7 @@ func (Handler) Inspect(
 // file whose content changed in place may have named another version, as
 // a restore of an earlier state.latest.json does; that version is settled
 // too.
-func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	f, ok := FileOf(it)
 	if !ok || it.Cached != pkgindex.Stored(c).Cached {
 		return nil
@@ -161,7 +161,7 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 }
 
 // Deleting runs before a file is removed; the item service unlinks it.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted settles each version a delete or a move took a state file from:
 // one whose current and timestamped files named the same version keeps
@@ -171,7 +171,7 @@ func (h Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	type version struct {
 		ws string
@@ -217,14 +217,14 @@ func (h Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) err
 		if err != nil {
 			return fmt.Errorf("terraformbackend: states of %s: %w", c.Key, err)
 		}
-		files := map[string]map[int64][]types.Item{}
+		files := map[string]map[int64][]model.Item{}
 		for _, hit := range hits {
 			f, ok := FileOf(hit.Item)
 			if !ok {
 				continue
 			}
 			if files[f.Workspace] == nil {
-				files[f.Workspace] = map[int64][]types.Item{}
+				files[f.Workspace] = map[int64][]model.Item{}
 			}
 			files[f.Workspace][f.Ms] = append(files[f.Workspace][f.Ms], hit.Item)
 		}
@@ -234,7 +234,7 @@ func (h Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) err
 			for ms, its := range versions {
 				// The current state describes the version when both name it,
 				// as sync has it.
-				slices.SortStableFunc(its, func(a, b types.Item) int {
+				slices.SortStableFunc(its, func(a, b model.Item) int {
 					return cmp.Compare(rank(b), rank(a))
 				})
 				m, err := h.metaOf(ctx, env, c, ws, its[0], nil, nil)
@@ -277,7 +277,7 @@ func (h Handler) sync(
 	known *Meta,
 ) error {
 	st := env.Store
-	var files []types.Item
+	var files []model.Item
 	latest, err := fileAt(ctx, st, c, LatestPath(ws))
 	if err != nil {
 		return err
@@ -306,7 +306,7 @@ func (h Handler) sync(
 	if err != nil {
 		return err
 	}
-	p, err := st.Packages().Ensure(ctx, types.Package{
+	p, err := st.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Name: ws, Type: c.PackageType, Created: Created(ms),
 	})
 	if err != nil {
@@ -328,7 +328,7 @@ func (h Handler) metaOf(
 	env format.Env,
 	c repo.Config,
 	ws string,
-	it types.Item,
+	it model.Item,
 	cached []byte,
 	known *Meta,
 ) (Meta, error) {
@@ -346,10 +346,10 @@ func (h Handler) metaOf(
 }
 
 // fileAt is the file at p in c, or nil when there is none.
-func fileAt(ctx context.Context, st format.Store, c repo.Config, p string) (*types.Item, error) {
+func fileAt(ctx context.Context, st format.Store, c repo.Config, p string) (*model.Item, error) {
 	it, err := st.Items().Get(ctx, c.Key, pkgindex.Stored(c).Cached, p)
 	switch {
-	case errors.Is(err, store.ErrNotFound) || err == nil && it.Folder:
+	case errors.Is(err, kernel.ErrNotFound) || err == nil && it.Folder:
 		return nil, nil //nolint:nilnil // nothing there is no failure
 	case err != nil:
 		return nil, fmt.Errorf("terraformbackend: get %s: %w", p, err)
@@ -363,24 +363,24 @@ func versionNamed(
 	st format.Store,
 	c repo.Config,
 	ws, v string,
-) (types.PackageVersion, bool, error) {
+) (model.PackageVersion, bool, error) {
 	p, err := st.Packages().Find(ctx, c.Key, ws)
-	if errors.Is(err, store.ErrNotFound) {
-		return types.PackageVersion{}, false, nil
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.PackageVersion{}, false, nil
 	}
 	if err != nil {
-		return types.PackageVersion{}, false, fmt.Errorf(
+		return model.PackageVersion{}, false, fmt.Errorf(
 			"terraformbackend: workspace %s: %w",
 			ws,
 			err,
 		)
 	}
 	pv, err := st.Packages().Version(ctx, p.ID, v)
-	if errors.Is(err, store.ErrNotFound) {
-		return types.PackageVersion{}, false, nil
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.PackageVersion{}, false, nil
 	}
 	if err != nil {
-		return types.PackageVersion{}, false, fmt.Errorf(
+		return model.PackageVersion{}, false, fmt.Errorf(
 			"terraformbackend: version %s of %s: %w", v, ws, err)
 	}
 	return pv, true, nil
@@ -388,7 +388,7 @@ func versionNamed(
 
 // drop removes version pv, which no file names any more though one still
 // links it, and its package when that was its last version.
-func drop(ctx context.Context, st format.Store, pv types.PackageVersion) error {
+func drop(ctx context.Context, st format.Store, pv model.PackageVersion) error {
 	if err := st.Packages().DeleteVersion(ctx, pv.ID); err != nil {
 		return fmt.Errorf("terraformbackend: drop version %s: %w", pv.Version, err)
 	}
@@ -406,7 +406,7 @@ func drop(ctx context.Context, st format.Store, pv types.PackageVersion) error {
 }
 
 // rank orders a version's files: the current state before an earlier one.
-func rank(it types.Item) int {
+func rank(it model.Item) int {
 	if f, _ := FileOf(it); f.Latest {
 		return 1
 	}

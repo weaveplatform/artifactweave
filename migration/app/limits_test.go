@@ -13,7 +13,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // budgets is the request budget store of the in-memory composite that
@@ -93,10 +92,15 @@ type (
 	unavailableBudget      struct{}
 )
 
-func (unavailableBudgetStore) RequestBudgets() store.RequestBudgetStore { return unavailableBudget{} }
+func (unavailableBudgetStore) RequestBudgets() apilimit.RequestBudgetStore {
+	return unavailableBudget{}
+}
 
-func (unavailableBudget) Take(context.Context, store.BudgetRequest) (store.BudgetDecision, error) {
-	return store.BudgetDecision{}, context.DeadlineExceeded
+func (unavailableBudget) Take(
+	context.Context,
+	apilimit.BudgetRequest,
+) (apilimit.BudgetDecision, error) {
+	return apilimit.BudgetDecision{}, context.DeadlineExceeded
 }
 
 func TestAccAPIBudgetBackendFailure(t *testing.T) {

@@ -12,9 +12,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // pageSize is how many rows each read of a folder or a repository's
@@ -24,7 +25,7 @@ const pageSize = 200
 // imageFolder splits the parent path of a file into its image and the
 // folder directly below the image that holds it. A file at the repository
 // root or in a top-level folder belongs to no image.
-func imageFolder(it types.Item) (name, folder string, ok bool) {
+func imageFolder(it model.Item) (name, folder string, ok bool) {
 	if it.Folder {
 		return "", "", false
 	}
@@ -41,7 +42,7 @@ func isManifest(file string) bool { return file == ManifestFile || file == ListM
 // the order of decision 0018: a later push of a different manifest
 // replaces the file and so moves the tag to the newest place. A move keeps
 // the time; a copy is a push at its target.
-func PushTime(m types.Item) time.Time {
+func PushTime(m model.Item) time.Time {
 	if m.Modified.IsZero() {
 		return m.Created
 	}
@@ -72,18 +73,18 @@ func manifestQuery(repoKey, name string, more ...aql.Node) *aql.Query {
 // when it holds none.
 func firstManifest(
 	ctx context.Context,
-	items store.ItemStore,
+	items port.ItemStore,
 	repoKey, name string,
-) (types.Item, bool, error) {
+) (model.Item, bool, error) {
 	q := manifestQuery(repoKey, name)
 	q.Sort = &aql.Sort{Fields: []aql.Field{aql.FieldCreated}}
 	q.Limit, q.HasLimit = 1, true
 	hits, err := items.Search(ctx, q, aql.Options{})
 	if err != nil {
-		return types.Item{}, false, fmt.Errorf("docker: manifests of %s: %w", name, err)
+		return model.Item{}, false, fmt.Errorf("docker: manifests of %s: %w", name, err)
 	}
 	if len(hits) == 0 {
-		return types.Item{}, false, nil
+		return model.Item{}, false, nil
 	}
 	return hits[0].Item, true, nil
 }
@@ -92,21 +93,21 @@ func firstManifest(
 // false when the folder holds none, and so is no tag.
 func FolderManifest(
 	ctx context.Context,
-	items store.ItemStore,
+	items port.ItemStore,
 	repoKey string,
 	cached bool,
 	dir string,
-) (types.Item, bool, error) {
+) (model.Item, bool, error) {
 	for _, file := range []string{ManifestFile, ListManifestFile} {
 		it, err := items.Get(ctx, repoKey, cached, dir+"/"+file)
 		switch {
 		case err == nil && !it.Folder:
 			return it, true, nil
-		case err != nil && !errors.Is(err, store.ErrNotFound):
-			return types.Item{}, false, fmt.Errorf("docker: get %s/%s: %w", dir, file, err)
+		case err != nil && !errors.Is(err, kernel.ErrNotFound):
+			return model.Item{}, false, fmt.Errorf("docker: get %s/%s: %w", dir, file, err)
 		}
 	}
-	return types.Item{}, false, nil
+	return model.Item{}, false, nil
 }
 
 // ensurePackage returns the image's package, creating it when absent with
@@ -117,23 +118,23 @@ func ensurePackage(
 	st format.Store,
 	c repo.Config,
 	name string,
-) (types.Package, error) {
+) (model.Package, error) {
 	p, err := st.Packages().Find(ctx, c.Key, name)
 	if err == nil {
 		return p, nil
 	}
-	if !errors.Is(err, store.ErrNotFound) {
-		return types.Package{}, fmt.Errorf("docker: package %s: %w", name, err)
+	if !errors.Is(err, kernel.ErrNotFound) {
+		return model.Package{}, fmt.Errorf("docker: package %s: %w", name, err)
 	}
 	first, _, err := firstManifest(ctx, st.Items(), c.Key, name)
 	if err != nil {
-		return types.Package{}, err
+		return model.Package{}, err
 	}
-	p, err = st.Packages().Ensure(ctx, types.Package{
+	p, err = st.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Name: name, Type: c.PackageType, Created: first.Created,
 	})
 	if err != nil {
-		return types.Package{}, fmt.Errorf("docker: package %s: %w", name, err)
+		return model.Package{}, fmt.Errorf("docker: package %s: %w", name, err)
 	}
 	return p, nil
 }
@@ -144,27 +145,27 @@ func tagVersion(
 	ctx context.Context,
 	st format.Store,
 	repoKey, name, folder string,
-) (types.PackageVersion, bool, error) {
+) (model.PackageVersion, bool, error) {
 	p, err := st.Packages().Find(ctx, repoKey, name)
-	if errors.Is(err, store.ErrNotFound) {
-		return types.PackageVersion{}, false, nil
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.PackageVersion{}, false, nil
 	}
 	if err != nil {
-		return types.PackageVersion{}, false, fmt.Errorf("docker: package %s: %w", name, err)
+		return model.PackageVersion{}, false, fmt.Errorf("docker: package %s: %w", name, err)
 	}
 	pv, err := st.Packages().Version(ctx, p.ID, folder)
-	if errors.Is(err, store.ErrNotFound) {
-		return types.PackageVersion{}, false, nil
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.PackageVersion{}, false, nil
 	}
 	if err != nil {
-		return types.PackageVersion{}, false,
+		return model.PackageVersion{}, false,
 			fmt.Errorf("docker: version %s of %s: %w", folder, name, err)
 	}
 	return pv, true, nil
 }
 
-func link(ctx context.Context, st format.Store, pv types.PackageVersion, it types.Item) error {
-	if err := st.Packages().LinkFile(ctx, types.VersionFile{
+func link(ctx context.Context, st format.Store, pv model.PackageVersion, it model.Item) error {
+	if err := st.Packages().LinkFile(ctx, model.VersionFile{
 		VersionID: pv.ID, ItemID: it.ID,
 	}); err != nil {
 		return fmt.Errorf("docker: link %s: %w", it.FullPath(), err)
@@ -217,7 +218,7 @@ func folderFiles(
 	dir string,
 ) ([]int64, error) {
 	var ids []int64
-	for page := (store.Page{Limit: pageSize}); ; {
+	for page := (kernel.Page{Limit: pageSize}); ; {
 		children, next, err := st.Items().Children(ctx, repoKey, cached, dir, page)
 		if err != nil {
 			return nil, fmt.Errorf("docker: list %s: %w", dir, err)
@@ -258,7 +259,7 @@ func syncPackage(ctx context.Context, st format.Store, c repo.Config, name strin
 		return err
 	}
 	p, err := st.Packages().Find(ctx, c.Key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil
 	}
 	if err == nil {
@@ -278,7 +279,7 @@ type affected struct {
 	images map[string]bool
 }
 
-func (a *affected) add(it types.Item) {
+func (a *affected) add(it model.Item) {
 	name, folder, ok := imageFolder(it)
 	if !ok || folder == UploadsFolder {
 		return

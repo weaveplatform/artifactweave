@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // TestUnitSpanUnits: $before and $last take the long units aql-search-criteria
@@ -55,8 +56,8 @@ func TestUnitCriteriaList(t *testing.T) {
 		t.Fatalf("criteria %#v", q.Criteria)
 	}
 	hit := Hit{
-		Item:       types.Item{RepoKey: "my_local", Name: "a"},
-		Properties: types.Properties{"artifactory.licenses": {"LGPL-2.1"}},
+		Item:       model.Item{RepoKey: "my_local", Name: "a"},
+		Properties: model.Properties{"artifactory.licenses": {"LGPL-2.1"}},
 	}
 	if !q.Match(hit, time.Time{}) {
 		t.Fatal("both objects hold")
@@ -252,17 +253,17 @@ func TestUnitNestBudget(t *testing.T) {
 	maxNestCombinations = 3
 	t.Cleanup(func() { maxNestCombinations = saved })
 	sha := strings.Repeat("a", 40)
-	files := make([]types.BuildFile, 4)
+	files := make([]model.BuildFile, 4)
 	for i := range files {
-		files[i] = types.BuildFile{Name: strconv.Itoa(i), Checksums: types.Checksums{SHA1: sha}}
+		files[i] = model.BuildFile{Name: strconv.Itoa(i), Checksums: kernel.Checksums{SHA1: sha}}
 	}
 	c := &Corpus{
-		Items: []Hit{{Item: types.Item{
-			ID: 1, RepoKey: "r", Name: "f", Actual: types.Checksums{SHA1: sha},
+		Items: []Hit{{Item: model.Item{
+			ID: 1, RepoKey: "r", Name: "f", Actual: kernel.Checksums{SHA1: sha},
 		}}},
-		Builds: []types.Build{{
+		Builds: []model.Build{{
 			ID: 1, Name: "b", Number: "1",
-			Modules: []types.BuildModule{{ID: "m", Artifacts: files}},
+			Modules: []model.BuildModule{{ID: "m", Artifacts: files}},
 		}},
 	}
 	q := mustParse(t, `items.find().include("artifact.name")`)
@@ -307,8 +308,8 @@ func TestUnitRoots(t *testing.T) {
 		t.Fatalf("missing roots %+v", roots)
 	}
 	stored := []Hit{
-		{Item: types.Item{ID: 5, RepoKey: "local", Path: ".", Name: "a", Folder: true}},
-		{Item: types.Item{ID: 6, RepoKey: "local", Path: ".", Name: "b", Folder: true}},
+		{Item: model.Item{ID: 5, RepoKey: "local", Path: ".", Name: "a", Folder: true}},
+		{Item: model.Item{ID: 6, RepoKey: "local", Path: ".", Name: "b", Folder: true}},
 	}
 	var asked *Query
 	got, err := q.WithRoots(Options{}, roots, func(w *Query, _ Options) ([]Hit, error) {
@@ -351,7 +352,7 @@ func TestUnitRoots(t *testing.T) {
 		}
 	}
 	// Roots without a record tie on ID and order by key, the cache last.
-	a, b := types.RootItem("x", false), types.RootItem("x", true)
+	a, b := model.RootItem("x", false), model.RootItem("x", true)
 	if q.Compare(a, b) >= 0 || q.Compare(b, a) <= 0 || q.Compare(a, a) != 0 {
 		t.Fatal("root order")
 	}

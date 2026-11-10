@@ -10,7 +10,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // sizeOf is the size field manifestOf and descriptorOf write for content.
@@ -67,7 +67,7 @@ func TestAccDescriptorSizes(t *testing.T) {
 			if !strings.Contains(err.Error(), "differ from the stored content") {
 				t.Fatalf("%s: %v", name, err)
 			}
-			if _, err := w.item(w.docker, "app/bad-"+name); !errors.Is(err, store.ErrNotFound) {
+			if _, err := w.item(w.docker, "app/bad-"+name); !errors.Is(err, kernel.ErrNotFound) {
 				t.Fatalf("%s: stored: %v", name, err)
 			}
 		}
@@ -122,7 +122,7 @@ func TestAccIndexChildSize(t *testing.T) {
 		if diff := cmp.Diff(want, sizes.Mismatches); diff != "" {
 			t.Fatal(diff)
 		}
-		if _, err := w.item(w.docker, "app/v1"); !errors.Is(err, store.ErrNotFound) {
+		if _, err := w.item(w.docker, "app/v1"); !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatalf("stored: %v", err)
 		}
 	})

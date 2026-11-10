@@ -9,8 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // A -SNAPSHOT deploy to a unique Maven repository answers with the path it
@@ -24,13 +25,13 @@ func TestAccMavenSnapshotDeploy(t *testing.T) {
 	if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Permissions().Create(ctx, types.Permission{
+	if err := w.db.Permissions().Create(ctx, model.Permission{
 		Name: "deploy-maven",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"deployer": types.ActionRead | types.ActionWrite,
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{
+				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]types.Target{"maven-local": {Include: []string{"**"}}},
+			Targets: map[string]model.Target{"maven-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

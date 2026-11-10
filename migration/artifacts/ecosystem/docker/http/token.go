@@ -9,8 +9,8 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The actions of the Docker token specification, and the scope of the
@@ -70,7 +70,7 @@ func (g *Registry) serveToken(w http.ResponseWriter, r *http.Request, q Request)
 	if strings.EqualFold(realm, nullRealm) {
 		realm = ""
 	}
-	access := types.RegistryAccess{Realm: realm}
+	access := kernel.RegistryAccess{Realm: realm}
 	for _, raw := range r.URL.Query()["scope"] {
 		for _, s := range strings.Fields(raw) {
 			grant, err := g.grant(r.Context(), p, realm, s)
@@ -117,7 +117,7 @@ func (g *Registry) serveToken(w http.ResponseWriter, r *http.Request, q Request)
 // credential behind it. A token that obtained one has a second left at
 // least, as it verified.
 func lifetime(p kernel.Principal, now time.Time) time.Duration {
-	d := types.RegistryTokenExpiry
+	d := model.RegistryTokenExpiry
 	if !p.TokenExpires.IsZero() {
 		d = min(d, p.TokenExpires.Sub(now).Truncate(time.Second))
 	}
@@ -132,11 +132,11 @@ func (g *Registry) grant(
 	ctx context.Context,
 	p kernel.Principal,
 	realm, scope string,
-) (types.RegistryGrant, error) {
+) (kernel.RegistryGrant, error) {
 	rest, acts, ok := cutLast(scope, ":")
 	typ, name, ok2 := cutLast(rest, ":")
 	if !ok || !ok2 || name == "" {
-		return types.RegistryGrant{}, nil
+		return kernel.RegistryGrant{}, nil
 	}
 	want := requested(acts)
 	var allowed []string
@@ -149,10 +149,10 @@ func (g *Registry) grant(
 	case typ == scopeRepository:
 		var err error
 		if allowed, err = g.allowedOn(ctx, realm, name); err != nil {
-			return types.RegistryGrant{}, err
+			return kernel.RegistryGrant{}, err
 		}
 	}
-	got := types.RegistryGrant{Type: typ, Name: name}
+	got := kernel.RegistryGrant{Type: typ, Name: name}
 	for _, a := range want {
 		if slices.Contains(allowed, a) && heldBy(p.Registry, realm, typ, name, a) {
 			got.Actions = append(got.Actions, a)
@@ -209,11 +209,11 @@ func (g *Registry) allowedOn(ctx context.Context, realm, name string) ([]string,
 			continue
 		}
 		repo := accessapi.Repo{Key: c.Key, Class: string(c.Class)}
-		for a, need := range map[string]types.Actions{
-			actionPull: types.ActionRead, actionPush: types.ActionWrite,
-			actionDelete: types.ActionDelete,
+		for a, need := range map[string]accessapi.Actions{
+			actionPull: accessapi.ActionRead, actionPush: accessapi.ActionWrite,
+			actionDelete: accessapi.ActionDelete,
 		} {
-			if d.AllowsFolder(types.ResourceArtifact, repo, t.image, need) &&
+			if d.AllowsFolder(accessapi.ResourceArtifact, repo, t.image, need) &&
 				!slices.Contains(allowed, a) {
 				allowed = append(allowed, a)
 			}
@@ -225,14 +225,14 @@ func (g *Registry) allowedOn(ctx context.Context, realm, name string) ([]string,
 // heldBy reports whether a registry token that obtains another holds the
 // action itself, so that a token never mints a broader one; any other
 // credential holds every action its permissions allow.
-func heldBy(have *types.RegistryAccess, realm, typ, name, action string) bool {
+func heldBy(have *kernel.RegistryAccess, realm, typ, name, action string) bool {
 	if have == nil {
 		return true
 	}
 	if !strings.EqualFold(have.Realm, realm) {
 		return false
 	}
-	return slices.ContainsFunc(have.Grants, func(g types.RegistryGrant) bool {
+	return slices.ContainsFunc(have.Grants, func(g kernel.RegistryGrant) bool {
 		return g.Type == typ && strings.EqualFold(g.Name, name) &&
 			(slices.Contains(g.Actions, action) || slices.Contains(g.Actions, actionAll))
 	})

@@ -11,12 +11,13 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var (
@@ -211,11 +212,11 @@ func TestAccReferrers(t *testing.T) {
 func TestAccReferrersPermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
-	if err := w.db.Permissions().Create(ctx, types.Permission{
+	if err := w.db.Permissions().Create(ctx, model.Permission{
 		Name: "docker",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}},
-			Targets: map[string]types.Target{"docker-local": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+			Targets: map[string]model.Target{"docker-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -286,12 +287,12 @@ func TestAccReferrersAndIndexesChallengeRegistryTokens(t *testing.T) {
 	}
 	g := New(Options{Store: w.db, Tokens: w.kit.API().Tokens, Blobs: blobs, Formats: ecosystem.For})
 	h := baseurl.Middleware("")(g.Challenge(router(g)))
-	pull := func(name string) *types.RegistryAccess {
-		return &types.RegistryAccess{Grants: []types.RegistryGrant{
+	pull := func(name string) *kernel.RegistryAccess {
+		return &kernel.RegistryAccess{Grants: []kernel.RegistryGrant{
 			{Type: scopeRepository, Name: name, Actions: []string{actionPull}},
 		}}
 	}
-	as := func(method, target string, grant *types.RegistryAccess) *httptest.ResponseRecorder {
+	as := func(method, target string, grant *kernel.RegistryAccess) *httptest.ResponseRecorder {
 		t.Helper()
 		req := httptest.NewRequest(
 			method,

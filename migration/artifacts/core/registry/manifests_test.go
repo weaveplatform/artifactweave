@@ -15,12 +15,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // An image's config, with labels, and two layers, as a client uploads
@@ -93,7 +94,7 @@ func (w *world) tree(dir string) map[string]string {
 	return out
 }
 
-func (w *world) properties(path string) types.Properties {
+func (w *world) properties(path string) model.Properties {
 	w.t.Helper()
 	it, err := w.item(w.docker, path)
 	if err != nil {
@@ -125,7 +126,7 @@ func TestAccPushByTag(t *testing.T) {
 		if diff := cmp.Diff(want, w.tree("app/v1")); diff != "" {
 			t.Fatal(diff)
 		}
-		wantProps := types.Properties{
+		wantProps := model.Properties{
 			"docker.manifest":               {"v1"},
 			"docker.manifest.digest":        {"sha256:" + digest},
 			"docker.manifest.type":          {layout.MediaTypeOCIManifest},
@@ -211,7 +212,7 @@ func TestAccUnknownBlobs(t *testing.T) {
 		if !strings.Contains(err.Error(), "unknown blobs") {
 			t.Fatal(err)
 		}
-		if _, err := w.item(w.docker, "app/v1"); !errors.Is(err, store.ErrNotFound) {
+		if _, err := w.item(w.docker, "app/v1"); !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatalf("stored: %v", err)
 		}
 	})
@@ -240,7 +241,7 @@ func TestAccOverwrite(t *testing.T) {
 		// The jf build properties on a layer survive a repeated push.
 		it, _ := w.item(w.docker, "app/v1/sha256__"+sum(layerA))
 		if err := w.db.Items().PatchProperties(ctx, it.ID,
-			types.Properties{"build.name": {"app"}}, nil, time.Now()); err != nil {
+			model.Properties{"build.name": {"app"}}, nil, time.Now()); err != nil {
 			t.Fatal(err)
 		}
 		replaces("v1", d1, false)
@@ -299,7 +300,7 @@ func TestAccBlobContentGone(t *testing.T) {
 		unknown.Digests[0] != "sha256:"+sum(layerA) {
 		t.Fatalf("err = %v", err)
 	}
-	if _, err := w.item(w.docker, "app/v1"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.item(w.docker, "app/v1"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("stored: %v", err)
 	}
 	w2 := newWorld(t, inmem.New())
@@ -336,7 +337,7 @@ func TestAccUnreadableConfigLosesItsProperties(t *testing.T) {
 
 // getFailing fails Get for one path.
 type getFailing struct {
-	store.ItemStore
+	port.ItemStore
 	path string
 }
 
@@ -345,9 +346,9 @@ func (g getFailing) Get(
 	repoKey string,
 	cached bool,
 	p string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if p == g.path {
-		return types.Item{}, errBoom
+		return model.Item{}, errBoom
 	}
 	return g.ItemStore.Get(ctx, repoKey, cached, p) //nolint:wrapcheck // test double
 }

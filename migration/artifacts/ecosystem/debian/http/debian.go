@@ -14,13 +14,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const debianIndexLimit = 64 << 20
@@ -79,8 +78,8 @@ func (s DebianAPI) serveDebianIndex(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.Folder(c, req.Path, types.ActionRead) ||
-		!acc.File(c, req.Path, types.ActionRead) ||
+	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
+		!acc.File(c, req.Path, accessapi.ActionRead) ||
 		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
@@ -95,10 +94,10 @@ func (s DebianAPI) serveDebianIndex(
 	var err error
 	switch c.Class {
 	case repo.Local, repo.Federated:
-		var it types.Item
+		var it model.Item
 		it, err = st.Items().Get(ctx, c.Key, false, req.Path)
 		if err == nil && it.Folder {
-			err = store.ErrNotFound
+			err = kernel.ErrNotFound
 		}
 		if err == nil {
 			body, err = s.readDebianBlob(ctx, it.Actual.SHA256)
@@ -134,7 +133,7 @@ func (s DebianAPI) serveDebianIndex(
 			err = source.ErrInvalidResult
 		}
 	default:
-		err = store.ErrNotFound
+		err = kernel.ErrNotFound
 	}
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian Packages index", err))
@@ -154,7 +153,7 @@ func (s DebianAPI) serveDebianIndex(
 		return
 	}
 	for _, path := range paths {
-		if !acc.File(c, path, types.ActionRead) ||
+		if !acc.File(c, path, accessapi.ActionRead) ||
 			generic.CheckDownload(c, path, false) != nil {
 			httpkit.WriteErr(w, r, httpkit.Denied(p))
 			return

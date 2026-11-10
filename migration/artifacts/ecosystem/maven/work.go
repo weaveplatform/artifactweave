@@ -11,8 +11,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // The kinds of derived work the Maven format queues (decisions 0033 and
@@ -34,14 +35,14 @@ func (Handler) WorkKinds() []string { return []string{KindMetadata, KindPlugins,
 // delete asks for it there, or applies the package's maxUniqueSnapshots. A
 // repository that is gone, or no longer a local repository of the Maven
 // group, owes nothing.
-func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) error {
+func (Handler) Work(ctx context.Context, env format.Env, it work.WorkItem) error {
 	key, name, ok := strings.Cut(it.Key, "/")
 	if !ok {
 		return nil
 	}
 	c, err := env.Store.Repos().Get(ctx, key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	case err != nil:
 		return fmt.Errorf("maven: repository %s: %w", key, err)
@@ -177,6 +178,6 @@ func enqueue(ctx context.Context, env format.Env, kind, repoKey, name string) er
 }
 
 // isPlugin reports a file whose properties mark it a plugin POM.
-func isPlugin(props types.Properties) bool {
+func isPlugin(props model.Properties) bool {
 	return slices.Contains(props[PluginProperty], "true")
 }

@@ -10,13 +10,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	conanfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type virtualSource struct{}
@@ -43,7 +43,7 @@ func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
 		}
 		seen[key] = true
 		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -67,7 +67,7 @@ func (h handler) virtualDeployment(
 	r *http.Request,
 	path string,
 ) (*http.Request, bool) {
-	if !h.k.Require(w, r, path, types.ActionWrite) {
+	if !h.k.Require(w, r, path, api.ActionWrite) {
 		return nil, false
 	}
 	c := pkgroute.RequestFrom(r).Repo
@@ -81,7 +81,7 @@ func (h handler) virtualDeployment(
 	}
 	target, err := h.k.DB().Repos().Get(r.Context(), c.DefaultDeploymentRepo)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			err = apierror.New(http.StatusNotFound, "Conan deployment target not found")
 		}
 		h.error(w, r, err)
@@ -92,7 +92,7 @@ func (h handler) virtualDeployment(
 		return nil, false
 	}
 	mr, err := h.k.MemberRequest(r, target)
-	if err != nil || !h.k.Can(mr, path, types.ActionWrite) {
+	if err != nil || !h.k.Can(mr, path, api.ActionWrite) {
 		h.error(w, r, denied(r))
 		return nil, false
 	}
@@ -107,7 +107,7 @@ func (h handler) virtualUpload(w http.ResponseWriter, r *http.Request, f conanfm
 }
 
 func missing(err error) bool {
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return true
 	}
 	var e *apierror.Error
@@ -130,7 +130,7 @@ func (h handler) virtualRevisions(
 		if id != "" {
 			folder = ref.Root() + "/package/" + id
 		}
-		if !h.k.CanFolder(mr, folder, types.ActionRead) {
+		if !h.k.CanFolder(mr, folder, api.ActionRead) {
 			continue
 		}
 		list, err := h.revisions(mr, ref, id)
@@ -168,7 +168,7 @@ func (h handler) virtualRevisionMember(
 		return nil, err
 	}
 	for _, mr := range members {
-		if !h.k.Can(mr, f.Path(), types.ActionRead) {
+		if !h.k.Can(mr, f.Path(), api.ActionRead) {
 			continue
 		}
 		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
@@ -238,7 +238,7 @@ func (h handler) virtualSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	set := map[string]bool{}
 	for _, mr := range members {
-		if !h.k.CanFolder(mr, "", types.ActionRead) {
+		if !h.k.CanFolder(mr, "", api.ActionRead) {
 			continue
 		}
 		rec := httptest.NewRecorder()
@@ -278,7 +278,7 @@ func (h handler) virtualPackageSearch(
 	}
 	result := map[string]json.RawMessage{}
 	for _, mr := range members {
-		if !h.k.CanFolder(mr, ref.Root()+"/package", types.ActionRead) {
+		if !h.k.CanFolder(mr, ref.Root()+"/package", api.ActionRead) {
 			continue
 		}
 		rec := httptest.NewRecorder()

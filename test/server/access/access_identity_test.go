@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type userDetails struct {
@@ -580,13 +581,13 @@ func TestAccUserListPagesAndFilters(t *testing.T) {
 	if !slices.Equal(p.names(), []string{"u3"}) {
 		t.Fatalf("locked %v", p.names())
 	}
-	if err := w.db.Permissions().Create(ctx, types.Permission{
-		Name: "p", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Targets: map[string]types.Target{"libs": {}},
-				Actions: types.Grants{
-					Users:  map[string]types.Actions{"u1": types.ActionRead},
-					Groups: map[string]types.Actions{"bosses": types.ActionRead},
+	if err := w.db.Permissions().Create(ctx, model.Permission{
+		Name: "p", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Targets: map[string]model.Target{"libs": {}},
+				Actions: model.Grants{
+					Users:  map[string]api.Actions{"u1": api.ActionRead},
+					Groups: map[string]api.Actions{"bosses": api.ActionRead},
 				},
 			},
 		},
@@ -639,7 +640,7 @@ func TestAccDeleteGroupDropsGrants(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	anything.Resources[types.ResourceArtifact].Actions.Groups["team"] = types.ActionWrite
+	anything.Resources[api.ResourceArtifact].Actions.Groups["team"] = api.ActionWrite
 	if err := w.db.Permissions().Update(ctx, anything); err != nil {
 		t.Fatal(err)
 	}
@@ -657,7 +658,7 @@ func TestAccDeleteGroupDropsGrants(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if g := got.Resources[types.ResourceArtifact].Actions.Groups; len(g) != 0 {
+	if g := got.Resources[api.ResourceArtifact].Actions.Groups; len(g) != 0 {
 		t.Fatalf("grants left to deleted groups: %v", g)
 	}
 	w.call(

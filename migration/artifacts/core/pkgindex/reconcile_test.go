@@ -10,8 +10,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 var at = time.Date(2026, 10, 17, 9, 0, 0, 0, time.UTC)
@@ -32,7 +32,7 @@ func newIndexWorld(t *testing.T, files ...string) *indexWorld {
 		t.Fatal(err)
 	}
 	for _, f := range files {
-		it, err := w.db.Items().Put(ctx, types.Item{RepoKey: w.c.Key, Name: f})
+		it, err := w.db.Items().Put(ctx, model.Item{RepoKey: w.c.Key, Name: f})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -53,7 +53,7 @@ func (w *indexWorld) files(names ...string) []int64 {
 func (w *indexWorld) dump() []string {
 	w.t.Helper()
 	ctx := context.Background()
-	pkgs, _, err := w.db.Packages().List(ctx, w.c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := w.db.Packages().List(ctx, w.c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -192,8 +192,8 @@ func TestUnitReconcilePages(t *testing.T) {
 func (f failingPackages) List(
 	ctx context.Context,
 	repoKey string,
-	p store.Page,
-) ([]types.Package, string, error) {
+	p kernel.Page,
+) ([]model.Package, string, error) {
 	if err := f.err("list"); err != nil {
 		return nil, "", err
 	}
@@ -204,15 +204,15 @@ func (f failingPackages) List(
 // recreates a version it was given back.
 func (f failingPackages) PutVersion(
 	ctx context.Context,
-	v types.PackageVersion,
-) (types.PackageVersion, error) {
+	v model.PackageVersion,
+) (model.PackageVersion, error) {
 	if f.fail == "putVersion" || f.fail == "rePut" && v.ID != 0 {
-		return types.PackageVersion{}, errBoom
+		return model.PackageVersion{}, errBoom
 	}
 	return f.PackageStore.PutVersion(ctx, v)
 }
 
-func (f failingPackages) LinkFile(ctx context.Context, v types.VersionFile) error {
+func (f failingPackages) LinkFile(ctx context.Context, v model.VersionFile) error {
 	if err := f.err("linkFile"); err != nil {
 		return err
 	}

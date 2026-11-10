@@ -15,11 +15,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	helmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const remoteIndexLimit = 32 << 20
@@ -108,7 +109,7 @@ func decodeRemoteIndex(c repo.Config, responseBase string, body io.Reader) (remo
 				entry.Name != name || !remoteVersionValid(entry.Version) || len(entry.URLs) == 0 {
 				return remoteIndex{}, remoteError()
 			}
-			sums, checksumErr := item.ParseChecksums(types.Checksums{SHA256: entry.Digest})
+			sums, checksumErr := item.ParseChecksums(kernel.Checksums{SHA256: entry.Digest})
 			if checksumErr != nil {
 				return remoteIndex{}, remoteError()
 			}
@@ -134,7 +135,7 @@ func decodeRemoteIndex(c repo.Config, responseBase string, body io.Reader) (remo
 			out.versions[name] = append(out.versions[name], v)
 		}
 		slices.SortStableFunc(out.versions[name], func(a, b remoteVersion) int {
-			return -types.CompareSemver(a.chart.Version, b.chart.Version)
+			return -model.CompareSemver(a.chart.Version, b.chart.Version)
 		})
 	}
 	return out, nil

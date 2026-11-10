@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccClaimDebianSnapshotBindsSourceAndDistribution(t *testing.T) {
@@ -123,19 +125,19 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			marker, err := st.Items().Put(ctx, types.Item{
+			marker, err := st.Items().Put(ctx, model.Item{
 				RepoKey: "deb-target", Name: "snapshots/first", Folder: true,
 				Created: time.Now().UTC(), CreatedBy: "admin",
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			props := types.Properties{
+			props := model.Properties{
 				"deb.snapshot.pending.source":       {"deb-source"},
 				"deb.snapshot.pending.distribution": {"stable"},
 			}
 			if tc.complete {
-				props = types.Properties{
+				props = model.Properties{
 					"deb.snapshot.source":       {"deb-source"},
 					"deb.snapshot.distribution": {"stable"},
 				}
@@ -183,17 +185,17 @@ func TestUnitDebianSnapshotWorkUsesCurrentPermissions(t *testing.T) {
 	}
 	for _, name := range []string{"dev", "other"} {
 		if err := st.Users().
-			Create(ctx, types.User{Name: name, PasswordHash: cheapHash}); err != nil {
+			Create(ctx, model.User{Name: name, PasswordHash: cheapHash}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := st.Permissions().Create(ctx, types.Permission{
+	if err := st.Permissions().Create(ctx, model.Permission{
 		Name: "snapshots",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"dev": types.ActionRead | types.ActionWrite | types.ActionManage,
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{
+				"dev": api.ActionRead | api.ActionWrite | api.ActionManage,
 			}},
-			Targets: map[string]types.Target{
+			Targets: map[string]model.Target{
 				"deb-source": {Include: []string{"**"}},
 				"deb-target": {Include: []string{"**"}},
 			},
@@ -201,14 +203,14 @@ func TestUnitDebianSnapshotWorkUsesCurrentPermissions(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	marker, err := st.Items().Put(ctx, types.Item{
+	marker, err := st.Items().Put(ctx, model.Item{
 		RepoKey: "deb-target", Name: "snapshots/first", Folder: true,
 		Created: time.Now().UTC(), CreatedBy: "dev",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.Items().SetProperties(ctx, marker.ID, types.Properties{
+	if err := st.Items().SetProperties(ctx, marker.ID, model.Properties{
 		"deb.snapshot.source":       {"deb-source"},
 		"deb.snapshot.distribution": {"stable"},
 	}, time.Now().UTC()); err != nil {

@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func stateResource(r *http.Request, st terraformstate.State, upload string) map[string]any {
@@ -39,7 +39,7 @@ func stateResource(r *http.Request, st terraformstate.State, upload string) map[
 }
 
 func (h handler) currentState(_ http.ResponseWriter, r *http.Request) (result, error) {
-	c, ws, err := h.resolveWorkspace(r, types.ActionRead)
+	c, ws, err := h.resolveWorkspace(r, api.ActionRead)
 	if err != nil {
 		return result{}, err //nolint:wrapcheck // storage errors retain their typed API status
 	}
@@ -50,7 +50,7 @@ func (h handler) currentState(_ http.ResponseWriter, r *http.Request) (result, e
 func (h handler) resolveState(r *http.Request) (repo.Config, terraformstate.State, error) {
 	c, st, err := h.states.ResolveState(r.Context(), parameter(r, "id"))
 	if err == nil {
-		err = require(r, c, tfbe.Folder(st.Workspace), types.ActionRead, true)
+		err = require(r, c, tfbe.Folder(st.Workspace), api.ActionRead, true)
 	}
 	return c, st, err
 }
@@ -87,7 +87,7 @@ func (h handler) statesList(_ http.ResponseWriter, r *http.Request) (result, err
 	}
 	c, err := h.states.Repository(r.Context(), key)
 	if err == nil {
-		err = require(r, c, tfbe.Folder(name), types.ActionRead, true)
+		err = require(r, c, tfbe.Folder(name), api.ActionRead, true)
 	}
 	if err != nil {
 		return result{}, err //nolint:wrapcheck // storage errors retain their typed API status
@@ -119,7 +119,7 @@ func (h handler) createState(w http.ResponseWriter, r *http.Request) (result, er
 	// state. The client normally also needs Read for init and locking.
 	c, ws, err := h.states.ResolveWorkspace(r.Context(), parameter(r, "id"))
 	if err == nil {
-		err = require(r, c, tfbe.LatestPath(ws.Name), types.ActionWrite, false)
+		err = require(r, c, tfbe.LatestPath(ws.Name), api.ActionWrite, false)
 	}
 	if err != nil {
 		return result{}, err //nolint:wrapcheck // storage errors retain their typed API status

@@ -9,10 +9,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Serves reports whether t is the CocoaPods package type.
@@ -108,7 +108,7 @@ func (Handler) Admit(
 // Deployed indexes a stored hosted archive's version under its pod, with
 // the Archive and the archive's SHA-256 as the version's metadata. Folders,
 // cached items and other paths are not indexed.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	name, version, ok := ParsePath(it.FullPath())
 	if !ok || it.Folder || it.Cached {
 		return nil
@@ -118,7 +118,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 		return err
 	}
 	a.SHA256 = it.Actual.SHA256
-	p, err := env.Store.Packages().Ensure(ctx, types.Package{
+	p, err := env.Store.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Type: c.PackageType, Name: name, Created: it.Created,
 	})
 	if err != nil {
@@ -136,11 +136,11 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 
 // Deleting does nothing: the item service drops a removed archive's version
 // link with it.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted does nothing: a version is one archive, so the item service's
 // pruning of versions left without files is all a delete needs.
-func (Handler) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
+func (Handler) Deleted(context.Context, format.Env, repo.Config, []model.Item) error { return nil }
 
 func archiveOf(ctx context.Context, env format.Env, sha, name, version string) (Archive, error) {
 	rc, info, err := env.Blobs.Open(ctx, sha)
@@ -162,7 +162,7 @@ func archiveOf(ctx context.Context, env format.Env, sha, name, version string) (
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	var want []pkgindex.Indexed
 	byName := map[string]int{}
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		items, next, err := env.Store.Items().Descendants(ctx, c.Key, false, "", page)
 		if err != nil {

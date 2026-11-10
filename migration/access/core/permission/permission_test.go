@@ -10,15 +10,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/permission"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
-	r = types.ActionRead
-	m = types.ActionManage
+	r = api.ActionRead
+	m = api.ActionManage
 )
 
 var clock = time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
@@ -29,11 +30,11 @@ func seeded(t *testing.T) *inmem.Store {
 	ctx := context.Background()
 	db := inmem.New()
 	for _, g := range []string{"devs", "readers"} {
-		if err := db.Groups().Create(ctx, types.Group{Name: g}); err != nil {
+		if err := db.Groups().Create(ctx, model.Group{Name: g}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, u := range []types.User{{Name: "bob", Groups: []string{"devs"}}, {Name: "carol"}} {
+	for _, u := range []model.User{{Name: "bob", Groups: []string{"devs"}}, {Name: "carol"}} {
 		if err := db.Users().Create(ctx, u); err != nil {
 			t.Fatal(err)
 		}
@@ -60,33 +61,33 @@ func service(db *inmem.Store) permission.Service {
 }
 
 func artifact(
-	targets map[string]types.Target,
-	users, groups map[string]types.Actions,
-) types.Resource {
-	return types.Resource{
-		Actions: types.Grants{Users: users, Groups: groups},
+	targets map[string]model.Target,
+	users, groups map[string]api.Actions,
+) model.Resource {
+	return model.Resource{
+		Actions: model.Grants{Users: users, Groups: groups},
 		Targets: targets,
 	}
 }
 
-func everywhere(keys ...string) map[string]types.Target {
-	out := map[string]types.Target{}
+func everywhere(keys ...string) map[string]model.Target {
+	out := map[string]model.Target{}
 	for _, k := range keys {
-		out[k] = types.Target{Include: []string{"**"}}
+		out[k] = model.Target{Include: []string{"**"}}
 	}
 	return out
 }
 
-func perm(name string, res map[types.ResourceType]types.Resource) types.Permission {
-	return types.Permission{Name: name, Resources: res}
+func perm(name string, res map[api.ResourceType]model.Resource) model.Permission {
+	return model.Permission{Name: name, Resources: res}
 }
 
 func TestUnitCreateGetDelete(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))
-	p := perm("dev", map[types.ResourceType]types.Resource{
-		types.ResourceArtifact: artifact(everywhere("libs-local"),
-			map[string]types.Actions{"bob": r | m}, nil),
+	p := perm("dev", map[api.ResourceType]model.Resource{
+		api.ResourceArtifact: artifact(everywhere("libs-local"),
+			map[string]api.Actions{"bob": r | m}, nil),
 	})
 	if err := svc.Create(ctx, p); err != nil {
 		t.Fatal(err)
@@ -96,7 +97,7 @@ func TestUnitCreateGetDelete(t *testing.T) {
 	}
 	got, err := svc.Get(ctx, "dev")
 	if err != nil || !got.Created.Equal(clock) ||
-		got.Resources[types.ResourceArtifact].Actions.Users["bob"] != r|m {
+		got.Resources[api.ResourceArtifact].Actions.Users["bob"] != r|m {
 		t.Fatalf("get = %+v, %v", got, err)
 	}
 	if err := svc.Delete(ctx, "dev"); err != nil {
@@ -113,12 +114,12 @@ func TestUnitCreateGetDelete(t *testing.T) {
 func TestUnitValidate(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))
-	res := func(rt types.ResourceType, targets map[string]types.Target) types.Permission {
-		return perm("p", map[types.ResourceType]types.Resource{rt: artifact(targets, nil, nil)})
+	res := func(rt api.ResourceType, targets map[string]model.Target) model.Permission {
+		return perm("p", map[api.ResourceType]model.Resource{rt: artifact(targets, nil, nil)})
 	}
 	long := strings.Repeat("a", permission.MaxPatternLength+1)
 	for name, c := range map[string]struct {
-		p        types.Permission
+		p        model.Permission
 		expected string
 	}{
 		"empty name":      {perm("", nil), "not valid"},
@@ -126,25 +127,25 @@ func TestUnitValidate(t *testing.T) {
 		"slash in name":   {perm("a/b", nil), "slash"},
 		"long name":       {perm(strings.Repeat("n", 65), nil), "longer than 64"},
 		"unknown section": {res("widgets", nil), "Unknown resource type"},
-		"unknown repo":    {res(types.ResourceArtifact, everywhere("nope")), "Repository 'nope' does not exist"},
-		"virtual repo":    {res(types.ResourceArtifact, everywhere("virt")), "Virtual repository"},
+		"unknown repo":    {res(api.ResourceArtifact, everywhere("nope")), "Repository 'nope' does not exist"},
+		"virtual repo":    {res(api.ResourceArtifact, everywhere("virt")), "Virtual repository"},
 		"cache of a local": {
-			res(types.ResourceArtifact, everywhere("libs-local-cache")),
+			res(api.ResourceArtifact, everywhere("libs-local-cache")),
 			"Repository 'libs-local-cache' does not exist",
 		},
 		"two build targets": {
-			res(types.ResourceBuild, everywhere(types.BuildInfoRepository, "x")),
+			res(api.ResourceBuild, everywhere(api.BuildInfoRepository, "x")),
 			"exactly one target",
 		},
-		"wrong build target": {res(types.ResourceBuild, everywhere("libs-local")), "must be artifactory-build-info"},
-		"long pattern": {res(types.ResourceArtifact, map[string]types.Target{
+		"wrong build target": {res(api.ResourceBuild, everywhere("libs-local")), "must be artifactory-build-info"},
+		"long pattern": {res(api.ResourceArtifact, map[string]model.Target{
 			"libs-local": {Include: []string{long}},
 		}), "longer than 1024"},
-		"unknown user": {perm("p", map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: artifact(everywhere("libs-local"), map[string]types.Actions{"zed": r}, nil),
+		"unknown user": {perm("p", map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: artifact(everywhere("libs-local"), map[string]api.Actions{"zed": r}, nil),
 		}), "User 'zed' does not exist"},
-		"unknown group": {perm("p", map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: artifact(everywhere("libs-local"), nil, map[string]types.Actions{"ops": r}),
+		"unknown group": {perm("p", map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: artifact(everywhere("libs-local"), nil, map[string]api.Actions{"ops": r}),
 		}), "Group 'ops' does not exist"},
 	} {
 		err := svc.Validate(ctx, c.p)
@@ -152,21 +153,21 @@ func TestUnitValidate(t *testing.T) {
 			t.Errorf("%s: %v, want ErrInvalid containing %q", name, err, c.expected)
 		}
 	}
-	ok := perm("ok", map[types.ResourceType]types.Resource{
-		types.ResourceArtifact: artifact(everywhere(
+	ok := perm("ok", map[api.ResourceType]model.Resource{
+		api.ResourceArtifact: artifact(everywhere(
 			"libs-local",
 			"docs-cache",
 			"central-cache",
-			types.TargetAny,
-			types.TargetAnyLocal,
-			types.TargetAnyRemote,
-			types.TargetAnyDistribution,
+			api.TargetAny,
+			api.TargetAnyLocal,
+			api.TargetAnyRemote,
+			api.TargetAnyDistribution,
 		),
-			map[string]types.Actions{"bob": r}, map[string]types.Actions{"devs": r}),
-		types.ResourceBuild:          artifact(everywhere(types.BuildInfoRepository), nil, nil),
-		types.ResourceReleaseBundle:  artifact(everywhere("release-bundles"), nil, nil),
-		types.ResourceDestination:    artifact(everywhere("edge-1"), nil, nil),
-		types.ResourcePipelineSource: artifact(nil, nil, nil),
+			map[string]api.Actions{"bob": r}, map[string]api.Actions{"devs": r}),
+		api.ResourceBuild:          artifact(everywhere(api.BuildInfoRepository), nil, nil),
+		api.ResourceReleaseBundle:  artifact(everywhere("release-bundles"), nil, nil),
+		api.ResourceDestination:    artifact(everywhere("edge-1"), nil, nil),
+		api.ResourcePipelineSource: artifact(nil, nil, nil),
 	})
 	if err := svc.Validate(ctx, ok); err != nil {
 		t.Fatalf("a permission naming every accepted target: %v", err)
@@ -176,15 +177,15 @@ func TestUnitValidate(t *testing.T) {
 func TestUnitPutAndPutResource(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))
-	full := perm("multi", map[types.ResourceType]types.Resource{
-		types.ResourceArtifact: artifact(
+	full := perm("multi", map[api.ResourceType]model.Resource{
+		api.ResourceArtifact: artifact(
 			everywhere("libs-local"),
-			map[string]types.Actions{"bob": r},
+			map[string]api.Actions{"bob": r},
 			nil,
 		),
-		types.ResourceBuild: artifact(
-			everywhere(types.BuildInfoRepository),
-			map[string]types.Actions{"bob": r},
+		api.ResourceBuild: artifact(
+			everywhere(api.BuildInfoRepository),
+			map[string]api.Actions{"bob": r},
 			nil,
 		),
 	})
@@ -193,38 +194,38 @@ func TestUnitPutAndPutResource(t *testing.T) {
 		t.Fatalf("put = %v, %v", created, err)
 	}
 	// A v1-style write replaces the artifact section and keeps build.
-	created, err = svc.PutResource(ctx, "multi", types.ResourceArtifact,
-		artifact(everywhere("central"), map[string]types.Actions{"carol": r}, nil), true)
+	created, err = svc.PutResource(ctx, "multi", api.ResourceArtifact,
+		artifact(everywhere("central"), map[string]api.Actions{"carol": r}, nil), true)
 	if err != nil || created {
 		t.Fatalf("put resource = %v, %v", created, err)
 	}
 	got, _ := svc.Get(ctx, "multi")
-	if _, ok := got.Resources[types.ResourceBuild]; !ok ||
-		got.Resources[types.ResourceArtifact].Actions.Users["carol"] != r {
+	if _, ok := got.Resources[api.ResourceBuild]; !ok ||
+		got.Resources[api.ResourceArtifact].Actions.Users["carol"] != r {
 		t.Fatalf("after put resource: %+v", got.Resources)
 	}
 	if !got.Created.Equal(clock) {
 		t.Fatalf("created time lost: %v", got.Created)
 	}
 	// A whole replace drops sections it does not carry.
-	if _, err := svc.Put(ctx, perm("multi", map[types.ResourceType]types.Resource{
-		types.ResourceArtifact: artifact(everywhere("libs-local"), nil, nil),
+	if _, err := svc.Put(ctx, perm("multi", map[api.ResourceType]model.Resource{
+		api.ResourceArtifact: artifact(everywhere("libs-local"), nil, nil),
 	})); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := svc.Get(ctx, "multi"); len(got.Resources) != 1 {
 		t.Fatalf("replace kept %v", got.ResourceTypes())
 	}
-	if _, err := svc.PutResource(ctx, "missing", types.ResourceArtifact,
+	if _, err := svc.PutResource(ctx, "missing", api.ResourceArtifact,
 		artifact(nil, nil, nil), false); !errors.Is(err, permission.ErrNotFound) {
 		t.Fatalf("put resource without create: %v", err)
 	}
-	if created, err := svc.PutResource(ctx, "fresh", types.ResourceArtifact,
+	if created, err := svc.PutResource(ctx, "fresh", api.ResourceArtifact,
 		artifact(everywhere("libs-local"), nil, nil), true); err != nil || !created {
 		t.Fatalf("put resource creating: %v, %v", created, err)
 	}
-	if _, err := svc.Put(ctx, perm("bad", map[types.ResourceType]types.Resource{
-		types.ResourceArtifact: artifact(everywhere("nope"), nil, nil),
+	if _, err := svc.Put(ctx, perm("bad", map[api.ResourceType]model.Resource{
+		api.ResourceArtifact: artifact(everywhere("nope"), nil, nil),
 	})); !errors.Is(err, permission.ErrInvalid) {
 		t.Fatalf("invalid put: %v", err)
 	}
@@ -238,17 +239,17 @@ func TestUnitPutAndPutResource(t *testing.T) {
 func TestUnitWrite(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))
-	first := perm("w", map[types.ResourceType]types.Resource{
-		types.ResourceArtifact: artifact(
+	first := perm("w", map[api.ResourceType]model.Resource{
+		api.ResourceArtifact: artifact(
 			everywhere("libs-local"),
-			map[string]types.Actions{"bob": r},
+			map[string]api.Actions{"bob": r},
 			nil,
 		),
 	})
 	created, err := svc.Write(
 		ctx,
 		"w",
-		func(_ types.Permission, exists bool) (types.Permission, error) {
+		func(_ model.Permission, exists bool) (model.Permission, error) {
 			if exists {
 				t.Error("a new name reported as stored")
 			}
@@ -259,8 +260,8 @@ func TestUnitWrite(t *testing.T) {
 		t.Fatalf("write creating = %v, %v", created, err)
 	}
 	refused := errors.New("refused")
-	_, err = svc.Write(ctx, "w", func(old types.Permission, exists bool) (types.Permission, error) {
-		if !exists || old.Resources[types.ResourceArtifact].Actions.Users["bob"] != r {
+	_, err = svc.Write(ctx, "w", func(old model.Permission, exists bool) (model.Permission, error) {
+		if !exists || old.Resources[api.ResourceArtifact].Actions.Users["bob"] != r {
 			t.Errorf("change saw %v, %+v", exists, old)
 		}
 		return perm("w", nil), refused
@@ -277,7 +278,7 @@ func TestUnitWrite(t *testing.T) {
 // in the group leads, holding in a section what those two entries grant.
 type manager struct{}
 
-func (manager) Grantable(g types.Grants) types.Actions {
+func (manager) Grantable(g model.Grants) api.Actions {
 	held := g.Users["bob"] | g.Groups["leads"]
 	if !held.Has(m) {
 		return 0
@@ -293,26 +294,26 @@ func (manager) Self() (user string, groups []string) { return "bob", []string{"l
 // judged on the stored grants.
 func TestUnitCheckManagerEdit(t *testing.T) {
 	const (
-		w = types.ActionWrite
-		d = types.ActionDelete
+		w = api.ActionWrite
+		d = api.ActionDelete
 	)
-	sections := []types.ResourceType{
-		types.ResourceArtifact, types.ResourceBuild, types.ResourceReleaseBundle,
+	sections := []api.ResourceType{
+		api.ResourceArtifact, api.ResourceBuild, api.ResourceReleaseBundle,
 	}
 	// bob holds read, write and MANAGE on artifacts, and only read on builds.
-	stored := func() types.Permission {
-		return perm("p", map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: artifact(
-				map[string]types.Target{"libs-local": {}},
-				map[string]types.Actions{"bob": r | w | m, "carol": r},
-				map[string]types.Actions{"ops": r | d, "leads": r},
+	stored := func() model.Permission {
+		return perm("p", map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: artifact(
+				map[string]model.Target{"libs-local": {}},
+				map[string]api.Actions{"bob": r | w | m, "carol": r},
+				map[string]api.Actions{"ops": r | d, "leads": r},
 			),
-			types.ResourceBuild: artifact(
-				everywhere(types.BuildInfoRepository),
-				map[string]types.Actions{"bob": r},
-				map[string]types.Actions{},
+			api.ResourceBuild: artifact(
+				everywhere(api.BuildInfoRepository),
+				map[string]api.Actions{"bob": r},
+				map[string]api.Actions{},
 			),
-			types.ResourceDestination: artifact(everywhere("edge"), nil, nil),
+			api.ResourceDestination: artifact(everywhere("edge"), nil, nil),
 		})
 	}
 	const (
@@ -322,74 +323,74 @@ func TestUnitCheckManagerEdit(t *testing.T) {
 	)
 	for _, c := range []struct {
 		name     string
-		edit     func(p *types.Permission)
+		edit     func(p *model.Permission)
 		expected string
 	}{
-		{"no change, its own entries included", func(*types.Permission) {}, ""},
-		{"grant a held action", func(p *types.Permission) {
-			p.Resources[types.ResourceArtifact].Actions.Users["carol"] = r | w
+		{"no change, its own entries included", func(*model.Permission) {}, ""},
+		{"grant a held action", func(p *model.Permission) {
+			p.Resources[api.ResourceArtifact].Actions.Users["carol"] = r | w
 		}, ""},
-		{"revoke a held action", func(p *types.Permission) {
-			delete(p.Resources[types.ResourceArtifact].Actions.Users, "carol")
+		{"revoke a held action", func(p *model.Permission) {
+			delete(p.Resources[api.ResourceArtifact].Actions.Users, "carol")
 		}, ""},
-		{"add a group with held actions", func(p *types.Permission) {
-			p.Resources[types.ResourceArtifact].Actions.Groups["devs"] = r | w
+		{"add a group with held actions", func(p *model.Permission) {
+			p.Resources[api.ResourceArtifact].Actions.Groups["devs"] = r | w
 		}, ""},
-		{"an empty include list is everything", func(p *types.Permission) {
-			p.Resources[types.ResourceArtifact].Targets["libs-local"] = types.Target{
+		{"an empty include list is everything", func(p *model.Permission) {
+			p.Resources[api.ResourceArtifact].Targets["libs-local"] = model.Target{
 				Include: []string{"**"},
 			}
 		}, ""},
-		{"a section the form does not carry", func(p *types.Permission) {
-			delete(p.Resources, types.ResourceDestination)
+		{"a section the form does not carry", func(p *model.Permission) {
+			delete(p.Resources, api.ResourceDestination)
 		}, ""},
-		{"grant an action it lacks", func(p *types.Permission) {
-			p.Resources[types.ResourceArtifact].Actions.Users["carol"] = r | d
+		{"grant an action it lacks", func(p *model.Permission) {
+			p.Resources[api.ResourceArtifact].Actions.Users["carol"] = r | d
 		}, heldOnly},
-		{"grant manage", func(p *types.Permission) {
-			p.Resources[types.ResourceArtifact].Actions.Users["carol"] = r | m
+		{"grant manage", func(p *model.Permission) {
+			p.Resources[api.ResourceArtifact].Actions.Users["carol"] = r | m
 		}, heldOnly},
-		{"revoke an action it lacks", func(p *types.Permission) {
-			p.Resources[types.ResourceArtifact].Actions.Groups["ops"] = r
+		{"revoke an action it lacks", func(p *model.Permission) {
+			p.Resources[api.ResourceArtifact].Actions.Groups["ops"] = r
 		}, heldOnly},
-		{"remove a principal holding an action it lacks", func(p *types.Permission) {
-			delete(p.Resources[types.ResourceArtifact].Actions.Groups, "ops")
+		{"remove a principal holding an action it lacks", func(p *model.Permission) {
+			delete(p.Resources[api.ResourceArtifact].Actions.Groups, "ops")
 		}, heldOnly},
-		{"grant in a section it does not manage", func(p *types.Permission) {
-			p.Resources[types.ResourceBuild].Actions.Users["carol"] = r
+		{"grant in a section it does not manage", func(p *model.Permission) {
+			p.Resources[api.ResourceBuild].Actions.Users["carol"] = r
 		}, heldOnly},
 		// Each of these would pass the held-actions rule but for its entry.
-		{"revoke a held action from itself", func(p *types.Permission) {
-			p.Resources[types.ResourceArtifact].Actions.Users["bob"] = r | m
+		{"revoke a held action from itself", func(p *model.Permission) {
+			p.Resources[api.ResourceArtifact].Actions.Users["bob"] = r | m
 		}, own},
-		{"revoke its own manage", func(p *types.Permission) {
-			p.Resources[types.ResourceArtifact].Actions.Users["bob"] = r | w
+		{"revoke its own manage", func(p *model.Permission) {
+			p.Resources[api.ResourceArtifact].Actions.Users["bob"] = r | w
 		}, own},
-		{"remove its own entry", func(p *types.Permission) {
-			delete(p.Resources[types.ResourceArtifact].Actions.Users, "bob")
+		{"remove its own entry", func(p *model.Permission) {
+			delete(p.Resources[api.ResourceArtifact].Actions.Users, "bob")
 		}, own},
-		{"grant its group a held action", func(p *types.Permission) {
-			p.Resources[types.ResourceArtifact].Actions.Groups["leads"] = r | w
+		{"grant its group a held action", func(p *model.Permission) {
+			p.Resources[api.ResourceArtifact].Actions.Groups["leads"] = r | w
 		}, own},
-		{"remove its group's entry", func(p *types.Permission) {
-			delete(p.Resources[types.ResourceArtifact].Actions.Groups, "leads")
+		{"remove its group's entry", func(p *model.Permission) {
+			delete(p.Resources[api.ResourceArtifact].Actions.Groups, "leads")
 		}, own},
-		{"add its group to another section", func(p *types.Permission) {
-			p.Resources[types.ResourceBuild].Actions.Groups["leads"] = r
+		{"add its group to another section", func(p *model.Permission) {
+			p.Resources[api.ResourceBuild].Actions.Groups["leads"] = r
 		}, own},
-		{"change a pattern", func(p *types.Permission) {
-			p.Resources[types.ResourceArtifact].Targets["libs-local"] = types.Target{
+		{"change a pattern", func(p *model.Permission) {
+			p.Resources[api.ResourceArtifact].Targets["libs-local"] = model.Target{
 				Exclude: []string{"secret/**"},
 			}
 		}, actionsOnly},
-		{"add a target", func(p *types.Permission) {
-			p.Resources[types.ResourceArtifact].Targets["central"] = types.Target{}
+		{"add a target", func(p *model.Permission) {
+			p.Resources[api.ResourceArtifact].Targets["central"] = model.Target{}
 		}, actionsOnly},
-		{"drop a section", func(p *types.Permission) {
-			delete(p.Resources, types.ResourceBuild)
+		{"drop a section", func(p *model.Permission) {
+			delete(p.Resources, api.ResourceBuild)
 		}, actionsOnly},
-		{"add a section", func(p *types.Permission) {
-			p.Resources[types.ResourceReleaseBundle] = artifact(nil, nil, nil)
+		{"add a section", func(p *model.Permission) {
+			p.Resources[api.ResourceReleaseBundle] = artifact(nil, nil, nil)
 		}, actionsOnly},
 	} {
 		p := stored()
@@ -408,14 +409,14 @@ func TestUnitCheckManagerEdit(t *testing.T) {
 func TestUnitMergeAndDeleteResource(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))
-	if err := svc.Create(ctx, perm("m", map[types.ResourceType]types.Resource{
-		types.ResourceArtifact: artifact(everywhere("libs-local"),
-			map[string]types.Actions{"bob": r}, map[string]types.Actions{"devs": r}),
+	if err := svc.Create(ctx, perm("m", map[api.ResourceType]model.Resource{
+		api.ResourceArtifact: artifact(everywhere("libs-local"),
+			map[string]api.Actions{"bob": r}, map[string]api.Actions{"devs": r}),
 	})); err != nil {
 		t.Fatal(err)
 	}
-	merged, err := svc.MergeResource(ctx, "m", types.ResourceArtifact, artifact(
-		everywhere("central"), map[string]types.Actions{"bob": r | m, "carol": r}, nil))
+	merged, err := svc.MergeResource(ctx, "m", api.ResourceArtifact, artifact(
+		everywhere("central"), map[string]api.Actions{"bob": r | m, "carol": r}, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -424,10 +425,10 @@ func TestUnitMergeAndDeleteResource(t *testing.T) {
 		t.Fatalf("merged = %+v", merged)
 	}
 	// A section with no groups stays without them, then gains some.
-	if err := svc.Create(ctx, perm("n", map[types.ResourceType]types.Resource{
-		types.ResourceArtifact: artifact(
+	if err := svc.Create(ctx, perm("n", map[api.ResourceType]model.Resource{
+		api.ResourceArtifact: artifact(
 			everywhere("libs-local"),
-			map[string]types.Actions{"bob": r},
+			map[string]api.Actions{"bob": r},
 			nil,
 		),
 	})); err != nil {
@@ -436,7 +437,7 @@ func TestUnitMergeAndDeleteResource(t *testing.T) {
 	if merged, err = svc.MergeResource(
 		ctx,
 		"n",
-		types.ResourceArtifact,
+		api.ResourceArtifact,
 		artifact(nil, nil, nil),
 	); err != nil ||
 		len(merged.Actions.Groups) != 0 ||
@@ -446,11 +447,11 @@ func TestUnitMergeAndDeleteResource(t *testing.T) {
 	if merged, err = svc.MergeResource(
 		ctx,
 		"n",
-		types.ResourceArtifact,
+		api.ResourceArtifact,
 		artifact(
 			nil,
 			nil,
-			map[string]types.Actions{"devs": r},
+			map[string]api.Actions{"devs": r},
 		),
 	); err != nil || merged.Actions.Groups["devs"] != r {
 		t.Fatalf("groups patch = %+v, %v", merged, err)
@@ -458,7 +459,7 @@ func TestUnitMergeAndDeleteResource(t *testing.T) {
 	if _, err := svc.MergeResource(
 		ctx,
 		"m",
-		types.ResourceBuild,
+		api.ResourceBuild,
 		artifact(nil, nil, nil),
 	); !errors.Is(
 		err,
@@ -469,7 +470,7 @@ func TestUnitMergeAndDeleteResource(t *testing.T) {
 	if _, err := svc.MergeResource(
 		ctx,
 		"none",
-		types.ResourceArtifact,
+		api.ResourceArtifact,
 		artifact(nil, nil, nil),
 	); !errors.Is(
 		err,
@@ -477,7 +478,7 @@ func TestUnitMergeAndDeleteResource(t *testing.T) {
 	) {
 		t.Fatalf("merge into a missing permission: %v", err)
 	}
-	if err := svc.DeleteResource(ctx, "m", types.ResourceArtifact); err != nil {
+	if err := svc.DeleteResource(ctx, "m", api.ResourceArtifact); err != nil {
 		t.Fatal(err)
 	}
 	got, err := svc.Get(ctx, "m")
@@ -487,7 +488,7 @@ func TestUnitMergeAndDeleteResource(t *testing.T) {
 	if err := svc.DeleteResource(
 		ctx,
 		"m",
-		types.ResourceArtifact,
+		api.ResourceArtifact,
 	); !errors.Is(
 		err,
 		permission.ErrNotFound,
@@ -497,7 +498,7 @@ func TestUnitMergeAndDeleteResource(t *testing.T) {
 	if err := svc.DeleteResource(
 		ctx,
 		"none",
-		types.ResourceArtifact,
+		api.ResourceArtifact,
 	); !errors.Is(
 		err,
 		permission.ErrNotFound,
@@ -509,22 +510,22 @@ func TestUnitMergeAndDeleteResource(t *testing.T) {
 func TestUnitGrantingAndList(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))
-	for _, p := range []types.Permission{
-		perm("to-bob", map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: artifact(everywhere("libs-local"), map[string]types.Actions{"bob": r}, nil),
+	for _, p := range []model.Permission{
+		perm("to-bob", map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: artifact(everywhere("libs-local"), map[string]api.Actions{"bob": r}, nil),
 		}),
-		perm("to-devs", map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: artifact(everywhere("libs-local"), nil, map[string]types.Actions{"devs": r}),
+		perm("to-devs", map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: artifact(everywhere("libs-local"), nil, map[string]api.Actions{"devs": r}),
 		}),
-		perm("to-readers", map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: artifact(everywhere("libs-local"), nil, map[string]types.Actions{"readers": r}),
+		perm("to-readers", map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: artifact(everywhere("libs-local"), nil, map[string]api.Actions{"readers": r}),
 		}),
 	} {
 		if err := svc.Create(ctx, p); err != nil {
 			t.Fatal(err)
 		}
 	}
-	names := func(ps []types.Permission) []string {
+	names := func(ps []model.Permission) []string {
 		var out []string
 		for _, p := range ps {
 			out = append(out, p.Name)
@@ -577,7 +578,7 @@ func TestUnitGrantingAndList(t *testing.T) {
 }
 
 func TestUnitValidResourceType(t *testing.T) {
-	for _, rt := range []types.ResourceType{"artifact", "build", "release_bundle", "destination", "pipeline_source"} {
+	for _, rt := range []api.ResourceType{"artifact", "build", "release_bundle", "destination", "pipeline_source"} {
 		if !permission.ValidResourceType(rt) {
 			t.Errorf("%s refused", rt)
 		}
@@ -606,29 +607,29 @@ func TestUnitDefaultClock(t *testing.T) {
 func TestUnitNarrow(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))
-	if err := svc.Create(ctx, perm("shared", map[types.ResourceType]types.Resource{
-		types.ResourceArtifact: artifact(everywhere("libs-local"),
-			map[string]types.Actions{"bob": r, "carol": r | m},
-			map[string]types.Actions{"devs": r, "readers": r}),
+	if err := svc.Create(ctx, perm("shared", map[api.ResourceType]model.Resource{
+		api.ResourceArtifact: artifact(everywhere("libs-local"),
+			map[string]api.Actions{"bob": r, "carol": r | m},
+			map[string]api.Actions{"devs": r, "readers": r}),
 	})); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range []struct {
 		inherited bool
-		expected  types.Grants
+		expected  model.Grants
 	}{
-		{true, types.Grants{
-			Users:  map[string]types.Actions{"bob": r},
-			Groups: map[string]types.Actions{"devs": r},
+		{true, model.Grants{
+			Users:  map[string]api.Actions{"bob": r},
+			Groups: map[string]api.Actions{"devs": r},
 		}},
-		{false, types.Grants{Users: map[string]types.Actions{"bob": r}}},
+		{false, model.Grants{Users: map[string]api.Actions{"bob": r}}},
 	} {
 		ps, pr, err := svc.Granting(ctx, []string{"bob"}, nil, c.inherited)
 		if err != nil || len(ps) != 1 {
 			t.Fatalf("granting = %v, %v", ps, err)
 		}
 		got := pr.Narrow(ps[0])
-		if a := got.Resources[types.ResourceArtifact]; !reflect.DeepEqual(a.Actions, c.expected) ||
+		if a := got.Resources[api.ResourceArtifact]; !reflect.DeepEqual(a.Actions, c.expected) ||
 			len(a.Targets) != 1 {
 			t.Errorf("inherited %v: narrowed to %+v, want %+v", c.inherited, a, c.expected)
 		}
@@ -644,7 +645,7 @@ func TestUnitNarrow(t *testing.T) {
 func TestUnitFoldUsers(t *testing.T) {
 	ctx := context.Background()
 	db := seeded(t)
-	if err := db.Users().Create(ctx, types.User{Name: "Bob"}); err != nil {
+	if err := db.Users().Create(ctx, model.User{Name: "Bob"}); err != nil {
 		t.Fatal(err)
 	}
 	svc := service(db)

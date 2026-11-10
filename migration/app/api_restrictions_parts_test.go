@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 )
 
 // The API restriction routes, as access/adapters/http serves them.
@@ -58,7 +58,7 @@ var apiRestrictionStatusPart = statusPart{
 var apiRestrictionMatrixPart = matrixPart{
 	seed: func(t *testing.T, f *matrixFixture) {
 		if err := f.db.Users().
-			Create(t.Context(), types.User{Name: "restriction-target"}); err != nil {
+			Create(t.Context(), model.User{Name: "restriction-target"}); err != nil {
 			t.Fatal(err)
 		}
 	},

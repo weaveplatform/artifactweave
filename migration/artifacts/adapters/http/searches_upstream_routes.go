@@ -16,7 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type searchRoute struct {
@@ -88,7 +87,7 @@ func (u *searchRoutes) Request(key string) source.Request {
 func (u *searchRoutes) Allowed(key, full string, folder bool) bool {
 	c := u.r.Configs[key]
 	return u.RouteKey(key, full, folder) != "" && repo.PatternsOf(c).Accepts(full, folder) &&
-		u.r.acc.Item(c, full, folder, types.ActionRead)
+		u.r.acc.Item(c, full, folder, accessapi.ActionRead)
 }
 
 // Current JFrog documents specific=true for remote GAVC, while older callers
@@ -213,7 +212,7 @@ func (u *searchRoutes) Disclose(key, full string, folder bool, cached ...bool) b
 	if u.RouteKey(key, full, folder, cached...) == "" ||
 		!repo.PatternsOf(c).
 			Accepts(full, folder) ||
-		!u.r.acc.Item(c, full, folder, types.ActionRead) {
+		!u.r.acc.Item(c, full, folder, accessapi.ActionRead) {
 		return false
 	}
 	u.disclosures = append(
@@ -286,10 +285,10 @@ func (u *searchRoutes) CheckDisclosures(ctx context.Context) error {
 			allows = d.AllowsFolder
 		}
 		if !allows(
-			types.ResourceArtifact,
+			accessapi.ResourceArtifact,
 			itemkit.Target(u.r.Configs[entry.key]),
 			entry.path,
-			types.ActionRead,
+			accessapi.ActionRead,
 		) ||
 			u.RouteKey(entry.key, entry.path, entry.isFolder, entry.isCached) == "" {
 			return source.ErrDenied

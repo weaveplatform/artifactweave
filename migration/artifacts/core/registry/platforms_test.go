@@ -12,10 +12,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Configs of a multi-architecture image's other platform and of its
@@ -400,10 +400,10 @@ type getFailingAt struct {
 	at string
 }
 
-func (g getFailingAt) Items() store.ItemStore { return getFailingItems{g.Store.Items(), g.at} }
+func (g getFailingAt) Items() port.ItemStore { return getFailingItems{g.Store.Items(), g.at} }
 
 type getFailingItems struct {
-	store.ItemStore
+	port.ItemStore
 	at string
 }
 
@@ -412,9 +412,9 @@ func (g getFailingItems) Get(
 	repoKey string,
 	cached bool,
 	fullPath string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if strings.Contains(fullPath, g.at) {
-		return types.Item{}, errBoom
+		return model.Item{}, errBoom
 	}
 	return g.ItemStore.Get(ctx, repoKey, cached, fullPath) //nolint:wrapcheck // test double
 }

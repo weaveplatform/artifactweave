@@ -15,7 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 type integritySpec struct {
@@ -80,14 +80,14 @@ func integrityAlgorithm(name string) (rank, size int) {
 	}
 }
 
-func distChecksums(integrity, shasum string) (types.Checksums, error) {
-	sums, err := item.ParseChecksums(types.Checksums{SHA1: shasum})
+func distChecksums(integrity, shasum string) (kernel.Checksums, error) {
+	sums, err := item.ParseChecksums(kernel.Checksums{SHA1: shasum})
 	if err != nil {
-		return types.Checksums{}, remoteProtocolError()
+		return kernel.Checksums{}, remoteProtocolError()
 	}
 	spec, err := parseIntegrity(integrity)
 	if err != nil {
-		return types.Checksums{}, err
+		return kernel.Checksums{}, err
 	}
 	if len(spec.digests) == 1 {
 		switch spec.algorithm {
@@ -97,7 +97,7 @@ func distChecksums(integrity, shasum string) (types.Checksums, error) {
 			sums.SHA256 = spec.digests[0]
 		case "sha1":
 			if sums.SHA1 != "" && sums.SHA1 != spec.digests[0] {
-				return types.Checksums{}, remoteProtocolError()
+				return kernel.Checksums{}, remoteProtocolError()
 			}
 			sums.SHA1 = spec.digests[0]
 		}

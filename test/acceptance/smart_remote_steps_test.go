@@ -16,8 +16,9 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // This controlled HTTP peer qualifies artifactweave behavior. Its replies are
@@ -199,7 +200,7 @@ func (p *smartPeerFixture) search(w http.ResponseWriter, r *http.Request) {
 		corpus = append(
 			corpus,
 			aql.Hit{
-				Item: types.Item{
+				Item: model.Item{
 					RepoKey:  "source",
 					Path:     ".",
 					Name:     "file.bin",
@@ -207,13 +208,13 @@ func (p *smartPeerFixture) search(w http.ResponseWriter, r *http.Request) {
 					Created:  now,
 					Modified: now,
 					Updated:  now,
-					Actual: types.Checksums{
+					Actual: kernel.Checksums{
 						SHA1:   fmt.Sprintf("%x", sha1.Sum(data)),
 						MD5:    fmt.Sprintf("%x", md5.Sum(data)),
 						SHA256: fmt.Sprintf("%x", sha256.Sum256(data)),
 					},
 				},
-				Properties: types.Properties{"color": {p.color}},
+				Properties: model.Properties{"color": {p.color}},
 			},
 		)
 	}

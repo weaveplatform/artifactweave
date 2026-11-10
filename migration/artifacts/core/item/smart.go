@@ -7,31 +7,31 @@ import (
 	"slices"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // MergeRemoteProperties changes only values which still match the previous
 // synchronized value. A local edit or deletion permanently takes ownership of
 // that key for this source lifetime; upstream disappearance cannot erase it.
 func MergeRemoteProperties(
-	current types.Properties,
-	prior *types.RemoteSmartState,
-	incoming types.Properties,
+	current model.Properties,
+	prior *model.RemoteSmartState,
+	incoming model.Properties,
 	at time.Time,
-) (types.Properties, *types.RemoteSmartState) {
-	state := store.Clone(prior)
+) (model.Properties, *model.RemoteSmartState) {
+	state := kernel.Clone(prior)
 	if state == nil {
-		state = &types.RemoteSmartState{}
+		state = &model.RemoteSmartState{}
 	}
 	if state.LocalProperties == nil {
 		state.LocalProperties = make(map[string]bool)
 	}
 	merged := current.Clone()
 	if merged == nil {
-		merged = make(types.Properties)
+		merged = make(model.Properties)
 	}
-	owned := make(types.Properties)
+	owned := make(model.Properties)
 	for key, old := range state.OwnedProperties {
 		value, exists := current[key]
 		if !exists || !slices.Equal(value, old) {
@@ -57,15 +57,15 @@ func MergeRemoteProperties(
 
 func (s *Service) propertyRepresentations(
 	ctx context.Context,
-	token types.RemoteCacheToken,
-) ([]types.RemoteCacheEntry, error) {
+	token model.RemoteCacheToken,
+) ([]model.RemoteCacheEntry, error) {
 	entries, next, err := s.Store.RemoteCache().
-		Exact(ctx, token.Key.RepoKey, token.Key.Path, store.Page{Limit: 64})
+		Exact(ctx, token.Key.RepoKey, token.Key.Path, kernel.Page{Limit: 64})
 	if err != nil {
 		return nil, fmt.Errorf("cache property representations: %w", err)
 	}
 	if next != "" {
-		return nil, fmt.Errorf("cache property representation bound: %w", store.ErrInvalid)
+		return nil, fmt.Errorf("cache property representation bound: %w", kernel.ErrInvalid)
 	}
 	return entries, nil
 }
@@ -74,10 +74,10 @@ func (s *Service) propertyRepresentations(
 // not each HTTP representation another client may independently request.
 func (s *Service) HasRemoteProperties(
 	ctx context.Context,
-	token types.RemoteCacheToken,
+	token model.RemoteCacheToken,
 ) (bool, error) {
 	it, err := s.Store.Items().Get(ctx, token.Key.RepoKey, true, token.Key.Path)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return false, nil
 	}
 	if err != nil {
@@ -103,21 +103,21 @@ func (s *Service) HasRemoteProperties(
 func (s *Service) initialRemoteProperties(
 	ctx context.Context,
 	u CacheUpload,
-) (types.Properties, *types.RemoteSmartState, error) {
-	current := make(types.Properties)
+) (model.Properties, *model.RemoteSmartState, error) {
+	current := make(model.Properties)
 	it, err := s.Store.Items().Get(ctx, u.Repo.Key, true, u.Token.Key.Path)
 	if err == nil {
 		current, err = s.Store.Items().Properties(ctx, it.ID)
 	}
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		return nil, nil, fmt.Errorf("cache current properties: %w", err)
 	}
 	entries, err := s.propertyRepresentations(ctx, u.Token)
 	if err != nil {
 		return nil, nil, err
 	}
-	prior := &types.RemoteSmartState{}
-	var latest *types.RemoteSmartState
+	prior := &model.RemoteSmartState{}
+	var latest *model.RemoteSmartState
 	for _, entry := range entries {
 		if entry.Token.Source != u.Token.Source ||
 			entry.Token.Key.SettingsRevision != u.Token.Key.SettingsRevision ||
@@ -125,7 +125,7 @@ func (s *Service) initialRemoteProperties(
 			continue
 		}
 		if entry.Token.Key == u.Token.Key {
-			prior = store.Clone(entry.Smart)
+			prior = kernel.Clone(entry.Smart)
 		}
 		if entry.ItemID == it.ID && entry.Blob.Checksums.SHA256 == it.Actual.SHA256 &&
 			(latest == nil || entry.Smart.PropertiesAt.After(latest.PropertiesAt)) {
@@ -150,7 +150,7 @@ func (s *Service) initialRemoteProperties(
 // transaction and preserves each representation's separate statistics claims.
 func (s *Service) PropagateRemotePropertyState(
 	ctx context.Context,
-	current types.RemoteCacheEntry,
+	current model.RemoteCacheEntry,
 ) error {
 	if current.Smart == nil || current.Smart.PropertiesAt.IsZero() {
 		return nil
@@ -167,7 +167,7 @@ func (s *Service) PropagateRemotePropertyState(
 			continue
 		}
 		if entry.Smart == nil {
-			entry.Smart = &types.RemoteSmartState{}
+			entry.Smart = &model.RemoteSmartState{}
 		}
 		copyRemoteOwnership(entry.Smart, current.Smart)
 		if _, err = s.Store.RemoteCache().Put(ctx, entry.Token, entry); err != nil {
@@ -177,8 +177,8 @@ func (s *Service) PropagateRemotePropertyState(
 	return nil
 }
 
-func copyRemoteOwnership(dst, src *types.RemoteSmartState) {
+func copyRemoteOwnership(dst, src *model.RemoteSmartState) {
 	dst.OwnedProperties = src.OwnedProperties.Clone()
-	dst.LocalProperties = store.Clone(src.LocalProperties)
+	dst.LocalProperties = kernel.Clone(src.LocalProperties)
 	dst.PropertiesAt = src.PropertiesAt
 }

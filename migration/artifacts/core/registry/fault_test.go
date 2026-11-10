@@ -11,10 +11,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 )
 
 var errBoom = errors.New("boom")
@@ -27,12 +28,12 @@ type faultyStore struct {
 	repos   *faultyRepos
 }
 
-func (f *faultyStore) Uploads() store.UploadStore { return f.uploads }
-func (f *faultyStore) Items() store.ItemStore     { return f.items }
-func (f *faultyStore) Repos() store.RepoStore     { return f.repos }
+func (f *faultyStore) Uploads() session.UploadStore { return f.uploads }
+func (f *faultyStore) Items() port.ItemStore        { return f.items }
+func (f *faultyStore) Repos() port.RepoStore        { return f.repos }
 
 type faultyUploads struct {
-	store.UploadStore
+	session.UploadStore
 	get, del error
 	// put fails the put numbered failPut (1 is the first), when set.
 	put     error
@@ -40,7 +41,7 @@ type faultyUploads struct {
 	failPut int
 }
 
-func (u *faultyUploads) Put(ctx context.Context, up store.Upload) error {
+func (u *faultyUploads) Put(ctx context.Context, up session.Upload) error {
 	u.puts++
 	if u.put != nil && u.puts >= u.failPut {
 		return u.put
@@ -48,9 +49,9 @@ func (u *faultyUploads) Put(ctx context.Context, up store.Upload) error {
 	return u.UploadStore.Put(ctx, up) //nolint:wrapcheck // test double
 }
 
-func (u *faultyUploads) Get(ctx context.Context, id string) (store.Upload, error) {
+func (u *faultyUploads) Get(ctx context.Context, id string) (session.Upload, error) {
 	if u.get != nil {
-		return store.Upload{}, u.get
+		return session.Upload{}, u.get
 	}
 	return u.UploadStore.Get(ctx, id) //nolint:wrapcheck // test double
 }
@@ -63,7 +64,7 @@ func (u *faultyUploads) Delete(ctx context.Context, id string) error {
 }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	search, del error
 }
 
@@ -76,19 +77,19 @@ func (i *faultyItems) Search(ctx context.Context, q *aql.Query, o aql.Options) (
 
 func (i *faultyItems) Delete(
 	ctx context.Context, repoKey string, cached bool, fullPath string,
-) (store.DeleteResult, error) {
+) (port.DeleteResult, error) {
 	if i.del != nil {
-		return store.DeleteResult{}, i.del
+		return port.DeleteResult{}, i.del
 	}
 	return i.ItemStore.Delete(ctx, repoKey, cached, fullPath) //nolint:wrapcheck // test double
 }
 
 type faultyRepos struct {
-	store.RepoStore
+	port.RepoStore
 	list error
 }
 
-func (r *faultyRepos) List(ctx context.Context, f store.RepoFilter) ([]repo.Config, error) {
+func (r *faultyRepos) List(ctx context.Context, f port.RepoFilter) ([]repo.Config, error) {
 	if r.list != nil {
 		return nil, r.list
 	}

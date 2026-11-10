@@ -17,14 +17,13 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	nixfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Options configures the Nix binary-cache protocol. Its access contracts
@@ -78,7 +77,7 @@ type (
 	}
 	located struct {
 		info    nixfmt.Info
-		archive *types.Item
+		archive *model.Item
 		r       *http.Request
 		check   func(context.Context) error
 	}
@@ -121,7 +120,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 			h.fail(w, r, err)
 			return
 		}
-		if h.k.Require(w, r, path, types.ActionRead) {
+		if h.k.Require(w, r, path, accessapi.ActionRead) {
 			write(w, r, []byte(nixfmt.CacheInfo), "text/x-nix-cache-info")
 		}
 		return
@@ -150,7 +149,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	}
 	parts := strings.Split(path, "/")
 	if len(parts) != 3 || parts[0] != "nar" || !nixfmt.IsInfoPath(parts[1]+".narinfo") {
-		h.fail(w, r, store.ErrNotFound)
+		h.fail(w, r, kernel.ErrNotFound)
 		return
 	}
 	found, err := h.lookup(r, parts[1]+".narinfo")
@@ -159,7 +158,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if found.info.URL != "nar/"+parts[2] {
-		h.fail(w, r, store.ErrNotFound)
+		h.fail(w, r, kernel.ErrNotFound)
 		return
 	}
 	c := pkgroute.RequestFrom(found.r).Repo
@@ -182,12 +181,12 @@ func write(w http.ResponseWriter, r *http.Request, data []byte, mediaType string
 
 func missing(err error) bool {
 	var e *apierror.Error
-	return errors.Is(err, store.ErrNotFound) || errors.As(err, &e) && e.Status == 404
+	return errors.Is(err, kernel.ErrNotFound) || errors.As(err, &e) && e.Status == 404
 }
 
 func (h handler) lookup(r *http.Request, path string) (located, error) {
 	c := pkgroute.RequestFrom(r).Repo
-	if !h.k.Can(r, path, types.ActionRead) {
+	if !h.k.Can(r, path, accessapi.ActionRead) {
 		return located{}, source.ErrDenied
 	}
 	if err := generic.CheckDownload(c, path, false); err != nil {
@@ -196,7 +195,7 @@ func (h handler) lookup(r *http.Request, path string) (located, error) {
 	if c.Class == repo.Virtual {
 		for _, key := range c.Repositories {
 			member, err := h.k.DB().Repos().Get(r.Context(), key)
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, kernel.ErrNotFound) {
 				continue
 			}
 			if err != nil {
@@ -206,7 +205,7 @@ func (h handler) lookup(r *http.Request, path string) (located, error) {
 			if err != nil {
 				return located{}, fmt.Errorf("nix: lookup: %w", err)
 			}
-			if !h.k.Can(mr, path, types.ActionRead) {
+			if !h.k.Can(mr, path, accessapi.ActionRead) {
 				continue
 			}
 			found, err := h.lookup(mr, path)
@@ -216,7 +215,7 @@ func (h handler) lookup(r *http.Request, path string) (located, error) {
 			if err != nil {
 				return located{}, fmt.Errorf("nix: lookup: %w", err)
 			}
-			if !h.k.Can(r, found.info.URL, types.ActionRead) ||
+			if !h.k.Can(r, found.info.URL, accessapi.ActionRead) ||
 				generic.CheckDownload(c, found.info.URL, false) != nil {
 				continue
 			}
@@ -229,7 +228,7 @@ func (h handler) lookup(r *http.Request, path string) (located, error) {
 			}
 			return found, nil
 		}
-		return located{}, store.ErrNotFound
+		return located{}, kernel.ErrNotFound
 	}
 	if c.Class == repo.Remote {
 		return h.remoteInfo(r, path)
@@ -242,7 +241,7 @@ func (h handler) lookup(r *http.Request, path string) (located, error) {
 	if err != nil {
 		return located{}, source.ErrInvalidResult
 	}
-	if !h.k.Can(r, info.URL, types.ActionRead) {
+	if !h.k.Can(r, info.URL, accessapi.ActionRead) {
 		return located{}, source.ErrDenied
 	}
 	if err := generic.CheckDownload(c, info.URL, false); err != nil {
@@ -276,7 +275,7 @@ func (h handler) current(r *http.Request, paths ...string) error {
 	}
 	r = r.WithContext(accessapi.WithCaller(r.Context(), p, d))
 	for _, path := range paths {
-		if !h.k.Can(r, path, types.ActionRead) {
+		if !h.k.Can(r, path, accessapi.ActionRead) {
 			return source.ErrDenied
 		}
 	}
@@ -292,7 +291,7 @@ func (h handler) sign(r *http.Request, info *nixfmt.Info) error {
 		return nil
 	}
 	pair, err := h.o.KeyPairs.Keypair(r.Context(), c.PrimaryKeyPairRef)
-	if err != nil || pair.Type != types.KeypairEd25519 {
+	if err != nil || pair.Type != accessapi.KeypairEd25519 {
 		return apierror.New(503, "Nix signing key is unavailable")
 	}
 	key, err := keymaterial.Ed25519PrivateKey(pair.PrivateKey, pair.Passphrase)
@@ -320,7 +319,7 @@ func (h handler) put(w http.ResponseWriter, r *http.Request) {
 	if nixfmt.IsInfoPath(path) || path == "nix-cache-info" {
 		limit = nixfmt.MaxMetadataBytes
 	}
-	it, err := h.k.Store(r, path, io.LimitReader(r.Body, limit+1), nil, types.Checksums{})
+	it, err := h.k.Store(r, path, io.LimitReader(r.Body, limit+1), nil, kernel.Checksums{})
 	if err != nil {
 		h.fail(w, r, err)
 		return
@@ -346,7 +345,7 @@ func (h handler) reindex(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, apierror.New(400, "invalid Nix reindex request"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionManage) {
+	if !h.k.RequireFolder(w, r, "", accessapi.ActionManage) {
 		return
 	}
 	err := h.k.DB().

@@ -16,11 +16,14 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	helmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
 	helmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm/http"
@@ -28,8 +31,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const endpoint = "/artifactory/api/helm/charts/"
@@ -66,7 +67,7 @@ func newFixture(t *testing.T, relative bool) *fixture {
 	}
 	for user, pattern := range map[string]string{"reader": "**", "partial": "visible/**"} {
 		if err := db.Permissions().
-			Create(ctx, types.Permission{Name: user, Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{user: types.ActionRead}}, Targets: map[string]types.Target{c.Key: {Include: []string{pattern}}}}}}); err != nil {
+			Create(ctx, model.Permission{Name: user, Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{user: api.ActionRead}}, Targets: map[string]model.Target{c.Key: {Include: []string{pattern}}}}}}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -86,7 +87,7 @@ func newFixture(t *testing.T, relative bool) *fixture {
 		pkgroute.Options{
 			Store: db,
 			Items: func() *item.Service { return items },
-			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 				rc, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 				if err != nil {
 					t.Fatal(err)
@@ -222,7 +223,7 @@ func TestAccIndexFailures(t *testing.T) {
 			if mode == "work-fault" {
 				f.deploy("web.tgz", archive("web", "1.0.0"))
 				packages, _, err := f.items.Store.Packages().
-					List(ctx, f.c.Key, store.Page{Limit: 10})
+					List(ctx, f.c.Key, kernel.Page{Limit: 10})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -236,7 +237,7 @@ func TestAccIndexFailures(t *testing.T) {
 				}
 			} else if mode == "folder" {
 				if _, err := f.items.Store.Items().
-					Put(ctx, types.Item{RepoKey: f.c.Key, Name: "index.yaml", Folder: true}); err != nil {
+					Put(ctx, model.Item{RepoKey: f.c.Key, Name: "index.yaml", Folder: true}); err != nil {
 					t.Fatal(err)
 				}
 			} else {

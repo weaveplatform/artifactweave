@@ -14,15 +14,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type virtualSource struct{}
@@ -86,8 +86,8 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) readMetadata(w http.ResponseWriter, r *http.Request, id condafmt.MetadataPath) {
-	if !h.k.RequireFolder(w, r, path.Dir(id.Path), types.ActionRead) ||
-		!h.k.Require(w, r, id.Path, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, path.Dir(id.Path), api.ActionRead) ||
+		!h.k.Require(w, r, id.Path, api.ActionRead) {
 		return
 	}
 	sharded := id.Filename == condafmt.ShardIndexFilename || condafmt.IsShardFilename(id.Filename)
@@ -163,7 +163,7 @@ func (h handler) memberIndex(r *http.Request, indexPath string, seen map[string]
 	c := pkgroute.RequestFrom(r).Repo
 	id, ok := condafmt.ParseMetadataPath(indexPath)
 	if !ok {
-		return condafmt.Repodata{}, nil, store.ErrNotFound
+		return condafmt.Repodata{}, nil, kernel.ErrNotFound
 	}
 	if seen[c.Key] || len(seen) >= 8 {
 		return condafmt.Repodata{}, nil, apierror.New(
@@ -176,8 +176,8 @@ func (h handler) memberIndex(r *http.Request, indexPath string, seen map[string]
 	if c.Class == repo.Virtual {
 		return h.virtualIndex(r, id, seen)
 	}
-	if !h.k.CanFolder(r, path.Dir(indexPath), types.ActionRead) ||
-		!h.k.Can(r, indexPath, types.ActionRead) ||
+	if !h.k.CanFolder(r, path.Dir(indexPath), api.ActionRead) ||
+		!h.k.Can(r, indexPath, api.ActionRead) ||
 		generic.CheckDownload(c, indexPath, false) != nil {
 		return condafmt.Repodata{}, nil, apierror.New(
 			http.StatusForbidden,
@@ -200,14 +200,14 @@ func (h handler) localIndex(r *http.Request, id condafmt.MetadataPath) (
 	condafmt.Repodata, func(context.Context) error, error,
 ) {
 	f, err := h.k.ResolveItem(r, id.Path)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return condafmt.EmptyRepodata(id.Subdir), nil, nil
 	}
 	if err != nil {
 		return condafmt.Repodata{}, nil, fmt.Errorf("conda: local index: %w", err)
 	}
 	if f.Item.Folder {
-		return condafmt.Repodata{}, nil, store.ErrNotFound
+		return condafmt.Repodata{}, nil, kernel.ErrNotFound
 	}
 	rc, _, err := h.k.Blobs().Open(r.Context(), f.Item.Actual.SHA256)
 	if err != nil {
@@ -302,7 +302,7 @@ func (h handler) filterIndex(ctx context.Context, r *http.Request,
 	c := pkgroute.RequestFrom(r).Repo
 	keep := func(filename string) (bool, error) {
 		p := condafmt.IndexPath(id.Channel, id.Subdir, filename)
-		if !h.k.Can(r, p, types.ActionRead) || generic.CheckDownload(c, p, false) != nil {
+		if !h.k.Can(r, p, api.ActionRead) || generic.CheckDownload(c, p, false) != nil {
 			return false, nil
 		}
 		if check != nil {

@@ -16,10 +16,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type publishPart struct {
@@ -384,11 +386,11 @@ func TestUnitSwiftLocalDoesNotAdvertiseStaleOrUnreadableReleases(t *testing.T) {
 			t.Fatalf("publish %s: %d %s", version, rec.Code, rec.Body)
 		}
 	}
-	if err := f.db.Permissions().Create(t.Context(), types.Permission{
-		Name: "swift-single-version", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}},
-				Targets: map[string]types.Target{
+	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+		Name: "swift-single-version", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]model.Target{
 					"packages": {Include: []string{"acme/Widget/Widget-1.0.0.zip"}},
 				},
 			},
@@ -407,7 +409,7 @@ func TestUnitSwiftLocalDoesNotAdvertiseStaleOrUnreadableReleases(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := f.db.Items().SetProperties(t.Context(), it.ID,
-		types.Properties{"swift.metadata": {`{"broken":`}}, time.Now()); err != nil {
+		model.Properties{"swift.metadata": {`{"broken":`}}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	rec = f.do(http.MethodGet, base+"acme/Widget/1.0.0", nil, "", "admin")
@@ -598,13 +600,13 @@ func TestUnitSwiftVirtualSkipsAbsentAndUnreadableMembers(t *testing.T) {
 			)
 		}
 	}
-	if err := f.db.Permissions().Create(t.Context(), types.Permission{
-		Name: "swift-virtual-only", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{
-					Users: map[string]types.Actions{"virtual-reader": types.ActionRead},
+	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+		Name: "swift-virtual-only", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{
+					Users: map[string]api.Actions{"virtual-reader": api.ActionRead},
 				},
-				Targets: map[string]types.Target{
+				Targets: map[string]model.Target{
 					"virtual": {Include: []string{"**"}},
 				},
 			},

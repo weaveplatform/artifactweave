@@ -12,9 +12,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 type wireLock struct {
@@ -37,22 +40,22 @@ type lockReply struct {
 func lockFixture(t *testing.T, class repo.Class) *fixture {
 	t.Helper()
 	f := newFixture(t, class)
-	targets := map[string]types.Target{}
+	targets := map[string]model.Target{}
 	keys := []string{"lfs"}
 	if class == repo.Virtual {
 		keys = []string{"lfs-empty", "lfs-local"}
 	}
 	for _, key := range keys {
-		targets[key] = types.Target{Include: []string{"**"}}
+		targets[key] = model.Target{Include: []string{"**"}}
 	}
-	err := f.db.Permissions().Create(t.Context(), types.Permission{
-		Name: "lfs-lock-access", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					"alice":   types.ActionRead | types.ActionWrite,
-					"bob":     types.ActionRead | types.ActionWrite,
-					"manager": types.ActionRead | types.ActionWrite | types.ActionDelete,
-					"reader":  types.ActionRead,
+	err := f.db.Permissions().Create(t.Context(), model.Permission{
+		Name: "lfs-lock-access", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{
+					"alice":   api.ActionRead | api.ActionWrite,
+					"bob":     api.ActionRead | api.ActionWrite,
+					"manager": api.ActionRead | api.ActionWrite | api.ActionDelete,
+					"reader":  api.ActionRead,
 				}}, Targets: targets,
 			},
 		},
@@ -226,7 +229,7 @@ func TestAccGitLFSLockWritePermissionAndOwnerUnlock(t *testing.T) {
 	if _, err := f.db.GitLFSLocks().
 		Get(t.Context(), "lfs", created.Lock.ID); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("owner unlock retained lock: %v", err)
 	}
@@ -234,20 +237,20 @@ func TestAccGitLFSLockWritePermissionAndOwnerUnlock(t *testing.T) {
 
 func TestAccGitLFSLockListingHidesRowsOutsidePathGrant(t *testing.T) {
 	f := newFixture(t, repo.Local)
-	if err := f.db.Permissions().Create(t.Context(), types.Permission{
-		Name: "lfs-public-only", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{
-					Users: map[string]types.Actions{"alice": types.ActionRead | types.ActionWrite},
+	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+		Name: "lfs-public-only", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{
+					Users: map[string]api.Actions{"alice": api.ActionRead | api.ActionWrite},
 				},
-				Targets: map[string]types.Target{"lfs": {Include: []string{"assets/public.bin"}}},
+				Targets: map[string]model.Target{"lfs": {Include: []string{"assets/public.bin"}}},
 			},
 		},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	stamp := time.Now().UTC().Truncate(time.Second)
-	for _, lock := range []types.GitLFSLock{
+	for _, lock := range []model.GitLFSLock{
 		{ID: "public", RepoKey: "lfs", Path: "assets/public.bin", Owner: "alice", LockedAt: stamp},
 		{ID: "private", RepoKey: "lfs", Path: "assets/private.bin", Owner: "bob", LockedAt: stamp},
 	} {
@@ -319,7 +322,7 @@ func TestAccGitLFSVirtualLocksFailClosedWhenDeploymentTargetDisappears(t *testin
 
 func TestAccGitLFSVirtualCrossMemberConflictAndVerification(t *testing.T) {
 	f := lockFixture(t, repo.Virtual)
-	upstream := types.GitLFSLock{
+	upstream := model.GitLFSLock{
 		ID: "member-lock", RepoKey: "lfs-empty", Path: "assets/shared.bin",
 		Owner: "bob", LockedAt: time.Now().UTC().Truncate(time.Second),
 	}
@@ -335,7 +338,7 @@ func TestAccGitLFSVirtualCrossMemberConflictAndVerification(t *testing.T) {
 		t.Fatalf("cross-member verify: %d %+v", status, verified)
 	}
 	rows, _, err := f.db.GitLFSLocks().List(t.Context(),
-		store.GitLFSLockFilter{RepoKey: "lfs-local"}, store.Page{})
+		port.GitLFSLockFilter{RepoKey: "lfs-local"}, kernel.Page{})
 	if err != nil || len(rows) != 0 {
 		t.Fatalf("target mutated on conflict: %+v %v", rows, err)
 	}
@@ -344,7 +347,7 @@ func TestAccGitLFSVirtualCrossMemberConflictAndVerification(t *testing.T) {
 func TestAccGitLFSVirtualLockPaginationKeepsFirstMemberPrecedence(t *testing.T) {
 	f := lockFixture(t, repo.Virtual)
 	stamp := time.Now().UTC().Truncate(time.Second)
-	for _, lock := range []types.GitLFSLock{
+	for _, lock := range []model.GitLFSLock{
 		{ID: "first", RepoKey: "lfs-empty", Path: "assets/shared.bin", Owner: "alice", LockedAt: stamp},
 		{ID: "shadowed", RepoKey: "lfs-local", Path: "assets/shared.bin", Owner: "bob", LockedAt: stamp},
 		{ID: "later", RepoKey: "lfs-local", Path: "assets/other.bin", Owner: "bob", LockedAt: stamp},
@@ -388,14 +391,14 @@ func TestAccGitLFSVirtualLockPaginationKeepsFirstMemberPrecedence(t *testing.T) 
 func TestAccGitLFSVirtualVerifyFailsClosedOnHiddenMember(t *testing.T) {
 	f := newFixture(t, repo.Virtual)
 	for _, key := range []string{"lfs-local"} {
-		err := f.db.Permissions().Create(t.Context(), types.Permission{
+		err := f.db.Permissions().Create(t.Context(), model.Permission{
 			Name: "lock-" + key,
-			Resources: map[types.ResourceType]types.Resource{
-				types.ResourceArtifact: {
-					Actions: types.Grants{Users: map[string]types.Actions{
-						"alice": types.ActionRead | types.ActionWrite,
+			Resources: map[api.ResourceType]model.Resource{
+				api.ResourceArtifact: {
+					Actions: model.Grants{Users: map[string]api.Actions{
+						"alice": api.ActionRead | api.ActionWrite,
 					}},
-					Targets: map[string]types.Target{key: {Include: []string{"**"}}},
+					Targets: map[string]model.Target{key: {Include: []string{"**"}}},
 				},
 			},
 		})
@@ -403,13 +406,13 @@ func TestAccGitLFSVirtualVerifyFailsClosedOnHiddenMember(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := f.db.GitLFSLocks().Create(t.Context(), types.GitLFSLock{
+	if err := f.db.GitLFSLocks().Create(t.Context(), model.GitLFSLock{
 		ID: "hidden", RepoKey: "lfs-empty", Path: "assets/private.bin",
 		Owner: "bob", LockedAt: time.Now().UTC(),
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.db.GitLFSLocks().Create(t.Context(), types.GitLFSLock{
+	if err := f.db.GitLFSLocks().Create(t.Context(), model.GitLFSLock{
 		ID: "visible", RepoKey: "lfs-local", Path: "assets/public.bin",
 		Owner: "bob", LockedAt: time.Now().UTC(),
 	}); err != nil {
@@ -430,22 +433,22 @@ func TestAccGitLFSVirtualVerifyFailsClosedOnHiddenPathWithinMember(t *testing.T)
 	for key, include := range map[string]string{
 		"lfs-empty": "assets/public.bin", "lfs-local": "assets/**",
 	} {
-		if err := f.db.Permissions().Create(t.Context(), types.Permission{
-			Name: "readwrite-" + key, Resources: map[types.ResourceType]types.Resource{
-				types.ResourceArtifact: {
-					Actions: types.Grants{
-						Users: map[string]types.Actions{
-							"alice": types.ActionRead | types.ActionWrite,
+		if err := f.db.Permissions().Create(t.Context(), model.Permission{
+			Name: "readwrite-" + key, Resources: map[api.ResourceType]model.Resource{
+				api.ResourceArtifact: {
+					Actions: model.Grants{
+						Users: map[string]api.Actions{
+							"alice": api.ActionRead | api.ActionWrite,
 						},
 					},
-					Targets: map[string]types.Target{key: {Include: []string{include}}},
+					Targets: map[string]model.Target{key: {Include: []string{include}}},
 				},
 			},
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := f.db.GitLFSLocks().Create(t.Context(), types.GitLFSLock{
+	if err := f.db.GitLFSLocks().Create(t.Context(), model.GitLFSLock{
 		ID: "hidden", RepoKey: "lfs-empty", Path: "assets/private.bin",
 		Owner: "bob", LockedAt: time.Now().UTC().Truncate(time.Second),
 	}); err != nil {
@@ -460,24 +463,24 @@ func TestAccGitLFSVirtualVerifyFailsClosedOnHiddenPathWithinMember(t *testing.T)
 func TestAccGitLFSVirtualVerifyHidesPathsOutsideDeploymentWriteGrant(t *testing.T) {
 	f := newFixture(t, repo.Virtual)
 	for _, key := range []string{"lfs-empty", "lfs-local"} {
-		if err := f.db.Permissions().Create(t.Context(), types.Permission{
-			Name: "read-" + key, Resources: map[types.ResourceType]types.Resource{
-				types.ResourceArtifact: {
-					Actions: types.Grants{
-						Users: map[string]types.Actions{"alice": types.ActionRead},
+		if err := f.db.Permissions().Create(t.Context(), model.Permission{
+			Name: "read-" + key, Resources: map[api.ResourceType]model.Resource{
+				api.ResourceArtifact: {
+					Actions: model.Grants{
+						Users: map[string]api.Actions{"alice": api.ActionRead},
 					},
-					Targets: map[string]types.Target{key: {Include: []string{"assets/**"}}},
+					Targets: map[string]model.Target{key: {Include: []string{"assets/**"}}},
 				},
 			},
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := f.db.Permissions().Create(t.Context(), types.Permission{
-		Name: "write-public", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"alice": types.ActionWrite}},
-				Targets: map[string]types.Target{
+	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+		Name: "write-public", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{"alice": api.ActionWrite}},
+				Targets: map[string]model.Target{
 					"lfs-local": {Include: []string{"assets/public.bin"}},
 				},
 			},
@@ -486,7 +489,7 @@ func TestAccGitLFSVirtualVerifyHidesPathsOutsideDeploymentWriteGrant(t *testing.
 		t.Fatal(err)
 	}
 	stamp := time.Now().UTC().Truncate(time.Second)
-	for _, lock := range []types.GitLFSLock{
+	for _, lock := range []model.GitLFSLock{
 		{ID: "public", RepoKey: "lfs-local", Path: "assets/public.bin", Owner: "alice", LockedAt: stamp},
 		{ID: "private", RepoKey: "lfs-empty", Path: "assets/private.bin", Owner: "bob", LockedAt: stamp},
 	} {
@@ -510,13 +513,13 @@ func TestAccGitLFSVirtualPathFilterSkipsUnreadableMember(t *testing.T) {
 	for key, include := range map[string]string{
 		"lfs-empty": "assets/public.bin", "lfs-local": "assets/private.bin",
 	} {
-		if err := f.db.Permissions().Create(t.Context(), types.Permission{
-			Name: "read-" + key, Resources: map[types.ResourceType]types.Resource{
-				types.ResourceArtifact: {
-					Actions: types.Grants{
-						Users: map[string]types.Actions{"alice": types.ActionRead},
+		if err := f.db.Permissions().Create(t.Context(), model.Permission{
+			Name: "read-" + key, Resources: map[api.ResourceType]model.Resource{
+				api.ResourceArtifact: {
+					Actions: model.Grants{
+						Users: map[string]api.Actions{"alice": api.ActionRead},
 					},
-					Targets: map[string]types.Target{key: {Include: []string{include}}},
+					Targets: map[string]model.Target{key: {Include: []string{include}}},
 				},
 			},
 		}); err != nil {
@@ -524,7 +527,7 @@ func TestAccGitLFSVirtualPathFilterSkipsUnreadableMember(t *testing.T) {
 		}
 	}
 	stamp := time.Now().UTC().Truncate(time.Second)
-	for _, lock := range []types.GitLFSLock{
+	for _, lock := range []model.GitLFSLock{
 		{ID: "hidden", RepoKey: "lfs-empty", Path: "assets/private.bin", Owner: "bob", LockedAt: stamp},
 		{ID: "visible", RepoKey: "lfs-local", Path: "assets/private.bin", Owner: "alice", LockedAt: stamp},
 	} {
@@ -556,7 +559,7 @@ func TestAccGitLFSLockInvalidRequestsLeaveStateUnchanged(t *testing.T) {
 		}
 	}
 	rows, _, err := f.db.GitLFSLocks().List(t.Context(),
-		store.GitLFSLockFilter{RepoKey: "lfs"}, store.Page{})
+		port.GitLFSLockFilter{RepoKey: "lfs"}, kernel.Page{})
 	if err != nil || len(rows) != 0 {
 		t.Fatalf("invalid requests mutated locks: %+v %v", rows, err)
 	}
@@ -663,7 +666,7 @@ func TestAccGitLFSLockMediaTypeRejectionsPreserveState(t *testing.T) {
 		})
 	}
 	rows, _, err := f.db.GitLFSLocks().List(t.Context(),
-		store.GitLFSLockFilter{RepoKey: "lfs"}, store.Page{})
+		port.GitLFSLockFilter{RepoKey: "lfs"}, kernel.Page{})
 	if err != nil || len(rows) != 0 {
 		t.Fatalf("invalid media type changed locks: %+v, err=%v", rows, err)
 	}

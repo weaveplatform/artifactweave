@@ -8,14 +8,14 @@ import (
 	"net/http"
 	"path"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func recordOf(index condafmt.Repodata, id condafmt.PackagePath) (condafmt.Record, bool) {
@@ -28,11 +28,11 @@ func recordOf(index condafmt.Repodata, id condafmt.PackagePath) (condafmt.Record
 }
 
 func (h handler) readPackage(w http.ResponseWriter, r *http.Request, id condafmt.PackagePath) {
-	if !h.k.Require(w, r, id.Path, types.ActionRead) {
+	if !h.k.Require(w, r, id.Path, api.ActionRead) {
 		return
 	}
 	if err := h.servePackage(w, r, id, map[string]bool{}); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			err = apierror.New(http.StatusNotFound, "Conda package not found")
 		}
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
@@ -57,7 +57,7 @@ func (h handler) servePackage(w http.ResponseWriter, r *http.Request, id condafm
 			return err
 		}
 		for _, mr := range members {
-			if !h.k.Can(mr, id.Path, types.ActionRead) {
+			if !h.k.Can(mr, id.Path, api.ActionRead) {
 				continue
 			}
 			indexPath := condafmt.IndexPath(id.Channel, id.Subdir, "repodata.json")
@@ -78,10 +78,10 @@ func (h handler) servePackage(w http.ResponseWriter, r *http.Request, id condafm
 			}
 			return h.servePackage(w, mr, id, seen)
 		}
-		return store.ErrNotFound
+		return kernel.ErrNotFound
 	}
-	if !h.k.Can(r, id.Path, types.ActionRead) ||
-		!h.k.CanFolder(r, path.Dir(id.Path), types.ActionRead) {
+	if !h.k.Can(r, id.Path, api.ActionRead) ||
+		!h.k.CanFolder(r, path.Dir(id.Path), api.ActionRead) {
 		return source.ErrDenied
 	}
 	indexPath := condafmt.IndexPath(id.Channel, id.Subdir, "repodata.json")
@@ -91,7 +91,7 @@ func (h handler) servePackage(w http.ResponseWriter, r *http.Request, id condafm
 	}
 	rec, ok := recordOf(index, id)
 	if !ok {
-		return store.ErrNotFound
+		return kernel.ErrNotFound
 	}
 	if finish != nil {
 		if err := finish(r.Context()); err != nil {
@@ -105,7 +105,7 @@ func (h handler) servePackage(w http.ResponseWriter, r *http.Request, id condafm
 	resource := source.Resource{
 		Kind: source.ResourceKindArtifact, Path: id.Path, Method: http.MethodGet,
 		Variant:   "conda-package-v1",
-		Checksums: types.Checksums{SHA256: rec.SHA256, MD5: rec.MD5},
+		Checksums: kernel.Checksums{SHA256: rec.SHA256, MD5: rec.MD5},
 		Validate: func(ctx context.Context, body io.ReadSeeker, size int64) error {
 			if size != rec.Size {
 				return source.ErrInvalidResult

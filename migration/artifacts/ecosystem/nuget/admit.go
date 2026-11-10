@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Admit applies Enforce Layout's rules (decision 0038, "Storage and the
@@ -93,14 +93,14 @@ func held(
 	w format.Write,
 ) (bool, error) {
 	p, err := st.Packages().Find(ctx, c.Key, key.pkg)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return false, nil
 	}
 	if err != nil {
 		return false, fmt.Errorf("nuget: package %s: %w", key.pkg, err)
 	}
 	pv, err := st.Packages().Version(ctx, p.ID, key.version)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return false, nil
 	}
 	if err != nil {

@@ -14,12 +14,12 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	hexfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Options configures the Hex registry protocol. KeyPairs reads through the
@@ -90,7 +90,7 @@ func (h handler) signingKey(r *http.Request) (*rsa.PrivateKey, error) {
 		return nil, apierror.New(http.StatusServiceUnavailable, "Hex signing key is not configured")
 	}
 	pair, err := h.o.KeyPairs.Keypair(r.Context(), ref)
-	if err != nil || pair.Type != types.KeypairRSA {
+	if err != nil || pair.Type != accessapi.KeypairRSA {
 		return nil, apierror.New(
 			http.StatusServiceUnavailable,
 			"Hex RSA signing key is unavailable",
@@ -120,7 +120,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if path == "public_key" {
-		if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+		if !h.k.RequireFolder(w, r, "", accessapi.ActionRead) {
 			return
 		}
 		key, err := h.signingKey(r)
@@ -131,7 +131,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		h.write(w, r, []byte(hexfmt.PublicKeyPEM(key)), "application/x-pem-file")
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", accessapi.ActionRead) {
 		return
 	}
 	packages, err := h.packages(r, path)
@@ -200,7 +200,7 @@ func (h handler) packages(r *http.Request, path string) (map[string]hexfmt.Regis
 	out := map[string]hexfmt.RegistryPackage{}
 	for _, it := range items {
 		p := it.FullPath()
-		if !hexfmt.IsTarballPath(p) || !h.k.Can(r, p, types.ActionRead) {
+		if !hexfmt.IsTarballPath(p) || !h.k.Can(r, p, accessapi.ActionRead) {
 			continue
 		}
 		pkg, err := h.packageItem(r, it)
@@ -225,7 +225,7 @@ func (h handler) packages(r *http.Request, path string) (map[string]hexfmt.Regis
 	return out, nil
 }
 
-func (h handler) packageItem(r *http.Request, it types.Item) (hexfmt.Package, error) {
+func (h handler) packageItem(r *http.Request, it model.Item) (hexfmt.Package, error) {
 	rc, _, err := h.k.Blobs().Open(r.Context(), it.Actual.SHA256)
 	if err != nil {
 		return hexfmt.Package{}, fmt.Errorf("hex: open stored package: %w", err)
@@ -243,7 +243,7 @@ func (h handler) packageItem(r *http.Request, it types.Item) (hexfmt.Package, er
 }
 
 func (h handler) tarball(w http.ResponseWriter, r *http.Request, path string) {
-	if !h.k.Require(w, r, path, types.ActionRead) {
+	if !h.k.Require(w, r, path, accessapi.ActionRead) {
 		return
 	}
 	c := pkgroute.RequestFrom(r).Repo
@@ -254,14 +254,14 @@ func (h handler) tarball(w http.ResponseWriter, r *http.Request, path string) {
 			return
 		}
 		for _, mr := range members {
-			if !h.k.Can(mr, path, types.ActionRead) {
+			if !h.k.Can(mr, path, accessapi.ActionRead) {
 				continue
 			}
 			if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
 				// The remote adapter resolves and validates the artifact against
 				// its upstream signed registry before delivery.
 				result, err := h.remoteResult(mr, path)
-				if errors.Is(err, store.ErrNotFound) {
+				if errors.Is(err, kernel.ErrNotFound) {
 					continue
 				}
 				if err != nil {
@@ -272,7 +272,7 @@ func (h handler) tarball(w http.ResponseWriter, r *http.Request, path string) {
 				return
 			}
 			found, err := h.k.Item(mr, path)
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, kernel.ErrNotFound) {
 				continue
 			}
 			if err != nil {
@@ -302,7 +302,7 @@ func (h handler) members(r *http.Request) ([]*http.Request, error) {
 		}
 		seen[key] = true
 		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -332,7 +332,7 @@ func (h handler) virtualPackages(
 	out := map[string]hexfmt.RegistryPackage{}
 	for _, mr := range members {
 		entries, err := h.packages(mr, path)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {

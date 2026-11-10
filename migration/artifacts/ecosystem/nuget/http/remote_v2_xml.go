@@ -12,7 +12,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const xmlNS = "http://www.w3.org/XML/1998/namespace"
@@ -144,7 +144,7 @@ type remoteAtomEntry struct {
 	atom   atomEntry
 	values map[string]string
 	meta   nugetfmt.Metadata
-	checks types.Checksums
+	checks kernel.Checksums
 }
 type remoteAtomPage struct {
 	entries []remoteAtomEntry
@@ -340,9 +340,9 @@ func remoteEntryProperties(n *remoteXML) (map[string]string, error) {
 	return values, nil
 }
 
-func v2Checksums(values map[string]string) (types.Checksums, error) {
+func v2Checksums(values map[string]string) (kernel.Checksums, error) {
 	hash, algorithm := values["PackageHash"], strings.ToUpper(values["PackageHashAlgorithm"])
-	var out types.Checksums
+	var out kernel.Checksums
 	if hash == "" && algorithm == "" {
 		return out, nil
 	}

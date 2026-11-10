@@ -9,28 +9,29 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/idempotency"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var (
 	// ErrInvalid is a document or request the API refuses as malformed.
 	ErrInvalid = errors.New("build: invalid request")
 	// ErrNotFound is a build or run that does not exist.
-	ErrNotFound = store.ErrNotFound
+	ErrNotFound = kernel.ErrNotFound
 	// ErrNoRepository is a project whose build-info repository does not
 	// exist. Projects are P11, so only the default project's is seeded.
 	ErrNoRepository = errors.New("build: the build-info repository does not exist")
 	// ErrForbidden is an operation the caller's permissions do not allow.
 	ErrForbidden = errors.New("build: permission denied")
 	// ErrConflict is a rename to a name that has runs.
-	ErrConflict = store.ErrConflict
+	ErrConflict = kernel.ErrConflict
 )
 
 // Access answers what the caller may do. Builds are the build resource of
@@ -39,8 +40,8 @@ var (
 // a build name's folder for a listing of names. Deleting a run's artifacts
 // asks about each of their items as an artifact.
 type Access interface {
-	Build(repoKey, path string, folder bool, want types.Actions) bool
-	Item(c repo.Config, path string, want types.Actions) bool
+	Build(repoKey, path string, folder bool, want api.Actions) bool
+	Item(c repo.Config, path string, want api.Actions) bool
 }
 
 // Store is what the build service reads and writes: the item service's
@@ -75,7 +76,7 @@ type Service struct {
 
 // checkDuplicates refuses modules that list one file twice, unless the
 // service allows it.
-func (s *Service) checkDuplicates(modules []types.BuildModule) error {
+func (s *Service) checkDuplicates(modules []model.BuildModule) error {
 	if s.AllowDuplicateEntries {
 		return nil
 	}
@@ -106,11 +107,11 @@ func ProjectKey(p string) string {
 
 // Published is what a publish stored.
 type Published struct {
-	Run types.Build
+	Run model.Build
 	// SHA256 is the stored document's, which the JFrog CLI reports.
 	SHA256 string
 	// Discarded are the runs the document's buildRetention discarded.
-	Discarded []types.BuildRun
+	Discarded []model.BuildRun
 	// Retention is why the document's buildRetention discarded nothing,
 	// such as a publisher without delete. The publish stands regardless,
 	// as Artifactory's does.
@@ -149,7 +150,7 @@ func (s *Service) Publish(
 		return Published{}, err
 	}
 	_, path := b.DocumentItem()
-	if !a.Build(c.Key, path, false, types.ActionWrite) {
+	if !a.Build(c.Key, path, false, api.ActionWrite) {
 		return Published{}, ErrForbidden
 	}
 	now := s.now()
@@ -160,14 +161,14 @@ func (s *Service) Publish(
 		switch {
 		case err == nil:
 			b.ID, b.Created, b.CreatedBy = old.ID, old.Created, old.CreatedBy
-		case !errors.Is(err, store.ErrNotFound):
+		case !errors.Is(err, kernel.ErrNotFound):
 			return fmt.Errorf("build: get run: %w", err)
 		}
 		exists, err := s.exists(ctx, c, path)
 		if err != nil {
 			return err
 		}
-		if (b.ID != 0 || exists) && !a.Build(c.Key, path, false, types.ActionDelete) {
+		if (b.ID != 0 || exists) && !a.Build(c.Key, path, false, api.ActionDelete) {
 			return ErrForbidden
 		}
 		if b.ID != 0 {
@@ -206,14 +207,14 @@ func (s *Service) Run(
 	projectKey, name, number string,
 	started time.Time,
 	a Access,
-) (types.Build, error) {
+) (model.Build, error) {
 	b, err := s.Store.Builds().Get(ctx, ProjectKey(projectKey), name, number, started)
 	if err != nil {
-		return types.Build{}, fmt.Errorf("build: get run: %w", err)
+		return model.Build{}, fmt.Errorf("build: get run: %w", err)
 	}
 	repoKey, path := b.DocumentItem()
-	if !a.Build(repoKey, path, false, types.ActionRead) {
-		return types.Build{}, ErrForbidden
+	if !a.Build(repoKey, path, false, api.ActionRead) {
+		return model.Build{}, ErrForbidden
 	}
 	return b, nil
 }
@@ -225,7 +226,7 @@ func (s *Service) Runs(
 	ctx context.Context,
 	projectKey, name string,
 	a Access,
-) ([]types.BuildRun, error) {
+) ([]model.BuildRun, error) {
 	projectKey = ProjectKey(projectKey)
 	all, err := s.runs(ctx, projectKey, name)
 	if err != nil {
@@ -234,10 +235,10 @@ func (s *Service) Runs(
 	if len(all) == 0 {
 		return nil, fmt.Errorf("build: runs of %s: %w", name, ErrNotFound)
 	}
-	repoKey := types.BuildInfoRepo(projectKey)
-	var out []types.BuildRun
+	repoKey := model.BuildInfoRepo(projectKey)
+	var out []model.BuildRun
 	for _, r := range all {
-		if a.Build(repoKey, documentPath(r), false, types.ActionRead) {
+		if a.Build(repoKey, documentPath(r), false, api.ActionRead) {
 			out = append(out, r)
 		}
 	}
@@ -253,18 +254,18 @@ func (s *Service) Names(
 	ctx context.Context,
 	projectKey string,
 	a Access,
-) ([]types.BuildName, error) {
+) ([]model.BuildName, error) {
 	projectKey = ProjectKey(projectKey)
-	all, err := collect(s.Page, func(p store.Page) ([]types.BuildName, string, error) {
+	all, err := collect(s.Page, func(p kernel.Page) ([]model.BuildName, string, error) {
 		return s.Store.Builds().Names(ctx, projectKey, p)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build: names: %w", err)
 	}
-	repoKey := types.BuildInfoRepo(projectKey)
-	var out []types.BuildName
+	repoKey := model.BuildInfoRepo(projectKey)
+	var out []model.BuildName
 	for _, n := range all {
-		if a.Build(repoKey, types.EncodeBuildInfoSegment(n.Name), true, types.ActionRead) {
+		if a.Build(repoKey, model.EncodeBuildInfoSegment(n.Name), true, api.ActionRead) {
 			out = append(out, n)
 		}
 	}
@@ -302,7 +303,7 @@ func (s *Service) Append(ctx context.Context, ap Append, a Access) error {
 			return fmt.Errorf("build: get run: %w", err)
 		}
 		_, path := b.DocumentItem()
-		if !a.Build(c.Key, path, false, types.ActionWrite|types.ActionDelete) {
+		if !a.Build(c.Key, path, false, api.ActionWrite|api.ActionDelete) {
 			return ErrForbidden
 		}
 		var cur struct {
@@ -363,8 +364,8 @@ func (s *Service) Rename(ctx context.Context, projectKey, from, to, by string, a
 		for _, r := range runs {
 			moved := r
 			moved.Name = to
-			if !a.Build(c.Key, documentPath(r), false, types.ActionWrite|types.ActionDelete) ||
-				!a.Build(c.Key, documentPath(moved), false, types.ActionWrite) {
+			if !a.Build(c.Key, documentPath(r), false, api.ActionWrite|api.ActionDelete) ||
+				!a.Build(c.Key, documentPath(moved), false, api.ActionWrite) {
 				return ErrForbidden
 			}
 		}
@@ -423,7 +424,7 @@ type Delete struct {
 // checksum that carry the run's build.name and build.number properties, as
 // item deletes: to the trash can, and needing delete on each. It returns the
 // deleted runs; ErrNotFound when none was.
-func (s *Service) Delete(ctx context.Context, d Delete, a Access) ([]types.BuildRun, error) {
+func (s *Service) Delete(ctx context.Context, d Delete, a Access) ([]model.BuildRun, error) {
 	if !d.All && len(d.Numbers) == 0 {
 		return nil, fmt.Errorf("%w: no build numbers to delete", ErrInvalid)
 	}
@@ -432,11 +433,11 @@ func (s *Service) Delete(ctx context.Context, d Delete, a Access) ([]types.Build
 	if err != nil {
 		return nil, err
 	}
-	var gone []types.BuildRun
+	var gone []model.BuildRun
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
 		// The store returns the deleted runs without their modules, so the
 		// artifacts are read first.
-		loaded := map[int64]types.Build{}
+		loaded := map[int64]model.Build{}
 		if d.Artifacts {
 			runs, err := s.runs(ctx, projectKey, d.Name)
 			if err != nil {
@@ -461,7 +462,7 @@ func (s *Service) Delete(ctx context.Context, d Delete, a Access) ([]types.Build
 			return fmt.Errorf("build: runs of %s: %w", d.Name, ErrNotFound)
 		}
 		for _, r := range gone {
-			if !a.Build(c.Key, documentPath(r), false, types.ActionDelete) {
+			if !a.Build(c.Key, documentPath(r), false, api.ActionDelete) {
 				return ErrForbidden
 			}
 		}
@@ -492,14 +493,14 @@ func (s *Service) Artifacts(
 	ctx context.Context,
 	projectKey, name, number string,
 	a Access,
-) ([]types.Item, error) {
+) ([]model.Item, error) {
 	b, err := s.Run(ctx, projectKey, name, number, time.Time{}, a)
 	if err != nil {
 		return nil, err
 	}
-	var out []types.Item
-	err = s.eachArtifactItem(ctx, b, func(c repo.Config, it types.Item) error {
-		if a.Item(c, it.FullPath(), types.ActionRead) {
+	var out []model.Item
+	err = s.eachArtifactItem(ctx, b, func(c repo.Config, it model.Item) error {
+		if a.Item(c, it.FullPath(), api.ActionRead) {
 			out = append(out, it)
 		}
 		return nil
@@ -515,23 +516,23 @@ func (s *Service) Artifacts(
 // alone.
 func (s *Service) SearchArtifacts(
 	ctx context.Context,
-	b types.Build,
-	in func(types.Item) bool,
+	b model.Build,
+	in func(model.Item) bool,
 	a Access,
-) ([]types.Item, error) {
+) ([]model.Item, error) {
 	keep := s.artifactOf(b, in)
 	seen, taken := map[int64]bool{}, claims{}
-	var out []types.Item
+	var out []model.Item
 	for _, m := range b.Modules {
 		for _, bf := range m.Artifacts {
-			if bf.Checksums == (types.Checksums{}) {
+			if bf.Checksums == (kernel.Checksums{}) {
 				continue
 			}
 			f, ok, err := s.findFile(ctx, bf, keep, taken, artifactKey(bf))
 			if err != nil {
 				return nil, err
 			}
-			if !ok || seen[f.it.ID] || !a.Item(f.repo, f.it.FullPath(), types.ActionRead) {
+			if !ok || seen[f.it.ID] || !a.Item(f.repo, f.it.FullPath(), api.ActionRead) {
 				continue
 			}
 			seen[f.it.ID] = true
@@ -553,13 +554,13 @@ func (s *Service) Find(
 	ctx context.Context,
 	projectKey, name, number, status string,
 	a Access,
-) (types.Build, error) {
+) (model.Build, error) {
 	projectKey = ProjectKey(projectKey)
 	all, err := s.runs(ctx, projectKey, name)
 	if err != nil {
-		return types.Build{}, err
+		return model.Build{}, err
 	}
-	repoKey, hidden := types.BuildInfoRepo(projectKey), false
+	repoKey, hidden := model.BuildInfoRepo(projectKey), false
 	for _, r := range all {
 		if number != Latest && r.Number != number {
 			continue
@@ -567,26 +568,26 @@ func (s *Service) Find(
 		if status != "" {
 			ok, err := s.promotedTo(ctx, r.ID, status)
 			if err != nil {
-				return types.Build{}, err
+				return model.Build{}, err
 			}
 			if !ok {
 				continue
 			}
 		}
-		if !a.Build(repoKey, documentPath(r), false, types.ActionRead) {
+		if !a.Build(repoKey, documentPath(r), false, api.ActionRead) {
 			hidden = true
 			continue
 		}
 		b, err := s.Store.Builds().ByID(ctx, r.ID)
 		if err != nil {
-			return types.Build{}, fmt.Errorf("build: get run: %w", err)
+			return model.Build{}, fmt.Errorf("build: get run: %w", err)
 		}
 		return b, nil
 	}
 	if hidden {
-		return types.Build{}, ErrForbidden
+		return model.Build{}, ErrForbidden
 	}
-	return types.Build{}, fmt.Errorf("build: run %s/%s: %w", name, number, ErrNotFound)
+	return model.Build{}, fmt.Errorf("build: run %s/%s: %w", name, number, ErrNotFound)
 }
 
 func (s *Service) promotedTo(ctx context.Context, id int64, status string) (bool, error) {
@@ -599,8 +600,8 @@ func (s *Service) promotedTo(ctx context.Context, id int64, status string) (bool
 
 // deleteArtifacts deletes the items of run b's artifacts that carry its
 // build properties.
-func (s *Service) deleteArtifacts(ctx context.Context, b types.Build, by string, a Access) error {
-	return s.eachArtifactItem(ctx, b, func(c repo.Config, it types.Item) error {
+func (s *Service) deleteArtifacts(ctx context.Context, b model.Build, by string, a Access) error {
+	return s.eachArtifactItem(ctx, b, func(c repo.Config, it model.Item) error {
 		props, err := s.Store.Items().Properties(ctx, it.ID)
 		if err != nil {
 			return fmt.Errorf("build: properties of %s: %w", it.FullPath(), err)
@@ -608,7 +609,7 @@ func (s *Service) deleteArtifacts(ctx context.Context, b types.Build, by string,
 		if !props.Has("build.name", b.Name) || !props.Has("build.number", b.Number) {
 			return nil
 		}
-		if !a.Item(c, it.FullPath(), types.ActionDelete) {
+		if !a.Item(c, it.FullPath(), api.ActionDelete) {
 			return ErrForbidden
 		}
 		t := item.Target{Repo: c, Cached: it.Cached, Path: it.FullPath()}
@@ -619,7 +620,7 @@ func (s *Service) deleteArtifacts(ctx context.Context, b types.Build, by string,
 			return fmt.Errorf("build: sidecars of %s: %w", it.FullPath(), err)
 		}
 		for _, sc := range sidecars {
-			if !a.Item(c, sc.From, types.ActionDelete) {
+			if !a.Item(c, sc.From, api.ActionDelete) {
 				return ErrForbidden
 			}
 		}
@@ -634,17 +635,17 @@ func (s *Service) deleteArtifacts(ctx context.Context, b types.Build, by string,
 // of b's artifacts, with its repository.
 func (s *Service) eachArtifactItem(
 	ctx context.Context,
-	b types.Build,
-	fn func(repo.Config, types.Item) error,
+	b model.Build,
+	fn func(repo.Config, model.Item) error,
 ) error {
 	seen := map[int64]bool{}
 	repos := map[string]repo.Config{}
 	for _, m := range b.Modules {
 		for _, f := range m.Artifacts {
-			if f.Checksums == (types.Checksums{}) {
+			if f.Checksums == (kernel.Checksums{}) {
 				continue
 			}
-			found, err := collect(s.Page, func(p store.Page) ([]types.Item, string, error) {
+			found, err := collect(s.Page, func(p kernel.Page) ([]model.Item, string, error) {
 				return s.Store.Items().FindByChecksum(ctx, f.Checksums, p)
 			})
 			if err != nil {
@@ -672,9 +673,9 @@ func (s *Service) eachArtifactItem(
 }
 
 func (s *Service) repository(ctx context.Context, projectKey string) (repo.Config, error) {
-	key := types.BuildInfoRepo(projectKey)
+	key := model.BuildInfoRepo(projectKey)
 	c, err := s.Store.Repos().Get(ctx, key)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return c, fmt.Errorf("%w: %s", ErrNoRepository, key)
 	}
 	if err != nil {
@@ -684,8 +685,8 @@ func (s *Service) repository(ctx context.Context, projectKey string) (repo.Confi
 }
 
 // runs lists every run of a build, newest first.
-func (s *Service) runs(ctx context.Context, projectKey, name string) ([]types.BuildRun, error) {
-	out, err := collect(s.Page, func(p store.Page) ([]types.BuildRun, string, error) {
+func (s *Service) runs(ctx context.Context, projectKey, name string) ([]model.BuildRun, error) {
+	out, err := collect(s.Page, func(p kernel.Page) ([]model.BuildRun, string, error) {
 		return s.Store.Builds().Runs(ctx, projectKey, name, p)
 	})
 	if err != nil {
@@ -697,9 +698,9 @@ func (s *Service) runs(ctx context.Context, projectKey, name string) ([]types.Bu
 func (s *Service) writeDocument(
 	ctx context.Context,
 	c repo.Config,
-	b types.Build,
+	b model.Build,
 	by string,
-) (types.Item, error) {
+) (model.Item, error) {
 	_, path := b.DocumentItem()
 	// The server writes the document from the run it stored, so its
 	// computed checksums are the originals.
@@ -708,7 +709,7 @@ func (s *Service) writeDocument(
 		Trusted: true,
 	})
 	if err != nil {
-		return types.Item{}, fmt.Errorf("build: write document %s: %w", path, err)
+		return model.Item{}, fmt.Errorf("build: write document %s: %w", path, err)
 	}
 	return it, nil
 }
@@ -720,7 +721,7 @@ func (s *Service) writeDocument(
 func (s *Service) exists(ctx context.Context, c repo.Config, path string) (bool, error) {
 	_, err := s.Store.Items().Get(ctx, c.Key, false, path)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return false, nil
 	case err != nil:
 		return false, fmt.Errorf("build: get %s: %w", path, err)
@@ -731,16 +732,16 @@ func (s *Service) exists(ctx context.Context, c repo.Config, path string) (bool,
 // dropDocument removes a deleted run's document item for good, and its
 // build name's folder once nothing is left in it. A document already
 // deleted through the item API is no error: the run goes all the same.
-func (s *Service) dropDocument(ctx context.Context, c repo.Config, r types.BuildRun) error {
+func (s *Service) dropDocument(ctx context.Context, c repo.Config, r model.BuildRun) error {
 	if err := s.purge(ctx, c, documentPath(r)); err != nil {
 		return err
 	}
-	folder := types.EncodeBuildInfoSegment(r.Name)
+	folder := model.EncodeBuildInfoSegment(r.Name)
 	ok, err := s.exists(ctx, c, folder)
 	if err != nil || !ok {
 		return err
 	}
-	left, _, err := s.Store.Items().Descendants(ctx, c.Key, false, folder, store.Page{Limit: 1})
+	left, _, err := s.Store.Items().Descendants(ctx, c.Key, false, folder, kernel.Page{Limit: 1})
 	if err != nil {
 		return fmt.Errorf("build: list %s: %w", folder, err)
 	}
@@ -763,16 +764,16 @@ func (s *Service) purge(ctx context.Context, c repo.Config, path string) error {
 
 // documentPath is the path of a run's document item in its build-info
 // repository.
-func documentPath(r types.BuildRun) string {
-	_, path := types.Build{
+func documentPath(r model.BuildRun) string {
+	_, path := model.Build{
 		ProjectKey: r.ProjectKey, Name: r.Name, Number: r.Number, Started: r.Started,
 	}.DocumentItem()
 	return path
 }
 
-func collect[T any](size int, list func(store.Page) ([]T, string, error)) ([]T, error) {
+func collect[T any](size int, list func(kernel.Page) ([]T, string, error)) ([]T, error) {
 	var out []T
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	if size > 0 {
 		page.Limit = size
 	}

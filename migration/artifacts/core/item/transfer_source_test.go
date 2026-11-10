@@ -8,19 +8,19 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 type transferSourceGuard struct {
 	bare
-	check func(repo.Config, types.Item) error
+	check func(repo.Config, model.Item) error
 }
 
 func (g transferSourceGuard) GuardTransferSource(
 	_ context.Context,
 	_ format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 ) error {
 	return g.check(c, it)
 }
@@ -34,7 +34,7 @@ func TestUnitTransferSourceGuardPrecedesDestinationInspection(t *testing.T) {
 			r := &recorder{calls: map[string]bool{}}
 			fault := errors.New("source authority unavailable")
 			called := false
-			guard := transferSourceGuard{check: func(c repo.Config, it types.Item) error {
+			guard := transferSourceGuard{check: func(c repo.Config, it model.Item) error {
 				called = true
 				if c.Key != w.loc.Key || it.ID != src.ID || len(r.order) != 0 {
 					t.Fatalf(
@@ -97,7 +97,7 @@ func TestUnitTransferSourceGuardFaultAbortsWholeFolder(t *testing.T) {
 		if kind == dst.PackageType {
 			return r
 		}
-		return transferSourceGuard{check: func(_ repo.Config, it types.Item) error {
+		return transferSourceGuard{check: func(_ repo.Config, it model.Item) error {
 			checked++
 			if it.FullPath() == "src/b.txt" {
 				if len(r.order) == 0 {

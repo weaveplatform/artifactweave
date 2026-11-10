@@ -7,12 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type remoteFixture struct {
@@ -53,7 +55,7 @@ func newRemoteFixture(t *testing.T, git bool) *remoteFixture {
 	t.Cleanup(pool.Close)
 	f.mount(&source.Service{
 		HTTP: policy, Cache: policy,
-		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			return f.db.RemoteCache().Source(ctx, c.Key)
 		},
 	})
@@ -249,11 +251,11 @@ func TestUnitBowerGitCatalogFiltersNamesBeforeFetchingRefs(t *testing.T) {
 		{"name":"visible","url":"` + f.up.URL + `/git/team/visible.git"},
 		{"name":"secret","url":"` + f.up.URL + `/git/team/secret.git"}
 	]`)})
-	if err := f.db.Permissions().Create(t.Context(), types.Permission{
+	if err := f.db.Permissions().Create(t.Context(), model.Permission{
 		Name: "visible-bower",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"limited": types.ActionRead}},
-			Targets: map[string]types.Target{"bower-remote": {Include: []string{"visible/**"}}},
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"limited": api.ActionRead}},
+			Targets: map[string]model.Target{"bower-remote": {Include: []string{"visible/**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

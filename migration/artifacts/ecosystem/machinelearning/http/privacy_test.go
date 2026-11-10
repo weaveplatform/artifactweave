@@ -6,9 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 func TestAccPrivateModelRecordsCannotEscape(t *testing.T) {
@@ -48,7 +50,7 @@ func TestAccPrivateModelRecordsCannotEscape(t *testing.T) {
 		}
 	}
 	if err := f.db.Settings().
-		Put(t.Context(), types.SettingFolderDownload, types.FolderDownloadSettings{Enabled: true}); err != nil {
+		Put(t.Context(), settings.SettingFolderDownload, model.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	archive := f.status(
@@ -89,7 +91,7 @@ func TestAccPrivateModelRecordsCannotEscape(t *testing.T) {
 	}
 	f.grant(
 		"manager",
-		types.ActionRead|types.ActionWrite|types.ActionDelete|types.ActionManage,
+		accessapi.ActionRead|accessapi.ActionWrite|accessapi.ActionDelete|accessapi.ActionManage,
 		[]string{"**"},
 		nil,
 	)

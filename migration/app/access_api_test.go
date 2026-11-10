@@ -9,7 +9,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
+	platformsettings "github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // uncomparable is a Grants that == cannot compare, as a fake holding a
@@ -48,12 +49,12 @@ func TestUnitWithAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	var on bool
-	err := st.Settings().Get(ctx, types.SettingAnonymousAccess, &on)
+	err := st.Settings().Get(ctx, platformsettings.SettingAnonymousAccess, &on)
 	if err != nil || !on {
 		t.Errorf("the Config's store reads anonymous access %v, %v; want on", on, err)
 	}
 
-	if err := st.Instance().Init(ctx, types.InstanceIdentity{
+	if err := st.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)

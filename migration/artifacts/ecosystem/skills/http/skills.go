@@ -15,11 +15,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	skillsfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxPayloadBytes = 64 << 10
@@ -69,7 +71,7 @@ type file struct {
 }
 
 func (h handler) publish(w http.ResponseWriter, r *http.Request) {
-	if !h.k.RequireFolder(w, r, "", types.ActionWrite) {
+	if !h.k.RequireFolder(w, r, "", api.ActionWrite) {
 		return
 	}
 	p, files, err := readPublish(w, r)
@@ -83,20 +85,20 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	props := types.Properties{}
+	props := model.Properties{}
 	for key, value := range map[string]string{
 		"skill.displayName": p.DisplayName,
 		"skill.summary":     p.Summary,
 		"skill.changelog":   p.Changelog,
 	} {
 		if value != "" {
-			props[key] = []string{types.TruncatePropertyValue(value, types.PropertyValueMax)}
+			props[key] = []string{model.TruncatePropertyValue(value, model.PropertyValueMax)}
 		}
 	}
 	if len(p.Tags) > 0 {
 		props["skill.tags"] = p.Tags
 	}
-	it, err := h.k.Store(r, target, bytes.NewReader(body), props, types.Checksums{})
+	it, err := h.k.Store(r, target, bytes.NewReader(body), props, kernel.Checksums{})
 	if err != nil {
 		h.k.Error(w, r, err)
 		return

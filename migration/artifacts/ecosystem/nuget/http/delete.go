@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // target is the version a delete or a relist names, /{id}/{version} under
@@ -36,7 +36,7 @@ func (h handler) target(w http.ResponseWriter, r *http.Request) (version, bool) 
 	case err != nil:
 		h.k.Error(w, r, err)
 		return version{}, false
-	case !ok || !h.k.Can(r, v.meta.Path, types.ActionRead):
+	case !ok || !h.k.Can(r, v.meta.Path, api.ActionRead):
 		h.k.Error(w, r, apierror.New(http.StatusNotFound,
 			fmt.Sprintf("Could not find %s %s", id, ver)))
 		return version{}, false
@@ -69,7 +69,7 @@ func (h handler) remove(w http.ResponseWriter, r *http.Request) {
 			h.k.Error(w, r, fmt.Errorf("nuget: file %d of %s: %w", id, v.meta.ID, err))
 			return
 		}
-		if !h.k.Require(w, r, it.FullPath(), types.ActionDelete) {
+		if !h.k.Require(w, r, it.FullPath(), api.ActionDelete) {
 			return
 		}
 		paths = append(paths, it.FullPath())
@@ -95,7 +95,7 @@ func (h handler) remove(w http.ResponseWriter, r *http.Request) {
 // version's .nupkg [I], the right a listing change would need.
 func (h handler) relist(w http.ResponseWriter, r *http.Request) {
 	v, ok := h.target(w, r)
-	if !ok || !h.k.Require(w, r, v.meta.Path, types.ActionAnnotate) {
+	if !ok || !h.k.Require(w, r, v.meta.Path, api.ActionAnnotate) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)

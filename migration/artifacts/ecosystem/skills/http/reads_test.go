@@ -14,11 +14,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	skillsfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const skillsBase = "/artifactory/api/skills/skills-local"
@@ -55,13 +56,13 @@ func TestAccSkillsReadsRespectVersionPermissions(t *testing.T) {
 	old := published(t, f, "alpha", "1.0.0")
 	newer := published(t, f, "alpha", "2.0.0")
 	_ = published(t, f, "secret", "1.0.0")
-	if err := f.db.Permissions().Create(t.Context(), types.Permission{
+	if err := f.db.Permissions().Create(t.Context(), model.Permission{
 		Name: "skills-limited",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"limited": types.ActionRead,
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{
+				"limited": api.ActionRead,
 			}},
-			Targets: map[string]types.Target{f.repo.Key: {
+			Targets: map[string]model.Target{f.repo.Key: {
 				Include: []string{"alpha/1.0.0/**"},
 			}},
 		}},
@@ -204,7 +205,7 @@ func TestAccSkillsPaginationFilesAndLifecycle(t *testing.T) {
 		t.Fatalf("restored detail: %d %s", r.Code, r.Body)
 	}
 	// Reindex from the persisted ZIPs must preserve discoverability.
-	packages, _, err := f.db.Packages().List(t.Context(), f.repo.Key, store.Page{})
+	packages, _, err := f.db.Packages().List(t.Context(), f.repo.Key, kernel.Page{})
 	if err != nil || len(packages) != 3 {
 		t.Fatalf("packages: %v %v", packages, err)
 	}

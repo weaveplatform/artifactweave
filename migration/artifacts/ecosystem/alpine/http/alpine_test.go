@@ -15,12 +15,13 @@ import (
 	"testing"
 	"testing/iotest"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // The keys of the Alpine repositories the tests here store, beside
@@ -59,7 +60,7 @@ func upstream(at map[string]func() (source.Result, error)) sourceBackend {
 		if answer, ok := at[q.Resource.Path]; ok {
 			return answer()
 		}
-		return source.Result{}, store.ErrNotFound
+		return source.Result{}, kernel.ErrNotFound
 	}
 }
 
@@ -270,7 +271,7 @@ func TestAccAlpineRemoteIndexRechecksAuthority(t *testing.T) {
 // server faults; a cached item whose content is there is served as is.
 func TestAccAlpineRemoteIndexFailures(t *testing.T) {
 	index := apkIndex(t, "hello")
-	cachedAt := func(w *itemWorld, body []byte) *types.Item {
+	cachedAt := func(w *itemWorld, body []byte) *model.Item {
 		it := w.world.Put(w.t, alpineRepo(alpineRemote, repo.Remote), true, apkIndexPath, body)
 		return &it
 	}
@@ -298,9 +299,9 @@ func TestAccAlpineRemoteIndexFailures(t *testing.T) {
 		{
 			name: "cached content lost", sources: true,
 			answer: func(*itemWorld) (source.Result, error) {
-				return source.Result{Item: &types.Item{
+				return source.Result{Item: &model.Item{
 					RepoKey: alpineRemote, Cached: true, Path: "v3.20/main/x86_64",
-					Name: "APKINDEX.tar.gz", Actual: types.Checksums{SHA256: absentSHA256},
+					Name: "APKINDEX.tar.gz", Actual: kernel.Checksums{SHA256: absentSHA256},
 				}}, nil
 			},
 			status: http.StatusInternalServerError, message: "internal error",
@@ -366,7 +367,7 @@ func TestUnitAlpineMemberIndexRefusesWhatHasNoIndex(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := alpineItems{w.kit}.alpineMemberIndex(
 				t.Context(), w.db, tc.c, tc.cached, tc.path, kittest.Admin, kittest.AdminAccess())
-			if !errors.Is(err, store.ErrNotFound) {
+			if !errors.Is(err, kernel.ErrNotFound) {
 				t.Errorf("read returned %v, want not found", err)
 			}
 		})
@@ -453,8 +454,8 @@ func TestAccAlpineVirtualIndexFailsClosed(t *testing.T) {
 			name:    "signing key named outside apk's key file names",
 			virtual: signedBy("apk"),
 			seed: func(w *itemWorld) {
-				if err := w.db.Keys().CreateKeypair(w.t.Context(), types.Keypair{
-					Name: "apk", Type: types.KeypairRSA, Alias: "bad alias",
+				if err := w.db.Keys().CreateKeypair(w.t.Context(), api.Keypair{
+					Name: "apk", Type: api.KeypairRSA, Alias: "bad alias",
 					PrivateKey: rsaKeyPEM(w.t),
 				}); err != nil {
 					w.t.Fatal(err)

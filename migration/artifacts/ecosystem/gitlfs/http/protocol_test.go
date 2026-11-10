@@ -15,16 +15,18 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	gitlfshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gitlfs/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type fixture struct {
@@ -69,10 +71,10 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 		permissionTarget = "lfs-local"
 	}
 	if err = db.Permissions().
-		Create(t.Context(), types.Permission{Name: "lfs-access", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{
-				"reader": types.ActionRead, "writer": types.ActionWrite,
-			}}, Targets: map[string]types.Target{permissionTarget: {Include: []string{"objects/**"}}}},
+		Create(t.Context(), model.Permission{Name: "lfs-access", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{
+				"reader": api.ActionRead, "writer": api.ActionWrite,
+			}}, Targets: map[string]model.Target{permissionTarget: {Include: []string{"objects/**"}}}},
 		}}); err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +86,7 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 	pkgroute.Mount(r, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
 		ItemError: func(_ context.Context, _ string, e error) error { return e },
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 			rc, _, e := blobs.Open(r.Context(), it.Actual.SHA256)
 			if e != nil {
 				t.Error(e)

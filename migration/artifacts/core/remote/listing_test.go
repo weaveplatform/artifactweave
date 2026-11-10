@@ -14,12 +14,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func listingFixture(t *testing.T) (*policyWorld, *source.Service, source.Request) {
@@ -42,7 +43,7 @@ func listingFixture(t *testing.T) (*policyWorld, *source.Service, source.Request
 		t.Fatal(err)
 	}
 	s := &source.Service{
-		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			return w.db.RemoteCache().Source(ctx, c.Key)
 		},
 		HTTP: w.p, Cache: w.p,
@@ -80,7 +81,7 @@ func TestAccListingHTMLUsesFinalBaseFiltersPathsAndCachesOnlyMetadata(t *testing
 	if err = got.Revalidate(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	children, _, err := w.db.Items().Children(t.Context(), w.c.Key, true, "", store.Page{})
+	children, _, err := w.db.Items().Children(t.Context(), w.c.Key, true, "", kernel.Page{})
 	if err != nil || len(children) != 0 {
 		t.Fatalf("manufactured items %v %v", children, err)
 	}
@@ -103,7 +104,7 @@ func TestAccListingHTMLUsesFinalBaseFiltersPathsAndCachesOnlyMetadata(t *testing
 		&remote.ListingBudget{},
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("cache miss", err)
 	}
@@ -121,10 +122,12 @@ func TestAccListingPermissionFilteringAndFinalRevocation(t *testing.T) {
 		),
 	)
 	if err := w.db.Permissions().
-		Create(t.Context(), types.Permission{Name: "narrow", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"limited": types.ActionRead}},
-				Targets: map[string]types.Target{
+		Create(t.Context(), model.Permission{Name: "narrow", Resources: map[accessapi.ResourceType]model.Resource{
+			accessapi.ResourceArtifact: {
+				Actions: model.Grants{
+					Users: map[string]accessapi.Actions{"limited": accessapi.ActionRead},
+				},
+				Targets: map[string]model.Target{
 					w.c.Key: {Include: []string{"public/allowed.txt"}},
 				},
 			},
@@ -184,7 +187,7 @@ func TestAccListingNoStoreFailuresAndSourceFence(t *testing.T) {
 			} else if err == nil {
 				t.Fatal("failure hidden")
 			}
-			entries, _, err := w.db.RemoteCache().List(t.Context(), w.c.Key, "", store.Page{})
+			entries, _, err := w.db.RemoteCache().List(t.Context(), w.c.Key, "", kernel.Page{})
 			if err != nil || len(entries) != 0 {
 				t.Fatalf("no-store persisted %v %v", entries, err)
 			}

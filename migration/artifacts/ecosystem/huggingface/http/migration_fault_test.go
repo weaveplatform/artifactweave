@@ -9,11 +9,14 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errMigrationStorage = errors.New("injected migration storage failure")
@@ -36,24 +39,24 @@ func (s *migrationFaultStore) fails(operation string) bool {
 	return false
 }
 
-func (s *migrationFaultStore) Items() store.ItemStore {
+func (s *migrationFaultStore) Items() port.ItemStore {
 	return migrationFaultItems{s.serverStore.Items(), s}
 }
 
-func (s *migrationFaultStore) Packages() store.PackageStore {
+func (s *migrationFaultStore) Packages() port.PackageStore {
 	return migrationFaultPackages{s.serverStore.Packages(), s}
 }
 
-func (s *migrationFaultStore) Repos() store.RepoStore {
+func (s *migrationFaultStore) Repos() port.RepoStore {
 	return migrationFaultRepos{s.serverStore.Repos(), s}
 }
 
-func (s *migrationFaultStore) Permissions() store.PermissionStore {
+func (s *migrationFaultStore) Permissions() port.PermissionStore {
 	return migrationFaultPermissions{s.serverStore.Permissions(), s}
 }
 
 type migrationFaultRepos struct {
-	store.RepoStore
+	port.RepoStore
 	faults *migrationFaultStore
 }
 
@@ -65,14 +68,14 @@ func (s migrationFaultRepos) Get(ctx context.Context, key string) (repo.Config, 
 }
 
 type migrationFaultPermissions struct {
-	store.PermissionStore
+	port.PermissionStore
 	faults *migrationFaultStore
 }
 
 func (s migrationFaultPermissions) List(
 	ctx context.Context,
-	page store.Page,
-) ([]types.Permission, string, error) {
+	page kernel.Page,
+) ([]model.Permission, string, error) {
 	if s.faults.planning.Load() && s.faults.fails("permission policy") {
 		return nil, "", errMigrationStorage
 	}
@@ -80,7 +83,7 @@ func (s migrationFaultPermissions) List(
 }
 
 type migrationFaultItems struct {
-	store.ItemStore
+	port.ItemStore
 	faults *migrationFaultStore
 }
 
@@ -89,8 +92,8 @@ func (s migrationFaultItems) Descendants(
 	key string,
 	cached bool,
 	path string,
-	page store.Page,
-) ([]types.Item, string, error) {
+	page kernel.Page,
+) ([]model.Item, string, error) {
 	if s.faults.active.Load() && strings.HasPrefix(path, "models/acme/") {
 		s.faults.planning.Store(true)
 	}
@@ -103,9 +106,9 @@ func (s migrationFaultItems) Descendants(
 	return items, next, err
 }
 
-func (s migrationFaultItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
+func (s migrationFaultItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
 	if s.faults.fails("source lock") {
-		return types.Item{}, errMigrationStorage
+		return model.Item{}, errMigrationStorage
 	}
 	it, err := s.ItemStore.GetByID(ctx, id)
 	if s.faults.fails("source changed before lock") {
@@ -114,7 +117,7 @@ func (s migrationFaultItems) GetByID(ctx context.Context, id int64) (types.Item,
 	return it, err
 }
 
-func (s migrationFaultItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (s migrationFaultItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	it, err := s.ItemStore.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -126,19 +129,19 @@ func (s migrationFaultItems) Properties(ctx context.Context, id int64) (types.Pr
 	return s.ItemStore.Properties(ctx, id)
 }
 
-func (s migrationFaultItems) Put(ctx context.Context, it types.Item) (types.Item, error) {
+func (s migrationFaultItems) Put(ctx context.Context, it model.Item) (model.Item, error) {
 	if strings.Contains(it.FullPath(), "/refs/") && s.faults.fails("ref publication") {
-		return types.Item{}, errMigrationStorage
+		return model.Item{}, errMigrationStorage
 	}
 	return s.ItemStore.Put(ctx, it)
 }
 
 type migrationFaultPackages struct {
-	store.PackageStore
+	port.PackageStore
 	faults *migrationFaultStore
 }
 
-func (s migrationFaultPackages) LinkFile(ctx context.Context, file types.VersionFile) error {
+func (s migrationFaultPackages) LinkFile(ctx context.Context, file model.VersionFile) error {
 	if s.faults.fails("index link") {
 		return errMigrationStorage
 	}
@@ -148,22 +151,22 @@ func (s migrationFaultPackages) LinkFile(ctx context.Context, file types.Version
 func (s migrationFaultPackages) VersionOf(
 	ctx context.Context,
 	id int64,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	if s.faults.fails("index lookup") {
-		return types.PackageVersion{}, errMigrationStorage
+		return model.PackageVersion{}, errMigrationStorage
 	}
 	if s.faults.fails("missing index") {
-		return types.PackageVersion{}, store.ErrNotFound
+		return model.PackageVersion{}, kernel.ErrNotFound
 	}
 	return s.PackageStore.VersionOf(ctx, id)
 }
 
 func (s migrationFaultPackages) PutVersion(
 	ctx context.Context,
-	version types.PackageVersion,
-) (types.PackageVersion, error) {
+	version model.PackageVersion,
+) (model.PackageVersion, error) {
 	if len(version.Metadata) != 0 && s.faults.fails("version metadata") {
-		return types.PackageVersion{}, errMigrationStorage
+		return model.PackageVersion{}, errMigrationStorage
 	}
 	return s.PackageStore.PutVersion(ctx, version)
 }
@@ -185,7 +188,7 @@ func TestAccLegacyMigrationStorageFailuresRollBackAndRetry(t *testing.T) {
 			})
 			f.legacyRevision("models", "1700000000", sha, false)
 			before, _, err := f.db.Items().
-				Descendants(t.Context(), "hf", false, "models/acme/demo", store.Page{})
+				Descendants(t.Context(), "hf", false, "models/acme/demo", kernel.Page{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -201,14 +204,14 @@ func TestAccLegacyMigrationStorageFailuresRollBackAndRetry(t *testing.T) {
 				t.Fatal("request did not reach the injected storage failure")
 			}
 			items, _, err := f.db.Items().
-				Descendants(t.Context(), "hf", false, "models--acme--demo", store.Page{})
+				Descendants(t.Context(), "hf", false, "models--acme--demo", kernel.Page{})
 			if err != nil || len(items) != 0 {
 				t.Fatalf("failed migration left destination items: %v %v", items, err)
 			}
 			if _, err := f.db.Packages().
 				Find(t.Context(), "hf", "models/acme/demo"); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatalf("failed migration left package index: %v", err)
 			}
@@ -234,7 +237,7 @@ func TestAccLegacyMigrationRejectsSourceProvenanceAndSkipsFolders(t *testing.T) 
 	it := f.legacyItem(
 		"models/acme/demo/main/1700000000/config.json",
 		[]byte(`{}`),
-		types.Properties{
+		model.Properties{
 			"artifactweave.huggingface.migration.source": {"unrelated source"},
 		},
 	)
@@ -243,7 +246,7 @@ func TestAccLegacyMigrationRejectsSourceProvenanceAndSkipsFolders(t *testing.T) 
 		t.Fatal(err)
 	}
 	if _, err := f.db.Items().
-		Put(t.Context(), types.Item{RepoKey: "hf", Name: "models/acme/demo/main/1700000000/sub", Folder: true}); err != nil {
+		Put(t.Context(), model.Item{RepoKey: "hf", Name: "models/acme/demo/main/1700000000/sub", Folder: true}); err != nil {
 		t.Fatal(err)
 	}
 	status := f.migrate(migrationBody("models", "1700000000", sha, "main", false), http.StatusOK)
@@ -315,7 +318,7 @@ func TestAccLegacyMigrationBlobFailuresLeaveSourceRetriable(t *testing.T) {
 				t.Fatal("failed migration leaked its blob reader")
 			}
 			items, _, err := f.db.Items().
-				Descendants(t.Context(), "hf", false, "models--acme--demo", store.Page{})
+				Descendants(t.Context(), "hf", false, "models--acme--demo", kernel.Page{})
 			if err != nil || len(items) != 0 {
 				t.Fatalf("failed verification published files: %v %v", items, err)
 			}

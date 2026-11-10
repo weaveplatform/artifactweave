@@ -9,16 +9,16 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func smartDue(
 	registryPath func(string) (image, operation, reference string, err error),
 	q source.Request,
-	state *types.RemoteSmartState,
+	state *model.RemoteSmartState,
 	now time.Time,
 ) bool {
 	properties := smartProperties(q.Repo) && smartPropertyPath(registryPath, q)
@@ -53,18 +53,18 @@ func (s *Smart) properties(
 	permit source.Permit,
 	opts remote.Options,
 	peer remote.SmartPeer,
-) (types.Properties, bool, error) {
+) (model.Properties, bool, error) {
 	target, err := peer.StorageURL(smartStoragePath(q), url.Values{"properties": {""}})
 	if err != nil {
 		//nolint:wrapcheck // preserves upstream error identity
 		return nil, false, err
 	}
 	doc, noStore, err := s.document(ctx, q, permit, opts, target)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		// The documented properties API returns 404 for an existing item with
 		// no properties too. Only a separate item-info miss confirms absence.
 		present, e := s.present(ctx, q, permit, opts, peer)
-		return make(types.Properties), present, e
+		return make(model.Properties), present, e
 	}
 	if err != nil {
 		return nil, false, err
@@ -72,16 +72,16 @@ func (s *Smart) properties(
 	if noStore {
 		return nil, false, source.ErrUnavailable
 	}
-	var props types.Properties
+	var props model.Properties
 	if json.Unmarshal(doc["properties"], &props) != nil || props == nil || len(props) > 1024 {
 		return nil, false, source.ErrInvalidResult
 	}
 	for key, values := range props {
-		if types.ValidatePropertyKey(key) != nil || len(values) == 0 || len(values) > 64 {
+		if model.ValidatePropertyKey(key) != nil || len(values) == 0 || len(values) > 64 {
 			return nil, false, source.ErrInvalidResult
 		}
 		for i, value := range values {
-			values[i] = types.TruncatePropertyValue(value, types.PropertyValueMax)
+			values[i] = model.TruncatePropertyValue(value, model.PropertyValueMax)
 		}
 		props.Set(key, values...)
 		if smartSystemProperty(key) {
@@ -113,7 +113,7 @@ func (s *Smart) present(
 		return false, err
 	}
 	doc, noStore, err := s.document(ctx, q, permit, opts, target)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return false, nil
 	}
 	if err != nil {
@@ -123,7 +123,7 @@ func (s *Smart) present(
 	_ = json.Unmarshal(doc["path"], &path)
 	_ = json.Unmarshal(doc["repo"], &repository)
 	if noStore || strings.TrimPrefix(path, "/") != smartStoragePath(q) ||
-		strings.TrimSuffix(repository, types.CacheSuffix) != peer.Repository {
+		strings.TrimSuffix(repository, model.CacheSuffix) != peer.Repository {
 		return false, source.ErrInvalidResult
 	}
 	return true, nil

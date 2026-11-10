@@ -12,10 +12,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 var slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
@@ -129,7 +129,7 @@ func (Handler) Admit(
 // reads the stored bundle otherwise; a bundle that does not read as valid
 // fails the write. Folders, a remote's cached files and other paths change
 // nothing.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || it.Cached || !strings.HasSuffix(it.FullPath(), ".zip") {
 		return nil
 	}
@@ -151,13 +151,13 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 
 // Deleting does nothing: a bundle is its version's only file, and the item
 // service prunes a version a delete leaves without files.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted does nothing: the item service has already pruned the versions
 // the delete left without files, and no other file belongs to a version.
-func (Handler) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
+func (Handler) Deleted(context.Context, format.Env, repo.Config, []model.Item) error { return nil }
 
-func metadataOf(ctx context.Context, env format.Env, it types.Item) (Metadata, error) {
+func metadataOf(ctx context.Context, env format.Env, it model.Item) (Metadata, error) {
 	if in, ok := env.Inspection.(*inspection); ok && in.sha == it.Actual.SHA256 {
 		return in.meta, in.err
 	}
@@ -173,10 +173,10 @@ func index(
 	ctx context.Context,
 	st format.Store,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	meta Metadata,
 ) error {
-	p, err := st.Packages().Ensure(ctx, types.Package{
+	p, err := st.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Type: c.PackageType, Name: meta.Slug, Created: it.Created,
 	})
 	if err != nil {
@@ -199,7 +199,7 @@ func index(
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	var all []pkgindex.Indexed
 	bySlug := map[string]int{}
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		items, next, err := env.Store.Items().Descendants(ctx, c.Key, false, "", page)
 		if err != nil {

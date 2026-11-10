@@ -15,10 +15,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // MavenBackend opts only Maven-family routes into format-aware source retrieval.
@@ -139,14 +139,14 @@ func (m *MavenBackend) PrepareUpload(
 ) error {
 	if !Serves(q.Repo.PackageType) || preparedMetadata(q.Resource) ||
 		q.Repo.RemoteRepoChecksumPolicyType == repo.IgnoreAndGenerate ||
-		u.Declared != (types.Checksums{}) && q.Repo.RemoteRepoChecksumPolicyType != repo.PassThru {
+		u.Declared != (kernel.Checksums{}) && q.Repo.RemoteRepoChecksumPolicyType != repo.PassThru {
 		return nil
 	}
 	conn, err := m.Policy.Pool.Connection(q.Repo, opts)
 	if err != nil {
 		return remote.PolicyError(err)
 	}
-	request := remote.TransportRequest(q, types.RemoteCacheEntry{})
+	request := remote.TransportRequest(q, model.RemoteCacheEntry{})
 	request.Method, request.Metadata = http.MethodGet, true
 	request.Header = nil
 	algorithms := []item.Algorithm{item.SHA1, item.MD5}
@@ -178,7 +178,7 @@ func (m *MavenBackend) PrepareUpload(
 		if len(value) == 0 {
 			return item.ErrBadChecksum
 		}
-		declared := types.Checksums{}
+		declared := kernel.Checksums{}
 		switch alg {
 		case item.SHA1:
 			declared.SHA1 = value[0]
@@ -279,7 +279,7 @@ func ResolveMavenSource(
 			q,
 			path.Join(path.Dir(p), "maven-metadata.xml"),
 		)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			return p, nil
 		}
 		if err != nil {
@@ -325,7 +325,7 @@ func ResolveMavenSource(
 		token, version = "[LATEST]", metadata.Versioning.Latest
 	}
 	if !validVersion(version) {
-		return "", store.ErrNotFound
+		return "", kernel.ErrNotFound
 	}
 	resolved := strings.ReplaceAll(p, token, version)
 	if IsNonUniqueSnapshot(resolved) {

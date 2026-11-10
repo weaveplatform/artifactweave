@@ -15,19 +15,20 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // restoredMessage is the plain-text body of a restore, as documented.
@@ -126,7 +127,7 @@ func (s ArtifactoryAPI) cleanTrash(ctx context.Context, repoPath string) error {
 	if !p.Admin {
 		c, err := st.Repos().Get(ctx, key)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			return trashRefusalf(p, "Only an administrator can clean trash of a deleted repository")
 		case err != nil:
 			return s.InternalError(ctx, "get repository", err)
@@ -213,22 +214,22 @@ func (s ArtifactoryAPI) restoreTrash(
 	}
 	dst, err := st.Repos().Get(ctx, toKey)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return httpkit.BadRequestf("Destination repository '%s' does not exist", toKey)
 	case err != nil:
 		return s.InternalError(ctx, "get repository", err)
 	case dst.Class != repo.Local && dst.Class != repo.Federated:
 		return httpkit.BadRequestf("Items can be restored only into a local repository; '%s' is %s",
 			toKey, dst.Class)
-	case !acc.File(dst, toPath, types.ActionManage):
+	case !acc.File(dst, toPath, api.ActionManage):
 		return trashRefusalf(p, "Manage permission on '%s' is required", toKey)
 	}
-	var permit func(types.Item) bool
+	var permit func(model.Item) bool
 	var nativeMetadataRelocation, modelRelocation bool
 	if !p.Admin {
 		origin, err := st.Repos().Get(ctx, fromKey)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			return trashRefusalf(
 				p,
 				"Only an administrator can restore trash of a deleted repository",
@@ -242,7 +243,7 @@ func (s ArtifactoryAPI) restoreTrash(
 		// An exclude pattern, or an include that admits from but not what
 		// lies below it, can still refuse an item the check above allowed.
 		relocated := toKey != fromKey || toPath != "" && toPath != fromPath
-		permit = func(it types.Item) bool {
+		permit = func(it model.Item) bool {
 			if !removes(acc, origin, it.FullPath()) {
 				return false
 			}
@@ -285,7 +286,7 @@ func (s ArtifactoryAPI) restoreTrash(
 			strings.Trim(from, "/"))
 	case errors.Is(err, trash.ErrNothingTrashed):
 		return apierror.New(http.StatusNotFound, fmt.Sprintf("Nothing is trashed at '%s'", from))
-	case errors.Is(err, item.ErrConflict), errors.Is(err, types.ErrInvalidItemPath):
+	case errors.Is(err, item.ErrConflict), errors.Is(err, kernel.ErrInvalidItemPath):
 		return apierror.New(http.StatusConflict, err.Error())
 	case err != nil:
 		return s.InternalError(ctx, "restore trash", err)
@@ -297,15 +298,15 @@ func (s ArtifactoryAPI) restoreTrash(
 // trash can: delete or manage there. Manage is accepted on its own because
 // a permission can grant it without delete.
 func removes(a itemkit.Access, c repo.Config, path string) bool {
-	return a.File(c, path, types.ActionDelete) || a.File(c, path, types.ActionManage)
+	return a.File(c, path, api.ActionDelete) || a.File(c, path, api.ActionManage)
 }
 
 // seesTrash reports whether a sees what was trashed from path in c: deploy
 // or manage there, not read, as 7.x shows the trash can. Manage is accepted
 // on its own because a permission can grant it without deploy.
 func seesTrash(a itemkit.Access, c repo.Config, path string, folder bool) bool {
-	return a.Item(c, path, folder, types.ActionWrite) ||
-		a.Item(c, path, folder, types.ActionManage)
+	return a.Item(c, path, folder, api.ActionWrite) ||
+		a.Item(c, path, folder, api.ActionManage)
 }
 
 // cutRepoPath splits "key/some/path" into the key and the path, as given.
@@ -373,7 +374,7 @@ func (s ArtifactoryAPI) trashStorage(w http.ResponseWriter, r *http.Request) {
 	}
 	n, children, err := v.target(ctx)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	case err != nil:
@@ -401,7 +402,7 @@ func (s ArtifactoryAPI) trashStorage(w http.ResponseWriter, r *http.Request) {
 type trashView struct {
 	svc  *trash.Service
 	dir  string
-	sees func(types.Item) bool
+	sees func(model.Item) bool
 	base string
 }
 
@@ -426,15 +427,15 @@ func (v trashView) target(ctx context.Context) (trash.Node, []trash.Node, error)
 	key, rest := cutRepoPath(v.dir)
 	if rest == "" {
 		if key != "" && len(children) == 0 {
-			return n, nil, store.ErrNotFound
+			return n, nil, kernel.ErrNotFound
 		}
 		return n, children, nil
 	}
 	e, err := v.svc.Find(ctx, key, rest)
 	switch {
-	case errors.Is(err, store.ErrNotFound) && len(children) == 0:
-		return n, nil, store.ErrNotFound
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound) && len(children) == 0:
+		return n, nil, kernel.ErrNotFound
+	case errors.Is(err, kernel.ErrNotFound):
 	case err != nil:
 		return n, nil, err //nolint:wrapcheck // as above
 	// A file trashed where a folder later held trashed items gives way to
@@ -479,9 +480,9 @@ func (v trashView) view(
 // trashed item as recorded, whose properties last changed when it was
 // trashed, as that set its trash.* properties. A folder only implied by
 // what was trashed below it has no record, and so no times.
-func trashItem(n trash.Node) types.Item {
+func trashItem(n trash.Node) model.Item {
 	if n.Entry == nil {
-		return types.Item{Folder: n.Folder}
+		return model.Item{Folder: n.Folder}
 	}
 	it := n.Entry.Record.Item
 	it.Folder, it.PropertiesModified = n.Folder, n.Entry.DeletedAt
@@ -532,7 +533,7 @@ func (v trashView) properties(n trash.Node, names string) (string, any, error) {
 	if n.Entry == nil {
 		return "", nil, noProperties()
 	}
-	props := types.Properties{}
+	props := model.Properties{}
 	maps.Copy(props, n.Entry.Record.Properties)
 	maps.Copy(props, trashProperties(*n.Entry))
 	if names != "" {
@@ -596,7 +597,7 @@ func (s ArtifactoryAPI) trashSight(
 	ctx context.Context,
 	st Store,
 	key, rest string,
-) (kernel.Principal, func(types.Item) bool, error) {
+) (kernel.Principal, func(model.Item) bool, error) {
 	p, acc, err := s.ItemCaller(ctx, st)
 	if err != nil || p.Admin {
 		return p, nil, err
@@ -608,14 +609,14 @@ func (s ArtifactoryAPI) trashSight(
 	if key == "" {
 		// The root shows to a holder of deploy or manage anywhere, so every
 		// repository is a candidate.
-		origins, err = st.Repos().List(ctx, store.RepoFilter{})
+		origins, err = st.Repos().List(ctx, port.RepoFilter{})
 		if err != nil {
 			return p, nil, s.InternalError(ctx, "list repositories", err)
 		}
 	} else {
 		c, err := st.Repos().Get(ctx, key)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			return p, nil, httpkit.Denied(p)
 		case err != nil:
 			return p, nil, s.InternalError(ctx, "get repository", err)
@@ -633,7 +634,7 @@ func (s ArtifactoryAPI) trashSight(
 	if !allowed {
 		return p, nil, httpkit.Denied(p)
 	}
-	return p, func(it types.Item) bool {
+	return p, func(it model.Item) bool {
 		c, ok := byKey[it.RepoKey]
 		return ok && seesTrash(acc, c, it.FullPath(), it.Folder)
 	}, nil
@@ -641,7 +642,7 @@ func (s ArtifactoryAPI) trashSight(
 
 // trashFileInfo is a trashed file's storage info, with when and by whom it
 // was deleted, as Artifactory records them in trash.* properties.
-func trashFileInfo(uri, dir string, e types.TrashEntry) map[string]any {
+func trashFileInfo(uri, dir string, e model.TrashEntry) map[string]any {
 	it := e.Record.Item
 	return map[string]any{
 		"repo": trash.Repository, "path": "/" + dir,
@@ -661,9 +662,9 @@ func trashFileInfo(uri, dir string, e types.TrashEntry) map[string]any {
 // keeps it too: RTFACT-29920 compares trash.time with an epoch in
 // milliseconds. The repository type is RepoType.getType(), the enumeration
 // name in lower case, which is yum for rpm.
-func trashProperties(e types.TrashEntry) types.Properties {
+func trashProperties(e model.TrashEntry) model.Properties {
 	it := e.Record.Item
-	props := types.Properties{
+	props := model.Properties{
 		"trash.time":               {strconv.FormatInt(e.DeletedAt.UnixMilli(), 10)},
 		"trash.deletedBy":          {e.DeletedBy},
 		"trash.originalRepository": {it.RepoKey},
@@ -737,10 +738,10 @@ func (s ArtifactoryAPI) zapCache(w http.ResponseWriter, r *http.Request) {
 			w,
 			r,
 			httpkit.BadRequestf("Zap applies to a remote repository's cache: use '%s'",
-				key+types.CacheSuffix),
+				key+model.CacheSuffix),
 		)
 		return
-	case !acc.File(c, rest, types.ActionDelete) && !acc.File(c, rest, types.ActionManage):
+	case !acc.File(c, rest, api.ActionDelete) && !acc.File(c, rest, api.ActionManage):
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}

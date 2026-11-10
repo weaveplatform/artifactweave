@@ -11,7 +11,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccMappedSmartListingKeepsCanonicalAuthority(t *testing.T) {
@@ -132,7 +132,7 @@ func TestAccSmartListingUsesRealDiscoveryTransportAndCacheFences(t *testing.T) {
 			binaryCalls,
 		)
 	}
-	items, _, err := w.db.Items().Children(w.ctx, w.c.Key, true, "", store.Page{})
+	items, _, err := w.db.Items().Children(w.ctx, w.c.Key, true, "", kernel.Page{})
 	if err != nil || len(items) != 0 {
 		t.Fatal("listing created items", items, err)
 	}

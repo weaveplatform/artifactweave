@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // The query text is AQL's method-chain syntax around JSON values. The JSON
@@ -606,7 +606,7 @@ func (p *parser) modifier(q *Query, name string, pos int) error {
 			if a.kind != vString || a.text == "" {
 				return syntaxErrf(a.pos, "keys takes property keys")
 			}
-			if err := types.CheckPropertyKeyLength(a.text); err != nil {
+			if err := model.CheckPropertyKeyLength(a.text); err != nil {
 				return fmt.Errorf("%w: keys: %w", ErrInvalid, err)
 			}
 			if !slices.Contains(q.Keys, a.text) {

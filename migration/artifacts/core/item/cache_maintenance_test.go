@@ -10,10 +10,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func cacheContent(
@@ -21,7 +22,7 @@ func cacheContent(
 	w *world,
 	u CacheUpload,
 	path string,
-	kind types.RemoteKind,
+	kind model.RemoteKind,
 	body string,
 ) CacheResult {
 	t.Helper()
@@ -44,10 +45,10 @@ func cacheContent(
 func TestUnitCacheMetadataZapAndDelete(t *testing.T) {
 	ctx := context.Background()
 	w, u := remoteWorld(t)
-	unique := cacheContent(t, w, u, "pkg/a.jar", types.RemoteUnique, "unique")
-	mutable := cacheContent(t, w, u, "pkg/snapshot.jar", types.RemoteMutable, "mutable")
-	metadata := cacheContent(t, w, u, "pkg/index", types.RemoteMetadata, "versions")
-	outside := cacheContent(t, w, u, "else/index", types.RemoteMetadata, "outside")
+	unique := cacheContent(t, w, u, "pkg/a.jar", model.RemoteUnique, "unique")
+	mutable := cacheContent(t, w, u, "pkg/snapshot.jar", model.RemoteMutable, "mutable")
+	metadata := cacheContent(t, w, u, "pkg/index", model.RemoteMetadata, "versions")
+	outside := cacheContent(t, w, u, "else/index", model.RemoteMetadata, "outside")
 	missing := u.Token.Key
 	missing.Path = "pkg/missing"
 	negative, err := w.db.RemoteCache().Begin(ctx, missing)
@@ -89,10 +90,10 @@ func TestUnitCacheMetadataZapAndDelete(t *testing.T) {
 	if err != nil || unchanged.Token != outside.Entry.Token {
 		t.Fatal("zap escaped path", err)
 	}
-	if err = w.db.RemoteCache().Check(ctx, pending); !errors.Is(err, store.ErrConflict) {
+	if err = w.db.RemoteCache().Check(ctx, pending); !errors.Is(err, kernel.ErrConflict) {
 		t.Fatal("late fill survived zap", err)
 	}
-	if _, err = w.db.RemoteCache().Read(ctx, missing); !errors.Is(err, store.ErrNotFound) {
+	if _, err = w.db.RemoteCache().Read(ctx, missing); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal("negative survived zap", err)
 	}
 	// Deleting only raw metadata succeeds and releases its independent reference.
@@ -121,7 +122,7 @@ func TestUnitCacheMetadataZapAndDelete(t *testing.T) {
 		t.Fatal("remote cache entered trash", err)
 	}
 	// Negative-only and pending-only paths can be deleted without an Item row.
-	for _, key := range []types.RemoteCacheKey{missing, pendingKey} {
+	for _, key := range []model.RemoteCacheKey{missing, pendingKey} {
 		token, err := w.db.RemoteCache().Begin(ctx, key)
 		if err != nil {
 			t.Fatal(err)
@@ -133,7 +134,7 @@ func TestUnitCacheMetadataZapAndDelete(t *testing.T) {
 		); err != nil {
 			t.Fatal(err)
 		}
-		if err = w.db.RemoteCache().Check(ctx, token); !errors.Is(err, store.ErrConflict) {
+		if err = w.db.RemoteCache().Check(ctx, token); !errors.Is(err, kernel.ErrConflict) {
 			t.Fatal("delete left pending work", err)
 		}
 	}
@@ -142,7 +143,7 @@ func TestUnitCacheMetadataZapAndDelete(t *testing.T) {
 func TestUnitCacheDeleteAndRestoreRollback(t *testing.T) {
 	ctx := context.Background()
 	w, u := remoteWorld(t)
-	seed := cacheContent(t, w, u, "pkg/a.bin", types.RemoteUnique, "seed")
+	seed := cacheContent(t, w, u, "pkg/a.bin", model.RemoteUnique, "seed")
 	w.svc.Store = faulty{w.db, "delete"}
 	if _, err := w.svc.Delete(
 		ctx,
@@ -169,15 +170,15 @@ func TestUnitCacheDeleteAndRestoreRollback(t *testing.T) {
 	if _, err = w.svc.Restore(
 		ctx,
 		Target{Repo: u.Repo, Cached: true, Path: "pkg/a.bin"},
-		types.TrashRecord{Item: seed.Item},
+		model.TrashRecord{Item: seed.Item},
 		"admin",
 	); err != nil {
 		t.Fatal(err)
 	}
-	if err = w.db.RemoteCache().Check(ctx, pending); !errors.Is(err, store.ErrConflict) {
+	if err = w.db.RemoteCache().Check(ctx, pending); !errors.Is(err, kernel.ErrConflict) {
 		t.Fatal("restore retained stale fence", err)
 	}
-	if _, err = w.db.RemoteCache().Read(ctx, pending.Key); !errors.Is(err, store.ErrNotFound) {
+	if _, err = w.db.RemoteCache().Read(ctx, pending.Key); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal("restore invented validation", err)
 	}
 	if w.refs(seed.Info.Digests.SHA256) != 1 {
@@ -224,17 +225,17 @@ func TestUnitCacheCleanupUsesActivityAndDisabling(t *testing.T) {
 	if err := w.db.Repos().Update(ctx, u.Repo); err != nil {
 		t.Fatal(err)
 	}
-	old := cacheContent(t, w, u, "old.bin", types.RemoteUnique, "old")
-	downloaded := cacheContent(t, w, u, "download.bin", types.RemoteUnique, "download")
-	touched := cacheContent(t, w, u, "touch.bin", types.RemoteUnique, "touch")
-	raw := cacheContent(t, w, u, "index", types.RemoteMetadata, "raw")
-	freshRaw := cacheContent(t, w, u, "fresh-index", types.RemoteMetadata, "fresh")
+	old := cacheContent(t, w, u, "old.bin", model.RemoteUnique, "old")
+	downloaded := cacheContent(t, w, u, "download.bin", model.RemoteUnique, "download")
+	touched := cacheContent(t, w, u, "touch.bin", model.RemoteUnique, "touch")
+	raw := cacheContent(t, w, u, "index", model.RemoteMetadata, "raw")
+	freshRaw := cacheContent(t, w, u, "fresh-index", model.RemoteMetadata, "fresh")
 	now := at.Add(2 * time.Hour)
 	if err := w.db.Items().
-		RecordDownload(ctx, downloaded.Item.ID, store.Download{At: now.Add(-time.Minute)}); err != nil {
+		RecordDownload(ctx, downloaded.Item.ID, port.Download{At: now.Add(-time.Minute)}); err != nil {
 		t.Fatal(err)
 	}
-	for _, e := range []types.RemoteCacheEntry{touched.Entry, freshRaw.Entry} {
+	for _, e := range []model.RemoteCacheEntry{touched.Entry, freshRaw.Entry} {
 		if err := w.db.RemoteCache().Touch(ctx, e.Token, now.Add(-time.Minute)); err != nil {
 			t.Fatal(err)
 		}
@@ -256,7 +257,7 @@ func TestUnitCacheCleanupUsesActivityAndDisabling(t *testing.T) {
 		if _, err := w.db.RemoteCache().
 			Read(ctx, e.Entry.Token.Key); !errors.Is(
 			err,
-			store.ErrNotFound,
+			kernel.ErrNotFound,
 		) {
 			t.Fatal("unused content retained", err)
 		}
@@ -269,7 +270,7 @@ func TestUnitCacheCleanupUsesActivityAndDisabling(t *testing.T) {
 			t.Fatal("recent content removed", err)
 		}
 	}
-	if _, err := w.db.RemoteCache().Read(ctx, key); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.db.RemoteCache().Read(ctx, key); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal("expired negative retained", err)
 	}
 	// A zero setting disables queued work, including a job left from before edit.
@@ -289,7 +290,7 @@ func TestUnitCacheCleanupUsesActivityAndDisabling(t *testing.T) {
 	if _, err = w.db.WorkQueue().
 		Get(ctx, KindCacheCleanup, u.Repo.Key); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("zero cleanup requeued", err)
 	}
@@ -304,7 +305,7 @@ func TestUnitCacheCleanupBatchesAndLifetime(t *testing.T) {
 		t.Fatal(err)
 	}
 	for n := range CacheCleanupBatch + 2 {
-		cacheContent(t, w, u, fmt.Sprintf("raw/%03d", n), types.RemoteMetadata, "same")
+		cacheContent(t, w, u, fmt.Sprintf("raw/%03d", n), model.RemoteMetadata, "same")
 	}
 	now := at.Add(2 * time.Hour)
 	q := maintenanceQueue(t, w, &now)
@@ -315,7 +316,7 @@ func TestUnitCacheCleanupBatchesAndLifetime(t *testing.T) {
 		t.Fatal(n, err)
 	}
 	rows, _, err := w.db.RemoteCache().
-		List(ctx, u.Repo.Key, "raw", store.Page{Limit: store.MaxLimit})
+		List(ctx, u.Repo.Key, "raw", kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +344,7 @@ func TestUnitCacheCleanupBatchesAndLifetime(t *testing.T) {
 	if err := w.db.Repos().Create(ctx, u.Repo); err != nil {
 		t.Fatal(err)
 	}
-	fresh := cacheContent(t, w, u, "new.bin", types.RemoteUnique, "new")
+	fresh := cacheContent(t, w, u, "new.bin", model.RemoteUnique, "new")
 	if _, err := q.RunDue(ctx, KindCacheCleanup); err != nil {
 		t.Fatal(err)
 	}
@@ -361,16 +362,16 @@ func TestUnitCacheCleanupSidecarActivityAndReplacement(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.svc.Formats = func(repo.PackageType) format.Handler { return keeper{} }
-	owner := cacheContent(t, w, u, "owned.bin", types.RemoteUnique, "owner")
-	signature := cacheContent(t, w, u, "owned.bin.sig", types.RemoteUnique, "signature")
-	stale := cacheContent(t, w, u, "replaced.bin", types.RemoteMutable, "stale")
+	owner := cacheContent(t, w, u, "owned.bin", model.RemoteUnique, "owner")
+	signature := cacheContent(t, w, u, "owned.bin.sig", model.RemoteUnique, "signature")
+	stale := cacheContent(t, w, u, "replaced.bin", model.RemoteMutable, "stale")
 	now := at.Add(2 * time.Hour)
 	q := maintenanceQueue(t, w, &now)
 	if err := w.db.Items().
-		RecordDownload(ctx, signature.Item.ID, store.Download{At: now}); err != nil {
+		RecordDownload(ctx, signature.Item.ID, port.Download{At: now}); err != nil {
 		t.Fatal(err)
 	}
-	replacement := cacheContent(t, w, u, "replaced.bin", types.RemoteMutable, "new")
+	replacement := cacheContent(t, w, u, "replaced.bin", model.RemoteMutable, "new")
 	source, err := w.db.RemoteCache().Source(ctx, u.Repo.Key)
 	if err != nil {
 		t.Fatal(err)
@@ -389,7 +390,7 @@ func TestUnitCacheCleanupSidecarActivityAndReplacement(t *testing.T) {
 	now = now.Add(2 * time.Hour)
 	runCleanup(t, q)
 	for _, cached := range []CacheResult{owner, signature, replacement} {
-		if _, err = w.db.Items().GetByID(ctx, cached.Item.ID); !errors.Is(err, store.ErrNotFound) {
+		if _, err = w.db.Items().GetByID(ctx, cached.Item.ID); !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatal("expired family retained", err)
 		}
 		if w.refs(cached.Info.Digests.SHA256) != 0 {
@@ -432,8 +433,8 @@ func TestUnitCacheCleanupFormatIndexAndRawIsolation(t *testing.T) {
 	}
 	r := &recorder{calls: map[string]bool{}}
 	w.svc.Formats = func(repo.PackageType) format.Handler { return maintenanceFormat{r} }
-	binary := cacheContent(t, w, u, "pkg/1/file.bin", types.RemoteUnique, "binary")
-	raw := cacheContent(t, w, u, "index", types.RemoteMetadata, "complete upstream versions")
+	binary := cacheContent(t, w, u, "pkg/1/file.bin", model.RemoteUnique, "binary")
+	raw := cacheContent(t, w, u, "index", model.RemoteMetadata, "complete upstream versions")
 	version := pkgindex.Version{
 		RepoKey:     u.Repo.Key,
 		PackageType: repo.Generic,
@@ -457,7 +458,7 @@ func TestUnitCacheCleanupFormatIndexAndRawIsolation(t *testing.T) {
 	now := at.Add(2 * time.Hour)
 	q := maintenanceQueue(t, w, &now)
 	runCleanup(t, q)
-	if _, err = w.db.Packages().Find(ctx, u.Repo.Key, "pkg"); !errors.Is(err, store.ErrNotFound) {
+	if _, err = w.db.Packages().Find(ctx, u.Repo.Key, "pkg"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal("package index survived last cached file", err)
 	}
 	if !r.calls["deleting pkg/1/file.bin"] || !r.calls["deleted 1"] {
@@ -480,8 +481,8 @@ func TestUnitCacheCleanupFaultRollbackAndEntryRaces(t *testing.T) {
 	if err := w.db.Repos().Update(ctx, u.Repo); err != nil {
 		t.Fatal(err)
 	}
-	original := cacheContent(t, w, u, "item.bin", types.RemoteUnique, "old")
-	raw := cacheContent(t, w, u, "index", types.RemoteMetadata, "index")
+	original := cacheContent(t, w, u, "item.bin", model.RemoteUnique, "old")
+	raw := cacheContent(t, w, u, "index", model.RemoteMetadata, "index")
 	source, err := w.db.RemoteCache().Source(ctx, u.Repo.Key)
 	if err != nil {
 		t.Fatal(err)
@@ -503,7 +504,7 @@ func TestUnitCacheCleanupFaultRollbackAndEntryRaces(t *testing.T) {
 	}
 	w.svc.Store = w.db
 	// A refreshed metadata entry invalidates an old scan candidate.
-	replacement := cacheContent(t, w, u, "index", types.RemoteMetadata, "new index")
+	replacement := cacheContent(t, w, u, "index", model.RemoteMetadata, "new index")
 	if err = w.svc.cleanupCacheEntry(ctx, cursor, raw.Entry); err != nil {
 		t.Fatal(err)
 	}
@@ -515,7 +516,7 @@ func TestUnitCacheCleanupFaultRollbackAndEntryRaces(t *testing.T) {
 	// A stale variant can be evicted without deleting the item's newer bytes.
 	other := u
 	other.Token.Key.Variant = "alternate"
-	fresh := cacheContent(t, w, other, "item.bin", types.RemoteUnique, "alternate")
+	fresh := cacheContent(t, w, other, "item.bin", model.RemoteUnique, "alternate")
 	if err = w.svc.cleanupCacheEntry(ctx, cursor, original.Entry); err != nil {
 		t.Fatal(err)
 	}
@@ -543,7 +544,7 @@ func TestUnitCacheCleanupFaultRollbackAndEntryRaces(t *testing.T) {
 	if _, err = w.db.RemoteCache().Read(ctx, negativeKey); err != nil {
 		t.Fatal("cleanup removed unexpired negative", err)
 	}
-	if err = w.svc.cacheCleanupWork(ctx, types.WorkItem{Payload: []byte("bad-json")}); err == nil {
+	if err = w.svc.cacheCleanupWork(ctx, work.WorkItem{Payload: []byte("bad-json")}); err == nil {
 		t.Fatal("corrupt job accepted")
 	}
 	if cleanupUnused(u.Repo, now, time.Time{}) || cleanupUnused(u.Repo, now, now.Add(time.Hour)) {

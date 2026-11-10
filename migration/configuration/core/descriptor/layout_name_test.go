@@ -11,8 +11,8 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 )
 
 // providerLayout is RepositoryLayoutAPIModel from the artifactory_repository_layout
@@ -55,7 +55,7 @@ const (
 
 func storedLayout(t *testing.T, db *inmem.Store, name string) map[string]any {
 	t.Helper()
-	doc, err := db.Configs().Get(context.Background(), types.ConfigLayout, name)
+	doc, err := db.Configs().Get(context.Background(), configdoc.ConfigLayout, name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,8 +126,8 @@ func TestUnitRepositoryLayoutResourceCycle(t *testing.T) {
 	if strings.Join(res.Deleted, " ") != "repoLayouts.tf-layout" {
 		t.Fatalf("delete %+v", res)
 	}
-	_, err := db.Configs().Get(context.Background(), types.ConfigLayout, "tf-layout")
-	if !errors.Is(err, store.ErrNotFound) {
+	_, err := db.Configs().Get(context.Background(), configdoc.ConfigLayout, "tf-layout")
+	if !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("after delete: %v", err)
 	}
 }

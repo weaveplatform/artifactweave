@@ -14,8 +14,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 const maxModuleBytes = 1 << 20
@@ -246,8 +246,8 @@ func (Handler) GuardWrite(
 	}
 	folder := "modules/" + f.Name + "/" + f.Version
 	items, _, err := env.Store.Items().
-		Children(ctx, c.Key, false, folder, store.Page{Limit: store.MaxLimit})
-	if errors.Is(err, store.ErrNotFound) {
+		Children(ctx, c.Key, false, folder, kernel.Page{Limit: kernel.MaxLimit})
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -271,7 +271,7 @@ func (Handler) GuardWrite(
 // stored items, so there is no second, mutable copy of the metadata to
 // rebuild.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		items, next, err := env.Store.Items().Descendants(ctx, c.Key, false, "modules", page)
 		if err != nil {

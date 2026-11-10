@@ -9,8 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 var errStore = errors.New("test store unavailable")
@@ -20,32 +24,32 @@ type failingStore struct {
 	fail string
 }
 
-func (s failingStore) Packages() store.PackageStore {
+func (s failingStore) Packages() port.PackageStore {
 	return failingPackages{s.serverStore.Packages(), s.fail}
 }
-func (s failingStore) Items() store.ItemStore { return failingItems{s.serverStore.Items(), s.fail} }
-func (s failingStore) Users() store.UserStore { return failingUsers{s.serverStore.Users(), s.fail} }
-func (s failingStore) Settings() store.SettingsStore {
+func (s failingStore) Items() port.ItemStore { return failingItems{s.serverStore.Items(), s.fail} }
+func (s failingStore) Users() port.UserStore { return failingUsers{s.serverStore.Users(), s.fail} }
+func (s failingStore) Settings() settings.SettingsStore {
 	return failingSettings{s.serverStore.Settings(), s.fail}
 }
 
-func (s failingStore) Permissions() store.PermissionStore {
+func (s failingStore) Permissions() port.PermissionStore {
 	return failingPermissions{s.serverStore.Permissions(), s.fail}
 }
 
 type failingPackages struct {
-	store.PackageStore
+	port.PackageStore
 	fail string
 }
 
-func (s failingPackages) Find(ctx context.Context, key, name string) (types.Package, error) {
+func (s failingPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
 	if s.fail == "package" {
-		return types.Package{}, errStore
+		return model.Package{}, errStore
 	}
 	return s.PackageStore.Find(ctx, key, name)
 }
 
-func (s failingPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (s failingPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if s.fail == "versions" {
 		return nil, errStore
 	}
@@ -60,16 +64,16 @@ func (s failingPackages) Files(ctx context.Context, id int64) ([]int64, error) {
 }
 
 type failingItems struct {
-	store.ItemStore
+	port.ItemStore
 	fail string
 }
 
-func (s failingItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
+func (s failingItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
 	if s.fail == "item" {
-		return types.Item{}, errStore
+		return model.Item{}, errStore
 	}
 	if s.fail == "gone" {
-		return types.Item{}, store.ErrNotFound
+		return model.Item{}, kernel.ErrNotFound
 	}
 	return s.ItemStore.GetByID(ctx, id)
 }
@@ -79,27 +83,27 @@ func (s failingItems) Get(
 	key string,
 	cached bool,
 	path string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if s.fail == "download" {
-		return types.Item{}, errStore
+		return model.Item{}, errStore
 	}
 	return s.ItemStore.Get(ctx, key, cached, path)
 }
 
 type failingUsers struct {
-	store.UserStore
+	port.UserStore
 	fail string
 }
 
-func (s failingUsers) Get(ctx context.Context, name string) (types.User, error) {
+func (s failingUsers) Get(ctx context.Context, name string) (model.User, error) {
 	if s.fail == "user" {
-		return types.User{}, errStore
+		return model.User{}, errStore
 	}
 	return s.UserStore.Get(ctx, name)
 }
 
 type failingSettings struct {
-	store.SettingsStore
+	settings.SettingsStore
 	fail string
 }
 
@@ -111,7 +115,7 @@ func (s failingSettings) Get(ctx context.Context, key string, into any) error {
 }
 
 type failingPermissions struct {
-	store.PermissionStore
+	port.PermissionStore
 	fail string
 }
 
@@ -119,7 +123,7 @@ func (s failingPermissions) ForPrincipal(
 	ctx context.Context,
 	user string,
 	groups []string,
-) ([]types.Permission, error) {
+) ([]model.Permission, error) {
 	if s.fail == "permissions" {
 		return nil, errStore
 	}

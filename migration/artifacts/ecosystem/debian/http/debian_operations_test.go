@@ -15,16 +15,16 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // queueFault is a store whose work queue refuses every new item; every
 // other call passes to Store.
 type queueFault struct{ *inmem.Store }
 
-func (s queueFault) WorkQueue() store.WorkQueue { return refusingQueue{s.Store.WorkQueue()} }
+func (s queueFault) WorkQueue() work.WorkQueue { return refusingQueue{s.Store.WorkQueue()} }
 
-type refusingQueue struct{ store.WorkQueue }
+type refusingQueue struct{ work.WorkQueue }
 
 func (refusingQueue) Enqueue(context.Context, string, string, []byte, time.Time) error {
 	return errFault

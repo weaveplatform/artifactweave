@@ -24,8 +24,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 func TestUnitCocoaPodsGitRevisions(t *testing.T) {
@@ -59,7 +59,7 @@ func TestUnitCocoaPodsGitRevisions(t *testing.T) {
 		refs,
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal(err)
 	}
@@ -310,11 +310,11 @@ func TestAccCocoaPodsGitDestinationAndTransport(t *testing.T) {
 		t.Fatal("opt-in missing")
 	}
 	for _, err := range []error{transport.ErrRepositoryNotFound, transport.ErrEmptyRemoteRepository} {
-		if !errors.Is(cocoaPodsGitError(err), store.ErrNotFound) {
+		if !errors.Is(cocoaPodsGitError(err), kernel.ErrNotFound) {
 			t.Fatal(err)
 		}
 	}
-	for _, err := range []error{source.ErrDenied, source.ErrSuperseded, source.ErrInvalidResult, context.Canceled, context.DeadlineExceeded, store.ErrNotFound} {
+	for _, err := range []error{source.ErrDenied, source.ErrSuperseded, source.ErrInvalidResult, context.Canceled, context.DeadlineExceeded, kernel.ErrNotFound} {
 		if !errors.Is(cocoaPodsGitError(err), err) {
 			t.Fatal(err)
 		}

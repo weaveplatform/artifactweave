@@ -9,8 +9,8 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // TestAccRuntimeAccessModule: the runtime builds the access module over its
@@ -77,7 +77,7 @@ func TestAccRuntimeAccessModule(t *testing.T) {
 		t.Errorf("the router's authenticator reads anonymous access %v, %v; want on", on, err)
 	}
 	var on bool
-	err = router.Store.Settings().Get(ctx, types.SettingAnonymousAccess, &on)
+	err = router.Store.Settings().Get(ctx, settings.SettingAnonymousAccess, &on)
 	if err != nil || !on {
 		t.Errorf("the router's store reads anonymous access %v, %v; want on", on, err)
 	}

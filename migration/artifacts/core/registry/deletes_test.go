@@ -8,17 +8,18 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // exists reports whether path is in docker-local.
 func (w *world) exists(path string) bool {
 	w.t.Helper()
 	_, err := w.item(w.docker, path)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		w.t.Fatal(err)
 	}
 	return err == nil
@@ -40,13 +41,13 @@ func TestAccDeleteTag(t *testing.T) {
 		if w.exists("app/v1") || !w.exists("app/v2/manifest.json") {
 			t.Fatal("the wrong folder went")
 		}
-		trashed, _, err := w.db.Trash().List(ctx, "docker-local", "app/v1", store.Page{})
+		trashed, _, err := w.db.Trash().List(ctx, "docker-local", "app/v1", kernel.Page{})
 		if err != nil || len(trashed) == 0 || trashed[0].DeletedBy != "alice" {
 			t.Fatalf("trash: %v %v", trashed, err)
 		}
 		for _, folder := range []string{"v1", "v9", "_uploads"} {
 			if err := w.svc.DeleteTag(ctx, w.owner("app"), folder); !errors.Is(
-				err, store.ErrNotFound,
+				err, kernel.ErrNotFound,
 			) {
 				t.Errorf("%s: %v", folder, err)
 			}
@@ -78,7 +79,7 @@ func TestAccDeleteManifest(t *testing.T) {
 			t.Fatal("the wrong folders went")
 		}
 		if err := w.svc.DeleteManifest(ctx, w.owner("app"), digest); !errors.Is(
-			err, store.ErrNotFound,
+			err, kernel.ErrNotFound,
 		) {
 			t.Fatalf("again: %v", err)
 		}
@@ -123,8 +124,8 @@ func TestAccDeleteStoreFailures(t *testing.T) {
 }
 
 // failingItemGets fails every Get.
-type failingItemGets struct{ store.ItemStore }
+type failingItemGets struct{ port.ItemStore }
 
-func (failingItemGets) Get(context.Context, string, bool, string) (types.Item, error) {
-	return types.Item{}, errBoom
+func (failingItemGets) Get(context.Context, string, bool, string) (model.Item, error) {
+	return model.Item{}, errBoom
 }

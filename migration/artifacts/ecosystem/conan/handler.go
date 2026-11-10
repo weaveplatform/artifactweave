@@ -11,10 +11,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Handler keeps the common package index tied to committed Conan manifests.
@@ -55,7 +55,7 @@ func (h Handler) Admit(
 // in the layout is stored, since that file may be the manifest that commits
 // its revision. Folders, a remote's cached files and paths outside the
 // layout change nothing.
-func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || it.Cached {
 		return nil
 	}
@@ -66,13 +66,13 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 }
 
 // Deleting does nothing: Deleted rebuilds the index once the items are gone.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted rebuilds the repository's index with Reindex when any removed
 // item was a hosted file in the layout, so a deleted revision leaves the
 // index.
 func (h Handler) Deleted(
-	ctx context.Context, env format.Env, c repo.Config, removed []types.Item,
+	ctx context.Context, env format.Env, c repo.Config, removed []model.Item,
 ) error {
 	for _, it := range removed {
 		if _, ok := ParseStored(it.FullPath()); ok && !it.Cached {
@@ -89,9 +89,9 @@ func Files(
 	st format.Store,
 	c repo.Config,
 	folder string,
-) ([]types.Item, error) {
-	var out []types.Item
-	for page := (store.Page{Limit: 1000}); ; {
+) ([]model.Item, error) {
+	var out []model.Item
+	for page := (kernel.Page{Limit: 1000}); ; {
 		items, next, err := st.Items().Descendants(
 			ctx, c.Key, c.Class == repo.Remote, folder, page,
 		)

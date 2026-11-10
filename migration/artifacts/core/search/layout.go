@@ -9,7 +9,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // LayoutScope is what a layout search reads: the layout of each repository
@@ -114,7 +115,7 @@ func under(prefixes ...string) aql.Node {
 		if p == "" {
 			return nil
 		}
-		dir, rest := types.RootPath, p
+		dir, rest := kernel.RootPath, p
 		if i := strings.LastIndex(p, "/"); i >= 0 {
 			dir, rest = p[:i], p[i+1:]
 		}
@@ -132,7 +133,7 @@ func under(prefixes ...string) aql.Node {
 // read returns the coordinates the layout of it's repository reads from
 // its path; ok is false when there is no such layout or the path does not
 // fit it.
-func (ls LayoutScope) read(it types.Item) (layout.Coordinates, bool) {
+func (ls LayoutScope) read(it model.Item) (layout.Coordinates, bool) {
 	l := ls.Layouts[it.RepoKey]
 	if l == nil {
 		return layout.Coordinates{}, false

@@ -16,9 +16,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // rich is the metadata of a package as dotnet pack writes it.
@@ -43,7 +43,7 @@ func TestUnitDeployIndexes(t *testing.T) {
 	w := newWorld(t, nil)
 	body := pkg("Contoso.Utility", "1.2.0.0-Beta+abc", rich)
 	p := "Contoso.Utility.1.2.0-Beta.nupkg"
-	it := w.deploy(p, body, types.Properties{"build.name": {"ci"}})
+	it := w.deploy(p, body, model.Properties{"build.name": {"ci"}})
 	sum := sha512.Sum512(body)
 	b64 := base64.StdEncoding.EncodeToString(sum[:])
 	v := w.version("contoso.utility", "1.2.0-beta")
@@ -76,7 +76,7 @@ func TestUnitDeployIndexes(t *testing.T) {
 	if !v.Metadata.HasPackage() || !v.Metadata.IsPrerelease() {
 		t.Fatal("the version reads as no pre-release package")
 	}
-	wantProps := types.Properties{
+	wantProps := model.Properties{
 		"build.name":                       {"ci"},
 		nuget.PropID:                       {"Contoso.Utility"},
 		nuget.PropVersion:                  {"1.2.0-Beta"},
@@ -216,7 +216,7 @@ func TestUnitDuplicates(t *testing.T) {
 	src := w.item("Foo.1.0.0-Beta.nupkg")
 	_, err := w.items.DeployByChecksum(w.ctx, item.Deploy{
 		Target:   item.Target{Repo: w.c, Path: "copy/Foo.1.0.0-Beta.nupkg"},
-		Declared: types.Checksums{SHA1: src.Actual.SHA1}, By: "tester",
+		Declared: kernel.Checksums{SHA1: src.Actual.SHA1}, By: "tester",
 	})
 	refusedWith(t, err, "The repository 'nuget-local' already contains Foo 1.0.0-Beta")
 	// An archive's entry.
@@ -420,14 +420,14 @@ func TestUnitReindex(t *testing.T) {
 	kept := w.index(w.c)
 	it := w.item("Foo.1.0.0.nupkg")
 	if err := w.items.Annotate(w.ctx, w.c, it,
-		types.Properties{nuget.PropID: {"Spoof"}, nuget.PropSummary: {"user"}, "keep": {"me"}},
+		model.Properties{nuget.PropID: {"Spoof"}, nuget.PropSummary: {"user"}, "keep": {"me"}},
 		[]string{nuget.PropTitle}); err != nil {
 		t.Fatal(err)
 	}
 	if w.version("foo", "1.0.0").Metadata.ID != "Foo" {
 		t.Fatal("a property changed the index")
 	}
-	pkgs, _, err := w.st.Packages().List(w.ctx, w.c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := w.st.Packages().List(w.ctx, w.c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -481,9 +481,9 @@ func TestUnitRemoteCache(t *testing.T) {
 func TestUnitInspectSkips(t *testing.T) {
 	h := nuget.Handler{}
 	for _, wr := range []format.Write{
-		{Path: "a.txt", Checksums: types.Checksums{SHA256: "x"}},
+		{Path: "a.txt", Checksums: kernel.Checksums{SHA256: "x"}},
 		{Path: "a.nupkg"},
-		{Path: "a.symbols.nupkg", Checksums: types.Checksums{SHA256: "x"}},
+		{Path: "a.symbols.nupkg", Checksums: kernel.Checksums{SHA256: "x"}},
 	} {
 		in, err := h.Inspect(t.Context(), format.Env{}, repo.Config{}, wr)
 		if in != nil || err != nil {

@@ -23,8 +23,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errP2VirtualCycle = errors.New("server: p2 virtual repository cycle")
@@ -92,7 +90,7 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 	c repo.Config, cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 	archiveURL string,
 ) {
-	if !acc.File(c, req.Path, types.ActionRead) ||
+	if !acc.File(c, req.Path, accessapi.ActionRead) ||
 		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
@@ -181,8 +179,8 @@ func (s p2Items) serveP2Virtual(
 	p kernel.Principal,
 	acc itemkit.Access,
 ) {
-	if !acc.Folder(c, req.Path, types.ActionRead) ||
-		!acc.File(c, req.Path, types.ActionRead) ||
+	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
+		!acc.File(c, req.Path, accessapi.ActionRead) ||
 		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
@@ -204,7 +202,7 @@ func (s p2Items) serveP2Virtual(
 			return
 		}
 		member := members[i]
-		if !acc.File(member, parts[1], types.ActionRead) ||
+		if !acc.File(member, parts[1], accessapi.ActionRead) ||
 			generic.CheckDownload(member, parts[1], false) != nil {
 			httpkit.WriteErr(w, r, httpkit.Denied(p))
 			return
@@ -257,13 +255,13 @@ func p2Members(ctx context.Context, st itemkit.Store, c repo.Config, acc itemkit
 	out := make([]repo.Config, 0, len(c.Repositories))
 	for _, key := range c.Repositories {
 		m, err := st.Repos().Get(ctx, key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
 			return nil, fmt.Errorf("p2 member %s: %w", key, err)
 		}
-		if !acc.Folder(m, "", types.ActionRead) {
+		if !acc.Folder(m, "", accessapi.ActionRead) {
 			continue
 		}
 		switch {

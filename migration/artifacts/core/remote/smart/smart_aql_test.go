@@ -10,7 +10,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const smartQueryResponse = `{"results":[],"range":{"start_pos":0,"end_pos":0,"total":0}}`
@@ -76,7 +76,7 @@ func TestAccSmartAQLTransientAuthenticatedPOST(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	entries, _, err := w.db.RemoteCache().List(w.ctx, w.c.Key, "", store.Page{Limit: 100})
+	entries, _, err := w.db.RemoteCache().List(w.ctx, w.c.Key, "", kernel.Page{Limit: 100})
 	if err != nil || len(entries) != 0 {
 		t.Fatal("search persisted remote cache state", entries, err)
 	}

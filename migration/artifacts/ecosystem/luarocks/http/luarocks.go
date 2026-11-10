@@ -11,13 +11,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Options configures the LuaRocks protocol. RemoteSources serves remote
@@ -84,7 +84,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if p.String() == luarocks.ManifestPath || strings.HasPrefix(p.String(), "manifest-5.") {
-		if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+		if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 			return
 		}
 		f, err := h.k.ResolveItem(r, p.String())
@@ -108,7 +108,7 @@ func (h handler) toolVersion(w http.ResponseWriter, _ *http.Request) {
 
 func (h handler) checkRockspec(w http.ResponseWriter, r *http.Request) {
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
-		member, ok := h.virtualDeployment(w, r, types.ActionRead)
+		member, ok := h.virtualDeployment(w, r, api.ActionRead)
 		if ok {
 			h.checkRockspec(w, member)
 		}
@@ -120,13 +120,13 @@ func (h handler) checkRockspec(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid LuaRocks package or version"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	response := map[string]any{}
 	p, err := h.k.DB().Packages().Find(r.Context(), pkgroute.RequestFrom(r).Repo.Key, name)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 	case err != nil:
 		h.k.Error(w, r, err)
 		return
@@ -134,7 +134,7 @@ func (h handler) checkRockspec(w http.ResponseWriter, r *http.Request) {
 		response["module"] = map[string]any{"name": name}
 		v, err := h.k.DB().Packages().Version(r.Context(), p.ID, version)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 		case err != nil:
 			h.k.Error(w, r, err)
 			return
@@ -147,13 +147,13 @@ func (h handler) checkRockspec(w http.ResponseWriter, r *http.Request) {
 
 func (h handler) uploadRockspec(w http.ResponseWriter, r *http.Request) {
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
-		member, ok := h.virtualDeployment(w, r, types.ActionWrite)
+		member, ok := h.virtualDeployment(w, r, api.ActionWrite)
 		if ok {
 			h.uploadRockspec(w, member)
 		}
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionWrite) {
+	if !h.k.RequireFolder(w, r, "", api.ActionWrite) {
 		return
 	}
 	form, err := h.k.ReadFormWith(r, "rockspec_file", "rockspec_sig")
@@ -177,7 +177,7 @@ func (h handler) uploadRockspec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { _ = rc.Close() }()
-	if _, err := h.k.Store(r, filename, rc, nil, types.Checksums{}); err != nil {
+	if _, err := h.k.Store(r, filename, rc, nil, kernel.Checksums{}); err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
@@ -200,13 +200,13 @@ func (h handler) uploadRockspec(w http.ResponseWriter, r *http.Request) {
 
 func (h handler) uploadRock(w http.ResponseWriter, r *http.Request) {
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
-		member, ok := h.virtualDeployment(w, r, types.ActionWrite)
+		member, ok := h.virtualDeployment(w, r, api.ActionWrite)
 		if ok {
 			h.uploadRock(w, member)
 		}
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionWrite) {
+	if !h.k.RequireFolder(w, r, "", api.ActionWrite) {
 		return
 	}
 	n, err := strconv.ParseInt(chi.URLParam(r, "versionID"), 10, 64)
@@ -215,7 +215,7 @@ func (h handler) uploadRock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, err := luarocks.VersionFile(r.Context(), h.k.DB(), pkgroute.RequestFrom(r).Repo, n)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		h.k.Error(w, r, apierror.New(http.StatusNotFound, "LuaRocks version not found"))
 		return
 	}
@@ -253,7 +253,7 @@ func (h handler) uploadRock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { _ = rc.Close() }()
-	if _, err := h.k.Store(r, filename, rc, nil, types.Checksums{}); err != nil {
+	if _, err := h.k.Store(r, filename, rc, nil, kernel.Checksums{}); err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
@@ -273,7 +273,7 @@ func (h handler) signature(r *http.Request, sig pkgroute.FormFile, owner string)
 		return fmt.Errorf("luarocks: open signature: %w", err)
 	}
 	defer func() { _ = rc.Close() }()
-	_, err = h.k.Store(r, sig.FileName, rc, nil, types.Checksums{})
+	_, err = h.k.Store(r, sig.FileName, rc, nil, kernel.Checksums{})
 	if err != nil {
 		return fmt.Errorf("luarocks: store signature: %w", err)
 	}

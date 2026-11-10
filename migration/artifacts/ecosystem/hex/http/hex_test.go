@@ -12,8 +12,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	hexfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 func TestUnitTarballPathGrammar(t *testing.T) {
@@ -143,7 +143,7 @@ func TestUnitRemoteTarballBoundaryRejectsUnverifiedSourceStream(t *testing.T) {
 			}
 		})
 	}
-	if _, err := h.remoteResult(r, "tarballs/bad.tar"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := h.remoteResult(r, "tarballs/bad.tar"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("noncanonical tarball path: %v", err)
 	}
 	if _, err := (virtualSource{}).Item(

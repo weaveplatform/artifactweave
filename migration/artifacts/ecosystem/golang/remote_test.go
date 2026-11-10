@@ -18,9 +18,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const (
@@ -67,7 +67,7 @@ func goSourceFixture(t *testing.T) (*policyWorld, GoSource, source.Request) {
 		t.Fatal(err)
 	}
 	s := &source.Service{
-		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			return w.db.RemoteCache().Source(ctx, c.Key)
 		},
 		HTTP: w.p, Cache: w.p,
@@ -135,7 +135,7 @@ func TestAccGoSourceEndpointsEscapingAndOffline(t *testing.T) {
 		t.Fatal("offline read contacted upstream")
 	}
 	q.Resource = source.Resource{Path: goModule + "/@v/v9.0.0+incompatible.zip"}
-	if _, err := src.Read(t.Context(), q); !errors.Is(err, store.ErrNotFound) {
+	if _, err := src.Read(t.Context(), q); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal("offline miss", err)
 	}
 }
@@ -184,12 +184,12 @@ func TestAccGoSourcePseudoVersionNegativeCacheAndCancellation(t *testing.T) {
 	version := "v0.0.0-20261020120000-abcdefabcdef"
 	path := goEscapedModule + "/@v/" + version + ".info"
 	q.Resource = source.Resource{Path: path}
-	if _, err := src.Read(t.Context(), q); !errors.Is(err, store.ErrNotFound) {
+	if _, err := src.Read(t.Context(), q); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal(err)
 	}
 	body := []byte(`{"Version":"` + version + `","Time":"2026-10-20T12:00:00Z"}`)
 	w.up.Set("/"+path, fakeupstream.Resource{Body: body})
-	if _, err := src.Read(t.Context(), q); !errors.Is(err, store.ErrNotFound) {
+	if _, err := src.Read(t.Context(), q); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal("negative cache bypass", err)
 	}
 	w.clock.Advance(6 * time.Second)
@@ -233,7 +233,7 @@ func TestAccGoSourceRejectsInvalidBodiesBeforeAdmission(t *testing.T) {
 				if _, err := w.db.Items().
 					Get(t.Context(), w.c.Key, true, resource.Path); !errors.Is(
 					err,
-					store.ErrNotFound,
+					kernel.ErrNotFound,
 				) {
 					t.Fatal("invalid body published", err)
 				}

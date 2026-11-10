@@ -7,11 +7,18 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/federation/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/notifications/core/model"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/workers/core/model"
 )
 
 // Opener opens the same database each call with the given keyring (nil for
@@ -89,47 +96,47 @@ func populate(t *testing.T, s *appsql.Store) {
 			{Name: "X-Token", Value: "header-secret", Sensitive: true},
 		},
 	}))
-	check(s.Keys().CreateKeypair(ctx, types.Keypair{
-		Name: "kp", Type: types.KeypairGPG,
+	check(s.Keys().CreateKeypair(ctx, api.Keypair{
+		Name: "kp", Type: api.KeypairGPG,
 		PrivateKey: "kp-private", Passphrase: "kp-pass",
 	}))
-	check(s.Keys().PutSigningKey(ctx, types.SigningKey{
+	check(s.Keys().PutSigningKey(ctx, model.SigningKey{
 		Alias:      "sk",
 		PrivateKey: "sk-private", Passphrase: "sk-pass", IsDefault: true,
 	}))
-	check(s.Keys().PutCertificate(ctx, types.Certificate{
+	check(s.Keys().PutCertificate(ctx, api.Certificate{
 		Alias: "cert", PEM: "cert-pem", PrivateKey: "cert-private",
 	}))
-	check(s.Tokens().Create(ctx, types.Token{
-		ID: "tok", Subject: "alice", Scope: types.UserScope(), Secret: "token-secret",
+	check(s.Tokens().Create(ctx, model.Token{
+		ID: "tok", Subject: "alice", Scope: kernel.UserScope(), Secret: "token-secret",
 	}))
-	check(s.Replications().Put(ctx, types.Replication{
+	check(s.Replications().Put(ctx, model.Replication{
 		RepoKey: "remote", Key: "rep",
 		URL: "https://peer.example/artifactory/remote", Password: "rep-pw",
 	}))
-	check(s.Webhooks().Create(ctx, types.WebhookSubscription{
+	check(s.Webhooks().Create(ctx, model.WebhookSubscription{
 		Key:        "hook",
 		Enabled:    true,
-		Domain:     types.DomainArtifact,
+		Domain:     model.DomainArtifact,
 		EventTypes: []string{"deployed"},
-		Handlers: []types.WebhookHandler{
-			{Type: types.HandlerWebhook, URL: "https://hook.example", Secret: "hook-secret"},
+		Handlers: []model.WebhookHandler{
+			{Type: model.HandlerWebhook, URL: "https://hook.example", Secret: "hook-secret"},
 		},
 	}))
-	check(s.Configs().Put(ctx, types.ConfigDocument{
-		Kind: types.ConfigLDAP,
+	check(s.Configs().Put(ctx, configdoc.ConfigDocument{
+		Kind: configdoc.ConfigLDAP,
 		Key:  "ldap",
 		Document: []byte(
 			`{"ldap_url":"ldap://dir"}`,
 		),
 		Secrets: map[string]string{"manager_password": "ldap-pw"},
 	}))
-	check(s.Workers().Create(ctx, types.Worker{
-		Key: "w", Action: types.WorkerAction("BEFORE_DOWNLOAD"),
+	check(s.Workers().Create(ctx, model.Worker{
+		Key: "w", Action: model.WorkerAction("BEFORE_DOWNLOAD"),
 		SourceCode: "export default async () => ({})",
 	}))
 	check(s.Workers().PutSecret(ctx, "w", "token", "worker-secret"))
-	check(s.Instance().Init(ctx, types.InstanceIdentity{
+	check(s.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01rotation",
 		PublicKey:  instanceKey.Public().(ed25519.PublicKey), PrivateKey: instanceKey,
 	}))
@@ -167,7 +174,7 @@ func verify(t *testing.T, s *appsql.Store) {
 		t.Fatalf("webhook = %+v, %v", h, err)
 	}
 	want("webhook secret", h.Handlers[0].Secret, "hook-secret", nil)
-	cd, err := s.Configs().Get(ctx, types.ConfigLDAP, "ldap")
+	cd, err := s.Configs().Get(ctx, configdoc.ConfigLDAP, "ldap")
 	want("config secret", cd.Secrets["manager_password"], "ldap-pw", err)
 	ws, err := s.Workers().Secrets(ctx, "w")
 	want("worker secret", ws["token"], "worker-secret", err)

@@ -14,8 +14,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	nixfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Nix's content-addressed archives are immutable, so this contract exercises
@@ -69,7 +69,7 @@ func TestAccNixFormatLifecycle(t *testing.T) {
 				t.Helper()
 				p, err := db.Packages().Find(t.Context(), c.Key, "weave-fixture")
 				if !want {
-					if !errors.Is(err, store.ErrNotFound) {
+					if !errors.Is(err, kernel.ErrNotFound) {
 						versions, _ := db.Packages().Versions(t.Context(), p.ID)
 						if len(versions) > 0 {
 							t.Fatalf("orphan index published: %v", versions)
@@ -103,7 +103,7 @@ func TestAccNixFormatLifecycle(t *testing.T) {
 			if _, err = db.Packages().
 				Find(t.Context(), c.Key, "other-name"); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatalf("rejected identity published: %v", err)
 			}
@@ -288,7 +288,7 @@ func TestAccNixConcurrentFirstPublicationKeepsOneIdentity(t *testing.T) {
 			if _, err = db.Packages().
 				Find(t.Context(), c.Key, losing); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatalf("losing identity indexed: %v", err)
 			}

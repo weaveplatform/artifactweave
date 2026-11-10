@@ -11,11 +11,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // grantLifecycle gives the fixture the users the dist-tag, deprecate and
@@ -24,12 +24,12 @@ import (
 //   - blind annotates all of npm-local and reads nothing;
 //   - tagone reads and annotates only rich's 1.x tarballs;
 //   - pruner reads and deletes only rich's 1.x tarballs.
-func grantLifecycle(grant func(user, include string, actions types.Actions)) {
-	read, annotate := types.ActionRead, types.ActionAnnotate
+func grantLifecycle(grant func(user, include string, actions api.Actions)) {
+	read, annotate := api.ActionRead, api.ActionAnnotate
 	grant("tagger", "**", read|annotate)
 	grant("blind", "**", annotate)
 	grant("tagone", "rich/-/rich-1.*", read|annotate)
-	grant("pruner", "rich/-/rich-1.*", read|types.ActionDelete)
+	grant("pruner", "rich/-/rich-1.*", read|api.ActionDelete)
 }
 
 const tags = registry + "-/package/"

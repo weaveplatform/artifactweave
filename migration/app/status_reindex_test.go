@@ -7,12 +7,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The reindex operations of the P8 package types (#516), which answer 501
@@ -105,7 +107,7 @@ func createReindexRepos(t *testing.T, st *inmem.Store) {
 			for _, p := range []string{"charts", "charts/team", "charts/team/app-1.0.0.tgz"} {
 				parent, name := path.Split(p)
 				if _, err := st.Items().
-					Put(context.Background(), types.Item{RepoKey: c.Key, Path: strings.TrimSuffix(parent, "/"), Name: name, Folder: !strings.HasSuffix(p, ".tgz")}); err != nil {
+					Put(context.Background(), model.Item{RepoKey: c.Key, Path: strings.TrimSuffix(parent, "/"), Name: name, Folder: !strings.HasSuffix(p, ".tgz")}); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -195,20 +197,20 @@ var reindexStatusPart = statusPart{
 		t.Helper()
 		ctx := context.Background()
 		createReindexRepos(t, db)
-		if err := db.Users().Create(ctx, types.User{
+		if err := db.Users().Create(ctx, model.User{
 			Name: "reindexer", PasswordHash: cheapHash,
 		}); err != nil {
 			t.Fatal(err)
 		}
-		targets := map[string]types.Target{}
+		targets := map[string]model.Target{}
 		for _, c := range reindexRepos {
-			targets[c.Key] = types.Target{Include: []string{"**"}}
+			targets[c.Key] = model.Target{Include: []string{"**"}}
 		}
-		if err := db.Permissions().Create(ctx, types.Permission{
+		if err := db.Permissions().Create(ctx, model.Permission{
 			Name: "reindex-manage",
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					"reindexer": types.ActionManage,
+			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{
+					"reindexer": api.ActionManage,
 				}},
 				Targets: targets,
 			}},

@@ -10,20 +10,24 @@ import (
 	"time"
 
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/oidc"
 	"github.com/weaveplatform/artifactweave/migration/access/core/roles"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
@@ -39,7 +43,7 @@ import (
 // repository under a prefix ("" is all of it; repo "*" is every repository).
 type matrixGrant struct {
 	repo, under string
-	actions     types.Actions
+	actions     api.Actions
 }
 
 // matrixPrincipal is one caller, and what the permission model says it is.
@@ -65,7 +69,7 @@ type matrixPrincipal struct {
 	// identity: the token's identity when its user need not be stored: an
 	// OIDC exchange's, which a registry token keeps, or a transient user's
 	// an administrator minted for a name that is no stored user.
-	identity types.TokenIdentity
+	identity kernel.TokenIdentity
 	// admin: acts as an administrator.
 	admin bool
 	// resources: holds the Manage Resources role, which manages every
@@ -81,9 +85,9 @@ type matrixPrincipal struct {
 }
 
 const (
-	rwd        = types.ActionRead | types.ActionWrite | types.ActionDelete
-	rawd       = rwd | types.ActionAnnotate
-	allContent = rawd | types.ActionManage
+	rwd        = api.ActionRead | api.ActionWrite | api.ActionDelete
+	rawd       = rwd | api.ActionAnnotate
+	allContent = rawd | api.ActionManage
 )
 
 // matrixPrincipals are the callers. The fixture gives each what its grants
@@ -107,12 +111,12 @@ var matrixPrincipals = []matrixPrincipal{
 	},
 	// Grants on artifactory-build-info are the build resource's (#165).
 	{name: "reader", user: "reader", grants: slices.Concat([]matrixGrant{
-		{"libs-local", "", types.ActionRead},
-		{types.BuildInfoRepository, "", types.ActionRead},
-	}, formatGrants("", types.ActionRead))},
+		{"libs-local", "", api.ActionRead},
+		{api.BuildInfoRepository, "", api.ActionRead},
+	}, formatGrants("", api.ActionRead))},
 	{name: "writer", user: "writer", grants: slices.Concat([]matrixGrant{
 		{"libs-local", "work/", rwd},
-		{types.BuildInfoRepository, "", types.ActionRead | types.ActionWrite},
+		{api.BuildInfoRepository, "", api.ActionRead | api.ActionWrite},
 	}, formatGrants("work/", rwd))},
 	// charter reads, deploys and deletes Helm charts in helm-local but not
 	// their .prov files, which its permission excludes (helmMatrixPart's
@@ -126,7 +130,7 @@ var matrixPrincipals = []matrixPrincipal{
 	// the CI user whose jf rt u, run again, replaces files with their own
 	// content (#400).
 	{name: "deployer", user: "deployer", grants: []matrixGrant{
-		{"libs-local", "work/", types.ActionRead | types.ActionWrite},
+		{"libs-local", "work/", api.ActionRead | api.ActionWrite},
 	}},
 	// member holds A and every build through its group, and reads B through
 	// a direct grant.
@@ -136,8 +140,8 @@ var matrixPrincipals = []matrixPrincipal{
 			"",
 			rawd,
 		},
-		{"libs-b", "", types.ActionRead},
-		{types.BuildInfoRepository, "", rwd},
+		{"libs-b", "", api.ActionRead},
+		{api.BuildInfoRepository, "", rwd},
 	}, formatGrants("", rawd))},
 	// Anonymous with anonymous access on holds nothing: since 7.84.3
 	// neither seeded permission grants it, Any Remote included (#383).
@@ -153,7 +157,7 @@ var matrixPrincipals = []matrixPrincipal{
 	{
 		name: "tok-groups", user: "member", token: true, scope: "applied-permissions/groups:team",
 		narrowed: true, grants: slices.Concat([]matrixGrant{
-			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd},
+			{"libs-local", "", rawd}, {api.BuildInfoRepository, "", rwd},
 		}, formatGrants("", rawd)),
 	},
 	// admin's token scoped to A: every action there, but no admin endpoint.
@@ -166,15 +170,15 @@ var matrixPrincipals = []matrixPrincipal{
 	// alone, as tok-groups does (#406).
 	{
 		name: "tok-transient", user: "ghost", token: true, scope: "applied-permissions/groups:team",
-		narrowed: true, identity: types.IdentityTransient, grants: slices.Concat([]matrixGrant{
-			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd},
+		narrowed: true, identity: kernel.IdentityTransient, grants: slices.Concat([]matrixGrant{
+			{"libs-local", "", rawd}, {api.BuildInfoRepository, "", rwd},
 		}, formatGrants("", rawd)),
 	},
 	// applied-permissions/admin for a name that is no stored user: an
 	// administrator all the same (#406).
 	{
 		name: "tok-admin-scope", user: "ghost-admin", token: true,
-		scope: "applied-permissions/admin", identity: types.IdentityTransient, admin: true,
+		scope: "applied-permissions/admin", identity: kernel.IdentityTransient, admin: true,
 		grants: []matrixGrant{{"*", "", allContent}},
 	},
 	// member's token scoped to the storage summary alone, which 7.x lets
@@ -197,7 +201,7 @@ var matrixPrincipals = []matrixPrincipal{
 	// not stored (#248): it answers exactly as tok-registry does.
 	{
 		name: "tok-registry-oidc", user: "ci-oidc", token: true, registry: true, narrowed: true,
-		identity: types.IdentityTransient,
+		identity: kernel.IdentityTransient,
 	},
 	// A transient user from an OIDC exchange whose mapping names it and
 	// member's group: it acts through team, as tok-transient does, but its
@@ -206,18 +210,18 @@ var matrixPrincipals = []matrixPrincipal{
 	{
 		name: "tok-transient-user", user: "ci-user", token: true,
 		scope:    "applied-permissions/groups:team applied-permissions/user",
-		identity: types.IdentityTransient, grants: slices.Concat([]matrixGrant{
-			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd},
+		identity: kernel.IdentityTransient, grants: slices.Concat([]matrixGrant{
+			{"libs-local", "", rawd}, {api.BuildInfoRepository, "", rwd},
 		}, formatGrants("", rawd)),
 	},
 }
 
 // holds reports whether p holds every action in want at path in repo.
-func (p matrixPrincipal) holds(repoKey, path string, want types.Actions) bool {
+func (p matrixPrincipal) holds(repoKey, path string, want api.Actions) bool {
 	if slices.ContainsFunc(p.excludes, func(s string) bool { return strings.HasSuffix(path, s) }) {
 		return false
 	}
-	var have types.Actions
+	var have api.Actions
 	for _, g := range p.grants {
 		if (g.repo == "*" || g.repo == repoKey) && strings.HasPrefix(path, g.under) {
 			have |= g.actions
@@ -230,7 +234,7 @@ func (p matrixPrincipal) holds(repoKey, path string, want types.Actions) bool {
 // configuration: it may read somewhere in it.
 func (p matrixPrincipal) sees(repoKey string) bool {
 	return slices.ContainsFunc(p.grants, func(g matrixGrant) bool {
-		return (g.repo == "*" || g.repo == repoKey) && g.actions.Has(types.ActionRead)
+		return (g.repo == "*" || g.repo == repoKey) && g.actions.Has(api.ActionRead)
 	})
 }
 
@@ -303,7 +307,7 @@ func accessMinter(p matrixPrincipal) int {
 // finds no user (404).
 func ownRecord(r rule) rule {
 	return func(p matrixPrincipal) int {
-		if s := r(p); s != 0 || p.identity != types.IdentityTransient {
+		if s := r(p); s != 0 || p.identity != kernel.IdentityTransient {
 			return s
 		}
 		return http.StatusNotFound
@@ -315,7 +319,7 @@ func ownRecord(r rule) rule {
 // unknown user (400).
 func namesSelf(r rule) rule {
 	return func(p matrixPrincipal) int {
-		if s := r(p); s != 0 || p.identity != types.IdentityTransient {
+		if s := r(p); s != 0 || p.identity != kernel.IdentityTransient {
 			return s
 		}
 		return http.StatusBadRequest
@@ -360,7 +364,7 @@ func permissionManagers(p matrixPrincipal) int {
 }
 
 // holds: a caller holding every action in want at path in repoKey.
-func holds(repoKey, path string, want types.Actions) rule {
+func holds(repoKey, path string, want api.Actions) rule {
 	return func(p matrixPrincipal) int {
 		if p.holds(repoKey, path, want) {
 			return 0
@@ -370,7 +374,7 @@ func holds(repoKey, path string, want types.Actions) rule {
 }
 
 // holdsEither: a caller holding a or b at path in repoKey.
-func holdsEither(repoKey, path string, a, b types.Actions) rule {
+func holdsEither(repoKey, path string, a, b api.Actions) rule {
 	return func(p matrixPrincipal) int {
 		if p.holds(repoKey, path, a) || p.holds(repoKey, path, b) {
 			return 0
@@ -574,9 +578,9 @@ func buildMatrix() []matrixRow {
 	const (
 		b    = "/artifactory/api/build"
 		arts = "GET /artifactory/api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo}"
-		bi   = types.BuildInfoRepository
+		bi   = api.BuildInfoRepository
 	)
-	read, write, del := types.ActionRead, types.ActionWrite, types.ActionDelete
+	read, write, del := api.ActionRead, api.ActionWrite, api.ActionDelete
 	mine := published("b-{p}")
 	return []matrixRow{
 		at("GET "+b, "", anyone, 200),
@@ -747,7 +751,7 @@ func contentMatrix() []matrixRow {
 		aql    = "POST /artifactory/api/search/aql"
 		create = "POST " + uploadsCreate
 	)
-	read, write, del := types.ActionRead, types.ActionWrite, types.ActionDelete
+	read, write, del := api.ActionRead, api.ActionWrite, api.ActionDelete
 	return []matrixRow{
 		row(put, lib+"work/new-{p}.txt", "a", holds("libs-local", "work/", write), 201),
 		row(put, lib+"other/new-{p}.txt", "a", holds("libs-local", "other/", write), 201),
@@ -856,7 +860,7 @@ func storageMatrix() []matrixRow {
 
 		rootMeta = "/artifactory/api/metadata/libs-local"
 	)
-	read, annotate := types.ActionRead, types.ActionAnnotate
+	read, annotate := api.ActionRead, api.ActionAnnotate
 	return []matrixRow{
 		row(get, file, "", holds("libs-local", "work/", read), 200),
 		// The effective permissions view is for administrators.
@@ -901,7 +905,7 @@ func storageMatrix() []matrixRow {
 		at("POST /artifactory/api/system/storage/gc", "", administrators, 200),
 		row(
 			"POST /artifactory/api/zap/{repoPath}", "/artifactory/api/zap/remote-private-cache", "",
-			holdsEither("remote-private", "", types.ActionDelete, types.ActionManage), 200,
+			holdsEither("remote-private", "", api.ActionDelete, api.ActionManage), 200,
 		),
 	}
 }
@@ -911,8 +915,8 @@ func storageMatrix() []matrixRow {
 // artifactory-build-info are the build resource's, which shows nothing.
 func trashViewer(p matrixPrincipal) int {
 	if !p.anonymous && slices.ContainsFunc(p.grants, func(g matrixGrant) bool {
-		return g.repo != types.BuildInfoRepository &&
-			(g.actions.Has(types.ActionWrite) || g.actions.Has(types.ActionManage))
+		return g.repo != api.BuildInfoRepository &&
+			(g.actions.Has(api.ActionWrite) || g.actions.Has(api.ActionManage))
 	}) {
 		return 0
 	}
@@ -925,7 +929,7 @@ func trashMatrix() []matrixRow {
 		list = "GET /artifactory/api/storage/auto-trashcan"
 		tc   = "/artifactory/api/storage/auto-trashcan"
 	)
-	write, manage := types.ActionWrite, types.ActionManage
+	write, manage := api.ActionWrite, api.ActionManage
 	return []matrixRow{
 		at(list, "", trashViewer, 200),
 		// What was trashed from A shows to its deploy and manage holders,
@@ -995,14 +999,14 @@ func trashMatrix() []matrixRow {
 			"POST /artifactory/api/trash/restore/{fromPath}",
 			"/artifactory/api/trash/restore/libs-local/work/off-{p}.txt?to=libs-local", "",
 			trashRule(allOf(
-				holds("libs-local", "", types.ActionManage),
-				holdsEither("libs-local", "work/", types.ActionDelete, types.ActionManage),
+				holds("libs-local", "", api.ActionManage),
+				holdsEither("libs-local", "work/", api.ActionDelete, api.ActionManage),
 			)), 202,
 		).seeding(trashedThenOff("libs-local", "work/off-{p}.txt")),
 		row(
 			"DELETE /artifactory/api/trash/clean/{repoPath}",
 			"/artifactory/api/trash/clean/libs-local/work/trash-{p}.txt", "",
-			trashRule(holdsEither("libs-local", "work/", types.ActionDelete, types.ActionManage)),
+			trashRule(holdsEither("libs-local", "work/", api.ActionDelete, api.ActionManage)),
 			204,
 		).seeding(trashed("libs-local", "work/trash-{p}.txt")),
 		// Restoring needs manage on the destination and delete or manage
@@ -1011,8 +1015,8 @@ func trashMatrix() []matrixRow {
 			"POST /artifactory/api/trash/restore/{fromPath}",
 			"/artifactory/api/trash/restore/libs-local/work/trash-{p}.txt?to=libs-local", "",
 			trashRule(allOf(
-				holds("libs-local", "", types.ActionManage),
-				holdsEither("libs-local", "work/", types.ActionDelete, types.ActionManage),
+				holds("libs-local", "", api.ActionManage),
+				holdsEither("libs-local", "work/", api.ActionDelete, api.ActionManage),
 			)), 202,
 		).seeding(trashed("libs-local", "work/trash-{p}.txt")),
 		// From B into A: tok-admin-repo manages A but holds nothing in B.
@@ -1020,8 +1024,8 @@ func trashMatrix() []matrixRow {
 			"POST /artifactory/api/trash/restore/{fromPath}",
 			"/artifactory/api/trash/restore/libs-b/work/b-trash-{p}.txt?to=libs-local", "",
 			trashRule(allOf(
-				holds("libs-local", "", types.ActionManage),
-				holdsEither("libs-b", "work/", types.ActionDelete, types.ActionManage),
+				holds("libs-local", "", api.ActionManage),
+				holdsEither("libs-b", "work/", api.ActionDelete, api.ActionManage),
 			)), 202,
 		).seeding(trashed("libs-b", "work/b-trash-{p}.txt")),
 		// A deleted repository's content stays in the trash can under its
@@ -1203,7 +1207,7 @@ func permissionMatrix() []matrixRow {
 // user's token mints one only when it is refreshable itself, which no
 // principal's is, since each refresh would outlast the identity (#456).
 func refreshableMinter(p matrixPrincipal) int {
-	if s := accessMinter(p); s != 0 || p.identity != types.IdentityTransient || p.admin {
+	if s := accessMinter(p); s != 0 || p.identity != kernel.IdentityTransient || p.admin {
 		return s
 	}
 	return http.StatusForbidden
@@ -1432,7 +1436,7 @@ type matrixFixture struct {
 func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int, string) {
 	t.Helper()
 	ctx := context.Background()
-	if err := f.db.Settings().Put(ctx, types.SettingAnonymousAccess, p.anonymousOn); err != nil {
+	if err := f.db.Settings().Put(ctx, settings.SettingAnonymousAccess, p.anonymousOn); err != nil {
 		t.Fatal(err)
 	}
 	fill := strings.NewReplacer(
@@ -1506,21 +1510,21 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		}
 	}
 	for _, u := range []string{"nobody", "reader", "writer", "deployer", "member", "gadmin", "gresmgr"} {
-		must(db.Users().Create(ctx, types.User{Name: u, PasswordHash: cheapHash}))
+		must(db.Users().Create(ctx, model.User{Name: u, PasswordHash: cheapHash}))
 	}
-	must(db.Users().Create(ctx, types.User{
-		Name: "resmgr", PasswordHash: cheapHash, Roles: types.RoleFlags{ResourcesManager: true},
+	must(db.Users().Create(ctx, model.User{
+		Name: "resmgr", PasswordHash: cheapHash, Roles: model.RoleFlags{ResourcesManager: true},
 	}))
-	must(db.Groups().Create(ctx, types.Group{
-		Name: "res-managers", Roles: types.RoleFlags{ResourcesManager: true},
+	must(db.Groups().Create(ctx, model.Group{
+		Name: "res-managers", Roles: model.RoleFlags{ResourcesManager: true},
 		Members: []string{"gresmgr"},
 	}))
 	for _, p := range names {
-		must(db.Users().Create(ctx, types.User{Name: "v-" + p, PasswordHash: cheapHash}))
-		must(db.Groups().Create(ctx, types.Group{Name: "g-" + p}))
+		must(db.Users().Create(ctx, model.User{Name: "v-" + p, PasswordHash: cheapHash}))
+		must(db.Groups().Create(ctx, model.Group{Name: "g-" + p}))
 	}
-	must(db.Groups().Create(ctx, types.Group{Name: "team", Members: []string{"member"}}))
-	must(db.Groups().Create(ctx, types.Group{
+	must(db.Groups().Create(ctx, model.Group{Name: "team", Members: []string{"member"}}))
+	must(db.Groups().Create(ctx, model.Group{
 		Name: "ops", AdminPrivileges: true, Members: []string{"gadmin"},
 	}))
 
@@ -1545,66 +1549,66 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		must(db.Repos().Create(ctx, *repo.Defaults(&c)))
 	}
 
-	grant := func(name string, g types.Grants, target string, include ...string) {
-		must(db.Permissions().Create(ctx, types.Permission{
+	grant := func(name string, g model.Grants, target string, include ...string) {
+		must(db.Permissions().Create(ctx, model.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: g, Targets: map[string]types.Target{target: {Include: include}},
+			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+				Actions: g, Targets: map[string]model.Target{target: {Include: include}},
 			}},
 		}))
 	}
-	users := func(name string, a types.Actions) types.Grants {
-		return types.Grants{Users: map[string]types.Actions{name: a}}
+	users := func(name string, a api.Actions) model.Grants {
+		return model.Grants{Users: map[string]api.Actions{name: a}}
 	}
 	// The permissions behind matrixPrincipals' grants.
-	grant("matrix-reader", users("reader", types.ActionRead), "libs-local", "**")
+	grant("matrix-reader", users("reader", api.ActionRead), "libs-local", "**")
 	grant("matrix-writer", users("writer", rwd), "libs-local", "work/**")
 	grant(
 		"matrix-deployer",
-		users("deployer", types.ActionRead|types.ActionWrite),
+		users("deployer", api.ActionRead|api.ActionWrite),
 		"libs-local",
 		"work/**",
 	)
 	grant(
 		"matrix-team",
-		types.Grants{Groups: map[string]types.Actions{"team": rawd}},
+		model.Grants{Groups: map[string]api.Actions{"team": rawd}},
 		"libs-local",
 		"**",
 	)
-	grant("matrix-member", users("member", types.ActionRead), "libs-b", "**")
+	grant("matrix-member", users("member", api.ActionRead), "libs-b", "**")
 	for _, p := range names {
-		grant("perm-"+p, users("v-"+p, types.ActionRead), "perm-local", "**")
+		grant("perm-"+p, users("v-"+p, api.ActionRead), "perm-local", "**")
 	}
 	// The formats' repositories have one permission per principal, so
 	// their grants follow the same pattern as libs-local's.
-	formatGrant := func(name string, g types.Grants, under string) {
-		must(db.Permissions().Create(ctx, types.Permission{
+	formatGrant := func(name string, g model.Grants, under string) {
+		must(db.Permissions().Create(ctx, model.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
 				Actions: g, Targets: formatTargets(under),
 			}},
 		}))
 	}
-	formatGrant("matrix-formats-reader", users("reader", types.ActionRead), "")
+	formatGrant("matrix-formats-reader", users("reader", api.ActionRead), "")
 	formatGrant("matrix-formats-writer", users("writer", rwd), "work/")
 	formatGrant(
 		"matrix-formats-team",
-		types.Grants{Groups: map[string]types.Actions{"team": rawd}},
+		model.Grants{Groups: map[string]api.Actions{"team": rawd}},
 		"",
 	)
-	buildGrant := func(name string, g types.Grants) {
-		must(db.Permissions().Create(ctx, types.Permission{
+	buildGrant := func(name string, g model.Grants) {
+		must(db.Permissions().Create(ctx, model.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceBuild: {
-				Actions: g, Targets: map[string]types.Target{
-					types.BuildInfoRepository: {Include: []string{"**"}},
+			Resources: map[api.ResourceType]model.Resource{api.ResourceBuild: {
+				Actions: g, Targets: map[string]model.Target{
+					api.BuildInfoRepository: {Include: []string{"**"}},
 				},
 			}},
 		}))
 	}
-	buildGrant("matrix-build-reader", users("reader", types.ActionRead))
-	buildGrant("matrix-build-writer", users("writer", types.ActionRead|types.ActionWrite))
-	buildGrant("matrix-build-team", types.Grants{Groups: map[string]types.Actions{"team": rwd}})
+	buildGrant("matrix-build-reader", users("reader", api.ActionRead))
+	buildGrant("matrix-build-writer", users("writer", api.ActionRead|api.ActionWrite))
+	buildGrant("matrix-build-team", model.Grants{Groups: map[string]api.Actions{"team": rwd}})
 
 	blobs, err := fs.New(t.TempDir())
 	must(err)
@@ -1633,19 +1637,19 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	// default limit of ten allows; matrixEnvironmentLimit lifts it.
 	rs := matrixRoles(db)
 	for _, p := range names {
-		must(db.Keys().CreateKeypair(ctx, types.Keypair{
-			Name: "kp-" + p, Type: types.KeypairRSA, Alias: "a-" + p,
+		must(db.Keys().CreateKeypair(ctx, api.Keypair{
+			Name: "kp-" + p, Type: api.KeypairRSA, Alias: "a-" + p,
 			PrivateKey: k.private, PublicKey: k.public,
 		}))
-		must(db.Keys().PutCertificate(ctx, types.Certificate{Alias: "cert-" + p, PEM: k.bundle}))
+		must(db.Keys().PutCertificate(ctx, api.Certificate{Alias: "cert-" + p, PEM: k.bundle}))
 		must(rs.CreateEnvironment(ctx, "E-"+p))
-		must(rs.CreateRole(ctx, types.Role{
-			Name: "role-" + p, Type: types.RoleCustomGlobal, Actions: []string{"READ_REPOSITORY"},
+		must(rs.CreateRole(ctx, model.Role{
+			Name: "role-" + p, Type: model.RoleCustomGlobal, Actions: []string{"READ_REPOSITORY"},
 		}))
 	}
 	must(
 		db.Settings().
-			Put(ctx, types.SettingFolderDownload, types.FolderDownloadSettings{Enabled: true}),
+			Put(ctx, settings.SettingFolderDownload, model.FolderDownloadSettings{Enabled: true}),
 	)
 	idp := oidc.Service{Store: db}
 	for _, p := range names {
@@ -1695,7 +1699,7 @@ func seedMatrixTokens(t *testing.T, db *inmem.Store) (*token.Service, map[string
 			t.Fatal(err)
 		}
 	}
-	must(db.Instance().Init(ctx, types.InstanceIdentity{
+	must(db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}))
 	tokens, err := token.New(ctx, db, token.Options{KeyBits: 1024})
@@ -1706,9 +1710,9 @@ func seedMatrixTokens(t *testing.T, db *inmem.Store) (*token.Service, map[string
 		KeyBits: 1024, Now: func() time.Time { return time.Now().Add(-90 * time.Minute) },
 	})
 	must(err)
-	issue := func(svc *token.Service, user, scope string, id types.TokenIdentity) token.Issued {
+	issue := func(svc *token.Service, user, scope string, id kernel.TokenIdentity) token.Issued {
 		t.Helper()
-		s, err := types.ParseScope(scope)
+		s, err := kernel.ParseScope(scope)
 		must(err)
 		hour := time.Hour
 		issued, err := svc.Issue(ctx, token.Request{
@@ -1738,12 +1742,12 @@ func seedMatrixTokens(t *testing.T, db *inmem.Store) (*token.Service, map[string
 			secrets[p.name] = issue(tokens, p.user, p.scope, p.identity).AccessToken
 		}
 		secrets["v-"+p.name] = issue(
-			tokens, "v-"+p.name, "applied-permissions/user", types.IdentityStored,
+			tokens, "v-"+p.name, "applied-permissions/user", kernel.IdentityStored,
 		).AccessToken
 		for id, user := range map[string]string{"t-" + p.name: p.user, "o-" + p.name: "v-" + p.name} {
-			must(db.Tokens().Create(ctx, types.Token{
+			must(db.Tokens().Create(ctx, model.Token{
 				ID: id, Subject: subjectOf(tokens, user), Revocable: true,
-				Scope: types.UserScope(), IssuedAt: now, AccessDigest: []byte(id),
+				Scope: kernel.UserScope(), IssuedAt: now, AccessDigest: []byte(id),
 			}))
 		}
 	}

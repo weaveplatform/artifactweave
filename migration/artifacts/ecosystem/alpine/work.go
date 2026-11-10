@@ -11,9 +11,9 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 const maxIndexEntries = 100000
@@ -21,13 +21,13 @@ const maxIndexEntries = 100000
 // Work derives every current architecture index from the stored packages.
 // A single repository work key coalesces bursts of writes and restores, and
 // a rerun reads the committed tree afresh.
-func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) error {
+func (Handler) Work(ctx context.Context, env format.Env, work work.WorkItem) error {
 	if work.Kind != KindIndex {
 		return nil
 	}
 	c, err := env.Store.Repos().Get(ctx, work.Key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	case err != nil:
 		return fmt.Errorf("alpine: repository: %w", err)
@@ -107,7 +107,7 @@ func SigningKey(
 	if err != nil {
 		return "", nil, fmt.Errorf("alpine: signing key %s: %w", ref, err)
 	}
-	if pair.Type != types.KeypairRSA {
+	if pair.Type != accessapi.KeypairRSA {
 		return "", nil, fmt.Errorf("%w: signing key %s must be rsa", errInvalidIndex, pair.Name)
 	}
 	private, err := keymaterial.RSAPrivateKey(pair.PrivateKey, pair.Passphrase)

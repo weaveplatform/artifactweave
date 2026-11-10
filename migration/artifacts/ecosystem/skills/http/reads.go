@@ -17,16 +17,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	skillsfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/skills"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type skillVersion struct {
-	record types.PackageVersion
+	record model.PackageVersion
 	meta   skillsfmt.Metadata
 }
 
@@ -76,7 +76,7 @@ func (h handler) discovery(w http.ResponseWriter, r *http.Request) {
 func (h handler) visible(r *http.Request, slug string) (skill, error) {
 	key := pkgroute.RequestFrom(r).Repo.Key
 	p, err := h.k.DB().Packages().Find(r.Context(), key, slug)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return skill{}, notFound()
 	}
 	if err != nil {
@@ -89,7 +89,7 @@ func (h handler) visible(r *http.Request, slug string) (skill, error) {
 	s := skill{slug: slug}
 	for i := len(versions) - 1; i >= 0; i-- {
 		v := versions[i]
-		if !h.k.Can(r, skillsfmt.Path(slug, v.Version), types.ActionRead) {
+		if !h.k.Can(r, skillsfmt.Path(slug, v.Version), api.ActionRead) {
 			continue
 		}
 		var meta skillsfmt.Metadata
@@ -116,7 +116,7 @@ func (h handler) selected(
 		h.k.Error(w, r, badQuery("invalid skill slug or version"))
 		return skillVersion{}, false
 	}
-	if !h.k.RequireFolder(w, r, slug, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
 		return skillVersion{}, false
 	}
 	s, err := h.visible(r, slug)
@@ -169,7 +169,7 @@ func stamp(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
 
 func (h handler) allVisible(r *http.Request) ([]skill, error) {
 	var out []skill
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	key := pkgroute.RequestFrom(r).Repo.Key
 	for {
 		all, next, err := h.k.DB().Packages().List(r.Context(), key, page)
@@ -178,7 +178,7 @@ func (h handler) allVisible(r *http.Request) ([]skill, error) {
 		}
 		for _, p := range all {
 			s, err := h.visible(r, p.Name)
-			if errors.Is(err, store.ErrNotFound) || is404(err) {
+			if errors.Is(err, kernel.ErrNotFound) || is404(err) {
 				continue
 			}
 			if err != nil {
@@ -238,7 +238,7 @@ func encodeCursor(offset int) string {
 }
 
 func (h handler) list(w http.ResponseWriter, r *http.Request) {
-	if !h.authenticated(w, r) || !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.authenticated(w, r) || !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	limit, err := boundInt(r.URL.Query().Get("limit"), 200, 1, 200)
@@ -303,7 +303,7 @@ func (h handler) detail(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badQuery("invalid skill slug"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, slug, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
 		return
 	}
 	s, err := h.visible(r, slug)
@@ -332,7 +332,7 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badQuery("invalid skill slug"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, slug, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
 		return
 	}
 	s, err := h.visible(r, slug)
@@ -389,7 +389,7 @@ func (h handler) version(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) search(w http.ResponseWriter, r *http.Request) {
-	if !h.authenticated(w, r) || !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.authenticated(w, r) || !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
@@ -476,7 +476,7 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badQuery("invalid skill slug"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, slug, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
 		return
 	}
 	s, err := h.visible(r, slug)
@@ -516,11 +516,11 @@ func (h handler) singleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := skillsfmt.Path(slug, v.record.Version)
-	if !h.k.Require(w, r, path, types.ActionRead) {
+	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
 	f, err := h.k.Item(r, path)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		h.k.Error(w, r, notFound())
 		return
 	}
@@ -584,11 +584,11 @@ func (h handler) xrayStatus(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badQuery("invalid skill artifact path"))
 		return
 	}
-	if !h.k.Require(w, r, path, types.ActionRead) {
+	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
 	f, err := h.k.Item(r, path)
-	if errors.Is(err, store.ErrNotFound) || err == nil && f.Item.Folder {
+	if errors.Is(err, kernel.ErrNotFound) || err == nil && f.Item.Folder {
 		h.k.Error(w, r, notFound())
 		return
 	}

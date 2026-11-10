@@ -6,7 +6,6 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Access asks the request's permission decider (decision 0006) the
@@ -20,18 +19,18 @@ func Target(c repo.Config) accessapi.Repo {
 }
 
 // File reports whether the caller holds every action in want on a file.
-func (a Access) File(c repo.Config, path string, want types.Actions) bool {
-	return a.Decider.Allows(types.ResourceArtifact, Target(c), path, want)
+func (a Access) File(c repo.Config, path string, want accessapi.Actions) bool {
+	return a.Decider.Allows(accessapi.ResourceArtifact, Target(c), path, want)
 }
 
 // Folder reports it for a folder, which is also allowed when a permitted
 // path lies below it, so that listings show the way down.
-func (a Access) Folder(c repo.Config, path string, want types.Actions) bool {
-	return a.Decider.AllowsFolder(types.ResourceArtifact, Target(c), path, want)
+func (a Access) Folder(c repo.Config, path string, want accessapi.Actions) bool {
+	return a.Decider.AllowsFolder(accessapi.ResourceArtifact, Target(c), path, want)
 }
 
 // Item is file or folder by kind.
-func (a Access) Item(c repo.Config, path string, isFolder bool, want types.Actions) bool {
+func (a Access) Item(c repo.Config, path string, isFolder bool, want accessapi.Actions) bool {
 	if isFolder {
 		return a.Folder(c, path, want)
 	}

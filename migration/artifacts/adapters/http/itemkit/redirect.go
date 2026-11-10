@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // DefaultRedirectTTL is how long a signed download URL stays valid when
@@ -263,7 +263,7 @@ func countsDownload(r *http.Request, status int) bool {
 // the download.
 func recordDownload(ctx context.Context, st Store, f Found, p kernel.Principal) {
 	at := time.Now().UTC()
-	_ = st.Items().RecordDownload(ctx, f.Item.ID, store.Download{By: p.Name, At: at})
+	_ = st.Items().RecordDownload(ctx, f.Item.ID, port.Download{By: p.Name, At: at})
 	_ = pkgindex.RecordDownload(ctx, st, f.Item.ID, at)
 }
 

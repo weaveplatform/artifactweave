@@ -8,8 +8,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // tagged is left-pad 1.0.0, then 2.0.0, which takes latest, and the beta
@@ -18,7 +18,7 @@ func (w *world) tagged() {
 	w.t.Helper()
 	w.deployVersion("1.0.0")
 	w.deployVersion("2.0.0")
-	w.annotate(canonical("2.0.0"), types.Properties{npm.PropDistTag: {"latest", "beta"}})
+	w.annotate(canonical("2.0.0"), model.Properties{npm.PropDistTag: {"latest", "beta"}})
 	if got := w.latestOf("left-pad"); got != "2.0.0" {
 		w.t.Fatalf("latest %s", got)
 	}
@@ -75,7 +75,7 @@ func TestUnitOverwriteKeepsTheWritesOwnTags(t *testing.T) {
 	w := newWorld(t)
 	w.tagged()
 	w.deploy(canonical("2.0.0"), pkg("left-pad", "0.5.0", ""),
-		types.Properties{npm.PropDistTag: {"legacy"}})
+		model.Properties{npm.PropDistTag: {"legacy"}})
 	if got := w.props(canonical("2.0.0"))[npm.PropDistTag]; !cmp.Equal(got, []string{"legacy"}) {
 		t.Fatalf("the overwritten file has %v", got)
 	}
@@ -92,7 +92,7 @@ func TestUnitOverwriteKeepsTheWritesOwnTags(t *testing.T) {
 func TestUnitOverwriteDropsTheDeprecation(t *testing.T) {
 	w := newWorld(t)
 	w.tagged()
-	w.annotate(canonical("2.0.0"), types.Properties{npm.PropDeprecated: {"use 3"}})
+	w.annotate(canonical("2.0.0"), model.Properties{npm.PropDeprecated: {"use 3"}})
 	w.deploy(canonical("2.0.0"), pkg("left-pad", "0.5.0", ""), nil)
 	if got := w.props(canonical("2.0.0")); len(got) != 0 {
 		t.Fatalf("the overwritten file kept %v", got)
@@ -110,7 +110,7 @@ func TestUnitOverwriteDropsTheDeprecation(t *testing.T) {
 func TestUnitRedeployOfAVersion(t *testing.T) {
 	w := newWorld(t)
 	w.tagged()
-	w.annotate(canonical("1.0.0"), types.Properties{npm.PropDistTag: {"latest"}})
+	w.annotate(canonical("1.0.0"), model.Properties{npm.PropDistTag: {"latest"}})
 	w.deploy(canonical("1.0.0"), pkg("left-pad", "1.0.0", ""), nil)
 	if diff := cmp.Diff(map[string][]string{"1.0.0": {"latest"}, "2.0.0": {"beta"}},
 		w.tags("left-pad")); diff != "" {
@@ -143,9 +143,9 @@ func TestUnitTransferOntoACanonicalPath(t *testing.T) {
 			if err := w.st.Repos().Create(w.ctx, other); err != nil {
 				t.Fatal(err)
 			}
-			var props types.Properties
+			var props model.Properties
 			if c.tags != nil {
-				props = types.Properties{npm.PropDistTag: c.tags}
+				props = model.Properties{npm.PropDistTag: c.tags}
 			}
 			// Off its canonical path the source is no version, so it
 			// carries only the tags its deploy gave it.

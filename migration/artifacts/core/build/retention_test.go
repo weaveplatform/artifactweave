@@ -9,7 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 func TestUnitRetentionSettings(t *testing.T) {
@@ -18,23 +19,23 @@ func TestUnitRetentionSettings(t *testing.T) {
 	// with a count of 0 keeping every run.
 	for _, tc := range []struct {
 		json     string
-		expected types.BuildRetention
+		expected model.BuildRetention
 	}{
-		{`{}`, types.BuildRetention{}},
+		{`{}`, model.BuildRetention{}},
 		{
 			`{"count":"3","buildNumbersNotToBeDiscarded":["1"," ",""]}`,
-			types.BuildRetention{Count: 3, KeepNumbers: []string{"1"}},
+			model.BuildRetention{Count: 3, KeepNumbers: []string{"1"}},
 		},
 		{
 			`{"count":3,"deleteBuildArtifacts":true}`,
-			types.BuildRetention{Count: 3, DeleteArtifacts: true},
+			model.BuildRetention{Count: 3, DeleteArtifacts: true},
 		},
-		{`{"count":-1}`, types.BuildRetention{}},
-		{`{"count":0}`, types.BuildRetention{}},
-		{`{"minimumBuildDate":1792056600000}`, types.BuildRetention{MinimumBuildDate: ms}},
-		{`{"minimumBuildDate":"1792056600000"}`, types.BuildRetention{MinimumBuildDate: ms}},
-		{`{"minimumBuildDate":"` + started0 + `"}`, types.BuildRetention{MinimumBuildDate: ms}},
-		{`{"minimumBuildDate":null}`, types.BuildRetention{}},
+		{`{"count":-1}`, model.BuildRetention{}},
+		{`{"count":0}`, model.BuildRetention{}},
+		{`{"minimumBuildDate":1792056600000}`, model.BuildRetention{MinimumBuildDate: ms}},
+		{`{"minimumBuildDate":"1792056600000"}`, model.BuildRetention{MinimumBuildDate: ms}},
+		{`{"minimumBuildDate":"` + started0 + `"}`, model.BuildRetention{MinimumBuildDate: ms}},
+		{`{"minimumBuildDate":null}`, model.BuildRetention{}},
 	} {
 		got, ok, err := documentRetention([]byte(`{"buildRetention":` + tc.json + `}`))
 		if err != nil || !ok || fmt.Sprint(got) != fmt.Sprint(tc.expected) {
@@ -80,13 +81,13 @@ func TestUnitRetentionSettings(t *testing.T) {
 func TestUnitDiscards(t *testing.T) {
 	base := time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC)
 	// Newest first: numbers 5, 4, 3, 3, 2, 1 started on days 6 to 1.
-	var runs []types.BuildRun
+	var runs []model.BuildRun
 	for i, n := range []string{"5", "4", "3", "3", "2", "1"} {
-		runs = append(runs, types.BuildRun{
+		runs = append(runs, model.BuildRun{
 			ID: int64(6 - i), Number: n, Started: base.AddDate(0, 0, 6-i),
 		})
 	}
-	ids := func(rs []types.BuildRun) string {
+	ids := func(rs []model.BuildRun) string {
 		var out []string
 		for _, r := range rs {
 			out = append(out, fmt.Sprint(r.ID))
@@ -94,16 +95,16 @@ func TestUnitDiscards(t *testing.T) {
 		return strings.Join(out, ",")
 	}
 	for _, tc := range []struct {
-		r        types.BuildRetention
+		r        model.BuildRetention
 		expected string
 	}{
-		{types.BuildRetention{}, ""},
-		{types.BuildRetention{Count: 10}, ""},
-		{types.BuildRetention{Count: 2}, "1,2,3,4"},
+		{model.BuildRetention{}, ""},
+		{model.BuildRetention{Count: 10}, ""},
+		{model.BuildRetention{Count: 2}, "1,2,3,4"},
 		// The kept number's runs count towards the two kept.
-		{types.BuildRetention{Count: 2, KeepNumbers: []string{"5", "2"}}, "1,3,4"},
-		{types.BuildRetention{MinimumBuildDate: base.AddDate(0, 0, 3)}, "1,2"},
-		{types.BuildRetention{Count: 5, MinimumBuildDate: base.AddDate(0, 0, 2)}, "1"},
+		{model.BuildRetention{Count: 2, KeepNumbers: []string{"5", "2"}}, "1,3,4"},
+		{model.BuildRetention{MinimumBuildDate: base.AddDate(0, 0, 3)}, "1,2"},
+		{model.BuildRetention{Count: 5, MinimumBuildDate: base.AddDate(0, 0, 2)}, "1"},
 	} {
 		if got := ids(discards(runs, tc.r)); got != tc.expected {
 			t.Errorf("%+v: discards %s, want %s", tc.r, got, tc.expected)
@@ -123,7 +124,7 @@ func TestUnitDiscard(t *testing.T) {
 	w.publish(doc("app", "4", at(4), artifactModule("artifact")))
 
 	gone, err := w.svc.Discard(ctx, Discard{
-		Name: "app", Retention: types.BuildRetention{Count: 3, KeepNumbers: []string{"1"}},
+		Name: "app", Retention: model.BuildRetention{Count: 3, KeepNumbers: []string{"1"}},
 	}, everyone)
 	if err != nil {
 		t.Fatal(err)
@@ -131,12 +132,12 @@ func TestUnitDiscard(t *testing.T) {
 	if len(gone) != 1 || gone[0].Number != "2" || !gone[0].Started.Equal(mustStarted(at(1))) {
 		t.Errorf("discarded %+v, want the first run of 2", gone)
 	}
-	if w.has(types.BuildInfoRepository, runPath("app", "2", at(1))) ||
-		!w.has(types.BuildInfoRepository, runPath("app", "2", at(2))) {
+	if w.has(api.BuildInfoRepository, runPath("app", "2", at(1))) ||
+		!w.has(api.BuildInfoRepository, runPath("app", "2", at(2))) {
 		t.Error("the wrong document went")
 	}
 	gone, err = w.svc.Discard(ctx, Discard{
-		Name: "app", Retention: types.BuildRetention{Count: 1, DeleteArtifacts: true},
+		Name: "app", Retention: model.BuildRetention{Count: 1, DeleteArtifacts: true},
 	}, everyone)
 	if err != nil || len(gone) != 3 {
 		t.Fatalf("discarded %+v, %v", gone, err)
@@ -146,7 +147,7 @@ func TestUnitDiscard(t *testing.T) {
 	}
 	// Nothing left to discard is no error.
 	if gone, err := w.svc.Discard(ctx, Discard{
-		Name: "app", Retention: types.BuildRetention{Count: 1},
+		Name: "app", Retention: model.BuildRetention{Count: 1},
 	}, everyone); err != nil || len(gone) != 0 {
 		t.Errorf("discarded %+v, %v", gone, err)
 	}
@@ -163,11 +164,11 @@ func TestUnitDiscardPermissions(t *testing.T) {
 	ctx := context.Background()
 	w.publish(doc("app", "1", at(0)))
 	w.publish(doc("app", "2", at(1)))
-	d := Discard{Name: "app", Retention: types.BuildRetention{Count: 1}}
-	if _, err := w.svc.Discards(ctx, d, only(types.ActionRead)); !errors.Is(err, ErrForbidden) {
+	d := Discard{Name: "app", Retention: model.BuildRetention{Count: 1}}
+	if _, err := w.svc.Discards(ctx, d, only(api.ActionRead)); !errors.Is(err, ErrForbidden) {
 		t.Errorf("without delete: %v", err)
 	}
-	notOne := perms{build: func(_, path string, _ bool, _ types.Actions) bool {
+	notOne := perms{build: func(_, path string, _ bool, _ api.Actions) bool {
 		return !strings.HasPrefix(path, "app/1-")
 	}}
 	if _, err := w.svc.Discard(ctx, d, notOne); !errors.Is(err, ErrForbidden) {
@@ -189,7 +190,7 @@ func TestUnitPublishRetention(t *testing.T) {
 		`"buildRetention":{"count":2,"buildNumbersNotToBeDiscarded":["9"]}}`
 
 	// A publisher without delete publishes, and nothing is discarded.
-	p, err := w.svc.Publish(ctx, "", []byte(retained), "ci", only(types.ActionWrite))
+	p, err := w.svc.Publish(ctx, "", []byte(retained), "ci", only(api.ActionWrite))
 	if err != nil || !errors.Is(p.Retention, ErrForbidden) {
 		t.Fatalf("%v, retention %v", err, p.Retention)
 	}

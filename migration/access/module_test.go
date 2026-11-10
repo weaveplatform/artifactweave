@@ -13,12 +13,13 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // testHash keeps password checks cheap; the bindings add nothing to them.
@@ -40,14 +41,14 @@ func clock() time.Time { return now }
 type world struct {
 	st  *inmem.Store
 	api accessapi.API
-	ann types.User
+	ann model.User
 }
 
 func newWorld(t *testing.T) world {
 	t.Helper()
 	ctx := t.Context()
 	st := inmem.New()
-	if err := st.Instance().Init(ctx, types.InstanceIdentity{
+	if err := st.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -56,10 +57,10 @@ func newWorld(t *testing.T) world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	must(t, st.Groups().Create(ctx, types.Group{Name: "readers"}))
-	must(t, st.Users().Create(ctx, types.User{
+	must(t, st.Groups().Create(ctx, model.Group{Name: "readers"}))
+	must(t, st.Users().Create(ctx, model.User{
 		Name: "ann", Email: "ann@example.com", PasswordHash: hash, Groups: []string{"readers"},
-		Status: types.UserEnabled,
+		Status: model.UserEnabled,
 	}))
 	ann, err := st.Users().Get(ctx, "ann")
 	if err != nil {
@@ -145,7 +146,7 @@ func TestUnitAuthenticatorBinding(t *testing.T) {
 	if on, err := authn.AnonymousAllowed(ctx); on || err != nil {
 		t.Errorf("AnonymousAllowed, never written = %v, %v; want false, nil", on, err)
 	}
-	must(t, w.st.Settings().Put(ctx, types.SettingAnonymousAccess, true))
+	must(t, w.st.Settings().Put(ctx, settings.SettingAnonymousAccess, true))
 	if on, err := authn.AnonymousAllowed(ctx); !on || err != nil {
 		t.Errorf("AnonymousAllowed, switched on = %v, %v; want true, nil", on, err)
 	}
@@ -229,13 +230,13 @@ func TestUnitAuthenticatorBinding(t *testing.T) {
 func TestUnitAuthorizerBinding(t *testing.T) {
 	w := newWorld(t)
 	ctx := t.Context()
-	must(t, w.st.Groups().Create(ctx, types.Group{Name: "admins", AdminPrivileges: true}))
-	must(t, w.st.Permissions().Create(ctx, permission("read-libs", map[string]types.Target{
+	must(t, w.st.Groups().Create(ctx, model.Group{Name: "admins", AdminPrivileges: true}))
+	must(t, w.st.Permissions().Create(ctx, permission("read-libs", map[string]model.Target{
 		libs.Key: {},
-	}, types.Grants{Groups: map[string]types.Actions{"readers": types.ActionRead}})))
-	must(t, w.st.Permissions().Create(ctx, permission("anonymous-public", map[string]types.Target{
+	}, model.Grants{Groups: map[string]accessapi.Actions{"readers": accessapi.ActionRead}})))
+	must(t, w.st.Permissions().Create(ctx, permission("anonymous-public", map[string]model.Target{
 		public.Key: {},
-	}, types.Grants{Users: map[string]types.Actions{kernel.AnonymousUser: types.ActionRead}})))
+	}, model.Grants{Users: map[string]accessapi.Actions{kernel.AnonymousUser: accessapi.ActionRead}})))
 	az := w.api.Authorizer
 	src := authz.Sources{Permissions: w.st.Permissions(), Groups: w.st.Groups()}
 	ann := kernel.Principal{Name: "ann", Groups: []string{"readers"}, Password: true}
@@ -279,7 +280,7 @@ func TestUnitAuthorizerBinding(t *testing.T) {
 			err,
 		)
 	}
-	must(t, w.st.Settings().Put(ctx, types.SettingAnonymousAccess, true))
+	must(t, w.st.Settings().Put(ctx, settings.SettingAnonymousAccess, true))
 	if d, err := az.For(ctx, anonymous); err != nil || !reads(d, public) {
 		t.Errorf(
 			"For(anonymous), setting on: reads public = %v, %v; want true",
@@ -298,9 +299,9 @@ func TestUnitAuthorizerBinding(t *testing.T) {
 
 	// A permission created inside a transaction counts inside it only.
 	err = w.st.Tx(ctx, func(ctx context.Context) error {
-		if err := w.st.Permissions().Create(ctx, permission("write-libs", map[string]types.Target{
+		if err := w.st.Permissions().Create(ctx, permission("write-libs", map[string]model.Target{
 			libs.Key: {},
-		}, types.Grants{Users: map[string]types.Actions{"ann": types.ActionWrite}})); err != nil {
+		}, model.Grants{Users: map[string]accessapi.Actions{"ann": accessapi.ActionWrite}})); err != nil {
 			return err
 		}
 		d, err := az.Decide(ctx, subject, false)
@@ -440,14 +441,14 @@ func TestUnitStoreBindings(t *testing.T) {
 	w := newWorld(t)
 	ctx := t.Context()
 	st := w.st
-	must(t, st.Keys().CreateKeypair(ctx, types.Keypair{
+	must(t, st.Keys().CreateKeypair(ctx, accessapi.Keypair{
 		Name:       "rsa",
 		Type:       accessapi.KeypairRSA,
 		Alias:      "rsa",
 		PublicKey:  "public",
 		PrivateKey: "private",
 	}))
-	must(t, st.Keys().PutCertificate(ctx, types.Certificate{
+	must(t, st.Keys().PutCertificate(ctx, accessapi.Certificate{
 		Alias: "client", PEM: "pem", PrivateKey: "key", IssuedTo: "ann",
 	}))
 	wantKP, _ := st.Keys().Keypair(ctx, "rsa")
@@ -480,8 +481,8 @@ func TestUnitStoreBindings(t *testing.T) {
 	}
 	_, noUser := st.Users().Get(ctx, "bob")
 	sameError(t, "User(bob)", second(w.api.Identity.User(ctx, "bob")), noUser)
-	must(t, st.Groups().Create(ctx, types.Group{Name: "zeta", AutoJoin: true}))
-	must(t, st.Groups().Create(ctx, types.Group{Name: "everyone", AutoJoin: true}))
+	must(t, st.Groups().Create(ctx, model.Group{Name: "zeta", AutoJoin: true}))
+	must(t, st.Groups().Create(ctx, model.Group{Name: "everyone", AutoJoin: true}))
 	if g, err := w.api.Identity.AutoJoinGroups(
 		ctx,
 	); err != nil ||
@@ -489,21 +490,21 @@ func TestUnitStoreBindings(t *testing.T) {
 		t.Errorf("AutoJoinGroups = %v, %v; want [everyone zeta]", g, err)
 	}
 
-	must(t, st.Projects().Create(ctx, types.Project{Key: "ml", DisplayName: "ML"}))
-	for _, e := range []types.Environment{{ProjectKey: "ml", Name: "ML-STAGE"}, {ProjectKey: "ml", Name: "ML-LAB"}, {Name: "QA"}} {
+	must(t, st.Projects().Create(ctx, model.Project{Key: "ml", DisplayName: "ML"}))
+	for _, e := range []model.Environment{{ProjectKey: "ml", Name: "ML-STAGE"}, {ProjectKey: "ml", Name: "ML-LAB"}, {Name: "QA"}} {
 		must(t, st.Projects().CreateEnvironment(ctx, e))
 	}
 	must(
 		t,
 		st.Projects().
-			PutMember(ctx, types.ProjectMember{ProjectKey: "ml", Type: types.PrincipalUser, Name: "ann"}),
+			PutMember(ctx, model.ProjectMember{ProjectKey: "ml", Type: model.PrincipalUser, Name: "ann"}),
 	)
 	must(
 		t,
 		st.Projects().
-			PutMember(ctx, types.ProjectMember{ProjectKey: "ml", Type: types.PrincipalGroup, Name: "readers"}),
+			PutMember(ctx, model.ProjectMember{ProjectKey: "ml", Type: model.PrincipalGroup, Name: "readers"}),
 	)
-	_, notMember := st.Projects().Member(ctx, "ml", types.PrincipalUser, "readers")
+	_, notMember := st.Projects().Member(ctx, "ml", model.PrincipalUser, "readers")
 	_, noProject := st.Projects().Get(ctx, "missing")
 	canceled := canceledContext(ctx)
 	_, unreadable := st.Projects().Environments(canceled, "ml")
@@ -534,7 +535,7 @@ func TestUnitStoreBindings(t *testing.T) {
 	}
 
 	var unused bool
-	unwritten := st.Settings().Get(ctx, types.SettingAnonymousAccess, &unused)
+	unwritten := st.Settings().Get(ctx, settings.SettingAnonymousAccess, &unused)
 	sameError(t, "Enabled, never written", second(w.api.AnonymousAccess.Enabled(ctx)), unwritten)
 	must(t, access.AnonymousAccessOf(st).SetEnabled(ctx, true))
 	if on, err := w.api.AnonymousAccess.Enabled(ctx); !on || err != nil {
@@ -577,39 +578,39 @@ func TestUnitStoreBindings(t *testing.T) {
 func TestUnitItemGrants(t *testing.T) {
 	ctx := t.Context()
 	st := inmem.New()
-	read := map[string]types.Actions{"ann": types.ActionRead}
-	for _, p := range []types.Permission{
-		permission("a-libs", map[string]types.Target{libs.Key: {Include: []string{"com/**"}}},
-			types.Grants{Users: read, Groups: map[string]types.Actions{"readers": types.ActionRead}}),
-		permission("b-any", map[string]types.Target{types.TargetAny: {}},
-			types.Grants{Users: map[string]types.Actions{"ann": types.ActionWrite}}),
+	read := map[string]accessapi.Actions{"ann": accessapi.ActionRead}
+	for _, p := range []model.Permission{
+		permission("a-libs", map[string]model.Target{libs.Key: {Include: []string{"com/**"}}},
+			model.Grants{Users: read, Groups: map[string]accessapi.Actions{"readers": accessapi.ActionRead}}),
+		permission("b-any", map[string]model.Target{accessapi.TargetAny: {}},
+			model.Grants{Users: map[string]accessapi.Actions{"ann": accessapi.ActionWrite}}),
 		// Its libs-local target excludes the path, so ANY LOCAL decides.
-		permission("c-any-local", map[string]types.Target{
-			libs.Key:             {Exclude: []string{"com/**"}},
-			types.TargetAnyLocal: {},
-		}, types.Grants{Users: map[string]types.Actions{"bob": types.ActionDelete}}),
-		permission("d-elsewhere", map[string]types.Target{libs.Key: {Include: []string{"org/**"}}},
-			types.Grants{Users: map[string]types.Actions{"eve": types.ActionManage}}),
-		permission("e-below", map[string]types.Target{libs.Key: {Include: []string{"com/acme/**"}}},
-			types.Grants{Users: map[string]types.Actions{"fay": types.ActionRead}}),
-		{Name: "f-build", Resources: map[types.ResourceType]types.Resource{types.ResourceBuild: {
-			Actions: types.Grants{Users: map[string]types.Actions{"gus": types.ActionRead}},
-			Targets: map[string]types.Target{libs.Key: {}},
+		permission("c-any-local", map[string]model.Target{
+			libs.Key:                 {Exclude: []string{"com/**"}},
+			accessapi.TargetAnyLocal: {},
+		}, model.Grants{Users: map[string]accessapi.Actions{"bob": accessapi.ActionDelete}}),
+		permission("d-elsewhere", map[string]model.Target{libs.Key: {Include: []string{"org/**"}}},
+			model.Grants{Users: map[string]accessapi.Actions{"eve": accessapi.ActionManage}}),
+		permission("e-below", map[string]model.Target{libs.Key: {Include: []string{"com/acme/**"}}},
+			model.Grants{Users: map[string]accessapi.Actions{"fay": accessapi.ActionRead}}),
+		{Name: "f-build", Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceBuild: {
+			Actions: model.Grants{Users: map[string]accessapi.Actions{"gus": accessapi.ActionRead}},
+			Targets: map[string]model.Target{libs.Key: {}},
 		}}},
 	} {
 		must(t, st.Permissions().Create(ctx, p))
 	}
 	var order []string
 	g := module(t, scripted{Store: st, targets: &order}).Grants
-	targets := []string{libs.Key, types.TargetAny, types.TargetAnyLocal}
+	targets := []string{libs.Key, accessapi.TargetAny, accessapi.TargetAnyLocal}
 
 	users, groups, err := g.ItemGrants(ctx, targets, "com/x.jar", false)
-	wantUsers := map[string]types.Actions{
-		"ann": types.ActionRead | types.ActionWrite,
-		"bob": types.ActionDelete,
+	wantUsers := map[string]accessapi.Actions{
+		"ann": accessapi.ActionRead | accessapi.ActionWrite,
+		"bob": accessapi.ActionDelete,
 	}
 	if err != nil || !reflect.DeepEqual(users, wantUsers) ||
-		!reflect.DeepEqual(groups, map[string]types.Actions{"readers": types.ActionRead}) {
+		!reflect.DeepEqual(groups, map[string]accessapi.Actions{"readers": accessapi.ActionRead}) {
 		t.Errorf(
 			"ItemGrants(com/x.jar) = %v, %v, %v; want %v and readers' READ",
 			users,
@@ -623,7 +624,7 @@ func TestUnitItemGrants(t *testing.T) {
 	}
 	// A folder also counts the permissions that admit a path below it.
 	users, _, _ = g.ItemGrants(ctx, targets, "com", true)
-	if users["fay"] != types.ActionRead {
+	if users["fay"] != accessapi.ActionRead {
 		t.Errorf("ItemGrants(com folder) = %v, want fay's READ from below", users)
 	}
 
@@ -632,9 +633,9 @@ func TestUnitItemGrants(t *testing.T) {
 		fail    string
 		targets []string
 	}{
-		{"", []string{types.TargetAnyLocal, libs.Key}},
-		{"", []string{libs.Key, types.TargetAnyLocal}},
-		{types.TargetAny, targets},
+		{"", []string{accessapi.TargetAnyLocal, libs.Key}},
+		{"", []string{libs.Key, accessapi.TargetAnyLocal}},
+		{accessapi.TargetAny, targets},
 	} {
 		order = nil
 		g := module(
@@ -664,47 +665,47 @@ func TestUnitItemGrants(t *testing.T) {
 func TestUnitAccessChange(t *testing.T) {
 	ctx := t.Context()
 	pairs := []accessapi.PathPair{{Source: "models/a", Destination: "archive/a", Folder: true}}
-	grant := types.Grants{Users: map[string]types.Actions{"ann": types.ActionRead}}
-	targets := func(m map[string]types.Target) func(string) types.Permission {
-		return func(name string) types.Permission { return permission(name, m, grant) }
+	grant := model.Grants{Users: map[string]accessapi.Actions{"ann": accessapi.ActionRead}}
+	targets := func(m map[string]model.Target) func(string) model.Permission {
+		return func(name string) model.Permission { return permission(name, m, grant) }
 	}
-	same := targets(map[string]types.Target{"hf-local": {}})
-	moves := targets(map[string]types.Target{"hf-local": {Include: []string{"models/**"}}})
+	same := targets(map[string]model.Target{"hf-local": {}})
+	moves := targets(map[string]model.Target{"hf-local": {Include: []string{"models/**"}}})
 	for _, c := range []struct {
 		name  string
-		perms []types.Permission
+		perms []model.Permission
 		class string
 		limit int
 		want  string
 		err   error
 		lists int
 	}{
-		{"exactly the limit", []types.Permission{same("a"), same("b"), same("c")}, "local", 3, "", nil, 1},
-		{"one past the limit", []types.Permission{same("a"), same("b"), same("c"), same("d")}, "local", 3, "", accessapi.ErrScanLimit, 2},
-		{"a change within the limit", []types.Permission{same("a"), same("b"), moves("c"), same("d")}, "local", 3, "c", nil, 1},
+		{"exactly the limit", []model.Permission{same("a"), same("b"), same("c")}, "local", 3, "", nil, 1},
+		{"one past the limit", []model.Permission{same("a"), same("b"), same("c"), same("d")}, "local", 3, "", accessapi.ErrScanLimit, 2},
+		{"a change within the limit", []model.Permission{same("a"), same("b"), moves("c"), same("d")}, "local", 3, "c", nil, 1},
 		// Counted before it is compared, the permission past the limit
 		// refuses the scan although it changes access.
-		{"a change past the limit", []types.Permission{same("a"), same("b"), same("c"), moves("d")}, "local", 3, "", accessapi.ErrScanLimit, 2},
-		{"the first change by name", []types.Permission{moves("c"), same("a"), moves("b")}, "local", 10, "b", nil, 1},
-		{"a special target covering the class", []types.Permission{
-			targets(map[string]types.Target{types.TargetAnyLocal: {Include: []string{"models/**"}}})("any-local"),
+		{"a change past the limit", []model.Permission{same("a"), same("b"), same("c"), moves("d")}, "local", 3, "", accessapi.ErrScanLimit, 2},
+		{"the first change by name", []model.Permission{moves("c"), same("a"), moves("b")}, "local", 10, "b", nil, 1},
+		{"a special target covering the class", []model.Permission{
+			targets(map[string]model.Target{accessapi.TargetAnyLocal: {Include: []string{"models/**"}}})("any-local"),
 		}, "local", 10, "any-local", nil, 1},
-		{"a special target not covering the class", []types.Permission{
-			targets(map[string]types.Target{types.TargetAnyRemote: {Include: []string{"models/**"}}})("any-remote"),
+		{"a special target not covering the class", []model.Permission{
+			targets(map[string]model.Target{accessapi.TargetAnyRemote: {Include: []string{"models/**"}}})("any-remote"),
 		}, "local", 10, "", nil, 1},
-		{"another repository's target", []types.Permission{
-			targets(map[string]types.Target{"other-local": {Include: []string{"models/**"}}})("other"),
+		{"another repository's target", []model.Permission{
+			targets(map[string]model.Target{"other-local": {Include: []string{"models/**"}}})("other"),
 		}, "local", 10, "", nil, 1},
-		{"an exclusion", []types.Permission{
-			targets(map[string]types.Target{"hf-local": {Exclude: []string{"archive/**"}}})("excluding"),
+		{"an exclusion", []model.Permission{
+			targets(map[string]model.Target{"hf-local": {Exclude: []string{"archive/**"}}})("excluding"),
 		}, "local", 10, "excluding", nil, 1},
 		// The union of the covering targets admits both ends.
-		{"a union admitting both ends", []types.Permission{targets(map[string]types.Target{
-			"hf-local":      {Include: []string{"models/**"}},
-			types.TargetAny: {Include: []string{"archive/**"}},
+		{"a union admitting both ends", []model.Permission{targets(map[string]model.Target{
+			"hf-local":          {Include: []string{"models/**"}},
+			accessapi.TargetAny: {Include: []string{"archive/**"}},
 		})("union")}, "local", 10, "", nil, 1},
-		{"no artifact section", []types.Permission{{Name: "build", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceBuild: {Actions: grant, Targets: map[string]types.Target{"hf-local": {Include: []string{"models/**"}}}},
+		{"no artifact section", []model.Permission{{Name: "build", Resources: map[accessapi.ResourceType]model.Resource{
+			accessapi.ResourceBuild: {Actions: grant, Targets: map[string]model.Target{"hf-local": {Include: []string{"models/**"}}}},
 		}}}, "local", 10, "", nil, 1},
 	} {
 		st := inmem.New()
@@ -741,9 +742,9 @@ func reads(d accessapi.Decider, repo accessapi.Repo) bool {
 
 // permission returns a permission whose artifact section grants g on
 // targets.
-func permission(name string, targets map[string]types.Target, g types.Grants) types.Permission {
-	return types.Permission{Name: name, Resources: map[types.ResourceType]types.Resource{
-		types.ResourceArtifact: {Actions: g, Targets: targets},
+func permission(name string, targets map[string]model.Target, g model.Grants) model.Permission {
+	return model.Permission{Name: name, Resources: map[accessapi.ResourceType]model.Resource{
+		accessapi.ResourceArtifact: {Actions: g, Targets: targets},
 	}}
 }
 
@@ -810,7 +811,7 @@ type scriptedPermissions struct {
 func (p scriptedPermissions) WithTarget(
 	ctx context.Context,
 	target string,
-) ([]types.Permission, error) {
+) ([]model.Permission, error) {
 	if p.s.targets != nil {
 		*p.s.targets = append(*p.s.targets, target)
 	}
@@ -826,7 +827,7 @@ func (p scriptedPermissions) WithTarget(
 func (p scriptedPermissions) List(
 	ctx context.Context,
 	page kernel.Page,
-) ([]types.Permission, string, error) {
+) ([]model.Permission, string, error) {
 	if p.s.pages != nil {
 		*p.s.pages = append(*p.s.pages, page)
 	}
@@ -840,7 +841,7 @@ func (p scriptedPermissions) ForPrincipal(
 	ctx context.Context,
 	user string,
 	groups []string,
-) ([]types.Permission, error) {
+) ([]model.Permission, error) {
 	if p.s.permErr != nil {
 		return nil, p.s.permErr
 	}

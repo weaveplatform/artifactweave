@@ -15,8 +15,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 func zipBytes(t *testing.T, files map[string]string) []byte {
@@ -437,8 +438,8 @@ func TestAccFolderArchiveOverHTTP(t *testing.T) {
 		w.do("GET", base+"libs-local/d?archiveType=zip", "admin", ""),
 		http.StatusForbidden,
 	)
-	if err := w.db.Settings().Put(ctx, types.SettingFolderDownload,
-		types.FolderDownloadSettings{Enabled: true, MaxFiles: 2}); err != nil {
+	if err := w.db.Settings().Put(ctx, settings.SettingFolderDownload,
+		model.FolderDownloadSettings{Enabled: true, MaxFiles: 2}); err != nil {
 		t.Fatal(err)
 	}
 	rec := w.do("GET", base+"libs-local/d?archiveType=zip", "admin", "")

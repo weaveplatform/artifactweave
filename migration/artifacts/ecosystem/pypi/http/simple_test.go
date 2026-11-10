@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // demoMeta is the core metadata of demo 1.0's wheel, whose Requires-Python
@@ -30,12 +30,12 @@ func seedDemo(t *testing.T, f *fixture) {
 		sdist(t, "demo", "1.0", metadata("demo", "1.0", "Requires-Python: >=3.9")), nil)
 	f.deploy(t, "pypi-local", "demo/1.5/demo-1.5-py3-none-any.whl",
 		wheel(t, "demo", "1.5", metadata("demo", "1.5", "")),
-		types.Properties{pypifmt.PropYanked: {"true"}})
+		model.Properties{pypifmt.PropYanked: {"true"}})
 	f.deploy(t, "pypi-local", "uploads/x y/demo-2.0-py3-none-any.whl",
 		wheel(t, "demo", "2.0", metadata("demo", "2.0", "")),
-		types.Properties{pypifmt.PropYanked: {`broken <b>"2.0"</b>`}})
+		model.Properties{pypifmt.PropYanked: {`broken <b>"2.0"</b>`}})
 	f.deploy(t, "pypi-local", "manual/demo-3.0.zip", []byte("not a zip"),
-		types.Properties{pypifmt.PropName: {"demo"}, pypifmt.PropVersion: {"3.0"}})
+		model.Properties{pypifmt.PropName: {"demo"}, pypifmt.PropVersion: {"3.0"}})
 	f.deploy(t, "pypi-local", "other/0.1/Other.Pkg-0.1-py3-none-any.whl",
 		wheel(t, "Other.Pkg", "0.1", metadata("Other.Pkg", "0.1", "")), nil)
 	f.deploy(t, "pypi-local", "notes.txt", []byte("notes"), nil)

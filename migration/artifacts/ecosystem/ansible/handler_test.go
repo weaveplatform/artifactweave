@@ -13,9 +13,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errFault = errors.New("injected failure")
@@ -45,16 +46,16 @@ type faultStore struct {
 	stage string
 }
 
-func (s faultStore) Items() store.ItemStore { return faultItems{s.Store.Items(), s.stage} }
+func (s faultStore) Items() port.ItemStore { return faultItems{s.Store.Items(), s.stage} }
 
-func (s faultStore) Packages() store.PackageStore { return faultPackages{s.Store.Packages(), s.stage} }
+func (s faultStore) Packages() port.PackageStore { return faultPackages{s.Store.Packages(), s.stage} }
 
 type faultItems struct {
-	store.ItemStore
+	port.ItemStore
 	stage string
 }
 
-func (s faultItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (s faultItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if s.stage == "properties" {
 		return nil, errFault
 	}
@@ -64,7 +65,7 @@ func (s faultItems) Properties(ctx context.Context, id int64) (types.Properties,
 func (s faultItems) PatchProperties(
 	ctx context.Context,
 	id int64,
-	p types.Properties,
+	p model.Properties,
 	remove []string,
 	at time.Time,
 ) error {
@@ -79,8 +80,8 @@ func (s faultItems) Descendants(
 	key string,
 	cached bool,
 	path string,
-	page store.Page,
-) ([]types.Item, string, error) {
+	page kernel.Page,
+) ([]model.Item, string, error) {
 	if s.stage == "descendants" {
 		return nil, "", errFault
 	}
@@ -95,13 +96,13 @@ func (s faultItems) Descendants(
 }
 
 type faultPackages struct {
-	store.PackageStore
+	port.PackageStore
 	stage string
 }
 
-func (s faultPackages) Ensure(ctx context.Context, p types.Package) (types.Package, error) {
+func (s faultPackages) Ensure(ctx context.Context, p model.Package) (model.Package, error) {
 	if s.stage == "ensure" {
-		return types.Package{}, errFault
+		return model.Package{}, errFault
 	}
 	return s.PackageStore.Ensure(ctx, p)
 }
@@ -109,15 +110,15 @@ func (s faultPackages) Ensure(ctx context.Context, p types.Package) (types.Packa
 func (s faultPackages) List(
 	ctx context.Context,
 	key string,
-	page store.Page,
-) ([]types.Package, string, error) {
+	page kernel.Page,
+) ([]model.Package, string, error) {
 	if s.stage == "list" {
 		return nil, "", errFault
 	}
 	return s.PackageStore.List(ctx, key, page)
 }
 
-func fixtureEnv(t *testing.T) (format.Env, repo.Config, types.Item) {
+func fixtureEnv(t *testing.T) (format.Env, repo.Config, model.Item) {
 	t.Helper()
 	st := inmem.New()
 	c := *repo.Defaults(&repo.Config{Key: "ansible", Class: repo.Local, PackageType: repo.Ansible})
@@ -133,7 +134,7 @@ func fixtureEnv(t *testing.T) (format.Env, repo.Config, types.Item) {
 		t.Fatal(err)
 	}
 	it, err := st.Items().
-		Put(t.Context(), types.Item{RepoKey: c.Key, Name: Path("weave", "sample", "1.2.3"), Actual: types.Checksums{SHA256: meta.SHA256}, Size: int64(len(data))})
+		Put(t.Context(), model.Item{RepoKey: c.Key, Name: Path("weave", "sample", "1.2.3"), Actual: kernel.Checksums{SHA256: meta.SHA256}, Size: int64(len(data))})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +235,7 @@ func TestUnitAnsibleAdmissionRequiresCanonicalValidatedContent(t *testing.T) {
 			}
 		})
 	}
-	for _, it := range []types.Item{{Folder: true}, {Cached: true}, {Name: "unrelated"}} {
+	for _, it := range []model.Item{{Folder: true}, {Cached: true}, {Name: "unrelated"}} {
 		if err := h.Deployed(t.Context(), env, c, it); err != nil {
 			t.Fatal(err)
 		}

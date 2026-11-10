@@ -7,13 +7,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // testStarted is a started timestamp in the layout the JFrog CLI writes.
@@ -22,8 +23,8 @@ const testStarted = "2026-10-15T09:30:00.000+0000"
 // allowBuilds lets a fixture publish builds without a caller.
 type allowBuilds struct{}
 
-func (allowBuilds) Build(string, string, bool, types.Actions) bool { return true }
-func (allowBuilds) Item(repo.Config, string, types.Actions) bool   { return true }
+func (allowBuilds) Build(string, string, bool, api.Actions) bool { return true }
+func (allowBuilds) Item(repo.Config, string, api.Actions) bool   { return true }
 
 // buildDoc is a build-info document of one run without modules.
 func buildDoc(name, number, started string) string {
@@ -55,7 +56,7 @@ func seedBuildArtifact(t *testing.T, db *inmem.Store, blobs blob.Store, name, pa
 		Store: db, Blobs: blobs, Formats: ecosystem.For,
 	}).Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: libs, Path: path}, Body: strings.NewReader(name),
-		Properties: types.Properties{"build.name": {name}, "build.number": {"1"}},
+		Properties: model.Properties{"build.name": {name}, "build.number": {"1"}},
 	}); err != nil {
 		t.Fatal(err)
 	}

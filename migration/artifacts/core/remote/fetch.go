@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func (p *Policy) fill(
@@ -21,14 +21,14 @@ func (p *Policy) fill(
 	q source.Request,
 	permit source.Permit,
 	opts Options,
-	key types.RemoteCacheKey,
+	key model.RemoteCacheKey,
 ) (fillResult, error) {
 	e, err := p.ReadEntry(ctx, key, permit)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		return fillResult{key: key}, err
 	}
 	if p.negativeFresh(q, e) {
-		return fillResult{key: key}, store.ErrNotFound
+		return fillResult{key: key}, kernel.ErrNotFound
 	}
 	if p.fresh(q, e) {
 		return fillResult{key: key, entry: e}, nil
@@ -65,7 +65,7 @@ func (p *Policy) fill(
 		if failure := p.Cooldown(latest); failure != nil {
 			return p.fallback(q, key, e, failure)
 		}
-		if probeErr != nil && !errors.Is(probeErr, store.ErrNotFound) {
+		if probeErr != nil && !errors.Is(probeErr, kernel.ErrNotFound) {
 			return p.fallback(q, key, e, probeErr)
 		}
 	}
@@ -77,8 +77,8 @@ func (p *Policy) fetch(
 	q source.Request,
 	permit source.Permit,
 	opts Options,
-	key types.RemoteCacheKey,
-	e types.RemoteCacheEntry,
+	key model.RemoteCacheKey,
+	e model.RemoteCacheEntry,
 ) (fillResult, error) {
 	out := fillResult{key: key}
 	token, err := p.Store.RemoteCache().Begin(ctx, key)
@@ -116,7 +116,7 @@ func (p *Policy) fetch(
 		if err = p.negative(ctx, q, permit, opts.Revision, token); err != nil {
 			return out, err
 		}
-		return out, store.ErrNotFound
+		return out, kernel.ErrNotFound
 	case http.StatusNotModified:
 		out.entry, err = p.revalidate(ctx, q, permit, opts.Revision, token, e, res)
 		return out, err
@@ -169,13 +169,13 @@ func (p *Policy) fetch(
 
 func (p *Policy) direct(
 	ctx context.Context, q source.Request, permit source.Permit, opts Options,
-	key types.RemoteCacheKey, noStore bool,
+	key model.RemoteCacheKey, noStore bool,
 ) (source.Result, error) {
-	var old types.RemoteCacheEntry
+	var old model.RemoteCacheEntry
 	if !noStore {
 		var err error
 		old, err = p.ReadEntry(ctx, key, permit)
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
+		if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 			return source.Result{}, err
 		}
 	}
@@ -206,7 +206,7 @@ func (p *Policy) direct(
 					permit,
 					opts,
 					key,
-					types.RemoteCacheEntry{},
+					model.RemoteCacheEntry{},
 					true,
 				)
 				if result.Stream != nil {
@@ -225,7 +225,7 @@ func (p *Policy) direct(
 		if failure := p.Cooldown(latest); failure != nil {
 			return fallback(failure)
 		}
-		if probeErr != nil && !errors.Is(probeErr, store.ErrNotFound) {
+		if probeErr != nil && !errors.Is(probeErr, kernel.ErrNotFound) {
 			return fallback(probeErr)
 		}
 	}
@@ -238,9 +238,9 @@ func (p *Policy) direct(
 
 func (p *Policy) directOnce(
 	ctx context.Context, q source.Request, permit source.Permit, opts Options,
-	key types.RemoteCacheKey, old types.RemoteCacheEntry, noStore bool,
+	key model.RemoteCacheKey, old model.RemoteCacheEntry, noStore bool,
 ) (source.Result, error) {
-	token := types.RemoteCacheToken{Key: key, Source: permit.Identity}
+	token := model.RemoteCacheToken{Key: key, Source: permit.Identity}
 	var err error
 	if !noStore {
 		token, err = p.Store.RemoteCache().Begin(ctx, key)
@@ -281,7 +281,7 @@ func (p *Policy) directOnce(
 				return source.Result{}, err
 			}
 		}
-		return source.Result{}, store.ErrNotFound
+		return source.Result{}, kernel.ErrNotFound
 	case http.StatusNotModified:
 		if noStore {
 			return source.Result{}, &source.HTTPError{Status: 502, Kind: source.FailureKindProtocol}
@@ -296,7 +296,7 @@ func (p *Policy) directOnce(
 		return source.Result{}, ResponseError(res, p.now())
 	}
 	if q.Resource.Method == http.MethodHead {
-		claimed, parseErr := item.ParseChecksums(types.Checksums{
+		claimed, parseErr := item.ParseChecksums(kernel.Checksums{
 			SHA256: res.Header.Get(
 				"X-Checksum-Sha256",
 			),
@@ -348,7 +348,7 @@ func (p *Policy) directOnce(
 				MediaType:         u.ContentType,
 				ETag:              u.ETag,
 				Modified:          modified,
-				Checksums: types.Checksums{
+				Checksums: kernel.Checksums{
 					SHA256: transient.Info.Digests.SHA256,
 					SHA512: transient.Info.Digests.SHA512,
 					SHA1:   transient.Info.Digests.SHA1,
@@ -364,7 +364,7 @@ func (p *Policy) negative(
 	q source.Request,
 	permit source.Permit,
 	revision string,
-	token types.RemoteCacheToken,
+	token model.RemoteCacheToken,
 ) error {
 	seconds := 1800
 	if q.Repo.MissedRetrievalCachePeriodSecs != nil {
@@ -387,12 +387,12 @@ func (p *Policy) negative(
 }
 
 func (p *Policy) probeKey(
-	key types.RemoteCacheKey,
+	key model.RemoteCacheKey,
 	permit source.Permit,
-	state types.RemoteSourceState,
+	state model.RemoteSourceState,
 ) string {
 	return p.FlightKey(
-		types.RemoteCacheKey{
+		model.RemoteCacheKey{
 			RepoKey:          key.RepoKey,
 			SettingsRevision: key.SettingsRevision,
 			Variant:          state.OfflineUntil.String(),
@@ -405,7 +405,7 @@ func (p *Policy) upload(
 	q source.Request,
 	permit source.Permit,
 	revision string,
-	token types.RemoteCacheToken,
+	token model.RemoteCacheToken,
 	res *http.Response,
 	noStore bool,
 ) item.CacheUpload {
@@ -432,7 +432,7 @@ func (p *Policy) upload(
 		Body:                 res.Body,
 		Kind:                 kind,
 		Length:               res.ContentLength,
-		Declared: types.Checksums{
+		Declared: kernel.Checksums{
 			SHA256: res.Header.Get("X-Checksum-Sha256"),
 			SHA512: res.Header.Get("X-Checksum-Sha512"),
 			SHA1:   res.Header.Get("X-Checksum-Sha1"),
@@ -454,8 +454,8 @@ func (p *Policy) upload(
 	}
 }
 
-func (p *Policy) metadataLimit(kind types.RemoteKind) int64 {
-	if kind == types.RemoteMetadata {
+func (p *Policy) metadataLimit(kind model.RemoteKind) int64 {
+	if kind == model.RemoteMetadata {
 		return p.MetadataLimit
 	}
 	return 0
@@ -496,8 +496,8 @@ func (p *Policy) Check(
 
 func (p *Policy) fallback(
 	q source.Request,
-	key types.RemoteCacheKey,
-	e types.RemoteCacheEntry,
+	key model.RemoteCacheKey,
+	e model.RemoteCacheEntry,
 	err error,
 ) (fillResult, error) {
 	var failure *source.HTTPError
@@ -547,8 +547,8 @@ func responseBase(res *http.Response) string {
 	return u.String()
 }
 
-func metadataResponse(res *http.Response, kind types.RemoteKind) source.MetadataResponse {
-	if kind != types.RemoteMetadata {
+func metadataResponse(res *http.Response, kind model.RemoteKind) source.MetadataResponse {
+	if kind != model.RemoteMetadata {
 		return source.MetadataResponse{}
 	}
 	return source.MetadataResponse{BaseURL: responseBase(res)}
@@ -559,10 +559,10 @@ func (p *Policy) revalidate(
 	q source.Request,
 	permit source.Permit,
 	revision string,
-	token types.RemoteCacheToken,
-	e types.RemoteCacheEntry,
+	token model.RemoteCacheToken,
+	e model.RemoteCacheEntry,
 	res *http.Response,
-) (types.RemoteCacheEntry, error) {
+) (model.RemoteCacheEntry, error) {
 	bad := e.Blob.Checksums.SHA256 == "" || (e.ETag == "" && e.LastModified == "")
 	if got := res.Header.Get(
 		"ETag",
@@ -577,7 +577,7 @@ func (p *Policy) revalidate(
 		bad = true
 	}
 	if bad {
-		return types.RemoteCacheEntry{}, &source.HTTPError{
+		return model.RemoteCacheEntry{}, &source.HTTPError{
 			Status: 502,
 			Kind:   source.FailureKindProtocol,
 		}
@@ -585,7 +585,7 @@ func (p *Policy) revalidate(
 	if q.Resource.ValidateMetadata != nil {
 		metadata := metadataResponse(res, e.Kind)
 		if err := p.validateCachedMetadata(ctx, q.Resource, e, metadata); err != nil {
-			return types.RemoteCacheEntry{}, PolicyError(err)
+			return model.RemoteCacheEntry{}, PolicyError(err)
 		}
 		e.MetadataBaseURL = metadata.BaseURL
 	}
@@ -599,7 +599,7 @@ func (p *Policy) revalidate(
 	}
 	e.ValidatedAt = p.now()
 	e.NegativeUntil = time.Time{}
-	var updated types.RemoteCacheEntry
+	var updated model.RemoteCacheEntry
 	err := p.Store.Tx(ctx, func(tx context.Context) error {
 		if currentErr := p.Check(tx, q, permit, revision); currentErr != nil {
 			return currentErr
@@ -612,7 +612,7 @@ func (p *Policy) revalidate(
 		return nil
 	})
 	if err != nil {
-		return types.RemoteCacheEntry{}, PolicyError(err)
+		return model.RemoteCacheEntry{}, PolicyError(err)
 	}
 	return updated, nil
 }
@@ -623,7 +623,7 @@ func (p *Policy) revalidate(
 func (p *Policy) validateCachedMetadata(
 	ctx context.Context,
 	r source.Resource,
-	e types.RemoteCacheEntry,
+	e model.RemoteCacheEntry,
 	metadata source.MetadataResponse,
 ) error {
 	body, _, err := p.Blobs.Open(ctx, e.Blob.Checksums.SHA256)

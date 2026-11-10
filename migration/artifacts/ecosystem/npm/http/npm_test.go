@@ -22,18 +22,20 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -75,19 +77,19 @@ func newFixture(t *testing.T, wrap ...func(pkgroute.Store) pkgroute.Store) *fixt
 			t.Fatal(err)
 		}
 	}
-	grant := func(user, include string, actions types.Actions) {
+	grant := func(user, include string, actions api.Actions) {
 		t.Helper()
-		if err := db.Permissions().Create(ctx, types.Permission{
+		if err := db.Permissions().Create(ctx, model.Permission{
 			Name: user,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{user: actions}},
-				Targets: map[string]types.Target{"npm-local": {Include: []string{include}}},
+			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{user: actions}},
+				Targets: map[string]model.Target{"npm-local": {Include: []string{include}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	read, write, del := types.ActionRead, types.ActionWrite, types.ActionDelete
+	read, write, del := api.ActionRead, api.ActionWrite, api.ActionDelete
 	grant("reader", "**", read)
 	grant("partial", "mixed/-/mixed-1.*", read)
 	grant("writer", "**", read|write|del)
@@ -106,7 +108,7 @@ func newFixture(t *testing.T, wrap ...func(pkgroute.Store) pkgroute.Store) *fixt
 	o := pkgroute.Options{
 		Store: backend,
 		Items: func() *item.Service { return f.items },
-		ServeItem: func(w http.ResponseWriter, _ *http.Request, c repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, _ *http.Request, c repo.Config, it model.Item) {
 			_, _ = io.WriteString(w, "served "+c.Key+"/"+it.FullPath())
 		},
 		ItemError: func(_ context.Context, _ string, err error) error { return err },
@@ -156,7 +158,7 @@ func (f *fixture) now() time.Time {
 func (f *fixture) deploy(
 	t *testing.T,
 	name, version, manifest string,
-	props types.Properties,
+	props model.Properties,
 ) []byte {
 	t.Helper()
 	ctx := context.Background()
@@ -249,10 +251,10 @@ func (f *fixture) deployRich(t *testing.T) map[string][]byte {
 	t.Helper()
 	return map[string][]byte{
 		"1.0.0": f.deploy(t, "rich", "1.0.0", rich100,
-			types.Properties{npmfmt.PropDeprecated: {"use 1.1.0"}}),
+			model.Properties{npmfmt.PropDeprecated: {"use 1.1.0"}}),
 		"1.1.0": f.deploy(t, "rich", "1.1.0", rich110, nil),
 		"2.0.0-beta.1": f.deploy(t, "rich", "2.0.0-beta.1", rich200,
-			types.Properties{npmfmt.PropDistTag: {"beta"}}),
+			model.Properties{npmfmt.PropDistTag: {"beta"}}),
 	}
 }
 
@@ -426,11 +428,11 @@ func TestAccLatest(t *testing.T) {
 	f.deploy(t, "pinned", "1.0.0", `{"name":"pinned","version":"1.0.0"}`, nil)
 	f.deploy(t, "pinned", "1.1.0", `{"name":"pinned","version":"1.1.0"}`, nil)
 	f.deploy(t, "pinned", "1.0.1", `{"name":"pinned","version":"1.0.1"}`,
-		types.Properties{npmfmt.PropDistTag: {"latest"}})
+		model.Properties{npmfmt.PropDistTag: {"latest"}})
 	f.deploy(t, "pinned", "2.0.0", `{"name":"pinned","version":"2.0.0"}`,
-		types.Properties{npmfmt.PropDistTag: {"next"}})
+		model.Properties{npmfmt.PropDistTag: {"next"}})
 	f.deploy(t, "moved", "1.0.0", `{"name":"moved","version":"1.0.0"}`,
-		types.Properties{npmfmt.PropDistTag: {"latest"}})
+		model.Properties{npmfmt.PropDistTag: {"latest"}})
 	f.deploy(t, "moved", "2.0.0", `{"name":"moved","version":"2.0.0"}`, nil)
 	f.deploy(t, "pre", "1.0.0-alpha", `{"name":"pre","version":"1.0.0-alpha"}`, nil)
 	f.deploy(t, "pre", "1.0.0-beta", `{"name":"pre","version":"1.0.0-beta"}`, nil)
@@ -453,7 +455,7 @@ func TestAccPackumentShowsReadableVersions(t *testing.T) {
 	f := newFixture(t)
 	f.deploy(t, "mixed", "1.0.0", `{"name":"mixed","version":"1.0.0"}`, nil)
 	f.deploy(t, "mixed", "2.0.0", `{"name":"mixed","version":"2.0.0"}`,
-		types.Properties{npmfmt.PropDistTag: {"next", "latest"}})
+		model.Properties{npmfmt.PropDistTag: {"next", "latest"}})
 	all := decode(t, f.do("GET", registry+"mixed", "reader"))
 	some := decode(t, f.do("GET", registry+"mixed", "partial"))
 	if diff := cmp.Diff(
@@ -501,7 +503,7 @@ func TestAccRev(t *testing.T) {
 	if got := rev(); got != "1-0" {
 		t.Errorf("_rev %v", got)
 	}
-	if err := f.items.Annotate(ctx, c, it, types.Properties{
+	if err := f.items.Annotate(ctx, c, it, model.Properties{
 		npmfmt.PropDistTag: {"stable"}, npmfmt.PropDeprecated: {"old"},
 	}, nil); err != nil {
 		t.Fatal(err)
@@ -776,23 +778,23 @@ type failingStore struct {
 	failing string
 }
 
-func (s failingStore) Packages() store.PackageStore {
+func (s failingStore) Packages() port.PackageStore {
 	return failingPackages{PackageStore: s.Store.Packages(), failing: s.failing}
 }
 
 type failingPackages struct {
-	store.PackageStore
+	port.PackageStore
 	failing string
 }
 
-func (p failingPackages) Find(ctx context.Context, key, name string) (types.Package, error) {
+func (p failingPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
 	if p.failing == "find" {
-		return types.Package{}, errBroken
+		return model.Package{}, errBroken
 	}
 	return p.PackageStore.Find(ctx, key, name) //nolint:wrapcheck // a test's pass-through
 }
 
-func (p failingPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (p failingPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if p.failing == "versions" {
 		return nil, errBroken
 	}

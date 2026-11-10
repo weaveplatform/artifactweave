@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"path"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (h handler) members(r *http.Request) ([]*http.Request, error) {
@@ -28,7 +28,7 @@ func (h handler) members(r *http.Request) ([]*http.Request, error) {
 		}
 		seen[key] = true
 		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -58,8 +58,8 @@ func (h handler) virtualIndex(r *http.Request, id condafmt.MetadataPath, seen ma
 	combined := condafmt.EmptyRepodata(id.Subdir)
 	var fences []func(context.Context) error
 	for _, mr := range members {
-		if !h.k.CanFolder(mr, path.Dir(id.Path), types.ActionRead) ||
-			!h.k.Can(mr, id.Path, types.ActionRead) {
+		if !h.k.CanFolder(mr, path.Dir(id.Path), api.ActionRead) ||
+			!h.k.Can(mr, id.Path, api.ActionRead) {
 			continue
 		}
 		index, finish, err := h.memberIndex(mr, id.Path, seen)

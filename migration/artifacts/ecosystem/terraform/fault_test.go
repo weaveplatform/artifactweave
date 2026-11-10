@@ -9,10 +9,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errFault = errors.New("store fault")
@@ -42,27 +42,27 @@ type faulty struct {
 	f *faults
 }
 
-func (f *faulty) Packages() store.PackageStore { return faultyPackages{f.Store.Packages(), f.f} }
+func (f *faulty) Packages() port.PackageStore { return faultyPackages{f.Store.Packages(), f.f} }
 
-func (f *faulty) Items() store.ItemStore { return faultyItems{f.Store.Items(), f.f} }
+func (f *faulty) Items() port.ItemStore { return faultyItems{f.Store.Items(), f.f} }
 
 type faultyPackages struct {
-	store.PackageStore
+	port.PackageStore
 	f *faults
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Ensure(ctx context.Context, v types.Package) (types.Package, error) {
+func (p faultyPackages) Ensure(ctx context.Context, v model.Package) (model.Package, error) {
 	if p.f.fail("Ensure") {
-		return types.Package{}, errFault
+		return model.Package{}, errFault
 	}
 	return p.PackageStore.Ensure(ctx, v)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Find(ctx context.Context, key, name string) (types.Package, error) {
+func (p faultyPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
 	if p.f.fail("Find") {
-		return types.Package{}, errFault
+		return model.Package{}, errFault
 	}
 	return p.PackageStore.Find(ctx, key, name)
 }
@@ -70,15 +70,15 @@ func (p faultyPackages) Find(ctx context.Context, key, name string) (types.Packa
 //nolint:wrapcheck // test double
 func (p faultyPackages) Version(
 	ctx context.Context, id int64, version string,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	if p.f.fail("Version") {
-		return types.PackageVersion{}, errFault
+		return model.PackageVersion{}, errFault
 	}
 	return p.PackageStore.Version(ctx, id, version)
 }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	f *faults
 }
 
@@ -88,9 +88,9 @@ func (i faultyItems) Get(
 	key string,
 	cached bool,
 	p string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if i.f.fail("Get") {
-		return types.Item{}, errFault
+		return model.Item{}, errFault
 	}
 	return i.ItemStore.Get(ctx, key, cached, p)
 }
@@ -117,8 +117,8 @@ func (unreadable) Open(context.Context, string) (io.ReadSeekCloser, blob.Info, e
 type faultWorld struct {
 	*world
 	moduleRepo, providerRepo repo.Config
-	module, archive          types.Item
-	sums                     types.Item
+	module, archive          model.Item
+	sums                     model.Item
 }
 
 func newFaultWorld(t *testing.T) *faultWorld {
@@ -131,7 +131,7 @@ func newFaultWorld(t *testing.T) *faultWorld {
 	for _, s := range []string{"linux_amd64.zip", "SHA256SUMS"} {
 		w.must(w.deploy(w.providerRepo, r.path(s), r.files[r.name(s)]))
 	}
-	get := func(c repo.Config, p string) types.Item {
+	get := func(c repo.Config, p string) model.Item {
 		it, err := w.st.Items().Get(w.ctx, c.Key, false, p)
 		w.must(err)
 		return it
@@ -170,13 +170,13 @@ func TestUnitFaults(t *testing.T) {
 			return h.Deployed(ctx, env, w.moduleRepo, w.module)
 		}},
 		{"a deleted module", "Get", 0, false, func(w *faultWorld, env format.Env) error {
-			return h.Deleted(ctx, env, w.moduleRepo, []types.Item{w.module})
+			return h.Deleted(ctx, env, w.moduleRepo, []model.Item{w.module})
 		}},
 		{"a release's files", "Search", 0, false, func(w *faultWorld, env format.Env) error {
 			return h.Deployed(ctx, env, w.providerRepo, w.sums)
 		}},
 		{"a deleted release's files", "Search", 0, false, func(w *faultWorld, env format.Env) error {
-			return h.Deleted(ctx, env, w.providerRepo, []types.Item{w.archive})
+			return h.Deleted(ctx, env, w.providerRepo, []model.Item{w.archive})
 		}},
 		{"a release's package", "Find", 0, false, func(w *faultWorld, env format.Env) error {
 			return h.Deployed(ctx, env, w.providerRepo, w.sums)
@@ -253,7 +253,7 @@ func TestUnitWhatTheHooksPassOver(t *testing.T) {
 	f := &faults{pass: map[string]int{"Get": 0, "Search": 0, "Ensure": 0}}
 	env := format.Env{Store: &faulty{Store: w.st, f: f}, Blobs: unreadable{w.blobs}}
 	h := terraform.Handler{}
-	folder := types.Item{
+	folder := model.Item{
 		RepoKey: w.providerRepo.Key,
 		Path:    "hashicorp/null",
 		Name:    "3.3.2",
@@ -261,19 +261,19 @@ func TestUnitWhatTheHooksPassOver(t *testing.T) {
 	}
 	cached := w.archive
 	cached.Cached = true
-	readme := types.Item{
+	readme := model.Item{
 		RepoKey: w.providerRepo.Key,
 		Path:    "hashicorp/null/3.3.2",
 		Name:    "README.md",
 	}
 	// What the repository's type indexes, which the faults would fail.
-	indexes := func(c repo.Config, it types.Item) bool {
+	indexes := func(c repo.Config, it model.Item) bool {
 		p := it.FullPath()
 		return !it.Cached && (p == w.module.FullPath() && c.TerraformType == repo.TerraformModule ||
 			p == w.archive.FullPath() && c.TerraformType == repo.TerraformProvider)
 	}
 	for _, c := range []repo.Config{w.moduleRepo, w.providerRepo, w.repo("tf-untyped", "")} {
-		for _, it := range []types.Item{folder, cached, readme, w.module, w.archive} {
+		for _, it := range []model.Item{folder, cached, readme, w.module, w.archive} {
 			if indexes(c, it) {
 				continue
 			}
@@ -281,7 +281,7 @@ func TestUnitWhatTheHooksPassOver(t *testing.T) {
 				t.Errorf("%s: deployed %s: %v", c.Key, it.FullPath(), err)
 			}
 		}
-		if err := h.Deleted(w.ctx, env, c, []types.Item{folder, cached, readme}); err != nil {
+		if err := h.Deleted(w.ctx, env, c, []model.Item{folder, cached, readme}); err != nil {
 			t.Errorf("%s: deleted: %v", c.Key, err)
 		}
 		if err := h.Deleting(w.ctx, env, c, w.module); err != nil {

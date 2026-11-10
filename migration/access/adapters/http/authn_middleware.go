@@ -14,7 +14,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // accessPublicRoutes are Access's routes that answer without credentials
@@ -230,7 +229,7 @@ func credentials(
 		return p, true, err //nolint:wrapcheck // apierror values, rendered by status
 	}
 	if k := r.Header.Get("X-JFrog-Art-Api"); k != "" {
-		if !types.IsReferenceToken(k) {
+		if !accessapi.IsReferenceToken(k) {
 			return kernel.Principal{}, true, kernel.ErrBadCredentials
 		}
 		p, err = a.Token(ctx, k, "")

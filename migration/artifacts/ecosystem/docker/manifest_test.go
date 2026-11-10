@@ -15,11 +15,11 @@ import (
 	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func digest(s string) string { return "sha256:" + sum(s) }
@@ -135,7 +135,7 @@ func TestUnitProperties(t *testing.T) {
 			"maintainer":                      "team",
 		},
 	})
-	want := types.Properties{
+	want := model.Properties{
 		"docker.manifest":        {"v1"},
 		"docker.manifest.digest": {"sha256:abc"},
 		"docker.manifest.type":   {layout.MediaTypeDockerManifest},
@@ -301,7 +301,7 @@ func findManifest(t *testing.T, db item.Store) {
 			sum(body),
 		); !errors.Is(
 			err,
-			store.ErrNotFound,
+			kernel.ErrNotFound,
 		) {
 			names = append(names, body)
 		}
@@ -310,7 +310,7 @@ func findManifest(t *testing.T, db item.Store) {
 		t.Errorf("found %v", slices.Sorted(slices.Values(names)))
 	}
 	_, err = layout.FindManifest(ctx, failingSearch{}, "r", "app", sum("x"))
-	if err == nil || errors.Is(err, store.ErrNotFound) {
+	if err == nil || errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("err = %v", err)
 	}
 }

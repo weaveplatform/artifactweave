@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	pubfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pub"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxMultipartBytes = pubfmt.MaxArchiveBytes + 2<<20
@@ -57,10 +57,10 @@ func (h handler) publishUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := pubfmt.Path(meta.Name, meta.Version)
-	if !h.k.Require(w, r, path, types.ActionWrite) {
+	if !h.k.Require(w, r, path, api.ActionWrite) {
 		return
 	}
-	item, err := h.k.StoreNew(r, path, form.File, nil, types.Checksums{}, func() error {
+	item, err := h.k.StoreNew(r, path, form.File, nil, kernel.Checksums{}, func() error {
 		return apierror.New(http.StatusConflict, "Dart pub version already published")
 	})
 	if err != nil {
@@ -89,11 +89,11 @@ func (h handler) publishComplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := pubfmt.Path(name, version)
-	if !h.k.Require(w, r, path, types.ActionWrite) {
+	if !h.k.Require(w, r, path, api.ActionWrite) {
 		return
 	}
 	item, err := h.k.DB().Items().Get(r.Context(), pkgroute.RequestFrom(r).Repo.Key, false, path)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		h.k.Error(w, r, apierror.New(http.StatusNotFound, "pub version not found"))
 		return
 	}
@@ -121,7 +121,7 @@ func (h handler) publishAllowed(w http.ResponseWriter, r *http.Request) bool {
 		))
 		return false
 	}
-	return h.k.RequireFolder(w, r, "", types.ActionWrite)
+	return h.k.RequireFolder(w, r, "", api.ActionWrite)
 }
 
 func hostedURL(r *http.Request) string {

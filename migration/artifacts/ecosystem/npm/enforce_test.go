@@ -10,9 +10,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // enforcing turns npm.enforce_path on for every write through the world's
@@ -141,7 +141,7 @@ func TestUnitEnforcePathAdmitsAPublish(t *testing.T) {
 	if _, err := w.items.Deploy(w.ctx, item.Deploy{
 		Target: item.Target{Repo: w.c, Path: npm.CanonicalPath("@s/x", "1.0.0")},
 		Body:   bytes.NewReader(pkg("@s/x", "1.0.0", "")), IfAbsent: true,
-		Properties: types.Properties{npm.PropDistTag: {"beta"}},
+		Properties: model.Properties{npm.PropDistTag: {"beta"}},
 	}); err != nil {
 		t.Fatal(err)
 	}

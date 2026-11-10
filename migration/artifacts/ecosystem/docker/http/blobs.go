@@ -9,15 +9,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Headers of the blob operations (OCI Distribution Specification v1.1).
@@ -47,7 +47,7 @@ func (g *Registry) registerBlobs() {
 // item; GET streams it, or redirects to a signed URL when the repository's
 // download redirect says so (decision 0029).
 func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
-	if err := q.Require(r, q.Name+"/", types.ActionRead); err != nil {
+	if err := q.Require(r, q.Name+"/", api.ActionRead); err != nil {
 		Write(w, err)
 		return
 	}
@@ -60,7 +60,7 @@ func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
 		return
 	}
 	it, err := layout.FindBlob(r.Context(), g.store.Items(), q.Repo.Key, q.Name, hex)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		Write(w, blobUnknown(q.Reference))
 		return
 	}
@@ -90,7 +90,7 @@ func (g *Registry) streamBlob(
 	w http.ResponseWriter,
 	r *http.Request,
 	_ repo.Config,
-	it types.Item,
+	it model.Item,
 ) {
 	content, _, err := g.blobs.Open(r.Context(), it.Actual.SHA256)
 	if err != nil {
@@ -115,7 +115,7 @@ func deleteBlob(w http.ResponseWriter, _ *http.Request, _ Request) {
 // ?digest=, a mount with ?mount=&from= when the caller may read the source
 // and it holds the blob, and otherwise a new session.
 func (g *Registry) startUpload(w http.ResponseWriter, r *http.Request, q Request) {
-	if err := q.Require(r, q.Name+"/", types.ActionWrite); err != nil {
+	if err := q.Require(r, q.Name+"/", api.ActionWrite); err != nil {
 		Write(w, err)
 		return
 	}
@@ -167,7 +167,7 @@ func (g *Registry) mount(w http.ResponseWriter, r *http.Request, q Request, o re
 		return false
 	}
 	for _, src := range g.mountSources(r, q, query.Get("from")) {
-		if src.Require(r, src.Name+"/", types.ActionRead) != nil {
+		if src.Require(r, src.Name+"/", api.ActionRead) != nil {
 			continue
 		}
 		_, ok, err := g.uploads.Mount(r.Context(), o, src.Repo, src.Name, hex)
@@ -232,7 +232,7 @@ func (g *Registry) mountSources(r *http.Request, q Request, from string) []Reque
 
 // uploadStatus serves GET on a session: 204 with how much it holds.
 func (g *Registry) uploadStatus(w http.ResponseWriter, r *http.Request, q Request) {
-	if err := q.Require(r, q.Name+"/", types.ActionWrite); err != nil {
+	if err := q.Require(r, q.Name+"/", api.ActionWrite); err != nil {
 		Write(w, err)
 		return
 	}
@@ -247,7 +247,7 @@ func (g *Registry) uploadStatus(w http.ResponseWriter, r *http.Request, q Reques
 // appendUpload serves PATCH on a session: a chunk, which must start where
 // the session ends when it carries Content-Range, or a stream without it.
 func (g *Registry) appendUpload(w http.ResponseWriter, r *http.Request, q Request) {
-	if err := q.Require(r, q.Name+"/", types.ActionWrite); err != nil {
+	if err := q.Require(r, q.Name+"/", api.ActionWrite); err != nil {
 		Write(w, err)
 		return
 	}
@@ -267,7 +267,7 @@ func (g *Registry) appendUpload(w http.ResponseWriter, r *http.Request, q Reques
 // finishUpload serves PUT on a session: the last chunk, if any, and the
 // digest the content must have.
 func (g *Registry) finishUpload(w http.ResponseWriter, r *http.Request, q Request) {
-	if err := q.Require(r, q.Name+"/", types.ActionWrite); err != nil {
+	if err := q.Require(r, q.Name+"/", api.ActionWrite); err != nil {
 		Write(w, err)
 		return
 	}
@@ -302,7 +302,7 @@ func (g *Registry) finishUpload(w http.ResponseWriter, r *http.Request, q Reques
 
 // cancelUpload serves DELETE on a session.
 func (g *Registry) cancelUpload(w http.ResponseWriter, r *http.Request, q Request) {
-	if err := q.Require(r, q.Name+"/", types.ActionWrite); err != nil {
+	if err := q.Require(r, q.Name+"/", api.ActionWrite); err != nil {
 		Write(w, err)
 		return
 	}

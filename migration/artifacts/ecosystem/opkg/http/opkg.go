@@ -20,8 +20,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/opkg"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var (
@@ -93,8 +91,8 @@ func (s opkgItems) serveOpkgIndex(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.Folder(c, req.Path, types.ActionRead) ||
-		!acc.File(c, req.Path, types.ActionRead) ||
+	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
+		!acc.File(c, req.Path, accessapi.ActionRead) ||
 		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
@@ -163,7 +161,7 @@ func opkgPackageReadable(
 	ctx context.Context, c repo.Config, p string, acc itemkit.Access,
 	check func(context.Context, string) error,
 ) (bool, error) {
-	if !acc.File(c, p, types.ActionRead) || generic.CheckDownload(c, p, false) != nil {
+	if !acc.File(c, p, accessapi.ActionRead) || generic.CheckDownload(c, p, false) != nil {
 		return false, nil
 	}
 	if check != nil {
@@ -218,14 +216,14 @@ func (s opkgItems) opkgMemberIndex(
 		}
 	} else {
 		if c.Class != repo.Local && c.Class != repo.Federated || cached {
-			return view, store.ErrNotFound
+			return view, kernel.ErrNotFound
 		}
 		it, err := st.Items().Get(ctx, c.Key, false, indexPath)
 		if err != nil {
 			return view, err //nolint:wrapcheck
 		}
 		if it.Folder {
-			return view, store.ErrNotFound
+			return view, kernel.ErrNotFound
 		}
 		view.raw, err = s.readOpkgBlob(ctx, it.Actual.SHA256)
 		if err != nil {
@@ -269,7 +267,7 @@ func (s opkgItems) opkgCandidates(
 	selected := map[string]bool{}
 	for _, key := range c.Repositories {
 		member, err := st.Repos().Get(ctx, key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -278,8 +276,8 @@ func (s opkgItems) opkgCandidates(
 		if member.PackageType != repo.Opkg {
 			return nil, fmt.Errorf("%w: %s", errOpkgMemberType, key)
 		}
-		if !acc.Folder(member, indexPath, types.ActionRead) ||
-			!acc.File(member, indexPath, types.ActionRead) ||
+		if !acc.Folder(member, indexPath, accessapi.ActionRead) ||
+			!acc.File(member, indexPath, accessapi.ActionRead) ||
 			generic.CheckDownload(member, indexPath, false) != nil {
 			continue
 		}
@@ -306,7 +304,7 @@ func (s opkgItems) opkgCandidates(
 				}
 			}
 		}
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -314,7 +312,7 @@ func (s opkgItems) opkgCandidates(
 		}
 		for _, entry := range entries {
 			if selected[entry.pkg.Path] ||
-				!acc.File(c, entry.pkg.Path, types.ActionRead) ||
+				!acc.File(c, entry.pkg.Path, accessapi.ActionRead) ||
 				generic.CheckDownload(c, entry.pkg.Path, false) != nil {
 				continue
 			}
@@ -333,7 +331,7 @@ func (s opkgItems) serveOpkgPackage(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.File(c, req.Path, types.ActionRead) ||
+	if !acc.File(c, req.Path, accessapi.ActionRead) ||
 		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
@@ -391,7 +389,7 @@ func (s opkgItems) serveRemoteOpkgPackage(
 		CacheOnly: cached,
 		Resource: source.Resource{
 			Kind: source.ResourceKindArtifact, Path: req.Path, Method: r.Method,
-			Checksums: types.Checksums{SHA256: expected.SHA256},
+			Checksums: kernel.Checksums{SHA256: expected.SHA256},
 		},
 	}
 	query, err := itemkit.OpkgSourceRequest(query)

@@ -13,11 +13,13 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
@@ -189,7 +191,7 @@ func TestUnitApplyCreatesThenNothing(t *testing.T) {
 	if err != nil || strings.Join(v.Repositories, ",") != "libs-local,maven-central" {
 		t.Fatalf("virtual %+v %v", v, err)
 	}
-	proxy, err := db.Configs().Get(ctx, types.ConfigProxy, "corp")
+	proxy, err := db.Configs().Get(ctx, configdoc.ConfigProxy, "corp")
 	if err != nil || proxy.Secrets["password"] != "pp" ||
 		strings.Contains(string(proxy.Document), "pp") {
 		t.Fatalf("proxy %+v %v: the password belongs in the sealed secrets only", proxy, err)
@@ -337,7 +339,7 @@ repoLayouts:
 	if v, _ := db.Repos().Get(ctx, "maven-all"); strings.Join(v.Repositories, ",") != "libs-local" {
 		t.Fatalf("virtual members %v", v.Repositories)
 	}
-	proxy, err := db.Configs().Get(ctx, types.ConfigProxy, "corp")
+	proxy, err := db.Configs().Get(ctx, configdoc.ConfigProxy, "corp")
 	if err != nil || len(proxy.Secrets) != 0 || !strings.Contains(string(proxy.Document), "8080") {
 		t.Fatalf("proxy %+v %v", proxy, err)
 	}
@@ -361,7 +363,7 @@ func TestUnitApplyTrashesDeletedRepositoriesAsTheCaller(t *testing.T) {
 	} {
 		db := inmem.New()
 		seedRepo(t, db, repo.Config{Key: "gone", Class: repo.Local})
-		if _, err := db.Items().Put(ctx, types.Item{RepoKey: "gone", Name: "f.txt"}); err != nil {
+		if _, err := db.Items().Put(ctx, model.Item{RepoKey: "gone", Name: "f.txt"}); err != nil {
 			t.Fatal(err)
 		}
 		p, err := Parse([]byte("localRepositories:\n  gone: null\n"), env(nil))
@@ -371,7 +373,7 @@ func TestUnitApplyTrashesDeletedRepositoriesAsTheCaller(t *testing.T) {
 		if _, err := Apply(ctx, depsOf(t, db), p, now, false); err != nil {
 			t.Fatal(err)
 		}
-		trashed, _, err := db.Trash().List(ctx, "gone", "", store.Page{})
+		trashed, _, err := db.Trash().List(ctx, "gone", "", kernel.Page{})
 		if err != nil || len(trashed) != 1 || trashed[0].DeletedBy != by {
 			t.Fatalf("by %q: %+v, %v", by, trashed, err)
 		}
@@ -411,15 +413,15 @@ func TestUnitApplyRefusesAndWritesNothing(t *testing.T) {
 	} {
 		// Every bad document carries a good entry too, in a section it
 		// does not already use, which must not be written either.
-		good, kind := "proxies:\n  good:\n    host: h\n    port: 80\n", types.ConfigProxy
+		good, kind := "proxies:\n  good:\n    host: h\n    port: 80\n", configdoc.ConfigProxy
 		if strings.Contains(doc, "proxies:") {
-			good, kind = "propertySets:\n  good:\n    visible: true\n", types.ConfigPropertySet
+			good, kind = "propertySets:\n  good:\n    visible: true\n", configdoc.ConfigPropertySet
 		}
 		res, err := apply(t, db, doc+good)
 		if !errors.Is(err, ErrInvalid) {
 			t.Errorf("%s: %+v, %v", name, res, err)
 		}
-		if _, err := db.Configs().Get(ctx, kind, "good"); !errors.Is(err, store.ErrNotFound) {
+		if _, err := db.Configs().Get(ctx, kind, "good"); !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatalf("%s: a refused patch wrote its good entry", name)
 		}
 	}
@@ -434,7 +436,7 @@ func TestUnitApplyKeepsKeysAndUpdatesBuildInfo(t *testing.T) {
 	db := inmem.New()
 	seedRepo(t, db, repo.Config{Key: "libs-local", Class: repo.Local})
 	seedRepo(t, db, repo.Config{
-		Key: types.BuildInfoRepository, Class: repo.Local, PackageType: repo.BuildInfo,
+		Key: accessapi.BuildInfoRepository, Class: repo.Local, PackageType: repo.BuildInfo,
 	})
 	for _, doc := range []string{
 		"localRepositories:\n  libs-local:\n    key: LIBS-LOCAL\n",
@@ -453,7 +455,7 @@ func TestUnitApplyKeepsKeysAndUpdatesBuildInfo(t *testing.T) {
 		db,
 		"localRepositories:\n  artifactory-build-info:\n    type: buildinfo\n    description: builds\n",
 	)
-	got, err := db.Repos().Get(ctx, types.BuildInfoRepository)
+	got, err := db.Repos().Get(ctx, accessapi.BuildInfoRepository)
 	if err != nil || len(res.Updated) != 1 || got.Description != "builds" ||
 		got.PackageType != repo.BuildInfo {
 		t.Fatalf("build-info %+v %+v %v", res, got, err)
@@ -503,7 +505,7 @@ func TestUnitApplyDryRun(t *testing.T) {
 	if err != nil || len(res.Created) != 6 || !strings.HasPrefix(res.String(), "Dry run") {
 		t.Fatalf("dry run %+v %v", res, err)
 	}
-	if repos, _ := db.Repos().List(context.Background(), store.RepoFilter{}); len(repos) != 0 {
+	if repos, _ := db.Repos().List(context.Background(), port.RepoFilter{}); len(repos) != 0 {
 		t.Fatalf("dry run wrote %v", repos)
 	}
 }
@@ -532,15 +534,15 @@ security:
 	if _, err := db.Repos().
 		Get(context.Background(), "new-local"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("repository survived failed transaction: %v", err)
 	}
 	var enabled bool
 	if err := db.Settings().
-		Get(context.Background(), types.SettingAnonymousAccess, &enabled); !errors.Is(
+		Get(context.Background(), settings.SettingAnonymousAccess, &enabled); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("setting survived failed transaction: enabled %t, error %v", enabled, err)
 	}
@@ -570,11 +572,11 @@ security:
 	if !written.readBack {
 		t.Fatal("the transaction did not see the setting it wrote")
 	}
-	if _, err := db.Repos().Get(ctx, "new-local"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := db.Repos().Get(ctx, "new-local"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("repository survived the failed transaction: %v", err)
 	}
 	anonymous := accesstest.Over(t, db).API().AnonymousAccess
-	if on, err := anonymous.Enabled(ctx); !errors.Is(err, store.ErrNotFound) {
+	if on, err := anonymous.Enabled(ctx); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("setting survived the failed transaction: enabled %t, error %v", on, err)
 	}
 }
@@ -648,16 +650,16 @@ propertySets:
 // last entry. First it reads back, with the same context, the proxy under
 // before, which the apply wrote earlier in the transaction.
 type failingPut struct {
-	store.ConfigStore
+	configdoc.ConfigStore
 	key, before string
 	readBack    bool
 }
 
-func (f *failingPut) Put(ctx context.Context, d types.ConfigDocument) error {
+func (f *failingPut) Put(ctx context.Context, d configdoc.ConfigDocument) error {
 	if d.Key != f.key {
 		return f.ConfigStore.Put(ctx, d) //nolint:wrapcheck // test double
 	}
-	_, err := f.ConfigStore.Get(ctx, types.ConfigProxy, f.before)
+	_, err := f.ConfigStore.Get(ctx, configdoc.ConfigProxy, f.before)
 	f.readBack = err == nil
 	return errBoom
 }
@@ -669,15 +671,15 @@ func (f *failingPut) Put(ctx context.Context, d types.ConfigDocument) error {
 func storeState(t *testing.T, db *inmem.Store) string {
 	t.Helper()
 	ctx := t.Context()
-	repos, err := db.Repos().List(ctx, store.RepoFilter{})
+	repos, err := db.Repos().List(ctx, port.RepoFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	proxies, err := db.Configs().List(ctx, types.ConfigProxy)
+	proxies, err := db.Configs().List(ctx, configdoc.ConfigProxy)
 	if err != nil {
 		t.Fatal(err)
 	}
-	sets, err := db.Configs().List(ctx, types.ConfigPropertySet)
+	sets, err := db.Configs().List(ctx, configdoc.ConfigPropertySet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -685,7 +687,7 @@ func storeState(t *testing.T, db *inmem.Store) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	trashed, _, err := db.Trash().List(ctx, "gone", "", store.Page{})
+	trashed, _, err := db.Trash().List(ctx, "gone", "", kernel.Page{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -698,14 +700,14 @@ func storeState(t *testing.T, db *inmem.Store) string {
 
 var errBoom = errors.New("boom")
 
-func (f faulty) Repos() store.RepoStore     { return faultyRepos{f.Store.Repos(), f.fail} }
-func (f faulty) Configs() store.ConfigStore { return faultyConfigs{f.Store.Configs(), f.fail} }
-func (f faulty) Settings() store.SettingsStore {
+func (f faulty) Repos() port.RepoStore          { return faultyRepos{f.Store.Repos(), f.fail} }
+func (f faulty) Configs() configdoc.ConfigStore { return faultyConfigs{f.Store.Configs(), f.fail} }
+func (f faulty) Settings() settings.SettingsStore {
 	return faultySettings{f.Store.Settings(), f.fail}
 }
 
 type faultySettings struct {
-	store.SettingsStore
+	settings.SettingsStore
 	fail string
 }
 
@@ -717,11 +719,11 @@ func (f faultySettings) Put(ctx context.Context, key string, value any) error {
 }
 
 type faultyRepos struct {
-	store.RepoStore
+	port.RepoStore
 	fail string
 }
 
-func (f faultyRepos) List(ctx context.Context, rf store.RepoFilter) ([]repo.Config, error) {
+func (f faultyRepos) List(ctx context.Context, rf port.RepoFilter) ([]repo.Config, error) {
 	if f.fail == "list" {
 		return nil, errBoom
 	}
@@ -743,39 +745,39 @@ func (f faultyRepos) Delete(ctx context.Context, key string) error {
 }
 
 type faultyConfigs struct {
-	store.ConfigStore
+	configdoc.ConfigStore
 	fail string
 }
 
 func (f faultyConfigs) Get(
 	ctx context.Context,
-	k types.ConfigKind,
+	k configdoc.ConfigKind,
 	key string,
-) (types.ConfigDocument, error) {
+) (configdoc.ConfigDocument, error) {
 	if f.fail == "config get" {
-		return types.ConfigDocument{}, errBoom
+		return configdoc.ConfigDocument{}, errBoom
 	}
 	return f.ConfigStore.Get(ctx, k, key) //nolint:wrapcheck // test double
 }
 
-func (f faultyConfigs) Put(ctx context.Context, d types.ConfigDocument) error {
+func (f faultyConfigs) Put(ctx context.Context, d configdoc.ConfigDocument) error {
 	if f.fail == "config put" {
 		return errBoom
 	}
 	return f.ConfigStore.Put(ctx, d) //nolint:wrapcheck // test double
 }
 
-func (f faultyConfigs) Delete(ctx context.Context, k types.ConfigKind, key string) error {
+func (f faultyConfigs) Delete(ctx context.Context, k configdoc.ConfigKind, key string) error {
 	if f.fail == "config delete" {
 		return errBoom
 	}
 	return f.ConfigStore.Delete(ctx, k, key) //nolint:wrapcheck // test double
 }
 
-func (f faulty) WorkQueue() store.WorkQueue { return faultyWork{f.Store.WorkQueue(), f.fail} }
+func (f faulty) WorkQueue() work.WorkQueue { return faultyWork{f.Store.WorkQueue(), f.fail} }
 
 type faultyWork struct {
-	store.WorkQueue
+	work.WorkQueue
 	fail string
 }
 
@@ -858,8 +860,8 @@ func TestUnitApplyStoreErrors(t *testing.T) {
 	} {
 		db := inmem.New()
 		seedRepo(t, db, repo.Config{Key: "gone", Class: repo.Local})
-		if err := db.Configs().Put(context.Background(), types.ConfigDocument{
-			Kind: types.ConfigProxy, Key: "old", Document: []byte(`{"host":"h","port":1}`),
+		if err := db.Configs().Put(context.Background(), configdoc.ConfigDocument{
+			Kind: configdoc.ConfigProxy, Key: "old", Document: []byte(`{"host":"h","port":1}`),
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -872,15 +874,15 @@ func TestUnitApplyStoreErrors(t *testing.T) {
 
 func TestUnitStoredDocumentThatIsNotJSON(t *testing.T) {
 	db := inmem.New()
-	if err := db.Configs().Put(context.Background(), types.ConfigDocument{
-		Kind: types.ConfigProxy, Key: "p", Document: []byte("not json"),
+	if err := db.Configs().Put(context.Background(), configdoc.ConfigDocument{
+		Kind: configdoc.ConfigProxy, Key: "p", Document: []byte("not json"),
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := apply(t, db, "proxies:\n  p:\n    host: h\n    port: 80\n"); err == nil {
 		t.Fatal("merged onto an unreadable stored document")
 	}
-	if sameDocument(types.ConfigDocument{Document: []byte("not json")}, []byte("{}"), nil) {
+	if sameDocument(configdoc.ConfigDocument{Document: []byte("not json")}, []byte("{}"), nil) {
 		t.Fatal("an unreadable stored document compared equal")
 	}
 }

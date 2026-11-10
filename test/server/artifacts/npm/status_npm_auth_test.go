@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -110,7 +110,7 @@ var npmAuthStatusPart = statusPart{
 	seed: func(t *testing.T, db harness.Store, _ blob.Store) {
 		t.Helper()
 		ctx := context.Background()
-		for _, u := range []types.User{
+		for _, u := range []model.User{
 			// Wrong passwords go to a user of their own, so no suspension
 			// reaches the user other rows sign in as.
 			{Name: "npm-victim", PasswordHash: cheapHash},

@@ -14,8 +14,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/platform/archivecheck"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -86,7 +86,7 @@ func ValidName(s string) bool {
 // box_version, a valid name (ValidName) and provider (ValidComponent), and
 // a dotted version of at most 128 bytes with an optional hyphenated
 // pre-release.
-func Properties(p types.Properties) (Identity, bool) {
+func Properties(p model.Properties) (Identity, bool) {
 	var id Identity
 	for key, dst := range map[string]*string{PropName: &id.Name, PropProvider: &id.Provider, PropVersion: &id.Version} {
 		if len(p[key]) != 1 {
@@ -104,7 +104,7 @@ func Properties(p types.Properties) (Identity, bool) {
 // the recorded vagrant.provider is box_provider, and any recorded
 // architecture is valid. The index and the catalog take a box only when
 // they do.
-func Verified(p types.Properties, sha string) (Identity, Box, bool) {
+func Verified(p model.Properties, sha string) (Identity, Box, bool) {
 	id, ok := Properties(p)
 	b := Box{Provider: single(p[propProvider]), Architecture: single(p[propArchitecture])}
 	return id, b, ok && sha != "" && single(p[propDigest]) == sha && b.Provider == id.Provider &&

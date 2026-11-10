@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // registerListings registers the tags list and the catalogs (decision
@@ -27,7 +27,7 @@ func (g *Registry) registerListings() {
 // listTags serves GET .../<name>/tags/list: the image's tags in the
 // specification's order, a page of them with n and last.
 func (g *Registry) listTags(w http.ResponseWriter, r *http.Request, q Request) {
-	if err := q.Require(r, q.Name+"/", types.ActionRead); err != nil {
+	if err := q.Require(r, q.Name+"/", api.ActionRead); err != nil {
 		Write(w, err)
 		return
 	}
@@ -99,7 +99,7 @@ func (g *Registry) catalog(w http.ResponseWriter, r *http.Request, q Request) {
 // Docker, OCI and Helm OCI repositories that hold their own images. Remote
 // and virtual repositories are left out until the registry serves them.
 func (g *Registry) served(r *http.Request) ([]repo.Config, error) {
-	all, err := g.store.Repos().List(r.Context(), store.RepoFilter{})
+	all, err := g.store.Repos().List(r.Context(), port.RepoFilter{})
 	if err != nil {
 		return nil, err //nolint:wrapcheck // store errors name themselves
 	}

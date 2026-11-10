@@ -9,12 +9,13 @@ import (
 	"path"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	nixfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (h handler) verifyRemote(r *http.Request, info nixfmt.Info) error {
@@ -27,7 +28,7 @@ func (h handler) verifyRemote(r *http.Request, info nixfmt.Info) error {
 		}
 		configured = true
 		pair, err := h.o.KeyPairs.Keypair(r.Context(), ref)
-		if err != nil || pair.Type != types.KeypairEd25519 {
+		if err != nil || pair.Type != api.KeypairEd25519 {
 			continue
 		}
 		pub, err := keymaterial.Ed25519PublicKey(pair.PublicKey)
@@ -139,7 +140,7 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, found loc
 		ExternalURL:       strings.TrimRight(c.URL, "/") + "/" + info.URL,
 		Method:            http.MethodGet,
 		Variant:           "nix-nar-v1",
-		Checksums:         types.Checksums{SHA256: info.FileHash},
+		Checksums:         kernel.Checksums{SHA256: info.FileHash},
 		NoCrossOriginAuth: true,
 		CheckURL:          func(_ context.Context, target *url.URL) error { return checkURL(c, target) },
 		Validate: func(_ context.Context, body io.ReadSeeker, size int64) error {

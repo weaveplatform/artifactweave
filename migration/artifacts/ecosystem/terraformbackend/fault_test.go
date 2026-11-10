@@ -9,11 +9,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 var errFault = errors.New("injected fault")
@@ -47,19 +48,19 @@ type faultyStore struct {
 	f *fault
 }
 
-func (s faultyStore) Items() store.ItemStore { return faultyItems{s.Store.Items(), s.f} }
+func (s faultyStore) Items() port.ItemStore { return faultyItems{s.Store.Items(), s.f} }
 
-func (s faultyStore) Packages() store.PackageStore { return faultyPackages{s.Store.Packages(), s.f} }
+func (s faultyStore) Packages() port.PackageStore { return faultyPackages{s.Store.Packages(), s.f} }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	f *fault
 }
 
 //nolint:wrapcheck // test double
-func (i faultyItems) Get(ctx context.Context, k string, c bool, p string) (types.Item, error) {
+func (i faultyItems) Get(ctx context.Context, k string, c bool, p string) (model.Item, error) {
 	if err := i.f.fail("items.Get"); err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	return i.ItemStore.Get(ctx, k, c, p)
 }
@@ -73,22 +74,22 @@ func (i faultyItems) Search(ctx context.Context, q *aql.Query, o aql.Options) ([
 }
 
 type faultyPackages struct {
-	store.PackageStore
+	port.PackageStore
 	f *fault
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Find(ctx context.Context, k, name string) (types.Package, error) {
+func (p faultyPackages) Find(ctx context.Context, k, name string) (model.Package, error) {
 	if err := p.f.fail("packages.Find"); err != nil {
-		return types.Package{}, err
+		return model.Package{}, err
 	}
 	return p.PackageStore.Find(ctx, k, name)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Ensure(ctx context.Context, pk types.Package) (types.Package, error) {
+func (p faultyPackages) Ensure(ctx context.Context, pk model.Package) (model.Package, error) {
 	if err := p.f.fail("packages.Ensure"); err != nil {
-		return types.Package{}, err
+		return model.Package{}, err
 	}
 	return p.PackageStore.Ensure(ctx, pk)
 }
@@ -98,15 +99,15 @@ func (p faultyPackages) Version(
 	ctx context.Context,
 	id int64,
 	v string,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	if err := p.f.fail("packages.Version"); err != nil {
-		return types.PackageVersion{}, err
+		return model.PackageVersion{}, err
 	}
 	return p.PackageStore.Version(ctx, id, v)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (p faultyPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if err := p.f.fail("packages.Versions"); err != nil {
 		return nil, err
 	}
@@ -130,9 +131,9 @@ func (p faultyPackages) Delete(ctx context.Context, id int64) error {
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) VersionOf(ctx context.Context, id int64) (types.PackageVersion, error) {
+func (p faultyPackages) VersionOf(ctx context.Context, id int64) (model.PackageVersion, error) {
 	if err := p.f.fail("packages.VersionOf"); err != nil {
-		return types.PackageVersion{}, err
+		return model.PackageVersion{}, err
 	}
 	return p.PackageStore.VersionOf(ctx, id)
 }
@@ -214,14 +215,14 @@ func TestUnitUnbackedVersionGoes(t *testing.T) {
 	}, it.ID, w.now); err != nil {
 		t.Fatal(err)
 	}
-	gone := types.Item{RepoKey: "tf-local", Name: tfbe.StatePath("ghost", 5)}
-	if err := w.h.Deleted(w.ctx, w.items.Env(), w.tf, []types.Item{gone}); err != nil {
+	gone := model.Item{RepoKey: "tf-local", Name: tfbe.StatePath("ghost", 5)}
+	if err := w.h.Deleted(w.ctx, w.items.Env(), w.tf, []model.Item{gone}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.st.Packages().
 		Find(w.ctx, "tf-local", "ghost"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("the unbacked workspace's package = %v", err)
 	}

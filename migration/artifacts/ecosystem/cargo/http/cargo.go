@@ -15,15 +15,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cargo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxPublishMetadata = 1 << 20
@@ -89,7 +90,7 @@ func configURL(r *http.Request) string {
 }
 
 func (h handler) config(w http.ResponseWriter, r *http.Request) {
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
@@ -128,7 +129,7 @@ func respond(w http.ResponseWriter, r *http.Request, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
-func recordFor(ctx context.Context, st format.Store, it types.Item) (cargo.Record, error) {
+func recordFor(ctx context.Context, st format.Store, it model.Item) (cargo.Record, error) {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return cargo.Record{}, fmt.Errorf("cargo: read index properties: %w", err)
@@ -149,7 +150,7 @@ func recordFor(ctx context.Context, st format.Store, it types.Item) (cargo.Recor
 
 func (h handler) localRecords(r *http.Request, name string) ([]cargo.Record, error) {
 	c := pkgroute.RequestFrom(r).Repo
-	if !h.k.CanFolder(r, "crates/"+name, types.ActionRead) {
+	if !h.k.CanFolder(r, "crates/"+name, api.ActionRead) {
 		return nil, failure(http.StatusForbidden, "Cargo crate read denied")
 	}
 	var out []cargo.Record
@@ -157,12 +158,12 @@ func (h handler) localRecords(r *http.Request, name string) ([]cargo.Record, err
 	for {
 		items, next, err := h.k.DB().
 			Items().
-			Descendants(r.Context(), c.Key, false, "crates/"+name, store.Page{After: after, Limit: 100})
+			Descendants(r.Context(), c.Key, false, "crates/"+name, kernel.Page{After: after, Limit: 100})
 		if err != nil {
 			return nil, fmt.Errorf("cargo: list crate versions: %w", err)
 		}
 		for _, it := range items {
-			if it.Folder || !h.k.Can(r, it.FullPath(), types.ActionRead) {
+			if it.Folder || !h.k.Can(r, it.FullPath(), api.ActionRead) {
 				continue
 			}
 			n, v, ok := cargo.ParseCratePath(it.FullPath())
@@ -194,7 +195,7 @@ func (h handler) index(w http.ResponseWriter, r *http.Request) {
 		h.replyError(w, r, failure(http.StatusNotFound, "Cargo index path not found"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, "crates/"+name, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "crates/"+name, api.ActionRead) {
 		return
 	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
@@ -228,7 +229,7 @@ func (h handler) index(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "private, no-store")
-	http.ServeContent(w, r, name, types.Item{}.Updated, bytes.NewReader(out.Bytes()))
+	http.ServeContent(w, r, name, model.Item{}.Updated, bytes.NewReader(out.Bytes()))
 }
 
 func (h handler) filterRemoteIndex(
@@ -246,7 +247,7 @@ func (h handler) filterRemoteIndex(
 	paths := make([]string, 0, len(records))
 	for i, rec := range records {
 		cratePath := cargo.CratePath(rec.Name, rec.Version)
-		if !h.k.Can(r, cratePath, types.ActionRead) {
+		if !h.k.Can(r, cratePath, api.ActionRead) {
 			continue
 		}
 		// Compact the validated original line so versioned Cargo fields that
@@ -364,7 +365,7 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	if !h.k.Require(w, r, path, types.ActionWrite) {
+	if !h.k.Require(w, r, path, api.ActionWrite) {
 		return
 	}
 	digest := sha256.Sum256(data)
@@ -423,8 +424,8 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request) {
 		r,
 		path,
 		info,
-		types.Properties{cargo.RecordProperty: {line}},
-		types.Checksums{},
+		model.Properties{cargo.RecordProperty: {line}},
+		kernel.Checksums{},
 		func() error { return failure(http.StatusConflict, "Cargo version already exists") },
 	)
 	if err != nil {
@@ -473,12 +474,12 @@ func (h handler) yank(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := cargo.CratePath(name, version)
-	if !h.k.Require(w, r, path, types.ActionAnnotate) {
+	if !h.k.Require(w, r, path, api.ActionAnnotate) {
 		return
 	}
 	it, err := h.k.DB().Items().Get(r.Context(), pkgroute.RequestFrom(r).Repo.Key, false, path)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			err = failure(http.StatusNotFound, "Cargo version not found")
 		}
 		h.replyError(w, r, err)
@@ -494,7 +495,7 @@ func (h handler) yank(w http.ResponseWriter, r *http.Request) {
 	if err = h.k.Annotate(
 		r,
 		it,
-		types.Properties{
+		model.Properties{
 			cargo.RecordProperty: {line},
 			cargo.YankedProperty: {fmt.Sprint(rec.Yanked)},
 		},

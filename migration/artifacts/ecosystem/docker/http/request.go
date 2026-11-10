@@ -8,7 +8,6 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Request is a registry request with its operation parsed and, for an
@@ -61,7 +60,7 @@ func (q Request) Path(segments ...string) string {
 // build, and is allowed. On a server that authenticates every request
 // (Options.Authenticated) it is refused as one without the right, so that
 // a principal stored without its decider is never allowed everything.
-func (q Request) Require(r *http.Request, path string, want types.Actions) error {
+func (q Request) Require(r *http.Request, path string, want accessapi.Actions) error {
 	p, ok := kernel.FromContext(r.Context())
 	d, _ := accessapi.DeciderFrom(r.Context())
 	if d == nil {
@@ -74,7 +73,7 @@ func (q Request) Require(r *http.Request, path string, want types.Actions) error
 		return Errorf(http.StatusUnauthorized, CodeUnauthorized,
 			"the token does not grant this access to %s", q.scopeName())
 	}
-	if d.Allows(types.ResourceArtifact, accessapi.Repo{
+	if d.Allows(accessapi.ResourceArtifact, accessapi.Repo{
 		Key: q.Repo.Key, Class: string(q.Repo.Class),
 	}, path, want) {
 		return nil
@@ -112,25 +111,25 @@ func (q Request) scopeName() string {
 // otherwise: a scope names what the client does, and replacing a tag is
 // part of a push, which Docker asks pull,push for (the permissions still
 // require Delete, DV-035). Manage is never granted.
-func (q Request) granted(a *types.RegistryAccess, method string, want types.Actions) bool {
+func (q Request) granted(a *kernel.RegistryAccess, method string, want accessapi.Actions) bool {
 	pathMethod := strings.HasPrefix(q.base, "/v2/")
 	if a.Realm == "" && !pathMethod || a.Realm != "" && !strings.EqualFold(a.Realm, q.RepoKey) {
 		return false
 	}
-	need := map[types.Actions]string{
-		types.ActionRead: actionPull, types.ActionWrite: actionPush,
-		types.ActionAnnotate: actionPush, types.ActionDelete: actionPush,
+	need := map[accessapi.Actions]string{
+		accessapi.ActionRead: actionPull, accessapi.ActionWrite: actionPush,
+		accessapi.ActionAnnotate: actionPush, accessapi.ActionDelete: actionPush,
 	}
 	if method == http.MethodDelete {
-		need[types.ActionDelete] = actionDelete
+		need[accessapi.ActionDelete] = actionDelete
 	}
 	name := q.scopeName()
-	for bit := types.Actions(1); bit != 0 && bit <= want; bit <<= 1 {
+	for bit := accessapi.Actions(1); bit != 0 && bit <= want; bit <<= 1 {
 		if want&bit == 0 {
 			continue
 		}
 		action, known := need[bit]
-		if !known || !slices.ContainsFunc(a.Grants, func(g types.RegistryGrant) bool {
+		if !known || !slices.ContainsFunc(a.Grants, func(g kernel.RegistryGrant) bool {
 			return g.Type == scopeRepository && strings.EqualFold(g.Name, name) &&
 				(slices.Contains(g.Actions, action) || slices.Contains(g.Actions, actionAll))
 		}) {
@@ -147,7 +146,7 @@ func GrantsCatalog(r *http.Request) bool {
 	if !ok || p.Registry == nil {
 		return true
 	}
-	return slices.ContainsFunc(p.Registry.Grants, func(g types.RegistryGrant) bool {
+	return slices.ContainsFunc(p.Registry.Grants, func(g kernel.RegistryGrant) bool {
 		return g.Type == scopeRegistry && g.Name == "catalog" && len(g.Actions) > 0
 	})
 }
@@ -162,7 +161,7 @@ func (g *Registry) readsAnything(r *http.Request, c repo.Config) bool {
 	if d == nil {
 		return !g.authenticated
 	}
-	return d.AllowsFolder(types.ResourceArtifact, accessapi.Repo{
+	return d.AllowsFolder(accessapi.ResourceArtifact, accessapi.Repo{
 		Key: c.Key, Class: string(c.Class),
-	}, "", types.ActionRead)
+	}, "", accessapi.ActionRead)
 }

@@ -6,10 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccDebianSnapshotReadGuards(t *testing.T) {
@@ -52,7 +55,7 @@ func TestAccDebianSnapshotReadGuards(t *testing.T) {
 				}
 			}
 			if tc.marker {
-				it, err := w.db.Items().Put(t.Context(), types.Item{
+				it, err := w.db.Items().Put(t.Context(), model.Item{
 					RepoKey: "deb-snapshot-target", Name: "snapshots/first", Folder: !tc.markerFile,
 					Created: time.Now().UTC(), CreatedBy: "admin",
 				})
@@ -61,7 +64,7 @@ func TestAccDebianSnapshotReadGuards(t *testing.T) {
 				}
 				if tc.sourceProperty {
 					if err := w.db.Items().SetProperties(t.Context(), it.ID,
-						types.Properties{
+						model.Properties{
 							"deb.snapshot.source": {tc.sourceKey},
 						}, time.Now().UTC()); err != nil {
 						t.Fatal(err)
@@ -93,7 +96,7 @@ func TestAccDebianSnapshotRefusesUnavailableOrCorruptIndex(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	marker, err := w.db.Items().Put(t.Context(), types.Item{
+	marker, err := w.db.Items().Put(t.Context(), model.Item{
 		RepoKey: "deb-snapshot-target", Name: "snapshots/first", Folder: true,
 		Created: time.Now().UTC(), CreatedBy: "admin",
 	})
@@ -101,15 +104,15 @@ func TestAccDebianSnapshotRefusesUnavailableOrCorruptIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := w.db.Items().SetProperties(t.Context(), marker.ID,
-		types.Properties{
+		model.Properties{
 			"deb.snapshot.source": {"deb-snapshot-source"},
 		}, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
 	const rel = "dists/stable/main/binary-amd64/Packages.gz"
-	it, err := w.db.Items().Put(t.Context(), types.Item{
+	it, err := w.db.Items().Put(t.Context(), model.Item{
 		RepoKey: "deb-snapshot-target", Name: "snapshots/first/" + rel,
-		Actual: types.Checksums{SHA256: strings.Repeat("a", 64)}, Size: 9,
+		Actual: kernel.Checksums{SHA256: strings.Repeat("a", 64)}, Size: 9,
 		Created: time.Now().UTC(), CreatedBy: "admin",
 	})
 	if err != nil {
@@ -130,7 +133,7 @@ func TestAccDebianSnapshotRefusesUnavailableOrCorruptIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	it.Actual = types.Checksums{SHA256: info.Digests.SHA256}
+	it.Actual = kernel.Checksums{SHA256: info.Digests.SHA256}
 	it.Size = info.Size
 	if _, err := w.db.Items().Put(t.Context(), it); err != nil {
 		t.Fatal(err)
@@ -155,17 +158,17 @@ func TestAccDebianSnapshotRefusesUnavailableOrCorruptIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	it.Actual = types.Checksums{SHA256: info.Digests.SHA256}
+	it.Actual = kernel.Checksums{SHA256: info.Digests.SHA256}
 	it.Size = info.Size
 	if _, err := w.db.Items().Put(t.Context(), it); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+	if err := w.db.Permissions().Create(t.Context(), model.Permission{
 		Name: "snapshot-metadata-only",
-		Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
-				Targets: map[string]types.Target{
+		Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+				Targets: map[string]model.Target{
 					"deb-snapshot-target": {Include: []string{"snapshots/first/" + rel}},
 					"deb-snapshot-source": {Include: []string{rel}},
 				},

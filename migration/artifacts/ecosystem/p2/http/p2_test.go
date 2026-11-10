@@ -11,9 +11,10 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 func TestUnitP2SourceAdmission(t *testing.T) {
@@ -47,7 +48,7 @@ func TestUnitP2SourceAdmission(t *testing.T) {
 		path, query, rangeHeader string
 		expected                 error
 	}{
-		{"../content.jar", "", "", store.ErrNotFound},
+		{"../content.jar", "", "", kernel.ErrNotFound},
 		{"content.jar", "download=1", "", source.ErrInvalidRequest},
 		{"plugins/org.example_1.0.jar", "", "bytes=0-10", source.ErrInvalidRequest},
 	} {
@@ -144,10 +145,10 @@ type p2FaultStore struct {
 	err error
 }
 
-func (s p2FaultStore) Repos() store.RepoStore { return p2FaultRepos{s.Store.Repos(), s.err} }
+func (s p2FaultStore) Repos() port.RepoStore { return p2FaultRepos{s.Store.Repos(), s.err} }
 
 type p2FaultRepos struct {
-	store.RepoStore
+	port.RepoStore
 	err error
 }
 

@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // RepoClass is what a repository key stands for in a repo criterion.
@@ -67,7 +67,7 @@ type RepoSet struct {
 
 func (RepoSet) node() {}
 
-func (s RepoSet) match(it types.Item) bool {
+func (s RepoSet) match(it model.Item) bool {
 	in := slices.Contains(s.Refs, RepoRef{Key: it.RepoKey, Cached: it.Cached})
 	return in != s.Negate
 }
@@ -122,7 +122,7 @@ func (q *Query) Roots() []RepoRef { return q.roots }
 
 // RootHit is the row of a repository root that has no record: a folder
 // with path and name ".", ID 0, and no times, properties or statistics.
-func RootHit(r RepoRef) Hit { return Hit{Item: types.RootItem(r.Key, r.Cached)} }
+func RootHit(r RepoRef) Hit { return Hit{Item: model.RootItem(r.Key, r.Cached)} }
 
 // MissingRoots returns the roots of q that recorded does not hold, as
 // RootHit makes them, and that satisfy q's criteria at o's clock.
@@ -233,7 +233,7 @@ func expandRepo(key string, repos Repositories) []RepoRef {
 		r, ok := repos[key]
 		switch {
 		case !ok:
-			stored, cached := types.ResolveRepoKey(key)
+			stored, cached := model.ResolveRepoKey(key)
 			out = append(out, RepoRef{Key: stored, Cached: cached})
 		case r.Class == RepoRemote:
 			// Only the cache holds a remote's items; the uncached form is

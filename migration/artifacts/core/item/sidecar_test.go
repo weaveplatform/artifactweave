@@ -9,8 +9,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // keeper keeps a signature and an armoured signature beside every file
@@ -267,7 +268,7 @@ func TestUnitSidecarStoreFailures(t *testing.T) {
 		}
 		w.svc.Store = w.db
 		w.has(w.loc, true, "x.bin", "x.bin.sig")
-		if entries, _, err := w.db.Trash().List(ctx, "libs", "", store.Page{}); err != nil ||
+		if entries, _, err := w.db.Trash().List(ctx, "libs", "", kernel.Page{}); err != nil ||
 			len(entries) != 0 {
 			t.Errorf("%s: a failed delete trashed %v %v", c.fail, entries, err)
 		}
@@ -282,8 +283,8 @@ func TestUnitDeleteSidecarsAddsReleases(t *testing.T) {
 	res, err := w.svc.deleteSidecars(
 		ctx,
 		Target{Repo: w.loc},
-		[]types.Item{sc},
-		store.DeleteResult{},
+		[]model.Item{sc},
+		port.DeleteResult{},
 	)
 	if err != nil || res.Files != 1 || res.BlobRefs[sums("x signed").SHA256] != 1 {
 		t.Errorf("released %+v %v", res, err)

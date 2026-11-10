@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Read reads q through the policy and holds a manifest or a blob to the
@@ -115,13 +115,13 @@ func (c *RegistryContent) Read(
 	return out, nil
 }
 
-func descriptorKey(id types.SourceIdentity, revision, image, digest string) string {
+func descriptorKey(id model.SourceIdentity, revision, image, digest string) string {
 	b, _ := json.Marshal([]any{id, revision, image, digest})
 	return string(b)
 }
 
 func (c *RegistryContent) remember(
-	id types.SourceIdentity,
+	id model.SourceIdentity,
 	revision, image string,
 	m Manifest,
 ) {
@@ -143,7 +143,7 @@ func (c *RegistryContent) remember(
 }
 
 func (c *RegistryContent) descriptor(
-	id types.SourceIdentity,
+	id model.SourceIdentity,
 	revision, image, digest string,
 ) (Descriptor, bool) {
 	c.mu.Lock()

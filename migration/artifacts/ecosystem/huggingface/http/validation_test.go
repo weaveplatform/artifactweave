@@ -11,10 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitNativeEndpointsRejectMalformedAndUnsafeRequests(t *testing.T) {
@@ -179,13 +180,13 @@ func TestUnitVirtualDeploymentRequiresAuthorizedLocalMember(t *testing.T) {
 					t.Fatal(err)
 				}
 				if tc.virtualOnly {
-					if err := f.db.Permissions().Create(t.Context(), types.Permission{
+					if err := f.db.Permissions().Create(t.Context(), model.Permission{
 						Name: "virtual-only-write",
-						Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-							Actions: types.Grants{
-								Users: map[string]types.Actions{"virtual-only": types.ActionWrite},
+						Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+							Actions: model.Grants{
+								Users: map[string]api.Actions{"virtual-only": api.ActionWrite},
 							},
-							Targets: map[string]types.Target{"hf": {Include: []string{"**"}}},
+							Targets: map[string]model.Target{"hf": {Include: []string{"**"}}},
 						}},
 					}); err != nil {
 						t.Fatal(err)
@@ -483,13 +484,13 @@ func TestUnitPathScopedWritesCannotBypassSnapshotOrRefGrants(t *testing.T) {
 		{"refs-only", "models--acme--demo/refs/**", sha},
 		{"snapshots-only", "models--acme--demo/snapshots/**", "main"},
 	} {
-		if err := f.db.Permissions().Create(t.Context(), types.Permission{
+		if err := f.db.Permissions().Create(t.Context(), model.Permission{
 			Name: "hf-" + grant.user,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{
-					Users: map[string]types.Actions{grant.user: types.ActionWrite},
+			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+				Actions: model.Grants{
+					Users: map[string]api.Actions{grant.user: api.ActionWrite},
 				},
-				Targets: map[string]types.Target{"hf": {Include: []string{grant.include}}},
+				Targets: map[string]model.Target{"hf": {Include: []string{grant.include}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)
@@ -521,23 +522,23 @@ func TestUnitIncrementalCommitRequiresParentReadAndReplacementDelete(t *testing.
 			t.Fatalf("%s commit: %d %s, want %d", user, r.StatusCode, b, want)
 		}
 	}
-	grant := func(name, user, include string, actions types.Actions) {
+	grant := func(name, user, include string, actions api.Actions) {
 		t.Helper()
-		if err := f.db.Permissions().Create(t.Context(), types.Permission{
+		if err := f.db.Permissions().Create(t.Context(), model.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{user: actions}},
-				Targets: map[string]types.Target{"hf": {Include: []string{include}}},
+			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{user: actions}},
+				Targets: map[string]model.Target{"hf": {Include: []string{include}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	commit("admin", file("config.json", "old"), http.StatusOK)
-	grant("narrow-read", "narrow", "**", types.ActionRead)
-	grant("narrow-ref-write", "narrow", "models--acme--demo/refs/**", types.ActionWrite)
+	grant("narrow-read", "narrow", "**", api.ActionRead)
+	grant("narrow-ref-write", "narrow", "models--acme--demo/refs/**", api.ActionWrite)
 	grant("narrow-new-file", "narrow", "models--acme--demo/snapshots/**/weights.bin",
-		types.ActionWrite)
+		api.ActionWrite)
 	for _, tc := range []struct {
 		name, op, expected string
 	}{
@@ -557,11 +558,11 @@ func TestUnitIncrementalCommitRequiresParentReadAndReplacementDelete(t *testing.
 			}
 		})
 	}
-	grant("existing-read", "existing-only", "**", types.ActionRead)
+	grant("existing-read", "existing-only", "**", api.ActionRead)
 	grant("existing-ref-write", "existing-only", "models--acme--demo/refs/**",
-		types.ActionWrite)
+		api.ActionWrite)
 	grant("existing-file-write", "existing-only", "models--acme--demo/snapshots/**/config.json",
-		types.ActionWrite)
+		api.ActionWrite)
 	r := f.requestAs("POST", "api/models/acme/demo/commit/main",
 		"application/x-ndjson", []byte(header+file("weights.bin", "new")), "existing-only")
 	b := readResponse(t, r)
@@ -569,13 +570,13 @@ func TestUnitIncrementalCommitRequiresParentReadAndReplacementDelete(t *testing.
 		!bytes.Contains(b, []byte("model file is not writable")) {
 		t.Fatalf("new file outside grant: %d %s", r.StatusCode, b)
 	}
-	grant("blind-write", "blind", "**", types.ActionWrite)
+	grant("blind-write", "blind", "**", api.ActionWrite)
 	grant("blind-ref", "blind", "models--acme--demo/refs/**",
-		types.ActionRead|types.ActionDelete)
+		api.ActionRead|api.ActionDelete)
 	commit("blind", file("weights.bin", "new"), http.StatusForbidden)
 
-	grant("editor-read-write", "editor", "**", types.ActionRead|types.ActionWrite)
-	grant("editor-ref-delete", "editor", "models--acme--demo/refs/**", types.ActionDelete)
+	grant("editor-read-write", "editor", "**", api.ActionRead|api.ActionWrite)
+	grant("editor-ref-delete", "editor", "models--acme--demo/refs/**", api.ActionDelete)
 	commit("editor", file("weights.bin", "new"), http.StatusOK)
 	commit("editor", file("config.json", "changed"), http.StatusForbidden)
 	r = f.request("GET", "acme/demo/resolve/main/config.json", "", nil)

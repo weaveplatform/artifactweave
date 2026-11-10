@@ -11,12 +11,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitIdempotencyKey(t *testing.T) {
@@ -31,7 +31,7 @@ func TestUnitIdempotencyKey(t *testing.T) {
 			t.Fatalf("invalid key %q accepted", raw)
 		}
 	}
-	for _, p := range []kernel.Principal{{}, kernel.Anonymous, {Name: "registry", Registry: &types.RegistryAccess{}}} {
+	for _, p := range []kernel.Principal{{}, kernel.Anonymous, {Name: "registry", Registry: &kernel.RegistryAccess{}}} {
 		if _, err := appendReplayRequest(`"key"`, p, build.Append{}); err == nil {
 			t.Fatalf("unsupported principal accepted: %+v", p)
 		}
@@ -45,17 +45,17 @@ func TestUnitIdempotencyKey(t *testing.T) {
 	}
 }
 
-type replayDeadlineUsers struct{ store.UserStore }
+type replayDeadlineUsers struct{ port.UserStore }
 
-func (u replayDeadlineUsers) Get(context.Context, string) (types.User, error) {
-	return types.User{}, context.DeadlineExceeded
+func (u replayDeadlineUsers) Get(context.Context, string) (model.User, error) {
+	return model.User{}, context.DeadlineExceeded
 }
 
 // replayDeadlineStore is a store whose users time out, for an access module
 // whose authenticator cannot recheck a caller.
 type replayDeadlineStore struct{ *inmem.Store }
 
-func (s replayDeadlineStore) Users() store.UserStore {
+func (s replayDeadlineStore) Users() port.UserStore {
 	return replayDeadlineUsers{s.Store.Users()}
 }
 

@@ -10,11 +10,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The simple index's media types (PEP 691). 7.x sends its HTML as
@@ -42,7 +42,7 @@ func (h handler) list(w http.ResponseWriter, r *http.Request) {
 		h.remoteList(w, r)
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	names, err := projects(r.Context(), h.k.DB(), pkgroute.RequestFrom(r).Repo.Key, h.reads(r))
@@ -66,7 +66,7 @@ func (h handler) project(w http.ResponseWriter, r *http.Request, name string) {
 		h.remoteProject(w, r, name)
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	p, ok, err := load(r.Context(), h.k.DB(), pkgroute.RequestFrom(r).Repo.Key, name, h.reads(r))

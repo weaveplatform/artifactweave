@@ -17,12 +17,11 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccSmartRefreshRetriesParkAndZapRecovery(t *testing.T) {
@@ -44,7 +43,7 @@ func TestAccSmartRefreshRetriesParkAndZapRecovery(t *testing.T) {
 		if e != nil || job.Attempts != attempt {
 			t.Fatal(job, e)
 		}
-		if attempt == 3 && job.State != types.WorkParked {
+		if attempt == 3 && job.State != work.WorkParked {
 			t.Fatal("unbounded retries", job)
 		}
 	}
@@ -106,7 +105,7 @@ func TestAccSmartDurableCapacityAndCorruptPayload(t *testing.T) {
 	for _, payload := range []string{"{", `{}`, `{"item_id":-1}`} {
 		if err := w.s.run(
 			w.ctx,
-			types.WorkItem{Payload: []byte(payload)},
+			work.WorkItem{Payload: []byte(payload)},
 		); !errors.Is(
 			err,
 			work.ErrPermanent,
@@ -200,12 +199,12 @@ func TestAccSmartOlderRefreshCannotReplaceNewerObservation(t *testing.T) {
 				return e
 			}
 			current.Smart.PropertiesAt = w.clock.Now()
-			current.Smart.OwnedProperties = types.Properties{"color": {"newer"}}
+			current.Smart.OwnedProperties = model.Properties{"color": {"newer"}}
 			if e = w.p.Items.Annotate(
 				tx,
 				w.c,
 				*result.Item,
-				types.Properties{"color": {"newer"}},
+				model.Properties{"color": {"newer"}},
 				nil,
 			); e != nil {
 				return e
@@ -278,7 +277,7 @@ func TestAccSmartNoStoreLeavesNoSynchronizationState(t *testing.T) {
 	if _, err = w.db.Items().
 		Get(w.ctx, w.c.Key, true, "file.bin"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("private bytes persisted", err)
 	}
@@ -328,7 +327,7 @@ func TestAccSmartEnqueueFailsClosed(t *testing.T) {
 		}, want: source.ErrDenied},
 		{name: "admission held elsewhere", setup: func(w *smartWorld, _ *context.Context, _ *source.Request, _ *source.Permit) {
 			now := w.clock.Now()
-			lease := types.Lease{Name: w.s.kind, Holder: "another node", Acquired: now, Expires: now.Add(time.Minute)}
+			lease := work.Lease{Name: w.s.kind, Holder: "another node", Acquired: now, Expires: now.Add(time.Minute)}
 			if held, err := w.db.Leases().Acquire(w.ctx, lease, now); err != nil || !held {
 				w.t.Fatal(held, err)
 			}
@@ -355,7 +354,7 @@ func TestAccSmartEnqueueFailsClosed(t *testing.T) {
 		{
 			name: "download count exhausted", statistics: true,
 			setup: func(w *smartWorld, _ *context.Context, _ *source.Request, _ *source.Permit) {
-				w.changeEntry(func(e *types.RemoteCacheEntry) { e.Smart.Downloads = math.MaxInt64 })
+				w.changeEntry(func(e *model.RemoteCacheEntry) { e.Smart.Downloads = math.MaxInt64 })
 			},
 			want: source.ErrUnavailable,
 		},
@@ -410,9 +409,9 @@ func TestAccSmartQueuedJobFailsClosed(t *testing.T) {
 				return image, "manifests", reference, nil
 			}
 			job.UpstreamPath = "image/manifests/1.0"
-			job.Principal.Registry = &kernel.RegistryReference{Verified: true, Access: types.RegistryAccess{
+			job.Principal.Registry = &kernel.RegistryReference{Verified: true, Access: kernel.RegistryAccess{
 				Realm:  w.c.Key,
-				Grants: []types.RegistryGrant{{Type: "repository", Name: "other", Actions: []string{"pull"}}},
+				Grants: []kernel.RegistryGrant{{Type: "repository", Name: "other", Actions: []string{"pull"}}},
 			}}
 		}, want: source.ErrDenied},
 		{name: "permissions unavailable", change: func(w *smartWorld, _ *smartJob) {
@@ -591,7 +590,7 @@ func TestAccSmartRefreshPublishesOnlyWhenItCompletes(t *testing.T) {
 			result := w.smartRead()
 			job := w.queued(false)
 			w.mu.Lock()
-			w.props = types.Properties{}
+			w.props = model.Properties{}
 			w.mu.Unlock()
 			if tc.setup != nil {
 				tc.setup(w)

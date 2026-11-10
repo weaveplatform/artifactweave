@@ -9,11 +9,13 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -40,11 +42,11 @@ func newNugetKeyFixture(t *testing.T) *nugetKeyFixture {
 	}
 	for _, name := range []string{"dev", "u1", "u2", "u3", "u4"} {
 		if err := db.Users().
-			Create(ctx, types.User{Name: name, PasswordHash: cheapHash}); err != nil {
+			Create(ctx, model.User{Name: name, PasswordHash: cheapHash}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -146,7 +148,7 @@ func TestAccNuGetAPIKeyElsewhere(t *testing.T) {
 		}
 	}
 	if err := f.db.Settings().
-		Put(context.Background(), types.SettingAnonymousAccess, true); err != nil {
+		Put(context.Background(), settings.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)
 	}
 	f.log.Reset()

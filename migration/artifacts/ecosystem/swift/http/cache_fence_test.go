@@ -15,11 +15,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitSwiftRegistryInputAndCancellationBoundaries(t *testing.T) {
@@ -90,8 +91,8 @@ func TestUnitSwiftCachedMetadataBlobAndPermissionFence(t *testing.T) {
 	}, pkgroute.Protocol{Name: "swift"})
 	h := handler{k: k}
 	r := httptest.NewRequest(http.MethodGet, "/swift/acme/Widget", nil)
-	result, err := h.metadataStream(r, source.Result{Item: &types.Item{
-		Size: info.Size, Actual: types.Checksums{SHA256: info.Digests.SHA256},
+	result, err := h.metadataStream(r, source.Result{Item: &model.Item{
+		Size: info.Size, Actual: kernel.Checksums{SHA256: info.Digests.SHA256},
 		MimeType: "application/json",
 	}}, 1<<20)
 	if err != nil || result.Stream == nil {
@@ -102,9 +103,9 @@ func TestUnitSwiftCachedMetadataBlobAndPermissionFence(t *testing.T) {
 	if err != nil || !bytes.Equal(got, content) {
 		t.Fatalf("cached metadata changed: %q %v", got, err)
 	}
-	for _, it := range []types.Item{
-		{Size: info.Size + 1, Actual: types.Checksums{SHA256: info.Digests.SHA256}},
-		{Size: info.Size, Actual: types.Checksums{SHA256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
+	for _, it := range []model.Item{
+		{Size: info.Size + 1, Actual: kernel.Checksums{SHA256: info.Digests.SHA256}},
+		{Size: info.Size, Actual: kernel.Checksums{SHA256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
 	} {
 		if _, err := h.metadataStream(r, source.Result{Item: &it}, info.Size); err == nil {
 			t.Fatalf("invalid cached metadata was opened: %+v", it)

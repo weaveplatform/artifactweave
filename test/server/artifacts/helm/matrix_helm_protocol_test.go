@@ -3,7 +3,7 @@ package helm_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 )
 
 var helmProtocolMatrixPart = matrixPart{
@@ -14,7 +14,7 @@ var helmProtocolMatrixPart = matrixPart{
 	},
 	rows: func() []matrixRow {
 		const root = "/artifactory/api/helm/helm-local/"
-		read := holds("helm-local", "work/chart.tgz", types.ActionRead)
+		read := holds("helm-local", "work/chart.tgz", api.ActionRead)
 		return []matrixRow{
 			row(
 				helmIndex,

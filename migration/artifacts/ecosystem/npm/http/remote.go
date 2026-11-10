@@ -10,12 +10,12 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const remoteMetadataLimit = 64 << 20
@@ -139,7 +139,7 @@ func (h handler) rewriteVersions(
 	}
 	for v, manifest := range versions {
 		path := npmfmt.CanonicalPath(name, v)
-		if !h.k.Can(r, path, types.ActionRead) {
+		if !h.k.Can(r, path, api.ActionRead) {
 			delete(versions, v)
 			continue
 		}
@@ -204,7 +204,7 @@ type remoteJSONBody struct{ *bytes.Reader }
 func (*remoteJSONBody) Close() error { return nil }
 
 func (h handler) remoteTarball(w http.ResponseWriter, r *http.Request, name, path string) {
-	if !h.k.Require(w, r, path, types.ActionRead) {
+	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
 	doc, _, err := h.upstreamPackage(r, name, jsonType)
@@ -295,7 +295,7 @@ func (h handler) remoteSearch(w http.ResponseWriter, r *http.Request) {
 		if json.Unmarshal(entry["package"], &pkg) != nil || pkg.Name == "" || pkg.Version == "" {
 			continue
 		}
-		if h.k.Can(r, npmfmt.CanonicalPath(pkg.Name, pkg.Version), types.ActionRead) {
+		if h.k.Can(r, npmfmt.CanonicalPath(pkg.Name, pkg.Version), api.ActionRead) {
 			filtered = append(filtered, entry)
 			paths = append(paths, npmfmt.CanonicalPath(pkg.Name, pkg.Version))
 		}

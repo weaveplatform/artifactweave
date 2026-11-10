@@ -22,11 +22,10 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	blobsession "github.com/weaveplatform/artifactweave/migration/platform/blob/session"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Backend names multipart sessions in the uploads table, so the garbage
@@ -212,7 +211,7 @@ func (s *Service) save(
 	if err != nil {
 		return fmt.Errorf("multipart: encode session: %w", err)
 	}
-	if err := s.Store.Uploads().Put(ctx, store.Upload{
+	if err := s.Store.Uploads().Put(ctx, blobsession.Upload{
 		ID: id, Backend: Backend, RepoKey: ss.Repo, Path: ss.Path, State: state,
 		Bytes: bytes, Started: started, Updated: s.now(),
 	}); err != nil {
@@ -222,9 +221,9 @@ func (s *Service) save(
 }
 
 // load returns the session with id. A row of another backend is not ours.
-func (s *Service) load(ctx context.Context, id string) (store.Upload, session, error) {
+func (s *Service) load(ctx context.Context, id string) (blobsession.Upload, session, error) {
 	u, err := s.Store.Uploads().Get(ctx, id)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return u, session{}, ErrBadToken
 	}
 	if err != nil {
@@ -238,10 +237,13 @@ func (s *Service) load(ctx context.Context, id string) (store.Upload, session, e
 }
 
 // authenticate returns the session a token opens.
-func (s *Service) authenticate(ctx context.Context, token string) (store.Upload, session, error) {
+func (s *Service) authenticate(
+	ctx context.Context,
+	token string,
+) (blobsession.Upload, session, error) {
 	id, secret, ok := strings.Cut(token, ".")
 	if !ok || id == "" || secret == "" {
-		return store.Upload{}, session{}, ErrBadToken
+		return blobsession.Upload{}, session{}, ErrBadToken
 	}
 	u, ss, err := s.load(ctx, id)
 	if err != nil {
@@ -369,7 +371,7 @@ func (s *Service) stage(id string, part int, size int64, body io.Reader) error {
 // blob upload's own size says how much of the next part an earlier append
 // stored before failing or before the process stopped. That much of the file
 // is skipped, so a part is never appended twice.
-func (s *Service) drain(ctx context.Context, u *store.Upload, ss *session) error {
+func (s *Service) drain(ctx context.Context, u *blobsession.Upload, ss *session) error {
 	var up blob.Upload
 	for ss.Status != StatusFailed {
 		name := s.partFile(u.ID, ss.Next+1)
@@ -407,7 +409,7 @@ func (s *Service) drain(ctx context.Context, u *store.Upload, ss *session) error
 // or resuming it in *up, and returns the part's size.
 func (s *Service) appendPart(
 	ctx context.Context,
-	u *store.Upload,
+	u *blobsession.Upload,
 	ss *session,
 	up *blob.Upload,
 	f *os.File,
@@ -535,7 +537,11 @@ func (s *Service) finish(ctx context.Context, id string) {
 }
 
 // assemble returns the session's next status and its error message.
-func (s *Service) assemble(ctx context.Context, u *store.Upload, ss *session) (string, string) {
+func (s *Service) assemble(
+	ctx context.Context,
+	u *blobsession.Upload,
+	ss *session,
+) (string, string) {
 	if err := s.drain(ctx, u, ss); err != nil {
 		return StatusRetryable, err.Error()
 	}
@@ -563,8 +569,8 @@ func (s *Service) assemble(ctx context.Context, u *store.Upload, ss *session) (s
 	// Indexed with no references: the CLI's checksum deploy, which follows
 	// at once, adds the item's. Until then the content is as any other
 	// unreferenced blob, kept for the collector's grace period.
-	_, err = s.Store.Blobs().Ref(ctx, types.Blob{
-		Checksums: types.Checksums{
+	_, err = s.Store.Blobs().Ref(ctx, blob.Blob{
+		Checksums: kernel.Checksums{
 			SHA256: info.Digests.SHA256, SHA512: info.Digests.SHA512,
 			SHA1: info.Digests.SHA1, MD5: info.Digests.MD5,
 		},
@@ -638,7 +644,7 @@ func (s *Service) Abort(ctx context.Context, token string) error {
 	return s.discard(ctx, u)
 }
 
-func (s *Service) discard(ctx context.Context, u store.Upload) error {
+func (s *Service) discard(ctx context.Context, u blobsession.Upload) error {
 	var ss session
 	_ = json.Unmarshal(u.State, &ss)
 	if ss.Blob != "" && ss.Status != StatusFinished {
@@ -651,7 +657,7 @@ func (s *Service) discard(ctx context.Context, u store.Upload) error {
 	}
 	if err := s.Store.Uploads().
 		Delete(ctx, u.ID); err != nil &&
-		!errors.Is(err, store.ErrNotFound) {
+		!errors.Is(err, kernel.ErrNotFound) {
 		return fmt.Errorf("multipart: drop session: %w", err)
 	}
 	return nil
@@ -659,7 +665,7 @@ func (s *Service) discard(ctx context.Context, u store.Upload) error {
 
 // Reap discards a stale session for the garbage collector, which found it
 // in the uploads table under Backend.
-func (s *Service) Reap(ctx context.Context, u store.Upload) error {
+func (s *Service) Reap(ctx context.Context, u blobsession.Upload) error {
 	unlock := s.lock(u.ID)
 	defer unlock()
 	return s.discard(ctx, u)
@@ -688,7 +694,7 @@ func (s *Service) Sweep(ctx context.Context) error {
 	for _, e := range entries {
 		_, err := s.Store.Uploads().Get(ctx, e.Name())
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			if err := os.RemoveAll(filepath.Join(s.Dir, e.Name())); err != nil {
 				return fmt.Errorf("multipart: sweep %s: %w", e.Name(), err)
 			}

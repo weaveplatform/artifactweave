@@ -18,7 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccCocoaPodsGitFailureBoundaries(t *testing.T) {
@@ -42,7 +42,7 @@ func TestAccCocoaPodsGitFailureBoundaries(t *testing.T) {
 			if err == nil || result.Stream != nil {
 				t.Fatalf("invalid fetch returned result=%+v, error=%v", result, err)
 			}
-			if name == "missing branch" && !errors.Is(err, store.ErrNotFound) {
+			if name == "missing branch" && !errors.Is(err, kernel.ErrNotFound) {
 				t.Fatalf("missing selector lost not-found semantics: %v", err)
 			}
 			if name == "redirect" {

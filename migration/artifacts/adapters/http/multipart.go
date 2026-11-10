@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -15,7 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Multipart upload routes (migration/artifacts/core/multipart). create authenticates
@@ -126,7 +126,7 @@ func (s ArtifactoryAPI) createMultipart(w http.ResponseWriter, r *http.Request) 
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("repoKey, repoPath and partSizeMB are required"))
 		return
 	}
-	if _, _, _, err := types.SplitItemPath(repoPath); err != nil {
+	if _, _, _, err := kernel.SplitItemPath(repoPath); err != nil {
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("malformed path %q", repoPath))
 		return
 	}
@@ -138,7 +138,7 @@ func (s ArtifactoryAPI) createMultipart(w http.ResponseWriter, r *http.Request) 
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve deploy target", err))
 		return
 	}
-	if !acc.File(c, repoPath, types.ActionWrite) {
+	if !acc.File(c, repoPath, api.ActionWrite) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}

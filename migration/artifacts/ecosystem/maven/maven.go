@@ -11,8 +11,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Serves reports the package types of Artifactory's Maven group that
@@ -41,7 +41,7 @@ type Handler struct {
 // too, and a plugin POM queues its group's plugin metadata of its own, which
 // a read of that file waits for. A snapshot build in a repository with
 // maxUniqueSnapshots marks the package for its cleanup.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder {
 		return nil
 	}
@@ -68,7 +68,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 // version link with it; Deleted settles the rest. A plugin POM, whose mark
 // goes with it, queues its group's plugin metadata here, under deployer
 // too, as a delete there recalculates.
-func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder {
 		return nil
 	}
@@ -81,7 +81,7 @@ func queueMarked(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	owed bool,
 ) error {
 	if !IsPom(it.Name) || !owed {
@@ -103,7 +103,7 @@ func (Handler) Annotated(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	a format.Annotation,
 ) error {
 	_, set := a.Set[PluginProperty]
@@ -124,7 +124,7 @@ func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	r, err := readerOf(ctx, env, c)
 	if err != nil {

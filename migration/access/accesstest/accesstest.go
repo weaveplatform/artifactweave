@@ -12,12 +12,12 @@ import (
 	accinmem "github.com/weaveplatform/artifactweave/migration/access/adapters/inmem"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 	platinmem "github.com/weaveplatform/artifactweave/migration/platform/store/inmem"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // cheap is the password hash cost of the kit's authenticator and of
@@ -293,7 +293,7 @@ func (k *Kit) Middleware(
 // without WithTokens there is no service to ask, and Verify fails the kit's
 // test with Fatal, so it must then be called from the goroutine running that
 // test.
-func (k *Kit) Verify(ctx context.Context, raw string) (types.Token, error) {
+func (k *Kit) Verify(ctx context.Context, raw string) (model.Token, error) {
 	k.tb.Helper()
 	if k.tokens == nil {
 		k.tb.Fatal("accesstest: Verify needs a kit built with WithTokens")

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // TagLatest is the dist-tag npm installs when no version is asked for. 7.x
@@ -86,7 +86,7 @@ func Outranks(a, b string) bool {
 	if pa, pb := prerelease(a), prerelease(b); pa != pb {
 		return pb
 	}
-	return types.CompareSemver(a, b) > 0
+	return model.CompareSemver(a, b) > 0
 }
 
 func prerelease(v string) bool { return strings.Contains(v, "-") }
@@ -94,7 +94,7 @@ func prerelease(v string) bool { return strings.Contains(v, "-") }
 // candidateOf reads what the latest rules need of a version's Metadata:
 // its dist-tags, and when it was deployed. It decodes no more, since a
 // question about latest reads every version of a package.
-func candidateOf(v types.PackageVersion) (Candidate, []string, error) {
+func candidateOf(v model.PackageVersion) (Candidate, []string, error) {
 	var m struct {
 		Tags      []string  `json:"tags"`
 		Published time.Time `json:"published"`
@@ -109,8 +109,8 @@ func candidateOf(v types.PackageVersion) (Candidate, []string, error) {
 // every version as a Candidate. Only a race leaves two holders, and then
 // the one that outranks the other is latest, as a read takes it.
 func (s Settings) holderOf(
-	versions []types.PackageVersion,
-) (holder types.PackageVersion, found bool, cs []Candidate, err error) {
+	versions []model.PackageVersion,
+) (holder model.PackageVersion, found bool, cs []Candidate, err error) {
 	cs = make([]Candidate, 0, len(versions))
 	var top Candidate
 	for _, v := range versions {
@@ -136,7 +136,7 @@ func (s Settings) holderOf(
 func (s Settings) claimLatest(
 	ctx context.Context,
 	st format.Store,
-	pv types.PackageVersion,
+	pv model.PackageVersion,
 	tags []string,
 	isNew bool,
 	now time.Time,
@@ -193,7 +193,7 @@ func (s Settings) settleLatest(
 func (s Settings) giveLatest(
 	ctx context.Context,
 	st format.Store,
-	versions []types.PackageVersion,
+	versions []model.PackageVersion,
 	cs []Candidate,
 	now time.Time,
 ) error {
@@ -201,13 +201,13 @@ func (s Settings) giveLatest(
 		return nil
 	}
 	top := s.Latest(cs)
-	i := slices.IndexFunc(versions, func(v types.PackageVersion) bool { return v.Version == top })
+	i := slices.IndexFunc(versions, func(v model.PackageVersion) bool { return v.Version == top })
 	return tagLatest(ctx, st, versions[i], now)
 }
 
 // tagLatest adds latest to the dist-tags of pv's tarball, takes it from
 // the package's other versions and brings pv's Metadata in line, at now.
-func tagLatest(ctx context.Context, st format.Store, pv types.PackageVersion, now time.Time) error {
+func tagLatest(ctx context.Context, st format.Store, pv model.PackageVersion, now time.Time) error {
 	files, err := st.Packages().Files(ctx, pv.ID)
 	if err != nil {
 		return fmt.Errorf("npm: files of version %s: %w", pv.Version, err)
@@ -219,7 +219,7 @@ func tagLatest(ctx context.Context, st format.Store, pv types.PackageVersion, no
 		}
 		tags := append(nonEmpty(props[PropDistTag]), TagLatest)
 		if err := st.Items().PatchProperties(ctx, id,
-			types.Properties{PropDistTag: tags}, nil, now); err != nil {
+			model.Properties{PropDistTag: tags}, nil, now); err != nil {
 			return fmt.Errorf("npm: dist-tags of item %d: %w", id, err)
 		}
 		if err := refresh(ctx, st, pv, id); err != nil {

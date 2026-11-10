@@ -7,8 +7,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Serves reports whether repositories of package type t hold images: docker,
@@ -44,9 +45,9 @@ func UploadPath(name, hex string) string {
 // when there is none.
 func FindBlob(
 	ctx context.Context,
-	items store.ItemStore,
+	items port.ItemStore,
 	repoKey, name, hex string,
-) (types.Item, error) {
+) (model.Item, error) {
 	q := aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{{Key: repoKey}}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
@@ -59,10 +60,10 @@ func FindBlob(
 	}, Limit: 1, HasLimit: true}
 	hits, err := items.Search(ctx, &q, aql.Options{})
 	if err != nil {
-		return types.Item{}, fmt.Errorf("docker: find blob %s in %s: %w", hex, name, err)
+		return model.Item{}, fmt.Errorf("docker: find blob %s in %s: %w", hex, name, err)
 	}
 	if len(hits) == 0 {
-		return types.Item{}, fmt.Errorf("docker: blob %s in %s: %w", hex, name, store.ErrNotFound)
+		return model.Item{}, fmt.Errorf("docker: blob %s in %s: %w", hex, name, kernel.ErrNotFound)
 	}
 	return hits[0].Item, nil
 }

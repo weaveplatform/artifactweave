@@ -13,12 +13,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // descriptorOf is the descriptor of a manifest body of mediaType.
@@ -118,7 +119,7 @@ func TestAccPushIndex(t *testing.T) {
 				w.tree("app/"+c.tag)); diff != "" {
 				t.Fatal(diff)
 			}
-			want := types.Properties{
+			want := model.Properties{
 				"docker.manifest":        {c.tag},
 				"docker.manifest.digest": {"sha256:" + digest},
 				"docker.manifest.type":   {c.mediaType},
@@ -176,9 +177,9 @@ func TestAccPlatformProperties(t *testing.T) {
 		}
 		for arch, p := range paths {
 			got := w.properties(p)
-			if diff := cmp.Diff(types.Properties{
+			if diff := cmp.Diff(model.Properties{
 				layout.OSProperty: {"linux"}, layout.ArchitectureProperty: {arch},
-			}, types.Properties{
+			}, model.Properties{
 				layout.OSProperty:           got[layout.OSProperty],
 				layout.ArchitectureProperty: got[layout.ArchitectureProperty],
 			}); diff != "" {
@@ -227,7 +228,7 @@ func TestAccIndexUnknownChildren(t *testing.T) {
 		if diff := cmp.Diff(want, unknown.Digests); diff != "" {
 			t.Fatal(diff)
 		}
-		if _, err := w.item(w.docker, "app/v1"); !errors.Is(err, store.ErrNotFound) {
+		if _, err := w.item(w.docker, "app/v1"); !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatalf("stored: %v", err)
 		}
 	})
@@ -287,7 +288,7 @@ func TestAccReferrers(t *testing.T) {
 			start,
 		)
 		if err := w.db.Items().PatchProperties(ctx, deep.ID,
-			types.Properties{
+			model.Properties{
 				"oci.subject": {"sha256:" + sum(ps[0])},
 			}, nil, time.Now()); err != nil {
 			t.Fatal(err)
@@ -339,7 +340,7 @@ func TestAccReferrersDeployedThroughREST(t *testing.T) {
 		} {
 			it := w.deploy(w.docker, path, body, start)
 			if err := w.db.Items().PatchProperties(ctx, it.ID,
-				types.Properties{
+				model.Properties{
 					"oci.subject": {"sha256:" + sum("s")},
 				}, nil, time.Now()); err != nil {
 				t.Fatal(err)
@@ -437,7 +438,7 @@ func TestAccDeleteMultiArch(t *testing.T) {
 		// No such tag, or a file where it would be.
 		w.deploy(w.docker, "app/file", "a file", start)
 		for _, tag := range []string{"absent", "file"} {
-			if _, err := w.svc.DeleteMultiArch(ctx, o, tag); !errors.Is(err, store.ErrNotFound) {
+			if _, err := w.svc.DeleteMultiArch(ctx, o, tag); !errors.Is(err, kernel.ErrNotFound) {
 				t.Errorf("%s: %v", tag, err)
 			}
 		}
@@ -458,7 +459,7 @@ func TestAccDeleteMultiArchMissingPlatforms(t *testing.T) {
 			`{"mediaType":"x","digest":"sha512:` + strings.Repeat("a", 128) + `","size":1}]}`
 		// Deployed through the REST API, so it was never checked.
 		it := w.deploy(w.docker, "app/v1/list.manifest.json", body, start)
-		if err := w.db.Items().PatchProperties(ctx, it.ID, types.Properties{
+		if err := w.db.Items().PatchProperties(ctx, it.ID, model.Properties{
 			"docker.manifest.type": {layout.MediaTypeOCIIndex},
 		}, nil, time.Now()); err != nil {
 			t.Fatal(err)
@@ -475,9 +476,9 @@ func TestAccDeleteMultiArchMissingPlatforms(t *testing.T) {
 }
 
 // propertiesFailing fails reading properties.
-type propertiesFailing struct{ store.ItemStore }
+type propertiesFailing struct{ port.ItemStore }
 
-func (propertiesFailing) Properties(context.Context, int64) (types.Properties, error) {
+func (propertiesFailing) Properties(context.Context, int64) (model.Properties, error) {
 	return nil, errBoom
 }
 

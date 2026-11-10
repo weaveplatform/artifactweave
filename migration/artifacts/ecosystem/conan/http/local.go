@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	conanfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -104,7 +104,7 @@ func (h handler) revisions(r *http.Request, ref conanfmt.Reference, id string) (
 	if id != "" {
 		folder = ref.Root() + "/package/" + id
 	}
-	if !h.k.CanFolder(r, folder, types.ActionRead) {
+	if !h.k.CanFolder(r, folder, api.ActionRead) {
 		return nil, denied(r)
 	}
 	files, err := conanfmt.Files(r.Context(), h.k.DB(), c, folder)
@@ -113,7 +113,7 @@ func (h handler) revisions(r *http.Request, ref conanfmt.Reference, id string) (
 	}
 	var list []revision
 	for _, it := range files {
-		if it.Folder || !h.k.Can(r, it.FullPath(), types.ActionRead) {
+		if it.Folder || !h.k.Can(r, it.FullPath(), api.ActionRead) {
 			continue
 		}
 		f, ok := conanfmt.ParseStored(it.FullPath())
@@ -146,7 +146,7 @@ func (h handler) fileList(w http.ResponseWriter, r *http.Request, root string) {
 		h.method(w, r)
 		return
 	}
-	if !h.k.RequireFolder(w, r, root, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, root, api.ActionRead) {
 		return
 	}
 	c := pkgroute.RequestFrom(r).Repo
@@ -172,7 +172,7 @@ func (h handler) fileList(w http.ResponseWriter, r *http.Request, root string) {
 		if it.Folder {
 			continue
 		}
-		if !h.k.Can(r, it.FullPath(), types.ActionRead) {
+		if !h.k.Can(r, it.FullPath(), api.ActionRead) {
 			h.error(w, r, denied(r))
 			return
 		}
@@ -197,7 +197,7 @@ func (h handler) file(w http.ResponseWriter, r *http.Request, f conanfmt.FilePat
 	c := pkgroute.RequestFrom(r).Repo
 	switch r.Method {
 	case http.MethodGet, http.MethodHead:
-		if !h.k.Require(w, r, f.Path(), types.ActionRead) {
+		if !h.k.Require(w, r, f.Path(), api.ActionRead) {
 			return
 		}
 		if c.Class == repo.Remote {
@@ -240,12 +240,12 @@ func (h handler) requireComplete(r *http.Request, root string) error {
 }
 
 func (h handler) manifest(r *http.Request, path string) error {
-	if !h.k.Can(r, path, types.ActionRead) {
+	if !h.k.Can(r, path, api.ActionRead) {
 		return denied(r)
 	}
 	found, err := h.k.Item(r, path)
 	switch {
-	case errors.Is(err, store.ErrNotFound) || err == nil && found.Item.Folder:
+	case errors.Is(err, kernel.ErrNotFound) || err == nil && found.Item.Folder:
 		return apierror.New(http.StatusNotFound, "Conan revision not found")
 	case err != nil:
 		return fmt.Errorf("read conan manifest: %w", err)
@@ -261,7 +261,7 @@ func (h handler) upload(w http.ResponseWriter, r *http.Request, f conanfmt.FileP
 			return
 		}
 	}
-	if !h.k.Require(w, r, f.Path(), types.ActionWrite) {
+	if !h.k.Require(w, r, f.Path(), api.ActionWrite) {
 		return
 	}
 	r = r.WithContext(conanfmt.Native(r.Context()))
@@ -279,12 +279,12 @@ func (h handler) upload(w http.ResponseWriter, r *http.Request, f conanfmt.FileP
 		body = bytes.NewReader(data)
 	}
 	declared := pkgroute.DeclaredChecksums(r.Header)
-	var it types.Item
+	var it model.Item
 	var err error
 	if strings.HasPrefix(f.File, "metadata/") {
 		it, err = h.k.Store(r, f.Path(), body, nil, declared)
 	} else {
-		it, err = h.k.StoreOnce(r, f.Path(), body, nil, declared, func(types.Item) error {
+		it, err = h.k.StoreOnce(r, f.Path(), body, nil, declared, func(model.Item) error {
 			return apierror.New(
 				http.StatusConflict,
 				"Conan revision file already has different content",
@@ -392,7 +392,7 @@ func (h handler) search(w http.ResponseWriter, r *http.Request) {
 		h.method(w, r)
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	c := pkgroute.RequestFrom(r).Repo
@@ -423,7 +423,7 @@ func (h handler) search(w http.ResponseWriter, r *http.Request) {
 	for _, it := range items {
 		f, ok := conanfmt.ParseStored(it.FullPath())
 		if !ok || it.Folder || f.Package || f.File != conanfmt.Manifest ||
-			!h.k.Can(r, it.FullPath(), types.ActionRead) {
+			!h.k.Can(r, it.FullPath(), api.ActionRead) {
 			continue
 		}
 		name := f.Ref.Name + "/" + f.Ref.Version + "@" + f.Ref.User + "/" + f.Ref.Channel
@@ -478,7 +478,7 @@ func (h handler) packageSearch(w http.ResponseWriter, r *http.Request, ref conan
 		ref.Revision = list[0].Revision
 	}
 	root := ref.Root() + "/package"
-	if !h.k.RequireFolder(w, r, root, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, root, api.ActionRead) {
 		return
 	}
 	items, err := conanfmt.Files(r.Context(), h.k.DB(), c, root)
@@ -486,11 +486,11 @@ func (h handler) packageSearch(w http.ResponseWriter, r *http.Request, ref conan
 		h.error(w, r, err)
 		return
 	}
-	latest := map[string]types.Item{}
+	latest := map[string]model.Item{}
 	for _, it := range items {
 		f, ok := conanfmt.ParseStored(it.FullPath())
 		if !ok || it.Folder || !f.Package || f.File != conanfmt.Manifest ||
-			!h.k.Can(r, it.FullPath(), types.ActionRead) {
+			!h.k.Can(r, it.FullPath(), api.ActionRead) {
 			continue
 		}
 		if old, ok := latest[f.ID]; !ok || old.Modified.Before(it.Modified) {
@@ -504,7 +504,7 @@ func (h handler) packageSearch(w http.ResponseWriter, r *http.Request, ref conan
 			continue
 		}
 		path := strings.TrimSuffix(marker.FullPath(), conanfmt.Manifest) + "conaninfo.txt"
-		if !h.k.Can(r, path, types.ActionRead) {
+		if !h.k.Can(r, path, api.ActionRead) {
 			continue
 		}
 		it, err := h.k.DB().Items().Get(r.Context(), c.Key, false, path)

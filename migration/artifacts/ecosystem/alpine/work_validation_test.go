@@ -17,7 +17,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 var errIndexWrite = errors.New("index persistence failed")
@@ -43,7 +45,7 @@ func TestUnitIndexWorkTracksCurrentRepository(t *testing.T) {
 		{"empty local", KindIndex, local.Key},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := h.Work(ctx, env, types.WorkItem{Kind: tc.kind, Key: tc.key}); err != nil {
+			if err := h.Work(ctx, env, work.WorkItem{Kind: tc.kind, Key: tc.key}); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -53,7 +55,7 @@ func TestUnitIndexWorkTracksCurrentRepository(t *testing.T) {
 	if err := h.Work(
 		ctx,
 		env,
-		types.WorkItem{Kind: KindIndex, Key: local.Key},
+		work.WorkItem{Kind: KindIndex, Key: local.Key},
 	); !errors.Is(
 		err,
 		context.Canceled,
@@ -73,9 +75,9 @@ func TestUnitSigningKeyRejectsUnusablePairs(t *testing.T) {
 	if _, _, err := SigningKey(ctx, keys, local); err == nil {
 		t.Fatal("missing signing pair accepted")
 	}
-	for _, pair := range []types.Keypair{
-		{Name: "gpg", Type: types.KeypairGPG},
-		{Name: "bad-rsa", Type: types.KeypairRSA, PrivateKey: "not PEM"},
+	for _, pair := range []accessapi.Keypair{
+		{Name: "gpg", Type: accessapi.KeypairGPG},
+		{Name: "bad-rsa", Type: accessapi.KeypairRSA, PrivateKey: "not PEM"},
 	} {
 		keys.Keypairs[pair.Name] = pair
 		local.PrimaryKeyPairRef = pair.Name
@@ -98,7 +100,7 @@ func TestUnitIndexWorkSignsWithEnvKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := st.Items().
-		Put(t.Context(), types.Item{RepoKey: c.Key, Name: testPackagePath, Actual: types.Checksums{SHA256: "test"}}); err != nil {
+		Put(t.Context(), model.Item{RepoKey: c.Key, Name: testPackagePath, Actual: kernel.Checksums{SHA256: "test"}}); err != nil {
 		t.Fatal(err)
 	}
 	private := pem.EncodeToMemory(&pem.Block{
@@ -118,13 +120,13 @@ func TestUnitIndexWorkSignsWithEnvKeys(t *testing.T) {
 			Branch: "v3.20", Component: "main", Path: testPackagePath,
 			ArchiveSize: 100, InstalledSize: 5,
 		}},
-		Derive: func(_ context.Context, d format.Derived) (types.Item, error) {
+		Derive: func(_ context.Context, d format.Derived) (model.Item, error) {
 			body, err := io.ReadAll(d.Body)
 			index = body
-			return types.Item{}, err
+			return model.Item{}, err
 		},
 	}
-	work := types.WorkItem{Kind: KindIndex, Key: c.Key}
+	work := work.WorkItem{Kind: KindIndex, Key: c.Key}
 	if err := (Handler{}).Work(t.Context(), env, work); err != nil {
 		t.Fatal(err)
 	}
@@ -152,12 +154,12 @@ func TestUnitIndexWorkSurfacesDerivationAndRemovalFailures(t *testing.T) {
 		"v3.19/main/x86_64/APKINDEX.tar.gz",
 	} {
 		if _, err := st.Items().
-			Put(t.Context(), types.Item{RepoKey: c.Key, Name: path, Actual: types.Checksums{SHA256: "test"}}); err != nil {
+			Put(t.Context(), model.Item{RepoKey: c.Key, Name: path, Actual: kernel.Checksums{SHA256: "test"}}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	h := Handler{}
-	work := types.WorkItem{Kind: KindIndex, Key: c.Key}
+	work := work.WorkItem{Kind: KindIndex, Key: c.Key}
 	meta := Package{
 		Name: "hello", Version: "1.0-r0", Architecture: "x86_64",
 		Branch: "v3.20", Component: "main", Path: testPackagePath,
@@ -167,8 +169,8 @@ func TestUnitIndexWorkSurfacesDerivationAndRemovalFailures(t *testing.T) {
 		Store:      st,
 		Keys:       &accessapitest.Keys{},
 		Inspection: inspection{sha: "test", path: testPackagePath, packageInfo: meta},
-		Derive: func(context.Context, format.Derived) (types.Item, error) {
-			return types.Item{}, errIndexWrite
+		Derive: func(context.Context, format.Derived) (model.Item, error) {
+			return model.Item{}, errIndexWrite
 		},
 		Underive: func(context.Context, repo.Config, bool, string) error {
 			return errIndexWrite
@@ -177,11 +179,11 @@ func TestUnitIndexWorkSurfacesDerivationAndRemovalFailures(t *testing.T) {
 	if err := h.Work(t.Context(), env, work); !errors.Is(err, errIndexWrite) {
 		t.Fatalf("derive failure: %v", err)
 	}
-	env.Derive = func(_ context.Context, d format.Derived) (types.Item, error) {
+	env.Derive = func(_ context.Context, d format.Derived) (model.Item, error) {
 		if d.Path != "v3.20/main/x86_64/APKINDEX.tar.gz" {
 			t.Errorf("derived wrong index: %s", d.Path)
 		}
-		return types.Item{}, nil
+		return model.Item{}, nil
 	}
 	if err := h.Work(t.Context(), env, work); !errors.Is(err, errIndexWrite) {
 		t.Fatalf("stale index removal failure: %v", err)

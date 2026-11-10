@@ -11,11 +11,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The listing budget applies across repositories and folders. Metadata has a
@@ -369,7 +369,7 @@ func (u *UpstreamSearch) listFiles(ctx context.Context, key string) ([]LayoutHit
 			dir, name := path.Split(full)
 			out = append(out, LayoutHit{
 				Hit: aql.Hit{
-					Item: types.Item{RepoKey: key, Path: strings.TrimSuffix(dir, "/"), Name: name},
+					Item: model.Item{RepoKey: key, Path: strings.TrimSuffix(dir, "/"), Name: name},
 				},
 				Coordinates: co,
 			})

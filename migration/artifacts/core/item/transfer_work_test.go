@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitTransferWorkOrderingAndRollback(t *testing.T) {
@@ -22,7 +22,7 @@ func TestUnitTransferWorkOrderingAndRollback(t *testing.T) {
 				q.fail = true
 			}
 			w.svc.Work = q
-			r.deployed = func(ctx context.Context, env format.Env, it types.Item) error {
+			r.deployed = func(ctx context.Context, env format.Env, it model.Item) error {
 				if it.Name == "inner" {
 					if err := env.Enqueue(ctx, "a", "z", []byte(`"inner"`)); err != nil {
 						return err
@@ -94,7 +94,7 @@ func TestUnitTransferWorkOrderingAndRollback(t *testing.T) {
 			if _, err := w.db.WorkQueue().
 				Get(t.Context(), "a", "z"); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("work survived rollback", err)
 			}

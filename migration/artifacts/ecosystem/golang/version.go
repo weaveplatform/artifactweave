@@ -8,7 +8,7 @@ import (
 	"golang.org/x/mod/semver"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // order is the package index's order of Go versions (decision 0018):
@@ -16,10 +16,10 @@ import (
 // affect it. A module path admits either vN.x.y with its /vN suffix or
 // vN.x.y+incompatible without one, never both, so no two versions of one
 // module compare equal.
-var order = types.ComparatorFor(repo.Go)
+var order = model.ComparatorFor(repo.Go)
 
 func compare(a, b string) int {
-	return order.Compare(types.PackageVersion{Version: a}, types.PackageVersion{Version: b})
+	return order.Compare(model.PackageVersion{Version: a}, model.PackageVersion{Version: b})
 }
 
 // Listed returns the lines @v/list answers for a module's visible
@@ -29,11 +29,11 @@ func compare(a, b string) int {
 // time only to choose @latest among pseudo-versions when @latest itself
 // fails, and leaves pseudo-versions out of go list -m -versions whatever
 // the list says, so listing them changes no version it picks.
-func Listed(versions []types.PackageVersion) []string {
+func Listed(versions []model.PackageVersion) []string {
 	sorted := slices.Clone(versions)
 	slices.SortFunc(
 		sorted,
-		func(a, b types.PackageVersion) int { return compare(a.Version, b.Version) },
+		func(a, b model.PackageVersion) int { return compare(a.Version, b.Version) },
 	)
 	out := make([]string, 0, len(sorted))
 	for _, v := range sorted {

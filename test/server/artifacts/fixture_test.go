@@ -22,6 +22,7 @@ import (
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
@@ -30,13 +31,16 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -122,7 +126,7 @@ func (w *itemWorld) do(
 	return w.world().Do(method, path, as, body, headers...)
 }
 
-func (w *itemWorld) item(key string, cached bool, p string) types.Item {
+func (w *itemWorld) item(key string, cached bool, p string) model.Item {
 	w.t.Helper()
 	return w.world().Item(key, cached, p)
 }
@@ -294,16 +298,16 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(ctx, types.User{Name: "user", PasswordHash: cheapHash}); err != nil {
+		Create(ctx, model.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Users().Create(ctx, types.User{
-		Name: "locked", PasswordHash: cheapHash, Status: types.UserLocked,
+	if err := db.Users().Create(ctx, model.User{
+		Name: "locked", PasswordHash: cheapHash, Status: model.UserLocked,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if anonymous {
-		if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+		if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -343,11 +347,11 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Settings().Put(ctx, types.SettingFolderDownload,
-		types.FolderDownloadSettings{Enabled: true}); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingFolderDownload,
+		model.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -392,7 +396,7 @@ func newRepoWorld(t *testing.T) *repoWorld {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	reader := types.User{
+	reader := model.User{
 		Name:         "reader",
 		PasswordHash: cheapHash,
 		Groups:       []string{authn.ReadersGroup},
@@ -464,7 +468,7 @@ func newIdentityWorld(t *testing.T) identityWorld {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -489,7 +493,7 @@ func (w identityWorld) bearer(t *testing.T, user string, scope string) map[strin
 	t.Helper()
 	req := token.Request{Username: user, ByAdmin: true}
 	if scope != "" {
-		sc, err := types.ParseScope(scope)
+		sc, err := kernel.ParseScope(scope)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -508,8 +512,8 @@ const testStarted = "2026-10-15T09:30:00.000+0000"
 // allowBuilds lets a fixture publish builds without a caller.
 type allowBuilds struct{}
 
-func (allowBuilds) Build(string, string, bool, types.Actions) bool { return true }
-func (allowBuilds) Item(repo.Config, string, types.Actions) bool   { return true }
+func (allowBuilds) Build(string, string, bool, accessapi.Actions) bool { return true }
+func (allowBuilds) Item(repo.Config, string, accessapi.Actions) bool   { return true }
 
 // buildDoc is a build-info document of one run without modules.
 func buildDoc(name, number, started string) string {

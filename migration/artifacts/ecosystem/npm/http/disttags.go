@@ -9,11 +9,11 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // maxTagBody bounds a dist-tag PUT's body, which is one version as a JSON
@@ -91,7 +91,7 @@ func (h handler) addTag(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, v := range versions {
 		if v.number != version && slices.Contains(v.tags, tag) &&
-			!h.k.Require(w, r, npmfmt.CanonicalPath(name, v.number), types.ActionAnnotate) {
+			!h.k.Require(w, r, npmfmt.CanonicalPath(name, v.number), api.ActionAnnotate) {
 			return
 		}
 	}
@@ -153,7 +153,7 @@ func (h handler) tagged(w http.ResponseWriter, r *http.Request) (name, tag strin
 		h.k.Error(w, r, badRequest("Tag name must not be a valid SemVer range: "+tag))
 		return "", "", false
 	}
-	return name, tag, h.k.RequireFolder(w, r, name, types.ActionAnnotate)
+	return name, tag, h.k.RequireFolder(w, r, name, api.ActionAnnotate)
 }
 
 // indexedVersion is one indexed version with the state npm changes after
@@ -209,7 +209,7 @@ func (h handler) retag(
 			h.k.Error(w, r, err)
 			return
 		}
-		if !h.k.Require(w, r, it.FullPath(), types.ActionAnnotate) {
+		if !h.k.Require(w, r, it.FullPath(), api.ActionAnnotate) {
 			return
 		}
 		props, err := h.k.DB().Items().Properties(r.Context(), it.ID)

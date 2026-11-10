@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // DefaultProject is the project key of a repository in no project.
@@ -95,14 +95,14 @@ func Summarize(ctx context.Context, st Store, loc Location) (Summary, error) {
 		repo   string
 		cached bool
 	}
-	byRepo := map[key]store.RepoUsage{}
+	byRepo := map[key]port.RepoUsage{}
 	for _, u := range usage {
 		byRepo[key{u.RepoKey, u.Cached}] = u
 		s.ArtifactsCount += u.Files
 		s.ArtifactsSize += u.Bytes
 		s.ItemsCount += u.Files + u.Folders
 	}
-	repos, err := st.Repos().List(ctx, store.RepoFilter{})
+	repos, err := st.Repos().List(ctx, port.RepoFilter{})
 	if err != nil {
 		return s, fmt.Errorf("usage: repositories: %w", err)
 	}
@@ -116,7 +116,7 @@ func Summarize(ctx context.Context, st Store, loc Location) (Summary, error) {
 		}
 		u := byRepo[key{c.Key, false}]
 		if c.Class == repo.Remote {
-			row.Key, row.Type = c.Key+types.CacheSuffix, "CACHE"
+			row.Key, row.Type = c.Key+model.CacheSuffix, "CACHE"
 			u = byRepo[key{c.Key, true}]
 		}
 		row.Files, row.Folders, row.Bytes = u.Files, u.Folders, u.Bytes
@@ -151,7 +151,7 @@ func trashUsage(ctx context.Context, st Store) (Row, error) {
 	row := Row{Key: trash.Repository, Type: "NA", ProjectKey: DefaultProject}
 	sizes := map[string]int64{}
 	folders := map[string]bool{}
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		batch, next, err := st.Trash().List(ctx, "", "", page)
 		if err != nil {

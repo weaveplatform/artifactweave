@@ -14,15 +14,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/mod/semver"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	cheffmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -80,7 +81,7 @@ func Protocol(remote *source.Service) pkgroute.Protocol {
 
 type release struct {
 	meta       cheffmt.Metadata
-	item       types.Item
+	item       model.Item
 	member     *http.Request
 	remoteURL  string
 	revalidate func(context.Context) error
@@ -145,7 +146,7 @@ func (h handler) identity(w http.ResponseWriter, r *http.Request) (string, bool)
 		h.k.Error(w, r, apierror.New(400, "invalid cookbook request"))
 		return "", false
 	}
-	return name, h.k.RequireFolder(w, r, name, types.ActionRead)
+	return name, h.k.RequireFolder(w, r, name, api.ActionRead)
 }
 
 func (h handler) cookbook(w http.ResponseWriter, r *http.Request) {
@@ -177,7 +178,7 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) (release, bool)
 		h.k.Error(w, r, apierror.New(400, "invalid cookbook version"))
 		return release{}, false
 	}
-	if version != "latest" && !h.k.Require(w, r, cheffmt.Path(name, version), types.ActionRead) {
+	if version != "latest" && !h.k.Require(w, r, cheffmt.Path(name, version), api.ActionRead) {
 		return release{}, false
 	}
 	found, err := h.lookup(r, name)
@@ -243,7 +244,7 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(400, "invalid cookbook category"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, types.ActionWrite) {
+	if !h.k.RequireFolder(w, r, name, api.ActionWrite) {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 2*cheffmt.MaxArchiveBytes)
@@ -273,7 +274,7 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request) {
 		cheffmt.Path(meta.Name, meta.Version),
 		upload.File,
 		nil,
-		types.Checksums{},
+		kernel.Checksums{},
 		func() error { return apierror.New(409, "cookbook version already exists") },
 	)
 	if err != nil {
@@ -339,7 +340,7 @@ func (h handler) catalog(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(400, "invalid search bounds"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	names, err := h.names(r)
@@ -351,7 +352,7 @@ func (h handler) catalog(w http.ResponseWriter, r *http.Request) {
 	checks := []release{}
 	for _, name := range names {
 		if query != "" && !strings.Contains(strings.ToLower(name), strings.ToLower(query)) ||
-			!h.k.CanFolder(r, name, types.ActionRead) {
+			!h.k.CanFolder(r, name, api.ActionRead) {
 			continue
 		}
 		found, e := h.lookup(r, name)
@@ -393,7 +394,7 @@ func (h handler) names(r *http.Request) ([]string, error) {
 		unique := map[string]bool{}
 		for _, key := range c.Repositories {
 			member, err := h.k.DB().Repos().Get(r.Context(), key)
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, kernel.ErrNotFound) {
 				continue
 			}
 			if err != nil {
@@ -403,7 +404,7 @@ func (h handler) names(r *http.Request) ([]string, error) {
 			if err != nil {
 				return nil, fmt.Errorf("chef: member request: %w", err)
 			}
-			if !h.k.CanFolder(mr, "", types.ActionRead) {
+			if !h.k.CanFolder(mr, "", api.ActionRead) {
 				continue
 			}
 			names, err := h.names(mr)
@@ -425,7 +426,7 @@ func (h handler) names(r *http.Request) ([]string, error) {
 		return out, nil
 	}
 	out := []string{}
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		packages, next, err := h.k.DB().Packages().List(r.Context(), c.Key, page)
 		if err != nil {
@@ -478,7 +479,7 @@ func (h handler) lookup(r *http.Request, name string) ([]release, error) {
 func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	q := pkgroute.RequestFrom(r)
 	p, err := h.k.DB().Packages().Find(r.Context(), q.Repo.Key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil, nil
 	}
 	if err != nil {
@@ -494,7 +495,7 @@ func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	out := make([]release, 0, len(versions))
 	for _, v := range versions {
 		path := cheffmt.Path(name, v.Version)
-		if !h.k.Can(r, path, types.ActionRead) ||
+		if !h.k.Can(r, path, api.ActionRead) ||
 			generic.CheckDownload(q.Repo, path, false) != nil {
 			continue
 		}
@@ -518,7 +519,7 @@ func (h handler) virtual(r *http.Request, name string) ([]release, error) {
 	byVersion := map[string]release{}
 	for _, key := range q.Repo.Repositories {
 		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -528,20 +529,20 @@ func (h handler) virtual(r *http.Request, name string) ([]release, error) {
 		if err != nil {
 			return nil, err //nolint:wrapcheck // protocol class refusal
 		}
-		if !h.k.CanFolder(mr, name, types.ActionRead) {
+		if !h.k.CanFolder(mr, name, api.ActionRead) {
 			continue
 		}
 		found, err := h.lookup(mr, name)
 		if err != nil {
 			var response *apierror.Error
-			if errors.Is(err, store.ErrNotFound) ||
+			if errors.Is(err, kernel.ErrNotFound) ||
 				errors.As(err, &response) && response.Status == http.StatusNotFound {
 				continue
 			}
 			return nil, err
 		}
 		for _, v := range found {
-			if !h.k.Can(r, v.meta.Path, types.ActionRead) ||
+			if !h.k.Can(r, v.meta.Path, api.ActionRead) ||
 				generic.CheckDownload(q.Repo, v.meta.Path, false) != nil {
 				continue
 			}

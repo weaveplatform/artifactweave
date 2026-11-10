@@ -7,8 +7,9 @@ import (
 
 	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 )
 
 // The artifacts module's tests run the remote cache persistence suite on its
@@ -45,12 +46,12 @@ func remoteLayoutPersistence(t *testing.T, s *appsql.Store, reopen func() *appsq
 		t.Fatal(err)
 	}
 	token, err := s.RemoteCache().
-		Begin(ctx, types.RemoteCacheKey{RepoKey: c.Key, Path: "layout-pending", Variant: "raw"})
+		Begin(ctx, model.RemoteCacheKey{RepoKey: c.Key, Path: "layout-pending", Variant: "raw"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	doc := types.ConfigDocument{
-		Kind: types.ConfigLayout,
+	doc := configdoc.ConfigDocument{
+		Kind: configdoc.ConfigLayout,
 		Key:  c.RepoLayoutRef,
 		Document: json.RawMessage(
 			`{"artifactPathPattern":"[org]/[module]/[baseRev]/[module]-[baseRev].[ext]"}`,
@@ -71,7 +72,7 @@ func remoteLayoutPersistence(t *testing.T, s *appsql.Store, reopen func() *appsq
 	if err != nil || got != current {
 		t.Fatal("restart lost layout source generation", got, current, err)
 	}
-	if err = s.RemoteCache().Check(ctx, token); !errors.Is(err, store.ErrConflict) {
+	if err = s.RemoteCache().Check(ctx, token); !errors.Is(err, kernel.ErrConflict) {
 		t.Fatal("restart restored stale layout publication authority", err)
 	}
 	stored, err := s.Configs().Get(ctx, doc.Kind, doc.Key)

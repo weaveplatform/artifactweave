@@ -19,9 +19,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitHexSignedRegistryPreservesAuthenticTransitiveRequirements(t *testing.T) {
@@ -175,7 +175,7 @@ func (b hexCoverageBlobs) Open(
 ) (io.ReadSeekCloser, blob.Info, error) {
 	data, ok := b[digest]
 	if !ok {
-		return nil, blob.Info{}, store.ErrNotFound
+		return nil, blob.Info{}, kernel.ErrNotFound
 	}
 	return &hexCoverageBlob{bytes.NewReader(data)}, blob.Info{Size: int64(len(data))}, nil
 }
@@ -183,7 +183,7 @@ func (b hexCoverageBlobs) Open(
 func (b hexCoverageBlobs) Stat(_ context.Context, digest string) (blob.Info, error) {
 	data, ok := b[digest]
 	if !ok {
-		return blob.Info{}, store.ErrNotFound
+		return blob.Info{}, kernel.ErrNotFound
 	}
 	return blob.Info{Size: int64(len(data))}, nil
 }
@@ -215,15 +215,15 @@ func hexCoverageItem(
 	pkg Package,
 	sha string,
 	size int64,
-) types.Item {
+) model.Item {
 	t.Helper()
 	p, ok := TarballPath(pkg.Name, pkg.Version)
 	if !ok {
 		t.Fatalf("invalid authentic Hex package identity: %+v", pkg)
 	}
-	it, err := st.Items().Put(t.Context(), types.Item{
+	it, err := st.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Path: "tarballs", Name: p[len("tarballs/"):],
-		Size: size, Actual: types.Checksums{SHA256: sha}, Created: time.Now().UTC(),
+		Size: size, Actual: kernel.Checksums{SHA256: sha}, Created: time.Now().UTC(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -244,7 +244,7 @@ func TestUnitHexAdmissionAuthenticatesPackageBytesAndClass(t *testing.T) {
 	p, _ := TarballPath(pkg.Name, pkg.Version)
 	w := format.Write{
 		Op: format.OpDeploy, Path: p, Size: size,
-		Checksums: types.Checksums{SHA256: sha},
+		Checksums: kernel.Checksums{SHA256: sha},
 	}
 	env := format.Env{Store: st, Blobs: blobs}
 	for _, skip := range []format.Write{
@@ -257,7 +257,7 @@ func TestUnitHexAdmissionAuthenticatesPackageBytesAndClass(t *testing.T) {
 	}
 	if _, err := h.Inspect(ctx, env, c, format.Write{
 		Op: format.OpDeploy, Path: p,
-		Checksums: types.Checksums{SHA256: "missing"},
+		Checksums: kernel.Checksums{SHA256: "missing"},
 	}); err == nil {
 		t.Fatal("missing package blob accepted")
 	}
@@ -289,7 +289,7 @@ func TestUnitHexAdmissionAuthenticatesPackageBytesAndClass(t *testing.T) {
 	}
 	wrongPath := format.Write{
 		Op: format.OpCopy, Path: "tarballs/other-2.0.0.tar", Size: size,
-		Checksums: types.Checksums{SHA256: sha},
+		Checksums: kernel.Checksums{SHA256: sha},
 	}
 	if _, err := h.Admit(ctx, format.Env{Store: st, Blobs: blobs}, c, wrongPath); err == nil {
 		t.Fatal("real decimal bytes accepted under another package identity")
@@ -297,7 +297,7 @@ func TestUnitHexAdmissionAuthenticatesPackageBytesAndClass(t *testing.T) {
 	if _, err := h.Admit(ctx, format.Env{Store: st, Blobs: blobs}, c,
 		format.Write{
 			Op: format.OpCopy, Path: p,
-			Checksums: types.Checksums{SHA256: "missing"},
+			Checksums: kernel.Checksums{SHA256: "missing"},
 		}); err == nil {
 		t.Fatal("copy from missing archive accepted")
 	}
@@ -308,7 +308,7 @@ func TestUnitHexAdmissionAuthenticatesPackageBytesAndClass(t *testing.T) {
 	if err := h.Deployed(ctx, env, c, item); err != nil {
 		t.Fatalf("link authentic package: %v", err)
 	}
-	for _, unrelated := range []types.Item{
+	for _, unrelated := range []model.Item{
 		{RepoKey: c.Key, Folder: true, Path: "tarballs", Name: item.Name},
 		{RepoKey: c.Key, Name: "README.md"},
 	} {
@@ -345,7 +345,7 @@ func TestUnitHexReindexPreservesOnlyAuthenticStoredPackages(t *testing.T) {
 	ecto, ectoSHA, ectoSize := hexCoverageArchive(t, blobs, "ecto-3.12.5.tar")
 	decimalItem := hexCoverageItem(t, st, c, decimal, decimalSHA, decimalSize)
 	_ = hexCoverageItem(t, st, c, ecto, ectoSHA, ectoSize)
-	if _, err := st.Items().Put(ctx, types.Item{RepoKey: c.Key, Name: "README.md"}); err != nil {
+	if _, err := st.Items().Put(ctx, model.Item{RepoKey: c.Key, Name: "README.md"}); err != nil {
 		t.Fatal(err)
 	}
 	env := format.Env{Store: st, Blobs: blobs}
@@ -371,13 +371,13 @@ func TestUnitHexReindexPreservesOnlyAuthenticStoredPackages(t *testing.T) {
 	if err := h.Reindex(ctx, env, c); err != nil {
 		t.Fatalf("idempotent reindex: %v", err)
 	}
-	if _, err := st.Items().Put(ctx, types.Item{
+	if _, err := st.Items().Put(ctx, model.Item{
 		RepoKey: c.Key, Path: "tarballs",
-		Name: "tampered-1.0.0.tar", Actual: types.Checksums{SHA256: "missing"},
+		Name: "tampered-1.0.0.tar", Actual: kernel.Checksums{SHA256: "missing"},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Reindex(ctx, env, c); err == nil || !errors.Is(err, store.ErrNotFound) {
+	if err := h.Reindex(ctx, env, c); err == nil || !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("reindex silently advertised missing archive: %v", err)
 	}
 }

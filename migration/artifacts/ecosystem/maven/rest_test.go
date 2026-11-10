@@ -12,8 +12,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // jarOf is a jar holding each name with its content.
@@ -223,7 +223,7 @@ func TestUnitGeneratePOMOtherLayout(t *testing.T) {
 }
 
 // item returns the item at p.
-func (w *metaWorld) item(p string) types.Item {
+func (w *metaWorld) item(p string) model.Item {
 	w.t.Helper()
 	it, err := w.db.Items().Get(w.ctx, w.c.Key, false, p)
 	if err != nil {

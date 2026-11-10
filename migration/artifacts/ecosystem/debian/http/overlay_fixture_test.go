@@ -25,12 +25,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The stable distribution's paths the overlay tests publish and read, and
@@ -143,7 +143,7 @@ func (w *itemWorld) debRepo(key string) repo.Config {
 
 // put stores body as the file at path in the repository key, blob first,
 // as a deploy leaves it; cached puts it in a remote's cache.
-func (w *itemWorld) put(key, path string, cached bool, body []byte) types.Item {
+func (w *itemWorld) put(key, path string, cached bool, body []byte) model.Item {
 	w.t.Helper()
 	ctx := w.t.Context()
 	upload, err := w.blobs.BeginUpload(ctx)
@@ -157,9 +157,9 @@ func (w *itemWorld) put(key, path string, cached bool, body []byte) types.Item {
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	it, err := w.db.Items().Put(ctx, types.Item{
+	it, err := w.db.Items().Put(ctx, model.Item{
 		RepoKey: key, Cached: cached, Name: path, Size: info.Size, CreatedBy: "admin",
-		Actual: types.Checksums{SHA256: info.Digests.SHA256},
+		Actual: kernel.Checksums{SHA256: info.Digests.SHA256},
 	})
 	if err != nil {
 		w.t.Fatal(err)
@@ -170,7 +170,7 @@ func (w *itemWorld) put(key, path string, cached bool, body []byte) types.Item {
 // folderAt stores a folder at path in the repository key.
 func (w *itemWorld) folderAt(key, path string) {
 	w.t.Helper()
-	if _, err := w.db.Items().Put(w.t.Context(), types.Item{
+	if _, err := w.db.Items().Put(w.t.Context(), model.Item{
 		RepoKey: key, Name: path, Folder: true, CreatedBy: "admin",
 	}); err != nil {
 		w.t.Fatal(err)
@@ -181,9 +181,9 @@ func (w *itemWorld) folderAt(key, path string) {
 // blob store in these tests holds.
 func (w *itemWorld) lostAt(key, path string) {
 	w.t.Helper()
-	if _, err := w.db.Items().Put(w.t.Context(), types.Item{
+	if _, err := w.db.Items().Put(w.t.Context(), model.Item{
 		RepoKey: key, Name: path, Size: 1, CreatedBy: "admin",
-		Actual: types.Checksums{SHA256: strings.Repeat("0", 64)},
+		Actual: kernel.Checksums{SHA256: strings.Repeat("0", 64)},
 	}); err != nil {
 		w.t.Fatal(err)
 	}
@@ -262,9 +262,9 @@ func (f sourceBackend) Read(
 
 // sourceIdentity resolves every remote repository to one fixed HTTP source
 // identity.
-func sourceIdentity(context.Context, repo.Config) (types.SourceIdentity, error) {
-	return types.SourceIdentity{
-		Kind:       types.ExternalHTTP,
+func sourceIdentity(context.Context, repo.Config) (model.SourceIdentity, error) {
+	return model.SourceIdentity{
+		Kind:       model.ExternalHTTP,
 		Repository: "repo-1",
 		ID:         "http-1",
 		Generation: "revision-1",
@@ -278,7 +278,7 @@ func upstream(at map[string]func() (source.Result, error)) sourceBackend {
 		if answer, ok := at[q.Resource.Path]; ok {
 			return answer()
 		}
-		return source.Result{}, store.ErrNotFound
+		return source.Result{}, kernel.ErrNotFound
 	}
 }
 
@@ -327,16 +327,16 @@ type faulty struct {
 	repo, items string
 }
 
-func (s faulty) Repos() store.RepoStore {
+func (s faulty) Repos() port.RepoStore {
 	return faultyRepos{RepoStore: s.serverStore.Repos(), fail: s.repo}
 }
 
-func (s faulty) Items() store.ItemStore {
+func (s faulty) Items() port.ItemStore {
 	return faultyItems{ItemStore: s.serverStore.Items(), fail: s.items}
 }
 
 type faultyRepos struct {
-	store.RepoStore
+	port.RepoStore
 	fail string
 }
 
@@ -348,7 +348,7 @@ func (r faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
 }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	fail string
 }
 
@@ -357,9 +357,9 @@ func (i faultyItems) Get(
 	key string,
 	cached bool,
 	path string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if key == i.fail {
-		return types.Item{}, errFault
+		return model.Item{}, errFault
 	}
 	return i.ItemStore.Get(ctx, key, cached, path)
 }

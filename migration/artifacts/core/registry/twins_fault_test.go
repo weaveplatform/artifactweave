@@ -9,11 +9,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // twinFaults adds property failures for one item to retentionFaults.
@@ -24,17 +24,17 @@ type twinFaults struct {
 	read, patch int64
 }
 
-func (f *twinFaults) Items() store.ItemStore {
+func (f *twinFaults) Items() port.ItemStore {
 	return faultyProps{f.retentionFaults.Items(), f}
 }
 
 type faultyProps struct {
-	store.ItemStore
+	port.ItemStore
 	f *twinFaults
 }
 
 //nolint:wrapcheck // test double
-func (p faultyProps) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (p faultyProps) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if id == p.f.read {
 		return nil, errBoom
 	}
@@ -43,7 +43,7 @@ func (p faultyProps) Properties(ctx context.Context, id int64) (types.Properties
 
 //nolint:wrapcheck // test double
 func (p faultyProps) PatchProperties(
-	ctx context.Context, id int64, set types.Properties, remove []string, at time.Time,
+	ctx context.Context, id int64, set model.Properties, remove []string, at time.Time,
 ) error {
 	if id == p.f.patch {
 		return errBoom
@@ -77,13 +77,13 @@ func TestAccTwinFailures(t *testing.T) {
 	}
 	cases := []struct {
 		name   string
-		faults func(twin types.Item) twinFaults
+		faults func(twin model.Item) twinFaults
 		run    func(*world, *registry.Service) error
 	}{
 		{
 			name: "limit: the tag's manifest",
 			run:  pushOver(func(c *repo.Config) { c.MaxUniqueTags = ptr(1) }, "v2"),
-			faults: func(types.Item) twinFaults {
+			faults: func(model.Item) twinFaults {
 				return twinFaults{retentionFaults: retentionFaults{
 					get: func(p string) bool { return p == "app/v1/manifest.json" },
 				}}
@@ -91,13 +91,13 @@ func TestAccTwinFailures(t *testing.T) {
 		},
 		{
 			name: "remove: the image's manifests", run: removeV1,
-			faults: func(types.Item) twinFaults {
+			faults: func(model.Item) twinFaults {
 				return twinFaults{retentionFaults: retentionFaults{search: manifestsQuery}}
 			},
 		},
 		{
 			name: "remove: the twin's folder", run: removeV1,
-			faults: func(types.Item) twinFaults {
+			faults: func(model.Item) twinFaults {
 				return twinFaults{retentionFaults: retentionFaults{
 					get: func(p string) bool { return p == twinDir },
 				}}
@@ -105,7 +105,7 @@ func TestAccTwinFailures(t *testing.T) {
 		},
 		{
 			name: "remove: the twin's manifest", run: removeV1,
-			faults: func(types.Item) twinFaults {
+			faults: func(model.Item) twinFaults {
 				return twinFaults{retentionFaults: retentionFaults{
 					get: func(p string) bool { return p == twinDir+"/manifest.json" },
 				}}
@@ -113,11 +113,11 @@ func TestAccTwinFailures(t *testing.T) {
 		},
 		{
 			name: "remove: the twin's properties", run: removeV1,
-			faults: func(twin types.Item) twinFaults { return twinFaults{read: twin.ID} },
+			faults: func(twin model.Item) twinFaults { return twinFaults{read: twin.ID} },
 		},
 		{
 			name: "remove: the twin", run: removeV1,
-			faults: func(types.Item) twinFaults {
+			faults: func(model.Item) twinFaults {
 				return twinFaults{retentionFaults: retentionFaults{
 					del: func(p string) bool { return p == twinDir },
 				}}
@@ -126,7 +126,7 @@ func TestAccTwinFailures(t *testing.T) {
 		{
 			name: "retention: name the tag",
 			run:  pushOver(func(c *repo.Config) { c.DockerTagRetention = ptr(2) }, "v1"),
-			faults: func(twin types.Item) twinFaults {
+			faults: func(twin model.Item) twinFaults {
 				return twinFaults{patch: twin.ID}
 			},
 		},

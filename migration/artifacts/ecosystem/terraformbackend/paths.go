@@ -8,7 +8,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // The layout of a repository (decision 0041, "Storage"): one folder per
@@ -84,7 +84,7 @@ type File struct {
 
 // FileOf reads it as a state file; ok is false for a folder and for any
 // other path, the workspace record included.
-func FileOf(it types.Item) (File, bool) {
+func FileOf(it model.Item) (File, bool) {
 	if it.Folder {
 		return File{}, false
 	}

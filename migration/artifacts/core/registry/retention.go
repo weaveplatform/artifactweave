@@ -9,9 +9,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // errNotKept is a previous manifest Tag Retention could not move whole to
@@ -46,7 +46,7 @@ func (s *Service) RemoveTag(ctx context.Context, o Owner, tag string, r Removal)
 		case err != nil:
 			return err //nolint:wrapcheck // the layout names itself
 		case !ok || layout.IsDigestFolder(tag):
-			return fmt.Errorf("registry: tag %s of %s: %w", tag, o.Name, store.ErrNotFound)
+			return fmt.Errorf("registry: tag %s of %s: %w", tag, o.Name, kernel.ErrNotFound)
 		}
 		return s.removeTag(ctx, items, o, tag, r)
 	})
@@ -161,7 +161,7 @@ func (s *Service) replace(
 			to := p.Name + "/" + layout.DigestFolder(old.Actual.SHA256)
 			_, err := s.Store.Items().Get(ctx, p.Repo.Key, false, to)
 			switch {
-			case errors.Is(err, store.ErrNotFound):
+			case errors.Is(err, kernel.ErrNotFound):
 				return s.keep(ctx, items, p, dir, to)
 			case err != nil:
 				return fmt.Errorf("registry: get %s: %w", to, err)
@@ -237,7 +237,7 @@ func (s *Service) retain(ctx context.Context, items *item.Service, p Push) error
 		return nil
 	}
 	pkg, err := s.Store.Packages().Find(ctx, p.Repo.Key, p.Name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -251,7 +251,7 @@ func (s *Service) retain(ctx context.Context, items *item.Service, p Push) error
 	if err != nil {
 		return err
 	}
-	versions = slices.DeleteFunc(versions, func(v types.PackageVersion) bool {
+	versions = slices.DeleteFunc(versions, func(v model.PackageVersion) bool {
 		return derived[v.Version]
 	})
 	for _, v := range versions[:max(0, len(versions)-limit)] {

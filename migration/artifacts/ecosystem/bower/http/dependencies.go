@@ -19,12 +19,12 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	bowerfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const dependencyTargetPrefix = "$$$art-shorthand-resolver$$$-"
@@ -119,7 +119,7 @@ func (h handler) checkDependencyAuthority(ctx context.Context, r *http.Request) 
 	if err != nil {
 		return source.ErrSuperseded
 	}
-	initial, ok := r.Context().Value(dependencyAuthorityKey{}).(types.SourceIdentity)
+	initial, ok := r.Context().Value(dependencyAuthorityKey{}).(model.SourceIdentity)
 	if !ok || id != initial {
 		return source.ErrSuperseded
 	}
@@ -141,7 +141,7 @@ func (h handler) currentDependencyRead(
 	if h.sources == nil || h.sources.Revalidate == nil {
 		return nil
 	}
-	id, ok := r.Context().Value(dependencyAuthorityKey{}).(types.SourceIdentity)
+	id, ok := r.Context().Value(dependencyAuthorityKey{}).(model.SourceIdentity)
 	if !ok {
 		return source.ErrSuperseded
 	}
@@ -180,7 +180,7 @@ func (h handler) dependencyVersionRead(
 		return func(context.Context) error { return nil }, nil
 	}
 	path := bowerfmt.ManifestPath(name, version)
-	if !h.k.Can(r, path, types.ActionRead) || !h.k.Can(member, path, types.ActionRead) {
+	if !h.k.Can(r, path, accessapi.ActionRead) || !h.k.Can(member, path, accessapi.ActionRead) {
 		return nil, source.ErrDenied
 	}
 	id, err := h.k.DB().RemoteCache().Source(r.Context(), pkgroute.RequestFrom(member).Repo.Key)
@@ -217,7 +217,7 @@ func (h handler) readDependency(
 	r *http.Request,
 	name, raw, version string,
 ) (dependencyRead, error) {
-	if !bowerfmt.ValidName(name) || !h.k.CanFolder(r, name, types.ActionRead) {
+	if !bowerfmt.ValidName(name) || !h.k.CanFolder(r, name, accessapi.ActionRead) {
 		return dependencyRead{}, source.ErrDenied
 	}
 	virtual := pkgroute.RequestFrom(r).Repo
@@ -280,7 +280,7 @@ func (h handler) readDependency(
 			return versionRead(ctx)
 		},
 	}
-	if !h.k.Can(r, resource.Path, types.ActionRead) {
+	if !h.k.Can(r, resource.Path, accessapi.ActionRead) {
 		return dependencyRead{}, source.ErrDenied
 	}
 	if err := h.currentDependencyRead(r.Context(), r, resource.Path, false); err != nil {
@@ -641,7 +641,7 @@ func (h handler) shorthand(r *http.Request, binary bool) (gitPointer, *http.Requ
 
 func (h handler) shorthandRefs(w http.ResponseWriter, r *http.Request) {
 	pointer, member, err := h.shorthand(r, false)
-	if err == nil && !h.k.CanFolder(r, pointer.name, types.ActionRead) {
+	if err == nil && !h.k.CanFolder(r, pointer.name, accessapi.ActionRead) {
 		err = source.ErrDenied
 	}
 	var refs []remoteRef
@@ -669,7 +669,7 @@ func (h handler) shorthandRefs(w http.ResponseWriter, r *http.Request) {
 	var out strings.Builder
 	for _, ref := range refs {
 		path := bowerfmt.ManifestPath(pointer.name, ref.Version)
-		if h.k.Can(r, path, types.ActionRead) && h.k.Can(member, path, types.ActionRead) {
+		if h.k.Can(r, path, accessapi.ActionRead) && h.k.Can(member, path, accessapi.ActionRead) {
 			if result.CheckRead != nil {
 				err = result.CheckRead(r.Context(), path)
 			}

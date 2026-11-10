@@ -13,14 +13,14 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Errors the HTTP layer maps onto statuses.
@@ -43,7 +43,7 @@ var (
 		"item: the content was removed by garbage collection while it was deployed; deploy it again",
 	)
 	// ErrNotFound is a missing item.
-	ErrNotFound = store.ErrNotFound
+	ErrNotFound = kernel.ErrNotFound
 	// ErrExists is a deploy with IfAbsent to a path that holds an item.
 	ErrExists = errors.New("item: the path already holds an item")
 )
@@ -122,9 +122,9 @@ type Deploy struct {
 	// Its error refuses the write without publishing items or package metadata.
 	ResolvePath func(inspection any) (string, error)
 	// Declared holds the checksums the client sent.
-	Declared types.Checksums
+	Declared kernel.Checksums
 	// Properties are set on the item (matrix parameters).
-	Properties types.Properties
+	Properties model.Properties
 	By         string
 	// IfAbsent stores the file only when nothing is at its path, and
 	// refuses with ErrExists otherwise, for a file published once, such as
@@ -158,13 +158,13 @@ type Deploy struct {
 	// is. A caller's checksum deploy sets it (knowing a checksum must not
 	// copy content the caller cannot read); a write that already holds the
 	// content, such as a registry upload's completion, leaves it nil.
-	Reusable func(ctx context.Context, b types.Blob) (bool, error)
+	Reusable func(ctx context.Context, b blob.Blob) (bool, error)
 }
 
 // ParseChecksums checks declared checksums: lowercase hex of the length of
 // their algorithm, or empty.
-func ParseChecksums(c types.Checksums) (types.Checksums, error) {
-	out := types.Checksums{
+func ParseChecksums(c kernel.Checksums) (kernel.Checksums, error) {
+	out := kernel.Checksums{
 		SHA256: strings.ToLower(strings.TrimSpace(c.SHA256)),
 		SHA512: strings.ToLower(strings.TrimSpace(c.SHA512)),
 		SHA1:   strings.ToLower(strings.TrimSpace(c.SHA1)),
@@ -188,7 +188,7 @@ func ParseChecksums(c types.Checksums) (types.Checksums, error) {
 // content: a SHA-1 or SHA-256 that equals f's, and neither that differs.
 // MD5 and SHA-512 do not count, as in Artifactory 6.20's isFileOverwrite,
 // which compares the SHA-1 and SHA-256 alone.
-func DeclaresContentOf(declared types.Checksums, f types.Item) bool {
+func DeclaresContentOf(declared kernel.Checksums, f model.Item) bool {
 	if declared.SHA1 == "" && declared.SHA256 == "" {
 		return false
 	}
@@ -204,10 +204,10 @@ func clientPolicy(c repo.Config) bool {
 }
 
 // Deploy streams d.Body into the blob store and stores the item.
-func (s *Service) Deploy(ctx context.Context, d Deploy) (types.Item, error) {
+func (s *Service) Deploy(ctx context.Context, d Deploy) (model.Item, error) {
 	info, err := s.Upload(ctx, d)
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	return s.DeployCommitted(ctx, d, info)
 }
@@ -265,10 +265,10 @@ func (s *Service) DeployCommitted(
 	ctx context.Context,
 	d Deploy,
 	info blob.Info,
-) (types.Item, error) {
+) (model.Item, error) {
 	declared, err := ParseChecksums(d.Declared)
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	return s.storeCommitted(ctx, d, info, declared)
 }
@@ -277,11 +277,11 @@ func (s *Service) storeCommitted(
 	ctx context.Context,
 	d Deploy,
 	info blob.Info,
-	declared types.Checksums,
-) (types.Item, error) {
+	declared kernel.Checksums,
+) (model.Item, error) {
 	actual := digestsOf(info)
 	stored, err := s.storeFile(ctx, d, actual, info.Size, declared)
-	if errors.Is(err, store.ErrDeleting) {
+	if errors.Is(err, port.ErrDeleting) {
 		s.finishCollection(ctx, actual.SHA256)
 	}
 	return stored, err
@@ -292,7 +292,7 @@ func (s *Service) storeCommitted(
 func (s *Service) inspected(
 	ctx context.Context,
 	d Deploy,
-	actual types.Checksums,
+	actual kernel.Checksums,
 	size int64,
 ) (format.Env, error) {
 	return inspect(ctx, s.format(d.Repo.PackageType), s.env(), d.Repo, format.Write{
@@ -318,20 +318,20 @@ func (s *Service) finishCollection(ctx context.Context, sha string) {
 // found by the strongest declared checksum. Every other declared checksum
 // must match too, and d.Reusable must allow it; otherwise, and when the
 // content is gone, ErrNoBlob.
-func (s *Service) DeployByChecksum(ctx context.Context, d Deploy) (types.Item, error) {
+func (s *Service) DeployByChecksum(ctx context.Context, d Deploy) (model.Item, error) {
 	declared, err := ParseChecksums(d.Declared)
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
-	if declared == (types.Checksums{}) {
-		return types.Item{}, fmt.Errorf("%w: a checksum deploy needs a checksum", ErrBadChecksum)
+	if declared == (kernel.Checksums{}) {
+		return model.Item{}, fmt.Errorf("%w: a checksum deploy needs a checksum", ErrBadChecksum)
 	}
 	b, err := s.Store.Blobs().Find(ctx, declared)
-	if errors.Is(err, store.ErrNotFound) {
-		return types.Item{}, ErrNoBlob
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.Item{}, ErrNoBlob
 	}
 	if err != nil {
-		return types.Item{}, fmt.Errorf("item: find blob: %w", err)
+		return model.Item{}, fmt.Errorf("item: find blob: %w", err)
 	}
 	for _, pair := range [][2]string{
 		{declared.SHA256, b.Checksums.SHA256},
@@ -340,23 +340,23 @@ func (s *Service) DeployByChecksum(ctx context.Context, d Deploy) (types.Item, e
 		{declared.MD5, b.Checksums.MD5},
 	} {
 		if pair[0] != "" && pair[0] != pair[1] {
-			return types.Item{}, ErrNoBlob
+			return model.Item{}, ErrNoBlob
 		}
 	}
 	if d.Reusable != nil {
 		ok, err := d.Reusable(ctx, b)
 		if err != nil {
-			return types.Item{}, fmt.Errorf("item: may reuse content: %w", err)
+			return model.Item{}, fmt.Errorf("item: may reuse content: %w", err)
 		}
 		if !ok {
-			return types.Item{}, ErrNoBlob
+			return model.Item{}, ErrNoBlob
 		}
 	}
 	// The index can name content that garbage collection already removed.
 	if ok, err := s.Blobs.Exists(ctx, b.Checksums.SHA256); err != nil {
-		return types.Item{}, fmt.Errorf("item: blob exists: %w", err)
+		return model.Item{}, fmt.Errorf("item: blob exists: %w", err)
 	} else if !ok {
-		return types.Item{}, ErrNoBlob
+		return model.Item{}, ErrNoBlob
 	}
 	// Artifactory trusts the found content's checksums (6.20
 	// UploadServiceUtils.setFileInfoChecksums); since 7.161.15 (RTDEV-80481)
@@ -365,7 +365,7 @@ func (s *Service) DeployByChecksum(ctx context.Context, d Deploy) (types.Item, e
 	stored, err := s.storeFile(ctx, d, b.Checksums, b.Size, declared)
 	if errors.Is(err, ErrCollected) {
 		// Collected since it was found: a miss, so the client uploads it.
-		return types.Item{}, ErrNoBlob
+		return model.Item{}, ErrNoBlob
 	}
 	return stored, err
 }
@@ -375,28 +375,28 @@ func (s *Service) DeployByChecksum(ctx context.Context, d Deploy) (types.Item, e
 func (s *Service) storeFile(
 	ctx context.Context,
 	d Deploy,
-	actual types.Checksums,
+	actual kernel.Checksums,
 	size int64,
-	declared types.Checksums,
-) (types.Item, error) {
+	declared kernel.Checksums,
+) (model.Item, error) {
 	env, err := s.inspected(ctx, d, actual, size)
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	if d.ResolvePath != nil {
 		d.Path, err = d.ResolvePath(env.Inspection)
 		if err != nil {
-			return types.Item{}, err
+			return model.Item{}, err
 		}
 	}
-	var stored types.Item
+	var stored model.Item
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
 		var err error
 		stored, err = s.putFile(ctx, env, d, actual, size, declared, s.now())
 		return err
 	})
 	if err != nil {
-		return types.Item{}, err //nolint:wrapcheck // the transaction returns ours
+		return model.Item{}, err //nolint:wrapcheck // the transaction returns ours
 	}
 	return stored, nil
 }
@@ -408,11 +408,11 @@ func (s *Service) putFile(
 	ctx context.Context,
 	env format.Env,
 	d Deploy,
-	actual types.Checksums,
+	actual kernel.Checksums,
 	size int64,
-	declared types.Checksums,
+	declared kernel.Checksums,
 	now time.Time,
-) (types.Item, error) {
+) (model.Item, error) {
 	h := s.format(d.Repo.PackageType)
 	// Only properties the client sent replace the file's: those a format
 	// adds in Admit, such as Maven's plugin mark, join the file's, as
@@ -423,35 +423,35 @@ func (s *Service) putFile(
 		Properties: d.Properties, Size: size, Checksums: actual,
 	}
 	if err := guardWrite(ctx, h, env, d.Repo, w); err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	w, err := admit(ctx, h, env, d.Repo, w)
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	d.Path, d.Properties = w.Path, w.Properties
 	stored, err := s.writeFile(ctx, d, fileWrite{
 		actual: actual, size: size, declared: declared, shouldReplace: replace,
 	}, now)
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	if err := h.Deployed(ctx, env, d.Repo, stored); err != nil {
-		return types.Item{}, err //nolint:wrapcheck // the format's own error
+		return model.Item{}, err //nolint:wrapcheck // the format's own error
 	}
 	if err := s.annotated(ctx, h, env, d.Repo, stored,
 		format.Annotation{Set: d.Properties, At: now}); err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	return stored, nil
 }
 
 // fileWrite is the content writeFile stores, and how its properties land.
 type fileWrite struct {
-	actual types.Checksums
+	actual kernel.Checksums
 	size   int64
 	// declared are the checksums the client sent.
-	declared types.Checksums
+	declared kernel.Checksums
 	// shouldReplace makes the deploy's properties replace the file's rather than
 	// join them: a client's matrix parameters, or a format's own set for an
 	// item it derives.
@@ -467,11 +467,11 @@ func (s *Service) writeFile(
 	d Deploy,
 	fw fileWrite,
 	now time.Time,
-) (types.Item, error) {
+) (model.Item, error) {
 	actual, size, declared := fw.actual, fw.size, fw.declared
 	full := strings.Trim(d.Path, "/")
 	if err := s.ensureFolders(ctx, d.Target, path.Dir(full), d.By, now); err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	items := s.Store.Items()
 	// Otherwise Artifactory records the SHA-256 it computes as the client's
@@ -488,7 +488,7 @@ func (s *Service) writeFile(
 	case original.SHA256 == "":
 		original.SHA256 = actual.SHA256
 	}
-	it := types.Item{
+	it := model.Item{
 		RepoKey: d.Repo.Key, Cached: d.Cached, Name: full,
 		Size: size, Actual: actual, Original: original, MimeType: MimeType(full),
 		Created: now, CreatedBy: d.By, Modified: now, ModifiedBy: d.By, Updated: now,
@@ -496,35 +496,35 @@ func (s *Service) writeFile(
 	old, err := items.Get(ctx, d.Repo.Key, d.Cached, full)
 	switch {
 	case err == nil && d.IfAbsent:
-		return types.Item{}, fmt.Errorf("%w: %s", ErrExists, full)
+		return model.Item{}, fmt.Errorf("%w: %s", ErrExists, full)
 	case err == nil && old.Folder:
-		return types.Item{}, fmt.Errorf("%w: %s is a folder", ErrConflict, full)
+		return model.Item{}, fmt.Errorf("%w: %s is a folder", ErrConflict, full)
 	case err == nil && !d.mayReplace(full, old, declared, actual):
-		return types.Item{}, &OverwriteDeniedError{Repo: d.Repo.Key, Path: full, User: d.By}
+		return model.Item{}, &OverwriteDeniedError{Repo: d.Repo.Key, Path: full, User: d.By}
 	case err == nil:
 		it.Created, it.CreatedBy = old.Created, old.CreatedBy
-	case !errors.Is(err, store.ErrNotFound):
-		return types.Item{}, fmt.Errorf("item: get %s: %w", full, err)
+	case !errors.Is(err, kernel.ErrNotFound):
+		return model.Item{}, fmt.Errorf("item: get %s: %w", full, err)
 	}
 	write := items.Put
 	if d.IfAbsent {
 		write = items.Create
 	}
 	stored, err := write(ctx, it)
-	if d.IfAbsent && errors.Is(err, store.ErrConflict) {
-		return types.Item{}, fmt.Errorf("%w: %s", ErrExists, full)
+	if d.IfAbsent && errors.Is(err, kernel.ErrConflict) {
+		return model.Item{}, fmt.Errorf("%w: %s", ErrExists, full)
 	}
 	if err != nil {
-		return types.Item{}, fmt.Errorf("item: put %s: %w", full, err)
+		return model.Item{}, fmt.Errorf("item: put %s: %w", full, err)
 	}
-	ref, err := s.Store.Blobs().Ref(ctx, types.Blob{
+	ref, err := s.Store.Blobs().Ref(ctx, blob.Blob{
 		Checksums: actual, Size: size, Created: now,
 	}, 1)
-	if errors.Is(err, store.ErrDeleting) {
-		return types.Item{}, fmt.Errorf("%w: %w", ErrCollected, err)
+	if errors.Is(err, port.ErrDeleting) {
+		return model.Item{}, fmt.Errorf("%w: %w", ErrCollected, err)
 	}
 	if err != nil {
-		return types.Item{}, fmt.Errorf("item: reference blob: %w", err)
+		return model.Item{}, fmt.Errorf("item: reference blob: %w", err)
 	}
 	// Content garbage collection removed recently may have gone after this
 	// deploy wrote it: the row only says when it went. Checked inside the
@@ -533,20 +533,20 @@ func (s *Service) writeFile(
 	if !ref.Deleted.IsZero() {
 		ok, err := s.Blobs.Exists(ctx, actual.SHA256)
 		if err != nil {
-			return types.Item{}, fmt.Errorf("item: blob exists: %w", err)
+			return model.Item{}, fmt.Errorf("item: blob exists: %w", err)
 		}
 		if !ok {
-			return types.Item{}, ErrCollected
+			return model.Item{}, ErrCollected
 		}
 	}
 	if old.ID != 0 && old.Actual.SHA256 != "" {
 		if _, err := s.Store.Blobs().Unref(ctx, old.Actual.SHA256, 1); err != nil {
-			return types.Item{}, fmt.Errorf("item: release overwritten blob: %w", err)
+			return model.Item{}, fmt.Errorf("item: release overwritten blob: %w", err)
 		}
 	}
 	fresh := old.ID != 0 && old.Actual.SHA256 != actual.SHA256 && !nonUniqueSnapshot(full)
 	if err := s.settle(ctx, stored, d.Properties, fresh, fw.shouldReplace, now); err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	return stored, nil
 }
@@ -564,8 +564,8 @@ func (s *Service) writeFile(
 // which clears first. [I] 7.x documents neither (#216).
 func (s *Service) settle(
 	ctx context.Context,
-	it types.Item,
-	props types.Properties,
+	it model.Item,
+	props model.Properties,
 	fresh, replace bool,
 	now time.Time,
 ) error {
@@ -587,10 +587,10 @@ func (s *Service) settle(
 	if err != nil {
 		return fmt.Errorf("item: statistics of %s: %w", it.FullPath(), err)
 	}
-	if stats == (types.ItemStats{}) {
+	if stats == (model.ItemStats{}) {
 		return nil
 	}
-	if err := items.PutStats(ctx, it.ID, types.ItemStats{}); err != nil {
+	if err := items.PutStats(ctx, it.ID, model.ItemStats{}); err != nil {
 		return fmt.Errorf("item: statistics of %s: %w", it.FullPath(), err)
 	}
 	return nil
@@ -612,7 +612,7 @@ func nonUniqueSnapshot(p string) bool {
 // content whose digests are actual: CanOverwritePath allows it, or
 // OverwriteIdentical does and the deploy declares and stores old's own
 // content.
-func (d *Deploy) mayReplace(full string, old types.Item, declared, actual types.Checksums) bool {
+func (d *Deploy) mayReplace(full string, old model.Item, declared, actual kernel.Checksums) bool {
 	if d.CanOverwritePath == nil || d.CanOverwritePath(full) {
 		return true
 	}
@@ -626,12 +626,12 @@ func (d *Deploy) mayReplace(full string, old types.Item, declared, actual types.
 func (s *Service) MakeFolder(
 	ctx context.Context,
 	t Target,
-	props types.Properties,
+	props model.Properties,
 	by string,
-) (types.Item, error) {
+) (model.Item, error) {
 	now := s.now()
 	full := strings.Trim(t.Path, "/")
-	var folder types.Item
+	var folder model.Item
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
 		if a, ok := s.format(t.Repo.PackageType).(format.FolderAdmitter); ok {
 			if err := a.AdmitFolder(ctx, s.env(), t.Repo, full); err != nil {
@@ -651,7 +651,7 @@ func (s *Service) MakeFolder(
 		return nil
 	})
 	if err != nil {
-		return types.Item{}, err //nolint:wrapcheck // the transaction returns ours
+		return model.Item{}, err //nolint:wrapcheck // the transaction returns ours
 	}
 	return folder, nil
 }
@@ -659,14 +659,14 @@ func (s *Service) MakeFolder(
 // EnsureRoot returns the record of the root of t's repository, or of its
 // cache when t.Cached, creating it when absent. The record holds the
 // properties set on the repository itself (store.ItemStore).
-func (s *Service) EnsureRoot(ctx context.Context, t Target, by string) (types.Item, error) {
+func (s *Service) EnsureRoot(ctx context.Context, t Target, by string) (model.Item, error) {
 	now := s.now()
-	it, err := s.Store.Items().EnsureRoot(ctx, types.Item{
+	it, err := s.Store.Items().EnsureRoot(ctx, model.Item{
 		RepoKey: t.Repo.Key, Cached: t.Cached,
 		Created: now, CreatedBy: by, Modified: now, ModifiedBy: by, Updated: now,
 	})
 	if err != nil {
-		return types.Item{}, fmt.Errorf("item: root of %s: %w", t.Repo.Key, err)
+		return model.Item{}, fmt.Errorf("item: root of %s: %w", t.Repo.Key, err)
 	}
 	return it, nil
 }
@@ -692,10 +692,10 @@ func (s *Service) ensureFolders(
 			return fmt.Errorf("%w: %s is a file", ErrConflict, p)
 		case err == nil:
 			continue
-		case !errors.Is(err, store.ErrNotFound):
+		case !errors.Is(err, kernel.ErrNotFound):
 			return fmt.Errorf("item: get %s: %w", p, err)
 		}
-		if _, err := s.Store.Items().Put(ctx, types.Item{
+		if _, err := s.Store.Items().Put(ctx, model.Item{
 			RepoKey: t.Repo.Key, Cached: t.Cached, Name: p, Folder: true,
 			Created: now, CreatedBy: by, Modified: now, ModifiedBy: by, Updated: now,
 		}); err != nil {
@@ -742,7 +742,7 @@ const mavenMetadata = "maven-metadata.xml"
 // for a file named maven-metadata.xml in any repository (the server
 // computes those checksums, and drops a client's), and in a remote cache,
 // which that policy does not govern, it is the computed checksum.
-func ServedChecksum(c repo.Config, it types.Item, a Algorithm) string {
+func ServedChecksum(c repo.Config, it model.Item, a Algorithm) string {
 	if it.Cached && c.RemoteRepoChecksumPolicyType == repo.PassThru &&
 		path.Base(it.Name) != mavenMetadata {
 		if original := a.Of(it.Original); original != "" {
@@ -756,7 +756,7 @@ func ServedChecksum(c repo.Config, it types.Item, a Algorithm) string {
 }
 
 // Of returns the digest a of c.
-func (a Algorithm) Of(c types.Checksums) string {
+func (a Algorithm) Of(c kernel.Checksums) string {
 	switch a {
 	case SHA1:
 		return c.SHA1
@@ -769,7 +769,7 @@ func (a Algorithm) Of(c types.Checksums) string {
 	}
 }
 
-func (a Algorithm) set(c *types.Checksums, v string) {
+func (a Algorithm) set(c *kernel.Checksums, v string) {
 	switch a {
 	case SHA1:
 		c.SHA1 = v
@@ -812,7 +812,7 @@ func (s *Service) RecordChecksum(
 	t Target,
 	a Algorithm,
 	value string,
-) (types.Item, error) {
+) (model.Item, error) {
 	return s.RecordSidecar(ctx, t, a, value, -1)
 }
 
@@ -827,9 +827,9 @@ func (s *Service) RecordSidecar(
 	a Algorithm,
 	value string,
 	size int64,
-) (types.Item, error) {
+) (model.Item, error) {
 	received := value
-	var stored types.Item
+	var stored model.Item
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
 		// The format answers first, as Artifactory refuses an oversized
 		// sidecar and drops metadata checksums before reading the value.
@@ -839,14 +839,14 @@ func (s *Service) RecordSidecar(
 		if err != nil {
 			return err
 		}
-		var declared types.Checksums
+		var declared kernel.Checksums
 		a.set(&declared, value)
 		if declared, err = ParseChecksums(declared); err != nil {
 			return err
 		}
 		value := a.Of(declared)
 		it, err := s.Store.Items().Get(ctx, t.Repo.Key, t.Cached, w.Path)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			return &SidecarError{Err: err, Message: fmt.Sprintf(
 				"Target file to set checksum on doesn't exist: %s:%s", t.Repo.Key, w.Path)}
 		}
@@ -869,7 +869,7 @@ func (s *Service) RecordSidecar(
 		return nil
 	})
 	if err != nil {
-		return types.Item{}, err //nolint:wrapcheck // the transaction returns ours
+		return model.Item{}, err //nolint:wrapcheck // the transaction returns ours
 	}
 	return stored, nil
 }
@@ -880,9 +880,9 @@ func TrashEnabled(
 	ctx context.Context,
 	st interface{ Settings() settings.SettingsStore },
 ) (bool, error) {
-	var t types.TrashcanSettings
-	err := st.Settings().Get(ctx, types.SettingTrashcan, &t)
-	if errors.Is(err, store.ErrNotFound) {
+	var t model.TrashcanSettings
+	err := st.Settings().Get(ctx, settings.SettingTrashcan, &t)
+	if errors.Is(err, kernel.ErrNotFound) {
 		return true, nil
 	}
 	if err != nil {
@@ -897,12 +897,12 @@ func TrashEnabled(
 // when it is on, keeping their blob references for a restore; otherwise,
 // and for remote caches, the references are released for garbage
 // collection.
-func (s *Service) Delete(ctx context.Context, t Target, by string) (store.DeleteResult, error) {
+func (s *Service) Delete(ctx context.Context, t Target, by string) (port.DeleteResult, error) {
 	trash := !t.Cached
 	if trash {
 		on, err := TrashEnabled(ctx, s.Store)
 		if err != nil {
-			return store.DeleteResult{}, err
+			return port.DeleteResult{}, err
 		}
 		trash = on
 	}
@@ -912,7 +912,7 @@ func (s *Service) Delete(ctx context.Context, t Target, by string) (store.Delete
 // Purge is Delete bypassing the trash can: the references are released at
 // once. It is for an item whose record lives elsewhere, such as a build-info
 // document (decision 0014), which a restore would bring back without its run.
-func (s *Service) Purge(ctx context.Context, t Target) (store.DeleteResult, error) {
+func (s *Service) Purge(ctx context.Context, t Target) (port.DeleteResult, error) {
 	return s.remove(ctx, t, "", false)
 }
 
@@ -923,17 +923,17 @@ func (s *Service) remove(
 	t Target,
 	by string,
 	trash bool,
-) (store.DeleteResult, error) {
+) (port.DeleteResult, error) {
 	full := strings.Trim(t.Path, "/")
 	now := s.now()
-	var res store.DeleteResult
+	var res port.DeleteResult
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
 		invalidated, err := s.invalidateCache(ctx, t)
 		if err != nil {
 			return err
 		}
 		removed, err := s.affected(ctx, t, full)
-		if errors.Is(err, store.ErrNotFound) && invalidated > 0 {
+		if errors.Is(err, kernel.ErrNotFound) && invalidated > 0 {
 			return nil
 		}
 		if err != nil {
@@ -956,7 +956,7 @@ func (s *Service) remove(
 		}
 		removed = append(removed, sidecars...)
 		hooks, env := s.format(t.Repo.PackageType), s.env()
-		var versions []types.PackageVersion
+		var versions []model.PackageVersion
 		for _, it := range removed {
 			if !it.Folder {
 				if err := hooks.Deleting(ctx, env, t.Repo, it); err != nil {
@@ -977,8 +977,8 @@ func (s *Service) remove(
 			if err != nil {
 				return fmt.Errorf("item: properties of %s: %w", it.FullPath(), err)
 			}
-			if _, err := s.Store.Trash().Add(ctx, types.TrashEntry{
-				Record: types.TrashRecord{
+			if _, err := s.Store.Trash().Add(ctx, model.TrashEntry{
+				Record: model.TrashRecord{
 					Item: it, Properties: props, PackageType: string(t.Repo.PackageType),
 				},
 				DeletedAt: now, DeletedBy: by,
@@ -1010,20 +1010,20 @@ func (s *Service) remove(
 		return nil
 	})
 	if err != nil {
-		return store.DeleteResult{}, err //nolint:wrapcheck // the transaction returns ours
+		return port.DeleteResult{}, err //nolint:wrapcheck // the transaction returns ours
 	}
 	return res, nil
 }
 
 // Tree lists the item at t.Path (none for the repository root) and every
 // item below it, parents before their children.
-func (s *Service) Tree(ctx context.Context, t Target) ([]types.Item, error) {
+func (s *Service) Tree(ctx context.Context, t Target) ([]model.Item, error) {
 	return s.affected(ctx, t, strings.Trim(t.Path, "/"))
 }
 
 // affected lists the item at full (none for the root) and every item below.
-func (s *Service) affected(ctx context.Context, t Target, full string) ([]types.Item, error) {
-	var out []types.Item
+func (s *Service) affected(ctx context.Context, t Target, full string) ([]model.Item, error) {
+	var out []model.Item
 	if full != "" {
 		it, err := s.Store.Items().Get(ctx, t.Repo.Key, t.Cached, full)
 		if err != nil {
@@ -1034,7 +1034,7 @@ func (s *Service) affected(ctx context.Context, t Target, full string) ([]types.
 			return out, nil
 		}
 	}
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		batch, next, err := s.Store.Items().Descendants(ctx, t.Repo.Key, t.Cached, full, page)
 		if err != nil {

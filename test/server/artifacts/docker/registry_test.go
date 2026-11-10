@@ -13,16 +13,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -215,10 +217,10 @@ func uploadSession(t *testing.T, f *matrixFixture, p string) {
 // gets a session, 202.
 func mountRule(srcRepo, srcPath string) rule {
 	return func(p matrixPrincipal) int {
-		if !p.holds(dockerA, "work/", types.ActionWrite) {
+		if !p.holds(dockerA, "work/", api.ActionWrite) {
 			return refuse(p)
 		}
-		if !p.holds(srcRepo, srcPath, types.ActionRead) {
+		if !p.holds(srcRepo, srcPath, api.ActionRead) {
 			return http.StatusAccepted
 		}
 		return 0
@@ -234,7 +236,7 @@ func registryBlobMatrix() []matrixRow {
 		uploads = "/v2/" + dockerA + "/work/{p}/blobs/uploads/"
 		session = uploads + "{upload}"
 	)
-	read, write := types.ActionRead, types.ActionWrite
+	read, write := api.ActionRead, api.ActionWrite
 	mount := uploads + "?mount=" + registryLayer + "&from="
 	return []matrixRow{
 		row(headBlob, layer+registryLayer, "", holds(dockerA, "work/app/", read), 200),
@@ -738,7 +740,7 @@ func seedMatrixManifests(t *testing.T, f *matrixFixture) {
 // is challenged whatever it holds.
 func registryManifestMatrix() []matrixRow {
 	const base = "/v2/" + dockerA + "/work/app/manifests/"
-	read, write, del := types.ActionRead, types.ActionWrite, types.ActionDelete
+	read, write, del := api.ActionRead, api.ActionWrite, api.ActionDelete
 	return []matrixRow{
 		row(headManifest, base+"v1", "", holds(dockerA, "work/app/", read), 200),
 		row(getManifest, base+sha256Digest(registryManifest("v1")), "",
@@ -800,7 +802,7 @@ func TestAccRegistryTokenFlow(t *testing.T) {
 		t.Fatalf("anonymous token: %d %s", rec.Code, rec.Body)
 	}
 	if err := db.Settings().
-		Put(context.Background(), types.SettingAnonymousAccess, false); err != nil {
+		Put(context.Background(), settings.SettingAnonymousAccess, false); err != nil {
 		t.Fatal(err)
 	}
 	rec := do(t, h, http.MethodGet, "/v2/", bearerAuth(anon), "")
@@ -836,7 +838,7 @@ func registryReferrersMatrix() []matrixRow {
 	const base = "/v2/" + dockerA + "/work/app/referrers/"
 	return []matrixRow{
 		row(getReferrers, base+sha256Digest(registryManifest("v1")), "",
-			holds(dockerA, "work/app/", types.ActionRead), 200),
+			holds(dockerA, "work/app/", api.ActionRead), 200),
 	}
 }
 
@@ -1032,7 +1034,7 @@ func registryListingMatrix() []matrixRow {
 		base     = "/v2/" + dockerA + "/work/app/manifests/"
 		prefixed = "/artifactory/api/docker/" + dockerA + "/v2/"
 	)
-	read, del := types.ActionRead, types.ActionDelete
+	read, del := api.ActionRead, api.ActionDelete
 	return []matrixRow{
 		row(tagsRoute, tags, "", holds(dockerA, "work/app/", read), 200),
 		at(catalogRoute, "", signedIn, 200),
@@ -1052,7 +1054,7 @@ func registryListingMatrix() []matrixRow {
 				`"tag":"t-{p}","targetDockerRepository":"work/promoted-{p}","copy":true}`,
 			allOf(
 				holds(dockerA, "work/app/", read),
-				holds(dockerA, "work/promoted-{p}/", types.ActionWrite),
+				holds(dockerA, "work/promoted-{p}/", api.ActionWrite),
 			),
 			200,
 		).seeding(taggedFor),
@@ -1183,12 +1185,12 @@ func TestAccMultiArchDelete(t *testing.T) {
 // failingGetStore fails reading any item.
 type failingGetStore struct{ harness.Store }
 
-func (s failingGetStore) Items() store.ItemStore { return failingGets{s.Store.Items()} }
+func (s failingGetStore) Items() port.ItemStore { return failingGets{s.Store.Items()} }
 
-type failingGets struct{ store.ItemStore }
+type failingGets struct{ port.ItemStore }
 
-func (failingGets) Get(context.Context, string, bool, string) (types.Item, error) {
-	return types.Item{}, errBoom
+func (failingGets) Get(context.Context, string, bool, string) (model.Item, error) {
+	return model.Item{}, errBoom
 }
 
 func TestAccMultiArchDeleteStoreFailures(t *testing.T) {

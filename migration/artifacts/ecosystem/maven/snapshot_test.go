@@ -13,15 +13,15 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const snapDir = "com/acme/app/1.0-SNAPSHOT/"
 
 // put deploys p with props and returns the path it was stored at.
-func (w *metaWorld) put(p string, props types.Properties) string {
+func (w *metaWorld) put(p string, props model.Properties) string {
 	w.t.Helper()
 	it, err := w.items.Deploy(w.ctx, item.Deploy{
 		Target: item.Target{Repo: w.c, Path: p}, Body: strings.NewReader(bodyOf(p)),
@@ -50,8 +50,8 @@ func (w *metaWorld) sidecar(p, want string) string {
 }
 
 // stamped is a build.timestamp matrix parameter for t.
-func stamped(t time.Time) types.Properties {
-	return types.Properties{"build.timestamp": {strconv.FormatInt(t.UnixMilli(), 10)}}
+func stamped(t time.Time) model.Properties {
+	return model.Properties{"build.timestamp": {strconv.FormatInt(t.UnixMilli(), 10)}}
 }
 
 func expect(t *testing.T, what, got, want string) {
@@ -151,7 +151,7 @@ func TestUnitUniqueSnapshotClientTimestamp(t *testing.T) {
 	}
 	it, err := w.items.DeployByChecksum(w.ctx, item.Deploy{
 		Target:   item.Target{Repo: w.c, Path: snapDir + "app-1.0-SNAPSHOT-tests.jar"},
-		Declared: types.Checksums{SHA1: src.Actual.SHA1}, Properties: stamped(t2), By: "deployer",
+		Declared: kernel.Checksums{SHA1: src.Actual.SHA1}, Properties: stamped(t2), By: "deployer",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -159,7 +159,7 @@ func TestUnitUniqueSnapshotClientTimestamp(t *testing.T) {
 	expect(t, "checksum deploy", it.FullPath(), b2+"-tests.jar")
 
 	expect(t, "not a number", w.put(snapDir+"app-1.0-SNAPSHOT.jar",
-		types.Properties{"build.timestamp": {"soon"}}),
+		model.Properties{"build.timestamp": {"soon"}}),
 		snapDir+"app-1.0-20261017.093000-3.jar")
 }
 
@@ -221,7 +221,7 @@ func TestUnitUniqueSnapshotSidecars(t *testing.T) {
 		item.Target{Repo: w.c, Path: snapDir + "app-1.0-SNAPSHOT-javadoc.jar"},
 		item.SHA1, strings.Repeat("0", 40), 40)
 	var side *item.SidecarError
-	if !errors.As(err, &side) || !errors.Is(err, store.ErrNotFound) || side.Message !=
+	if !errors.As(err, &side) || !errors.Is(err, kernel.ErrNotFound) || side.Message !=
 		"Target file to set checksum on doesn't exist: maven-local:"+
 			snapDir+"app-1.0-SNAPSHOT-javadoc.jar" {
 		t.Fatalf("no build: %v", err)

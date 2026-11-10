@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 )
 
 const serviceIDPath = "/artifactory/api/system/service_id"
@@ -22,7 +22,7 @@ func serviceIDHandler(t *testing.T) (http.Handler, *token.Service) {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@0f1e2d3c-4b5a-4687-9a0b-1c2d3e4f5a6b", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)

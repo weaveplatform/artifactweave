@@ -9,9 +9,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The remote cache cleanup's work on the persistent queue (decision 0033).
@@ -31,7 +32,7 @@ const (
 
 type cacheCleanupCursor struct {
 	Repository  string                      `json:"repository"`
-	Incarnation types.RepositoryIncarnation `json:"incarnation"`
+	Incarnation model.RepositoryIncarnation `json:"incarnation"`
 	Items       bool                        `json:"items"`
 	After       string                      `json:"after"`
 }
@@ -52,7 +53,7 @@ func (s *Service) RegisterCacheMaintenance(ctx context.Context, q *work.Queue) e
 	}
 	return s.cacheMaintenanceTx(ctx, func(ctx context.Context) error {
 		_, err := s.Store.WorkQueue().Get(ctx, KindCacheCleanupSchedule, "scan")
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			return cacheMaintenanceError(
 				s.Store.WorkQueue().Enqueue(ctx, KindCacheCleanupSchedule, "scan", nil, s.now()),
 			)
@@ -61,8 +62,8 @@ func (s *Service) RegisterCacheMaintenance(ctx context.Context, q *work.Queue) e
 	})
 }
 
-func (s *Service) scheduleCacheCleanup(ctx context.Context, _ types.WorkItem) error {
-	configs, err := s.Store.Repos().List(ctx, store.RepoFilter{Class: repo.Remote})
+func (s *Service) scheduleCacheCleanup(ctx context.Context, _ work.WorkItem) error {
+	configs, err := s.Store.Repos().List(ctx, port.RepoFilter{Class: repo.Remote})
 	if err != nil {
 		return fmt.Errorf("item: list cleanup repositories: %w", err)
 	}
@@ -74,11 +75,11 @@ func (s *Service) scheduleCacheCleanup(ctx context.Context, _ types.WorkItem) er
 			// Never overwrite the cursor of a pending or leased batch.
 			if _, err := s.Store.WorkQueue().Get(ctx, KindCacheCleanup, c.Key); err == nil {
 				return nil
-			} else if !errors.Is(err, store.ErrNotFound) {
+			} else if !errors.Is(err, kernel.ErrNotFound) {
 				return cacheMaintenanceError(err)
 			}
 			identity, err := s.Store.RemoteCache().Source(ctx, c.Key)
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, kernel.ErrNotFound) {
 				return nil
 			}
 			if err != nil {
@@ -114,7 +115,7 @@ func (s *Service) enqueueCacheCleanup(ctx context.Context, cursor cacheCleanupCu
 	return nil
 }
 
-func (s *Service) cacheCleanupWork(ctx context.Context, it types.WorkItem) error {
+func (s *Service) cacheCleanupWork(ctx context.Context, it work.WorkItem) error {
 	var cursor cacheCleanupCursor
 	if err := json.Unmarshal(it.Payload, &cursor); err != nil {
 		return fmt.Errorf("item: decode cache cleanup: %w", err)
@@ -123,10 +124,10 @@ func (s *Service) cacheCleanupWork(ctx context.Context, it types.WorkItem) error
 	if err != nil || c.Key == "" {
 		return cacheMaintenanceError(err)
 	}
-	page := store.Page{Limit: CacheCleanupBatch, After: cursor.After}
+	page := kernel.Page{Limit: CacheCleanupBatch, After: cursor.After}
 	var next string
 	if cursor.Items {
-		var items []types.Item
+		var items []model.Item
 		items, next, err = s.Store.Items().Descendants(ctx, c.Key, true, "", page)
 		if err == nil {
 			for _, item := range items {
@@ -136,7 +137,7 @@ func (s *Service) cacheCleanupWork(ctx context.Context, it types.WorkItem) error
 			}
 		}
 	} else {
-		var entries []types.RemoteCacheEntry
+		var entries []model.RemoteCacheEntry
 		entries, next, err = s.Store.RemoteCache().List(ctx, c.Key, "", page)
 		if err == nil {
 			for _, entry := range entries {
@@ -169,7 +170,7 @@ func (s *Service) currentCleanupRepo(
 	cursor cacheCleanupCursor,
 ) (repo.Config, error) {
 	identity, err := s.Store.RemoteCache().Source(ctx, cursor.Repository)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return repo.Config{}, nil
 	}
 	if err != nil {
@@ -209,7 +210,7 @@ func latestUse(times ...time.Time) time.Time {
 func (s *Service) cleanupCacheEntry(
 	ctx context.Context,
 	cursor cacheCleanupCursor,
-	candidate types.RemoteCacheEntry,
+	candidate model.RemoteCacheEntry,
 ) error {
 	return s.cacheMaintenanceTx(ctx, func(ctx context.Context) error {
 		c, err := s.currentCleanupRepo(ctx, cursor)
@@ -226,7 +227,7 @@ func (s *Service) cleanupCacheEntry(
 			return nil
 		}
 		e, err := s.Store.RemoteCache().Read(ctx, token.Key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			if e.ItemID != 0 {
 				return s.Store.RemoteCache().Evict(ctx, token)
 			}
@@ -254,7 +255,7 @@ func (s *Service) cleanupCacheEntry(
 func (s *Service) cleanupCachedItem(
 	ctx context.Context,
 	cursor cacheCleanupCursor,
-	candidate types.Item,
+	candidate model.Item,
 ) error {
 	if candidate.Folder {
 		return nil
@@ -265,7 +266,7 @@ func (s *Service) cleanupCachedItem(
 			return cacheMaintenanceError(err)
 		}
 		item, err := s.Store.Items().GetByID(ctx, candidate.ID)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			return nil
 		}
 		if err != nil {
@@ -283,7 +284,7 @@ func (s *Service) cleanupCachedItem(
 		}
 		// Deleting an owner also removes its sidecars. A recently downloaded
 		// signature must not disappear merely because its owner is older.
-		sidecars, err := s.sidecarsOf(ctx, c, true, []types.Item{item})
+		sidecars, err := s.sidecarsOf(ctx, c, true, []model.Item{item})
 		if err != nil {
 			return err
 		}
@@ -311,7 +312,7 @@ func (s *Service) cleanupCachedItem(
 func (s *Service) cachedItemUnused(
 	ctx context.Context,
 	c repo.Config,
-	item types.Item,
+	item model.Item,
 ) (bool, error) {
 	stats, err := s.Store.Items().Stats(ctx, item.ID)
 	if err != nil {
@@ -320,7 +321,7 @@ func (s *Service) cachedItemUnused(
 	used := latestUse(item.Created, stats.LastDownloaded)
 	// A path's representations share an item slot. Any recent representation
 	// protects the item; raw metadata is independently evicted in the first pass.
-	page := store.Page{Limit: CacheCleanupBatch}
+	page := kernel.Page{Limit: CacheCleanupBatch}
 	for {
 		entries, next, err := s.Store.RemoteCache().List(ctx, c.Key, item.FullPath(), page)
 		if err != nil {

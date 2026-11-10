@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // filtersHeader names the filters a referrers answer applied (end-12b), so
@@ -37,7 +37,7 @@ type referrersIndex struct {
 // may not exist, is an empty index: the API answers no 404 (end-12a). A
 // reference that is no digest is refused with DIGEST_INVALID.
 func (g *Registry) getReferrers(w http.ResponseWriter, r *http.Request, q Request) {
-	if err := q.Require(r, q.Name+"/", types.ActionRead); err != nil {
+	if err := q.Require(r, q.Name+"/", api.ActionRead); err != nil {
 		Write(w, err)
 		return
 	}

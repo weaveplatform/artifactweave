@@ -11,10 +11,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cargo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func lifecycleCrate(t *testing.T, name, version string) []byte {
@@ -70,7 +70,7 @@ func TestUnitCrateLifecycleAndReindex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	check := func(it types.Item) {
+	check := func(it model.Item) {
 		t.Helper()
 		props, err := st.Items().Properties(ctx, it.ID)
 		if err != nil || len(props[cargo.RecordProperty]) != 1 ||
@@ -87,7 +87,7 @@ func TestUnitCrateLifecycleAndReindex(t *testing.T) {
 		t.Fatal(err)
 	}
 	check(stored)
-	if err := st.Items().PatchProperties(ctx, stored.ID, types.Properties{
+	if err := st.Items().PatchProperties(ctx, stored.ID, model.Properties{
 		cargo.RecordProperty: {"invalid JSON"}, cargo.YankedProperty: {"true"},
 	}, nil, stored.Updated); err != nil {
 		t.Fatal(err)
@@ -205,10 +205,10 @@ func TestUnitHandlerRejectsInvalidWrites(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Deployed(ctx, items.Env(), c, types.Item{Folder: true}); err != nil {
+	if err := h.Deployed(ctx, items.Env(), c, model.Item{Folder: true}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Deployed(ctx, items.Env(), c, types.Item{Name: "anything.txt"}); err != nil {
+	if err := h.Deployed(ctx, items.Env(), c, model.Item{Name: "anything.txt"}); err != nil {
 		t.Fatal(err)
 	}
 }

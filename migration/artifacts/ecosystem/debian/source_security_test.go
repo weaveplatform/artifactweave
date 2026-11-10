@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitSourceDescriptorRejectsCorruptDeclarations(t *testing.T) {
@@ -302,8 +302,8 @@ func dpkgSourceIndexEntry(t *testing.T) IndexedSource {
 	return entry
 }
 
-func sourceTestChecksums(body []byte) types.Checksums {
+func sourceTestChecksums(body []byte) kernel.Checksums {
 	sha := sha256.Sum256(body)
 	md5sum := md5.Sum(body) //nolint:gosec // Debian Sources wire checksum.
-	return types.Checksums{SHA256: fmt.Sprintf("%x", sha), MD5: fmt.Sprintf("%x", md5sum)}
+	return kernel.Checksums{SHA256: fmt.Sprintf("%x", sha), MD5: fmt.Sprintf("%x", md5sum)}
 }

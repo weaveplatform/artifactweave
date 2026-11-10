@@ -7,11 +7,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -27,7 +29,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...harness.Tune) *itemWorld
 	t.Helper()
 	db := inmem.New()
 	cheapSeed(t, db)
-	for _, user := range []types.User{
+	for _, user := range []model.User{
 		{Name: "reader", PasswordHash: cheapHash, Groups: []string{authn.ReadersGroup}},
 		{Name: "deployer", PasswordHash: cheapHash},
 		{Name: "user", PasswordHash: cheapHash},
@@ -36,19 +38,20 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...harness.Tune) *itemWorld
 			t.Fatal(err)
 		}
 	}
-	if err := db.Permissions().Create(t.Context(), types.Permission{
+	if err := db.Permissions().Create(t.Context(), model.Permission{
 		Name: "deploy-libs",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"deployer": types.ActionRead | types.ActionWrite,
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{
+				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]types.Target{"libs-local": {Include: []string{"**"}}},
+			Targets: map[string]model.Target{"libs-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if anonymous {
-		if err := db.Settings().Put(t.Context(), types.SettingAnonymousAccess, true); err != nil {
+		if err := db.Settings().
+			Put(t.Context(), settings.SettingAnonymousAccess, true); err != nil {
 			t.Fatal(err)
 		}
 	}

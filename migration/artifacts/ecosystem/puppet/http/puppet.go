@@ -14,15 +14,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/mod/semver"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	puppetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const mediaType = "application/json"
@@ -96,7 +97,7 @@ func Protocol(o Options) pkgroute.Protocol {
 
 type release struct {
 	meta       puppetfmt.Metadata
-	item       types.Item
+	item       model.Item
 	member     *http.Request
 	remoteURL  string
 	revalidate func(context.Context) error
@@ -181,7 +182,7 @@ func (h handler) releases(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(400, "invalid Puppet offset"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
 	releases, err := h.lookup(r, name)
@@ -219,7 +220,7 @@ func (h handler) release(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(400, "invalid Puppet release"))
 		return
 	}
-	if !h.k.Require(w, r, puppetfmt.Path(name, version), types.ActionRead) {
+	if !h.k.Require(w, r, puppetfmt.Path(name, version), api.ActionRead) {
 		return
 	}
 	releases, err := h.lookup(r, name)
@@ -269,7 +270,7 @@ func (h handler) module(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(400, "invalid Puppet module"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
 	releases, err := h.lookup(r, name)
@@ -296,7 +297,7 @@ func (h handler) modules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := q.Get("query")
-	if !h.k.RequireFolder(w, r, name, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
 	releases, err := h.lookup(r, name)
@@ -328,7 +329,7 @@ func (h handler) archive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := puppetfmt.Path(name, version)
-	if !h.k.Require(w, r, path, types.ActionRead) {
+	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
 	releases, err := h.lookup(r, name)
@@ -390,7 +391,7 @@ func (h handler) lookup(r *http.Request, name string) ([]release, error) {
 func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	q := pkgroute.RequestFrom(r)
 	p, err := h.k.DB().Packages().Find(r.Context(), q.Repo.Key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil, nil
 	}
 	if err != nil {
@@ -406,7 +407,7 @@ func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	out := make([]release, 0, len(versions))
 	for _, v := range versions {
 		path := puppetfmt.Path(name, v.Version)
-		if !h.k.Can(r, path, types.ActionRead) ||
+		if !h.k.Can(r, path, api.ActionRead) ||
 			generic.CheckDownload(q.Repo, path, false) != nil {
 			continue
 		}
@@ -430,7 +431,7 @@ func (h handler) virtual(r *http.Request, name string) ([]release, error) {
 	byVersion := map[string]release{}
 	for _, key := range q.Repo.Repositories {
 		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -440,20 +441,20 @@ func (h handler) virtual(r *http.Request, name string) ([]release, error) {
 		if err != nil {
 			return nil, err //nolint:wrapcheck // protocol class refusal
 		}
-		if !h.k.CanFolder(mr, name, types.ActionRead) {
+		if !h.k.CanFolder(mr, name, api.ActionRead) {
 			continue
 		}
 		found, err := h.lookup(mr, name)
 		if err != nil {
 			var response *apierror.Error
-			if errors.Is(err, store.ErrNotFound) ||
+			if errors.Is(err, kernel.ErrNotFound) ||
 				errors.As(err, &response) && response.Status == http.StatusNotFound {
 				continue
 			}
 			return nil, err
 		}
 		for _, v := range found {
-			if !h.k.Can(r, v.meta.Path, types.ActionRead) ||
+			if !h.k.Can(r, v.meta.Path, api.ActionRead) ||
 				generic.CheckDownload(q.Repo, v.meta.Path, false) != nil {
 				continue
 			}

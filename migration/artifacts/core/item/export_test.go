@@ -3,7 +3,7 @@ package item
 import (
 	"context"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // NonUniqueSnapshot is nonUniqueSnapshot, for the parity test in package
@@ -30,8 +30,8 @@ var (
 func (s *Service) CleanupCachedItem(
 	ctx context.Context,
 	repository string,
-	incarnation types.RepositoryIncarnation,
-	candidate types.Item,
+	incarnation model.RepositoryIncarnation,
+	candidate model.Item,
 ) error {
 	return s.cleanupCachedItem(
 		ctx,

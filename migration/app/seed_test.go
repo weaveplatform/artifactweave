@@ -15,11 +15,13 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 func adminPasswordIs(t *testing.T, st *inmem.Store, password string) bool {
@@ -86,8 +88,8 @@ func TestAccSeedUsesConfiguredPassword(t *testing.T) {
 	}
 	// The seed creates the build-info repository through the artifacts
 	// module's binding, so it lands in the store app passes.
-	bi, err := db.Repos().Get(context.Background(), types.BuildInfoRepository)
-	if err != nil || bi.Key != types.BuildInfoRepository {
+	bi, err := db.Repos().Get(context.Background(), api.BuildInfoRepository)
+	if err != nil || bi.Key != api.BuildInfoRepository {
 		t.Fatalf("build-info repository = %+v, %v", bi, err)
 	}
 	if _, err := os.Stat(filepath.Join(cfg.DataDir, InitialPasswordFile)); !os.IsNotExist(err) {
@@ -102,16 +104,16 @@ type hidden struct {
 	hide atomic.Int32
 }
 
-func (h *hidden) Settings() store.SettingsStore { return hiddenSettings{h.Store.Settings(), h} }
+func (h *hidden) Settings() settings.SettingsStore { return hiddenSettings{h.Store.Settings(), h} }
 
 type hiddenSettings struct {
-	store.SettingsStore
+	settings.SettingsStore
 	h *hidden
 }
 
 func (s hiddenSettings) Get(ctx context.Context, key string, into any) error {
-	if key == types.SettingSeeded && s.h.hide.Add(-1) >= 0 {
-		return store.ErrNotFound
+	if key == settings.SettingSeeded && s.h.hide.Add(-1) >= 0 {
+		return kernel.ErrNotFound
 	}
 	return s.SettingsStore.Get(ctx, key, into) //nolint:wrapcheck // test double
 }
@@ -164,7 +166,7 @@ func TestAccSeedErrors(t *testing.T) {
 	}
 
 	db := inmem.New()
-	if err := db.Groups().Create(ctx, types.Group{Name: authn.ReadersGroup}); err != nil {
+	if err := db.Groups().Create(ctx, model.Group{Name: authn.ReadersGroup}); err != nil {
 		t.Fatal(err)
 	}
 	cfg = testConfig(t)

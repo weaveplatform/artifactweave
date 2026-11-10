@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var nixStatusPart = statusPart{
@@ -55,15 +55,15 @@ var nixMatrixPart = matrixPart{
 			if c.as != "admin" {
 				continue
 			}
-			action := types.ActionRead
+			action := api.ActionRead
 			if strings.HasPrefix(c.route, "PUT ") {
-				action = types.ActionWrite
+				action = api.ActionWrite
 			}
 			if strings.HasPrefix(c.route, "DELETE ") {
-				action = types.ActionDelete
+				action = api.ActionDelete
 			}
 			if strings.HasPrefix(c.route, "POST ") {
-				action = types.ActionManage
+				action = api.ActionManage
 			}
 			rows = append(
 				rows,

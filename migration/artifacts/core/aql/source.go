@@ -5,17 +5,18 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // BuildRuns reads the build runs an AQL include of builds reaches: the runs
 // that hold a file as an artifact or as a dependency, a run by ID and a
 // run's promotions. Each method keeps the build store's contract.
 type BuildRuns interface {
-	FindArtifacts(ctx context.Context, c types.Checksums) ([]types.BuildFileRef, error)
-	FindDependencies(ctx context.Context, c types.Checksums) ([]types.BuildFileRef, error)
-	ByID(ctx context.Context, id int64) (types.Build, error)
-	Promotions(ctx context.Context, buildID int64) ([]types.BuildPromotion, error)
+	FindArtifacts(ctx context.Context, c kernel.Checksums) ([]model.BuildFileRef, error)
+	FindDependencies(ctx context.Context, c kernel.Checksums) ([]model.BuildFileRef, error)
+	ByID(ctx context.Context, id int64) (model.Build, error)
+	Promotions(ctx context.Context, buildID int64) ([]model.BuildPromotion, error)
 }
 
 // ItemSearch runs the item search that nested files are read through: the
@@ -44,12 +45,12 @@ func (a aqlSource) RunsWithFile(
 	ctx context.Context,
 	dependency bool,
 	sha1 string,
-) ([]types.Build, error) {
+) ([]model.Build, error) {
 	find := a.builds.FindArtifacts
 	if dependency {
 		find = a.builds.FindDependencies
 	}
-	refs, err := find(ctx, types.Checksums{SHA1: sha1})
+	refs, err := find(ctx, kernel.Checksums{SHA1: sha1})
 	if err != nil {
 		return nil, fmt.Errorf("find build files: %w", err)
 	}
@@ -60,7 +61,7 @@ func (a aqlSource) RunsWithFile(
 		}
 	}
 	slices.Sort(ids)
-	out := make([]types.Build, 0, len(ids))
+	out := make([]model.Build, 0, len(ids))
 	for _, id := range ids {
 		b, err := a.Run(ctx, id)
 		if err != nil {
@@ -90,7 +91,7 @@ func (a aqlSource) ItemsWithSHA1(ctx context.Context, sha1 string) ([]Hit, error
 	return hits, nil
 }
 
-func (a aqlSource) Run(ctx context.Context, id int64) (types.Build, error) {
+func (a aqlSource) Run(ctx context.Context, id int64) (model.Build, error) {
 	b, err := a.builds.ByID(ctx, id)
 	if err != nil {
 		return b, fmt.Errorf("build run %d: %w", id, err)
@@ -98,7 +99,7 @@ func (a aqlSource) Run(ctx context.Context, id int64) (types.Build, error) {
 	return b, nil
 }
 
-func (a aqlSource) RunPromotions(ctx context.Context, id int64) ([]types.BuildPromotion, error) {
+func (a aqlSource) RunPromotions(ctx context.Context, id int64) ([]model.BuildPromotion, error) {
 	ps, err := a.builds.Promotions(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("promotions of build run %d: %w", id, err)

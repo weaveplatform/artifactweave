@@ -11,13 +11,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	bowerfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // stashPointer treats the documented SSH address as a Git locator, never an
@@ -87,7 +88,7 @@ func (h handler) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name, raw := form.Get("name"), form.Get("url")
-	if !h.k.RequireFolder(w, r, name, types.ActionWrite) {
+	if !h.k.RequireFolder(w, r, name, api.ActionWrite) {
 		return
 	}
 	target, err := h.registrationTarget(r, name, raw)
@@ -95,7 +96,7 @@ func (h handler) register(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
 	}
-	if !h.k.RequireFolder(w, target, name, types.ActionWrite) {
+	if !h.k.RequireFolder(w, target, name, api.ActionWrite) {
 		return
 	}
 	selected := pkgroute.RequestFrom(target).Repo
@@ -114,9 +115,9 @@ func (h handler) register(w http.ResponseWriter, r *http.Request) {
 		}
 		return h.k.DB().
 			BowerRegistrations().
-			Create(ctx, types.BowerRegistration{RepoKey: selected.Key, Name: name, URL: raw})
+			Create(ctx, model.BowerRegistration{RepoKey: selected.Key, Name: name, URL: raw})
 	})
-	if errors.Is(err, store.ErrConflict) {
+	if errors.Is(err, kernel.ErrConflict) {
 		h.k.Error(w, r, apierror.New(http.StatusForbidden, "Bower package is already registered"))
 		return
 	}
@@ -156,13 +157,13 @@ func (h handler) registrationTarget(r *http.Request, name, raw string) (*http.Re
 func (h handler) registrationNames(r *http.Request, query string) ([]string, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	var out []string
-	for page := (store.Page{Limit: store.MaxLimit}); ; {
+	for page := (kernel.Page{Limit: kernel.MaxLimit}); ; {
 		rows, next, err := h.k.DB().BowerRegistrations().List(r.Context(), c.Key, page)
 		if err != nil {
 			return nil, fmt.Errorf("bower registrations: %w", err)
 		}
 		for _, v := range rows {
-			if !strings.Contains(v.Name, query) || !h.k.CanFolder(r, v.Name, types.ActionRead) {
+			if !strings.Contains(v.Name, query) || !h.k.CanFolder(r, v.Name, api.ActionRead) {
 				continue
 			}
 			if _, err := gitPointerURL(c, v.Name, v.URL); err == nil {

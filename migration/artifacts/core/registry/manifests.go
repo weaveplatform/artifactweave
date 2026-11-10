@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // BlobsUnknownError is a manifest that references blobs the image does
@@ -92,7 +92,7 @@ func (s *Service) folderState(
 	items := s.Store.Items()
 	dir := o.Name + "/" + folder
 	f, err := items.Get(ctx, o.Repo.Key, false, dir)
-	if errors.Is(err, store.ErrNotFound) || (err == nil && !f.Folder) {
+	if errors.Is(err, kernel.ErrNotFound) || (err == nil && !f.Folder) {
 		// A file in the way is the deploy's conflict to report.
 		return false, false, nil
 	}
@@ -101,7 +101,7 @@ func (s *Service) folderState(
 	}
 	for _, file := range []string{layout.ManifestFile, layout.ListManifestFile} {
 		it, err := items.Get(ctx, o.Repo.Key, false, dir+"/"+file)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -170,7 +170,7 @@ func (s *Service) present(
 	o Owner,
 	descs []layout.Descriptor,
 ) ([]string, error) {
-	return s.sized(descs, func(hex string) (types.Item, error) {
+	return s.sized(descs, func(hex string) (model.Item, error) {
 		return layout.FindBlob(ctx, s.Store.Items(), o.Repo.Key, o.Name, hex)
 	})
 }
@@ -182,7 +182,7 @@ func (s *Service) present(
 // 0031 answers it; a digest under another algorithm cannot be stored here,
 // so it is missing.
 func (s *Service) childrenPresent(ctx context.Context, o Owner, descs []layout.Descriptor) error {
-	_, err := s.sized(descs, func(hex string) (types.Item, error) {
+	_, err := s.sized(descs, func(hex string) (model.Item, error) {
 		return layout.FindManifest(ctx, s.Store.Items(), o.Repo.Key, o.Name, hex)
 	})
 	return err
@@ -193,7 +193,7 @@ func (s *Service) childrenPresent(ctx context.Context, o Owner, descs []layout.D
 // wins over sizes, and a found item of another size a *SizeMismatchError.
 func (s *Service) sized(
 	descs []layout.Descriptor,
-	find func(hex string) (types.Item, error),
+	find func(hex string) (model.Item, error),
 ) ([]string, error) {
 	var found, missing []string
 	var mismatched []SizeMismatch
@@ -203,7 +203,7 @@ func (s *Service) sized(
 		stored, seen := sizes[d.Digest]
 		if !seen {
 			hex, ok := layout.SHA256Hex(d.Digest)
-			it, err := types.Item{}, store.ErrNotFound
+			it, err := model.Item{}, kernel.ErrNotFound
 			if ok {
 				it, err = find(hex)
 			}
@@ -211,7 +211,7 @@ func (s *Service) sized(
 			case err == nil:
 				found = append(found, hex)
 				stored = it.Size
-			case errors.Is(err, store.ErrNotFound):
+			case errors.Is(err, kernel.ErrNotFound):
 				missing = append(missing, d.Digest)
 				stored = -1
 			default:
@@ -285,7 +285,7 @@ func (s *Service) putFolder(
 	// the originals.
 	_, err = items.DeployCommitted(ctx, item.Deploy{
 		Target:     item.Target{Repo: p.Repo, Path: dir + "/" + m.File()},
-		Declared:   types.Checksums{SHA256: m.Digest},
+		Declared:   kernel.Checksums{SHA256: m.Digest},
 		Properties: layout.Properties(m, p.Name, folder, cfg),
 		By:         p.By,
 		Trusted:    true,
@@ -296,7 +296,7 @@ func (s *Service) putFolder(
 	for _, hex := range blobs {
 		_, err := items.DeployByChecksum(ctx, item.Deploy{
 			Target:   item.Target{Repo: p.Repo, Path: dir + "/" + layout.BlobFile(hex)},
-			Declared: types.Checksums{SHA256: hex},
+			Declared: kernel.Checksums{SHA256: hex},
 			By:       p.By,
 		})
 		if errors.Is(err, item.ErrNoBlob) {

@@ -19,8 +19,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var (
@@ -96,7 +94,7 @@ func (s CranAPI) serveCranIndex(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.Folder(c, feed, types.ActionRead) || !acc.File(c, req.Path, types.ActionRead) ||
+	if !acc.Folder(c, feed, accessapi.ActionRead) || !acc.File(c, req.Path, accessapi.ActionRead) ||
 		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
@@ -160,7 +158,7 @@ func cranPackageReadable(
 	ctx context.Context, c repo.Config, p string, acc itemkit.Access,
 	check func(context.Context, string) error,
 ) (bool, error) {
-	if !acc.File(c, p, types.ActionRead) || generic.CheckDownload(c, p, false) != nil {
+	if !acc.File(c, p, accessapi.ActionRead) || generic.CheckDownload(c, p, false) != nil {
 		return false, nil
 	}
 	if check != nil {
@@ -221,7 +219,7 @@ func (s CranAPI) cranMemberIndex(
 		}
 	} else {
 		if c.Class != repo.Local && c.Class != repo.Federated || cached {
-			return view, store.ErrNotFound
+			return view, kernel.ErrNotFound
 		}
 		if err := s.Await(ctx, st, cran.KindIndex, c.Key); err != nil {
 			return view, fmt.Errorf("cran: refresh index: %w", err)
@@ -231,7 +229,7 @@ func (s CranAPI) cranMemberIndex(
 			return view, getErr //nolint:wrapcheck // ErrNotFound is the answer.
 		}
 		if it.Folder {
-			return view, store.ErrNotFound
+			return view, kernel.ErrNotFound
 		}
 		body, err = s.readCranBlob(ctx, it.Actual.SHA256)
 		if err != nil {
@@ -282,7 +280,7 @@ func (s CranAPI) cranCandidates(
 	selected := map[string]bool{}
 	for _, key := range c.Repositories {
 		member, err := st.Repos().Get(ctx, key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -292,8 +290,8 @@ func (s CranAPI) cranCandidates(
 			return nil, fmt.Errorf("%w: %s", errCranMemberType, key)
 		}
 		feed, _, _ := cran.IndexPath(indexPath)
-		if !acc.Folder(member, feed, types.ActionRead) ||
-			!acc.File(member, indexPath, types.ActionRead) ||
+		if !acc.Folder(member, feed, accessapi.ActionRead) ||
+			!acc.File(member, indexPath, accessapi.ActionRead) ||
 			generic.CheckDownload(member, indexPath, false) != nil {
 			continue
 		}
@@ -325,7 +323,7 @@ func (s CranAPI) cranCandidates(
 				}
 			}
 		}
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -333,7 +331,7 @@ func (s CranAPI) cranCandidates(
 		}
 		for _, entry := range entries {
 			if selected[entry.pkg.Name] ||
-				!acc.File(c, entry.pkg.Path, types.ActionRead) ||
+				!acc.File(c, entry.pkg.Path, accessapi.ActionRead) ||
 				generic.CheckDownload(c, entry.pkg.Path, false) != nil {
 				continue
 			}
@@ -352,7 +350,7 @@ func (s CranAPI) serveCranPackage(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.File(c, req.Path, types.ActionRead) ||
+	if !acc.File(c, req.Path, accessapi.ActionRead) ||
 		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
@@ -412,7 +410,7 @@ func (s CranAPI) serveRemoteCranPackage(
 		CacheOnly: cached,
 		Resource: source.Resource{
 			Kind: source.ResourceKindArtifact, Path: req.Path, Method: r.Method,
-			Checksums: types.Checksums{MD5: expected.MD5},
+			Checksums: kernel.Checksums{MD5: expected.MD5},
 		},
 	}
 	query, err := itemkit.CranSourceRequest(query)

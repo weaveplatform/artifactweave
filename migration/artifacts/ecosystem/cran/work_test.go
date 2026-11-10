@@ -13,9 +13,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 type cranReadCloser struct{ *bytes.Reader }
@@ -34,25 +36,25 @@ func (b cranFixtureBlobs) Stat(_ context.Context, _ string) (blob.Info, error) {
 
 type cranStorageFault struct {
 	format.Store
-	packages store.PackageStore
+	packages port.PackageStore
 }
 
-func (s cranStorageFault) Packages() store.PackageStore { return s.packages }
+func (s cranStorageFault) Packages() port.PackageStore { return s.packages }
 
 type cranPackageStoreFault struct {
-	store.PackageStore
+	port.PackageStore
 	err error
 }
 
-func (s cranPackageStoreFault) Ensure(context.Context, types.Package) (types.Package, error) {
-	return types.Package{}, s.err
+func (s cranPackageStoreFault) Ensure(context.Context, model.Package) (model.Package, error) {
+	return model.Package{}, s.err
 }
 
 func (s cranPackageStoreFault) List(
 	context.Context,
 	string,
-	store.Page,
-) ([]types.Package, string, error) {
+	kernel.Page,
+) ([]model.Package, string, error) {
 	return nil, "", s.err
 }
 
@@ -81,9 +83,9 @@ func TestUnitCRANStorageFailuresStopPackagePublication(t *testing.T) {
 		t.Fatal(err)
 	}
 	hash := sha256.Sum256(body)
-	it, err := st.Items().Put(t.Context(), types.Item{
+	it, err := st.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Name: packagePath, Size: int64(len(body)),
-		Actual: types.Checksums{SHA256: fmt.Sprintf("%x", hash)},
+		Actual: kernel.Checksums{SHA256: fmt.Sprintf("%x", hash)},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -124,15 +126,15 @@ func TestUnitCRANLifecycleRegeneratesOnlyAdvertisedPackages(t *testing.T) {
 		t.Fatal(err)
 	}
 	hash := sha256.Sum256(body)
-	it, err := st.Items().Put(t.Context(), types.Item{
+	it, err := st.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Name: packagePath, Size: int64(len(body)),
-		Actual: types.Checksums{SHA256: fmt.Sprintf("%x", hash)},
+		Actual: kernel.Checksums{SHA256: fmt.Sprintf("%x", hash)},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	stale := "src/contrib/PACKAGES"
-	if _, err := st.Items().Put(t.Context(), types.Item{
+	if _, err := st.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Name: stale, Size: 7,
 	}); err != nil {
 		t.Fatal(err)
@@ -143,13 +145,13 @@ func TestUnitCRANLifecycleRegeneratesOnlyAdvertisedPackages(t *testing.T) {
 	env := format.Env{
 		Store:      st,
 		Inspection: inspection{sha: it.Actual.SHA256, path: packagePath, pkg: pkg},
-		Derive: func(_ context.Context, d format.Derived) (types.Item, error) {
+		Derive: func(_ context.Context, d format.Derived) (model.Item, error) {
 			body, err := io.ReadAll(d.Body)
 			if err != nil {
-				return types.Item{}, err
+				return model.Item{}, err
 			}
 			generated[d.Path] = body
-			return types.Item{}, nil
+			return model.Item{}, nil
 		},
 		Underive: func(_ context.Context, _ repo.Config, _ bool, path string) error {
 			removed[path] = true
@@ -171,13 +173,13 @@ func TestUnitCRANLifecycleRegeneratesOnlyAdvertisedPackages(t *testing.T) {
 	if err != nil || len(props[PropName]) != 1 || props[PropName][0] != "assertthat" {
 		t.Fatalf("deployed package properties = %v, %+v", err, props)
 	}
-	if err := h.Work(t.Context(), env, types.WorkItem{Kind: KindIndex, Key: c.Key}); err != nil {
+	if err := h.Work(t.Context(), env, work.WorkItem{Kind: KindIndex, Key: c.Key}); err != nil {
 		t.Fatal(err)
 	}
-	env.Derive = func(_ context.Context, _ format.Derived) (types.Item, error) {
-		return types.Item{}, errors.New("derived storage unavailable")
+	env.Derive = func(_ context.Context, _ format.Derived) (model.Item, error) {
+		return model.Item{}, errors.New("derived storage unavailable")
 	}
-	if err := h.Work(t.Context(), env, types.WorkItem{Kind: KindIndex, Key: c.Key}); err == nil {
+	if err := h.Work(t.Context(), env, work.WorkItem{Kind: KindIndex, Key: c.Key}); err == nil {
 		t.Fatal("failed derived index publication was ignored")
 	}
 	plain := generated[stale]
@@ -195,7 +197,7 @@ func TestUnitCRANLifecycleRegeneratesOnlyAdvertisedPackages(t *testing.T) {
 	if err := h.Deleting(t.Context(), env, c, it); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Deleted(t.Context(), env, c, []types.Item{it, it}); err != nil {
+	if err := h.Deleted(t.Context(), env, c, []model.Item{it, it}); err != nil {
 		t.Fatal(err)
 	}
 	if queued < 3 {
@@ -210,7 +212,7 @@ func TestUnitCRANIndexWorkRemovesStaleMetadataAfterLastPackage(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"PACKAGES", "PACKAGES.gz"} {
-		if _, err := st.Items().Put(t.Context(), types.Item{
+		if _, err := st.Items().Put(t.Context(), model.Item{
 			RepoKey: c.Key, Name: "src/contrib/" + name, Size: 1,
 		}); err != nil {
 			t.Fatal(err)
@@ -227,7 +229,7 @@ func TestUnitCRANIndexWorkRemovesStaleMetadataAfterLastPackage(t *testing.T) {
 	if err := (Handler{}).Work(
 		t.Context(),
 		env,
-		types.WorkItem{Kind: KindIndex, Key: c.Key},
+		work.WorkItem{Kind: KindIndex, Key: c.Key},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +241,7 @@ func TestUnitCRANIndexWorkRemovesStaleMetadataAfterLastPackage(t *testing.T) {
 	if err := (Handler{}).Work(
 		t.Context(),
 		env,
-		types.WorkItem{Kind: KindIndex, Key: "absent"},
+		work.WorkItem{Kind: KindIndex, Key: "absent"},
 	); err != nil {
 		t.Fatalf("deleted repository work must be harmless: %v", err)
 	}
@@ -249,7 +251,7 @@ func TestUnitCRANIndexWorkRemovesStaleMetadataAfterLastPackage(t *testing.T) {
 	if err := (Handler{}).Work(
 		t.Context(),
 		env,
-		types.WorkItem{Kind: KindIndex, Key: c.Key},
+		work.WorkItem{Kind: KindIndex, Key: c.Key},
 	); err == nil {
 		t.Fatal("failed stale index removal was ignored")
 	}
@@ -260,7 +262,7 @@ func TestUnitCRANIndexWorkRemovesStaleMetadataAfterLastPackage(t *testing.T) {
 	if err := (Handler{}).Work(
 		t.Context(),
 		env,
-		types.WorkItem{Kind: KindIndex, Key: remote.Key},
+		work.WorkItem{Kind: KindIndex, Key: remote.Key},
 	); err != nil {
 		t.Fatalf("remote index must not derive local metadata: %v", err)
 	}
@@ -275,7 +277,7 @@ func TestUnitCRANInspectsCommittedBytesBeforeAdmission(t *testing.T) {
 	hash := sha256.Sum256(body)
 	w := format.Write{
 		Op: format.OpDeploy, Path: p,
-		Checksums: types.Checksums{SHA256: fmt.Sprintf("%x", hash)},
+		Checksums: kernel.Checksums{SHA256: fmt.Sprintf("%x", hash)},
 	}
 	h := Handler{}
 	c := repo.Config{Key: "cran-local", Class: repo.Local, PackageType: repo.Cran}
@@ -314,7 +316,7 @@ func TestUnitCRANRejectsMissingCommittedBytesAndFailedWorkQueue(t *testing.T) {
 	if _, err := h.Inspect(t.Context(), format.Env{}, c, w); err == nil {
 		t.Fatal("package with no committed blob passed inspection")
 	}
-	it := types.Item{RepoKey: c.Key, Name: w.Path}
+	it := model.Item{RepoKey: c.Key, Name: w.Path}
 	if err := h.Deployed(t.Context(), format.Env{}, c, it); err == nil {
 		t.Fatal("package with no committed blob passed deployment")
 	}
@@ -333,7 +335,7 @@ func TestUnitCRANLifecycleRefusesPersistedPackageWithoutContent(t *testing.T) {
 	if err := st.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	it, err := st.Items().Put(t.Context(), types.Item{
+	it, err := st.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Name: "src/contrib/assertthat_0.2.1.tar.gz", Size: 12742,
 	})
 	if err != nil {
@@ -347,9 +349,9 @@ func TestUnitCRANLifecycleRefusesPersistedPackageWithoutContent(t *testing.T) {
 	}{
 		{"reindex", func() error { return h.Reindex(t.Context(), env, c) }},
 		{"index work", func() error {
-			return h.Work(t.Context(), env, types.WorkItem{Kind: KindIndex, Key: c.Key})
+			return h.Work(t.Context(), env, work.WorkItem{Kind: KindIndex, Key: c.Key})
 		}},
-		{"deletion reconciliation", func() error { return h.Deleted(t.Context(), env, c, []types.Item{it}) }},
+		{"deletion reconciliation", func() error { return h.Deleted(t.Context(), env, c, []model.Item{it}) }},
 		{"version reconciliation", func() error {
 			return syncVersion(t.Context(), env, c, "assertthat", "0.2.1")
 		}},
@@ -370,22 +372,22 @@ func TestUnitCRANLifecycleSkipsIrrelevantItemsAndHonorsCancellation(t *testing.T
 	}
 	h := Handler{}
 	env := format.Env{Store: st}
-	folder := types.Item{RepoKey: c.Key, Name: "src/contrib", Folder: true}
+	folder := model.Item{RepoKey: c.Key, Name: "src/contrib", Folder: true}
 	if err := h.Deployed(t.Context(), env, c, folder); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.Deleting(t.Context(), env, c, folder); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Deleted(t.Context(), env, c, []types.Item{{
+	if err := h.Deleted(t.Context(), env, c, []model.Item{{
 		RepoKey: c.Key, Name: "src/contrib/README",
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Work(t.Context(), env, types.WorkItem{Kind: "other", Key: c.Key}); err != nil {
+	if err := h.Work(t.Context(), env, work.WorkItem{Kind: "other", Key: c.Key}); err != nil {
 		t.Fatal(err)
 	}
-	if err := setProperties(t.Context(), st, types.Item{ID: -1}, Package{
+	if err := setProperties(t.Context(), st, model.Item{ID: -1}, Package{
 		Name: "demo", Version: "1.0", Feed: "src/contrib",
 	}); err == nil {
 		t.Fatal("missing item accepted CRAN properties")
@@ -398,7 +400,7 @@ func TestUnitCRANLifecycleSkipsIrrelevantItemsAndHonorsCancellation(t *testing.T
 	}{
 		{"files", func() error { _, err := files(ctx, st, c); return err }},
 		{"reindex", func() error { return h.Reindex(ctx, env, c) }},
-		{"work", func() error { return h.Work(ctx, env, types.WorkItem{Kind: KindIndex, Key: c.Key}) }},
+		{"work", func() error { return h.Work(ctx, env, work.WorkItem{Kind: KindIndex, Key: c.Key}) }},
 		{"version", func() error { return syncVersion(ctx, env, c, "demo", "1.0") }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -411,9 +413,9 @@ func TestUnitCRANLifecycleSkipsIrrelevantItemsAndHonorsCancellation(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	it, err := st.Items().Put(t.Context(), types.Item{
+	it, err := st.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Name: "src/contrib/assertthat_0.2.1.tar.gz",
-		Actual: types.Checksums{SHA256: "fixture"}, Size: int64(len(body)),
+		Actual: kernel.Checksums{SHA256: "fixture"}, Size: int64(len(body)),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -425,7 +427,7 @@ func TestUnitCRANLifecycleSkipsIrrelevantItemsAndHonorsCancellation(t *testing.T
 	if _, err := st.Packages().
 		Find(t.Context(), c.Key, "assertthat"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("absent version was registered: item=%d err=%v", it.ID, err)
 	}
@@ -439,8 +441,8 @@ func TestUnitCRANArchiveAndUnrelatedFilesDoNotEnterTerminalIndex(t *testing.T) {
 	}
 	const archived = "src/contrib/Archive/demo/demo_1.0.tar.gz"
 	for _, p := range []string{archived, "src/contrib/README"} {
-		if _, err := st.Items().Put(t.Context(), types.Item{
-			RepoKey: c.Key, Name: p, Actual: types.Checksums{SHA256: "fixture"},
+		if _, err := st.Items().Put(t.Context(), model.Item{
+			RepoKey: c.Key, Name: p, Actual: kernel.Checksums{SHA256: "fixture"},
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -449,15 +451,15 @@ func TestUnitCRANArchiveAndUnrelatedFilesDoNotEnterTerminalIndex(t *testing.T) {
 	derived := 0
 	env := format.Env{
 		Store: st, Blobs: cranFixtureBlobs{body: body},
-		Derive: func(context.Context, format.Derived) (types.Item, error) {
+		Derive: func(context.Context, format.Derived) (model.Item, error) {
 			derived++
-			return types.Item{}, nil
+			return model.Item{}, nil
 		},
 	}
 	if err := (Handler{}).Work(
 		t.Context(),
 		env,
-		types.WorkItem{Kind: KindIndex, Key: c.Key},
+		work.WorkItem{Kind: KindIndex, Key: c.Key},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -470,9 +472,9 @@ func TestUnitCRANLifecycleRefusesMissingPropertyTarget(t *testing.T) {
 	st := inmem.New()
 	c := repo.Config{Key: "cran-local", Class: repo.Local, PackageType: repo.Cran}
 	const p = "src/contrib/demo_1.0.tar.gz"
-	it := types.Item{
+	it := model.Item{
 		ID: -1, RepoKey: c.Key, Name: p,
-		Actual: types.Checksums{SHA256: "fixture"},
+		Actual: kernel.Checksums{SHA256: "fixture"},
 	}
 	env := format.Env{Store: st, Inspection: inspection{
 		sha: "fixture", path: p, pkg: Package{

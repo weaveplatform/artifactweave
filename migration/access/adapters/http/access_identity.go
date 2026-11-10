@@ -13,13 +13,14 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/identity"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // Access v2 users and groups, the basic authentication switch, the password
@@ -79,7 +80,7 @@ func (s AccessService) identityFor(ctx context.Context, self string) (*identity.
 	if err != nil {
 		return nil, s.identityErr(ctx, "evaluate permissions", "", err)
 	}
-	if !d.System("identities", types.ScopeRead) {
+	if !d.System("identities", kernel.ScopeRead) {
 		return nil, kernel.ErrForbidden
 	}
 	return svc, nil
@@ -131,13 +132,13 @@ func (s AccessService) GetUserList(
 		return nil, err
 	}
 	if p.Status != nil && !slices.Contains(
-		[]types.UserStatus{
-			types.UserInvited,
-			types.UserEnabled,
-			types.UserDisabled,
-			types.UserLocked,
+		[]model.UserStatus{
+			model.UserInvited,
+			model.UserEnabled,
+			model.UserDisabled,
+			model.UserLocked,
 		},
-		types.UserStatus(*p.Status),
+		model.UserStatus(*p.Status),
 	) {
 		return nil, httpkit.BadRequestf(
 			"status %q is not one of invited, enabled, disabled or locked",
@@ -156,7 +157,7 @@ func (s AccessService) GetUserList(
 			Descending: httpkit.Deref(p.DescendingOrder),
 			Resource:   resource,
 		},
-		Status: types.UserStatus(httpkit.Deref(p.Status)), OnlyAdmins: httpkit.Deref(p.OnlyAdmins),
+		Status: model.UserStatus(httpkit.Deref(p.Status)), OnlyAdmins: httpkit.Deref(p.OnlyAdmins),
 	}, kernel.Page{After: httpkit.Deref(p.Cursor), Limit: limit})
 	if errors.Is(err, kernel.ErrInvalidCursor) {
 		return nil, httpkit.BadRequestf("cursor is not valid")
@@ -205,7 +206,7 @@ func (s AccessService) CreateUser(
 	if name == "" || len(name) > maxUsernameLength {
 		return nil, httpkit.BadRequestf("username must be 1 to %d characters", maxUsernameLength)
 	}
-	u := types.User{
+	u := model.User{
 		Name:             name,
 		Email:            string(b.Email),
 		Admin:            httpkit.Deref(b.Admin),
@@ -215,7 +216,7 @@ func (s AccessService) CreateUser(
 		),
 		InternalPasswordDisabled: httpkit.Deref(b.InternalPasswordDisabled),
 		Groups:                   httpkit.DerefSlice(b.Groups),
-		Roles: types.RoleFlags{
+		Roles: model.RoleFlags{
 			WatchManager: httpkit.Deref(
 				b.WatchManager,
 			),
@@ -573,13 +574,13 @@ func (s AccessService) CreateGroup(
 		}
 		return nil, httpkit.BadRequestf("LDAP group import is not available in artifactweave")
 	}
-	g := types.Group{
+	g := model.Group{
 		Name:            b.Name,
 		Description:     httpkit.Deref(b.Description),
 		AutoJoin:        httpkit.Deref(b.AutoJoin),
 		AdminPrivileges: httpkit.Deref(b.AdminPrivileges),
 		ExternalID:      httpkit.Deref(b.ExternalId),
-		Roles: types.RoleFlags{
+		Roles: model.RoleFlags{
 			WatchManager: httpkit.Deref(
 				b.WatchManager,
 			),
@@ -677,7 +678,7 @@ func (s AccessService) UpdateGroup(
 // does not change. One sent with its stored value is accepted, and members
 // are ignored, since they have their own endpoint: platform_group PATCHes
 // its whole model.
-func fixedGroupFields(raw []byte, g types.Group) error {
+func fixedGroupFields(raw []byte, g model.Group) error {
 	if len(raw) == 0 {
 		return nil
 	}
@@ -816,7 +817,7 @@ func (s AccessService) SetBasicAuthenticationStatus(
 		return nil, httpkit.BadRequestf("a body with enabled is required")
 	}
 	if err := svc.Store.Settings().
-		Put(ctx, types.SettingBasicAuthEnabled, req.Body.Enabled); err != nil {
+		Put(ctx, settings.SettingBasicAuthEnabled, req.Body.Enabled); err != nil {
 		return nil, s.identityErr(ctx, "set basic authentication switch", "", err)
 	}
 	s.forgetPolicies()
@@ -833,7 +834,7 @@ func (s AccessService) CreatePasswordPolicy(
 	if err != nil {
 		return nil, err
 	}
-	p := types.DefaultPasswordPolicy()
+	p := model.DefaultPasswordPolicy()
 	if req.Body != nil {
 		p = mergePolicy(p, *req.Body)
 	}
@@ -865,7 +866,7 @@ func (s AccessService) UpdatePasswordPolicy(
 	return accessgen.UpdatePasswordPolicy204Response{}, nil
 }
 
-func mergePolicy(p types.PasswordPolicy, b accessgen.PasswordPolicy) types.PasswordPolicy {
+func mergePolicy(p model.PasswordPolicy, b accessgen.PasswordPolicy) model.PasswordPolicy {
 	setIf(&p.Uppercase, b.Uppercase)
 	setIf(&p.Lowercase, b.Lowercase)
 	setIf(&p.Digit, b.Digit)
@@ -912,7 +913,7 @@ func (s AccessService) ConfigureAccessUserLockPolicy(
 	stored, err := svc.SetAccessLockPolicy(ctx, identity.AccessLockPolicy{
 		Attempts:           derefOr(b.Attempts, 0),
 		PasswordExpiryDays: derefOr(b.PasswordExpiryDays, 0),
-		AccessLockSettings: types.AccessLockSettings{
+		AccessLockSettings: model.AccessLockSettings{
 			SecondsToUnlock:                derefOr(b.SecondsToUnlock, 0),
 			AdminPasswordExpirable:         derefOr(b.AdminPasswordExpirable, false),
 			MaxLoginDelayIncorrectAttempts: derefOr(b.MaxLoginDelayIncorrectAttempts, 0),
@@ -959,10 +960,10 @@ func identityResource(resourceType, resourceName *string) (*port.IdentityResourc
 	if resourceType == nil || resourceName == nil {
 		return nil, nil //nolint:nilnil // no filter
 	}
-	rt := types.ResourceType(*resourceType)
+	rt := accessapi.ResourceType(*resourceType)
 	switch rt {
-	case types.ResourceArtifact, types.ResourceBuild, types.ResourceReleaseBundle,
-		types.ResourceDestination, types.ResourcePipelineSource:
+	case accessapi.ResourceArtifact, accessapi.ResourceBuild, accessapi.ResourceReleaseBundle,
+		accessapi.ResourceDestination, accessapi.ResourcePipelineSource:
 		return &port.IdentityResource{Type: rt, Name: *resourceName}, nil
 	default:
 		return nil, httpkit.BadRequestf(
@@ -1016,11 +1017,11 @@ func adminGroups(ctx context.Context, svc *identity.Service) (map[string]bool, e
 }
 
 // effectiveAdmin is the admin flag or membership of an admin group.
-func effectiveAdmin(u types.User, adminGroups map[string]bool) bool {
+func effectiveAdmin(u model.User, adminGroups map[string]bool) bool {
 	return u.Admin || slices.ContainsFunc(u.Groups, func(g string) bool { return adminGroups[g] })
 }
 
-func statusOf(u types.User) accessgen.UserDetailsStatus {
+func statusOf(u model.User) accessgen.UserDetailsStatus {
 	if u.Status == "" {
 		return accessgen.UserDetailsStatusEnabled
 	}
@@ -1029,7 +1030,7 @@ func statusOf(u types.User) accessgen.UserDetailsStatus {
 
 func realmOf(realm string) string {
 	if realm == "" {
-		return types.RealmInternal
+		return model.RealmInternal
 	}
 	return realm
 }

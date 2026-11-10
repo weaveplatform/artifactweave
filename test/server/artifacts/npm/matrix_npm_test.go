@@ -3,8 +3,8 @@ package npm_test
 import (
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // npmMatrixPart is npm's share of the route × principal matrix, which
@@ -15,12 +15,12 @@ var npmMatrixPart = matrixPart{
 	rows: func() []matrixRow {
 		local := npmBase + "npm-local/"
 		reads := func(name string) rule {
-			return holds("npm-local", npmfmt.CanonicalPath(name, "1.0.0"), types.ActionRead)
+			return holds("npm-local", npmfmt.CanonicalPath(name, "1.0.0"), api.ActionRead)
 		}
 		return []matrixRow{
 			// Manage on the repository, which only the administrators hold
 			// here (#293).
-			row(npmReindex, local+"reindex", "", holds("npm-local", "", types.ActionManage), 200),
+			row(npmReindex, local+"reindex", "", holds("npm-local", "", api.ActionManage), 200),
 			row(npmPackument, local+"work", "", reads("work"), 200),
 			row(npmPackument, local+"lib", "", reads("lib"), 200),
 			row(npmManifest, local+"work/1.0.0", "", reads("work"), 200),
@@ -33,13 +33,13 @@ var npmMatrixPart = matrixPart{
 			// Each principal publishes to a fixture of its own: the
 			// version is published once.
 			row(npmPublish, local+"work", npmPublishBody("work", "2.0.0"),
-				holds("npm-local", npmfmt.CanonicalPath("work", "2.0.0"), types.ActionWrite),
+				holds("npm-local", npmfmt.CanonicalPath("work", "2.0.0"), api.ActionWrite),
 				201).alone(),
 			// npm-releases handles no snapshots: a caller who may deploy a
 			// pre-release meets the policy, the rest are refused first.
 			row(npmPublish, npmBase+"npm-releases/work", npmPublishBody("work", "2.0.0-rc.1"),
 				holds("npm-releases", npmfmt.CanonicalPath("work", "2.0.0-rc.1"),
-					types.ActionWrite), 409),
+					api.ActionWrite), 409),
 		}
 	},
 	seed: func(t *testing.T, f *matrixFixture) {

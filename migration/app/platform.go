@@ -32,7 +32,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // errBlobStore reports a blob store that could not be built from a
@@ -51,8 +50,8 @@ type blobTier struct {
 	// writing one directory would each count the other's copies as theirs.
 	root      string
 	storesDir string
-	blobs     store.BlobIndex
-	replicas  store.ReplicaIndex
+	blobs     artport.BlobIndex
+	replicas  artport.ReplicaIndex
 	// lease names the mirror's repair lease. The hot and cold mirrors share
 	// a lease store, so they need different names.
 	lease string
@@ -376,7 +375,7 @@ func logSigning(
 	signs := func(via blob.Via) bool { return signer != nil && signer.Signs(via) }
 	log.InfoContext(ctx, "download redirect routes",
 		"storage", signs(blob.ViaStorage), "cdn", signs(blob.ViaCDN))
-	repos, err := st.Repos().List(ctx, store.RepoFilter{})
+	repos, err := st.Repos().List(ctx, artport.RepoFilter{})
 	if err != nil {
 		log.WarnContext(ctx, "download redirect: listing repositories", "error", err)
 		return

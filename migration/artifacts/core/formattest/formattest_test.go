@@ -16,11 +16,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // backends are the stores the suite's own tests run on, the three that
@@ -88,7 +89,7 @@ func (h tagged) read(ctx context.Context, st format.Store, c repo.Config, p, v s
 ) {
 	out := pkgindex.IndexedVersion{Version: v}
 	files, _, err := st.Items().Descendants(ctx, c.Key, pkgindex.Stored(c).Cached, p+"/"+v,
-		store.Page{Limit: store.MaxLimit})
+		kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		return out, false, err
 	}
@@ -134,7 +135,7 @@ func (h tagged) sync(ctx context.Context, env format.Env, c repo.Config, full st
 	if err != nil || !ok {
 		return err
 	}
-	pkg, err := env.Store.Packages().Ensure(ctx, types.Package{
+	pkg, err := env.Store.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Name: p, Type: c.PackageType, Created: iv.Created,
 	})
 	if err != nil {
@@ -144,7 +145,7 @@ func (h tagged) sync(ctx context.Context, env format.Env, c repo.Config, full st
 	return err
 }
 
-func (h tagged) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (h tagged) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if err := h.sync(ctx, env, c, it.FullPath()); err != nil {
 		return err
 	}
@@ -158,7 +159,7 @@ func (h tagged) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	for _, it := range removed {
 		if err := h.sync(ctx, env, c, it.FullPath()); err != nil {
@@ -172,7 +173,7 @@ func (h tagged) Annotated(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	_ format.Annotation,
 ) error {
 	return h.sync(ctx, env, c, it.FullPath())
@@ -181,7 +182,7 @@ func (h tagged) Annotated(
 func (h tagged) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	return env.Store.Tx(ctx, func(ctx context.Context) error {
 		all, _, err := env.Store.Items().Descendants(ctx, c.Key, pkgindex.Stored(c).Cached, "",
-			store.Page{Limit: store.MaxLimit})
+			kernel.Page{Limit: kernel.MaxLimit})
 		if err != nil {
 			return err
 		}
@@ -228,7 +229,7 @@ func taggedFormat(h format.Handler) Format {
 				},
 			}}
 		},
-		Properties: []types.Properties{{tagKey: {"latest"}}, {tagKey: {"next", "beta"}}},
+		Properties: []model.Properties{{tagKey: {"latest"}}, {tagKey: {"next", "beta"}}},
 		Work:       []string{rebuildKind},
 	}
 }
@@ -250,7 +251,7 @@ func (h indexing) Deployed(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 ) error {
 	if err := h.tagged.Deployed(ctx, env, c, it); err != nil {
 		return err
@@ -262,7 +263,7 @@ func (h indexing) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	if err := h.tagged.Deleted(ctx, env, c, removed); err != nil {
 		return err
@@ -340,7 +341,7 @@ func (h withoutAnnotated) Deployed(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 ) error {
 	return h.t.Deployed(ctx, env, c, it)
 }
@@ -349,7 +350,7 @@ func (h withoutAnnotated) Deleting(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 ) error {
 	return h.t.Deleting(ctx, env, c, it)
 }
@@ -358,7 +359,7 @@ func (h withoutAnnotated) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	r []types.Item,
+	r []model.Item,
 ) error {
 	return h.t.Deleted(ctx, env, c, r)
 }
@@ -386,7 +387,7 @@ func (h noReindex) Deployed(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 ) error {
 	return h.t.Deployed(ctx, env, c, it)
 }
@@ -395,7 +396,7 @@ func (h noReindex) Deleting(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 ) error {
 	return nil
 }
@@ -404,7 +405,7 @@ func (h noReindex) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	r []types.Item,
+	r []model.Item,
 ) error {
 	return h.t.Deleted(ctx, env, c, r)
 }
@@ -416,7 +417,7 @@ func (h skewed) Reindex(ctx context.Context, env format.Env, c repo.Config) erro
 	if err := h.tagged.Reindex(ctx, env, c); err != nil {
 		return err
 	}
-	pkgs, _, err := env.Store.Packages().List(ctx, c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := env.Store.Packages().List(ctx, c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		return err
 	}
@@ -442,7 +443,7 @@ func (h perVersion) Deployed(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 ) error {
 	if err := h.sync(ctx, env, c, it.FullPath()); err != nil {
 		return err
@@ -462,7 +463,7 @@ func (h keyedIndex) Deployed(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 ) error {
 	if err := h.tagged.Deployed(ctx, env, c, it); err != nil {
 		return err
@@ -489,10 +490,10 @@ func (forgetful) Reindex(ctx context.Context, env format.Env, c repo.Config) err
 // escapes the transaction of the write that asked for it.
 type escaped struct {
 	item.Store
-	queue store.WorkQueue
+	queue work.WorkQueue
 }
 
-func (e escaped) WorkQueue() store.WorkQueue { return e.queue }
+func (e escaped) WorkQueue() work.WorkQueue { return e.queue }
 
 // Each way of breaking the contract fails the scenario that guards it.
 func TestUnitTheSuiteCatchesBrokenFormats(t *testing.T) {
@@ -642,7 +643,7 @@ func TestUnitAnIndexWithoutAReindexerFails(t *testing.T) {
 		t.Fatalf("an empty index: %v", err)
 	}
 	if _, err := w.st.Packages().
-		Ensure(w.ctx, types.Package{RepoKey: keyA, Name: "stray"}); err != nil {
+		Ensure(w.ctx, model.Package{RepoKey: keyA, Name: "stray"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.verify(w.a); err == nil || !strings.Contains(err.Error(), "cannot reindex") {

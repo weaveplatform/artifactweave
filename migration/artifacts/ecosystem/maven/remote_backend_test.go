@@ -11,17 +11,18 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func mavenFixture(t *testing.T) (*policyWorld, *MavenBackend) {
@@ -66,7 +67,7 @@ func TestAccMavenSourceAdmissionFaults(t *testing.T) {
 			if _, err := w.db.Items().
 				Get(t.Context(), w.c.Key, true, p); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("failed admission published", err)
 			}
@@ -127,11 +128,11 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 			w.permit.Identity, _ = w.db.RemoteCache().Source(t.Context(), w.c.Key)
 			hash := accesstest.HashPassword(t, "test-password")
 			if err := w.db.Users().
-				Create(t.Context(), types.User{Name: "reader", PasswordHash: hash}); err != nil {
+				Create(t.Context(), model.User{Name: "reader", PasswordHash: hash}); err != nil {
 				t.Fatal(err)
 			}
 			if err := w.db.Permissions().
-				Create(t.Context(), types.Permission{Name: "read", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Targets: map[string]types.Target{w.c.Key: {}}, Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}}}}}); err != nil {
+				Create(t.Context(), model.Permission{Name: "read", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Targets: map[string]model.Target{w.c.Key: {}}, Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}}}}); err != nil {
 				t.Fatal(err)
 			}
 			api := accesstest.Over(t, w.db, accesstest.WithNow(w.clock.Now)).API()
@@ -140,12 +141,12 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 				t.Fatal(err)
 			}
 			if strings.HasPrefix(change, "token") {
-				scope, parseErr := types.ParseScope("artifact:remote:r")
+				scope, parseErr := kernel.ParseScope("artifact:remote:r")
 				if parseErr != nil {
 					t.Fatal(parseErr)
 				}
 				if err = w.db.Tokens().
-					Create(t.Context(), types.Token{ID: "token", Subject: "jfac@test/users/reader", Scope: scope, ExpiresAt: w.clock.Now().Add(time.Hour)}); err != nil {
+					Create(t.Context(), model.Token{ID: "token", Subject: "jfac@test/users/reader", Scope: scope, ExpiresAt: w.clock.Now().Add(time.Hour)}); err != nil {
 					t.Fatal(err)
 				}
 				p, err = api.Authenticator.Current(
@@ -159,7 +160,7 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 			service := &source.Service{
 				HTTP:  m,
 				Cache: m,
-				Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+				Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 					return w.db.RemoteCache().Source(ctx, c.Key)
 				},
 			}
@@ -192,7 +193,7 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 				t.Fatal("not deduplicated", stats, err)
 			}
 			rows, err := w.db.WorkQueue().
-				Lease(t.Context(), store.WorkLease{Kinds: []string{MavenCompanionKind}, Holder: "inspect", Limit: 1, Now: time.Now().Add(time.Minute), Until: time.Now().Add(2 * time.Minute)})
+				Lease(t.Context(), work.WorkLease{Kinds: []string{MavenCompanionKind}, Holder: "inspect", Limit: 1, Now: time.Now().Add(time.Minute), Until: time.Now().Add(2 * time.Minute)})
 			if err != nil || len(rows) != 1 {
 				t.Fatal(rows, err)
 			}
@@ -271,11 +272,11 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 			}
 			record, err := w.db.WorkQueue().Get(ctx, saved.Kind, saved.Key)
 			if change == "restart" {
-				if !errors.Is(err, store.ErrNotFound) || w.up.Count("GET", target) != 1 {
+				if !errors.Is(err, kernel.ErrNotFound) || w.up.Count("GET", target) != 1 {
 					t.Fatal("durable work did not resume", err, w.up.Requests())
 				}
 			} else {
-				if err != nil || record.State != types.WorkParked {
+				if err != nil || record.State != work.WorkParked {
 					t.Fatal("failed job not visible", record.State, err)
 				}
 				want := 1
@@ -298,7 +299,7 @@ func TestUnitMavenCompanionReferenceDecoding(t *testing.T) {
 	e := &MavenEager{policy: w.p, service: &source.Service{HTTP: m}}
 	if err := e.run(
 		t.Context(),
-		types.WorkItem{Payload: []byte("bad JSON")},
+		work.WorkItem{Payload: []byte("bad JSON")},
 	); !errors.Is(
 		err,
 		work.ErrPermanent,
@@ -308,7 +309,7 @@ func TestUnitMavenCompanionReferenceDecoding(t *testing.T) {
 	payload, _ := json.Marshal(mavenJob{Repo: "deleted"})
 	if err := e.run(
 		t.Context(),
-		types.WorkItem{Payload: payload},
+		work.WorkItem{Payload: payload},
 	); !errors.Is(
 		err,
 		source.ErrSuperseded,

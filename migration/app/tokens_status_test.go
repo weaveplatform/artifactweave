@@ -5,8 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 )
 
 // subjectOf is the subject of name's tokens, as access/adapters/http writes
@@ -41,7 +43,7 @@ type statusSecrets map[string]string
 func seedTokens(t *testing.T, db RouterStore) (*token.Service, statusSecrets) {
 	t.Helper()
 	ctx := context.Background()
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -51,7 +53,7 @@ func seedTokens(t *testing.T, db RouterStore) (*token.Service, statusSecrets) {
 		t.Fatal(err)
 	}
 	now := time.Now().Truncate(time.Second)
-	for _, r := range []types.Token{
+	for _, r := range []model.Token{
 		{ID: "admin-token", Subject: subjectOf(tokens, "admin"), Revocable: true},
 		{ID: "admin-token-2", Subject: subjectOf(tokens, "admin"), Revocable: true},
 		{ID: "user-token", Subject: subjectOf(tokens, "user"), Revocable: true},
@@ -60,7 +62,7 @@ func seedTokens(t *testing.T, db RouterStore) (*token.Service, statusSecrets) {
 			ExpiresAt: now.Add(time.Hour),
 		},
 	} {
-		r.Scope, r.IssuedAt, r.AccessDigest = types.UserScope(), now, []byte(r.ID)
+		r.Scope, r.IssuedAt, r.AccessDigest = kernel.UserScope(), now, []byte(r.ID)
 		if err := db.Tokens().Create(ctx, r); err != nil {
 			t.Fatal(err)
 		}
@@ -107,7 +109,7 @@ func seedTokens(t *testing.T, db RouterStore) (*token.Service, statusSecrets) {
 		secrets[r.name+"-access"], secrets[r.name+"-id"] = issued.AccessToken, issued.Record.ID
 	}
 	transient, err := tokens.Issue(ctx, token.Request{
-		Username: "ghost", ExpiresIn: &hour, ByAdmin: true, Identity: types.IdentityTransient,
+		Username: "ghost", ExpiresIn: &hour, ByAdmin: true, Identity: kernel.IdentityTransient,
 	})
 	if err != nil {
 		t.Fatal(err)

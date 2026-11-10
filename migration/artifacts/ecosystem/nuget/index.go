@@ -12,14 +12,14 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // member is a file at one of a version's canonical names.
 type member struct {
-	it   types.Item
+	it   model.Item
 	kind kind
 	// nuspec is its package's when already read, nil otherwise.
 	nuspec *Nuspec
@@ -55,15 +55,15 @@ func syncFiles(
 	st := env.Store
 	p, err := st.Packages().Find(ctx, c.Key, key.pkg)
 	exists := err == nil
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		return fmt.Errorf("nuget: package %s: %w", key.pkg, err)
 	}
-	var pv types.PackageVersion
+	var pv model.PackageVersion
 	linked := false
 	if exists {
 		pv, err = st.Packages().Version(ctx, p.ID, key.version)
 		linked = err == nil
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
+		if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 			return fmt.Errorf("nuget: version %s of %s: %w", key.version, key.pkg, err)
 		}
 	}
@@ -98,7 +98,7 @@ func syncFiles(
 	}
 	iv := entry(key, pkg, sym, ids, n, sources)
 	if !exists {
-		p, err = st.Packages().Ensure(ctx, types.Package{
+		p, err = st.Packages().Ensure(ctx, model.Package{
 			RepoKey: c.Key, Name: key.pkg, Type: c.PackageType, Created: iv.Created,
 		})
 		if err != nil {
@@ -113,7 +113,7 @@ func syncFiles(
 func linkedMembers(
 	ctx context.Context,
 	st format.Store,
-	pv types.PackageVersion,
+	pv model.PackageVersion,
 	add *member,
 	drop int64,
 ) ([]member, error) {
@@ -137,7 +137,7 @@ func linkedMembers(
 
 // dropVersion removes pv, whose last file left it, and its package with
 // its last version.
-func dropVersion(ctx context.Context, st format.Store, pv types.PackageVersion) error {
+func dropVersion(ctx context.Context, st format.Store, pv model.PackageVersion) error {
 	if err := st.Packages().DeleteVersion(ctx, pv.ID); err != nil {
 		return fmt.Errorf("nuget: drop version %s: %w", pv.Version, err)
 	}
@@ -367,7 +367,7 @@ func readOnce(
 	ctx context.Context,
 	env format.Env,
 	cache map[string]*Nuspec,
-	it types.Item,
+	it model.Item,
 ) (*Nuspec, error) {
 	if kindOf(it.FullPath()) == other {
 		return nil, nil //nolint:nilnil // no package to read is no failure

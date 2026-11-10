@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // Metadata is a version's document in the package index
@@ -40,7 +40,7 @@ func DecodeMetadata(b []byte) (Metadata, error) {
 }
 
 // metadataOf is the Metadata of c read from the archive it.
-func metadataOf(c *Chart, it types.Item) Metadata {
+func metadataOf(c *Chart, it model.Item) Metadata {
 	return Metadata{Chart: *c, Path: it.FullPath(), Digest: it.Actual.SHA256, Created: deployed(it)}
 }
 
@@ -58,7 +58,7 @@ func (m Metadata) encode() []byte {
 }
 
 // deployed is when the archive it was last deployed.
-func deployed(it types.Item) time.Time {
+func deployed(it model.Item) time.Time {
 	return it.Modified.UTC().Truncate(time.Microsecond)
 }
 
@@ -68,7 +68,7 @@ func deployed(it types.Item) time.Time {
 // A copy keeps its source's time, so two archives can tie; the item made
 // later, with the greater ID, comes first then, which keeps the choice the
 // same on every store and in every reindex.
-func newestFirst(a, b types.Item) int {
+func newestFirst(a, b model.Item) int {
 	if c := deployed(b).Compare(deployed(a)); c != 0 {
 		return c
 	}

@@ -15,7 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const (
@@ -294,7 +294,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 		return format.Rejectf(http.StatusBadRequest, "Composer reindex requires hosted repository")
 	}
 	items, cursor, err := env.Store.Items().
-		Descendants(ctx, c.Key, false, "", store.Page{Limit: 500})
+		Descendants(ctx, c.Key, false, "", kernel.Page{Limit: 500})
 	for err == nil {
 		for _, it := range items {
 			if it.Folder {
@@ -317,7 +317,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 			return nil
 		}
 		items, cursor, err = env.Store.Items().
-			Descendants(ctx, c.Key, false, "", store.Page{Limit: 500, After: cursor})
+			Descendants(ctx, c.Key, false, "", kernel.Page{Limit: 500, After: cursor})
 	}
 	if err != nil {
 		return fmt.Errorf("composer reindex descendants: %w", err)

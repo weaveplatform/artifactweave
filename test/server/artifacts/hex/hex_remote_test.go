@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	hexfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type hexSource func(context.Context, source.Request, source.Permit) (source.Result, error)
@@ -156,8 +158,8 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 			}}, nil
 		},
 	)
-	identity := types.SourceIdentity{
-		Kind:       types.ExternalHTTP,
+	identity := model.SourceIdentity{
+		Kind:       model.ExternalHTTP,
 		Repository: "hex-r",
 		ID:         "upstream",
 		Generation: "rev-1",
@@ -165,7 +167,7 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 	w := newItemWorld(t, false, func(c *Config) {
 		c.RemoteSources = &source.Service{
 			HTTP:    backend,
-			Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) { return identity, nil },
+			Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) { return identity, nil },
 			Revalidate: func(_ context.Context, q source.Request, _ source.Permit) error {
 				if denyAllDecimalCheck &&
 					(q.Resource.Path == "tarballs/decimal-2.0.0.tar" ||
@@ -185,8 +187,8 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 			},
 		}
 	})
-	if err := w.db.Keys().CreateKeypair(t.Context(), types.Keypair{
-		Name: "hex-key", Type: types.KeypairRSA, PrivateKey: keys.private, PublicKey: keys.public,
+	if err := w.db.Keys().CreateKeypair(t.Context(), api.Keypair{
+		Name: "hex-key", Type: api.KeypairRSA, PrivateKey: keys.private, PublicKey: keys.public,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -198,14 +200,14 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := w.db.Users().
-		Create(t.Context(), types.User{Name: "partial", PasswordHash: cheapHash}); err != nil {
+		Create(t.Context(), model.User{Name: "partial", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+	if err := w.db.Permissions().Create(t.Context(), model.Permission{
 		Name: "hex-one-version",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"partial": types.ActionRead}},
-			Targets: map[string]types.Target{
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
+			Targets: map[string]model.Target{
 				"hex-r": {Include: []string{
 					"tarballs/decimal-2.0.0.tar", "tarballs/ecto-3.12.5.tar",
 				}},

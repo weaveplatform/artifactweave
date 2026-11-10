@@ -12,13 +12,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	bowerfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Options configures the Bower protocol. RemoteSources serves remote
@@ -84,7 +84,7 @@ func (h handler) packageByName(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Bower package"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
 	versions, err := h.versions(r, name)
@@ -117,7 +117,7 @@ func (h handler) packages(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) list(w http.ResponseWriter, r *http.Request, query string) {
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	names, err := h.packageNames(r, query)
@@ -168,7 +168,7 @@ func (h handler) refs(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Bower refs path"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
 	versions, err := h.versions(r, name)
@@ -217,7 +217,7 @@ func (h handler) binary(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Bower version"))
 		return
 	}
-	if !h.k.Require(w, r, bowerfmt.ManifestPath(name, version), types.ActionRead) {
+	if !h.k.Require(w, r, bowerfmt.ManifestPath(name, version), api.ActionRead) {
 		return
 	}
 	versions, err := h.versions(r, name)
@@ -260,7 +260,7 @@ func (h handler) packageNames(r *http.Request, query string) ([]string, error) {
 		return h.remotePackageNames(r, query)
 	}
 	var out []string
-	for page := (store.Page{Limit: store.MaxLimit}); ; {
+	for page := (kernel.Page{Limit: kernel.MaxLimit}); ; {
 		ps, next, err := h.k.DB().
 			Packages().
 			List(r.Context(), pkgroute.RequestFrom(r).Repo.Key, page)
@@ -278,7 +278,7 @@ func (h handler) packageNames(r *http.Request, query string) ([]string, error) {
 }
 
 func (h handler) versions(r *http.Request, name string) ([]string, error) {
-	if !h.k.CanFolder(r, name, types.ActionRead) {
+	if !h.k.CanFolder(r, name, api.ActionRead) {
 		return nil, nil
 	}
 	switch pkgroute.RequestFrom(r).Repo.Class {
@@ -288,7 +288,7 @@ func (h handler) versions(r *http.Request, name string) ([]string, error) {
 		return h.remoteVersions(r, name)
 	default:
 		p, err := h.k.DB().Packages().Find(r.Context(), pkgroute.RequestFrom(r).Repo.Key, name)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			return nil, nil
 		}
 		if err != nil {
@@ -300,7 +300,7 @@ func (h handler) versions(r *http.Request, name string) ([]string, error) {
 		}
 		out := make([]string, 0, len(vs))
 		for _, v := range vs {
-			if h.k.Can(r, bowerfmt.ManifestPath(name, v.Version), types.ActionRead) {
+			if h.k.Can(r, bowerfmt.ManifestPath(name, v.Version), api.ActionRead) {
 				out = append(out, v.Version)
 			}
 		}

@@ -17,8 +17,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 const maxShardSnapshotBytes = 64 << 20
@@ -244,6 +244,6 @@ func (h handler) remoteShard(
 
 func shardNotFound(err error) bool {
 	var response *apierror.Error
-	return errors.Is(err, store.ErrNotFound) ||
+	return errors.Is(err, kernel.ErrNotFound) ||
 		errors.As(err, &response) && response.Status == http.StatusNotFound
 }

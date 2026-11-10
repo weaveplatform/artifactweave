@@ -16,9 +16,10 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitBowerDependencyArchiveRejectsCorruptionAndAmbiguity(t *testing.T) {
@@ -103,11 +104,11 @@ func TestAccBowerDependencyReadFailuresNeverDeliverOrRecordUsage(t *testing.T) {
 					switch fault {
 					case "empty result":
 					case "missing blob":
-						result.Item = &types.Item{
+						result.Item = &model.Item{
 							RepoKey: q.Repo.Key,
 							Cached:  true,
 							Name:    q.Resource.Path,
-							Actual:  types.Checksums{SHA256: strings.Repeat("a", 64)},
+							Actual:  kernel.Checksums{SHA256: strings.Repeat("a", 64)},
 						}
 					default:
 						var reader io.Reader = bytes.NewReader(bowerArchive(t, []archiveEntry{{"dep/bower.json", `{"name":"dep"}`, 0}}))

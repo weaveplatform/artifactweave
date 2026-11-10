@@ -21,9 +21,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/upstreamtest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
@@ -31,8 +34,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type smartWorld struct {
@@ -41,7 +42,7 @@ type smartWorld struct {
 	service      *source.Service
 	ctx          context.Context
 	mu           sync.Mutex
-	props        types.Properties
+	props        model.Properties
 	present      bool
 	status       int
 	statsStatus  int
@@ -56,7 +57,7 @@ func smartFixture(t *testing.T) *smartWorld {
 	t.Helper()
 	w := &smartWorld{
 		policyWorld: policyFixture(t),
-		props:       types.Properties{"color": {"blue"}},
+		props:       model.Properties{"color": {"blue"}},
 		present:     true,
 	}
 	router := chi.NewRouter()
@@ -75,11 +76,11 @@ func smartFixture(t *testing.T) *smartWorld {
 	w.permit.Identity, _ = w.db.RemoteCache().Source(t.Context(), w.c.Key)
 	hash := accesstest.HashPassword(t, "reader-password")
 	if err := w.db.Users().
-		Create(t.Context(), types.User{Name: "reader", PasswordHash: hash}); err != nil {
+		Create(t.Context(), model.User{Name: "reader", PasswordHash: hash}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), types.Permission{Name: "read", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Targets: map[string]types.Target{w.c.Key: {}}, Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}}}}}); err != nil {
+		Create(t.Context(), model.Permission{Name: "read", Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {Targets: map[string]model.Target{w.c.Key: {}}, Actions: model.Grants{Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	kit := accesstest.Over(t, w.db, accesstest.WithNow(w.clock.Now))
@@ -96,7 +97,7 @@ func smartFixture(t *testing.T) *smartWorld {
 	w.p.Options = resolver.Options
 	w.p.CheckCurrent = func(ctx context.Context, _ remote.Store, q source.Request, permit source.Permit, revision string) error {
 		current, err := w.db.Repos().Get(ctx, q.Repo.Key)
-		if err != nil || store.RemotePolicyChanged(current, q.Repo) {
+		if err != nil || port.RemotePolicyChanged(current, q.Repo) {
 			return source.ErrSuperseded
 		}
 		id, err := w.db.RemoteCache().Source(ctx, q.Repo.Key)
@@ -118,10 +119,10 @@ func smartFixture(t *testing.T) *smartWorld {
 		_, d, err := api.Authorizer.Authorize(ctx, principal, principal.Anonymous)
 		if err != nil ||
 			!d.Allows(
-				types.ResourceArtifact,
+				accessapi.ResourceArtifact,
 				accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
 				q.Resource.Path,
-				types.ActionRead,
+				accessapi.ActionRead,
 			) {
 			return source.ErrDenied
 		}
@@ -161,7 +162,7 @@ func smartFixture(t *testing.T) *smartWorld {
 	w.service = &source.Service{
 		HTTP:  w.p,
 		Cache: w.p,
-		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			return w.db.RemoteCache().Source(ctx, c.Key)
 		},
 	}
@@ -249,7 +250,7 @@ func (w *smartWorld) smartRead() source.Result {
 	return result
 }
 
-func (w *smartWorld) smartEntry() types.RemoteCacheEntry {
+func (w *smartWorld) smartEntry() model.RemoteCacheEntry {
 	w.t.Helper()
 	opts, err := w.p.Options(w.ctx, w.c)
 	if err != nil {
@@ -273,13 +274,13 @@ func TestAccSmartPropertiesRefreshOwnershipAndOffline(t *testing.T) {
 		w.ctx,
 		w.c,
 		*first.Item,
-		types.Properties{"local": {"keep"}, "color": {"mine"}},
+		model.Properties{"local": {"keep"}, "color": {"mine"}},
 		nil,
 	); err != nil {
 		t.Fatal(err)
 	}
 	w.mu.Lock()
-	w.props = types.Properties{"color": {"red"}, "new": {"value"}}
+	w.props = model.Properties{"color": {"red"}, "new": {"value"}}
 	w.mu.Unlock()
 	w.clock.Advance(31 * time.Second)
 	w.smartRead()
@@ -374,7 +375,7 @@ func (w *smartWorld) peerCalls() int {
 }
 
 // queued queues file.bin's refresh or statistics job and returns it.
-func (w *smartWorld) queued(statistics bool) types.WorkItem {
+func (w *smartWorld) queued(statistics bool) work.WorkItem {
 	w.t.Helper()
 	key, err := w.s.enqueue(w.ctx, w.smartRequest(), w.permit, w.smartEntry().Token.Key, statistics)
 	if err != nil {
@@ -388,7 +389,7 @@ func (w *smartWorld) queued(statistics bool) types.WorkItem {
 }
 
 // changeEntry rewrites file.bin's cache entry with change.
-func (w *smartWorld) changeEntry(change func(*types.RemoteCacheEntry)) {
+func (w *smartWorld) changeEntry(change func(*model.RemoteCacheEntry)) {
 	w.t.Helper()
 	key := w.smartEntry().Token.Key
 	if err := w.db.Tx(w.ctx, func(tx context.Context) error {
@@ -515,7 +516,7 @@ func TestAccSmartFlagsAndInitialOnlyProperties(t *testing.T) {
 				t.Fatal(mode, props)
 			}
 			w.mu.Lock()
-			w.props = types.Properties{"color": {"red"}}
+			w.props = model.Properties{"color": {"red"}}
 			before := w.calls
 			w.mu.Unlock()
 			w.clock.Advance(31 * time.Second)
@@ -621,7 +622,7 @@ func TestAccSmartRevocationDuringProperties(t *testing.T) {
 	if _, err := w.db.Items().
 		Get(w.ctx, w.c.Key, true, "file.bin"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("revoked properties fetch published content", err)
 	}
@@ -717,7 +718,7 @@ func TestAccSmartEmptySnapshotRemovesOwnedPropertiesOnRefill(t *testing.T) {
 		t.Fatal(props, err)
 	}
 	w.mu.Lock()
-	w.props = types.Properties{}
+	w.props = model.Properties{}
 	w.mu.Unlock()
 	w.clock.Advance(31 * time.Second)
 	if _, err = w.service.Read(w.ctx, q); err != nil {
@@ -735,13 +736,13 @@ func TestAccSmartPropertyOwnershipAcrossRepresentations(t *testing.T) {
 	q := w.smartRequest()
 	q.Resource.Accept = "application/octet-stream"
 	w.mu.Lock()
-	w.props = types.Properties{"color": {"red"}}
+	w.props = model.Properties{"color": {"red"}}
 	w.mu.Unlock()
 	if _, err := w.service.Read(w.ctx, q); err != nil {
 		t.Fatal(err)
 	}
 	w.mu.Lock()
-	w.props = types.Properties{"color": {"green"}}
+	w.props = model.Properties{"color": {"green"}}
 	w.mu.Unlock()
 	w.clock.Advance(31 * time.Second)
 	w.smartRead()
@@ -753,7 +754,7 @@ func TestAccSmartPropertyOwnershipAcrossRepresentations(t *testing.T) {
 		w.ctx,
 		w.c,
 		*first.Item,
-		types.Properties{"color": {"local"}},
+		model.Properties{"color": {"local"}},
 		nil,
 	); err != nil {
 		t.Fatal(err)
@@ -838,13 +839,13 @@ func TestAccSmartStatusFailsOnUnreadableState(t *testing.T) {
 func TestAccSmartStatusOmitsRepresentationsWithoutTheirItem(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
-		change func(*smartWorld, types.Item) error
+		change func(*smartWorld, model.Item) error
 	}{
-		{"removed", func(w *smartWorld, _ types.Item) error {
+		{"removed", func(w *smartWorld, _ model.Item) error {
 			_, err := w.db.Items().Delete(w.ctx, w.c.Key, true, "file.bin")
 			return err
 		}},
-		{"replaced", func(w *smartWorld, it types.Item) error {
+		{"replaced", func(w *smartWorld, it model.Item) error {
 			it.Actual.SHA256 = strings.Repeat("f", 64)
 			_, err := w.db.Items().Put(w.ctx, it)
 			return err
@@ -876,7 +877,7 @@ func TestAccSmartStatusFindsRegistryWorkUnderItsKind(t *testing.T) {
 		t.Fatal(err)
 	}
 	status, err := w.s.Status(w.ctx, w.c.Key, "file.bin")
-	want := []SmartWorkStatus{{Operation: "statistics", State: types.WorkPending}}
+	want := []SmartWorkStatus{{Operation: "statistics", State: work.WorkPending}}
 	if err != nil || len(status.Representations) != 1 ||
 		!slices.Equal(status.Representations[0].Work, want) {
 		t.Fatal(status, err)
@@ -964,7 +965,7 @@ func TestAccSmartReadFailsWhenItsDueRefreshFails(t *testing.T) {
 	}
 	job, err := w.db.WorkQueue().
 		Get(w.ctx, w.s.kind, smartWorkKey(w.smartEntry().Token.Key, w.permit.Identity, false))
-	if err != nil || job.State != types.WorkPending || job.Attempts != 1 {
+	if err != nil || job.State != work.WorkPending || job.Attempts != 1 {
 		t.Fatal(job, err)
 	}
 }

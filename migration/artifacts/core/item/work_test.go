@@ -11,9 +11,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // worker is a format that runs derived work, recording each run.
@@ -27,7 +26,7 @@ type worker struct {
 
 func (f worker) WorkKinds() []string { return f.kinds }
 
-func (f worker) Work(_ context.Context, env format.Env, it types.WorkItem) error {
+func (f worker) Work(_ context.Context, env format.Env, it work.WorkItem) error {
 	if env.Store == nil || env.Derive == nil {
 		return errors.New("work ran without its environment")
 	}
@@ -302,13 +301,13 @@ func (f partial) ReindexPath(_ context.Context, _ format.Env, c repo.Config, p s
 }
 
 // reposDown fails every repository lookup.
-type reposDown struct{ store.RepoStore }
+type reposDown struct{ port.RepoStore }
 
 func (reposDown) Get(context.Context, string) (repo.Config, error) { return repo.Config{}, errBoom }
 
 type lookupFails struct{ *inmem.Store }
 
-func (lookupFails) Repos() store.RepoStore { return reposDown{} }
+func (lookupFails) Repos() port.RepoStore { return reposDown{} }
 
 // The reindex kinds run through the format of the repository's package
 // type, whichever format it is: a whole repository, or a path through a
@@ -400,7 +399,7 @@ func TestUnitSourceBoundReindexRejectsPathWork(t *testing.T) {
 	}
 	var ran []string
 	w.svc.Formats = func(repo.PackageType) format.Handler { return partial{reindexer{ran: &ran}} }
-	err := w.svc.reindexWork(t.Context(), types.WorkItem{
+	err := w.svc.reindexWork(t.Context(), work.WorkItem{
 		Kind: format.KindReindexPath, Key: c.Key + "/package",
 		Payload: []byte(`{"source":{}}`),
 	})

@@ -13,13 +13,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const transitiveRows = 10000
@@ -31,7 +30,7 @@ type transitiveMember struct {
 }
 type transitiveResult struct {
 	result      source.Result
-	paths       []types.Item
+	paths       []model.Item
 	isTruncated bool
 }
 
@@ -191,13 +190,18 @@ func transitiveVisible(
 	p kernel.Principal,
 	d accessapi.Decider,
 	m transitiveMember,
-	it types.Item,
+	it model.Item,
 ) bool {
 	allows := d.Allows
 	if it.Folder {
 		allows = d.AllowsFolder
 	}
-	if !allows(types.ResourceArtifact, itemkit.Target(m.config), it.FullPath(), types.ActionRead) {
+	if !allows(
+		accessapi.ResourceArtifact,
+		itemkit.Target(m.config),
+		it.FullPath(),
+		accessapi.ActionRead,
+	) {
 		return false
 	}
 	if p.Admin {
@@ -335,10 +339,10 @@ func (s ArtifactoryAPI) transitiveCollect(
 			continue
 		}
 		if !d.AllowsFolder(
-			types.ResourceArtifact,
+			accessapi.ResourceArtifact,
 			itemkit.Target(member.config),
 			"",
-			types.ActionRead,
+			accessapi.ActionRead,
 		) {
 			continue
 		}
@@ -356,7 +360,7 @@ func (s ArtifactoryAPI) transitiveCollect(
 				kept = append(kept, hit)
 			}
 		}
-		paths := make([]types.Item, 0, len(kept))
+		paths := make([]model.Item, 0, len(kept))
 		for _, hit := range kept {
 			if !p.Admin && !hit.Item.Folder {
 				if e = result.CheckRead(ctx, hit.Item.FullPath()); errors.Is(e, source.ErrDenied) {
@@ -370,7 +374,7 @@ func (s ArtifactoryAPI) transitiveCollect(
 			// would make an ordinary remote download return a different object.
 			if _, e = st.Items().Get(ctx, member.config.Key, true, hit.Item.FullPath()); e == nil {
 				continue
-			} else if !errors.Is(e, store.ErrNotFound) {
+			} else if !errors.Is(e, kernel.ErrNotFound) {
 				return nil, nil, fmt.Errorf("transitive peer: %w", e)
 			}
 			paths = append(paths, hit.Item)
@@ -398,7 +402,7 @@ func checkTransitivePaths(
 		}
 		if _, err := st.Items().Get(ctx, it.RepoKey, true, it.FullPath()); err == nil {
 			return source.ErrSuperseded
-		} else if !errors.Is(err, store.ErrNotFound) {
+		} else if !errors.Is(err, kernel.ErrNotFound) {
 			return fmt.Errorf("transitive cache precedence: %w", err)
 		}
 	}

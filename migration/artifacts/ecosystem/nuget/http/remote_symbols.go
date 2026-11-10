@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (s *remoteSession) symbol(w http.ResponseWriter, path string) {
-	if !s.h.k.Require(w, s.r, path, types.ActionRead) {
+	if !s.h.k.Require(w, s.r, path, api.ActionRead) {
 		return
 	}
 	c := pkgroute.RequestFrom(s.r).Repo

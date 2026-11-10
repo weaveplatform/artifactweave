@@ -13,38 +13,39 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const started0 = "2026-10-15T09:30:00.000+0000"
 
 // perms answers Access from two functions; nil allows everything.
 type perms struct {
-	build func(repoKey, path string, folder bool, want types.Actions) bool
-	item  func(c repo.Config, path string, want types.Actions) bool
+	build func(repoKey, path string, folder bool, want api.Actions) bool
+	item  func(c repo.Config, path string, want api.Actions) bool
 }
 
-func (p perms) Build(repoKey, path string, folder bool, want types.Actions) bool {
+func (p perms) Build(repoKey, path string, folder bool, want api.Actions) bool {
 	return p.build == nil || p.build(repoKey, path, folder, want)
 }
 
-func (p perms) Item(c repo.Config, path string, want types.Actions) bool {
+func (p perms) Item(c repo.Config, path string, want api.Actions) bool {
 	return p.item == nil || p.item(c, path, want)
 }
 
 var everyone = perms{}
 
 // only allows the build actions in have, on every path.
-func only(have types.Actions) perms {
+func only(have api.Actions) perms {
 	return perms{
-		build: func(_, _ string, _ bool, want types.Actions) bool { return have.Has(want) },
+		build: func(_, _ string, _ bool, want api.Actions) bool { return have.Has(want) },
 	}
 }
 
@@ -61,7 +62,7 @@ func newWorld(t *testing.T) *world {
 	ctx := context.Background()
 	db := inmem.New()
 	for _, c := range []repo.Config{
-		{Key: types.BuildInfoRepository, Class: repo.Local, PackageType: repo.BuildInfo},
+		{Key: api.BuildInfoRepository, Class: repo.Local, PackageType: repo.BuildInfo},
 		{Key: "libs-local", Class: repo.Local},
 	} {
 		if err := db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
@@ -110,7 +111,7 @@ func (w *world) publish(d string) Published {
 }
 
 // deploy puts content at path in libs-local with properties.
-func (w *world) deploy(path, content string, props types.Properties) {
+func (w *world) deploy(path, content string, props model.Properties) {
 	w.t.Helper()
 	ctx := context.Background()
 	c, err := w.db.Repos().Get(ctx, "libs-local")
@@ -131,7 +132,7 @@ func (w *world) deploy(path, content string, props types.Properties) {
 // carries the run's build properties.
 func (w *world) seed(name string) {
 	w.t.Helper()
-	w.deploy("app/a.bin", "artifact", types.Properties{
+	w.deploy("app/a.bin", "artifact", model.Properties{
 		"build.name": {name}, "build.number": {"1"},
 	})
 	w.publish(doc(name, "1", started0, artifactModule("artifact")))
@@ -140,7 +141,7 @@ func (w *world) seed(name string) {
 func (w *world) has(key, path string) bool {
 	w.t.Helper()
 	_, err := w.db.Items().Get(context.Background(), key, false, path)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		w.t.Fatal(err)
 	}
 	return err == nil
@@ -151,12 +152,12 @@ func runPath(name, number, started string) string {
 	if err != nil {
 		panic(err)
 	}
-	_, p := types.Build{Name: name, Number: number, Started: t}.DocumentItem()
+	_, p := model.Build{Name: name, Number: number, Started: t}.DocumentItem()
 	return p
 }
 
 func TestUnitParse(t *testing.T) {
-	longKey := strings.Repeat("k", types.PropertyKeyMax+1)
+	longKey := strings.Repeat("k", model.PropertyKeyMax+1)
 	for _, tc := range []struct{ doc, expected string }{
 		{`{`, "not valid json"},
 		{`[]`, "not valid json"},
@@ -187,18 +188,18 @@ func TestUnitParse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := types.Build{
+	want := model.Build{
 		ProjectKey: "proj", Name: "a", Number: "1",
 		Started: time.Date(2026, 10, 15, 9, 30, 0, 250e6, time.UTC), URL: "https://ci",
-		Properties: types.Properties{"s": {"v"}, "n": {"3"}, "l": {`["x"]`}},
-		Modules: []types.BuildModule{{
-			ID: "m", Type: "generic", Properties: types.Properties{"k": {"v"}},
-			Artifacts: []types.BuildFile{{
+		Properties: model.Properties{"s": {"v"}, "n": {"3"}, "l": {`["x"]`}},
+		Modules: []model.BuildModule{{
+			ID: "m", Type: "generic", Properties: model.Properties{"k": {"v"}},
+			Artifacts: []model.BuildFile{{
 				Name: "a", Type: "jar", Path: "p/a",
-				Checksums: types.Checksums{SHA1: "1", SHA256: "2", MD5: "3"},
+				Checksums: kernel.Checksums{SHA1: "1", SHA256: "2", MD5: "3"},
 			}},
-			Dependencies: []types.BuildFile{{
-				ID: "d", Scopes: []string{"compile"}, Checksums: types.Checksums{SHA1: "4"},
+			Dependencies: []model.BuildFile{{
+				ID: "d", Scopes: []string{"compile"}, Checksums: kernel.Checksums{SHA1: "4"},
 			}},
 		}},
 		Document: []byte(raw),
@@ -254,7 +255,7 @@ func TestUnitPublish(t *testing.T) {
 		t.Fatalf("published %+v", p)
 	}
 	path := runPath("team/app", "1", started0)
-	if path != "team%2Fapp/1-1792056600000.json" || !w.has(types.BuildInfoRepository, path) {
+	if path != "team%2Fapp/1-1792056600000.json" || !w.has(api.BuildInfoRepository, path) {
 		t.Fatalf("no document item at %s", path)
 	}
 	w.publish(doc("team/app", "1", at(1)))
@@ -265,7 +266,7 @@ func TestUnitPublish(t *testing.T) {
 		"default",
 		[]byte(replaced),
 		"ci",
-		only(types.ActionWrite),
+		only(api.ActionWrite),
 	); !errors.Is(
 		err,
 		ErrForbidden,
@@ -288,7 +289,7 @@ func TestUnitPublish(t *testing.T) {
 		t.Errorf("replaced run %s, %v", b.Document, err)
 	}
 
-	if _, err := w.svc.Publish(ctx, "", []byte(first), "ci", only(types.ActionRead)); !errors.Is(
+	if _, err := w.svc.Publish(ctx, "", []byte(first), "ci", only(api.ActionRead)); !errors.Is(
 		err, ErrForbidden) {
 		t.Errorf("publish without deploy: %v", err)
 	}
@@ -306,7 +307,7 @@ func TestUnitPublish(t *testing.T) {
 func TestUnitPublishOverStaleDocument(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
-	c, err := w.db.Repos().Get(ctx, types.BuildInfoRepository)
+	c, err := w.db.Repos().Get(ctx, api.BuildInfoRepository)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +325,7 @@ func TestUnitPublishOverStaleDocument(t *testing.T) {
 		"",
 		d,
 		"ci",
-		only(types.ActionWrite),
+		only(api.ActionWrite),
 	); !errors.Is(
 		err,
 		ErrForbidden,
@@ -336,7 +337,7 @@ func TestUnitPublishOverStaleDocument(t *testing.T) {
 		"",
 		d,
 		"ci",
-		only(types.ActionWrite|types.ActionDelete),
+		only(api.ActionWrite|api.ActionDelete),
 	); err != nil {
 		t.Error(err)
 	}
@@ -352,7 +353,7 @@ func TestUnitReads(t *testing.T) {
 		w.publish(doc(name, "1", at(i)))
 		w.publish(doc(name, "2", at(10+i)))
 	}
-	notB := perms{build: func(_, path string, folder bool, _ types.Actions) bool {
+	notB := perms{build: func(_, path string, folder bool, _ api.Actions) bool {
 		return !strings.HasPrefix(path, "b") && !strings.HasSuffix(path, "-1792056610000.json")
 	}}
 	names, err := w.svc.Names(ctx, "", notB)
@@ -419,7 +420,7 @@ func TestUnitAppend(t *testing.T) {
 		{Append{Name: "app", Number: "1", Modules: []byte(`[1]`)}, everyone, ErrInvalid},
 		{Append{Name: "app", Number: "2", Modules: []byte(`[]`)}, everyone, ErrNotFound},
 		{Append{ProjectKey: "p1", Name: "app", Number: "1", Modules: []byte(`[]`)}, everyone, ErrNoRepository},
-		{Append{Name: "app", Number: "1", Modules: []byte(`[]`)}, only(types.ActionWrite), ErrForbidden},
+		{Append{Name: "app", Number: "1", Modules: []byte(`[]`)}, only(api.ActionWrite), ErrForbidden},
 	} {
 		if err := w.svc.Append(ctx, tc.ap, tc.a); !errors.Is(err, tc.expected) {
 			t.Errorf("%+v: %v, want %v", tc.ap, err, tc.expected)
@@ -432,7 +433,7 @@ func TestUnitAppend(t *testing.T) {
 		t.Fatal(err)
 	}
 	for number, stored := range map[string]string{"3": `[]`, "4": `null`} {
-		if _, err := w.db.Builds().Put(ctx, types.Build{
+		if _, err := w.db.Builds().Put(ctx, model.Build{
 			Name: "app", Number: number, Started: started, Document: []byte(stored),
 		}); err != nil {
 			t.Fatal(err)
@@ -463,8 +464,8 @@ func TestUnitRename(t *testing.T) {
 		{"old", " ", everyone, ErrInvalid},
 		{"absent", "x", everyone, ErrNotFound},
 		{"old", "taken", everyone, ErrConflict},
-		{"old", "new", only(types.ActionWrite), ErrForbidden},
-		{"old", "new", perms{build: func(_, path string, _ bool, _ types.Actions) bool {
+		{"old", "new", only(api.ActionWrite), ErrForbidden},
+		{"old", "new", perms{build: func(_, path string, _ bool, _ api.Actions) bool {
 			return strings.HasPrefix(path, "old/")
 		}}, ErrForbidden},
 	} {
@@ -476,7 +477,7 @@ func TestUnitRename(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.db.Builds().Put(ctx, types.Build{
+	if _, err := w.db.Builds().Put(ctx, model.Build{
 		Name: "nulldoc", Number: "1", Started: started, Document: []byte(`null`),
 	}); err != nil {
 		t.Fatal(err)
@@ -504,8 +505,8 @@ func TestUnitRename(t *testing.T) {
 	if err != nil || string(b.Document) != doc("new", "2", at(1)) {
 		t.Fatalf("renamed run %s, %v", b.Document, err)
 	}
-	if w.has(types.BuildInfoRepository, "old") ||
-		!w.has(types.BuildInfoRepository, runPath("new", "2", at(1))) {
+	if w.has(api.BuildInfoRepository, "old") ||
+		!w.has(api.BuildInfoRepository, runPath("new", "2", at(1))) {
 		t.Error("the documents did not move")
 	}
 
@@ -514,7 +515,7 @@ func TestUnitRename(t *testing.T) {
 	if err := w.svc.Rename(ctx, "", "a b", "a\tb", "ci", everyone); err != nil {
 		t.Fatal(err)
 	}
-	if !w.has(types.BuildInfoRepository, runPath("a\tb", "1", started0)) {
+	if !w.has(api.BuildInfoRepository, runPath("a\tb", "1", started0)) {
 		t.Error("the document of a rename to the same path went")
 	}
 	if err := w.svc.Rename(ctx, "", "a\tb", "a\tb", "ci", everyone); err != nil {
@@ -538,13 +539,13 @@ func TestUnitDelete(t *testing.T) {
 		FormatStarted(gone[0].Started) != at(0) {
 		t.Errorf("deleted %v", gone)
 	}
-	if w.has(types.BuildInfoRepository, runPath("app", "1", at(0))) ||
-		!w.has(types.BuildInfoRepository, runPath("app", "1", at(3))) {
+	if w.has(api.BuildInfoRepository, runPath("app", "1", at(0))) ||
+		!w.has(api.BuildInfoRepository, runPath("app", "1", at(3))) {
 		t.Error("document items do not follow their runs")
 	}
 
 	// A document already deleted through the item API is no obstacle.
-	c, err := w.db.Repos().Get(ctx, types.BuildInfoRepository)
+	c, err := w.db.Repos().Get(ctx, api.BuildInfoRepository)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -563,7 +564,7 @@ func TestUnitDelete(t *testing.T) {
 		{Delete{Name: "app"}, everyone, ErrInvalid},
 		{Delete{Name: "absent", All: true}, everyone, ErrNotFound},
 		{Delete{ProjectKey: "p1", Name: "app", All: true}, everyone, ErrNoRepository},
-		{Delete{Name: "app", All: true}, only(types.ActionRead | types.ActionWrite), ErrForbidden},
+		{Delete{Name: "app", All: true}, only(api.ActionRead | api.ActionWrite), ErrForbidden},
 	} {
 		if _, err := w.svc.Delete(ctx, tc.d, tc.a); !errors.Is(err, tc.expected) {
 			t.Errorf("%+v: %v, want %v", tc.d, err, tc.expected)
@@ -573,7 +574,7 @@ func TestUnitDelete(t *testing.T) {
 	if err != nil || len(gone) != 2 {
 		t.Fatalf("deleted %v, %v", gone, err)
 	}
-	if w.has(types.BuildInfoRepository, "app") {
+	if w.has(api.BuildInfoRepository, "app") {
 		t.Error("the folder outlived the build")
 	}
 }
@@ -589,7 +590,7 @@ func TestUnitArtifacts(t *testing.T) {
 	w.deploy("hidden/a.bin", "artifact", nil)
 	w.publish(doc("app", "2", at(1), artifactModule("artifact"), artifactModule("artifact"),
 		`{"id":"none","artifacts":[{"name":"x"}]}`))
-	noHidden := perms{item: func(_ repo.Config, path string, _ types.Actions) bool {
+	noHidden := perms{item: func(_ repo.Config, path string, _ api.Actions) bool {
 		return !strings.HasPrefix(path, "hidden/")
 	}}
 	items, err := w.svc.Artifacts(ctx, "", "app", "2", noHidden)
@@ -607,8 +608,8 @@ func TestUnitArtifacts(t *testing.T) {
 		t.Errorf("artifacts of a missing run: %v", err)
 	}
 
-	refused := perms{item: func(_ repo.Config, _ string, want types.Actions) bool {
-		return !want.Has(types.ActionDelete)
+	refused := perms{item: func(_ repo.Config, _ string, want api.Actions) bool {
+		return !want.Has(api.ActionDelete)
 	}}
 	if _, err := w.svc.Delete(ctx, Delete{Name: "app", Numbers: []string{"1"}, Artifacts: true},
 		refused); !errors.Is(err, ErrForbidden) {
@@ -629,7 +630,7 @@ func TestUnitArtifacts(t *testing.T) {
 func TestUnitFind(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
-	runs := map[string]types.Build{}
+	runs := map[string]model.Build{}
 	for _, r := range []struct{ key, number, started string }{
 		{"1", "1", started0}, {"2a", "2", at(1)}, {"2b", "2", at(2)}, {"3", "3", at(3)},
 	} {
@@ -637,7 +638,7 @@ func TestUnitFind(t *testing.T) {
 	}
 	promote := func(key string, statuses ...string) {
 		for _, st := range statuses {
-			if _, err := w.db.Builds().AddPromotion(ctx, types.BuildPromotion{
+			if _, err := w.db.Builds().AddPromotion(ctx, model.BuildPromotion{
 				BuildID: runs[key].ID, Status: st, Created: time.Now(),
 			}); err != nil {
 				t.Fatal(err)
@@ -646,7 +647,7 @@ func TestUnitFind(t *testing.T) {
 	}
 	promote("2a", "Released")
 	promote("3", "Released", "Staged")
-	find := func(number, status string, a Access) (types.Build, error) {
+	find := func(number, status string, a Access) (model.Build, error) {
 		return w.svc.Find(ctx, "default", "app", number, status, a)
 	}
 	for _, tc := range []struct{ number, status, expected string }{
@@ -668,7 +669,7 @@ func TestUnitFind(t *testing.T) {
 	}
 	// A run the caller may not read is skipped; when it was the only one,
 	// the answer is a refusal.
-	no3 := perms{build: func(_, path string, _ bool, _ types.Actions) bool {
+	no3 := perms{build: func(_, path string, _ bool, _ api.Actions) bool {
 		return !strings.HasPrefix(path, "app/3-")
 	}}
 	if b, err := find(Latest, "", no3); err != nil || b.ID != runs["2b"].ID {
@@ -688,7 +689,7 @@ func TestUnitSearchArtifacts(t *testing.T) {
 	w.deploy("copy/a.bin", "artifact", nil)
 	w.seed("app")
 	run := must(w.svc.Run(ctx, "", "app", "1", time.Time{}, everyone))
-	paths := func(in func(types.Item) bool, a Access) []string {
+	paths := func(in func(model.Item) bool, a Access) []string {
 		t.Helper()
 		var out []string
 		for _, it := range must(w.svc.SearchArtifacts(ctx, run, in, a)) {
@@ -701,12 +702,12 @@ func TestUnitSearchArtifacts(t *testing.T) {
 	if got := paths(nil, everyone); !slices.Equal(got, []string{"app/a.bin"}) {
 		t.Errorf("artifacts %v", got)
 	}
-	notApp := func(it types.Item) bool { return !strings.HasPrefix(it.Path, "app") }
+	notApp := func(it model.Item) bool { return !strings.HasPrefix(it.Path, "app") }
 	if got := paths(notApp, everyone); !slices.Equal(got, []string{"other/x.bin"}) {
 		t.Errorf("outside app/ %v", got)
 	}
 	// A file the caller may not read is left out, not replaced.
-	noApp := perms{item: func(_ repo.Config, path string, _ types.Actions) bool {
+	noApp := perms{item: func(_ repo.Config, path string, _ api.Actions) bool {
 		return !strings.HasPrefix(path, "app/")
 	}}
 	if got := paths(nil, noApp); got != nil {

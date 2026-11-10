@@ -21,8 +21,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errDebianVirtualMemberType = errors.New(
@@ -45,8 +43,8 @@ func (s DebianAPI) serveVirtualDebianMetadata(
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if len(req.Props) != 0 || r.URL.RawQuery != "" ||
-		!acc.Folder(c, req.Path, types.ActionRead) ||
-		!acc.File(c, req.Path, types.ActionRead) ||
+		!acc.Folder(c, req.Path, accessapi.ActionRead) ||
+		!acc.File(c, req.Path, accessapi.ActionRead) ||
 		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
@@ -76,13 +74,13 @@ func (s DebianAPI) buildVirtualDebianView(
 	p kernel.Principal, acc itemkit.Access,
 ) (debianVirtualView, error) {
 	if len(c.Repositories) == 0 || len(c.Repositories) > 128 {
-		return debianVirtualView{}, store.ErrNotFound
+		return debianVirtualView{}, kernel.ErrNotFound
 	}
 	indexes := map[string][]debian.PackageRecord{}
 	selected := map[string]map[string]bool{}
 	for _, key := range c.Repositories {
 		member, err := st.Repos().Get(ctx, key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -98,7 +96,7 @@ func (s DebianAPI) buildVirtualDebianView(
 		}
 	}
 	if len(indexes) == 0 {
-		return debianVirtualView{}, store.ErrNotFound
+		return debianVirtualView{}, kernel.ErrNotFound
 	}
 	files := map[string][]byte{}
 	entries := []debian.ReleaseEntry{}
@@ -151,7 +149,7 @@ func (s DebianAPI) buildVirtualDebianView(
 		if err != nil {
 			return debianVirtualView{}, fmt.Errorf("debian virtual signing key: %w", err)
 		}
-		if pair.Type != types.KeypairGPG {
+		if pair.Type != accessapi.KeypairGPG {
 			return debianVirtualView{}, errDebianVirtualMemberType
 		}
 		signed, err := debian.SignRelease(release, pair.PrivateKey, pair.Passphrase)
@@ -179,7 +177,7 @@ func (s DebianAPI) addDebianMemberIndexes(
 ) error {
 	releasePath := "dists/" + distribution + "/Release"
 	release, _, err := s.debianMemberBytes(ctx, st, member, releasePath, p, acc)
-	if errors.Is(err, store.ErrNotFound) || errors.Is(err, source.ErrDenied) {
+	if errors.Is(err, kernel.ErrNotFound) || errors.Is(err, source.ErrDenied) {
 		return nil
 	}
 	if err != nil {
@@ -191,7 +189,7 @@ func (s DebianAPI) addDebianMemberIndexes(
 	}
 	for _, ref := range refs {
 		body, checkRead, err := s.debianMemberBytes(ctx, st, member, ref.Path, p, acc)
-		if errors.Is(err, store.ErrNotFound) || errors.Is(err, source.ErrDenied) {
+		if errors.Is(err, kernel.ErrNotFound) || errors.Is(err, source.ErrDenied) {
 			continue
 		}
 		if err != nil {
@@ -211,8 +209,8 @@ func (s DebianAPI) addDebianMemberIndexes(
 		}
 		for _, row := range rows {
 			if selected[base][row.Filename] ||
-				!acc.File(member, row.Filename, types.ActionRead) ||
-				!acc.File(virtual, row.Filename, types.ActionRead) ||
+				!acc.File(member, row.Filename, accessapi.ActionRead) ||
+				!acc.File(virtual, row.Filename, accessapi.ActionRead) ||
 				generic.CheckDownload(member, row.Filename, false) != nil ||
 				generic.CheckDownload(virtual, row.Filename, false) != nil {
 				continue
@@ -237,14 +235,14 @@ func (s DebianAPI) serveVirtualDebianPackage(
 ) {
 	ctx := r.Context()
 	if len(req.Props) != 0 || r.URL.RawQuery != "" ||
-		!acc.File(c, req.Path, types.ActionRead) ||
+		!acc.File(c, req.Path, accessapi.ActionRead) ||
 		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	for _, key := range c.Repositories {
 		member, err := st.Repos().Get(ctx, key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -260,7 +258,7 @@ func (s DebianAPI) serveVirtualDebianPackage(
 			)
 			return
 		}
-		if !acc.File(member, req.Path, types.ActionRead) ||
+		if !acc.File(member, req.Path, accessapi.ActionRead) ||
 			generic.CheckDownload(member, req.Path, false) != nil {
 			continue
 		}
@@ -271,7 +269,7 @@ func (s DebianAPI) serveVirtualDebianPackage(
 			continue
 		}
 		it, err := st.Items().Get(ctx, member.Key, false, req.Path)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -308,7 +306,7 @@ func (s DebianAPI) serveRemoteVirtualDebianPackage(
 		return true
 	}
 	result, err := s.RemoteSources.Read(r.Context(), q)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return false
 	}
 	if err != nil {
@@ -343,7 +341,7 @@ func (s DebianAPI) debianMemberBytes(
 	ctx context.Context, st itemkit.Store, member repo.Config, path string,
 	p kernel.Principal, acc itemkit.Access,
 ) ([]byte, func(context.Context, string) error, error) {
-	if !acc.File(member, path, types.ActionRead) ||
+	if !acc.File(member, path, accessapi.ActionRead) ||
 		generic.CheckDownload(member, path, false) != nil {
 		return nil, nil, source.ErrDenied
 	}
@@ -364,7 +362,7 @@ func (s DebianAPI) debianMemberBytes(
 		}
 		result, err := s.RemoteSources.Read(ctx, q)
 		if err != nil {
-			if errors.Is(err, store.ErrNotFound) || errors.Is(err, source.ErrDenied) {
+			if errors.Is(err, kernel.ErrNotFound) || errors.Is(err, source.ErrDenied) {
 				return nil, nil, fmt.Errorf("debian member source: %w", err)
 			}
 			return nil, nil, fmt.Errorf("debian member source: %w",
@@ -389,7 +387,7 @@ func (s DebianAPI) debianMemberBytes(
 		return nil, nil, fmt.Errorf("debian member item: %w", err)
 	}
 	if it.Folder {
-		return nil, nil, store.ErrNotFound
+		return nil, nil, kernel.ErrNotFound
 	}
 	body, err := s.readDebianBlob(ctx, it.Actual.SHA256)
 	return body, nil, err

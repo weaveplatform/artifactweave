@@ -11,8 +11,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func archive(t *testing.T, metadata string, extra map[string]string) []byte {
@@ -247,7 +247,7 @@ func TestUnitHandlerClassAndCachedAdmission(t *testing.T) {
 		format.Write{
 			Path:      "acme/widget/1.0.0.zip",
 			Op:        format.OpDeploy,
-			Checksums: types.Checksums{SHA256: strings.Repeat("0", 64)},
+			Checksums: kernel.Checksums{SHA256: strings.Repeat("0", 64)},
 		},
 	); err == nil {
 		t.Fatal("publication without a matching inspected archive admitted")

@@ -9,10 +9,11 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 )
 
 // failBlobStore fails the blob store's Delete or Walk.
@@ -35,29 +36,29 @@ func (f failBlobStore) Walk(ctx context.Context, fn func(blob.Info) error) error
 	return f.Store.Walk(ctx, fn) //nolint:wrapcheck // test double
 }
 
-type failDeleteUploads struct{ store.UploadStore }
+type failDeleteUploads struct{ session.UploadStore }
 
 func (failDeleteUploads) Delete(context.Context, string) error { return errBoom }
 
 type uploadsFailing struct{ failing }
 
-func (u uploadsFailing) Uploads() store.UploadStore {
+func (u uploadsFailing) Uploads() session.UploadStore {
 	return failDeleteUploads{u.Store.Uploads()}
 }
 
 // faultBlobs fails chosen blob index calls.
 type faultBlobs struct {
-	store.BlobIndex
+	port.BlobIndex
 	mark, finish, deleting, get, prune error
 }
 
 func (f faultBlobs) MarkDeleting(
 	ctx context.Context,
-	b types.Blob,
+	b blob.Blob,
 	at time.Time,
-) (types.Blob, error) {
+) (blob.Blob, error) {
 	if f.mark != nil {
-		return types.Blob{}, f.mark
+		return blob.Blob{}, f.mark
 	}
 	return f.BlobIndex.MarkDeleting(ctx, b, at) //nolint:wrapcheck // test double
 }
@@ -69,16 +70,16 @@ func (f faultBlobs) FinishDelete(ctx context.Context, sha string, at time.Time) 
 	return f.BlobIndex.FinishDelete(ctx, sha, at) //nolint:wrapcheck // test double
 }
 
-func (f faultBlobs) Deleting(ctx context.Context, p store.Page) ([]types.Blob, string, error) {
+func (f faultBlobs) Deleting(ctx context.Context, p kernel.Page) ([]blob.Blob, string, error) {
 	if f.deleting != nil {
 		return nil, "", f.deleting
 	}
 	return f.BlobIndex.Deleting(ctx, p) //nolint:wrapcheck // test double
 }
 
-func (f faultBlobs) Get(ctx context.Context, sha string) (types.Blob, error) {
+func (f faultBlobs) Get(ctx context.Context, sha string) (blob.Blob, error) {
 	if f.get != nil {
-		return types.Blob{}, f.get
+		return blob.Blob{}, f.get
 	}
 	return f.BlobIndex.Get(ctx, sha) //nolint:wrapcheck // test double
 }
@@ -96,7 +97,7 @@ type faulty struct {
 	faults faultBlobs
 }
 
-func (f faulty) Blobs() store.BlobIndex {
+func (f faulty) Blobs() port.BlobIndex {
 	b := f.faults
 	b.BlobIndex = f.Store.Blobs()
 	return b
@@ -119,8 +120,8 @@ func TestUnitManyUnreferenced(t *testing.T) {
 	const n = 501 // more than one page
 	for i := range n {
 		sha := fmt.Sprintf("%064x", i)
-		if _, err := w.db.Blobs().Ref(ctx, types.Blob{
-			Checksums: types.Checksums{SHA256: sha}, Size: 1, Created: w.now(),
+		if _, err := w.db.Blobs().Ref(ctx, blob.Blob{
+			Checksums: kernel.Checksums{SHA256: sha}, Size: 1, Created: w.now(),
 		}, 1); err != nil {
 			t.Fatal(err)
 		}
@@ -155,7 +156,7 @@ func TestUnitDeleteFailures(t *testing.T) {
 		return c.Run(ctx)
 	}
 	w, sha := prepare(t)
-	if rep, err := collect(t, w, faultBlobs{mark: store.ErrConflict}, w.blobs); err != nil ||
+	if rep, err := collect(t, w, faultBlobs{mark: kernel.ErrConflict}, w.blobs); err != nil ||
 		rep.Kept != 1 || !w.stored(t, sha) {
 		t.Fatalf("a blob referenced again is kept: %+v, %v", rep, err)
 	}
@@ -180,7 +181,7 @@ func TestUnitDeleteFailures(t *testing.T) {
 	) {
 		t.Fatalf("content delete failure: %v", err)
 	}
-	if b, err := w.db.Blobs().Get(ctx, sha); err != nil || b.State != types.BlobDeleting {
+	if b, err := w.db.Blobs().Get(ctx, sha); err != nil || b.State != blob.BlobDeleting {
 		t.Fatalf("row after a failed content delete: %+v, %v", b, err)
 	}
 	if _, err := collect(t, w, faultBlobs{deleting: errBoom}, w.blobs); !errors.Is(err, errBoom) {
@@ -190,7 +191,7 @@ func TestUnitDeleteFailures(t *testing.T) {
 	if b, gerr := w.db.Blobs().
 		Get(ctx, sha); err != nil || rep.BlobsDeleted != 1 || w.stored(t, sha) ||
 		gerr != nil ||
-		b.State != types.BlobDeleted {
+		b.State != blob.BlobDeleted {
 		t.Fatalf("the next pass finishes the removal: %+v, %v; row %+v, %v", rep, err, b, gerr)
 	}
 	if _, err := collect(t, w, faultBlobs{prune: errBoom}, w.blobs); !errors.Is(err, errBoom) {
@@ -250,7 +251,7 @@ func TestUnitReapFailure(t *testing.T) {
 	w := newWorld(t)
 	old := w.now().Add(-48 * time.Hour)
 	if err := w.db.Uploads().
-		Put(ctx, store.Upload{ID: "x", Started: old, Updated: old}); err != nil {
+		Put(ctx, session.Upload{ID: "x", Started: old, Updated: old}); err != nil {
 		t.Fatal(err)
 	}
 	_, err := w.collector(t, uploadsFailing{failing{Store: w.db}}).Run(ctx)

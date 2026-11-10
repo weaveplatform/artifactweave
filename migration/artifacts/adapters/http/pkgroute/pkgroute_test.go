@@ -13,16 +13,18 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // testFormat is the test-only protocol: one route per part of the kit.
@@ -60,7 +62,7 @@ func testFormat(sources map[repo.Class]pkgroute.Source) pkgroute.Protocol {
 				k.Deploy(w, r, p.String(), p.Props)
 			})
 			r.Get("/check/*", func(w http.ResponseWriter, r *http.Request) {
-				if k.Require(w, r, chi.URLParam(r, "*"), types.ActionRead) {
+				if k.Require(w, r, chi.URLParam(r, "*"), api.ActionRead) {
 					w.WriteHeader(http.StatusNoContent)
 				}
 			})
@@ -119,13 +121,13 @@ func newKitFixture(t *testing.T, sources map[repo.Class]pkgroute.Source) *kitFix
 			t.Fatal(err)
 		}
 	}
-	grant := func(name, user, under string, a types.Actions) {
+	grant := func(name, user, under string, a api.Actions) {
 		t.Helper()
-		if err := db.Permissions().Create(ctx, types.Permission{
+		if err := db.Permissions().Create(ctx, model.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{user: a}},
-				Targets: map[string]types.Target{
+			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{user: a}},
+				Targets: map[string]model.Target{
 					local:     {Include: []string{under + "**"}},
 					federated: {Include: []string{under + "**"}},
 				},
@@ -134,10 +136,10 @@ func newKitFixture(t *testing.T, sources map[repo.Class]pkgroute.Source) *kitFix
 			t.Fatal(err)
 		}
 	}
-	grant("reader", "reader", "", types.ActionRead)
-	grant("writer", "writer", "work/", types.ActionRead|types.ActionWrite|types.ActionDelete)
+	grant("reader", "reader", "", api.ActionRead)
+	grant("writer", "writer", "work/", api.ActionRead|api.ActionWrite|api.ActionDelete)
 	// updater deploys but may not replace what is there.
-	grant("updater", "updater", "", types.ActionRead|types.ActionWrite)
+	grant("updater", "updater", "", api.ActionRead|api.ActionWrite)
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -149,7 +151,7 @@ func newKitFixture(t *testing.T, sources map[repo.Class]pkgroute.Source) *kitFix
 	o := pkgroute.Options{
 		Store: db,
 		Items: func() *item.Service { return f.items },
-		ServeItem: func(w http.ResponseWriter, _ *http.Request, c repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, _ *http.Request, c repo.Config, it model.Item) {
 			f.served = append(f.served, c.Key+"/"+it.FullPath())
 			_, _ = io.WriteString(w, "served "+it.FullPath())
 		},
@@ -457,11 +459,11 @@ func TestAccSourceSeam(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("remote without a grant: %d %s", rec.Code, rec.Body)
 	}
-	if err := f.db.Permissions().Create(context.Background(), types.Permission{
+	if err := f.db.Permissions().Create(context.Background(), model.Permission{
 		Name: "remote-reader",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}},
-			Targets: map[string]types.Target{"gen-remote": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+			Targets: map[string]model.Target{"gen-remote": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -558,15 +560,15 @@ func TestAccDeploy(t *testing.T) {
 
 // failingItems fails reading items, so a deploy cannot tell whether it
 // replaces a file.
-type failingItems struct{ store.ItemStore }
+type failingItems struct{ port.ItemStore }
 
-func (failingItems) Get(context.Context, string, bool, string) (types.Item, error) {
-	return types.Item{}, errors.New("items down")
+func (failingItems) Get(context.Context, string, bool, string) (model.Item, error) {
+	return model.Item{}, errors.New("items down")
 }
 
 type failingStore struct{ *inmem.Store }
 
-func (s failingStore) Items() store.ItemStore { return failingItems{s.Store.Items()} }
+func (s failingStore) Items() port.ItemStore { return failingItems{s.Store.Items()} }
 
 func TestAccDeployStoreFailure(t *testing.T) {
 	f := newKitFixture(t, nil)
@@ -601,7 +603,7 @@ func TestAccRepositoryLookupFailures(t *testing.T) {
 	}
 }
 
-type brokenRepoStore struct{ store.RepoStore }
+type brokenRepoStore struct{ port.RepoStore }
 
 func (brokenRepoStore) Get(context.Context, string) (repo.Config, error) {
 	return repo.Config{}, errors.New("repos down")
@@ -609,7 +611,7 @@ func (brokenRepoStore) Get(context.Context, string) (repo.Config, error) {
 
 type brokenRepos struct{ *inmem.Store }
 
-func (s brokenRepos) Repos() store.RepoStore { return brokenRepoStore{s.Store.Repos()} }
+func (s brokenRepos) Repos() port.RepoStore { return brokenRepoStore{s.Store.Repos()} }
 
 // npm addresses a scoped package as "@scope%2fname": chi matches the
 // escaped path, so the name reaches the handler as one parameter, and
@@ -644,7 +646,7 @@ func TestAccEncodedSlash(t *testing.T) {
 // the path between validation and serving must not select the new blob.
 func TestAccServeFoundKeepsVerifiedSnapshot(t *testing.T) {
 	f := newKitFixture(t, nil)
-	var verified types.Item
+	var verified model.Item
 	p := testFormat(nil)
 	p.Routes = func(r chi.Router, k *pkgroute.Kit) {
 		r.Get("/snapshot", func(w http.ResponseWriter, r *http.Request) {
@@ -658,7 +660,7 @@ func TestAccServeFoundKeepsVerifiedSnapshot(t *testing.T) {
 		})
 	}
 	o := f.o
-	o.ServeItem = func(w http.ResponseWriter, _ *http.Request, _ repo.Config, it types.Item) {
+	o.ServeItem = func(w http.ResponseWriter, _ *http.Request, _ repo.Config, it model.Item) {
 		if it.Actual.SHA256 != verified.Actual.SHA256 {
 			t.Fatal("served replacement bytes")
 		}

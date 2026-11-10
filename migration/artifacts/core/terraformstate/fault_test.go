@@ -12,13 +12,14 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	testfault "github.com/weaveplatform/artifactweave/migration/platform/testkit/fault"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errFault = errors.New("injected fault")
@@ -56,37 +57,37 @@ type faultyStore struct {
 	f *fault
 }
 
-func (s faultyStore) Items() store.ItemStore { return faultyItems{s.Store.Items(), s.f} }
+func (s faultyStore) Items() port.ItemStore { return faultyItems{s.Store.Items(), s.f} }
 
-func (s faultyStore) Packages() store.PackageStore { return faultyPackages{s.Store.Packages(), s.f} }
-func (s faultyStore) Repos() store.RepoStore       { return faultyRepos{s.Store.Repos(), s.f} }
-func (s faultyStore) Blobs() store.BlobIndex       { return faultyIndex{s.Store.Blobs(), s.f} }
+func (s faultyStore) Packages() port.PackageStore { return faultyPackages{s.Store.Packages(), s.f} }
+func (s faultyStore) Repos() port.RepoStore       { return faultyRepos{s.Store.Repos(), s.f} }
+func (s faultyStore) Blobs() port.BlobIndex       { return faultyIndex{s.Store.Blobs(), s.f} }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	f *fault
 }
 
 //nolint:wrapcheck // test double
-func (i faultyItems) Get(ctx context.Context, k string, c bool, p string) (types.Item, error) {
+func (i faultyItems) Get(ctx context.Context, k string, c bool, p string) (model.Item, error) {
 	if err := i.f.fail("items.Get"); err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	return i.ItemStore.Get(ctx, k, c, p)
 }
 
 //nolint:wrapcheck // test double
-func (i faultyItems) Put(ctx context.Context, it types.Item) (types.Item, error) {
+func (i faultyItems) Put(ctx context.Context, it model.Item) (model.Item, error) {
 	if err := i.f.fail("items.Put"); err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	return i.ItemStore.Put(ctx, it)
 }
 
 //nolint:wrapcheck // test double
 func (i faultyItems) Children(
-	ctx context.Context, k string, c bool, folder string, p store.Page,
-) ([]types.Item, string, error) {
+	ctx context.Context, k string, c bool, folder string, p kernel.Page,
+) ([]model.Item, string, error) {
 	if err := i.f.fail("items.Children"); err != nil {
 		return nil, "", err
 	}
@@ -102,7 +103,7 @@ func (i faultyItems) Search(ctx context.Context, q *aql.Query, o aql.Options) ([
 }
 
 //nolint:wrapcheck // test double
-func (i faultyItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (i faultyItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if err := i.f.fail("items.Properties"); err != nil {
 		return nil, err
 	}
@@ -111,7 +112,7 @@ func (i faultyItems) Properties(ctx context.Context, id int64) (types.Properties
 
 //nolint:wrapcheck // test double
 func (i faultyItems) PatchProperties(
-	ctx context.Context, id int64, set types.Properties, rm []string, at time.Time,
+	ctx context.Context, id int64, set model.Properties, rm []string, at time.Time,
 ) error {
 	if err := i.f.fail("items.PatchProperties"); err != nil {
 		return err
@@ -122,30 +123,30 @@ func (i faultyItems) PatchProperties(
 //nolint:wrapcheck // test double
 func (i faultyItems) Delete(
 	ctx context.Context, k string, c bool, p string,
-) (store.DeleteResult, error) {
+) (port.DeleteResult, error) {
 	if err := i.f.fail("items.Delete"); err != nil {
-		return store.DeleteResult{}, err
+		return port.DeleteResult{}, err
 	}
 	return i.ItemStore.Delete(ctx, k, c, p)
 }
 
 type faultyPackages struct {
-	store.PackageStore
+	port.PackageStore
 	f *fault
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Find(ctx context.Context, k, name string) (types.Package, error) {
+func (p faultyPackages) Find(ctx context.Context, k, name string) (model.Package, error) {
 	if err := p.f.fail("packages.Find"); err != nil {
-		return types.Package{}, err
+		return model.Package{}, err
 	}
 	return p.PackageStore.Find(ctx, k, name)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Ensure(ctx context.Context, pk types.Package) (types.Package, error) {
+func (p faultyPackages) Ensure(ctx context.Context, pk model.Package) (model.Package, error) {
 	if err := p.f.fail("packages.Ensure"); err != nil {
-		return types.Package{}, err
+		return model.Package{}, err
 	}
 	return p.PackageStore.Ensure(ctx, pk)
 }
@@ -153,15 +154,15 @@ func (p faultyPackages) Ensure(ctx context.Context, pk types.Package) (types.Pac
 //nolint:wrapcheck // test double
 func (p faultyPackages) Version(
 	ctx context.Context, id int64, v string,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	if err := p.f.fail("packages.Version"); err != nil {
-		return types.PackageVersion{}, err
+		return model.PackageVersion{}, err
 	}
 	return p.PackageStore.Version(ctx, id, v)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (p faultyPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if err := p.f.fail("packages.Versions"); err != nil {
 		return nil, err
 	}
@@ -185,15 +186,15 @@ func (p faultyPackages) Delete(ctx context.Context, id int64) error {
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) VersionOf(ctx context.Context, id int64) (types.PackageVersion, error) {
+func (p faultyPackages) VersionOf(ctx context.Context, id int64) (model.PackageVersion, error) {
 	if err := p.f.fail("packages.VersionOf"); err != nil {
-		return types.PackageVersion{}, err
+		return model.PackageVersion{}, err
 	}
 	return p.PackageStore.VersionOf(ctx, id)
 }
 
 type faultyRepos struct {
-	store.RepoStore
+	port.RepoStore
 	f *fault
 }
 
@@ -206,7 +207,7 @@ func (r faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
 }
 
 //nolint:wrapcheck // test double
-func (r faultyRepos) List(ctx context.Context, f store.RepoFilter) ([]repo.Config, error) {
+func (r faultyRepos) List(ctx context.Context, f port.RepoFilter) ([]repo.Config, error) {
 	if err := r.f.fail("repos.List"); err != nil {
 		return nil, err
 	}
@@ -214,22 +215,22 @@ func (r faultyRepos) List(ctx context.Context, f store.RepoFilter) ([]repo.Confi
 }
 
 type faultyIndex struct {
-	store.BlobIndex
+	port.BlobIndex
 	f *fault
 }
 
 //nolint:wrapcheck // test double
-func (b faultyIndex) Ref(ctx context.Context, bl types.Blob, n int64) (types.Blob, error) {
+func (b faultyIndex) Ref(ctx context.Context, bl blob.Blob, n int64) (blob.Blob, error) {
 	if err := b.f.fail("blobs.Ref"); err != nil {
-		return types.Blob{}, err
+		return blob.Blob{}, err
 	}
 	return b.BlobIndex.Ref(ctx, bl, n)
 }
 
 //nolint:wrapcheck // test double
-func (b faultyIndex) Unref(ctx context.Context, sha string, n int64) (types.Blob, error) {
+func (b faultyIndex) Unref(ctx context.Context, sha string, n int64) (blob.Blob, error) {
 	if err := b.f.fail("blobs.Unref"); err != nil {
-		return types.Blob{}, err
+		return blob.Blob{}, err
 	}
 	return b.BlobIndex.Unref(ctx, sha, n)
 }
@@ -300,7 +301,7 @@ var faultOps = map[string]func(w *world) error{
 		return err
 	},
 	"Reindex": func(w *world) error {
-		pkgs, _, err := w.st.Packages().List(w.ctx, tfKey, store.Page{Limit: 10})
+		pkgs, _, err := w.st.Packages().List(w.ctx, tfKey, kernel.Page{Limit: 10})
 		for _, p := range pkgs {
 			err = errors.Join(err, w.st.Packages().Delete(w.ctx, p.ID))
 		}

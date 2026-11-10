@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/alpine"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cran"
@@ -29,8 +30,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // getRemoteItem returns false for existing folder/archive browsing, which remains
@@ -39,7 +38,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 	req ItemRequest, p kernel.Principal, acc Access,
 ) bool {
 	ctx := r.Context()
-	if strings.HasSuffix(req.Key, types.CacheSuffix) && maven.Serves(c.PackageType) &&
+	if strings.HasSuffix(req.Key, model.CacheSuffix) && maven.Serves(c.PackageType) &&
 		!maven.IsMetadata(req.Path) {
 		return false
 	}
@@ -47,19 +46,19 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 	if err == nil && existing.Folder {
 		return false
 	}
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "cached item", err))
 		return true
 	}
-	if errors.Is(err, store.ErrNotFound) && strings.Contains(req.Path, "!/") {
+	if errors.Is(err, kernel.ErrNotFound) && strings.Contains(req.Path, "!/") {
 		return false
 	}
 	resource := RemoteResource(r, req.Path)
 	sidecar := ""
-	if artifact, alg, ok := item.Sidecar(req.Path); ok && errors.Is(err, store.ErrNotFound) {
+	if artifact, alg, ok := item.Sidecar(req.Path); ok && errors.Is(err, kernel.ErrNotFound) {
 		// A checksum cannot disclose a file the caller cannot read. Cold SHA-256
 		// retrieval is an explicit transient operation; other cold sidecars stay404.
-		if !acc.File(c, artifact, types.ActionRead) {
+		if !acc.File(c, artifact, accessapi.ActionRead) {
 			httpkit.WriteErr(w, r, ItemNotFound())
 			return true
 		}
@@ -73,7 +72,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 			sidecar = string(alg)
 			resource.Path = artifact
 			resource.EscapedPath = strings.TrimSuffix(resource.EscapedPath, "."+sidecar)
-		case errors.Is(getErr, store.ErrNotFound) && string(alg) == "sha256" &&
+		case errors.Is(getErr, kernel.ErrNotFound) && string(alg) == "sha256" &&
 			c.RetrieveSha256FromServer != nil && *c.RetrieveSha256FromServer:
 			resource.ChecksumOnly = true
 		default:
@@ -88,7 +87,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 		Resource:  resource,
 		Matrix:    req.matrix(),
 		Project:   c.ProjectKey,
-		CacheOnly: strings.HasSuffix(req.Key, types.CacheSuffix),
+		CacheOnly: strings.HasSuffix(req.Key, model.CacheSuffix),
 	}
 	query, err = s.formatRemoteSourceRequest(ctx, query, acc)
 	if err != nil {
@@ -173,7 +172,7 @@ func P2SourceRequest(q source.Request) (source.Request, error) {
 	name := q.Resource.Path
 	kind := p2.Classify(name)
 	if kind == p2.KindInvalid {
-		return q, store.ErrNotFound
+		return q, kernel.ErrNotFound
 	}
 	if q.Resource.Query != "" || q.Resource.Range != "" {
 		return q, source.ErrInvalidRequest
@@ -258,7 +257,7 @@ func (s *Kit) ServeRemoteStream(
 		result.Stream.Size = 64
 		result.Stream.MediaType = "text/plain"
 		result.Stream.ETag = ""
-		result.Stream.Checksums = types.Checksums{}
+		result.Stream.Checksums = kernel.Checksums{}
 		result.Stream.ContentRange = ""
 	}
 	sw := &StatusWriter{ResponseWriter: w}
@@ -328,7 +327,7 @@ func AlpineSourceRequest(q source.Request) (source.Request, error) {
 	}
 	if strings.HasSuffix(path, "/"+alpine.IndexName) {
 		if _, _, _, ok := alpine.ParseIndexPath(path); !ok {
-			return q, store.ErrNotFound
+			return q, kernel.ErrNotFound
 		}
 		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.PermissionFolder = true
@@ -360,7 +359,7 @@ func AlpineSourceRequest(q source.Request) (source.Request, error) {
 	}
 	if strings.HasSuffix(path, ".apk") {
 		if _, _, _, _, ok := alpine.ParsePath(path); !ok {
-			return q, store.ErrNotFound
+			return q, kernel.ErrNotFound
 		}
 		q.Resource.Variant = "alpine-package-v2"
 		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
@@ -396,7 +395,7 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 	case strings.Contains(p, "/by-hash/SHA256/"):
 		expected, ok := debian.ByHashMetadataPath(p)
 		if !ok || q.Resource.Query != "" {
-			return q, store.ErrNotFound
+			return q, kernel.ErrNotFound
 		}
 		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.Variant = "debian-by-hash-v1"
@@ -409,7 +408,7 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 		strings.HasPrefix(path.Base(p), "Sources"):
 		if !debian.PackagesIndexPath(p) && !debian.SourcesIndexPath(p) ||
 			q.Resource.Query != "" {
-			return q, store.ErrNotFound
+			return q, kernel.ErrNotFound
 		}
 		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.PermissionFolder = true
@@ -449,7 +448,7 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 		}
 	case strings.HasSuffix(p, ".deb") || strings.HasSuffix(p, ".ddeb"):
 		if !debian.ValidBinaryPath(p) {
-			return q, store.ErrNotFound
+			return q, kernel.ErrNotFound
 		}
 		q.Resource.Variant = "debian-binary-v1"
 		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
@@ -463,7 +462,7 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 		}
 	case strings.HasSuffix(p, ".dsc"):
 		if !debian.ValidSourcePath(p) {
-			return q, store.ErrNotFound
+			return q, kernel.ErrNotFound
 		}
 		q.Resource.Variant = "debian-source-v1"
 		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
@@ -533,7 +532,7 @@ func CranSourceRequest(q source.Request) (source.Request, error) {
 	}
 	if strings.HasSuffix(p, "PACKAGES.rds") || strings.Contains(p, "src/contrib/") ||
 		strings.HasPrefix(p, "bin/") {
-		return q, store.ErrNotFound
+		return q, kernel.ErrNotFound
 	}
 	return q, nil
 }
@@ -547,7 +546,7 @@ func OpkgSourceRequest(q source.Request) (source.Request, error) {
 	}
 	if opkg.IsIndex(p) {
 		if _, ok := opkg.FeedPath(p); !ok {
-			return q, store.ErrNotFound
+			return q, kernel.ErrNotFound
 		}
 		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.PermissionFolder = true
@@ -590,7 +589,7 @@ func OpkgSourceRequest(q source.Request) (source.Request, error) {
 	}
 	if strings.HasSuffix(p, ".ipk") {
 		if !opkg.ValidPath(p) {
-			return q, store.ErrNotFound
+			return q, kernel.ErrNotFound
 		}
 		q.Resource.Variant = "opkg-package-v1"
 		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
@@ -753,7 +752,7 @@ func (s *Kit) recordCacheUse(ctx context.Context, f Found) {
 	if f.Repo.Class != repo.Remote || !f.Item.Cached {
 		return
 	}
-	page := store.Page{}
+	page := kernel.Page{}
 	for {
 		entries, next, err := s.Store.RemoteCache().
 			List(ctx, f.Repo.Key, f.Item.FullPath(), page)
@@ -783,7 +782,7 @@ func (s *Kit) serveColdChecksum(
 	defer func() { _ = stream.Body.Close() }()
 	data, err := io.ReadAll(io.LimitReader(stream.Body, 4097))
 	value, _, _ := strings.Cut(strings.TrimSpace(string(data)), " ")
-	sums, parseErr := item.ParseChecksums(types.Checksums{SHA256: value})
+	sums, parseErr := item.ParseChecksums(kernel.Checksums{SHA256: value})
 	if err != nil || len(data) > 4096 || parseErr != nil || sums.SHA256 == "" {
 		httpkit.WriteErr(
 			w,
@@ -803,7 +802,7 @@ func (s *Kit) mavenSourceRequest(
 	q source.Request,
 	acc Access,
 ) (source.Request, error) {
-	if !acc.File(q.Repo, q.Resource.Path, types.ActionRead) {
+	if !acc.File(q.Repo, q.Resource.Path, accessapi.ActionRead) {
 		return q, source.ErrDenied
 	}
 	if err := generic.CheckDownload(q.Repo, q.Resource.Path, false); err != nil {

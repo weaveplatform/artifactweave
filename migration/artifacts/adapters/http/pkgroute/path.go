@@ -6,8 +6,9 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Path is an escaped path with its matrix parameters parsed out.
@@ -22,7 +23,7 @@ type Path struct {
 	// Props are the matrix parameters (";key=value" after any segment), and
 	// Mandatory the keys sent as "key+=value", which a download requires the
 	// item to carry.
-	Props     types.Properties
+	Props     model.Properties
 	Mandatory map[string]bool
 }
 
@@ -37,7 +38,7 @@ func (p Path) String() string { return strings.Join(p.Segments, "/") }
 // answers 400.
 func ParsePath(escaped string) (Path, error) {
 	p := Path{
-		Folder: strings.HasSuffix(escaped, "/"), Props: types.Properties{},
+		Folder: strings.HasSuffix(escaped, "/"), Props: model.Properties{},
 		Mandatory: map[string]bool{},
 	}
 	trimmed := strings.Trim(escaped, "/")
@@ -86,7 +87,7 @@ func (p *Path) addMatrix(params string) error {
 		if base, ok := strings.CutSuffix(k, "+"); ok {
 			k, mandatory = base, true
 		}
-		if err := types.ValidatePropertyKey(k); err != nil {
+		if err := model.ValidatePropertyKey(k); err != nil {
 			return badRequestf("%v", err)
 		}
 		v, err = url.QueryUnescape(v)
@@ -124,8 +125,8 @@ func SplitValues(v string) []string {
 // DeclaredChecksums reads the checksums a deploy declares in its
 // X-Checksum-Sha1, -Sha256 and -Md5 headers. X-Checksum names its
 // algorithm by length; the JFrog CLI sends the SHA-256 in it.
-func DeclaredChecksums(h http.Header) types.Checksums {
-	declared := types.Checksums{
+func DeclaredChecksums(h http.Header) kernel.Checksums {
+	declared := kernel.Checksums{
 		SHA1: h.Get("X-Checksum-Sha1"), SHA256: h.Get("X-Checksum-Sha256"),
 		MD5: h.Get("X-Checksum-Md5"),
 	}
@@ -145,7 +146,7 @@ func DeclaredChecksums(h http.Header) types.Checksums {
 // SetChecksums sets the X-Checksum-Sha1, -Sha256 and -Md5 headers a
 // download and a protocol deploy answer with; jf go-publish reads the
 // SHA-256 from a deploy's (research 26 section 3.1).
-func SetChecksums(h http.Header, c types.Checksums) {
+func SetChecksums(h http.Header, c kernel.Checksums) {
 	h.Set("X-Checksum-Sha1", c.SHA1)
 	h.Set("X-Checksum-Sha256", c.SHA256)
 	h.Set("X-Checksum-Md5", c.MD5)

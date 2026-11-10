@@ -9,12 +9,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // JSONMetadata builds the Warehouse-shaped document from the caller's visible
@@ -55,17 +56,17 @@ func jsonRelease(p project, version string) (release, bool) {
 	var latest, stable release
 	for _, rel := range p.releases {
 		if version != "" {
-			if types.ComparePEP440(version, rel.version) == 0 {
+			if model.ComparePEP440(version, rel.version) == 0 {
 				return rel, true
 			}
 			continue
 		}
-		if latest.version == "" || types.ComparePEP440(rel.version, latest.version) > 0 {
+		if latest.version == "" || model.ComparePEP440(rel.version, latest.version) > 0 {
 			latest = rel
 		}
 		if !pypifmt.IsPrerelease(rel.version) &&
 			slices.ContainsFunc(rel.files, func(f pypifmt.File) bool { return !f.Yanked }) &&
-			(stable.version == "" || types.ComparePEP440(rel.version, stable.version) > 0) {
+			(stable.version == "" || model.ComparePEP440(rel.version, stable.version) > 0) {
 			stable = rel
 		}
 	}
@@ -163,7 +164,7 @@ func (h handler) metadataJSON(w http.ResponseWriter, r *http.Request, name, vers
 		h.remoteWarehouse(w, r, name, version)
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	doc, err := JSONMetadata(r.Context(), h.k.DB(), pkgroute.RequestFrom(r).Repo.Key,

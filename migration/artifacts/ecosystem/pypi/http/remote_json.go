@@ -9,10 +9,10 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type warehouseRemote struct {
@@ -177,7 +177,7 @@ func (h handler) remoteWarehouse(w http.ResponseWriter, r *http.Request, name, v
 	filter := func(files []remoteFile) []remoteDoc {
 		out := []remoteDoc{}
 		for _, f := range files {
-			if !h.k.Can(r, f.path, types.ActionRead) {
+			if !h.k.Can(r, f.path, api.ActionRead) {
 				continue
 			}
 			paths = append(paths, f.path)

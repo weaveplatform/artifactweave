@@ -19,8 +19,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const alpineIndexLimit = 36 << 20
@@ -90,8 +88,8 @@ func (s alpineItems) serveAlpineIndex(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.Folder(c, req.Path, types.ActionRead) ||
-		!acc.File(c, req.Path, types.ActionRead) ||
+	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
+		!acc.File(c, req.Path, accessapi.ActionRead) ||
 		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
@@ -161,7 +159,7 @@ func alpinePackageReadable(
 	ctx context.Context, c repo.Config, path string, acc itemkit.Access,
 	check func(context.Context, string) error,
 ) (bool, error) {
-	if !acc.File(c, path, types.ActionRead) || generic.CheckDownload(c, path, false) != nil {
+	if !acc.File(c, path, accessapi.ActionRead) || generic.CheckDownload(c, path, false) != nil {
 		return false, nil
 	}
 	if check != nil {
@@ -218,14 +216,14 @@ func (s alpineItems) alpineMemberIndex(
 		}
 	} else {
 		if c.Class != repo.Local && c.Class != repo.Federated || cached {
-			return view, store.ErrNotFound
+			return view, kernel.ErrNotFound
 		}
 		it, err := st.Items().Get(ctx, c.Key, false, path)
 		if err != nil {
 			return view, err //nolint:wrapcheck // ErrNotFound is the answer.
 		}
 		if it.Folder {
-			return view, store.ErrNotFound
+			return view, kernel.ErrNotFound
 		}
 		view.raw, err = s.readAlpineBlob(ctx, it.Actual.SHA256)
 		if err != nil {
@@ -271,7 +269,7 @@ func (s alpineItems) alpineCandidates(
 	selected := map[string]bool{}
 	for _, key := range c.Repositories {
 		member, err := st.Repos().Get(ctx, key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -280,8 +278,8 @@ func (s alpineItems) alpineCandidates(
 		if member.PackageType != repo.Alpine {
 			return nil, fmt.Errorf("%w: %s", errAlpineMemberType, key)
 		}
-		if !acc.Folder(member, indexPath, types.ActionRead) ||
-			!acc.File(member, indexPath, types.ActionRead) ||
+		if !acc.Folder(member, indexPath, accessapi.ActionRead) ||
+			!acc.File(member, indexPath, accessapi.ActionRead) ||
 			generic.CheckDownload(member, indexPath, false) != nil {
 			continue
 		}
@@ -308,7 +306,7 @@ func (s alpineItems) alpineCandidates(
 				}
 			}
 		}
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -316,7 +314,7 @@ func (s alpineItems) alpineCandidates(
 		}
 		for _, entry := range entries {
 			if selected[entry.packageInfo.Path] ||
-				!acc.File(c, entry.packageInfo.Path, types.ActionRead) ||
+				!acc.File(c, entry.packageInfo.Path, accessapi.ActionRead) ||
 				generic.CheckDownload(c, entry.packageInfo.Path, false) != nil {
 				continue
 			}
@@ -336,7 +334,7 @@ func (s alpineItems) serveVirtualAlpinePackage(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.File(c, req.Path, types.ActionRead) ||
+	if !acc.File(c, req.Path, accessapi.ActionRead) ||
 		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return

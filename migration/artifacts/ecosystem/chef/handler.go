@@ -9,10 +9,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // The item properties Deployed and Reindex keep on every stored cookbook
@@ -108,7 +108,7 @@ func (Handler) Admit(
 // version to the archive, with its Metadata as the version's metadata.
 // Folders and files at other paths change nothing. An archive whose
 // metadata.json no longer matches its path fails with ErrArchive.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder {
 		return nil
 	}
@@ -127,7 +127,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	if err := setProperties(ctx, env.Store, it, meta); err != nil {
 		return err
 	}
-	p, err := env.Store.Packages().Ensure(ctx, types.Package{
+	p, err := env.Store.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Type: c.PackageType, Name: name, Created: it.Created,
 	})
 	if err != nil {
@@ -142,11 +142,11 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 
 // Deleting does nothing: the item service drops a removed archive's
 // version link with it.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted does nothing: a version is one archive, so the item service's
 // pruning of versions left without files is all a delete needs.
-func (Handler) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
+func (Handler) Deleted(context.Context, format.Env, repo.Config, []model.Item) error { return nil }
 
 func cachedMetadataPath(p string) bool {
 	return strings.HasPrefix(p, "api/v1/")
@@ -165,22 +165,22 @@ func readStored(ctx context.Context, blobs format.Blobs, sha string) (Metadata, 
 	return meta, nil
 }
 
-func metadataOf(ctx context.Context, env format.Env, it types.Item) (Metadata, error) {
+func metadataOf(ctx context.Context, env format.Env, it model.Item) (Metadata, error) {
 	if in, ok := env.Inspection.(inspection); ok && in.sha == it.Actual.SHA256 {
 		return in.meta, nil
 	}
 	return readStored(ctx, env.Blobs, it.Actual.SHA256)
 }
 
-func setProperties(ctx context.Context, st format.Store, it types.Item, meta Metadata) error {
+func setProperties(ctx context.Context, st format.Store, it model.Item, meta Metadata) error {
 	current, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("chef: get item properties: %w", err)
 	}
-	want := types.Properties{
+	want := model.Properties{
 		PropName: {meta.Name}, PropVersion: {meta.Version}, PropSHA256: {meta.SHA256},
 	}
-	set := types.Properties{}
+	set := model.Properties{}
 	for key, value := range want {
 		if len(current[key]) != 1 || current[key][0] != value[0] {
 			set[key] = value
@@ -199,7 +199,7 @@ func setProperties(ctx context.Context, st format.Store, it types.Item, meta Met
 // The item tree, including the remote cache tree, remains authoritative.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	byName := map[string]*pkgindex.Indexed{}
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		items, next, err := env.Store.Items().Descendants(
 			ctx, c.Key, pkgindex.Stored(c).Cached, "", page,
@@ -262,7 +262,7 @@ func (Handler) GuardTransferSource(
 	_ context.Context,
 	_ format.Env,
 	_ repo.Config,
-	it types.Item,
+	it model.Item,
 ) error {
 	if IsMetadata(it.FullPath()) {
 		return format.Rejectf(

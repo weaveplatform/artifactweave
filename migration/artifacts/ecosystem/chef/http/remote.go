@@ -13,13 +13,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	cheffmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxMetadataBytes = 4 << 20
@@ -314,7 +315,7 @@ func (h handler) remoteVersions(r *http.Request, name string) ([]release, error)
 	out := make([]release, 0, len(versions))
 	for _, version := range versions {
 		path := cheffmt.Path(name, version)
-		if !h.k.Can(r, path, types.ActionRead) || generic.CheckDownload(c, path, false) != nil {
+		if !h.k.Can(r, path, api.ActionRead) || generic.CheckDownload(c, path, false) != nil {
 			continue
 		}
 		if err = index.CheckRead(r.Context(), path); errors.Is(err, source.ErrDenied) {
@@ -419,7 +420,7 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, rel relea
 		NoCrossOriginAuth: true,
 		Method:            http.MethodGet,
 		Variant:           "chef-supermarket-archive-v1",
-		Checksums:         types.Checksums{SHA256: rel.meta.SHA256},
+		Checksums:         kernel.Checksums{SHA256: rel.meta.SHA256},
 		// Supermarket downloads may redirect to object storage. The source service
 		// retains its DNS/SSRF and redirect limits and strips cross-origin credentials.
 		CheckURL: func(_ context.Context, u *url.URL) error {

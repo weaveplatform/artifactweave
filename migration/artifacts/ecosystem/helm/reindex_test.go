@@ -4,15 +4,15 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // wipe removes the repository's whole index.
 func (w *world) wipe() {
 	w.t.Helper()
-	pkgs, _, err := w.st.Packages().List(w.ctx, w.c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := w.st.Packages().List(w.ctx, w.c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -90,16 +90,16 @@ func TestUnitReindexPathDropsStaleLinks(t *testing.T) {
 	w.deploy("y/web-1.0.0.tgz", chartTgz("web", "1.0.0", "description: y"))
 	junk := w.deploy("y/junk.tgz", []byte("no chart"))
 	lone := w.deploy("z/lone.tgz", []byte("no chart either"))
-	link := func(name, version string, it types.Item) {
+	link := func(name, version string, it model.Item) {
 		t.Helper()
 		p, err := w.st.Packages().
-			Ensure(w.ctx, types.Package{RepoKey: w.c.Key, Name: name, Type: w.c.PackageType})
+			Ensure(w.ctx, model.Package{RepoKey: w.c.Key, Name: name, Type: w.c.PackageType})
 		if err != nil {
 			t.Fatal(err)
 		}
 		pv, err := w.st.Packages().Version(w.ctx, p.ID, version)
 		if err != nil {
-			pv, err = w.st.Packages().PutVersion(w.ctx, types.PackageVersion{
+			pv, err = w.st.Packages().PutVersion(w.ctx, model.PackageVersion{
 				PackageID: p.ID,
 				Version:   version,
 				Metadata: []byte(
@@ -111,7 +111,7 @@ func TestUnitReindexPathDropsStaleLinks(t *testing.T) {
 			}
 		}
 		if err := w.st.Packages().
-			LinkFile(w.ctx, types.VersionFile{VersionID: pv.ID, ItemID: it.ID}); err != nil {
+			LinkFile(w.ctx, model.VersionFile{VersionID: pv.ID, ItemID: it.ID}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -130,7 +130,7 @@ func TestUnitReindexPathDropsStaleLinks(t *testing.T) {
 func TestUnitReindexSetsProperties(t *testing.T) {
 	w := newWorld(t)
 	it := w.deploy("web-1.0.0.tgz", chartTgz("web", "1.0.0"))
-	if err := w.items.Annotate(w.ctx, w.c, it, types.Properties{
+	if err := w.items.Annotate(w.ctx, w.c, it, model.Properties{
 		helm.PropAppVersion: {"stale"}, helm.PropName: {"wrong"},
 	}, []string{helm.PropVersion}); err != nil {
 		t.Fatal(err)
@@ -163,7 +163,7 @@ func TestUnitStaleNewestLink(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := w.st.Packages().
-		LinkFile(w.ctx, types.VersionFile{VersionID: pv.ID, ItemID: stale.ID}); err != nil {
+		LinkFile(w.ctx, model.VersionFile{VersionID: pv.ID, ItemID: stale.ID}); err != nil {
 		t.Fatal(err)
 	}
 	w.deploy("x/web-1.0.0.tgz", chartTgz("api", "1.0.0"))

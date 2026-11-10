@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/storekit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // errLayoutRollback rolls back the transaction that deletes a layout.
@@ -28,13 +29,13 @@ func testRemoteLayoutFences(t *testing.T, s Store) {
 	local := canonical
 	local.Key, local.Class = "local-layout", repo.Local
 	storekit.Must(t, s.Repos().Create(ctx, local))
-	states := map[string]types.SourceIdentity{}
+	states := map[string]model.SourceIdentity{}
 	for _, c := range []repo.Config{canonical, upstream, other, local} {
-		states[c.Key] = storekit.Get[types.SourceIdentity](t)(s.RemoteCache().Source(ctx, c.Key))
+		states[c.Key] = storekit.Get[model.SourceIdentity](t)(s.RemoteCache().Source(ctx, c.Key))
 	}
-	pending := storekit.Get[types.RemoteCacheToken](t)(s.RemoteCache().Begin(ctx, key))
-	doc := types.ConfigDocument{
-		Kind: types.ConfigLayout,
+	pending := storekit.Get[model.RemoteCacheToken](t)(s.RemoteCache().Begin(ctx, key))
+	doc := configdoc.ConfigDocument{
+		Kind: configdoc.ConfigLayout,
 		Key:  "mapped-layout",
 		Document: json.RawMessage(
 			`{"artifactPathPattern":"[org]/[module]/[baseRev]/[module]-[baseRev].[ext]"}`,
@@ -42,7 +43,7 @@ func testRemoteLayoutFences(t *testing.T, s Store) {
 	}
 	storekit.Must(t, s.Configs().Put(ctx, doc))
 	for _, c := range []repo.Config{canonical, upstream, other, local} {
-		current := storekit.Get[types.SourceIdentity](t)(s.RemoteCache().Source(ctx, c.Key))
+		current := storekit.Get[model.SourceIdentity](t)(s.RemoteCache().Source(ctx, c.Key))
 		previous := states[c.Key]
 		changed := c.Key == canonical.Key || c.Key == upstream.Key
 		if current.Repository != previous.Repository ||
@@ -51,29 +52,29 @@ func testRemoteLayoutFences(t *testing.T, s Store) {
 		}
 		states[c.Key] = current
 	}
-	storekit.WantErr(t, s.RemoteCache().Check(ctx, pending), store.ErrConflict)
+	storekit.WantErr(t, s.RemoteCache().Check(ctx, pending), kernel.ErrConflict)
 	doc.Updated = storekit.At(2)
 	storekit.Must(t, s.Configs().Put(ctx, doc))
 	storekit.Same(
 		t,
 		"unchanged layout",
 		states[canonical.Key],
-		storekit.Get[types.SourceIdentity](t)(s.RemoteCache().Source(ctx, canonical.Key)),
+		storekit.Get[model.SourceIdentity](t)(s.RemoteCache().Source(ctx, canonical.Key)),
 	)
-	state := storekit.Get[types.RemoteSourceState](t)(s.RemoteCache().State(ctx, canonical.Key))
+	state := storekit.Get[model.RemoteSourceState](t)(s.RemoteCache().State(ctx, canonical.Key))
 	state.ConnectionFailures, state.OfflineUntil, state.RetryAfterUntil = 10, storekit.At(
 		5,
 	), storekit.At(
 		6,
 	)
 	storekit.Must(t, s.RemoteCache().PutState(ctx, canonical.Key, state))
-	pending = storekit.Get[types.RemoteCacheToken](t)(s.RemoteCache().Begin(ctx, key))
+	pending = storekit.Get[model.RemoteCacheToken](t)(s.RemoteCache().Begin(ctx, key))
 	doc.Document = json.RawMessage(
 		`{"artifactPathPattern":"different/[org]/[module]/[baseRev]/[module]-[baseRev].[ext]"}`,
 	)
 	storekit.Must(t, s.Configs().Put(ctx, doc))
-	storekit.WantErr(t, s.RemoteCache().Check(ctx, pending), store.ErrConflict)
-	state = storekit.Get[types.RemoteSourceState](t)(s.RemoteCache().State(ctx, canonical.Key))
+	storekit.WantErr(t, s.RemoteCache().Check(ctx, pending), kernel.ErrConflict)
+	state = storekit.Get[model.RemoteSourceState](t)(s.RemoteCache().State(ctx, canonical.Key))
 	if state.ConnectionFailures != 0 || !state.OfflineUntil.IsZero() ||
 		!state.RetryAfterUntil.IsZero() {
 		t.Fatal("layout edit retained old availability", state)
@@ -89,22 +90,22 @@ func testRemoteLayoutFences(t *testing.T, s Store) {
 		t,
 		"rolled-back source",
 		state,
-		storekit.Get[types.RemoteSourceState](t)(s.RemoteCache().State(ctx, canonical.Key)),
+		storekit.Get[model.RemoteSourceState](t)(s.RemoteCache().State(ctx, canonical.Key)),
 	)
 	storekit.Same(
 		t,
 		"rolled-back document",
 		doc,
-		storekit.Get[types.ConfigDocument](t)(s.Configs().Get(ctx, doc.Kind, doc.Key)),
+		storekit.Get[configdoc.ConfigDocument](t)(s.Configs().Get(ctx, doc.Kind, doc.Key)),
 	)
-	pending = storekit.Get[types.RemoteCacheToken](t)(s.RemoteCache().Begin(ctx, key))
+	pending = storekit.Get[model.RemoteCacheToken](t)(s.RemoteCache().Begin(ctx, key))
 	storekit.Must(t, s.Configs().Delete(ctx, doc.Kind, doc.Key))
-	storekit.WantErr(t, s.RemoteCache().Check(ctx, pending), store.ErrConflict)
+	storekit.WantErr(t, s.RemoteCache().Check(ctx, pending), kernel.ErrConflict)
 	storekit.Same(
 		t,
 		"unrelated source",
 		states[other.Key],
-		storekit.Get[types.SourceIdentity](t)(s.RemoteCache().Source(ctx, other.Key)),
+		storekit.Get[model.SourceIdentity](t)(s.RemoteCache().Source(ctx, other.Key)),
 	)
 }
 
@@ -115,7 +116,7 @@ func testRemoteLayoutFences(t *testing.T, s Store) {
 func remoteFixture(
 	t *testing.T,
 	s Store,
-) (context.Context, repo.Config, types.RemoteCacheKey) {
+) (context.Context, repo.Config, model.RemoteCacheKey) {
 	t.Helper()
 	ctx := context.Background()
 	c := repo.Config{
@@ -125,7 +126,7 @@ func remoteFixture(
 		URL:         "https://source.example",
 	}
 	storekit.Must(t, s.Repos().Create(ctx, c))
-	return ctx, c, types.RemoteCacheKey{
+	return ctx, c, model.RemoteCacheKey{
 		RepoKey:          c.Key,
 		Path:             "pkg/index.json",
 		Variant:          "json",

@@ -13,15 +13,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	swifthttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift/http"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type remoteFixture struct {
@@ -45,12 +47,12 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 			t.Fatal(err)
 		}
 		if err := db.Permissions().
-			Create(t.Context(), types.Permission{Name: "swift-reader", Resources: map[types.ResourceType]types.Resource{
-				types.ResourceArtifact: {
-					Actions: types.Grants{
-						Users: map[string]types.Actions{"reader": types.ActionRead},
+			Create(t.Context(), model.Permission{Name: "swift-reader", Resources: map[api.ResourceType]model.Resource{
+				api.ResourceArtifact: {
+					Actions: model.Grants{
+						Users: map[string]api.Actions{"reader": api.ActionRead},
 					},
-					Targets: map[string]types.Target{
+					Targets: map[string]model.Target{
 						"packages": {Include: []string{"acme/Widget/Widget-1.0.0.zip"}},
 					},
 				},
@@ -70,7 +72,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		t.Cleanup(pool.Close)
 		svc := &source.Service{
 			HTTP: policy, Cache: policy,
-			Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+			Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 				return db.RemoteCache().Source(ctx, c.Key)
 			},
 		}
@@ -336,12 +338,12 @@ func TestAccSwiftPMRemoteVirtualAndOffline(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := f.db.Permissions().
-		Create(t.Context(), types.Permission{Name: "swiftpm-authenticated-reader", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{
-					Users: map[string]types.Actions{"swift-client": types.ActionRead},
+		Create(t.Context(), model.Permission{Name: "swiftpm-authenticated-reader", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{
+					Users: map[string]api.Actions{"swift-client": api.ActionRead},
 				},
-				Targets: map[string]types.Target{
+				Targets: map[string]model.Target{
 					"packages": {Include: []string{"**"}},
 					"virtual":  {Include: []string{"**"}},
 					"empty":    {Include: []string{"**"}},

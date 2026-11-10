@@ -16,14 +16,15 @@ import (
 
 	"golang.org/x/crypto/blake2b"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func uploadItemError(_ context.Context, _ string, err error) error {
@@ -143,7 +144,7 @@ func TestAccUploads(t *testing.T) {
 		if _, err := f.db.Items().
 			Get(t.Context(), "pypi-local", false, path+".asc"); !errors.Is(
 			err,
-			store.ErrNotFound,
+			kernel.ErrNotFound,
 		) {
 			t.Fatalf("signature stored: %v", err)
 		}
@@ -204,7 +205,7 @@ func TestAccUploadRefusals(t *testing.T) {
 			if _, err := f.db.Packages().
 				Find(t.Context(), "pypi-local", "demo"); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatalf("refusal indexed package: %v", err)
 			}
@@ -264,7 +265,7 @@ func TestAccUploadInspectsOnceAndChecksCanonicalPermission(t *testing.T) {
 				prefix = "elsewhere/**"
 			}
 			if err := f.db.Permissions().
-				Create(t.Context(), types.Permission{Name: "scoped", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"scoped": types.ActionWrite}}, Targets: map[string]types.Target{"pypi-local": {Include: []string{prefix}}}}}}); err != nil {
+				Create(t.Context(), model.Permission{Name: "scoped", Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {Actions: model.Grants{Users: map[string]accessapi.Actions{"scoped": accessapi.ActionWrite}}, Targets: map[string]model.Target{"pypi-local": {Include: []string{prefix}}}}}}); err != nil {
 				t.Fatal(err)
 			}
 			content := wheel(t, "demo", "1.0", metadata("demo", "1.0", ""))
@@ -288,14 +289,14 @@ func TestAccUploadInspectsOnceAndChecksCanonicalPermission(t *testing.T) {
 				if _, err := f.db.Items().
 					Get(t.Context(), "pypi-local", false, "demo/1.0/demo-1.0-py3-none-any.whl"); !errors.Is(
 					err,
-					store.ErrNotFound,
+					kernel.ErrNotFound,
 				) {
 					t.Fatalf("refused destination created: %v", err)
 				}
 				if _, err := f.db.Packages().
 					Find(t.Context(), "pypi-local", "demo"); !errors.Is(
 					err,
-					store.ErrNotFound,
+					kernel.ErrNotFound,
 				) {
 					t.Fatalf("refused destination indexed: %v", err)
 				}

@@ -10,12 +10,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	luafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func remoteFailure() error {
@@ -115,7 +115,7 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, path string)
 		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Could not find resource"))
 		return
 	}
-	if !h.k.Require(w, r, path, types.ActionRead) {
+	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
 	result, err := h.remoteRock(r, path)
@@ -129,14 +129,14 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, path string)
 func (h handler) remoteRock(r *http.Request, path string) (source.Result, error) {
 	id, ok := luafmt.Parse(path)
 	if !ok {
-		return source.Result{}, store.ErrNotFound
+		return source.Result{}, kernel.ErrNotFound
 	}
 	metadata, manifest, err := h.upstreamManifest(r, luafmt.ManifestPath)
 	if err != nil {
 		return source.Result{}, err
 	}
 	if !manifest.has(path) {
-		return source.Result{}, store.ErrNotFound
+		return source.Result{}, kernel.ErrNotFound
 	}
 	if metadata.CheckRead != nil {
 		if err = metadata.CheckRead(r.Context(), path); err != nil {
@@ -171,7 +171,7 @@ func (h handler) remoteManifest(
 	}
 	var checkErr error
 	data, paths, err := manifest.filtered(func(path string) bool {
-		if !h.k.Can(r, path, types.ActionRead) {
+		if !h.k.Can(r, path, api.ActionRead) {
 			return false
 		}
 		if metadata.CheckRead != nil {
@@ -196,7 +196,7 @@ func (h handler) remoteManifest(
 			MediaType: "text/plain; charset=utf-8",
 			Size:      int64(len(data)),
 			ETag:      fmt.Sprintf(`"%x"`, digest),
-			Checksums: types.Checksums{
+			Checksums: kernel.Checksums{
 				SHA256: fmt.Sprintf("%x", digest),
 			},
 		},

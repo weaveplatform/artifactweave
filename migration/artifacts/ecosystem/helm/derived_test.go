@@ -15,10 +15,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func indexQueue(t *testing.T, w *world) *work.Queue {
@@ -71,7 +71,7 @@ func TestUnitDerivedIndex(t *testing.T) {
 		!bytes.Contains(raw, []byte("entries: {}")) {
 		t.Fatalf("empty index %s", raw)
 	}
-	var newest types.Item
+	var newest model.Item
 	for i := range 10 {
 		newest = w.deploy(
 			fmt.Sprintf("charts/web-1.0.%d.tgz", i),
@@ -125,7 +125,7 @@ func TestUnitDerivedIndex(t *testing.T) {
 	if _, err := w.st.WorkQueue().
 		Get(w.ctx, helm.KindIndex, w.c.Key); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("nested index queued work: %v", err)
 	}
@@ -155,7 +155,7 @@ func TestUnitDerivedIndexTransferAndProperties(t *testing.T) {
 		w.ctx,
 		other,
 		it,
-		types.Properties{"chart.appVersion": {"edited"}},
+		model.Properties{"chart.appVersion": {"edited"}},
 		nil,
 	); err != nil {
 		t.Fatal(err)
@@ -166,7 +166,7 @@ func TestUnitDerivedIndexTransferAndProperties(t *testing.T) {
 		w.ctx,
 		other,
 		it,
-		types.Properties{"chart.version": {"other"}},
+		model.Properties{"chart.version": {"other"}},
 		nil,
 	); err != nil {
 		t.Fatal(err)
@@ -174,7 +174,7 @@ func TestUnitDerivedIndexTransferAndProperties(t *testing.T) {
 	if _, err := w.st.WorkQueue().
 		Get(w.ctx, helm.KindIndex, other.Key); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("annotation queued index: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestUnitHelmIndexEncodingAndSettings(t *testing.T) {
 		if err := h.Work(
 			context.Background(),
 			w.items.Env(),
-			types.WorkItem{Kind: helm.KindIndex, Key: c.Key},
+			work.WorkItem{Kind: helm.KindIndex, Key: c.Key},
 		); err != nil {
 			t.Fatal(err)
 		}
@@ -236,7 +236,7 @@ func TestUnitIndexWorkerFaults(t *testing.T) {
 			if err := (helm.Handler{}).Work(
 				w.ctx,
 				w.items.Env(),
-				types.WorkItem{Kind: helm.KindIndex, Key: w.c.Key},
+				work.WorkItem{Kind: helm.KindIndex, Key: w.c.Key},
 			); !errors.Is(
 				err,
 				errFault,
@@ -248,11 +248,11 @@ func TestUnitIndexWorkerFaults(t *testing.T) {
 	w := newWorld(t)
 	w.deploy("web.tgz", chartTgz("web", "1.0.0"))
 	env := w.items.Env()
-	env.Derive = func(context.Context, format.Derived) (types.Item, error) { return types.Item{}, errFault }
+	env.Derive = func(context.Context, format.Derived) (model.Item, error) { return model.Item{}, errFault }
 	if err := (helm.Handler{}).Work(
 		w.ctx,
 		env,
-		types.WorkItem{Kind: helm.KindIndex, Key: w.c.Key},
+		work.WorkItem{Kind: helm.KindIndex, Key: w.c.Key},
 	); !errors.Is(
 		err,
 		errFault,
@@ -268,19 +268,19 @@ func TestUnitColdIndexPreservesParkedWork(t *testing.T) {
 		t.Fatal(err)
 	}
 	workItem, leased, err := w.st.WorkQueue().
-		LeaseKey(w.ctx, helm.KindIndex, w.c.Key, store.WorkLease{Holder: "test", Now: w.now, Until: w.now.Add(time.Minute)})
+		LeaseKey(w.ctx, helm.KindIndex, w.c.Key, work.WorkLease{Holder: "test", Now: w.now, Until: w.now.Add(time.Minute)})
 	if err != nil || !leased {
 		t.Fatalf("lease: %v %v", leased, err)
 	}
 	if err := w.st.WorkQueue().
-		Fail(w.ctx, helm.KindIndex, w.c.Key, workItem.Generation, store.WorkFailure{Park: true, Now: w.now, Error: "broken index"}); err != nil {
+		Fail(w.ctx, helm.KindIndex, w.c.Key, workItem.Generation, work.WorkFailure{Park: true, Now: w.now, Error: "broken index"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.items.Resolve(w.ctx, w.c, format.Download{Path: helm.IndexPath}); err == nil {
 		t.Fatal("cold read reset parked work")
 	}
 	pending, err := w.st.WorkQueue().Get(w.ctx, helm.KindIndex, w.c.Key)
-	if err != nil || pending.State != types.WorkParked {
+	if err != nil || pending.State != work.WorkParked {
 		t.Fatalf("parked item %+v %v", pending, err)
 	}
 	for _, download := range []format.Download{{Path: "other.yaml"}, {Path: helm.IndexPath, Cached: true}} {

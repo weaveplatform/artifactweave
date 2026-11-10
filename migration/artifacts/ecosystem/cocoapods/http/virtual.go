@@ -8,20 +8,20 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The source adapter renders confirmed upstream absence as a protocol 404.
 // Virtual lookup still needs to try the next member after that mapping.
 func missingMember(err error) bool {
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return true
 	}
 	var apiErr *apierror.Error
@@ -133,14 +133,14 @@ func (h handler) virtualIndex(
 			}
 			for _, row := range rows {
 				if path == "all_pods.txt" {
-					if h.k.CanFolder(r, row, types.ActionRead) {
+					if h.k.CanFolder(r, row, api.ActionRead) {
 						names[row] = true
 					}
 					continue
 				}
 				parts := strings.Split(row, "/")
 				for _, v := range parts[1:] {
-					if h.k.CanFolder(r, parts[0]+"/"+v, types.ActionRead) {
+					if h.k.CanFolder(r, parts[0]+"/"+v, api.ActionRead) {
 						if versions[parts[0]] == nil {
 							versions[parts[0]] = map[string]bool{}
 						}
@@ -157,7 +157,7 @@ func (h handler) virtualIndex(
 		}
 		for name, entries := range packages {
 			if path == "all_pods.txt" {
-				if h.k.CanFolder(r, name, types.ActionRead) {
+				if h.k.CanFolder(r, name, api.ActionRead) {
 					names[name] = true
 				}
 				continue
@@ -166,7 +166,7 @@ func (h handler) virtualIndex(
 				continue
 			}
 			for v := range entries {
-				if h.k.Can(r, podfmt.Path(name, v), types.ActionRead) {
+				if h.k.Can(r, podfmt.Path(name, v), api.ActionRead) {
 					if versions[name] == nil {
 						versions[name] = map[string]bool{}
 					}
@@ -229,7 +229,7 @@ func (h handler) virtualSpec(
 			return
 		}
 		v, ok := packages[name][version]
-		if !ok || !h.k.Can(r, podfmt.Path(name, version), types.ActionRead) {
+		if !ok || !h.k.Can(r, podfmt.Path(name, version), api.ActionRead) {
 			continue
 		}
 		data, err := specFor(baseurl.From(r.Context()), key, v.archive)
@@ -250,7 +250,7 @@ func (h handler) virtualLocalArchive(
 	path string,
 ) {
 	name, version, ok := podfmt.ParsePath(path)
-	if !ok || !h.k.Can(r, path, types.ActionRead) {
+	if !ok || !h.k.Can(r, path, api.ActionRead) {
 		h.k.Error(w, r, notFound())
 		return
 	}
@@ -277,7 +277,7 @@ func (h handler) virtualSourceArchive(
 	members []*http.Request,
 	name, version, ext string,
 ) {
-	if !h.k.Can(r, sourcePath(name, version, ext), types.ActionRead) {
+	if !h.k.Can(r, sourcePath(name, version, ext), api.ActionRead) {
 		h.k.Error(w, r, notFound())
 		return
 	}

@@ -16,13 +16,14 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // rpmAlphaPath is where the createrepo_c fixture's primary places the one
@@ -64,7 +65,7 @@ func (w *itemWorld) rpmRepo(key string) repo.Config {
 
 // storeFile stores body as the file at path in the repository key, blob
 // first, as a deploy leaves it; cached puts it in a remote's cache.
-func (w *itemWorld) storeFile(key, path string, cached bool, body []byte) types.Item {
+func (w *itemWorld) storeFile(key, path string, cached bool, body []byte) model.Item {
 	w.t.Helper()
 	ctx := w.t.Context()
 	upload, err := w.blobs.BeginUpload(ctx)
@@ -78,9 +79,9 @@ func (w *itemWorld) storeFile(key, path string, cached bool, body []byte) types.
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	it, err := w.db.Items().Put(ctx, types.Item{
+	it, err := w.db.Items().Put(ctx, model.Item{
 		RepoKey: key, Cached: cached, Name: path, Size: info.Size,
-		Actual: types.Checksums{SHA256: info.Digests.SHA256},
+		Actual: kernel.Checksums{SHA256: info.Digests.SHA256},
 	})
 	if err != nil {
 		w.t.Fatal(err)
@@ -208,7 +209,7 @@ func TestAccRPMVirtualRepodataSkipsMembersItCannotRead(t *testing.T) {
 	)
 	w.publish("rpm-dark", "")
 	w.publish("rpm-hidden", "")
-	if _, err := w.db.Items().Put(t.Context(), types.Item{
+	if _, err := w.db.Items().Put(t.Context(), model.Item{
 		RepoKey: "rpm-folder", Name: "repodata/repomd.xml", Folder: true,
 	}); err != nil {
 		t.Fatal(err)

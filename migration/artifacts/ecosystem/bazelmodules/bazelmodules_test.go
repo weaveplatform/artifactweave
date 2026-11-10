@@ -12,7 +12,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitPathAndManifestIdentity(t *testing.T) {
@@ -136,7 +136,7 @@ func TestUnitAdmissionRejectsInvalidPaths(t *testing.T) {
 		format.Write{
 			Path:      "modules/hello/1.0.0/MODULE.bazel",
 			Op:        format.OpDeploy,
-			Checksums: types.Checksums{SHA256: "missing"},
+			Checksums: kernel.Checksums{SHA256: "missing"},
 		},
 	); err == nil {
 		t.Fatal("uninspected module admitted")

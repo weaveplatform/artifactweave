@@ -5,8 +5,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // PrepareUpload publishes validated NIM metadata in the documented cache
@@ -14,7 +14,7 @@ import (
 // by model name or version without trusting fields supplied by an upstream.
 // Other Nimmodel.* fields require a target response capture before mapping.
 func PrepareUpload(q source.Request, u *item.CacheUpload) {
-	if q.Repo.PackageType != repo.NIMModel || u.Kind != types.RemoteMetadata {
+	if q.Repo.PackageType != repo.NIMModel || u.Kind != model.RemoteMetadata {
 		return
 	}
 	parts := strings.Split(q.Resource.Path, "/")
@@ -23,7 +23,7 @@ func PrepareUpload(q source.Request, u *item.CacheUpload) {
 		if len(parts) < 5 || parts[len(parts)-1] != ".jfrog_nim_model_info.json" {
 			return
 		}
-		u.Properties = types.Properties{
+		u.Properties = model.Properties{
 			"Nimmodel.name":      {parts[len(parts)-3]},
 			"Nimmodel.versionId": {parts[len(parts)-2]},
 		}
@@ -31,7 +31,7 @@ func PrepareUpload(q source.Request, u *item.CacheUpload) {
 		if len(parts) < 4 || parts[len(parts)-1] != "repo.json" {
 			return
 		}
-		u.Properties = types.Properties{"Nimmodel.name": {parts[len(parts)-2]}}
+		u.Properties = model.Properties{"Nimmodel.name": {parts[len(parts)-2]}}
 	default:
 		return
 	}

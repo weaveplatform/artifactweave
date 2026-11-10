@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccUnder(t *testing.T) {
@@ -17,7 +17,7 @@ func TestAccUnder(t *testing.T) {
 		t.Fatalf("under %#v", either)
 	}
 	at, _ := either[3].(aql.And)
-	if dir, _ := at[0].(*aql.FieldCriterion); dir == nil || dir.Text != types.RootPath {
+	if dir, _ := at[0].(*aql.FieldCriterion); dir == nil || dir.Text != kernel.RootPath {
 		t.Fatalf("a prefix without a slash is a name at the root: %#v", at)
 	}
 }

@@ -17,8 +17,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Remote opts one protocol into the common source boundary. It is never
@@ -68,9 +66,9 @@ type ReadSource interface {
 // and fetch intent. Existing local sources continue using their stored items.
 func (k *Kit) Read(r *http.Request, resource source.Resource) (source.Result, error) {
 	q := RequestFrom(r)
-	allowed := can(r, q.Repo, resource.Path, types.ActionRead)
+	allowed := can(r, q.Repo, resource.Path, accessapi.ActionRead)
 	if resource.PermissionFolder {
-		allowed = k.CanFolder(r, resource.PermissionPath, types.ActionRead)
+		allowed = k.CanFolder(r, resource.PermissionPath, accessapi.ActionRead)
 	}
 	if !allowed {
 		return source.Result{}, refusal(r)
@@ -140,7 +138,7 @@ func SourceError(err error, anonymous bool) error {
 		status = http.StatusBadRequest
 	case errors.Is(err, source.ErrUnsupported):
 		status = http.StatusNotImplemented
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		status = http.StatusNotFound
 	case errors.Is(err, context.DeadlineExceeded):
 		status = http.StatusGatewayTimeout

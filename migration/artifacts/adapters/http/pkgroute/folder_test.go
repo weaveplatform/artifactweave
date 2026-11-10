@@ -7,10 +7,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // RequireFolder lets through a caller who may read somewhere below the
@@ -22,7 +22,7 @@ func TestAccRequireFolder(t *testing.T) {
 		Name: "folders", Types: []repo.PackageType{repo.Generic}, ErrorProfile: apierror.ProfileNPM,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			r.Get("/folder/*", func(w http.ResponseWriter, r *http.Request) {
-				if k.RequireFolder(w, r, chi.URLParam(r, "*"), types.ActionRead) {
+				if k.RequireFolder(w, r, chi.URLParam(r, "*"), api.ActionRead) {
 					w.WriteHeader(http.StatusNoContent)
 				}
 			})

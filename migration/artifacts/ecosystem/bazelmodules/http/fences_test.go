@@ -14,8 +14,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type bazelBackend func(context.Context, source.Request, source.Permit) (source.Result, error)
@@ -105,9 +105,9 @@ func TestAccSourceRevocationBeforeDelivery(t *testing.T) {
 			)
 			service := &source.Service{
 				HTTP: backend, Cache: backend,
-				Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
-					return types.SourceIdentity{
-						Kind:       types.ExternalHTTP,
+				Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+					return model.SourceIdentity{
+						Kind:       model.ExternalHTTP,
 						Repository: "bazel-remote",
 						ID:         "source-1",
 						Generation: "revision-1",

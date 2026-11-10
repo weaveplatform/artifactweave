@@ -11,15 +11,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -31,8 +31,8 @@ const (
 // "Manage, Delete/Overwrite, Deploy/Cache, Annotate, and Read", as JFrog's
 // REST reference listed them from 4.8 (research 27 section 9). Manage
 // alone is not enough, since a grant may hold it without the others.
-const calculateMetadataActions = types.ActionManage | types.ActionDelete | types.ActionWrite |
-	types.ActionAnnotate | types.ActionRead
+const calculateMetadataActions = api.ActionManage | api.ActionDelete | api.ActionWrite |
+	api.ActionAnnotate | api.ActionRead
 
 // MavenAPI serves the Maven REST operations over the item kit.
 type MavenAPI struct{ *itemkit.Kit }
@@ -57,7 +57,7 @@ type mavenTarget struct {
 	st   itemkit.Store
 	c    repo.Config
 	path string
-	it   types.Item
+	it   model.Item
 }
 
 // mavenTargetOf resolves the repository and path after prefix in r's URL
@@ -67,7 +67,7 @@ type mavenTarget struct {
 func (s MavenAPI) mavenTargetOf(
 	r *http.Request,
 	prefix string,
-	want types.Actions,
+	want api.Actions,
 ) (mavenTarget, error) {
 	ctx := r.Context()
 	st, err := s.Content()
@@ -104,7 +104,7 @@ func (s MavenAPI) mavenTargetOf(
 	}
 	t.it, err = st.Items().Get(ctx, c.Key, false, p)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return mavenTarget{}, missing
 	case err != nil:
 		return mavenTarget{}, s.ItemError(ctx, "get item", err)
@@ -153,7 +153,7 @@ func (s MavenAPI) calculateMavenMetadata(w http.ResponseWriter, r *http.Request)
 // what writing it by hand would take (decision 0036).
 func (s MavenAPI) generateMavenPom(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	t, err := s.mavenTargetOf(r, mavenGeneratePrefix, types.ActionRead)
+	t, err := s.mavenTargetOf(r, mavenGeneratePrefix, api.ActionRead)
 	if err == nil && (t.path == "" || t.it.Folder) {
 		err = httpkit.BadRequestf("'%s/%s' is not a file", t.c.Key, t.path)
 	}
@@ -183,7 +183,7 @@ func (s MavenAPI) writePom(
 	p string,
 	body []byte,
 ) error {
-	if !t.acc.File(t.c, p, types.ActionWrite) {
+	if !t.acc.File(t.c, p, api.ActionWrite) {
 		return httpkit.Denied(t.p)
 	}
 	_, err := svc.Deploy(ctx, item.Deploy{

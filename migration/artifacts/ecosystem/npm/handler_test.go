@@ -22,11 +22,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // world is an npm local repository with the item service over it and a
@@ -80,7 +80,7 @@ func pkg(name, version, fields string) []byte {
 	)
 }
 
-func (w *world) deploy(p string, body []byte, props types.Properties) types.Item {
+func (w *world) deploy(p string, body []byte, props model.Properties) model.Item {
 	w.t.Helper()
 	it, err := w.tryDeploy(p, body, props)
 	if err != nil {
@@ -89,7 +89,7 @@ func (w *world) deploy(p string, body []byte, props types.Properties) types.Item
 	return it
 }
 
-func (w *world) tryDeploy(p string, body []byte, props types.Properties) (types.Item, error) {
+func (w *world) tryDeploy(p string, body []byte, props model.Properties) (model.Item, error) {
 	w.now = w.now.Add(time.Minute)
 	return w.items.Deploy(w.ctx, item.Deploy{ //nolint:wrapcheck // test helper
 		Target: item.Target{Repo: w.c, Path: p}, Body: bytes.NewReader(body),
@@ -97,7 +97,7 @@ func (w *world) tryDeploy(p string, body []byte, props types.Properties) (types.
 	})
 }
 
-func (w *world) annotate(p string, set types.Properties, remove ...string) {
+func (w *world) annotate(p string, set model.Properties, remove ...string) {
 	w.t.Helper()
 	it, err := w.st.Items().Get(w.ctx, w.c.Key, false, p)
 	if err != nil {
@@ -108,7 +108,7 @@ func (w *world) annotate(p string, set types.Properties, remove ...string) {
 	}
 }
 
-func (w *world) props(p string) types.Properties {
+func (w *world) props(p string) model.Properties {
 	w.t.Helper()
 	it, err := w.st.Items().Get(w.ctx, w.c.Key, false, p)
 	if err != nil {
@@ -136,7 +136,7 @@ func (w *world) propsTime(p string) time.Time {
 func (w *world) index() map[string]map[string]npm.Metadata {
 	w.t.Helper()
 	out := map[string]map[string]npm.Metadata{}
-	pkgs, _, err := w.st.Packages().List(w.ctx, w.c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := w.st.Packages().List(w.ctx, w.c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -196,7 +196,7 @@ func TestUnitDeployIndexes(t *testing.T) {
 	}
 	// artifactory.licenses as RTFACT-30834's 7.x log writes it beside the
 	// npm.* properties.
-	if diff := cmp.Diff(types.Properties{
+	if diff := cmp.Diff(model.Properties{
 		npm.PropName: {"@acme/left-pad"}, npm.PropVersion: {"1.3.0"},
 		npm.PropDescription: {"pads <left>"}, npm.PropKeywords: {`["pad","left"]`},
 		npm.PropLicenses: {"Python-2.0"}, npm.PropDistTag: {"latest"},
@@ -219,7 +219,7 @@ func TestUnitDeployIndexes(t *testing.T) {
 // of npm.keywords so it stays JSON; Metadata keeps all of them.
 func TestUnitLongPropertyValues(t *testing.T) {
 	w := newWorld(t)
-	long := strings.Repeat("é", types.PropertyValueMax+1000)
+	long := strings.Repeat("é", model.PropertyValueMax+1000)
 	many := make([]string, 0, 400)
 	for i := range 400 {
 		many = append(many, fmt.Sprintf("keyword-%03d", i))
@@ -228,18 +228,18 @@ func TestUnitLongPropertyValues(t *testing.T) {
 	p := "x/-/x-1.0.0.tgz"
 	w.deploy(p, pkg("x", "1.0.0", `"description":"`+long+`","keywords":`+string(kw)), nil)
 	props := w.props(p)
-	if d := props[npm.PropDescription][0]; d != long[:2*types.PropertyValueMax] {
+	if d := props[npm.PropDescription][0]; d != long[:2*model.PropertyValueMax] {
 		t.Errorf("description of %d bytes", len(d))
 	}
 	var got []string
 	if err := json.Unmarshal([]byte(props[npm.PropKeywords][0]), &got); err != nil ||
 		len(got) == 0 || len(got) == len(many) || !slices.Equal(got, many[:len(got)]) ||
-		len(props[npm.PropKeywords][0]) > types.PropertyValueMax {
+		len(props[npm.PropKeywords][0]) > model.PropertyValueMax {
 		t.Errorf("keywords %d %v", len(got), err)
 	}
 	w.deploy(
 		p,
-		pkg("x", "1.0.0", `"keywords":["`+strings.Repeat("k", types.PropertyValueMax)+`"]`),
+		pkg("x", "1.0.0", `"keywords":["`+strings.Repeat("k", model.PropertyValueMax)+`"]`),
 		nil,
 	)
 	if _, ok := w.props(p)[npm.PropKeywords]; ok {
@@ -264,7 +264,7 @@ func TestUnitLicenses(t *testing.T) {
 	if got := w.props(p)[npm.PropLicenses]; got != nil {
 		t.Fatalf("other content kept %v", got)
 	}
-	w.annotate(p, types.Properties{npm.PropLicenses: {"ISC"}})
+	w.annotate(p, model.Properties{npm.PropLicenses: {"ISC"}})
 	w.deploy(p, bare, nil)
 	if err := w.run(format.KindReindex, ""); err != nil {
 		t.Fatal(err)
@@ -273,14 +273,14 @@ func TestUnitLicenses(t *testing.T) {
 		t.Fatalf("after no license: %v", got)
 	}
 	other := "other/-/other-1.0.0.tgz"
-	w.deploy(other, pkg("other", "1.0.0", ""), types.Properties{npm.PropLicenses: {"Apache-2.0"}})
+	w.deploy(other, pkg("other", "1.0.0", ""), model.Properties{npm.PropLicenses: {"Apache-2.0"}})
 	if got := w.props(other)[npm.PropLicenses]; !slices.Equal(got, []string{"Apache-2.0"}) {
 		t.Fatalf("a deploy's own license: %v", got)
 	}
-	long := strings.Repeat("L", types.PropertyValueMax+10)
+	long := strings.Repeat("L", model.PropertyValueMax+10)
 	w.deploy(other, pkg("other", "1.0.0", `"license":"`+long+`"`), nil)
 	if got := w.props(other)[npm.PropLicenses]; len(got) != 1 ||
-		got[0] != long[:types.PropertyValueMax] {
+		got[0] != long[:model.PropertyValueMax] {
 		t.Fatalf("a long license: %d values", len(got))
 	}
 }
@@ -338,14 +338,14 @@ func TestUnitOverwrite(t *testing.T) {
 func TestUnitDistTagsMove(t *testing.T) {
 	w := newWorld(t)
 	p1, p2 := "left-pad/-/left-pad-1.0.0.tgz", "left-pad/-/left-pad-2.0.0.tgz"
-	w.deploy(p1, pkg("left-pad", "1.0.0", ""), types.Properties{npm.PropDistTag: {"beta", "rc"}})
-	w.deploy(p2, pkg("left-pad", "2.0.0", ""), types.Properties{npm.PropDistTag: {"beta"}})
+	w.deploy(p1, pkg("left-pad", "1.0.0", ""), model.Properties{npm.PropDistTag: {"beta", "rc"}})
+	w.deploy(p2, pkg("left-pad", "2.0.0", ""), model.Properties{npm.PropDistTag: {"beta"}})
 	if diff := cmp.Diff(map[string][]string{"1.0.0": {"latest", "rc"}, "2.0.0": {"beta"}},
 		w.tags("left-pad")); diff != "" {
 		t.Fatalf("after deploy (-want +got):\n%s", diff)
 	}
 	w.now = w.now.Add(time.Hour)
-	w.annotate(p2, types.Properties{npm.PropDistTag: {"beta", "rc", "next", ""}})
+	w.annotate(p2, model.Properties{npm.PropDistTag: {"beta", "rc", "next", ""}})
 	if diff := cmp.Diff(map[string][]string{"1.0.0": {"latest"}, "2.0.0": {"beta", "next", "rc"}},
 		w.tags("left-pad")); diff != "" {
 		t.Fatalf("after annotate (-want +got):\n%s", diff)
@@ -371,13 +371,13 @@ func TestUnitDeprecation(t *testing.T) {
 	p := "left-pad/-/left-pad-1.0.0.tgz"
 	w.deploy(p, pkg("left-pad", "1.0.0", ""), nil)
 	for _, c := range []struct {
-		set      types.Properties
+		set      model.Properties
 		remove   []string
 		expected string
 	}{
-		{types.Properties{npm.PropDeprecated: {"use 2"}}, nil, "use 2"},
-		{types.Properties{npm.PropDeprecated: {""}}, nil, ""},
-		{types.Properties{npm.PropDeprecated: {"gone"}}, nil, "gone"},
+		{model.Properties{npm.PropDeprecated: {"use 2"}}, nil, "use 2"},
+		{model.Properties{npm.PropDeprecated: {""}}, nil, ""},
+		{model.Properties{npm.PropDeprecated: {"gone"}}, nil, "gone"},
 		{nil, []string{npm.PropDeprecated}, ""},
 	} {
 		w.annotate(p, c.set, c.remove...)
@@ -396,9 +396,9 @@ func TestUnitAnnotatedIgnores(t *testing.T) {
 	stray := "left-pad/-/left-pad-1.0.0-copy.tgz"
 	w.deploy(stray, pkg("left-pad", "1.0.0", ""), nil)
 	before := w.index()
-	w.annotate(p, types.Properties{"build.name": {"x"}})
-	w.annotate("left-pad", types.Properties{npm.PropDistTag: {"beta"}})
-	w.annotate(stray, types.Properties{npm.PropDistTag: {"beta"}})
+	w.annotate(p, model.Properties{"build.name": {"x"}})
+	w.annotate("left-pad", model.Properties{npm.PropDistTag: {"beta"}})
+	w.annotate(stray, model.Properties{npm.PropDistTag: {"beta"}})
 	if diff := cmp.Diff(before, w.index()); diff != "" {
 		t.Fatalf("index changed (-before +after):\n%s", diff)
 	}
@@ -408,7 +408,7 @@ func TestUnitAnnotatedIgnores(t *testing.T) {
 func TestUnitReindex(t *testing.T) {
 	w := newWorld(t)
 	w.deploy("left-pad/-/left-pad-1.0.0.tgz", pkg("left-pad", "1.0.0", ""),
-		types.Properties{npm.PropDistTag: {"beta"}, npm.PropDeprecated: {"old"}})
+		model.Properties{npm.PropDistTag: {"beta"}, npm.PropDeprecated: {"old"}})
 	w.deploy("@a/b/-/@a/b-2.0.0.tgz", pkg("@a/b", "2.0.0", `"description":"b"`), nil)
 	w.deploy("@a/b/-/@a/b-1.0.0.tgz", pkg("@a/b", "1.0.0", ""), nil)
 	// Redeployed, 2.0.0 is now the later of the two, though the tree lists
@@ -417,7 +417,7 @@ func TestUnitReindex(t *testing.T) {
 	w.deploy("stray/-/stray-1.0.0.tgz", pkg("other", "1.0.0", ""), nil)
 	w.deploy("readme.md", []byte("hi"), nil)
 	want := w.index()
-	pkgs, _, err := w.st.Packages().List(w.ctx, w.c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := w.st.Packages().List(w.ctx, w.c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -540,7 +540,7 @@ func TestUnitInspect(t *testing.T) {
 	h := npm.Handler{}
 	_, err := h.Inspect(w.ctx, env, w.c, format.Write{
 		Op: format.OpDeploy, Path: "x/-/x-1.0.0.tgz",
-		Checksums: types.Checksums{SHA256: hex.EncodeToString(make([]byte, 32))},
+		Checksums: kernel.Checksums{SHA256: hex.EncodeToString(make([]byte, 32))},
 	})
 	if err == nil {
 		t.Fatal("inspected content that is not stored")

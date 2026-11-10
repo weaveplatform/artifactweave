@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // An include may name fields of the domains a relation path reaches
@@ -184,14 +184,14 @@ func (q *Query) ForNesting() *Query {
 type Source interface {
 	// RunsWithFile returns the runs with an artifact, or with dependency a
 	// dependency, whose SHA-1 is sha1, by ID.
-	RunsWithFile(ctx context.Context, dependency bool, sha1 string) ([]types.Build, error)
+	RunsWithFile(ctx context.Context, dependency bool, sha1 string) ([]model.Build, error)
 	// ItemsWithSHA1 returns the files whose actual SHA-1 is sha1, by ID,
 	// each with Stats set only when it has a statistics record.
 	ItemsWithSHA1(ctx context.Context, sha1 string) ([]Hit, error)
 	// Run returns the run with id.
-	Run(ctx context.Context, id int64) (types.Build, error)
+	Run(ctx context.Context, id int64) (model.Build, error)
 	// RunPromotions returns the promotions of the run with id, by ID.
-	RunPromotions(ctx context.Context, id int64) ([]types.BuildPromotion, error)
+	RunPromotions(ctx context.Context, id int64) ([]model.BuildPromotion, error)
 }
 
 // Nesting is how Nest renders related rows for one caller.
@@ -202,8 +202,8 @@ type Nesting struct {
 	// ItemVisible and RunVisible, when set, report whether the caller may
 	// see a related item, or a run with its modules, files and promotions.
 	// A row they refuse is left out with every row below it.
-	ItemVisible func(types.Item) bool
-	RunVisible  func(types.Build) bool
+	ItemVisible func(model.Item) bool
+	RunVisible  func(model.Build) bool
 }
 
 // nestNode is one path of the include tree: what renders of the rows it
@@ -746,7 +746,7 @@ func (x *nester) load(parents []*row, to rel) error {
 }
 
 func (x *nester) loadFiles(items []*row, dependency bool) error {
-	var added []types.Build
+	var added []model.Build
 	for _, it := range items {
 		sha1 := it.hit.Item.Actual.SHA1
 		key := strconv.FormatBool(dependency) + sha1
@@ -803,7 +803,7 @@ func (x *nester) loadItems(files []*row) error {
 }
 
 func (x *nester) loadPromotions(builds []*row) error {
-	var added []types.BuildPromotion
+	var added []model.BuildPromotion
 	for _, b := range builds {
 		id := b.build.ID
 		if x.promos[id] {
@@ -820,7 +820,7 @@ func (x *nester) loadPromotions(builds []*row) error {
 		promos := append(slices.Clone(x.c.Promotions), added...)
 		slices.SortFunc(
 			promos,
-			func(a, b types.BuildPromotion) int { return cmp.Compare(a.ID, b.ID) },
+			func(a, b model.BuildPromotion) int { return cmp.Compare(a.ID, b.ID) },
 		)
 		x.c.Promotions, x.c.idx = promos, nil
 	}
@@ -828,7 +828,7 @@ func (x *nester) loadPromotions(builds []*row) error {
 }
 
 func (x *nester) loadRuns(ids []int64) error {
-	var added []types.Build
+	var added []model.Build
 	for _, id := range ids {
 		if x.runs[id] {
 			continue
@@ -846,12 +846,12 @@ func (x *nester) loadRuns(ids []int64) error {
 
 // addRuns adds runs to the corpus in a new slice ordered by ID, so the rows
 // already made keep pointing at the runs they were made from.
-func (x *nester) addRuns(added []types.Build) {
+func (x *nester) addRuns(added []model.Build) {
 	if len(added) == 0 {
 		return
 	}
 	runs := append(slices.Clone(x.c.Builds), added...)
-	slices.SortFunc(runs, func(a, b types.Build) int { return cmp.Compare(a.ID, b.ID) })
+	slices.SortFunc(runs, func(a, b model.Build) int { return cmp.Compare(a.ID, b.ID) })
 	x.c.Builds, x.c.idx = runs, nil
 }
 
@@ -860,19 +860,19 @@ func (c *Corpus) RunsWithFile(
 	_ context.Context,
 	dependency bool,
 	sha1 string,
-) ([]types.Build, error) {
+) ([]model.Build, error) {
 	x := c.index()
 	files := x.artifacts[sha1]
 	if dependency {
 		files = x.dependencies[sha1]
 	}
-	var out []types.Build
+	var out []model.Build
 	for _, f := range files {
-		if !slices.ContainsFunc(out, func(b types.Build) bool { return b.ID == f.build.ID }) {
+		if !slices.ContainsFunc(out, func(b model.Build) bool { return b.ID == f.build.ID }) {
 			out = append(out, *f.build)
 		}
 	}
-	slices.SortFunc(out, func(a, b types.Build) int { return cmp.Compare(a.ID, b.ID) })
+	slices.SortFunc(out, func(a, b model.Build) int { return cmp.Compare(a.ID, b.ID) })
 	return out, nil
 }
 
@@ -888,18 +888,18 @@ func (c *Corpus) ItemsWithSHA1(_ context.Context, sha1 string) ([]Hit, error) {
 }
 
 // Run implements Source over the corpus.
-func (c *Corpus) Run(_ context.Context, id int64) (types.Build, error) {
+func (c *Corpus) Run(_ context.Context, id int64) (model.Build, error) {
 	b, ok := c.index().builds[id]
 	if !ok {
-		return types.Build{}, fmt.Errorf("%w: %d", errNoRun, id)
+		return model.Build{}, fmt.Errorf("%w: %d", errNoRun, id)
 	}
 	return *b, nil
 }
 
 // RunPromotions implements Source over the corpus.
-func (c *Corpus) RunPromotions(_ context.Context, id int64) ([]types.BuildPromotion, error) {
+func (c *Corpus) RunPromotions(_ context.Context, id int64) ([]model.BuildPromotion, error) {
 	rows := c.index().promotions[id]
-	out := make([]types.BuildPromotion, len(rows))
+	out := make([]model.BuildPromotion, len(rows))
 	for i, r := range rows {
 		out[i] = *r.promo
 	}

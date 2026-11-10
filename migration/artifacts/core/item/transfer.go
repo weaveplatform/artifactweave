@@ -13,9 +13,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 )
 
 // Levels of a copy or move message (the CopyOrMoveMessage enum).
@@ -32,7 +34,7 @@ var ErrInvalidTransfer = errors.New("item: invalid copy or move")
 // ErrNoSource is a copy or move whose source does not exist (400 with a
 // report). It wraps store.ErrNotFound, so a caller that tests for that,
 // such as a promotion whose file went in the meantime, still sees a miss.
-var ErrNoSource = fmt.Errorf("item: no source: %w", store.ErrNotFound)
+var ErrNoSource = fmt.Errorf("item: no source: %w", kernel.ErrNotFound)
 
 // Message is one line of a copy or move report.
 type Message struct {
@@ -76,10 +78,10 @@ type TransferResult struct {
 // copied file replaces. A file also carries the properties it lands with,
 // as the target's format admitted them, and what that format inspected.
 type step struct {
-	src        types.Item
+	src        model.Item
 	dst        string
-	replace    types.Item
-	props      types.Properties
+	replace    model.Item
+	props      model.Properties
 	inspection any
 }
 
@@ -144,12 +146,12 @@ func (s *Service) plan(ctx context.Context, t Transfer, res *TransferResult) ([]
 	items := s.Store.Items()
 	srcFull := strings.Trim(t.From.Path, "/")
 	toFull := strings.Trim(t.To.Path, "/")
-	root := types.Item{RepoKey: t.From.Repo.Key, Cached: t.From.Cached, Folder: true}
+	root := model.Item{RepoKey: t.From.Repo.Key, Cached: t.From.Cached, Folder: true}
 	if srcFull != "" {
 		var err error
 		root, err = items.Get(ctx, t.From.Repo.Key, t.From.Cached, srcFull)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			return nil, fmt.Errorf("%w: %s:%s", ErrNoSource, t.From.Repo.Key, srcFull)
 		case err != nil:
 			return nil, fmt.Errorf("item: source %s: %w", srcFull, err)
@@ -163,7 +165,7 @@ func (s *Service) plan(ctx context.Context, t Transfer, res *TransferResult) ([]
 			switch {
 			case err == nil:
 				into = existing.Folder
-			case !errors.Is(err, store.ErrNotFound):
+			case !errors.Is(err, kernel.ErrNotFound):
 				return nil, fmt.Errorf("item: target %s: %w", toFull, err)
 			}
 		}
@@ -206,7 +208,7 @@ func (s *Service) planItems(
 	ctx context.Context,
 	t Transfer,
 	res *TransferResult,
-	sources []types.Item,
+	sources []model.Item,
 	srcFull, dstRoot string,
 	tr *translation,
 ) ([]step, error) {
@@ -267,7 +269,7 @@ func (s *Service) planStep(
 	hooks format.Handler,
 	env format.Env,
 	t Transfer,
-	src types.Item,
+	src model.Item,
 	dst string,
 ) (step, string, error) {
 	st, problem, err := s.admitStep(ctx, hooks, env, t, src, dst)
@@ -284,7 +286,7 @@ func (s *Service) admitStep(
 	hooks format.Handler,
 	env format.Env,
 	t Transfer,
-	src types.Item,
+	src model.Item,
 	dst string,
 ) (step, string, error) {
 	st := step{src: src, dst: dst}
@@ -307,7 +309,7 @@ func (s *Service) admitStep(
 		}
 	}
 	props, err := s.Store.Items().Properties(ctx, src.ID)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		return st, "", fmt.Errorf("item: properties of %s: %w", src.FullPath(), err)
 	}
 	op := format.OpCopy
@@ -337,7 +339,7 @@ func (s *Service) admitStep(
 func (s *Service) check(ctx context.Context, t Transfer, st step) (step, string, error) {
 	src, dst := st.src, st.dst
 	existing, err := s.Store.Items().Get(ctx, t.To.Repo.Key, false, dst)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return st, "", nil
 	}
 	if err != nil {
@@ -370,7 +372,7 @@ func (s *Service) checkAncestors(ctx context.Context, t Target, dst string) erro
 		switch {
 		case err == nil && !it.Folder:
 			return fmt.Errorf("%w: the target %s is below the file %s", ErrInvalidTransfer, dst, p)
-		case err != nil && !errors.Is(err, store.ErrNotFound):
+		case err != nil && !errors.Is(err, kernel.ErrNotFound):
 			return fmt.Errorf("item: target %s: %w", p, err)
 		}
 	}
@@ -473,8 +475,8 @@ func (tr *translation) claim(dst, src string) string {
 // Layout compiles a repository layout: one the descriptor stored, else a
 // bundled one.
 func (s *Service) Layout(ctx context.Context, name string) (*layout.Layout, error) {
-	doc, err := s.Store.Configs().Get(ctx, types.ConfigLayout, name)
-	if errors.Is(err, store.ErrNotFound) {
+	doc, err := s.Store.Configs().Get(ctx, configdoc.ConfigLayout, name)
+	if errors.Is(err, kernel.ErrNotFound) {
 		l, err := layout.Lookup(name)
 		if err != nil {
 			return nil, fmt.Errorf("item: layout %s: %w", name, err)
@@ -520,7 +522,7 @@ func (s *Service) apply(ctx context.Context, t Transfer, steps []step, res *Tran
 		if st.src.Folder {
 			var err error
 			props, err = items.Properties(ctx, st.src.ID)
-			if err != nil && !errors.Is(err, store.ErrNotFound) {
+			if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 				return fmt.Errorf("item: properties of %s: %w", st.src.FullPath(), err)
 			}
 		}
@@ -571,8 +573,8 @@ func (s *Service) carry(
 	ctx context.Context,
 	t Transfer,
 	st step,
-	landed types.Item,
-	props types.Properties,
+	landed model.Item,
+	props model.Properties,
 	now time.Time,
 ) error {
 	items := s.Store.Items()
@@ -587,14 +589,14 @@ func (s *Service) carry(
 			return fmt.Errorf("item: properties of %s: %w", st.dst, err)
 		}
 	}
-	var stats types.ItemStats
+	var stats model.ItemStats
 	if t.Move && st.src.ID != 0 {
 		var err error
 		if stats, err = items.Stats(ctx, st.src.ID); err != nil {
 			return fmt.Errorf("item: statistics of %s: %w", st.src.FullPath(), err)
 		}
 	}
-	if stats == (types.ItemStats{}) && !replaced {
+	if stats == (model.ItemStats{}) && !replaced {
 		return nil
 	}
 	if err := items.PutStats(ctx, landed.ID, stats); err != nil {
@@ -612,8 +614,8 @@ func (s *Service) landed(
 	env format.Env,
 	c repo.Config,
 	st step,
-	it types.Item,
-	props types.Properties,
+	it model.Item,
+	props model.Properties,
 	now time.Time,
 ) error {
 	if !it.Folder {
@@ -637,20 +639,20 @@ func (s *Service) land(
 	t Transfer,
 	st step,
 	now time.Time,
-) (types.Item, error) {
+) (model.Item, error) {
 	items := s.Store.Items()
 	if st.src.Folder {
 		if err := s.ensureFolders(ctx, t.To, path.Dir(st.dst), t.By, now); err != nil {
-			return types.Item{}, err
+			return model.Item{}, err
 		}
 		folder, err := items.Get(ctx, t.To.Repo.Key, false, st.dst)
 		if err == nil {
 			return folder, nil
 		}
-		if !errors.Is(err, store.ErrNotFound) {
-			return types.Item{}, fmt.Errorf("item: get %s: %w", st.dst, err)
+		if !errors.Is(err, kernel.ErrNotFound) {
+			return model.Item{}, fmt.Errorf("item: get %s: %w", st.dst, err)
 		}
-		f := types.Item{
+		f := model.Item{
 			RepoKey: t.To.Repo.Key, Name: st.dst, Folder: true,
 			Created: now, CreatedBy: t.By, Modified: now, ModifiedBy: t.By, Updated: now,
 		}
@@ -660,14 +662,14 @@ func (s *Service) land(
 		}
 		out, err := items.Put(ctx, f)
 		if err != nil {
-			return types.Item{}, fmt.Errorf("item: create folder %s: %w", st.dst, err)
+			return model.Item{}, fmt.Errorf("item: create folder %s: %w", st.dst, err)
 		}
 		return out, nil
 	}
 	if err := s.ensureFolders(ctx, t.To, path.Dir(st.dst), t.By, now); err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
-	it := types.Item{
+	it := model.Item{
 		RepoKey: t.To.Repo.Key, Name: st.dst,
 		Size: st.src.Size, Actual: st.src.Actual, Original: st.src.Original,
 		MimeType: st.src.MimeType,
@@ -681,17 +683,17 @@ func (s *Service) land(
 	}
 	out, err := write(ctx, it)
 	if err != nil {
-		return types.Item{}, fmt.Errorf("item: put %s: %w", st.dst, err)
+		return model.Item{}, fmt.Errorf("item: put %s: %w", st.dst, err)
 	}
 	// The copy shares the content: one more reference, no new blob.
-	if _, err := s.Store.Blobs().Ref(ctx, types.Blob{
+	if _, err := s.Store.Blobs().Ref(ctx, blob.Blob{
 		Checksums: st.src.Actual, Size: st.src.Size, Created: now,
 	}, 1); err != nil {
-		return types.Item{}, fmt.Errorf("item: reference blob: %w", err)
+		return model.Item{}, fmt.Errorf("item: reference blob: %w", err)
 	}
 	if st.replace.ID != 0 && st.replace.Actual.SHA256 != "" {
 		if _, err := s.Store.Blobs().Unref(ctx, st.replace.Actual.SHA256, 1); err != nil {
-			return types.Item{}, fmt.Errorf("item: release overwritten blob: %w", err)
+			return model.Item{}, fmt.Errorf("item: release overwritten blob: %w", err)
 		}
 	}
 	return out, nil
@@ -703,8 +705,8 @@ func (s *Service) land(
 func (s *Service) removeSources(ctx context.Context, t Transfer, steps []step) error {
 	items := s.Store.Items()
 	hooks, env := s.format(t.From.Repo.PackageType), s.env()
-	var versions []types.PackageVersion
-	var folders, files []types.Item
+	var versions []model.PackageVersion
+	var folders, files []model.Item
 	for _, st := range steps {
 		if st.src.Folder {
 			folders = append(folders, st.src)
@@ -733,7 +735,7 @@ func (s *Service) removeSources(ctx context.Context, t Transfer, steps []step) e
 	}
 	for _, f := range slices.Backward(folders) {
 		children, _, err := items.Children(ctx, t.From.Repo.Key, false, f.FullPath(),
-			store.Page{Limit: 1})
+			kernel.Page{Limit: 1})
 		if err != nil {
 			return fmt.Errorf("item: list %s: %w", f.FullPath(), err)
 		}
@@ -765,7 +767,7 @@ func (s *Service) moveFile(
 	switch {
 	case err == nil:
 		return fmt.Sprintf("%s:%s is taken", c.Key, to), nil
-	case !errors.Is(err, store.ErrNotFound):
+	case !errors.Is(err, kernel.ErrNotFound):
 		return "", fmt.Errorf("item: get %s: %w", to, err)
 	}
 	res, err := s.Transfer(ctx, Transfer{
@@ -800,7 +802,7 @@ func guardStep(
 	env format.Env,
 	t Transfer,
 	st step,
-	props types.Properties,
+	props model.Properties,
 ) error {
 	if st.src.Folder {
 		return nil

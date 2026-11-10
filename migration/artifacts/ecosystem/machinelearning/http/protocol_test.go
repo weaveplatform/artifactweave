@@ -17,11 +17,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -261,7 +261,7 @@ func TestAccModelPublicationLifecycle(t *testing.T) {
 			if _, err := f.items.Restore(
 				t.Context(),
 				item.Target{Repo: f.c, Path: path},
-				types.TrashRecord{Item: it},
+				model.TrashRecord{Item: it},
 				"admin",
 			); err != nil {
 				t.Fatal(err)

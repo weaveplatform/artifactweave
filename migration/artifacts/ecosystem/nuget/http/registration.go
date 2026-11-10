@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // hive is a registration hive (decision 0038). Microsoft defines
@@ -241,8 +241,8 @@ func (h handler) registrationPage(
 		return
 	}
 	p = p.only(func(m nugetfmt.Metadata) bool {
-		return hv.shows(m) && types.CompareNuGet(m.Version, lo) >= 0 &&
-			types.CompareNuGet(m.Version, hi) <= 0
+		return hv.shows(m) && model.CompareNuGet(m.Version, lo) >= 0 &&
+			model.CompareNuGet(m.Version, hi) <= 0
 	})
 	if len(p.versions) == 0 {
 		h.k.Error(w, r, notFound(r))

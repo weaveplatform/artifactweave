@@ -19,12 +19,12 @@ import (
 	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -82,8 +82,8 @@ func testLongPropertyValues(t *testing.T, db harness.Store) {
 		t.Helper()
 		return do(t, h, method, path, admin, "x").Result()
 	}
-	text := storetest.LongText(types.PropertyValueMax + 100)
-	notes := string([]rune(text)[:types.PropertyValueMax])
+	text := storetest.LongText(model.PropertyValueMax + 100)
+	notes := string([]rune(text)[:model.PropertyValueMax])
 	if r := call(
 		http.MethodPut,
 		"/artifactory/libs-local/a.txt;notes="+url.PathEscape(notes),
@@ -139,8 +139,8 @@ func TestAccLongPropertyKeysOnPostgres(t *testing.T) { testLongPropertyKeys(t, o
 func testLongPropertyKeys(t *testing.T, db harness.Store) {
 	ctx := context.Background()
 	h := propertyServer(t, db)
-	key := strings.Repeat("é", types.PropertyKeyMax)
-	long := strings.Repeat("é", types.PropertyKeyMax+1)
+	key := strings.Repeat("é", model.PropertyKeyMax)
+	long := strings.Repeat("é", model.PropertyKeyMax+1)
 	call := func(method, path, body string, status int) {
 		t.Helper()
 		headers := basic("admin", "pw")
@@ -152,7 +152,7 @@ func testLongPropertyKeys(t *testing.T, db harness.Store) {
 			t.Fatalf("%s %.80s: %d %.200s, want %d", method, path, rec.Code, rec.Body, status)
 		}
 	}
-	props := func() types.Properties {
+	props := func() model.Properties {
 		t.Helper()
 		it, err := db.Items().Get(ctx, "libs-local", false, "a.txt")
 		if err != nil {
@@ -175,7 +175,7 @@ func testLongPropertyKeys(t *testing.T, db harness.Store) {
 	if _, err := db.Items().
 		Get(ctx, "libs-local", false, "b.txt"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("a refused deploy stored its file: %v", err)
 	}
@@ -191,7 +191,7 @@ func testLongPropertyKeys(t *testing.T, db harness.Store) {
 		url.QueryEscape("ok=2;"+long+"=2"), "", http.StatusBadRequest)
 	call(http.MethodPatch, "/artifactory/api/metadata/libs-local/a.txt",
 		fmt.Sprintf(`{"props":{"ok":"3",%q:"3"}}`, long), http.StatusBadRequest)
-	want := types.Properties{key: {"1"}}
+	want := model.Properties{key: {"1"}}
 	if diff := cmp.Diff(want, props()); diff != "" {
 		t.Fatalf("refused property writes changed the item (-want +got):\n%s", diff)
 	}
@@ -209,7 +209,7 @@ func testLongPropertyKeys(t *testing.T, db harness.Store) {
 		key,
 	),
 		http.StatusOK)
-	if diff := cmp.Diff(types.Properties{key: {"3"}}, props()); diff != "" {
+	if diff := cmp.Diff(model.Properties{key: {"3"}}, props()); diff != "" {
 		t.Fatalf("properties after the AQL update (-want +got):\n%s", diff)
 	}
 
@@ -220,7 +220,7 @@ func testLongPropertyKeys(t *testing.T, db harness.Store) {
 	}
 	call(http.MethodPut, buildsPath, doc("1", long, "m"), http.StatusBadRequest)
 	call(http.MethodPut, buildsPath, doc("1", "b", long), http.StatusBadRequest)
-	if _, err := db.Builds().Latest(ctx, "", "app"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := db.Builds().Latest(ctx, "", "app"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("a refused build-info document was stored: %v", err)
 	}
 	call(http.MethodPut, buildsPath, doc("1", key, key), http.StatusNoContent)
@@ -238,13 +238,13 @@ func testLongPropertyKeys(t *testing.T, db harness.Store) {
 	}
 	call(http.MethodPost, buildsPath+"/promote/app/1",
 		fmt.Sprintf(`{"status":"released","properties":{%q:["v"]}}`, long), http.StatusBadRequest)
-	if diff := cmp.Diff(types.Properties{key: {"3"}}, props()); diff != "" {
+	if diff := cmp.Diff(model.Properties{key: {"3"}}, props()); diff != "" {
 		t.Fatalf("a refused promotion changed the item (-want +got):\n%s", diff)
 	}
 
 	// A long key that reached a store would still answer 400.
 	err = newArtifactoryAPI(Config{}).ItemError(ctx, "set properties",
-		fmt.Errorf("%w: %w", store.ErrInvalid, types.ErrPropertyKeyTooLong))
+		fmt.Errorf("%w: %w", kernel.ErrInvalid, model.ErrPropertyKeyTooLong))
 	var api *apierror.Error
 	if !errors.As(err, &api) || api.Status != http.StatusBadRequest {
 		t.Fatalf("itemError = %v", err)

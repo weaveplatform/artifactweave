@@ -16,7 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/idempotency"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 const (
@@ -91,7 +90,7 @@ func appendReplayRequest(
 		Name       string                     `json:"name"`
 		Number     string                     `json:"number"`
 		Started    time.Time                  `json:"started"`
-	}{p.CredentialReference(), "appendBuild", build.ProjectKey(ap.ProjectKey), ap.Name, ap.Number, store.Normalise(ap.Started)})
+	}{p.CredentialReference(), "appendBuild", build.ProjectKey(ap.ProjectKey), ap.Name, ap.Number, kernel.Normalise(ap.Started)})
 	if err != nil {
 		return request, fmt.Errorf("append replay scope: %w", err)
 	}
@@ -124,7 +123,7 @@ func (s ArtifactoryAPI) appendOnce(
 			if errors.Is(err, kernel.ErrBadCredentials) ||
 				errors.Is(err, kernel.ErrPasswordExpired) ||
 				errors.Is(err, kernel.ErrAccountLocked) ||
-				errors.Is(err, store.ErrNotFound) {
+				errors.Is(err, kernel.ErrNotFound) {
 				return nil, build.ErrForbidden
 			}
 			return nil, fmt.Errorf("recheck append credential: %w", err)

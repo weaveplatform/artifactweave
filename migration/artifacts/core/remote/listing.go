@@ -14,7 +14,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const listingBytes = 64 << 20
@@ -93,10 +93,10 @@ func ListFolder(ctx context.Context, service *source.Service, q source.Request,
 			}
 			if !repo.PatternsOf(q.Repo).Accepts(entry.Path, entry.Folder) ||
 				!allows(
-					types.ResourceArtifact,
+					accessapi.ResourceArtifact,
 					accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
 					entry.Path,
-					types.ActionRead,
+					accessapi.ActionRead,
 				) {
 				continue
 			}
@@ -135,7 +135,7 @@ type listingPage struct {
 
 func listingTarget(q source.Request, folder string) (string, error) {
 	if folder != "" {
-		if _, _, _, err := types.SplitItemPath(
+		if _, _, _, err := kernel.SplitItemPath(
 			folder,
 		); err != nil ||
 			folder != strings.Trim(folder, "/") {

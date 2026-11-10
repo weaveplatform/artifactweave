@@ -9,25 +9,25 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitRestoreRecord(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
-	f, err := w.deploy("a/f.txt", "content", types.Checksums{})
+	f, err := w.deploy("a/f.txt", "content", kernel.Checksums{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.svc.Restore(
 		ctx,
 		Target{Repo: w.loc},
-		types.TrashRecord{Item: f},
+		model.TrashRecord{Item: f},
 		"bob",
 	); !errors.Is(
 		err,
-		types.ErrInvalidItemPath,
+		kernel.ErrInvalidItemPath,
 	) {
 		t.Fatalf("restore to the root: %v", err)
 	}
@@ -37,13 +37,13 @@ func TestUnitRestoreRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := w.svc.Annotate(ctx, w.loc, root, types.Properties{"k": {"repo"}, "r": {"1"}},
+	if err := w.svc.Annotate(ctx, w.loc, root, model.Properties{"k": {"repo"}, "r": {"1"}},
 		nil); err != nil {
 		t.Fatal(err)
 	}
 	// A file restored where a file is in the way replaces it.
 	got, err := w.svc.Restore(ctx, Target{Repo: w.loc, Path: "b/copy.txt"},
-		types.TrashRecord{Item: f, Properties: types.Properties{"k": {"v"}}}, "bob")
+		model.TrashRecord{Item: f, Properties: model.Properties{"k": {"v"}}}, "bob")
 	if err != nil || got.FullPath() != "b/copy.txt" || got.Actual.SHA256 != f.Actual.SHA256 {
 		t.Fatalf("restore %+v, %v", got, err)
 	}
@@ -57,16 +57,16 @@ func TestUnitRestoreRecord(t *testing.T) {
 		t.Fatalf("restored properties %v, %v", props, err)
 	}
 	if _, err := w.svc.Restore(ctx, Target{Repo: w.loc, Path: "a/f.txt/x"},
-		types.TrashRecord{Item: f}, "bob"); !errors.Is(err, ErrConflict) {
+		model.TrashRecord{Item: f}, "bob"); !errors.Is(err, ErrConflict) {
 		t.Fatalf("a file in the way of a parent folder: %v", err)
 	}
-	folder := types.Item{Folder: true, Created: at}
+	folder := model.Item{Folder: true, Created: at}
 	if _, err := w.svc.Restore(ctx, Target{Repo: w.loc, Path: "a/f.txt"},
-		types.TrashRecord{Item: folder}, "bob"); !errors.Is(err, ErrConflict) {
+		model.TrashRecord{Item: folder}, "bob"); !errors.Is(err, ErrConflict) {
 		t.Fatalf("a folder where a file is: %v", err)
 	}
 	if got, err := w.svc.Restore(ctx, Target{Repo: w.loc, Path: "new/dir"},
-		types.TrashRecord{Item: folder}, "bob"); err != nil || !got.Folder {
+		model.TrashRecord{Item: folder}, "bob"); err != nil || !got.Folder {
 		t.Fatalf("folder restore %+v, %v", got, err)
 	}
 }
@@ -74,7 +74,7 @@ func TestUnitRestoreRecord(t *testing.T) {
 func TestUnitRestoreAnnotates(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
-	f, err := w.deploy("a/f.txt", "content", types.Checksums{})
+	f, err := w.deploy("a/f.txt", "content", kernel.Checksums{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,16 +82,16 @@ func TestUnitRestoreAnnotates(t *testing.T) {
 	// An item deleted from another repository names that one, and a
 	// restore time recorded by an earlier restore gives way to this one's.
 	f.RepoKey = "elsewhere"
-	recorded := types.Properties{
+	recorded := model.Properties{
 		"k":                   {"v"},
 		PropTrashRestoredTime: {"1"},
 	}
 	got, err := w.svc.Restore(ctx, Target{Repo: w.loc, Path: "b/f.txt"},
-		types.TrashRecord{Item: f, Properties: recorded}, "bob")
+		model.TrashRecord{Item: f, Properties: recorded}, "bob")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := types.Properties{
+	want := model.Properties{
 		"k":                         {"v"},
 		PropTrashOriginalRepository: {"elsewhere"},
 		PropTrashRestoredTime:       {restoredAt},
@@ -106,7 +106,7 @@ func TestUnitRestoreAnnotates(t *testing.T) {
 	}
 	// A folder already at the path gains them beside its own.
 	dir, err := w.svc.Restore(ctx, Target{Repo: w.loc, Path: "b"},
-		types.TrashRecord{Item: types.Item{RepoKey: "libs", Folder: true, Created: at}}, "bob")
+		model.TrashRecord{Item: model.Item{RepoKey: "libs", Folder: true, Created: at}}, "bob")
 	if err != nil || !dir.Folder {
 		t.Fatalf("folder restore %+v, %v", dir, err)
 	}
@@ -147,7 +147,7 @@ func TestUnitZap(t *testing.T) {
 		Target{Repo: remote, Cached: true, Path: "absent"},
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("zap of a missing path: %v", err)
 	}

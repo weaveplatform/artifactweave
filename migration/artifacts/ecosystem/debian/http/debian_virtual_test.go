@@ -11,12 +11,12 @@ import (
 	"testing"
 	"testing/iotest"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // refuseSources is a source transport for tests whose reads must be
@@ -210,9 +210,9 @@ func TestAccDebianVirtualMetadataFailsClosed(t *testing.T) {
 				},
 			)
 			w.publish("deb-local", index)
-			for _, pair := range []types.Keypair{
-				{Name: "deb-rsa", Type: types.KeypairRSA},
-				{Name: "deb-gpg", Type: types.KeypairGPG, PrivateKey: "invalid key"},
+			for _, pair := range []api.Keypair{
+				{Name: "deb-rsa", Type: api.KeypairRSA},
+				{Name: "deb-gpg", Type: api.KeypairGPG, PrivateKey: "invalid key"},
 			} {
 				if err := w.db.Keys().CreateKeypair(t.Context(), pair); err != nil {
 					t.Fatal(err)
@@ -253,7 +253,7 @@ func TestAccDebianVirtualMetadataFromARemoteMember(t *testing.T) {
 		{
 			name: "Release not upstream",
 			release: func(*overlayWorld) func() (source.Result, error) {
-				return failing(store.ErrNotFound)
+				return failing(kernel.ErrNotFound)
 			},
 			status: http.StatusNotFound, message: "Could not find resource",
 		},
@@ -341,7 +341,7 @@ func TestUnitDebianMemberBytesRefusesAPathTheSourceCannotName(t *testing.T) {
 	w.debRepos(repo.Config{Key: "deb-remote", Class: repo.Remote})
 	_, _, err := DebianAPI{w.kit}.debianMemberBytes(t.Context(), w.db, w.debRepo("deb-remote"),
 		"pool/../alpha.deb", kittest.Admin, kittest.AdminAccess())
-	if !errors.Is(err, store.ErrNotFound) {
+	if !errors.Is(err, kernel.ErrNotFound) {
 		t.Errorf("member bytes returned %v, want not found", err)
 	}
 }
@@ -355,7 +355,7 @@ func TestUnitDebianMemberBytesRefusesAPathTheSourceCannotName(t *testing.T) {
 // its stream is relayed and its revoked cached copy is refused.
 func TestAccDebianVirtualPackage(t *testing.T) {
 	noSuch := func(*overlayWorld) (source.Result, error) {
-		return source.Result{}, store.ErrNotFound
+		return source.Result{}, kernel.ErrNotFound
 	}
 	for _, tc := range []struct {
 		name    string

@@ -9,13 +9,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // changeFormat changes what it names through the kit: PATCH /props/*
@@ -33,7 +36,7 @@ func changeFormat() pkgroute.Protocol {
 			r.Patch("/props/*", func(w http.ResponseWriter, r *http.Request) {
 				it, err := k.DB().Items().Get(r.Context(), local, false, path(r, "props/"))
 				if err == nil {
-					err = k.Annotate(r, it, types.Properties{"k": {"v"}}, nil)
+					err = k.Annotate(r, it, model.Properties{"k": {"v"}}, nil)
 				}
 				if err != nil {
 					k.Error(w, r, err)
@@ -49,7 +52,7 @@ func changeFormat() pkgroute.Protocol {
 				w.WriteHeader(http.StatusNoContent)
 			})
 			r.Get("/folder/*", func(w http.ResponseWriter, r *http.Request) {
-				if k.CanFolder(r, path(r, "folder/"), types.ActionWrite) {
+				if k.CanFolder(r, path(r, "folder/"), api.ActionWrite) {
 					w.WriteHeader(http.StatusNoContent)
 					return
 				}
@@ -87,17 +90,17 @@ func TestAccAnnotateAndDelete(t *testing.T) {
 		}
 	}
 	if _, err := f.db.Items().Get(ctx, local, false, "work/old.txt"); !errors.Is(
-		err, store.ErrNotFound) {
+		err, kernel.ErrNotFound) {
 		t.Fatalf("not deleted: %v", err)
 	}
 	// Annotate needs its own grant.
-	if err := f.db.Permissions().Create(ctx, types.Permission{
+	if err := f.db.Permissions().Create(ctx, model.Permission{
 		Name: "annotator",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{
-				Users: map[string]types.Actions{"annotator": types.ActionAnnotate},
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{
+				Users: map[string]api.Actions{"annotator": api.ActionAnnotate},
 			},
-			Targets: map[string]types.Target{local: {Include: []string{"**"}}},
+			Targets: map[string]model.Target{local: {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -133,10 +136,10 @@ func TestAccAnnotateAndDelete(t *testing.T) {
 // failingTrash fails putting anything in the trash can.
 type failingTrash struct{ item.Store }
 
-func (s failingTrash) Trash() store.TrashStore { return failingTrashStore{s.Store.Trash()} }
+func (s failingTrash) Trash() port.TrashStore { return failingTrashStore{s.Store.Trash()} }
 
-type failingTrashStore struct{ store.TrashStore }
+type failingTrashStore struct{ port.TrashStore }
 
-func (failingTrashStore) Add(context.Context, types.TrashEntry) (types.TrashEntry, error) {
-	return types.TrashEntry{}, errors.New("trash down")
+func (failingTrashStore) Add(context.Context, model.TrashEntry) (model.TrashEntry, error) {
+	return model.TrashEntry{}, errors.New("trash down")
 }

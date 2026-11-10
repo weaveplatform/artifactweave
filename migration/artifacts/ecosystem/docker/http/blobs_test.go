@@ -15,18 +15,19 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func digestOf(s string) string {
@@ -91,7 +92,7 @@ func send(
 }
 
 // deploy stores a file in the repository key.
-func (w *blobWorld) deploy(key, path, body string) types.Item {
+func (w *blobWorld) deploy(key, path, body string) model.Item {
 	w.t.Helper()
 	ctx := context.Background()
 	c, err := w.db.Repos().Get(ctx, key)
@@ -456,22 +457,22 @@ func principalAs(t *testing.T, db *inmem.Store, h http.Handler, name string) htt
 func TestAccPermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
-	grant := func(name string, users map[string]types.Actions, key string) {
-		if err := w.db.Permissions().Create(ctx, types.Permission{
+	grant := func(name string, users map[string]accessapi.Actions, key string) {
+		if err := w.db.Permissions().Create(ctx, model.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: users},
-				Targets: map[string]types.Target{key: {Include: []string{"**"}}},
+			Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+				Actions: model.Grants{Users: users},
+				Targets: map[string]model.Target{key: {Include: []string{"**"}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	grant("docker", map[string]types.Actions{
-		"reader": types.ActionRead, "writer": types.ActionRead | types.ActionWrite,
-		"other": types.ActionRead | types.ActionWrite,
+	grant("docker", map[string]accessapi.Actions{
+		"reader": accessapi.ActionRead, "writer": accessapi.ActionRead | accessapi.ActionWrite,
+		"other": accessapi.ActionRead | accessapi.ActionWrite,
 	}, "docker-local")
-	grant("oci", map[string]types.Actions{"reader": types.ActionRead}, "oci-local")
+	grant("oci", map[string]accessapi.Actions{"reader": accessapi.ActionRead}, "oci-local")
 	d := digestOf("p")
 	w.deploy("docker-local", "app/v1/sha256__"+d[7:], "p")
 	w.deploy("oci-local", "base/v1/sha256__"+d[7:], "p")
@@ -588,10 +589,10 @@ func TestAccAbsoluteLocations(t *testing.T) {
 }
 
 func TestAccServeBlobHook(t *testing.T) {
-	var served types.Item
+	var served model.Item
 	var in repo.Config
 	w := newBlobWorld(t, func(o *Options) {
-		o.ServeBlob = func(w http.ResponseWriter, _ *http.Request, c repo.Config, it types.Item) {
+		o.ServeBlob = func(w http.ResponseWriter, _ *http.Request, c repo.Config, it model.Item) {
 			served, in = it, c
 			w.WriteHeader(http.StatusTeapot)
 		}
@@ -686,7 +687,7 @@ func TestAccLayersStreamWithoutBuffering(t *testing.T) {
 }
 
 // failingItems fails searches, so finding a blob fails.
-type failingItems struct{ store.ItemStore }
+type failingItems struct{ port.ItemStore }
 
 func (failingItems) Search(context.Context, *aql.Query, aql.Options) ([]aql.Hit, error) {
 	return nil, errBoom
@@ -694,10 +695,10 @@ func (failingItems) Search(context.Context, *aql.Query, aql.Options) ([]aql.Hit,
 
 type itemsFault struct {
 	registry.Store
-	items store.ItemStore
+	items port.ItemStore
 }
 
-func (f itemsFault) Items() store.ItemStore { return f.items }
+func (f itemsFault) Items() port.ItemStore { return f.items }
 
 // failingBlobs fails to open content and to begin uploads.
 type failingBlobs struct{ blob.Store }
@@ -755,14 +756,14 @@ func TestAccBlobStoreAndIndexFailures(t *testing.T) {
 func TestAccMountWithRegistryTokens(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
-	for key, a := range map[string]types.Actions{
-		"docker-local": types.ActionRead | types.ActionWrite, "oci-local": types.ActionRead,
+	for key, a := range map[string]accessapi.Actions{
+		"docker-local": accessapi.ActionRead | accessapi.ActionWrite, "oci-local": accessapi.ActionRead,
 	} {
-		if err := w.db.Permissions().Create(ctx, types.Permission{
+		if err := w.db.Permissions().Create(ctx, model.Permission{
 			Name: "tw-" + key,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"tw": a}},
-				Targets: map[string]types.Target{key: {Include: []string{"**"}}},
+			Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]accessapi.Actions{"tw": a}},
+				Targets: map[string]model.Target{key: {Include: []string{"**"}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)
@@ -771,12 +772,12 @@ func TestAccMountWithRegistryTokens(t *testing.T) {
 	d := digestOf("tok")
 	w.deploy("oci-local", "base/v1/sha256__"+d[7:], "tok")
 	w.deploy("docker-local", "base/v1/sha256__"+d[7:], "tok")
-	grant := func(name string, actions ...string) types.RegistryGrant {
-		return types.RegistryGrant{Type: "repository", Name: name, Actions: actions}
+	grant := func(name string, actions ...string) kernel.RegistryGrant {
+		return kernel.RegistryGrant{Type: "repository", Name: name, Actions: actions}
 	}
 	cases := []struct {
 		name, target, host, realm string
-		grants                    []types.RegistryGrant
+		grants                    []kernel.RegistryGrant
 		status                    int
 	}{
 		{
@@ -784,7 +785,7 @@ func TestAccMountWithRegistryTokens(t *testing.T) {
 			"/v2/docker-local/a1/blobs/uploads/?from=oci-local/base",
 			"",
 			"",
-			[]types.RegistryGrant{
+			[]kernel.RegistryGrant{
 				grant("docker-local/a1", "pull", "push"),
 				grant("oci-local/base", "pull"),
 			},
@@ -793,27 +794,27 @@ func TestAccMountWithRegistryTokens(t *testing.T) {
 		{
 			"repository path, no grant on the source",
 			"/v2/docker-local/a2/blobs/uploads/?from=oci-local/base", "", "",
-			[]types.RegistryGrant{grant("docker-local/a2", "pull", "push")},
+			[]kernel.RegistryGrant{grant("docker-local/a2", "pull", "push")},
 			202,
 		},
 		{
 			"prefix, repository form",
 			"/artifactory/api/docker/docker-local/v2/a3/blobs/uploads/?from=oci-local/base", "",
 			"docker-local",
-			[]types.RegistryGrant{grant("a3", "push"), grant("oci-local/base", "pull")},
+			[]kernel.RegistryGrant{grant("a3", "push"), grant("oci-local/base", "pull")},
 			201,
 		},
 		{
 			"prefix, same repository",
 			"/artifactory/api/docker/docker-local/v2/a4/blobs/uploads/?from=base", "",
 			"docker-local",
-			[]types.RegistryGrant{grant("a4", "push"), grant("base", "pull")},
+			[]kernel.RegistryGrant{grant("a4", "push"), grant("base", "pull")},
 			201,
 		},
 		{
 			"subdomain", "/v2/a5/blobs/uploads/?from=base", "docker-local.reg.example.com",
 			"docker-local",
-			[]types.RegistryGrant{grant("a5", "push"), grant("base", "pull")},
+			[]kernel.RegistryGrant{grant("a5", "push"), grant("base", "pull")},
 			201,
 		},
 	}
@@ -821,7 +822,7 @@ func TestAccMountWithRegistryTokens(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			authorizer := accesstest.Over(t, w.db).API().Authorizer
 			p, decider, err := authorizer.Authorize(ctx, kernel.Principal{
-				Name: "tw", Registry: &types.RegistryAccess{Realm: c.realm, Grants: c.grants},
+				Name: "tw", Registry: &kernel.RegistryAccess{Realm: c.realm, Grants: c.grants},
 			}, false)
 			if err != nil {
 				t.Fatal(err)

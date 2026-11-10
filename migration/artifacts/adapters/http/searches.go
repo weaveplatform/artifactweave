@@ -17,13 +17,13 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The GET searches (decision 0012, research 22 §2) build an items query and
@@ -195,7 +195,7 @@ func (s ArtifactoryAPI) newSearch(ctx context.Context, named bool) (*searchRun, 
 // uri is the storage API URL of an item under the key clients see for it;
 // a repository root, which the property search finds by the properties set
 // on it, is the repository's URL with no trailing slash.
-func (r *searchRun) uri(ctx context.Context, it types.Item) string {
+func (r *searchRun) uri(ctx context.Context, it model.Item) string {
 	u := baseurl.From(ctx) + storagePrefix + it.ReportedRepoKey()
 	if p := it.FullPath(); p != "" {
 		u += "/" + httpkit.EscapePath(p)
@@ -433,11 +433,11 @@ func (s ArtifactoryAPI) SearchBadChecksum(
 	if err != nil {
 		return nil, err
 	}
-	of := func(c types.Checksums) string { return c.MD5 }
+	of := func(c kernel.Checksums) string { return c.MD5 }
 	switch req.Params.Type {
 	case artgen.Md5:
 	case artgen.Sha1:
-		of = func(c types.Checksums) string { return c.SHA1 }
+		of = func(c kernel.Checksums) string { return c.SHA1 }
 	default:
 		return nil, httpkit.BadRequestf("type must be md5 or sha1")
 	}
@@ -709,7 +709,7 @@ func (s ArtifactoryAPI) SearchPattern(
 	paths := []string{}
 	scope, _ := r.RepoScope(&key, false)
 	if scope, ok := scope.(aql.Or); ok && len(scope) == 1 {
-		dir := types.RootPath
+		dir := kernel.RootPath
 		if len(segs) > 1 {
 			dir = strings.Join(segs[:len(segs)-1], "/")
 		}

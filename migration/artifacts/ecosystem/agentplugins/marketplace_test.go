@@ -9,14 +9,14 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 func TestUnitMarketplaceLatestAndPermissionFiltering(t *testing.T) {
 	ctx := context.Background()
 	st := inmem.New()
 	p, err := st.Packages().
-		Ensure(ctx, types.Package{RepoKey: "plugins", Type: repo.AgentPlugins, Name: "reader", Created: time.Now()})
+		Ensure(ctx, model.Package{RepoKey: "plugins", Type: repo.AgentPlugins, Name: "reader", Created: time.Now()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestUnitMarketplaceLatestAndPermissionFiltering(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := st.Packages().
-			PutVersion(ctx, types.PackageVersion{PackageID: p.ID, Version: version, Metadata: b}); err != nil {
+			PutVersion(ctx, model.PackageVersion{PackageID: p.ID, Version: version, Metadata: b}); err != nil {
 			t.Fatal(err)
 		}
 	}

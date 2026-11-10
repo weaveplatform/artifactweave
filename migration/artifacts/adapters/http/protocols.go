@@ -8,6 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	agentpackageshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages/http"
 	aieditorextensionshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/aieditorextensions/http"
 	ansiblehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/ansible/http"
@@ -41,7 +42,6 @@ import (
 	vagranthttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vagrant/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // ProtocolOptions gives the router kit the item routes' download, deploy
@@ -51,7 +51,7 @@ func (s ArtifactoryAPI) ProtocolOptions() pkgroute.Options {
 	return pkgroute.Options{
 		Store: s.cfg.Store,
 		Items: func() *item.Service { return s.Items(s.cfg.Store) },
-		ServeItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, it model.Item) {
 			p, _ := kernel.FromContext(r.Context())
 			s.ServeFile(w, r, s.cfg.Store, itemkit.Found{Repo: c, Item: it}, p)
 		},
@@ -59,7 +59,7 @@ func (s ArtifactoryAPI) ProtocolOptions() pkgroute.Options {
 			s.deployEscapedItem(w, r, url.PathEscape(c.Key)+"/"+rest)
 		},
 		ItemError: s.ItemError,
-		Created: func(w http.ResponseWriter, r *http.Request, it types.Item) {
+		Created: func(w http.ResponseWriter, r *http.Request, it model.Item) {
 			httpkit.WriteJSON(w, http.StatusCreated, itemkit.ItemCreated(r.Context(), it))
 		},
 		Fault: func(r *http.Request, err error) { httpkit.NoteCause(r.Context(), err) },

@@ -16,11 +16,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // imageConfig is an image's config with a label, as Docker writes it.
@@ -310,13 +311,13 @@ func TestAccManifestUnknownShape(t *testing.T) {
 // (DV-035); writing one that is absent needs Deploy alone.
 func TestAccListPushStrictOverwriteCoversPlatformTags(t *testing.T) {
 	w := newBlobWorld(t)
-	if err := w.db.Permissions().Create(context.Background(), types.Permission{
+	if err := w.db.Permissions().Create(context.Background(), model.Permission{
 		Name: "deployers",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"deployer": types.ActionRead | types.ActionWrite,
+		Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]accessapi.Actions{
+				"deployer": accessapi.ActionRead | accessapi.ActionWrite,
 			}},
-			Targets: map[string]types.Target{"docker-local": {Include: []string{"**"}}},
+			Targets: map[string]model.Target{"docker-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -463,15 +464,15 @@ func TestAccAFileWhereTheTagGoes(t *testing.T) {
 func TestAccManifestPermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
-	if err := w.db.Permissions().Create(ctx, types.Permission{
+	if err := w.db.Permissions().Create(ctx, model.Permission{
 		Name: "docker",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"reader": types.ActionRead,
-				"writer": types.ActionRead | types.ActionWrite,
-				"owner":  types.ActionRead | types.ActionWrite | types.ActionDelete,
+		Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]accessapi.Actions{
+				"reader": accessapi.ActionRead,
+				"writer": accessapi.ActionRead | accessapi.ActionWrite,
+				"owner":  accessapi.ActionRead | accessapi.ActionWrite | accessapi.ActionDelete,
 			}},
-			Targets: map[string]types.Target{"docker-local": {Include: []string{"**"}}},
+			Targets: map[string]model.Target{"docker-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -504,29 +505,29 @@ func TestAccManifestPermissions(t *testing.T) {
 	}
 	// The refused push by digest stored nothing.
 	if _, err := w.db.Items().Get(ctx, "docker-local", false,
-		"app/"+digestOf(second)); !errors.Is(err, store.ErrNotFound) {
+		"app/"+digestOf(second)); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("stored: %v", err)
 	}
 }
 
 // failingProperties fails reading properties.
-type failingProperties struct{ store.ItemStore }
+type failingProperties struct{ port.ItemStore }
 
-func (failingProperties) Properties(context.Context, int64) (types.Properties, error) {
+func (failingProperties) Properties(context.Context, int64) (model.Properties, error) {
 	return nil, errBoom
 }
 
 // failingGets fails Get for every path below an image's tag folders.
-type failingGets struct{ store.ItemStore }
+type failingGets struct{ port.ItemStore }
 
 func (f failingGets) Get(
 	ctx context.Context,
 	key string,
 	cached bool,
 	p string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if strings.Count(p, "/") >= 1 {
-		return types.Item{}, errBoom
+		return model.Item{}, errBoom
 	}
 	return f.ItemStore.Get(ctx, key, cached, p) //nolint:wrapcheck // test double
 }
@@ -603,14 +604,14 @@ func TestAccAccepts(t *testing.T) {
 func TestAccManifestPushWithRegistryTokens(t *testing.T) {
 	w := newBlobWorld(t)
 	ctx := context.Background()
-	if err := w.db.Permissions().Create(ctx, types.Permission{
+	if err := w.db.Permissions().Create(ctx, model.Permission{
 		Name: "docker",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"owner":  types.ActionRead | types.ActionWrite | types.ActionDelete,
-				"writer": types.ActionRead | types.ActionWrite,
+		Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]accessapi.Actions{
+				"owner":  accessapi.ActionRead | accessapi.ActionWrite | accessapi.ActionDelete,
+				"writer": accessapi.ActionRead | accessapi.ActionWrite,
 			}},
-			Targets: map[string]types.Target{"docker-local": {Include: []string{"**"}}},
+			Targets: map[string]model.Target{"docker-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -619,7 +620,7 @@ func TestAccManifestPushWithRegistryTokens(t *testing.T) {
 	authorizer := accesstest.Over(t, w.db).API().Authorizer
 	tokenAs := func(user string, actions ...string) http.Handler {
 		p, decider, err := authorizer.Authorize(ctx, kernel.Principal{
-			Name: user, Registry: &types.RegistryAccess{Grants: []types.RegistryGrant{
+			Name: user, Registry: &kernel.RegistryAccess{Grants: []kernel.RegistryGrant{
 				{Type: scopeRepository, Name: "docker-local/app", Actions: actions},
 			}},
 		}, false)

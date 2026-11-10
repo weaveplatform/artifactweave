@@ -12,12 +12,13 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	helmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (h handler) upstreamIndex(r *http.Request) (remoteIndex, source.Result, error) {
@@ -60,8 +61,8 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, requested st
 		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Could not find resource"))
 		return
 	}
-	if !h.k.Require(w, r, requested, types.ActionRead) ||
-		(provenance && !h.k.Require(w, r, owner, types.ActionRead)) {
+	if !h.k.Require(w, r, requested, api.ActionRead) ||
+		(provenance && !h.k.Require(w, r, owner, api.ActionRead)) {
 		return
 	}
 	index, metadata, err := h.upstreamIndex(r)
@@ -90,7 +91,7 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, requested st
 				if provenance {
 					upstream.Path += ".prov"
 					upstream.RawPath = ""
-					resource.Checksums = types.Checksums{}
+					resource.Checksums = kernel.Checksums{}
 					resource.Variant = "helm-provenance-v1:" + version.chart.Digest
 					resource.Validate = validateRemoteProvenance(version.chart, target.url.Path)
 				}
@@ -159,7 +160,7 @@ func (h handler) remoteIndex(w http.ResponseWriter, r *http.Request) {
 		for _, version := range index.versions[name.Value] {
 			var locations []string
 			for _, target := range version.targets {
-				if !h.k.Can(r, target.path, types.ActionRead) {
+				if !h.k.Can(r, target.path, api.ActionRead) {
 					continue
 				}
 				// Signed upstream query parameters remain adapter-only authority.

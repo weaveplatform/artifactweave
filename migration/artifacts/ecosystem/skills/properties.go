@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 var propertyKeys = []string{
@@ -19,7 +19,7 @@ var propertyKeys = []string{
 func setProperties(
 	ctx context.Context,
 	st format.Store,
-	it types.Item,
+	it model.Item,
 	meta Metadata,
 ) (Metadata, error) {
 	current, err := st.Items().Properties(ctx, it.ID)
@@ -56,13 +56,13 @@ func setProperties(
 	if meta.Name == "" {
 		meta.Name = meta.Slug
 	}
-	wanted := types.Properties{
+	wanted := model.Properties{
 		"skill.name": {meta.Name}, "skill.version": {meta.Version},
 		"skill.fingerprint": {meta.Fingerprint},
 	}
 	one := func(key, value string) {
 		if value != "" {
-			wanted[key] = []string{types.TruncatePropertyValue(value, types.PropertyValueMax)}
+			wanted[key] = []string{model.TruncatePropertyValue(value, model.PropertyValueMax)}
 		}
 	}
 	one("skill.description", meta.Description)
@@ -76,13 +76,13 @@ func setProperties(
 			tag = strings.TrimSpace(tag)
 			if tag != "" {
 				wanted["skill.tags"] = append(wanted["skill.tags"],
-					types.TruncatePropertyValue(tag, types.PropertyValueMax))
+					model.TruncatePropertyValue(tag, model.PropertyValueMax))
 			}
 		}
 		slices.Sort(wanted["skill.tags"])
 		wanted["skill.tags"] = slices.Compact(wanted["skill.tags"])
 	}
-	set := types.Properties{}
+	set := model.Properties{}
 	var remove []string
 	for _, key := range propertyKeys {
 		want, yes := wanted[key]

@@ -15,13 +15,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitParseTarget(t *testing.T) {
@@ -836,7 +836,7 @@ func TestAccBaseHost(t *testing.T) {
 
 // faultyRepos fails Get, or List, with a store error.
 type faultyRepos struct {
-	store.RepoStore
+	port.RepoStore
 	get, list bool
 }
 
@@ -849,7 +849,7 @@ func (f faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
 	return f.RepoStore.Get(ctx, key) //nolint:wrapcheck // test double
 }
 
-func (f faultyRepos) List(ctx context.Context, filter store.RepoFilter) ([]repo.Config, error) {
+func (f faultyRepos) List(ctx context.Context, filter port.RepoFilter) ([]repo.Config, error) {
 	if f.list {
 		return nil, errBoom
 	}
@@ -861,7 +861,7 @@ type faultyStore struct {
 	repos faultyRepos
 }
 
-func (f faultyStore) Repos() store.RepoStore { return f.repos }
+func (f faultyStore) Repos() port.RepoStore { return f.repos }
 
 func TestAccStoreFailures(t *testing.T) {
 	db := fixture(t)
@@ -912,13 +912,13 @@ func TestAccStoreFailures(t *testing.T) {
 func TestAccRequire(t *testing.T) {
 	ctx := context.Background()
 	db := fixture(t)
-	if err := db.Permissions().Create(ctx, types.Permission{
+	if err := db.Permissions().Create(ctx, model.Permission{
 		Name: "readers",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"reader": types.ActionRead, kernel.AnonymousUser: types.ActionRead,
+		Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]accessapi.Actions{
+				"reader": accessapi.ActionRead, kernel.AnonymousUser: accessapi.ActionRead,
 			}},
-			Targets: map[string]types.Target{"docker-local": {Include: []string{"pub/**"}}},
+			Targets: map[string]model.Target{"docker-local": {Include: []string{"pub/**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -944,17 +944,29 @@ func TestAccRequire(t *testing.T) {
 		name     string
 		r        *http.Request
 		path     string
-		expected types.Actions
+		expected accessapi.Actions
 		code     string
 	}{
-		{"no principal", httptest.NewRequest(http.MethodGet, "/", nil), "x", types.ActionWrite, ""},
-		{"reader reads", reader, "pub/app/v1/manifest.json", types.ActionRead, ""},
-		{"reader cannot write", reader, "pub/app/v1/manifest.json", types.ActionWrite, CodeDenied},
-		{"reader outside the pattern", reader, "priv/app", types.ActionRead, CodeDenied},
-		{"nobody", nobody, "pub/app", types.ActionRead, CodeDenied},
-		{"anonymous reads", anonOn, "pub/app", types.ActionRead, ""},
-		{"anonymous cannot write", anonOn, "pub/app", types.ActionWrite, CodeUnauthorized},
-		{"anonymous while off", anonOff, "pub/app", types.ActionRead, CodeUnauthorized},
+		{
+			"no principal",
+			httptest.NewRequest(http.MethodGet, "/", nil),
+			"x",
+			accessapi.ActionWrite,
+			"",
+		},
+		{"reader reads", reader, "pub/app/v1/manifest.json", accessapi.ActionRead, ""},
+		{
+			"reader cannot write",
+			reader,
+			"pub/app/v1/manifest.json",
+			accessapi.ActionWrite,
+			CodeDenied,
+		},
+		{"reader outside the pattern", reader, "priv/app", accessapi.ActionRead, CodeDenied},
+		{"nobody", nobody, "pub/app", accessapi.ActionRead, CodeDenied},
+		{"anonymous reads", anonOn, "pub/app", accessapi.ActionRead, ""},
+		{"anonymous cannot write", anonOn, "pub/app", accessapi.ActionWrite, CodeUnauthorized},
+		{"anonymous while off", anonOff, "pub/app", accessapi.ActionRead, CodeUnauthorized},
 	}
 	for _, c := range cases {
 		err := q.Require(c.r, c.path, c.expected)

@@ -13,8 +13,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 func TestUnitAdmissionProtectsGeneratedMetadataAndSnapshots(t *testing.T) {
@@ -50,11 +52,11 @@ func TestUnitAdmissionProtectsGeneratedMetadataAndSnapshots(t *testing.T) {
 		t.Fatalf("trusted snapshot writer rejected: %v", err)
 	}
 	if err := h.Deleting(t.Context(), format.Env{}, c,
-		types.Item{Name: "snapshots/old/notes.txt"}); err == nil {
+		model.Item{Name: "snapshots/old/notes.txt"}); err == nil {
 		t.Fatal("snapshot delete accepted without trusted context")
 	}
 	if err := h.Deleting(WithSnapshotDelete(t.Context()), format.Env{}, c,
-		types.Item{Name: "snapshots/old/notes.txt"}); err != nil {
+		model.Item{Name: "snapshots/old/notes.txt"}); err != nil {
 		t.Fatalf("trusted snapshot delete rejected: %v", err)
 	}
 }
@@ -66,8 +68,8 @@ func TestUnitAdmissionBindsInspectedPackageCoordinates(t *testing.T) {
 	binary := Binary{Name: "alpha", Version: "1.0", Architecture: "amd64"}
 	binaryWrite := format.Write{
 		Op: format.OpDeploy, Path: binaryPath,
-		Checksums: types.Checksums{SHA256: strings.Repeat("a", 64)},
-		Properties: types.Properties{
+		Checksums: kernel.Checksums{SHA256: strings.Repeat("a", 64)},
+		Properties: model.Properties{
 			PropDistribution: {"stable"}, PropComponent: {"main"},
 			PropArchitecture: {"amd64"},
 		},
@@ -80,14 +82,14 @@ func TestUnitAdmissionBindsInspectedPackageCoordinates(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		name  string
-		props types.Properties
+		props model.Properties
 	}{
-		{"partial coordinates", types.Properties{PropDistribution: {"stable"}}},
-		{"path escape coordinate", types.Properties{
+		{"partial coordinates", model.Properties{PropDistribution: {"stable"}}},
+		{"path escape coordinate", model.Properties{
 			PropDistribution: {"../stable"},
 			PropComponent:    {"main"}, PropArchitecture: {"amd64"},
 		}},
-		{"architecture mismatch", types.Properties{
+		{"architecture mismatch", model.Properties{
 			PropDistribution: {"stable"},
 			PropComponent:    {"main"}, PropArchitecture: {"arm64"},
 		}},
@@ -103,8 +105,8 @@ func TestUnitAdmissionBindsInspectedPackageCoordinates(t *testing.T) {
 	const sourcePath = "pool/main/a/alpha/alpha_1.0-1.dsc"
 	sourceWrite := format.Write{
 		Op: format.OpDeploy, Path: sourcePath,
-		Checksums:  types.Checksums{SHA256: strings.Repeat("b", 64)},
-		Properties: types.Properties{"dsc.distribution": {"stable"}, "dsc.component": {"main"}},
+		Checksums:  kernel.Checksums{SHA256: strings.Repeat("b", 64)},
+		Properties: model.Properties{"dsc.distribution": {"stable"}, "dsc.component": {"main"}},
 	}
 	srcEnv := format.Env{Inspection: sourceInspection{
 		sha:  sourceWrite.Checksums.SHA256,
@@ -137,7 +139,7 @@ func TestUnitDebianWorkAndClassificationsRespectRepositoryClass(t *testing.T) {
 	if err := h.Work(
 		t.Context(),
 		format.Env{},
-		types.WorkItem{Kind: "unrelated", Key: c.Key},
+		work.WorkItem{Kind: "unrelated", Key: c.Key},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +149,7 @@ func TestUnitDebianWorkAndClassificationsRespectRepositoryClass(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := h.Work(t.Context(), format.Env{Store: st},
-		types.WorkItem{Kind: KindIndex, Key: remote.Key}); err != nil {
+		work.WorkItem{Kind: KindIndex, Key: remote.Key}); err != nil {
 		t.Fatalf("remote cache tried to derive a partial apt index: %v", err)
 	}
 }
@@ -200,7 +202,7 @@ func TestUnitInspectionReadsCommittedDebianContent(t *testing.T) {
 			got, err := h.Inspect(t.Context(), format.Env{Blobs: debianFixtureBlobs{body}}, c,
 				format.Write{
 					Op: format.OpDeploy, Path: tc.path,
-					Checksums: types.Checksums{SHA256: sha},
+					Checksums: kernel.Checksums{SHA256: sha},
 				})
 			if err != nil {
 				t.Fatal(err)
@@ -217,14 +219,14 @@ func TestUnitInspectionReadsCommittedDebianContent(t *testing.T) {
 	if _, err := h.Inspect(t.Context(), format.Env{Blobs: debianFixtureBlobs{[]byte("bad")}}, c,
 		format.Write{
 			Op: format.OpDeploy, Path: "pool/bad.deb",
-			Checksums: types.Checksums{SHA256: "bad"},
+			Checksums: kernel.Checksums{SHA256: "bad"},
 		}); err == nil {
 		t.Fatal("invalid committed binary inspected successfully")
 	}
 	if _, err := h.Inspect(t.Context(), format.Env{Blobs: debianFixtureBlobs{[]byte("bad")}}, c,
 		format.Write{
 			Op: format.OpDeploy, Path: "pool/bad.dsc",
-			Checksums: types.Checksums{SHA256: "bad"},
+			Checksums: kernel.Checksums{SHA256: "bad"},
 		}); err == nil {
 		t.Fatal("invalid committed descriptor inspected successfully")
 	}
@@ -235,12 +237,12 @@ func TestUnitAdmissionRechecksStaleInspectionAgainstStoredBytes(t *testing.T) {
 	c := *repo.Defaults(&repo.Config{Key: "deb-local", Class: repo.Local, PackageType: repo.Debian})
 	for _, tc := range []struct {
 		path, file string
-		props      types.Properties
+		props      model.Properties
 		stale      any
 	}{
 		{
 			"pool/alpha.deb", "testdata/alpha_1.0_amd64_0.deb",
-			types.Properties{
+			model.Properties{
 				PropDistribution: {"stable"}, PropComponent: {"main"},
 				PropArchitecture: {"amd64"},
 			},
@@ -248,7 +250,7 @@ func TestUnitAdmissionRechecksStaleInspectionAgainstStoredBytes(t *testing.T) {
 		},
 		{
 			"pool/alpha.dsc", "testdata/alpha_1.0-1.dsc",
-			types.Properties{"dsc.distribution": {"stable"}, "dsc.component": {"main"}},
+			model.Properties{"dsc.distribution": {"stable"}, "dsc.component": {"main"}},
 			sourceInspection{sha: "stale", path: "pool/alpha.dsc", source: Source{Name: "forged"}},
 		},
 	} {
@@ -259,7 +261,7 @@ func TestUnitAdmissionRechecksStaleInspectionAgainstStoredBytes(t *testing.T) {
 			}
 			w := format.Write{
 				Op: format.OpDeploy, Path: tc.path, Properties: tc.props,
-				Checksums: types.Checksums{SHA256: sourceTestChecksums(body).SHA256},
+				Checksums: kernel.Checksums{SHA256: sourceTestChecksums(body).SHA256},
 			}
 			env := format.Env{Blobs: debianFixtureBlobs{body}, Inspection: tc.stale}
 			if _, err := h.Admit(t.Context(), env, c, w); err != nil {
@@ -291,7 +293,7 @@ func TestUnitSourceLifecycleQueuesLocalIndexWork(t *testing.T) {
 		return nil
 	}}
 	for _, path := range []string{"pool/alpha.dsc", "pool/alpha.diff.gz", "pool/alpha.orig.tar.gz"} {
-		it := types.Item{Name: path}
+		it := model.Item{Name: path}
 		if err := h.Deployed(t.Context(), env, c, it); err != nil {
 			t.Fatal(err)
 		}
@@ -306,7 +308,7 @@ func TestUnitSourceLifecycleQueuesLocalIndexWork(t *testing.T) {
 		t.Context(),
 		env,
 		c,
-		types.Item{Name: "pool/alpha.dsc", Cached: true},
+		model.Item{Name: "pool/alpha.dsc", Cached: true},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +325,7 @@ func TestUnitDeleteCoalescesTwoFilesOfOneDebianVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	env := format.Env{Store: inmem.New(), Blobs: debianFixtureBlobs{body}}
-	removed := []types.Item{
+	removed := []model.Item{
 		{Name: "pool/alpha_1.0_amd64_0.deb", Actual: sourceTestChecksums(body)},
 		{Name: "pool/alpha_1.0_amd64_1.deb", Actual: sourceTestChecksums(body)},
 	}
@@ -339,9 +341,9 @@ func TestUnitLifecycleRejectsUnavailablePackageContent(t *testing.T) {
 	if err := st.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	it, err := st.Items().Put(t.Context(), types.Item{
+	it, err := st.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Name: "pool/broken.deb", Size: 4,
-		Actual: types.Checksums{SHA256: strings.Repeat("a", 64)},
+		Actual: kernel.Checksums{SHA256: strings.Repeat("a", 64)},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -350,13 +352,13 @@ func TestUnitLifecycleRejectsUnavailablePackageContent(t *testing.T) {
 	if err := h.Deployed(t.Context(), env, c, it); err == nil {
 		t.Fatal("invalid package entered the index on deployment")
 	}
-	if err := h.Deleted(t.Context(), env, c, []types.Item{it}); err == nil {
+	if err := h.Deleted(t.Context(), env, c, []model.Item{it}); err == nil {
 		t.Fatal("invalid deleted package silently altered the index")
 	}
 	if err := h.Reindex(t.Context(), env, c); err == nil {
 		t.Fatal("reindex silently accepted corrupt stored package")
 	}
-	if err := h.Work(t.Context(), env, types.WorkItem{Kind: KindIndex, Key: c.Key}); err == nil {
+	if err := h.Work(t.Context(), env, work.WorkItem{Kind: KindIndex, Key: c.Key}); err == nil {
 		t.Fatal("apt metadata was derived from corrupt stored package")
 	}
 	body, err := os.ReadFile("testdata/alpha_1.0_amd64_0.deb")
@@ -374,9 +376,9 @@ func TestUnitLifecycleRejectsUnavailablePackageContent(t *testing.T) {
 	if err := h.Deployed(t.Context(), env, c, missing); err == nil {
 		t.Fatal("deployment ignored missing item properties")
 	}
-	if _, err := st.Items().Put(t.Context(), types.Item{
+	if _, err := st.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Name: "pool/corrupt-peer.deb", Size: 4,
-		Actual: types.Checksums{SHA256: strings.Repeat("b", 64)},
+		Actual: kernel.Checksums{SHA256: strings.Repeat("b", 64)},
 	}); err != nil {
 		t.Fatal(err)
 	}

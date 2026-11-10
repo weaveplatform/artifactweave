@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // Dialect selects the SQL the compiler writes.
@@ -54,7 +54,7 @@ var statColumns = map[StatField]string{
 
 // repoExpr is the repository key as AQL reports it: a remote's cached items
 // are in "<key>-cache".
-const repoExpr = "(CASE WHEN items.cached THEN items.repo_key || '" + types.CacheSuffix +
+const repoExpr = "(CASE WHEN items.cached THEN items.repo_key || '" + model.CacheSuffix +
 	"' ELSE items.repo_key END)"
 
 type compiler struct {
@@ -218,7 +218,7 @@ func (c *compiler) fieldOf(alias string, f *FieldCriterion) {
 	case f.Field == FieldRepo && (f.Op == OpEq || f.Op == OpNe) && alias == "items":
 		// Spelled out on the stored key and cached flag so the natural-key
 		// index serves the CLI's most common criterion.
-		stored, cached := types.ResolveRepoKey(f.Text)
+		stored, cached := model.ResolveRepoKey(f.Text)
 		if f.Op == OpNe {
 			c.b.WriteString("NOT ")
 		}

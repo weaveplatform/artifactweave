@@ -8,9 +8,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 var errBoom = errors.New("boom")
@@ -22,23 +23,23 @@ type faulty struct {
 	fail string
 }
 
-func (f faulty) Builds() store.BuildStore { return faultyBuilds{f.Store.Builds(), f.fail} }
-func (f faulty) Items() store.ItemStore   { return faultyItems{f.Store.Items(), f.fail} }
-func (f faulty) Repos() store.RepoStore   { return faultyRepos{f.Store.Repos(), f.fail} }
+func (f faulty) Builds() port.BuildStore { return faultyBuilds{f.Store.Builds(), f.fail} }
+func (f faulty) Items() port.ItemStore   { return faultyItems{f.Store.Items(), f.fail} }
+func (f faulty) Repos() port.RepoStore   { return faultyRepos{f.Store.Repos(), f.fail} }
 
 type faultyBuilds struct {
-	store.BuildStore
+	port.BuildStore
 	fail string
 }
 
-func (f faultyBuilds) Put(ctx context.Context, b types.Build) (types.Build, error) {
+func (f faultyBuilds) Put(ctx context.Context, b model.Build) (model.Build, error) {
 	if f.fail == "put" {
 		return b, errBoom
 	}
 	return f.BuildStore.Put(ctx, b)
 }
 
-func (f faultyBuilds) Replace(ctx context.Context, b types.Build) error {
+func (f faultyBuilds) Replace(ctx context.Context, b model.Build) error {
 	if f.fail == "replace" {
 		return errBoom
 	}
@@ -47,23 +48,23 @@ func (f faultyBuilds) Replace(ctx context.Context, b types.Build) error {
 
 func (f faultyBuilds) Get(
 	ctx context.Context, project, name, number string, started time.Time,
-) (types.Build, error) {
+) (model.Build, error) {
 	if f.fail == "get" {
-		return types.Build{}, errBoom
+		return model.Build{}, errBoom
 	}
 	return f.BuildStore.Get(ctx, project, name, number, started)
 }
 
-func (f faultyBuilds) ByID(ctx context.Context, id int64) (types.Build, error) {
+func (f faultyBuilds) ByID(ctx context.Context, id int64) (model.Build, error) {
 	if f.fail == "byid" {
-		return types.Build{}, errBoom
+		return model.Build{}, errBoom
 	}
 	return f.BuildStore.ByID(ctx, id)
 }
 
-func (f faultyBuilds) ByIDForUpdate(ctx context.Context, id int64) (types.Build, error) {
+func (f faultyBuilds) ByIDForUpdate(ctx context.Context, id int64) (model.Build, error) {
 	if f.fail == "byid" {
-		return types.Build{}, errBoom
+		return model.Build{}, errBoom
 	}
 	return f.BuildStore.ByIDForUpdate(ctx, id)
 }
@@ -72,16 +73,16 @@ func (f faultyBuilds) GetForUpdate(
 	ctx context.Context,
 	project, name, number string,
 	started time.Time,
-) (types.Build, error) {
+) (model.Build, error) {
 	if f.fail == "get" {
-		return types.Build{}, errBoom
+		return model.Build{}, errBoom
 	}
 	return f.BuildStore.GetForUpdate(ctx, project, name, number, started)
 }
 
 func (f faultyBuilds) Runs(
-	ctx context.Context, project, name string, p store.Page,
-) ([]types.BuildRun, string, error) {
+	ctx context.Context, project, name string, p kernel.Page,
+) ([]model.BuildRun, string, error) {
 	if f.fail == "runs" {
 		return nil, "", errBoom
 	}
@@ -89,8 +90,8 @@ func (f faultyBuilds) Runs(
 }
 
 func (f faultyBuilds) Names(
-	ctx context.Context, project string, p store.Page,
-) ([]types.BuildName, string, error) {
+	ctx context.Context, project string, p kernel.Page,
+) ([]model.BuildName, string, error) {
 	if f.fail == "names" {
 		return nil, "", errBoom
 	}
@@ -99,7 +100,7 @@ func (f faultyBuilds) Names(
 
 func (f faultyBuilds) DeleteNumbers(
 	ctx context.Context, project, name string, numbers []string,
-) ([]types.BuildRun, error) {
+) ([]model.BuildRun, error) {
 	if f.fail == "deletenumbers" {
 		return nil, errBoom
 	}
@@ -109,7 +110,7 @@ func (f faultyBuilds) DeleteNumbers(
 func (f faultyBuilds) DeleteAll(
 	ctx context.Context,
 	project, name string,
-) ([]types.BuildRun, error) {
+) ([]model.BuildRun, error) {
 	if f.fail == "deleteall" {
 		return nil, errBoom
 	}
@@ -117,15 +118,15 @@ func (f faultyBuilds) DeleteAll(
 }
 
 func (f faultyBuilds) AddPromotion(
-	ctx context.Context, p types.BuildPromotion,
-) (types.BuildPromotion, error) {
+	ctx context.Context, p model.BuildPromotion,
+) (model.BuildPromotion, error) {
 	if f.fail == "addpromotion" {
 		return p, errBoom
 	}
 	return f.BuildStore.AddPromotion(ctx, p)
 }
 
-func (f faultyBuilds) PutRetention(ctx context.Context, r types.BuildRetention) error {
+func (f faultyBuilds) PutRetention(ctx context.Context, r model.BuildRetention) error {
 	if f.fail == "putretention" {
 		return errBoom
 	}
@@ -139,7 +140,7 @@ func (f faultyBuilds) Rename(ctx context.Context, project, from, to string) erro
 	return f.BuildStore.Rename(ctx, project, from, to)
 }
 
-func (f faultyBuilds) Promotions(ctx context.Context, id int64) ([]types.BuildPromotion, error) {
+func (f faultyBuilds) Promotions(ctx context.Context, id int64) ([]model.BuildPromotion, error) {
 	if f.fail == "promotions" {
 		return nil, errBoom
 	}
@@ -147,18 +148,18 @@ func (f faultyBuilds) Promotions(ctx context.Context, id int64) ([]types.BuildPr
 }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	fail string
 }
 
-func (f faultyItems) Get(ctx context.Context, k string, c bool, p string) (types.Item, error) {
+func (f faultyItems) Get(ctx context.Context, k string, c bool, p string) (model.Item, error) {
 	if f.fail == "item" || f.fail == "item:"+p {
-		return types.Item{}, errBoom
+		return model.Item{}, errBoom
 	}
 	return f.ItemStore.Get(ctx, k, c, p)
 }
 
-func (f faultyItems) Put(ctx context.Context, it types.Item) (types.Item, error) {
+func (f faultyItems) Put(ctx context.Context, it model.Item) (model.Item, error) {
 	if f.fail == "itemput" && !it.Folder {
 		return it, errBoom
 	}
@@ -167,23 +168,23 @@ func (f faultyItems) Put(ctx context.Context, it types.Item) (types.Item, error)
 
 func (f faultyItems) Delete(
 	ctx context.Context, k string, c bool, p string,
-) (store.DeleteResult, error) {
+) (port.DeleteResult, error) {
 	if f.fail == "delete" || f.fail == "delete:"+p {
-		return store.DeleteResult{}, errBoom
+		return port.DeleteResult{}, errBoom
 	}
 	return f.ItemStore.Delete(ctx, k, c, p)
 }
 
 func (f faultyItems) Descendants(
-	ctx context.Context, k string, c bool, p string, pg store.Page,
-) ([]types.Item, string, error) {
+	ctx context.Context, k string, c bool, p string, pg kernel.Page,
+) ([]model.Item, string, error) {
 	if f.fail == "descendants" {
 		return nil, "", errBoom
 	}
 	return f.ItemStore.Descendants(ctx, k, c, p, pg)
 }
 
-func (f faultyItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (f faultyItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if f.fail == "properties" {
 		return nil, errBoom
 	}
@@ -191,7 +192,7 @@ func (f faultyItems) Properties(ctx context.Context, id int64) (types.Properties
 }
 
 func (f faultyItems) PatchProperties(
-	ctx context.Context, id int64, set types.Properties, remove []string, at time.Time,
+	ctx context.Context, id int64, set model.Properties, remove []string, at time.Time,
 ) error {
 	if f.fail == "patch" {
 		return errBoom
@@ -200,8 +201,8 @@ func (f faultyItems) PatchProperties(
 }
 
 func (f faultyItems) FindByChecksum(
-	ctx context.Context, c types.Checksums, p store.Page,
-) ([]types.Item, string, error) {
+	ctx context.Context, c kernel.Checksums, p kernel.Page,
+) ([]model.Item, string, error) {
 	if f.fail == "find" {
 		return nil, "", errBoom
 	}
@@ -209,7 +210,7 @@ func (f faultyItems) FindByChecksum(
 }
 
 type faultyRepos struct {
-	store.RepoStore
+	port.RepoStore
 	fail string
 }
 
@@ -330,9 +331,9 @@ func TestUnitPromotionFaults(t *testing.T) {
 			return err
 		}
 	}
-	tagged := types.Properties{"k": {"v"}}
+	tagged := model.Properties{"k": {"v"}}
 	discard := func(s *Service) error {
-		_, err := s.Discard(ctx, Discard{Name: "app", Retention: types.BuildRetention{Count: 1}},
+		_, err := s.Discard(ctx, Discard{Name: "app", Retention: model.BuildRetention{Count: 1}},
 			everyone)
 		return err
 	}

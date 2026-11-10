@@ -7,7 +7,7 @@ import (
 	"net/url"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // ErrRegistryDenied is what a registry client returns when the upstream
@@ -46,7 +46,7 @@ type Registries interface {
 	Open(
 		ctx context.Context,
 		c repo.Config,
-		id types.SourceIdentity,
+		id model.SourceIdentity,
 		revision string,
 	) (RegistryClient, error)
 	// Foreign sends r once through an unpooled client built from opts, for

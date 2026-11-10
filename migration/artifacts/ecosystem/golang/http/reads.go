@@ -10,12 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	goformat "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // reads answers the GOPROXY reads of decision 0035 from the package index.
@@ -46,7 +47,7 @@ func (h reads) serve(w http.ResponseWriter, r *http.Request) {
 
 // version is a visible version of a module.
 type version struct {
-	types.PackageVersion
+	model.PackageVersion
 	// hasInfo reports a stored .info.
 	hasInfo bool
 }
@@ -62,7 +63,7 @@ func (h reads) list(w http.ResponseWriter, r *http.Request, m string) {
 		h.k.Error(w, r, err)
 		return
 	}
-	indexed := make([]types.PackageVersion, 0, len(vs))
+	indexed := make([]model.PackageVersion, 0, len(vs))
 	for _, v := range vs {
 		indexed = append(indexed, v.PackageVersion)
 	}
@@ -97,7 +98,7 @@ func (h reads) latest(w http.ResponseWriter, r *http.Request, m string) {
 // up.
 func (h reads) info(w http.ResponseWriter, r *http.Request, f goformat.File) {
 	mod := goformat.File{Module: f.Module, Version: f.Version, Ext: goformat.ExtMod}.Path()
-	if !h.k.Can(r, mod, types.ActionRead) && !h.k.Require(w, r, f.Path(), types.ActionRead) {
+	if !h.k.Can(r, mod, api.ActionRead) && !h.k.Require(w, r, f.Path(), api.ActionRead) {
 		return
 	}
 	v, err := h.version(r, f.Module, f.Version)
@@ -123,7 +124,7 @@ func (h reads) serveInfo(w http.ResponseWriter, r *http.Request, m string, v ver
 		return
 	}
 	mod := goformat.File{Module: m, Version: v.Version, Ext: goformat.ExtMod}.Path()
-	if !h.k.Require(w, r, mod, types.ActionRead) {
+	if !h.k.Require(w, r, mod, api.ActionRead) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -142,7 +143,7 @@ type info struct {
 // caller who may not read the file is refused before the version is looked
 // up.
 func (h reads) file(w http.ResponseWriter, r *http.Request, f goformat.File) {
-	if !h.k.Require(w, r, f.Path(), types.ActionRead) {
+	if !h.k.Require(w, r, f.Path(), api.ActionRead) {
 		return
 	}
 	if _, err := h.version(r, f.Module, f.Version); err != nil {
@@ -160,13 +161,13 @@ func (h reads) version(r *http.Request, m, v string) (version, error) {
 		fmt.Sprintf("Version %s of module %s is not in %s.", v, m, key))
 	db := h.k.DB()
 	p, err := db.Packages().Find(ctx, key, m)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return version{}, missing
 	} else if err != nil {
 		return version{}, fmt.Errorf("golang: module %s in %s: %w", m, key, err)
 	}
 	pv, err := db.Packages().Version(ctx, p.ID, v)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return version{}, missing
 	} else if err != nil {
 		return version{}, fmt.Errorf("golang: version %s of %s in %s: %w", v, m, key, err)
@@ -176,7 +177,7 @@ func (h reads) version(r *http.Request, m, v string) (version, error) {
 		path := goformat.File{Module: m, Version: v, Ext: ext}.Path()
 		f, err := h.k.Item(r, path)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 		case err != nil:
 			return version{}, err //nolint:wrapcheck // the kit wraps its own
 		default:
@@ -198,7 +199,7 @@ func (h reads) readable(r *http.Request, m string) ([]version, error) {
 		fmt.Sprintf("Module %s has no version in %s.", m, key))
 	db := h.k.DB()
 	p, err := db.Packages().Find(ctx, key, m)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil, missing
 	} else if err != nil {
 		return nil, fmt.Errorf("golang: module %s in %s: %w", m, key, err)
@@ -215,7 +216,7 @@ func (h reads) readable(r *http.Request, m string) ([]version, error) {
 	for _, v := range all {
 		mod := goformat.File{Module: m, Version: v.Version, Ext: goformat.ExtMod}
 		if !stored[v.Version+"."+goformat.ExtZip] || !stored[v.Version+"."+goformat.ExtMod] ||
-			!h.k.Can(r, mod.Path(), types.ActionRead) {
+			!h.k.Can(r, mod.Path(), api.ActionRead) {
 			continue
 		}
 		out = append(
@@ -233,7 +234,7 @@ func (h reads) readable(r *http.Request, m string) ([]version, error) {
 // @v folder says which of every version's files are stored in one listing.
 func files(ctx context.Context, db format.Store, key, folder string) (map[string]bool, error) {
 	out := map[string]bool{}
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		items, next, err := db.Items().Children(ctx, key, false, folder, page)
 		if err != nil {

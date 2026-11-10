@@ -12,10 +12,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // State is one state version of a workspace.
@@ -247,7 +247,7 @@ func (s *Service) WriteState(
 		}
 		if ms == 0 {
 			ms = next(s.now(), files)
-		} else if slices.ContainsFunc(files, func(it types.Item) bool {
+		} else if slices.ContainsFunc(files, func(it model.Item) bool {
 			f, _ := tfbe.FileOf(it)
 			return f.Ms == ms
 		}) {
@@ -304,7 +304,7 @@ func (s *Service) writable(
 	ctx context.Context,
 	c repo.Config,
 	name, by string,
-) ([]types.Item, error) {
+) ([]model.Item, error) {
 	folder, err := s.holdWorkspace(ctx, c, name)
 	if err != nil {
 		return nil, err
@@ -322,7 +322,7 @@ func (s *Service) writable(
 // next is the name of a new state version: now's milliseconds, or one more
 // than the newest of files when that is later, so names stay unique
 // within the workspace (decision 0041, "Identifiers").
-func next(now time.Time, files []types.Item) int64 {
+func next(now time.Time, files []model.Item) int64 {
 	ms := now.UnixMilli()
 	for _, it := range files {
 		if f, _ := tfbe.FileOf(it); f.Ms >= ms {
@@ -336,9 +336,9 @@ func (s *Service) stateFiles(
 	ctx context.Context,
 	c repo.Config,
 	name string,
-) ([]types.Item, error) {
-	var out []types.Item
-	for page := (store.Page{Limit: store.MaxLimit}); ; {
+) ([]model.Item, error) {
+	var out []model.Item
+	for page := (kernel.Page{Limit: kernel.MaxLimit}); ; {
 		children, next, err := s.store().Items().
 			Children(ctx, c.Key, false, tfbe.Folder(name), page)
 		if err != nil {
@@ -363,7 +363,7 @@ func (s *Service) stateOf(
 	ctx context.Context,
 	c repo.Config,
 	name string,
-	it types.Item,
+	it model.Item,
 ) (State, error) {
 	f, _ := tfbe.FileOf(it)
 	st := State{

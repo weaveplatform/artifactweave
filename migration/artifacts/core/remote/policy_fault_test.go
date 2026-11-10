@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccPolicyHEADRevalidatesWithoutGETAndPreservesStale(t *testing.T) {
@@ -51,10 +51,10 @@ func TestAccPolicyHEADRevalidatesWithoutGETAndPreservesStale(t *testing.T) {
 	w.mustRead(q, "new")
 	missing := w.request("absent", source.ResourceKindArtifact)
 	missing.Resource.Method = http.MethodHead
-	if _, err = w.read(missing); !errors.Is(err, store.ErrNotFound) {
+	if _, err = w.read(missing); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal(err)
 	}
-	if _, err = w.read(missing); !errors.Is(err, store.ErrNotFound) {
+	if _, err = w.read(missing); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal(err)
 	}
 	if w.up.Count("HEAD", "/absent") != 1 {
@@ -94,7 +94,7 @@ func TestAccPolicyRawMetadataOfflineUsesNoResolverAndTracksUsage(t *testing.T) {
 		t.Fatal(w.up.Requests())
 	}
 	q.Resource.Path = "absent"
-	if _, err = w.read(q); !errors.Is(err, store.ErrNotFound) {
+	if _, err = w.read(q); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal(err)
 	}
 }
@@ -293,7 +293,7 @@ func TestAccPolicyNoStoreFailureCooldownAndHEAD(t *testing.T) {
 	if _, err = w.db.RemoteCache().
 		Read(t.Context(), w.p.CacheKey(q, "credential-1")); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("no-store persisted representation", err)
 	}
@@ -480,7 +480,7 @@ func TestAccPolicySecurityTimeoutAndZeroNegativeTTL(t *testing.T) {
 		q := w.request("file.txt", source.ResourceKindArtifact)
 		q.Repo.MissedRetrievalCachePeriodSecs = ptr(0)
 		for range 2 {
-			if _, err := w.read(q); !errors.Is(err, store.ErrNotFound) {
+			if _, err := w.read(q); !errors.Is(err, kernel.ErrNotFound) {
 				t.Fatal(err)
 			}
 		}
@@ -532,7 +532,7 @@ func TestAccPolicySharedFallbackHonorsEachCallersHardFail(t *testing.T) {
 func TestAccPolicyNegativeTTLChangeAndConfirmedDeletionRecheck(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("file.txt", source.ResourceKindArtifact)
-	if _, err := w.read(q); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.read(q); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal(err)
 	}
 	w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("available")})

@@ -20,13 +20,13 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden metadata files")
@@ -81,7 +81,7 @@ func newMetaWorldOn(t *testing.T, db item.Store, tune func(*repo.Config)) *metaW
 	return w
 }
 
-func (w *metaWorld) deploy(p string, props types.Properties, body ...string) {
+func (w *metaWorld) deploy(p string, props model.Properties, body ...string) {
 	w.t.Helper()
 	// A POM must name its path's coordinates, or #278's checks refuse it.
 	b := bodyOf(p)
@@ -116,15 +116,15 @@ func (w *metaWorld) delete(p string) {
 
 // get reads p as a download does: resolved, which brings its metadata up
 // to date, then looked up. ok is false when nothing is there.
-func (w *metaWorld) get(p string) (string, types.Item, bool) {
+func (w *metaWorld) get(p string) (string, model.Item, bool) {
 	w.t.Helper()
 	p, err := w.items.Resolve(w.ctx, w.c, format.Download{Path: p})
 	if err != nil {
 		w.t.Fatalf("resolve %s: %v", p, err)
 	}
 	it, err := w.db.Items().Get(w.ctx, w.c.Key, false, p)
-	if errors.Is(err, store.ErrNotFound) {
-		return "", types.Item{}, false
+	if errors.Is(err, kernel.ErrNotFound) {
+		return "", model.Item{}, false
 	}
 	if err != nil {
 		w.t.Fatal(err)
@@ -328,7 +328,7 @@ func TestUnitMetadataRemoved(t *testing.T) {
 // marked as plugins, named by the highest version's POM.
 func TestUnitPluginMetadata(t *testing.T) {
 	w := newMetaWorld(t, nil)
-	plugin := types.Properties{maven.PluginProperty: {"true"}}
+	plugin := model.Properties{maven.PluginProperty: {"true"}}
 	g := "com.acme.plugins"
 	dir := "com/acme/plugins/"
 	suppress := true
@@ -401,7 +401,7 @@ func TestUnitPluginMetadata(t *testing.T) {
 func TestUnitDeployerMetadata(t *testing.T) {
 	w := newMetaWorld(t, func(c *repo.Config) { c.SnapshotVersionBehavior = repo.Deployer })
 	dir := "com/acme/app/"
-	plugin := types.Properties{maven.PluginProperty: {"true"}}
+	plugin := model.Properties{maven.PluginProperty: {"true"}}
 	w.deploy(dir+"1.0/app-1.0.pom", plugin)
 	w.deploy(dir+"1.0/app-1.0.jar", nil)
 	w.deploy(dir+"2.0/app-2.0.pom", nil)
@@ -627,16 +627,16 @@ func metadataFiles(c repo.Config) *aql.Query {
 func TestUnitPluginWorkQueued(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	w.deploy("com/acme/x/1.0/x-1.0.pom", nil)
-	w.deploy("com/acme/x/1.0/x-1.0.jar", types.Properties{maven.PluginProperty: {"true"}})
+	w.deploy("com/acme/x/1.0/x-1.0.jar", model.Properties{maven.PluginProperty: {"true"}})
 	pom, err := w.db.Items().Get(w.ctx, w.c.Key, false, "com/acme/x/1.0/x-1.0.pom")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := w.items.Annotate(w.ctx, w.c, pom, types.Properties{"other": {"1"}}, nil); err != nil {
+	if err := w.items.Annotate(w.ctx, w.c, pom, model.Properties{"other": {"1"}}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.items.MakeFolder(w.ctx, item.Target{Repo: w.c, Path: "com/acme/x"},
-		types.Properties{maven.PluginProperty: {"true"}}, "deployer"); err != nil {
+		model.Properties{maven.PluginProperty: {"true"}}, "deployer"); err != nil {
 		t.Fatal(err)
 	}
 	w.delete("com/acme/x/1.0/x-1.0.pom")
@@ -660,7 +660,7 @@ func TestUnitPluginMetadataOnEveryWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := w.db.Items().PatchProperties(w.ctx, it.ID,
-		types.Properties{maven.PluginProperty: {"true"}}, nil, time.Now()); err != nil {
+		model.Properties{maven.PluginProperty: {"true"}}, nil, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	if got := w.queued(); got[maven.KindPlugins] != 0 {

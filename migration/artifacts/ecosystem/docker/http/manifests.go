@@ -11,12 +11,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // tagHeader names, once per tag, the tags a push by digest stored with
@@ -45,7 +46,7 @@ func (g *Registry) registerManifests() {
 // answered here, since containerd and oras resolve a tag with it and a URL
 // signed for GET refuses a HEAD.
 func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request) {
-	if err := q.Require(r, q.Name+"/", types.ActionRead); err != nil {
+	if err := q.Require(r, q.Name+"/", api.ActionRead); err != nil {
 		Write(w, err)
 		return
 	}
@@ -53,7 +54,7 @@ func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request
 		return
 	}
 	it, err := g.findManifest(r, q)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		Write(w, manifestUnknown(q))
 		return
 	}
@@ -97,27 +98,27 @@ func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request
 // the tag folder; by digest, the manifest with that SHA-256 in any of the
 // image's own folders. A reference that is no valid tag or digest, a
 // reserved name and a digest under another algorithm are not found.
-func (g *Registry) findManifest(r *http.Request, q Request) (types.Item, error) {
+func (g *Registry) findManifest(r *http.Request, q Request) (model.Item, error) {
 	ctx := r.Context()
 	if strings.Contains(q.Reference, ":") {
 		hex, ok := layout.SHA256Hex(q.Reference)
 		if !ok {
-			return types.Item{}, store.ErrNotFound
+			return model.Item{}, kernel.ErrNotFound
 		}
 		it, err := layout.FindManifest(ctx, g.store.Items(), q.Repo.Key, q.Name, hex)
 		return it, err //nolint:wrapcheck // the layout names itself
 	}
 	if !layout.ValidTag(q.Reference) || layout.ReservedTag(q.Reference) {
-		return types.Item{}, store.ErrNotFound
+		return model.Item{}, kernel.ErrNotFound
 	}
 	for _, file := range []string{layout.ManifestFile, layout.ListManifestFile} {
 		it, err := g.store.Items().Get(ctx, q.Repo.Key, false,
 			q.Name+"/"+q.Reference+"/"+file)
-		if !errors.Is(err, store.ErrNotFound) {
+		if !errors.Is(err, kernel.ErrNotFound) {
 			return it, err //nolint:wrapcheck // store errors name themselves
 		}
 	}
-	return types.Item{}, store.ErrNotFound
+	return model.Item{}, kernel.ErrNotFound
 }
 
 // manifestType is the media type a manifest is served with: the one it was
@@ -126,7 +127,7 @@ func (g *Registry) findManifest(r *http.Request, q Request) (types.Item, error) 
 // file name does.
 func (g *Registry) manifestType(
 	r *http.Request,
-	it types.Item,
+	it model.Item,
 	content io.ReadSeeker,
 ) (string, error) {
 	props, err := g.store.Items().Properties(r.Context(), it.ID)
@@ -188,7 +189,7 @@ var manifestTypes = []string{
 // (end-7b). It answers 201 with the manifest's digest and location, and
 // its subject when it has one.
 func (g *Registry) putManifest(w http.ResponseWriter, r *http.Request, q Request) {
-	if err := q.Require(r, q.Name+"/", types.ActionWrite); err != nil {
+	if err := q.Require(r, q.Name+"/", api.ActionWrite); err != nil {
 		Write(w, err)
 		return
 	}
@@ -228,7 +229,7 @@ func (g *Registry) putManifest(w http.ResponseWriter, r *http.Request, q Request
 		replaces, err := g.uploads.Replaces(r.Context(), o, f.Tag, f.Hex)
 		if err == nil && replaces {
 			// Strict Tag Overwrite (DV-035).
-			err = q.Require(r, q.Name+"/"+f.Tag+"/", types.ActionDelete)
+			err = q.Require(r, q.Name+"/"+f.Tag+"/", api.ActionDelete)
 		}
 		if err != nil {
 			g.writeErr(w, r, err)

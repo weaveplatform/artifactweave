@@ -17,9 +17,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitSwiftArchiveRejectsUnsafeMembersAndCanceledInspection(t *testing.T) {
@@ -184,7 +184,7 @@ func (b swiftCoverageBlobs) Open(
 ) (io.ReadSeekCloser, blob.Info, error) {
 	data, ok := b[digest]
 	if !ok {
-		return nil, blob.Info{}, store.ErrNotFound
+		return nil, blob.Info{}, kernel.ErrNotFound
 	}
 	return &swiftCoverageBlob{bytes.NewReader(data)}, blob.Info{Size: int64(len(data))}, nil
 }
@@ -192,7 +192,7 @@ func (b swiftCoverageBlobs) Open(
 func (b swiftCoverageBlobs) Stat(_ context.Context, digest string) (blob.Info, error) {
 	data, ok := b[digest]
 	if !ok {
-		return blob.Info{}, store.ErrNotFound
+		return blob.Info{}, kernel.ErrNotFound
 	}
 	return blob.Info{Size: int64(len(data))}, nil
 }
@@ -216,14 +216,14 @@ func swiftCoverageItem(
 	p Package,
 	sha string,
 	size int64,
-) types.Item {
+) model.Item {
 	t.Helper()
-	it, err := st.Items().Put(t.Context(), types.Item{
+	it, err := st.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key,
 		Path:    p.Scope + "/" + p.Name,
 		Name:    p.Name + "-" + p.Version + ".zip",
 		Size:    size,
-		Actual:  types.Checksums{SHA256: sha},
+		Actual:  kernel.Checksums{SHA256: sha},
 		Created: time.Now().UTC(),
 	})
 	if err != nil {
@@ -248,7 +248,7 @@ func TestUnitSwiftAdmissionRejectsCorruptAndMutableArchives(t *testing.T) {
 	env := format.Env{Store: st, Blobs: blobs}
 	w := format.Write{
 		Op: format.OpDeploy, Path: p.ArchivePath(), Size: goodSize,
-		Checksums: types.Checksums{SHA256: goodSHA},
+		Checksums: kernel.Checksums{SHA256: goodSHA},
 	}
 
 	for _, skip := range []format.Write{
@@ -268,14 +268,14 @@ func TestUnitSwiftAdmissionRejectsCorruptAndMutableArchives(t *testing.T) {
 	}
 	if _, err := h.Inspect(ctx, env, c, format.Write{
 		Op:   format.OpDeploy,
-		Path: p.ArchivePath(), Checksums: types.Checksums{SHA256: strings.Repeat("f", 64)},
+		Path: p.ArchivePath(), Checksums: kernel.Checksums{SHA256: strings.Repeat("f", 64)},
 	}); err == nil {
 		t.Fatal("missing source blob accepted")
 	}
 	if _, err := h.Inspect(ctx, env, c, format.Write{
 		Op:   format.OpDeploy,
 		Path: p.ArchivePath(), Size: int64(len(bad)),
-		Checksums: types.Checksums{SHA256: badSHA},
+		Checksums: kernel.Checksums{SHA256: badSHA},
 	}); err == nil {
 		t.Fatal("corrupt source ZIP accepted")
 	}
@@ -302,7 +302,7 @@ func TestUnitSwiftAdmissionRejectsCorruptAndMutableArchives(t *testing.T) {
 	if _, err := h.Admit(ctx, format.Env{Store: st, Blobs: blobs}, c,
 		format.Write{
 			Op: format.OpDeploy, Path: p.ArchivePath(), Size: int64(len(bad)),
-			Checksums: types.Checksums{SHA256: badSHA},
+			Checksums: kernel.Checksums{SHA256: badSHA},
 		}); err == nil {
 		t.Fatal("corrupt copy or restore admitted without prior inspection")
 	}
@@ -317,7 +317,7 @@ func TestUnitSwiftAdmissionRejectsCorruptAndMutableArchives(t *testing.T) {
 	if err := h.Deployed(ctx, env, c, old); err != nil {
 		t.Fatalf("index source archive: %v", err)
 	}
-	for _, unrelated := range []types.Item{
+	for _, unrelated := range []model.Item{
 		{RepoKey: c.Key, Folder: true, Name: old.Name},
 		{RepoKey: c.Key, Cached: true, Path: old.Path, Name: old.Name},
 		{RepoKey: c.Key, Name: "README.md"},
@@ -329,7 +329,7 @@ func TestUnitSwiftAdmissionRejectsCorruptAndMutableArchives(t *testing.T) {
 	if err := h.Deleting(ctx, env, c, old); err != nil {
 		t.Fatalf("pre-delete hook: %v", err)
 	}
-	if err := h.Deleted(ctx, env, c, []types.Item{old}); err != nil {
+	if err := h.Deleted(ctx, env, c, []model.Item{old}); err != nil {
 		t.Fatalf("post-delete hook: %v", err)
 	}
 	if h.Classify(c, p.ArchivePath()) != format.ClassUnique ||
@@ -372,9 +372,9 @@ func TestUnitSwiftReindexRestoresOnlyValidStoredArchives(t *testing.T) {
 	blobs[badSHA] = bad
 	invalid := Package{Scope: p.Scope, Name: p.Name, Version: "3.0.0"}
 	_ = swiftCoverageItem(t, st, c, invalid, badSHA, int64(len(bad)))
-	if _, err := st.Items().Put(ctx, types.Item{
+	if _, err := st.Items().Put(ctx, model.Item{
 		RepoKey: c.Key, Name: "README.md",
-		Actual: types.Checksums{SHA256: goodSHA},
+		Actual: kernel.Checksums{SHA256: goodSHA},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -403,7 +403,7 @@ func TestUnitSwiftReindexRestoresOnlyValidStoredArchives(t *testing.T) {
 	}
 	missing := swiftCoverageBlobs{}
 	if err := h.Reindex(ctx, format.Env{Store: st, Blobs: missing}, c); err == nil ||
-		!errors.Is(err, store.ErrNotFound) {
+		!errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("missing stored archive was silently advertised: %v", err)
 	}
 }

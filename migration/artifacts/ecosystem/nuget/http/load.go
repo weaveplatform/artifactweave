@@ -5,17 +5,18 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // version is one indexed version a caller may see: its index entry, whose
 // Version is the normalised version lower-cased (nugetfmt.VersionKey), and
 // the document the NuGet format keeps for it.
 type version struct {
-	pv   types.PackageVersion
+	pv   model.PackageVersion
 	meta nugetfmt.Metadata
 }
 
@@ -60,7 +61,7 @@ func (h handler) load(r *http.Request, id string) (pkg, bool, error) {
 	key := pkgroute.RequestFrom(r).Repo.Key
 	name := nugetfmt.PackageName(id)
 	found, err := st.Packages().Find(ctx, key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return pkg{}, false, nil
 	}
 	if err != nil {
@@ -70,7 +71,7 @@ func (h handler) load(r *http.Request, id string) (pkg, bool, error) {
 }
 
 // versionsOf is load for a package the index already returned.
-func (h handler) versionsOf(r *http.Request, found types.Package) (pkg, bool, error) {
+func (h handler) versionsOf(r *http.Request, found model.Package) (pkg, bool, error) {
 	all, err := h.k.DB().Packages().Versions(r.Context(), found.ID)
 	if err != nil {
 		return pkg{}, false, fmt.Errorf("nuget: versions of %s: %w", found.Name, err)
@@ -81,7 +82,7 @@ func (h handler) versionsOf(r *http.Request, found types.Package) (pkg, bool, er
 		if err != nil {
 			return pkg{}, false, fmt.Errorf("nuget: %s %s: %w", found.Name, pv.Version, err)
 		}
-		if !m.HasPackage() || !h.k.Can(r, m.Path, types.ActionRead) {
+		if !m.HasPackage() || !h.k.Can(r, m.Path, api.ActionRead) {
 			continue
 		}
 		p.versions = append(p.versions, version{pv: pv, meta: m})
@@ -100,14 +101,14 @@ func (h handler) indexed(r *http.Request, id, key string) (version, bool, error)
 	repoKey := pkgroute.RequestFrom(r).Repo.Key
 	name := nugetfmt.PackageName(id)
 	found, err := st.Packages().Find(ctx, repoKey, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return version{}, false, nil
 	}
 	if err != nil {
 		return version{}, false, fmt.Errorf("nuget: package %s: %w", name, err)
 	}
 	pv, err := st.Packages().Version(ctx, found.ID, key)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return version{}, false, nil
 	}
 	if err != nil {

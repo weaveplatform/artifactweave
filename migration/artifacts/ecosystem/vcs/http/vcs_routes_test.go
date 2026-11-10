@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitVCSArchiveRedirectPolicy(t *testing.T) {
@@ -235,14 +235,14 @@ func TestUnitVCSPropertyFilterRequiresCachedItem(t *testing.T) {
 
 func TestUnitVCSPropertyFilterMatchesOnlyCachedItemProperties(t *testing.T) {
 	w := newItemWorld(t)
-	item, err := w.db.Items().Put(t.Context(), types.Item{
+	item, err := w.db.Items().Put(t.Context(), model.Item{
 		RepoKey: "up", Path: "team", Name: "project.tar.gz", Cached: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := w.db.Items().SetProperties(t.Context(), item.ID,
-		types.Properties{"qa": {"approved"}, "source": {"git"}}, time.Now()); err != nil {
+		model.Properties{"qa": {"approved"}, "source": {"git"}}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	s := VCSAPI{newKit(Config{Store: w.db})}
@@ -272,7 +272,7 @@ func TestUnitVCSPropertyFilterMatchesOnlyCachedItemProperties(t *testing.T) {
 }
 
 func TestUnitVCSCachedResultRequiresBlobAndPreservesReadFault(t *testing.T) {
-	result := source.Result{Item: &types.Item{Size: 7}}
+	result := source.Result{Item: &model.Item{Size: 7}}
 	s := VCSAPI{newKit(Config{})}
 	if _, _, err := s.vcsOpenResult(
 		t.Context(),

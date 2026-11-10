@@ -14,9 +14,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	tf "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -26,10 +26,10 @@ const (
 )
 
 type moduleSource struct {
-	Target    string          `json:"target"`
-	Subdir    string          `json:"subdir"`
-	Archive   string          `json:"archive"`
-	Checksums types.Checksums `json:"checksums"`
+	Target    string           `json:"target"`
+	Subdir    string           `json:"subdir"`
+	Archive   string           `json:"archive"`
+	Checksums kernel.Checksums `json:"checksums"`
 }
 
 func remoteModuleError() error {
@@ -298,8 +298,8 @@ func moduleArchiveType(p string) string {
 	return ""
 }
 
-func moduleChecksum(raw string) (types.Checksums, error) {
-	var out types.Checksums
+func moduleChecksum(raw string) (kernel.Checksums, error) {
+	var out kernel.Checksums
 	if raw == "" {
 		return out, nil
 	}

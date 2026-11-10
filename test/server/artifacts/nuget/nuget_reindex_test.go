@@ -18,9 +18,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // This is API evidence against the production router/runtime and SQLite queue.
@@ -59,12 +60,12 @@ func TestAccNuGetRemoteReindexAPI(t *testing.T) {
 	// Simulate damaged derived metadata through the same store that persists it.
 	// The upstream package and its raw protocol representations remain intact.
 	if err = st.Items().
-		SetProperties(t.Context(), it.ID, types.Properties{nugetfmt.PropID: {"incorrect"}, "custom": {"keep"}}, it.Updated); err != nil {
+		SetProperties(t.Context(), it.ID, model.Properties{nugetfmt.PropID: {"incorrect"}, "custom": {"keep"}}, it.Updated); err != nil {
 		t.Fatal(err)
 	}
 	assertReindexSearch(t, w, 0)
 	rawBefore, _, err := st.RemoteCache().
-		List(t.Context(), w.c.Key, "", store.Page{Limit: store.MaxLimit})
+		List(t.Context(), w.c.Key, "", kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,16 +87,16 @@ func TestAccNuGetRemoteReindexAPI(t *testing.T) {
 	}
 	queued, err := st.WorkQueue().Get(t.Context(), format.KindReindex, w.c.Key)
 	if err == nil {
-		if queued.State != types.WorkPending && queued.State != types.WorkLeased {
+		if queued.State != work.WorkPending && queued.State != work.WorkLeased {
 			t.Fatal("unexpected worker state after HTTP response", queued)
 		}
-	} else if !errors.Is(err, store.ErrNotFound) {
+	} else if !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal("read scheduled worker", err)
 	}
 	if _, err = st.WorkQueue().
 		Get(t.Context(), format.KindReindex, "remote-cache"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("cache alias created independent work", err)
 	}
@@ -105,12 +106,12 @@ func TestAccNuGetRemoteReindexAPI(t *testing.T) {
 	if _, err = st.WorkQueue().
 		Get(t.Context(), format.KindReindex, w.c.Key); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("worker still pending", err)
 	}
 	rawAfter, _, err := st.RemoteCache().
-		List(t.Context(), w.c.Key, "", store.Page{Limit: store.MaxLimit})
+		List(t.Context(), w.c.Key, "", kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil || !reflect.DeepEqual(rawBefore, rawAfter) {
 		t.Fatal("reindex changed raw upstream metadata/cache", err)
 	}

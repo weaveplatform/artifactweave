@@ -16,9 +16,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // world is an in-memory store with the item and trash services over it,
@@ -96,12 +96,12 @@ type indexed struct {
 func (w *world) version(c repo.Config, name, v string) (indexed, bool) {
 	w.t.Helper()
 	p, err := w.st.Packages().Find(w.ctx, c.Key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return indexed{}, false
 	}
 	w.must(err)
 	pv, err := w.st.Packages().Version(w.ctx, p.ID, v)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return indexed{}, false
 	}
 	w.must(err)
@@ -120,7 +120,7 @@ func (w *world) version(c repo.Config, name, v string) (indexed, bool) {
 // packages lists the names of c's indexed packages.
 func (w *world) packages(c repo.Config) []string {
 	w.t.Helper()
-	pkgs, _, err := w.st.Packages().List(w.ctx, c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := w.st.Packages().List(w.ctx, c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	w.must(err)
 	out := make([]string, 0, len(pkgs))
 	for _, p := range pkgs {

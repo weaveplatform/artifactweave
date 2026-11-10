@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxLockResponse = 256 << 10
@@ -66,7 +66,7 @@ func parseRemoteLockPage(
 
 func (h handler) remoteLockPage(
 	r *http.Request, f lockFilter, limit int, after string, strict bool,
-) ([]types.GitLFSLock, string, error) {
+) ([]model.GitLFSLock, string, error) {
 	if h.o.RemoteSources == nil {
 		return nil, "", source.ErrUnsupported
 	}
@@ -116,7 +116,7 @@ func (h handler) remoteLockPage(
 	if err != nil {
 		return nil, "", err
 	}
-	out := make([]types.GitLFSLock, 0, len(page.Locks))
+	out := make([]model.GitLFSLock, 0, len(page.Locks))
 	for _, lock := range page.Locks {
 		if f.Path != "" && lock.Path != f.Path || f.ID != "" && lock.ID != f.ID {
 			return nil, "", source.ErrInvalidResult
@@ -134,7 +134,7 @@ func (h handler) remoteLockPage(
 		if err != nil {
 			return nil, "", source.ErrInvalidResult
 		}
-		out = append(out, types.GitLFSLock{
+		out = append(out, model.GitLFSLock{
 			ID: lock.ID, RepoKey: pkgroute.RequestFrom(r).Repo.Key, Path: lock.Path,
 			Owner: lock.Owner.Name, LockedAt: stamp,
 		})

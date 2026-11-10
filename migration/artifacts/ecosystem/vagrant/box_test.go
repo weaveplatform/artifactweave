@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 type entry struct {
@@ -202,7 +202,7 @@ func TestUnitBoxArchivesAndIdentity(t *testing.T) {
 			}
 		})
 	}
-	p := types.Properties{
+	p := model.Properties{
 		PropName:         {"acme/demo"},
 		PropProvider:     {"virtualbox"},
 		PropVersion:      {"1.2.3-beta.1"},

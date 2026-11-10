@@ -14,7 +14,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // PropDistribution, PropComponent and PropArchitecture are the matrix
@@ -38,7 +38,7 @@ type IndexedBinary struct {
 	Binary    Binary
 	Path      string
 	Size      int64
-	Checksums types.Checksums
+	Checksums kernel.Checksums
 }
 
 func (b IndexedBinary) record() (string, error) {

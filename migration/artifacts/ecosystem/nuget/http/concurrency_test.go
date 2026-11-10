@@ -13,10 +13,10 @@ import (
 	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // These requests use independent database pools, as two registry nodes do.
@@ -230,25 +230,25 @@ type pausedWrite struct {
 	fail            error
 }
 
-func (s pausedWrite) Items() store.ItemStore {
+func (s pausedWrite) Items() port.ItemStore {
 	return pausedItems{ItemStore: s.Store.Items(), pause: s}
 }
 
 type pausedItems struct {
-	store.ItemStore
+	port.ItemStore
 	pause pausedWrite
 }
 
-func (s pausedItems) Put(ctx context.Context, it types.Item) (types.Item, error) {
+func (s pausedItems) Put(ctx context.Context, it model.Item) (model.Item, error) {
 	if !it.Folder && strings.HasSuffix(it.Name, ".nupkg") {
 		close(s.pause.entered)
 		select {
 		case <-ctx.Done():
-			return types.Item{}, ctx.Err()
+			return model.Item{}, ctx.Err()
 		case <-s.pause.resume:
 		}
 		if s.pause.fail != nil {
-			return types.Item{}, s.pause.fail
+			return model.Item{}, s.pause.fail
 		}
 	}
 	return s.ItemStore.Put(ctx, it) //nolint:wrapcheck // test pass-through

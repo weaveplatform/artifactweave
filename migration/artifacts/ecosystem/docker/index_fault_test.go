@@ -12,11 +12,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errIndex = errors.New("index boom")
@@ -28,37 +29,37 @@ type faulty struct {
 	pkgs, items map[string]bool
 }
 
-func (f *faulty) Packages() store.PackageStore {
+func (f *faulty) Packages() port.PackageStore {
 	return faultyPackages{f.Store.Packages(), f.pkgs}
 }
 
-func (f *faulty) Items() store.ItemStore { return faultyReads{f.Store.Items(), f.items} }
+func (f *faulty) Items() port.ItemStore { return faultyReads{f.Store.Items(), f.items} }
 
 type faultyPackages struct {
-	store.PackageStore
+	port.PackageStore
 	fail map[string]bool
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Ensure(ctx context.Context, v types.Package) (types.Package, error) {
+func (p faultyPackages) Ensure(ctx context.Context, v model.Package) (model.Package, error) {
 	if p.fail["Ensure"] {
-		return types.Package{}, errIndex
+		return model.Package{}, errIndex
 	}
 	return p.PackageStore.Ensure(ctx, v)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Find(ctx context.Context, repoKey, name string) (types.Package, error) {
+func (p faultyPackages) Find(ctx context.Context, repoKey, name string) (model.Package, error) {
 	if p.fail["Find"] {
-		return types.Package{}, errIndex
+		return model.Package{}, errIndex
 	}
 	return p.PackageStore.Find(ctx, repoKey, name)
 }
 
 //nolint:wrapcheck // test double
 func (p faultyPackages) List(
-	ctx context.Context, repoKey string, pg store.Page,
-) ([]types.Package, string, error) {
+	ctx context.Context, repoKey string, pg kernel.Page,
+) ([]model.Package, string, error) {
 	if p.fail["List"] {
 		return nil, "", errIndex
 	}
@@ -75,10 +76,10 @@ func (p faultyPackages) Delete(ctx context.Context, id int64) error {
 
 //nolint:wrapcheck // test double
 func (p faultyPackages) PutVersion(
-	ctx context.Context, v types.PackageVersion,
-) (types.PackageVersion, error) {
+	ctx context.Context, v model.PackageVersion,
+) (model.PackageVersion, error) {
 	if p.fail["PutVersion"] {
-		return types.PackageVersion{}, errIndex
+		return model.PackageVersion{}, errIndex
 	}
 	return p.PackageStore.PutVersion(ctx, v)
 }
@@ -86,15 +87,15 @@ func (p faultyPackages) PutVersion(
 //nolint:wrapcheck // test double
 func (p faultyPackages) Version(
 	ctx context.Context, id int64, v string,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	if p.fail["Version"] {
-		return types.PackageVersion{}, errIndex
+		return model.PackageVersion{}, errIndex
 	}
 	return p.PackageStore.Version(ctx, id, v)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (p faultyPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if p.fail["Versions"] {
 		return nil, errIndex
 	}
@@ -110,7 +111,7 @@ func (p faultyPackages) DeleteVersion(ctx context.Context, id int64) error {
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) LinkFile(ctx context.Context, f types.VersionFile) error {
+func (p faultyPackages) LinkFile(ctx context.Context, f model.VersionFile) error {
 	if p.fail["LinkFile"] {
 		return errIndex
 	}
@@ -126,7 +127,7 @@ func (p faultyPackages) Files(ctx context.Context, id int64) ([]int64, error) {
 }
 
 type faultyReads struct {
-	store.ItemStore
+	port.ItemStore
 	fail map[string]bool
 }
 
@@ -136,17 +137,17 @@ func (r faultyReads) Get(
 	key string,
 	cached bool,
 	p string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if r.fail["Get"] {
-		return types.Item{}, errIndex
+		return model.Item{}, errIndex
 	}
 	return r.ItemStore.Get(ctx, key, cached, p)
 }
 
 //nolint:wrapcheck // test double
 func (r faultyReads) Children(
-	ctx context.Context, key string, cached bool, folder string, p store.Page,
-) ([]types.Item, string, error) {
+	ctx context.Context, key string, cached bool, folder string, p kernel.Page,
+) ([]model.Item, string, error) {
 	if r.fail["Children"] {
 		return nil, "", errIndex
 	}
@@ -168,8 +169,8 @@ type indexed struct {
 	db                       format.Store
 	c                        repo.Config
 	items                    *item.Service
-	manifest, blob, byDigest types.Item
-	freshManifest, stray     types.Item
+	manifest, blob, byDigest model.Item
+	freshManifest, stray     model.Item
 }
 
 func newIndexed(t *testing.T) *indexed {
@@ -189,7 +190,7 @@ func newIndexed(t *testing.T) *indexed {
 		Now:     func() time.Time { return time.Date(2026, 10, 16, 9, 0, 0, 0, time.UTC) },
 		Formats: ecosystem.For,
 	}}
-	deploy := func(path, body string) types.Item {
+	deploy := func(path, body string) model.Item {
 		t.Helper()
 		it, err := x.items.Deploy(ctx, item.Deploy{
 			Target: item.Target{Repo: c, Path: path}, Body: strings.NewReader(body),
@@ -226,7 +227,7 @@ func (x *indexed) strayLink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := x.db.Packages().LinkFile(ctx, types.VersionFile{
+	if err := x.db.Packages().LinkFile(ctx, model.VersionFile{
 		VersionID: v.ID, ItemID: x.stray.ID,
 	}); err != nil {
 		t.Fatal(err)
@@ -246,19 +247,19 @@ func (x *indexed) removeQuietly(t *testing.T, path string) {
 // caller, which rolls its transaction back.
 func TestUnitIndexFailures(t *testing.T) {
 	h := layout.Handler{}
-	deployed := func(pick func(x *indexed) types.Item) func(*indexed, format.Store) error {
+	deployed := func(pick func(x *indexed) model.Item) func(*indexed, format.Store) error {
 		return func(x *indexed, st format.Store) error {
 			return h.Deployed(context.Background(), format.Env{Store: st}, x.c, pick(x))
 		}
 	}
-	manifest := deployed(func(x *indexed) types.Item { return x.manifest })
-	fresh := deployed(func(x *indexed) types.Item { return x.freshManifest })
+	manifest := deployed(func(x *indexed) model.Item { return x.manifest })
+	fresh := deployed(func(x *indexed) model.Item { return x.freshManifest })
 	deleted := func(x *indexed, st format.Store) error {
 		return h.Deleted(
 			context.Background(),
 			format.Env{Store: st},
 			x.c,
-			[]types.Item{x.manifest, x.byDigest},
+			[]model.Item{x.manifest, x.byDigest},
 		)
 	}
 	reindex := func(x *indexed, st format.Store) error {
@@ -295,7 +296,7 @@ func TestUnitIndexFailures(t *testing.T) {
 			name: "new image: put version", pkgs: []string{"PutVersion"},
 			setup: func(t *testing.T, x *indexed) {
 				ctx := context.Background()
-				if _, err := x.db.Packages().Ensure(ctx, types.Package{
+				if _, err := x.db.Packages().Ensure(ctx, model.Package{
 					RepoKey: x.c.Key, Name: "fresh", Type: repo.Docker,
 				}); err != nil {
 					t.Fatal(err)
@@ -304,15 +305,15 @@ func TestUnitIndexFailures(t *testing.T) {
 		},
 		{
 			name: "blob: find", pkgs: []string{"Find"},
-			run: deployed(func(x *indexed) types.Item { return x.blob }),
+			run: deployed(func(x *indexed) model.Item { return x.blob }),
 		},
 		{
 			name: "blob: version", pkgs: []string{"Version"},
-			run: deployed(func(x *indexed) types.Item { return x.blob }),
+			run: deployed(func(x *indexed) model.Item { return x.blob }),
 		},
 		{
 			name: "digest manifest: find", pkgs: []string{"Find"},
-			run: deployed(func(x *indexed) types.Item { return x.byDigest }),
+			run: deployed(func(x *indexed) model.Item { return x.byDigest }),
 		},
 		{name: "deleted tag: find", pkgs: []string{"Find"}, setup: noManifest, run: deleted},
 		{name: "deleted tag: version", pkgs: []string{"Version"}, setup: noManifest, run: deleted},
@@ -359,10 +360,10 @@ func TestUnitIndexFailures(t *testing.T) {
 // A manifest whose time was never set is dated by its creation.
 func TestUnitPushTime(t *testing.T) {
 	at := time.Date(2026, 10, 16, 9, 0, 0, 0, time.UTC)
-	if got := layout.PushTime(types.Item{Created: at}); !got.Equal(at) {
+	if got := layout.PushTime(model.Item{Created: at}); !got.Equal(at) {
 		t.Fatal(got)
 	}
-	if got := layout.PushTime(types.Item{Created: at, Modified: at.Add(time.Hour)}); !got.Equal(
+	if got := layout.PushTime(model.Item{Created: at, Modified: at.Add(time.Hour)}); !got.Equal(
 		at.Add(time.Hour)) {
 		t.Fatal(got)
 	}

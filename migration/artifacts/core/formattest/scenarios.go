@@ -11,8 +11,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // scenario is one part of the contract, run on a fresh world.
@@ -292,7 +292,7 @@ func propertiesScenario(w *world) error {
 	return errors.Join(w.expect(w.a, v), w.expect(w.c, v), w.verify(w.a, w.b, w.c))
 }
 
-func (w *world) annotate(c repo.Config, v Version, set types.Properties, remove []string) error {
+func (w *world) annotate(c repo.Config, v Version, set model.Properties, remove []string) error {
 	for _, f := range v.Files {
 		it, err := w.file(c, f.Path)
 		if err != nil {

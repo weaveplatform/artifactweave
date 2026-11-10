@@ -20,12 +20,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type fixture struct {
@@ -65,7 +65,7 @@ func (f *fixture) mount(svc *source.Service) {
 			}
 			return err
 		},
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 			rc, _, err := f.items.Blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				f.t.Fatal(err)

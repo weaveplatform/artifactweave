@@ -18,13 +18,14 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 )
 
 const mib = 1 << 20
@@ -139,7 +140,7 @@ func TestUnitOutOfOrderRoundTrip(t *testing.T) {
 		*st.Progress != 100 {
 		t.Fatalf("status %+v", st)
 	}
-	b, err := w.db.Blobs().Find(ctx, types.Checksums{SHA1: sha1Of(data)})
+	b, err := w.db.Blobs().Find(ctx, kernel.Checksums{SHA1: sha1Of(data)})
 	if err != nil || b.Refs != 0 || b.Size != int64(len(data)) {
 		t.Fatalf("the content is indexed without references: %+v %v", b, err)
 	}
@@ -196,7 +197,7 @@ func TestUnitAuthentication(t *testing.T) {
 		}
 	}
 	// A row of another backend is not a multipart session.
-	if err := w.db.Uploads().Put(ctx, store.Upload{ID: "other", Backend: "fs"}); err != nil {
+	if err := w.db.Uploads().Put(ctx, session.Upload{ID: "other", Backend: "fs"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Status(ctx, "other.secret"); !errors.Is(err, multipart.ErrBadToken) {
@@ -208,7 +209,7 @@ func TestUnitAPIRestrictionFencesExistingUpload(t *testing.T) {
 	w := newWorld(t)
 	s := w.service()
 	ctx := t.Context()
-	if err := w.db.Users().Create(ctx, types.User{Name: "admin"}); err != nil {
+	if err := w.db.Users().Create(ctx, model.User{Name: "admin"}); err != nil {
 		t.Fatal(err)
 	}
 	token, err := s.Create(ctx, "libs", "f", 1, "admin")
@@ -224,7 +225,7 @@ func TestUnitAPIRestrictionFencesExistingUpload(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	r := store.APIRestriction{
+	r := port.APIRestriction{
 		User:    "admin",
 		Actor:   "operator",
 		Reason:  "Stop upload load",
@@ -358,7 +359,7 @@ func TestUnitFinished(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := wait(t, s, token)
-	b, err := w.db.Blobs().Find(ctx, types.Checksums{SHA1: sha1Of(data)})
+	b, err := w.db.Blobs().Find(ctx, kernel.Checksums{SHA1: sha1Of(data)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -519,7 +520,7 @@ func TestUnitResumesAfterRestart(t *testing.T) {
 	if st := wait(t, third, token); st.Status != multipart.StatusFinished {
 		t.Fatalf("status %+v", st)
 	}
-	if _, err := w.db.Blobs().Find(ctx, types.Checksums{SHA1: sha1Of(data)}); err != nil {
+	if _, err := w.db.Blobs().Find(ctx, kernel.Checksums{SHA1: sha1Of(data)}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -570,7 +571,7 @@ func TestUnitAbortReapAndSweep(t *testing.T) {
 	if err := s.Reap(ctx, u); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.db.Uploads().Get(ctx, id); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.db.Uploads().Get(ctx, id); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("reaped: %v", err)
 	}
 

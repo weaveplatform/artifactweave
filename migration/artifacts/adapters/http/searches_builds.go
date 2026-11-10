@@ -9,13 +9,15 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The build searches (decision 0012, research 22 §2) read build-info
@@ -50,7 +52,7 @@ func (s ArtifactoryAPI) SearchDependency(
 	if !checksumHex["sha1"].MatchString(sha1) {
 		return nil, httpkit.BadRequestf("%s is not a hex sha1 checksum", req.Params.Sha1)
 	}
-	refs, err := r.st.Builds().FindDependencies(ctx, types.Checksums{SHA1: sha1})
+	refs, err := r.st.Builds().FindDependencies(ctx, kernel.Checksums{SHA1: sha1})
 	if err != nil {
 		return nil, s.InternalError(ctx, "dependency search", err)
 	}
@@ -63,10 +65,10 @@ func (s ArtifactoryAPI) SearchDependency(
 		if seen[id] {
 			continue
 		}
-		repoKey, doc := types.Build{
+		repoKey, doc := model.Build{
 			ProjectKey: run.ProjectKey, Name: run.Name, Number: run.Number, Started: run.Started,
 		}.DocumentItem()
-		if !a.Build(repoKey, doc, false, types.ActionRead) {
+		if !a.Build(repoKey, doc, false, api.ActionRead) {
 			continue
 		}
 		seen[id] = true
@@ -133,9 +135,9 @@ func (s ArtifactoryAPI) SearchBuildArtifacts(
 		}
 		mappings = append(mappings, re)
 	}
-	var in func(types.Item) bool
+	var in func(model.Item) bool
 	if refs := r.RefsOf(httpkit.Deref(body.Repos)); refs != nil {
-		in = func(it types.Item) bool { return refs[aql.RepoRef{Key: it.RepoKey, Cached: it.Cached}] }
+		in = func(it model.Item) bool { return refs[aql.RepoRef{Key: it.RepoKey, Cached: it.Cached}] }
 	}
 	missing := noBuildArtifacts(body.BuildName, number, status)
 	which := number

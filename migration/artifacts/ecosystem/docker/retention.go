@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 )
 
 // Retained returns the previous manifests of the image name's tag that Tag
@@ -16,9 +16,9 @@ import (
 // its digest folder.
 func Retained(
 	ctx context.Context,
-	items store.ItemStore,
+	items port.ItemStore,
 	repoKey, name, tag string,
-) ([]types.Item, error) {
+) ([]model.Item, error) {
 	q := manifestQuery(
 		repoKey,
 		name,
@@ -37,23 +37,23 @@ func Retained(
 // and digest folders alike.
 func Manifests(
 	ctx context.Context,
-	items store.ItemStore,
+	items port.ItemStore,
 	repoKey, name string,
-) ([]types.Item, error) {
+) ([]model.Item, error) {
 	return search(ctx, items, manifestQuery(repoKey, name), "manifests of "+name)
 }
 
 func search(
 	ctx context.Context,
-	items store.ItemStore,
+	items port.ItemStore,
 	q *aql.Query,
 	what string,
-) ([]types.Item, error) {
+) ([]model.Item, error) {
 	hits, err := items.Search(ctx, q, aql.Options{})
 	if err != nil {
 		return nil, fmt.Errorf("docker: %s: %w", what, err)
 	}
-	out := make([]types.Item, len(hits))
+	out := make([]model.Item, len(hits))
 	for i, h := range hits {
 		out[i] = h.Item
 	}

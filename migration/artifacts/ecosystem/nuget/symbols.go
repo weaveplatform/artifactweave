@@ -16,9 +16,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const symbolPrefix = ".symbols/"
@@ -131,7 +131,7 @@ func symbolManifest(body map[string][]byte) []SymbolFile {
 func symbolsOf(
 	ctx context.Context,
 	env format.Env,
-	it types.Item,
+	it model.Item,
 	old []SymbolSource,
 ) (SymbolSource, error) {
 	for _, s := range old {
@@ -204,7 +204,7 @@ func syncSymbols(ctx context.Context, env format.Env, c repo.Config) error {
 	if err != nil {
 		return fmt.Errorf("nuget: derived symbols: %w", err)
 	}
-	existing := map[string]types.Item{}
+	existing := map[string]model.Item{}
 	for _, hit := range hits {
 		p := hit.Item.FullPath()
 		existing[p] = hit.Item
@@ -260,7 +260,7 @@ func symbolOwners(
 	c repo.Config,
 ) (map[string]symbolOwner, error) {
 	out := map[string]symbolOwner{}
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		packages, next, err := st.Packages().List(ctx, c.Key, page)
 		if err != nil {
@@ -333,7 +333,7 @@ func queueSymbols(ctx context.Context, env format.Env, c repo.Config) error {
 func symbolWork(ctx context.Context, env format.Env, key string) error {
 	c, err := env.Store.Repos().Get(ctx, key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	case err != nil:
 		return fmt.Errorf("nuget: symbol repository: %w", err)

@@ -11,10 +11,11 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 )
 
 func moduleLocationRequest(w *policyWorld) source.Request {
@@ -65,7 +66,7 @@ func TestAccModuleLocationProjectionCacheRefreshOfflineAndNoStore(t *testing.T) 
 				result.Stream.ETag != "" {
 				t.Fatal("projection metadata", result)
 			}
-			entries, _, err := w.db.RemoteCache().List(t.Context(), q.Repo.Key, "", store.Page{})
+			entries, _, err := w.db.RemoteCache().List(t.Context(), q.Repo.Key, "", kernel.Page{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -79,7 +80,7 @@ func TestAccModuleLocationProjectionCacheRefreshOfflineAndNoStore(t *testing.T) 
 			}
 			if len(entries) != 1 || entries[0].MetadataBaseURL != w.up.URL+"/effective/download" ||
 				entries[0].ETag != "" ||
-				entries[0].OriginalChecksums != (types.Checksums{}) {
+				entries[0].OriginalChecksums != (kernel.Checksums{}) {
 				t.Fatal("invalid cache projection", entries)
 			}
 			calls := len(w.up.Requests())
@@ -190,8 +191,8 @@ func TestAccModuleLocationProjectionBoundsAndIdentity(t *testing.T) {
 	q.Resource.ModuleDownloadLocation = true
 	req := remote.TransportRequest(
 		q,
-		types.RemoteCacheEntry{
-			Blob:         types.Blob{Checksums: types.Checksums{SHA256: "digest"}},
+		model.RemoteCacheEntry{
+			Blob:         blob.Blob{Checksums: kernel.Checksums{SHA256: "digest"}},
 			ETag:         `"old"`,
 			LastModified: time.Now().Format(http.TimeFormat),
 		},

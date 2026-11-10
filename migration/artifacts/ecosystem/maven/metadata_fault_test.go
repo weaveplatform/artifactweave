@@ -10,10 +10,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 var errWork = errors.New("work boom")
@@ -24,14 +25,14 @@ type workFaults struct {
 	fail string
 }
 
-func (f workFaults) Repos() store.RepoStore { return faultyRepos{f.Store.Repos(), f.fail} }
-func (f workFaults) Packages() store.PackageStore {
+func (f workFaults) Repos() port.RepoStore { return faultyRepos{f.Store.Repos(), f.fail} }
+func (f workFaults) Packages() port.PackageStore {
 	return faultyRunPackages{f.Store.Packages(), f.fail}
 }
-func (f workFaults) Items() store.ItemStore { return faultyRunItems{f.Store.Items(), f.fail} }
+func (f workFaults) Items() port.ItemStore { return faultyRunItems{f.Store.Items(), f.fail} }
 
 type faultyRepos struct {
-	store.RepoStore
+	port.RepoStore
 	fail string
 }
 
@@ -44,20 +45,20 @@ func (r faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
 }
 
 type faultyRunPackages struct {
-	store.PackageStore
+	port.PackageStore
 	fail string
 }
 
 //nolint:wrapcheck // test double
-func (p faultyRunPackages) Find(ctx context.Context, key, name string) (types.Package, error) {
+func (p faultyRunPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
 	if p.fail == "Find" {
-		return types.Package{}, errWork
+		return model.Package{}, errWork
 	}
 	return p.PackageStore.Find(ctx, key, name)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyRunPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (p faultyRunPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if p.fail == "Versions" {
 		return nil, errWork
 	}
@@ -73,14 +74,14 @@ func (p faultyRunPackages) Files(ctx context.Context, id int64) ([]int64, error)
 }
 
 type faultyRunItems struct {
-	store.ItemStore
+	port.ItemStore
 	fail string
 }
 
 //nolint:wrapcheck // test double
-func (i faultyRunItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
+func (i faultyRunItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
 	if i.fail == "GetByID" {
-		return types.Item{}, errWork
+		return model.Item{}, errWork
 	}
 	return i.ItemStore.GetByID(ctx, id)
 }
@@ -91,9 +92,9 @@ func (i faultyRunItems) Get(
 	key string,
 	cached bool,
 	p string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if i.fail == "Get" {
-		return types.Item{}, errWork
+		return model.Item{}, errWork
 	}
 	return i.ItemStore.Get(ctx, key, cached, p)
 }
@@ -111,7 +112,7 @@ func (i faultyRunItems) Search(
 }
 
 //nolint:wrapcheck // test double
-func (i faultyRunItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (i faultyRunItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if i.fail == "Properties" {
 		return nil, errWork
 	}
@@ -128,7 +129,7 @@ func (closedBlobs) Open(context.Context, string) (io.ReadSeekCloser, blob.Info, 
 // Every failure a metadata run meets comes back from it, so the queue
 // retries the item.
 func TestUnitWorkFailures(t *testing.T) {
-	plugin := types.Properties{maven.PluginProperty: {"true"}}
+	plugin := model.Properties{maven.PluginProperty: {"true"}}
 	const (
 		pkg     = "maven-local/com.acme:app"
 		noPom   = "maven-local/org.x:lib"
@@ -173,11 +174,11 @@ func TestUnitWorkFailures(t *testing.T) {
 			env := format.Env{
 				Store: workFaults{w.db, tc.fail}, Blobs: w.blobs, Layouts: layouts{},
 				Now: func() time.Time { return w.now },
-				Derive: func(context.Context, format.Derived) (types.Item, error) {
+				Derive: func(context.Context, format.Derived) (model.Item, error) {
 					if tc.derive {
-						return types.Item{}, errWork
+						return model.Item{}, errWork
 					}
-					return types.Item{}, nil
+					return model.Item{}, nil
 				},
 				Underive: func(context.Context, repo.Config, bool, string) error {
 					if tc.underive {
@@ -189,7 +190,7 @@ func TestUnitWorkFailures(t *testing.T) {
 			if tc.blobs {
 				env.Blobs = closedBlobs{w.blobs}
 			}
-			err := maven.Handler{}.Work(w.ctx, env, types.WorkItem{Kind: tc.kind, Key: tc.key})
+			err := maven.Handler{}.Work(w.ctx, env, work.WorkItem{Kind: tc.kind, Key: tc.key})
 			if !errors.Is(err, errWork) {
 				t.Fatalf("err = %v", err)
 			}
@@ -200,7 +201,7 @@ func TestUnitWorkFailures(t *testing.T) {
 // A hook whose queueing fails fails its write.
 func TestUnitQueueFailures(t *testing.T) {
 	w := newMetaWorld(t, nil)
-	w.deploy("com/acme/app/1.0/app-1.0.pom", types.Properties{maven.PluginProperty: {"true"}})
+	w.deploy("com/acme/app/1.0/app-1.0.pom", model.Properties{maven.PluginProperty: {"true"}})
 	pom, err := w.db.Items().Get(w.ctx, w.c.Key, false, "com/acme/app/1.0/app-1.0.pom")
 	if err != nil {
 		t.Fatal(err)
@@ -210,7 +211,7 @@ func TestUnitQueueFailures(t *testing.T) {
 	env := format.Env{Store: w.db, Layouts: layouts{}, Enqueue: refuse}
 	for name, err := range map[string]error{
 		"deployed":  h.Deployed(w.ctx, env, w.c, pom),
-		"deleted":   h.Deleted(w.ctx, env, w.c, []types.Item{pom}),
+		"deleted":   h.Deleted(w.ctx, env, w.c, []model.Item{pom}),
 		"deleting":  h.Deleting(w.ctx, env, w.c, pom),
 		"annotated": h.Annotated(w.ctx, env, w.c, pom, format.Annotation{Removed: []string{maven.PluginProperty}}),
 		"properties": h.Deleting(w.ctx, format.Env{Store: workFaults{w.db, "Properties"}, Layouts: layouts{}},
@@ -221,8 +222,8 @@ func TestUnitQueueFailures(t *testing.T) {
 		}
 	}
 	// A POM too shallow to sit in a group queues no plugin metadata.
-	top := types.Item{RepoKey: w.c.Key, Path: "app", Name: "app-1.0.pom"}
-	if err := h.Annotated(w.ctx, env, w.c, top, format.Annotation{Set: types.Properties{
+	top := model.Item{RepoKey: w.c.Key, Path: "app", Name: "app-1.0.pom"}
+	if err := h.Annotated(w.ctx, env, w.c, top, format.Annotation{Set: model.Properties{
 		maven.PluginProperty: {"true"},
 	}}); err != nil {
 		t.Errorf("shallow POM: %v", err)

@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
@@ -23,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -32,7 +34,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -90,7 +91,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	if err = db.Keys().
-		CreateKeypair(t.Context(), types.Keypair{Name: "signer", Type: types.KeypairEd25519, Alias: "cache-1", PrivateKey: string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: priv})), PublicKey: string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pub}))}); err != nil {
+		CreateKeypair(t.Context(), api.Keypair{Name: "signer", Type: api.KeypairEd25519, Alias: "cache-1", PrivateKey: string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: priv})), PublicKey: string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pub}))}); err != nil {
 		t.Fatal(err)
 	}
 	f := &fixture{
@@ -133,7 +134,7 @@ func (f *fixture) mount(remote *source.Service, tune ...func(*pkgroute.Protocol)
 		pkgroute.Options{
 			Store: f.st,
 			Items: func() *item.Service { return f.items },
-			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 				rc, _, err := f.items.Blobs.Open(r.Context(), it.Actual.SHA256)
 				if err != nil {
 					f.t.Fatal(err)
@@ -296,7 +297,7 @@ func remoteFixture(t *testing.T) (*fixture, *fakeupstream.Server, repo.Config, s
 	svc := &source.Service{
 		HTTP:  policy,
 		Cache: policy,
-		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			return f.db.RemoteCache().Source(ctx, c.Key)
 		},
 	}

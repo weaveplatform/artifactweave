@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 var errFault = errors.New("the store failed")
@@ -21,22 +22,22 @@ type faulty struct {
 	fail string
 }
 
-func (s faulty) Packages() store.PackageStore {
+func (s faulty) Packages() port.PackageStore {
 	return faultyPackages{PackageStore: s.Store.Packages(), fail: s.fail}
 }
 
-func (s faulty) Items() store.ItemStore {
+func (s faulty) Items() port.ItemStore {
 	return faultyItems{ItemStore: s.Store.Items(), fail: s.fail}
 }
 
 type faultyPackages struct {
-	store.PackageStore
+	port.PackageStore
 	fail string
 }
 
-func (p faultyPackages) Find(ctx context.Context, key, name string) (types.Package, error) {
+func (p faultyPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
 	if p.fail == "Find" {
-		return types.Package{}, errFault
+		return model.Package{}, errFault
 	}
 	return p.PackageStore.Find(ctx, key, name)
 }
@@ -44,30 +45,30 @@ func (p faultyPackages) Find(ctx context.Context, key, name string) (types.Packa
 func (p faultyPackages) List(
 	ctx context.Context,
 	key string,
-	page store.Page,
-) ([]types.Package, string, error) {
+	page kernel.Page,
+) ([]model.Package, string, error) {
 	if p.fail == "List" {
 		return nil, "", errFault
 	}
 	return p.PackageStore.List(ctx, key, page)
 }
 
-func (p faultyPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (p faultyPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if p.fail == "Versions" {
 		return nil, errFault
 	}
 	return p.PackageStore.Versions(ctx, id)
 }
 
-func (p faultyPackages) VersionOf(ctx context.Context, id int64) (types.PackageVersion, error) {
+func (p faultyPackages) VersionOf(ctx context.Context, id int64) (model.PackageVersion, error) {
 	if p.fail == "VersionOf" {
-		return types.PackageVersion{}, errFault
+		return model.PackageVersion{}, errFault
 	}
 	return p.PackageStore.VersionOf(ctx, id)
 }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	fail string
 }
 
@@ -76,9 +77,9 @@ func (s faultyItems) Get(
 	key string,
 	cached bool,
 	path string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if s.fail == "Get" {
-		return types.Item{}, errFault
+		return model.Item{}, errFault
 	}
 	return s.ItemStore.Get(ctx, key, cached, path)
 }

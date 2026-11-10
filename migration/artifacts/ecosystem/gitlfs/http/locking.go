@@ -17,12 +17,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxLockRequest = 16 << 10
@@ -42,7 +43,7 @@ type lockWire struct {
 	} `json:"owner"`
 }
 
-func lockDocument(v types.GitLFSLock) lockWire {
+func lockDocument(v model.GitLFSLock) lockWire {
 	d := lockWire{ID: v.ID, Path: v.Path, LockedAt: v.LockedAt.UTC().Format(time.RFC3339)}
 	d.Owner.Name = v.Owner
 	return d
@@ -84,7 +85,7 @@ func validLockPath(path string) bool {
 		strings.ContainsAny(path, "\r\n\x00") {
 		return false
 	}
-	_, _, _, err := types.SplitItemPath(path)
+	_, _, _, err := kernel.SplitItemPath(path)
 	return err == nil
 }
 
@@ -140,7 +141,7 @@ func (h handler) lockTarget(r *http.Request, path string) (*http.Request, error)
 	}
 	// Virtual repositories cannot be permission targets. Their deployment
 	// member supplies write authority; read members supply list authority.
-	if c.Class != repo.Virtual && !h.k.Can(r, path, types.ActionWrite) {
+	if c.Class != repo.Virtual && !h.k.Can(r, path, api.ActionWrite) {
 		return nil, kernel.ErrForbidden
 	}
 	if c.Class != repo.Virtual {
@@ -150,7 +151,7 @@ func (h handler) lockTarget(r *http.Request, path string) (*http.Request, error)
 	if err != nil {
 		return nil, err
 	}
-	if !h.k.Can(target, path, types.ActionWrite) {
+	if !h.k.Can(target, path, api.ActionWrite) {
 		return nil, kernel.ErrForbidden
 	}
 	return target, nil
@@ -164,7 +165,7 @@ func lockTargetStatus(err error) int {
 	if errors.Is(err, kernel.ErrForbidden) {
 		return http.StatusForbidden
 	}
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return http.StatusMethodNotAllowed
 	}
 	return http.StatusMethodNotAllowed
@@ -203,7 +204,7 @@ func (h handler) createLock(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, member := range members {
 			if pkgroute.RequestFrom(member).Repo.Key == pkgroute.RequestFrom(target).Repo.Key ||
-				!h.k.Can(member, request.Path, types.ActionRead) {
+				!h.k.Can(member, request.Path, api.ActionRead) {
 				continue
 			}
 			rows, _, readErr := h.readLockPage(member, lockFilter{Path: request.Path}, 1, "", false)
@@ -212,7 +213,7 @@ func (h handler) createLock(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if len(rows) != 0 {
-				if h.k.Can(member, request.Path, types.ActionRead) {
+				if h.k.Can(member, request.Path, api.ActionRead) {
 					lockResponse(w, http.StatusConflict, map[string]any{
 						"message": "Git LFS path is already locked", "lock": lockDocument(rows[0]),
 					})
@@ -223,16 +224,16 @@ func (h handler) createLock(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	v := types.GitLFSLock{
+	v := model.GitLFSLock{
 		ID: rand.Text(), RepoKey: pkgroute.RequestFrom(target).Repo.Key,
 		Path: request.Path, Owner: p.Name, LockedAt: time.Now().UTC().Truncate(time.Second),
 	}
 	if err = h.k.DB().GitLFSLocks().Create(r.Context(), v); err != nil {
-		if errors.Is(err, store.ErrConflict) {
-			if h.k.Can(target, v.Path, types.ActionRead) {
-				rows, _, listErr := h.k.DB().GitLFSLocks().List(r.Context(), store.GitLFSLockFilter{
+		if errors.Is(err, kernel.ErrConflict) {
+			if h.k.Can(target, v.Path, api.ActionRead) {
+				rows, _, listErr := h.k.DB().GitLFSLocks().List(r.Context(), port.GitLFSLockFilter{
 					RepoKey: v.RepoKey, Path: v.Path,
-				}, store.Page{Limit: 1})
+				}, kernel.Page{Limit: 1})
 				if listErr == nil && len(rows) == 1 {
 					lockResponse(w, http.StatusConflict, map[string]any{
 						"message": "Git LFS path is already locked", "lock": lockDocument(rows[0]),
@@ -273,16 +274,16 @@ func parseLockCursor(
 		return c, nil
 	}
 	if len(raw) > 4096 {
-		return c, store.ErrInvalidCursor
+		return c, kernel.ErrInvalidCursor
 	}
 	data, err := base64.RawURLEncoding.DecodeString(raw)
 	if err != nil || json.Unmarshal(data, &c) != nil ||
 		c.Repo != repoKey || c.Mode != mode || c.Path != filter.Path || c.ID != filter.ID ||
 		c.Member < 0 || c.Member >= maxMember {
-		return c, store.ErrInvalidCursor
+		return c, kernel.ErrInvalidCursor
 	}
 	if len(c.After) > 2048 {
-		return c, store.ErrInvalidCursor
+		return c, kernel.ErrInvalidCursor
 	}
 	return c, nil
 }
@@ -294,11 +295,11 @@ func encodeLockCursor(c lockCursor) string {
 
 func lockLimit(raw string) (int, error) {
 	if raw == "" {
-		return store.DefaultLimit, nil
+		return kernel.DefaultLimit, nil
 	}
 	n, err := strconv.Atoi(raw)
-	if err != nil || n < 1 || n > store.MaxLimit {
-		return 0, store.ErrInvalid
+	if err != nil || n < 1 || n > kernel.MaxLimit {
+		return 0, kernel.ErrInvalid
 	}
 	return n, nil
 }
@@ -307,15 +308,15 @@ func lockQuery(raw url.Values) (lockFilter, int, string, error) {
 	for key, values := range raw {
 		allowed := slices.Contains([]string{"path", "id", "cursor", "limit", "refspec"}, key)
 		if !allowed || len(values) != 1 {
-			return lockFilter{}, 0, "", store.ErrInvalid
+			return lockFilter{}, 0, "", kernel.ErrInvalid
 		}
 	}
 	f := lockFilter{Path: raw.Get("path"), ID: raw.Get("id")}
 	if f.Path != "" && !validLockPath(f.Path) || len(f.ID) > 256 {
-		return f, 0, "", store.ErrInvalid
+		return f, 0, "", kernel.ErrInvalid
 	}
 	if ref := raw.Get("refspec"); ref != "" && !validLockRef(&lockRef{Name: ref}) {
-		return f, 0, "", store.ErrInvalid
+		return f, 0, "", kernel.ErrInvalid
 	}
 	limit, err := lockLimit(raw.Get("limit"))
 	return f, limit, raw.Get("cursor"), err
@@ -367,12 +368,12 @@ func (h handler) verifyLocks(w http.ResponseWriter, r *http.Request) {
 	if !decodeLockBody(w, r, &request) {
 		return
 	}
-	if !validLockRef(request.Ref) || request.Limit < 0 || request.Limit > store.MaxLimit {
+	if !validLockRef(request.Ref) || request.Limit < 0 || request.Limit > kernel.MaxLimit {
 		lockError(w, http.StatusBadRequest, "invalid Git LFS lock verification")
 		return
 	}
 	if request.Limit == 0 {
-		request.Limit = store.DefaultLimit
+		request.Limit = kernel.DefaultLimit
 	}
 	locks, next, err := h.collectLocks(r, "verify", lockFilter{}, request.Limit, request.Cursor)
 	if err != nil {
@@ -431,15 +432,15 @@ func (h handler) unlockLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if pkgroute.RequestFrom(r).Repo.Class != repo.Virtual &&
-		!h.k.Can(r, v.Path, types.ActionWrite) ||
-		!h.k.Can(target, v.Path, types.ActionWrite) {
+		!h.k.Can(r, v.Path, api.ActionWrite) ||
+		!h.k.Can(target, v.Path, api.ActionWrite) {
 		lockError(w, http.StatusForbidden, "Git LFS unlock denied")
 		return
 	}
 	if v.Owner != p.Name {
 		if !request.Force || pkgroute.RequestFrom(r).Repo.Class != repo.Virtual &&
-			!h.k.Can(r, v.Path, types.ActionDelete) ||
-			!h.k.Can(target, v.Path, types.ActionDelete) {
+			!h.k.Can(r, v.Path, api.ActionDelete) ||
+			!h.k.Can(target, v.Path, api.ActionDelete) {
 			lockError(w, http.StatusForbidden, "Git LFS unlock denied")
 			return
 		}
@@ -457,7 +458,7 @@ func (h handler) unlockLock(w http.ResponseWriter, r *http.Request) {
 func (h handler) lockTargetForID(r *http.Request) (*http.Request, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	if c.Class == repo.Remote {
-		return nil, store.ErrNotFound
+		return nil, kernel.ErrNotFound
 	}
 	if c.Class != repo.Virtual {
 		return r, nil
@@ -469,9 +470,9 @@ func lockReadError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, kernel.ErrForbidden):
 		lockError(w, http.StatusForbidden, "Git LFS locks denied")
-	case errors.Is(err, store.ErrInvalidCursor), errors.Is(err, store.ErrInvalid):
+	case errors.Is(err, kernel.ErrInvalidCursor), errors.Is(err, kernel.ErrInvalid):
 		lockError(w, http.StatusBadRequest, "invalid Git LFS lock cursor")
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		lockError(w, http.StatusBadGateway, "Git LFS lock source unavailable")
 	default:
 		lockError(w, http.StatusBadGateway, "Git LFS lock source unavailable")
@@ -494,7 +495,7 @@ func (h handler) lockMembers(r *http.Request, mode string) ([]*http.Request, err
 		if err != nil {
 			return nil, err
 		}
-		if !h.k.CanFolder(target, "", types.ActionWrite) {
+		if !h.k.CanFolder(target, "", api.ActionWrite) {
 			return nil, kernel.ErrForbidden
 		}
 	}
@@ -503,14 +504,14 @@ func (h handler) lockMembers(r *http.Request, mode string) ([]*http.Request, err
 
 func (h handler) readLockPage(
 	r *http.Request, f lockFilter, limit int, after string, strict bool,
-) ([]types.GitLFSLock, string, error) {
+) ([]model.GitLFSLock, string, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	if c.Class == repo.Remote {
 		return h.remoteLockPage(r, f, limit, after, strict)
 	}
-	rows, next, err := h.k.DB().GitLFSLocks().List(r.Context(), store.GitLFSLockFilter{
+	rows, next, err := h.k.DB().GitLFSLocks().List(r.Context(), port.GitLFSLockFilter{
 		RepoKey: c.Key, Path: f.Path, ID: f.ID,
-	}, store.Page{Limit: limit, After: after})
+	}, kernel.Page{Limit: limit, After: after})
 	if err != nil {
 		return nil, "", fmt.Errorf("gitlfs: list locks: %w", err)
 	}
@@ -524,14 +525,14 @@ func (h handler) earlierLock(
 	members []*http.Request, before int, path string,
 ) (bool, error) {
 	for _, member := range members[:before] {
-		if !h.k.Can(member, path, types.ActionRead) {
+		if !h.k.Can(member, path, api.ActionRead) {
 			continue
 		}
 		rows, _, err := h.readLockPage(member, lockFilter{Path: path}, 1, "", false)
 		if err != nil {
 			return false, err
 		}
-		if len(rows) == 1 && h.k.Can(member, path, types.ActionRead) {
+		if len(rows) == 1 && h.k.Can(member, path, api.ActionRead) {
 			return true, nil
 		}
 	}
@@ -541,9 +542,9 @@ func (h handler) earlierLock(
 func (h handler) collectLocks(
 	r *http.Request, mode string, f lockFilter, limit int, rawCursor string,
 ) ([]lockWire, string, error) {
-	want := types.ActionRead
+	want := api.ActionRead
 	if mode == "verify" {
-		want = types.ActionWrite
+		want = api.ActionWrite
 	}
 	virtual := pkgroute.RequestFrom(r).Repo.Class == repo.Virtual
 	if f.Path != "" {
@@ -580,7 +581,7 @@ func (h handler) collectLocks(
 		member := members[c.Member]
 		memberWant := want
 		if virtualVerify {
-			memberWant = types.ActionRead
+			memberWant = api.ActionRead
 		}
 		if virtualVerify && !h.k.CanFolder(member, "", memberWant) {
 			return nil, "", kernel.ErrForbidden
@@ -628,13 +629,13 @@ func (h handler) collectLocks(
 
 func (h handler) visibleLockRow(
 	r *http.Request, members []*http.Request, target *http.Request,
-	row types.GitLFSLock, memberIndex int, mode string, want types.Actions,
+	row model.GitLFSLock, memberIndex int, mode string, want api.Actions,
 ) (bool, error) {
 	virtual := pkgroute.RequestFrom(r).Repo.Class == repo.Virtual
 	virtualVerify := virtual && mode == "verify"
 	memberWant := want
 	if virtualVerify {
-		memberWant = types.ActionRead
+		memberWant = api.ActionRead
 	}
 	if !h.k.Can(members[memberIndex], row.Path, memberWant) {
 		if virtualVerify {
@@ -643,7 +644,7 @@ func (h handler) visibleLockRow(
 		return false, nil
 	}
 	if !virtual && !h.k.Can(r, row.Path, want) ||
-		virtualVerify && !h.k.Can(target, row.Path, types.ActionWrite) {
+		virtualVerify && !h.k.Can(target, row.Path, api.ActionWrite) {
 		return false, nil
 	}
 	if mode == "list" && memberIndex > 0 {

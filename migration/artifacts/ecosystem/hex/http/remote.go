@@ -10,12 +10,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	hexfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func upstreamFailure() error {
@@ -141,7 +141,7 @@ func (h handler) remotePackagesWithAuthority(
 			if !ok {
 				return nil, source.Result{}, upstreamFailure()
 			}
-			if !h.k.Can(r, p, types.ActionRead) {
+			if !h.k.Can(r, p, api.ActionRead) {
 				continue
 			}
 			if err := metadata.CheckRead(r.Context(), p); errors.Is(err, source.ErrDenied) {
@@ -188,7 +188,7 @@ func (h handler) remotePackagesWithAuthority(
 			if !ok {
 				return nil, source.Result{}, upstreamFailure()
 			}
-			if !h.k.Can(r, p, types.ActionRead) {
+			if !h.k.Can(r, p, api.ActionRead) {
 				continue
 			}
 			if err := metadata.CheckRead(r.Context(), p); errors.Is(err, source.ErrDenied) {
@@ -227,7 +227,7 @@ func splitTarball(path string) (string, string, bool) {
 
 func (h handler) remoteTarball(w http.ResponseWriter, r *http.Request, path string) {
 	result, err := h.remoteResult(r, path)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		h.fail(w, r, http.StatusNotFound, "Hex tarball not found")
 		return
 	}
@@ -241,7 +241,7 @@ func (h handler) remoteTarball(w http.ResponseWriter, r *http.Request, path stri
 func (h handler) remoteResult(r *http.Request, path string) (source.Result, error) {
 	name, version, ok := splitTarball(path)
 	if !ok {
-		return source.Result{}, store.ErrNotFound
+		return source.Result{}, kernel.ErrNotFound
 	}
 	entries, metadata, err := h.remotePackagesWithAuthority(r, "packages/"+name)
 	if err != nil {
@@ -249,7 +249,7 @@ func (h handler) remoteResult(r *http.Request, path string) (source.Result, erro
 	}
 	reg, ok := entries[name]
 	if !ok {
-		return source.Result{}, store.ErrNotFound
+		return source.Result{}, kernel.ErrNotFound
 	}
 	var expected hexfmt.Package
 	for _, release := range reg.Releases {
@@ -259,7 +259,7 @@ func (h handler) remoteResult(r *http.Request, path string) (source.Result, erro
 		}
 	}
 	if expected.Version == "" {
-		return source.Result{}, store.ErrNotFound
+		return source.Result{}, kernel.ErrNotFound
 	}
 	resource := tarballResource(r, path, name, version, expected)
 	result, err := h.k.Read(r, resource)

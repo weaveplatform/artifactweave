@@ -10,9 +10,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // A reindex from an empty index rebuilds it from the files and their
@@ -22,12 +22,12 @@ func TestUnitReindexFromEmpty(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	first := w.deploy("x/x-2.0.zip", zipOf(entry{"PKG-INFO", meta("x", "2.0")}), nil)
 	w.deploy("x/x-1.0.zip", zipOf(entry{"PKG-INFO", meta("x", "1.0")}),
-		types.Properties{pypi.PropYanked: {"bad"}})
-	w.deploy("m/m.tar.gz", []byte("x"), types.Properties{
+		model.Properties{pypi.PropYanked: {"bad"}})
+	w.deploy("m/m.tar.gz", []byte("x"), model.Properties{
 		pypi.PropName: {"m"}, pypi.PropVersion: {"1"}, pypi.PropRequiresPython: {">=3"},
 	})
 	kept := w.index()
-	pkgs, _, err := w.st.Packages().List(w.ctx, w.c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := w.st.Packages().List(w.ctx, w.c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestUnitIndexWherever(t *testing.T) {
 	if len(idx) != 1 || len(idx["jfrog-pypi"]) != 1 || !ok {
 		t.Fatalf("index %v", idx)
 	}
-	record := func(it types.Item, core bool) pypi.File {
+	record := func(it model.Item, core bool) pypi.File {
 		return pypi.File{
 			Path: it.FullPath(), Name: it.Name, SHA256: it.Actual.SHA256, MD5: it.Actual.MD5,
 			Size: it.Size, Uploaded: it.Modified.UTC(), RequiresPython: ">=3.9",
@@ -89,12 +89,12 @@ func TestUnitIndexWherever(t *testing.T) {
 	if got.Text(got.Files[0]) != m || got.Text(pypi.File{}) != "" {
 		t.Errorf("text %q", got.Text(got.Files[0]))
 	}
-	want2 := types.Properties{
+	want2 := model.Properties{
 		pypi.PropName: {"Jfrog.PyPI"}, pypi.PropVersion: {"1.0-RC1"},
 		pypi.PropNormalizedName: {"jfrog-pypi"}, pypi.PropSummary: {"Tools"},
 		pypi.PropRequiresPython: {">=3.9"},
 	}
-	for _, it := range []types.Item{whl, tgz, again} {
+	for _, it := range []model.Item{whl, tgz, again} {
 		if diff := cmp.Diff(want2, w.props(it.FullPath())); diff != "" {
 			t.Errorf("%s (-want +got):\n%s", it.FullPath(), diff)
 		}
@@ -142,11 +142,11 @@ func TestUnitVersionDate(t *testing.T) {
 // is removed. Properties the format does not keep stay.
 func TestUnitContentWins(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
-	w.deploy("x-1.0.tar.gz", sdist("x", "1.0", meta("x", "1.0")), types.Properties{
+	w.deploy("x-1.0.tar.gz", sdist("x", "1.0", meta("x", "1.0")), model.Properties{
 		pypi.PropName: {"y"}, pypi.PropVersion: {"9"}, pypi.PropSummary: {"stale"},
 		pypi.PropRequiresPython: {">=2"}, "team": {"a"},
 	})
-	want := types.Properties{
+	want := model.Properties{
 		pypi.PropName: {"x"}, pypi.PropVersion: {"1.0"}, pypi.PropNormalizedName: {"x"},
 		"team": {"a"},
 	}
@@ -159,7 +159,7 @@ func TestUnitContentWins(t *testing.T) {
 	}
 	// The core metadata decides: renaming the file's project by its
 	// properties moves nothing.
-	w.annotate("x-1.0.tar.gz", types.Properties{pypi.PropName: {"z"}, pypi.PropVersion: {"2"}})
+	w.annotate("x-1.0.tar.gz", model.Properties{pypi.PropName: {"z"}, pypi.PropVersion: {"2"}})
 	if idx := w.index(); len(idx["x"]) != 1 || idx["z"] != nil {
 		t.Fatalf("after renaming: %v", idx)
 	}
@@ -177,14 +177,14 @@ func TestUnitIndexedByProperties(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	body := []byte("not an archive")
 	w.deploy("manual/thing-1.0.tar.gz", body, nil)
-	w.deploy("manual/nameless.whl", body, types.Properties{pypi.PropVersion: {"1.0"}})
-	w.deploy("manual/invalid.whl", body, types.Properties{
+	w.deploy("manual/nameless.whl", body, model.Properties{pypi.PropVersion: {"1.0"}})
+	w.deploy("manual/invalid.whl", body, model.Properties{
 		pypi.PropName: {"no good"}, pypi.PropVersion: {"1.0"},
 	})
 	if idx := w.index(); len(idx) != 0 {
 		t.Fatalf("index %v", idx)
 	}
-	w.annotate("manual/thing-1.0.tar.gz", types.Properties{
+	w.annotate("manual/thing-1.0.tar.gz", model.Properties{
 		pypi.PropName: {"My_Thing"}, pypi.PropVersion: {" 1.0.0 "},
 		pypi.PropRequiresPython: {">=3.8"},
 	})
@@ -196,12 +196,12 @@ func TestUnitIndexedByProperties(t *testing.T) {
 	if props := w.props("manual/thing-1.0.tar.gz"); props[pypi.PropNormalizedName] != nil {
 		t.Errorf("a file indexed by its properties keeps them: %v", props)
 	}
-	w.annotate("manual/thing-1.0.tar.gz", types.Properties{pypi.PropVersion: {"2.0"}})
+	w.annotate("manual/thing-1.0.tar.gz", model.Properties{pypi.PropVersion: {"2.0"}})
 	if idx := w.index(); idx["my-thing"]["1.0.0"].Files != nil || len(idx["my-thing"]) != 1 ||
 		len(idx["my-thing"]["2.0"].Files) != 1 {
 		t.Fatalf("after a new version: %v", idx)
 	}
-	w.annotate("manual/thing-1.0.tar.gz", types.Properties{pypi.PropRequiresPython: {">=3.10"}})
+	w.annotate("manual/thing-1.0.tar.gz", model.Properties{pypi.PropRequiresPython: {">=3.10"}})
 	if f := w.index()["my-thing"]["2.0"].Files[0]; f.RequiresPython != ">=3.10" {
 		t.Fatalf("after a new Requires-Python: %+v", f)
 	}
@@ -210,7 +210,7 @@ func TestUnitIndexedByProperties(t *testing.T) {
 		t.Fatalf("after removing the name: %v", idx)
 	}
 	// A property the index does not follow changes nothing.
-	w.annotate("manual/thing-1.0.tar.gz", types.Properties{"team": {"a"}})
+	w.annotate("manual/thing-1.0.tar.gz", model.Properties{"team": {"a"}})
 	if idx := w.index(); len(idx) != 0 {
 		t.Fatalf("after another property: %v", idx)
 	}
@@ -221,7 +221,7 @@ func TestUnitIndexedByProperties(t *testing.T) {
 func TestUnitYanked(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	p := "x/1.0/" + wheelName("x", "1.0")
-	w.deploy(p, wheel("x", "1.0", meta("x", "1.0")), types.Properties{pypi.PropYanked: {"true"}})
+	w.deploy(p, wheel("x", "1.0", meta("x", "1.0")), model.Properties{pypi.PropYanked: {"true"}})
 	state := func() (bool, string) {
 		f := w.index()["x"]["1.0"].Files[0]
 		return f.Yanked, f.YankedReason
@@ -240,12 +240,12 @@ func TestUnitYanked(t *testing.T) {
 		{"TRUE", true, ""},
 		{"false", false, ""},
 	} {
-		w.annotate(p, types.Properties{pypi.PropYanked: {c.value}})
+		w.annotate(p, model.Properties{pypi.PropYanked: {c.value}})
 		if y, r := state(); y != c.yanked || r != c.reason {
 			t.Errorf("%q: %v %q", c.value, y, r)
 		}
 	}
-	w.annotate(p, types.Properties{pypi.PropYanked: {"gone"}})
+	w.annotate(p, model.Properties{pypi.PropYanked: {"gone"}})
 	w.annotate(p, nil, pypi.PropYanked)
 	if y, _ := state(); y {
 		t.Error("still yanked once the property is removed")
@@ -299,15 +299,15 @@ func TestUnitNotIndexed(t *testing.T) {
 	w := newWorld(t, pypi.Settings{})
 	ctx, h := w.ctx, w.h
 	remote := w.repo("pypi-remote", repo.Remote)
-	it := types.Item{Name: "x-1.0.zip", Folder: false}
+	it := model.Item{Name: "x-1.0.zip", Folder: false}
 	if err := h.Deployed(ctx, w.items.Env(), remote, it); err != nil {
 		t.Fatal(err)
 	}
-	folder := types.Item{Name: "x.whl", Folder: true}
+	folder := model.Item{Name: "x.whl", Folder: true}
 	if err := h.Annotated(ctx, w.items.Env(), w.c, folder, annotation()); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Deleting(ctx, w.items.Env(), w.c, types.Item{Name: "README"}); err != nil {
+	if err := h.Deleting(ctx, w.items.Env(), w.c, model.Item{Name: "README"}); err != nil {
 		t.Fatal(err)
 	}
 	if idx := w.index(); len(idx) != 0 {

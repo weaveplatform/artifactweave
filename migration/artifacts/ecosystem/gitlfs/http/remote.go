@@ -19,8 +19,6 @@ import (
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gitlfs"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxBatchResponse = 64 << 10
@@ -29,7 +27,7 @@ func objectResource(obj batchObject) source.Resource {
 	path, _ := format.ObjectPath(obj.OID)
 	return source.Resource{
 		Kind: source.ResourceKindArtifact, Path: path, Method: http.MethodGet,
-		Variant: "gitlfs-object-v1", Checksums: types.Checksums{SHA256: obj.OID},
+		Variant: "gitlfs-object-v1", Checksums: kernel.Checksums{SHA256: obj.OID},
 		Validate: func(_ context.Context, body io.ReadSeeker, size int64) error {
 			if size != obj.Size {
 				return source.ErrInvalidResult
@@ -110,7 +108,7 @@ func (h handler) cachedObject(r *http.Request, obj batchObject) (source.Result, 
 
 func (h handler) remoteAvailable(r *http.Request, obj batchObject) error {
 	path, _ := format.ObjectPath(obj.OID)
-	if !h.k.Can(r, path, types.ActionRead) {
+	if !h.k.Can(r, path, accessapi.ActionRead) {
 		return apierror.New(http.StatusForbidden, "Git LFS read denied")
 	}
 	if cached, err := h.cachedObject(r, obj); err == nil {
@@ -125,7 +123,7 @@ func (h handler) remoteAvailable(r *http.Request, obj batchObject) error {
 
 func (h handler) remoteObject(r *http.Request, obj batchObject) (source.Result, error) {
 	path, _ := format.ObjectPath(obj.OID)
-	if !h.k.Can(r, path, types.ActionRead) {
+	if !h.k.Can(r, path, accessapi.ActionRead) {
 		return source.Result{}, apierror.New(http.StatusForbidden, "Git LFS read denied")
 	}
 	if cached, err := h.cachedObject(r, obj); err == nil {
@@ -154,7 +152,7 @@ func (h handler) remoteObject(r *http.Request, obj batchObject) (source.Result, 
 }
 
 func missing(err error) bool {
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return true
 	}
 	var api *apierror.Error
@@ -204,7 +202,7 @@ func (h handler) remoteBatch(r *http.Request, obj batchObject) (downloadAction, 
 		return downloadAction{}, err
 	}
 	if missing {
-		return downloadAction{}, store.ErrNotFound
+		return downloadAction{}, kernel.ErrNotFound
 	}
 	return action, nil
 }

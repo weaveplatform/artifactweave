@@ -17,7 +17,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 func TestUnitCRANIndexOwnershipAndUploadPolicy(t *testing.T) {
@@ -317,11 +318,11 @@ func TestUnitCRANLifecycleDoesNotQueueCachedOrRemoteContent(t *testing.T) {
 	}}
 	for _, tc := range []struct {
 		config repo.Config
-		item   types.Item
+		item   model.Item
 	}{
-		{local, types.Item{Folder: true}},
-		{local, types.Item{Cached: true}},
-		{remote, types.Item{}},
+		{local, model.Item{Folder: true}},
+		{local, model.Item{Cached: true}},
+		{remote, model.Item{}},
 	} {
 		if err := h.Deleting(t.Context(), env, tc.config, tc.item); err != nil {
 			t.Fatal(err)
@@ -339,7 +340,7 @@ func TestUnitCRANLifecycleDoesNotQueueCachedOrRemoteContent(t *testing.T) {
 	if got := h.WorkKinds(); len(got) != 1 || got[0] != KindIndex {
 		t.Fatalf("work kinds = %v", got)
 	}
-	if err := h.Work(t.Context(), format.Env{}, types.WorkItem{Kind: "unrelated"}); err != nil {
+	if err := h.Work(t.Context(), format.Env{}, work.WorkItem{Kind: "unrelated"}); err != nil {
 		t.Fatalf("unrelated work: %v", err)
 	}
 	if got, err := h.Inspect(t.Context(), format.Env{}, local, format.Write{

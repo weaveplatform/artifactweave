@@ -14,8 +14,8 @@ import (
 
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -276,11 +276,13 @@ func TestAccMultipartChecksumToken(t *testing.T) {
 		}
 	})
 	// user may deploy to libs-local, but read nothing.
-	if err := w.db.Permissions().Create(context.Background(), types.Permission{
+	if err := w.db.Permissions().Create(context.Background(), model.Permission{
 		Name: "user-deploys",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionWrite}},
-			Targets: map[string]types.Target{"libs-local": {Include: []string{"**"}}},
+		Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+			Actions: model.Grants{
+				Users: map[string]accessapi.Actions{"user": accessapi.ActionWrite},
+			},
+			Targets: map[string]model.Target{"libs-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

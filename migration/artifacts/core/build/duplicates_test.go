@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // entry is a build-info artifact or dependency of content, with id, name and
@@ -187,7 +187,7 @@ func TestUnitPromoteFilesSharingAChecksum(t *testing.T) {
 	// The build artifacts search finds files as the promotion does.
 	run := must(w.svc.Run(ctx, "", "app", "1", time.Time{}, everyone))
 	var found []string
-	for _, it := range must(w.svc.SearchArtifacts(ctx, run, func(it types.Item) bool {
+	for _, it := range must(w.svc.SearchArtifacts(ctx, run, func(it model.Item) bool {
 		return it.RepoKey == "libs-local"
 	}, everyone)) {
 		found = append(found, it.FullPath())
@@ -231,7 +231,7 @@ func TestUnitFolderEntries(t *testing.T) {
 	// folder.
 	w.put("release-local", false, "app/dir/kept.bin", "kept", nil)
 	gone, err := w.svc.Discard(ctx, Discard{
-		Name: "app", Retention: types.BuildRetention{Count: 1, DeleteArtifacts: true},
+		Name: "app", Retention: model.BuildRetention{Count: 1, DeleteArtifacts: true},
 	}, everyone)
 	if err != nil || len(gone) != 1 || gone[0].Number != "1" {
 		t.Fatalf("discarded %+v, %v", gone, err)

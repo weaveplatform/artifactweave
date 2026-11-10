@@ -8,8 +8,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Sidecars returns the paths in c of the sidecars that the file at p owns
@@ -68,8 +69,8 @@ func (s *Service) sidecarsOf(
 	ctx context.Context,
 	c repo.Config,
 	cached bool,
-	items []types.Item,
-) ([]types.Item, error) {
+	items []model.Item,
+) ([]model.Item, error) {
 	k, ok := s.format(c.PackageType).(format.SidecarKeeper)
 	if !ok {
 		return nil, nil
@@ -78,7 +79,7 @@ func (s *Service) sidecarsOf(
 	for _, it := range items {
 		have[it.FullPath()] = true
 	}
-	var out []types.Item
+	var out []model.Item
 	for _, it := range items {
 		if it.Folder {
 			continue
@@ -105,10 +106,10 @@ func (s *Service) sidecar(
 	c repo.Config,
 	cached bool,
 	p string,
-) (types.Item, bool, error) {
+) (model.Item, bool, error) {
 	it, err := s.Store.Items().Get(ctx, c.Key, cached, p)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return it, false, nil
 	case err != nil:
 		return it, false, fmt.Errorf("item: get %s: %w", p, err)
@@ -121,9 +122,9 @@ func (s *Service) sidecar(
 func (s *Service) deleteSidecars(
 	ctx context.Context,
 	t Target,
-	sidecars []types.Item,
-	res store.DeleteResult,
-) (store.DeleteResult, error) {
+	sidecars []model.Item,
+	res port.DeleteResult,
+) (port.DeleteResult, error) {
 	for _, sc := range sidecars {
 		more, err := s.Store.Items().Delete(ctx, t.Repo.Key, t.Cached, sc.FullPath())
 		if err != nil {
@@ -154,7 +155,7 @@ func (s *Service) planSidecars(
 	ctx context.Context,
 	t Transfer,
 	res *TransferResult,
-	sources []types.Item,
+	sources []model.Item,
 	steps []step,
 ) ([]step, error) {
 	k, ok := s.format(t.From.Repo.PackageType).(format.SidecarKeeper)

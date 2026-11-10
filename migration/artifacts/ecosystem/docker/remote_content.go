@@ -18,7 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // RegistryContent is the Docker, OCI and Helm OCI rules of remote repositories
@@ -327,7 +327,7 @@ func RegistryResource(image, operation, reference string) (source.Resource, erro
 		folder := reference
 		if h, ok := SHA256Hex(reference); ok {
 			folder = DigestFolder(h)
-			r.Checksums = types.Checksums{SHA256: h}
+			r.Checksums = kernel.Checksums{SHA256: h}
 		} else {
 			r.Kind = source.ResourceKindMetadata
 		}
@@ -335,7 +335,7 @@ func RegistryResource(image, operation, reference string) (source.Resource, erro
 	case "blobs":
 		h, _ := SHA256Hex(reference)
 		r.Path = UploadPath(image, h)
-		r.Checksums = types.Checksums{SHA256: h}
+		r.Checksums = kernel.Checksums{SHA256: h}
 	case "tags":
 		r.Path = image + "/_remote/tags.json"
 		r.Kind = source.ResourceKindVersions

@@ -8,10 +8,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // versionsPrefix is the hand-written latest version by properties search:
@@ -94,7 +94,7 @@ func (s ArtifactoryAPI) latestVersionByProperties(w http.ResponseWriter, req *ht
 	best := ""
 	for _, h := range hits {
 		for _, v := range h.Properties[versionProperty] {
-			if best == "" || types.CompareMercury(v, best) > 0 {
+			if best == "" || model.CompareMercury(v, best) > 0 {
 				best = v
 			}
 		}

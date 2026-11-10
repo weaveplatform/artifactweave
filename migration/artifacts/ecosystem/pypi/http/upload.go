@@ -10,11 +10,12 @@ import (
 
 	"golang.org/x/crypto/blake2b"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (h handler) upload(w http.ResponseWriter, r *http.Request) {
@@ -37,7 +38,7 @@ func (h handler) upload(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionWrite) {
+	if !h.k.RequireFolder(w, r, "", api.ActionWrite) {
 		return
 	}
 	form, err := h.k.ReadForm(r, "content")
@@ -99,8 +100,8 @@ func (h handler) put(w http.ResponseWriter, r *http.Request) {
 	h.k.DeployItem(w, r)
 }
 
-func (h handler) digests(r *http.Request, f pkgroute.Form) (types.Checksums, error) {
-	var out types.Checksums
+func (h handler) digests(r *http.Request, f pkgroute.Form) (kernel.Checksums, error) {
+	var out kernel.Checksums
 	for _, check := range []struct {
 		name, want string
 		dst        *string

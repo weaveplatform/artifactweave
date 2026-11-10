@@ -8,12 +8,13 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // project is a project as one caller sees it: its versions with a file the
@@ -48,7 +49,7 @@ func load(
 	reads Reads,
 ) (project, bool, error) {
 	found, err := st.Packages().Find(ctx, key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return project{}, false, nil
 	}
 	if err != nil {
@@ -63,7 +64,7 @@ func load(
 func readable(
 	ctx context.Context,
 	st format.Store,
-	pkg types.Package,
+	pkg model.Package,
 	reads Reads,
 	probe bool,
 ) (project, error) {
@@ -98,7 +99,7 @@ func readable(
 // with a file reads allows, in the order the index lists them, by name.
 func projects(ctx context.Context, st format.Store, key string, reads Reads) ([]string, error) {
 	var names []string
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		pkgs, next, err := st.Packages().List(ctx, key, page)
 		if err != nil {
@@ -122,7 +123,7 @@ func projects(ctx context.Context, st format.Store, key string, reads Reads) ([]
 
 // reads is what the request's caller may read in its repository.
 func (h handler) reads(r *http.Request) Reads {
-	return func(path string) bool { return h.k.Can(r, path, types.ActionRead) }
+	return func(path string) bool { return h.k.Can(r, path, api.ActionRead) }
 }
 
 // repoBase is the request's repository's URL under /api/pypi/, from the

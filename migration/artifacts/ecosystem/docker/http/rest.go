@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
@@ -14,8 +15,6 @@ import (
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // DockerAPI is the Docker ecosystem's partial strict server: the JFrog REST
@@ -56,7 +55,7 @@ func (s DockerAPI) DeleteDockerTag(
 		return nil, httpkit.BadRequestf("invalid image name '%s'", name)
 	case !layout.ValidTag(tag):
 		return nil, httpkit.BadRequestf("invalid tag '%s'", tag)
-	case !acc.File(c, name+"/", types.ActionDelete):
+	case !acc.File(c, name+"/", api.ActionDelete):
 		return nil, httpkit.Denied(p)
 	}
 	missing := apierror.New(http.StatusNotFound,
@@ -67,7 +66,7 @@ func (s DockerAPI) DeleteDockerTag(
 	_, err = s.registry(st).DeleteMultiArch(ctx,
 		registry.Owner{Repo: c, Name: name, By: p.Name}, tag)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil, missing
 	case err != nil:
 		return nil, s.InternalError(ctx, "delete docker tag", err)
@@ -114,11 +113,11 @@ func (s DockerAPI) PromoteDockerImage(
 			to.PackageType,
 		)
 	}
-	read := types.ActionRead
+	read := api.ActionRead
 	if !args.shouldCopy {
-		read |= types.ActionDelete
+		read |= api.ActionDelete
 	}
-	if !acc.File(from, args.name+"/", read) || !acc.File(to, args.toName+"/", types.ActionWrite) {
+	if !acc.File(from, args.name+"/", read) || !acc.File(to, args.toName+"/", api.ActionWrite) {
 		return nil, httpkit.Denied(p)
 	}
 	svc := s.registry(st)
@@ -191,10 +190,10 @@ func (s DockerAPI) promotionTags(
 ) ([]registry.Rename, error) {
 	tags, err := svc.PromotedTags(ctx, pr.From, args.tag)
 	switch {
-	case errors.Is(err, store.ErrNotFound) && args.tag == "":
+	case errors.Is(err, kernel.ErrNotFound) && args.tag == "":
 		return nil, apierror.New(http.StatusNotFound,
 			fmt.Sprintf("Image '%s' does not exist in '%s'", args.name, pr.From.Repo.Key))
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil, apierror.New(http.StatusNotFound, fmt.Sprintf(
 			"Tag '%s' of image '%s' does not exist in '%s'", args.tag, args.name, pr.From.Repo.Key))
 	case err != nil:
@@ -211,7 +210,7 @@ func (s DockerAPI) promotionTags(
 		if err != nil {
 			return nil, s.InternalError(ctx, "docker promotion target", err)
 		}
-		if replaces && !acc.File(pr.To.Repo, pr.To.Name+"/", types.ActionDelete) {
+		if replaces && !acc.File(pr.To.Repo, pr.To.Name+"/", api.ActionDelete) {
 			return nil, httpkit.Denied(p)
 		}
 		renames = append(renames, r)
@@ -248,13 +247,13 @@ func (s DockerAPI) FindParentManifestLists(
 		return nil, httpkit.BadRequestf("invalid image name '%s'", name)
 	case !layout.ValidTag(tag):
 		return nil, httpkit.BadRequestf("invalid tag '%s'", tag)
-	case !acc.File(c, name+"/", types.ActionRead):
+	case !acc.File(c, name+"/", api.ActionRead):
 		return nil, httpkit.Denied(p)
 	}
 	parents, err := s.registry(st).ParentManifests(ctx,
 		registry.Owner{Repo: c, Name: name, By: p.Name}, tag)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil, apierror.New(http.StatusNotFound,
 			fmt.Sprintf("Tag '%s' of image '%s' does not exist in '%s'", tag, name, c.Key))
 	case err != nil:

@@ -16,11 +16,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 )
 
 // tokenWorld is a registry with a real token service over the fixture,
@@ -39,24 +40,24 @@ func newTokenWorld(t *testing.T) *tokenWorld {
 	t.Helper()
 	ctx := context.Background()
 	db := fixture(t)
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	for _, p := range []types.Permission{
-		{Name: "readers", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"reader": types.ActionRead, kernel.AnonymousUser: types.ActionRead,
+	for _, p := range []model.Permission{
+		{Name: "readers", Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]accessapi.Actions{
+				"reader": accessapi.ActionRead, kernel.AnonymousUser: accessapi.ActionRead,
 			}},
-			Targets: map[string]types.Target{"docker-local": {Include: []string{"pub/**"}}},
+			Targets: map[string]model.Target{"docker-local": {Include: []string{"pub/**"}}},
 		}}},
-		{Name: "writers", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"writer": types.ActionRead | types.ActionWrite | types.ActionDelete |
-					types.ActionAnnotate,
+		{Name: "writers", Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]accessapi.Actions{
+				"writer": accessapi.ActionRead | accessapi.ActionWrite | accessapi.ActionDelete |
+					accessapi.ActionAnnotate,
 			}},
-			Targets: map[string]types.Target{"docker-local": {Include: []string{"**"}}},
+			Targets: map[string]model.Target{"docker-local": {Include: []string{"**"}}},
 		}}},
 	} {
 		if err := db.Permissions().Create(ctx, p); err != nil {
@@ -64,7 +65,7 @@ func newTokenWorld(t *testing.T) *tokenWorld {
 		}
 	}
 	if err := db.Users().
-		Create(ctx, types.User{Name: "writer", Email: "w@example.com"}); err != nil {
+		Create(ctx, model.User{Name: "writer", Email: "w@example.com"}); err != nil {
 		t.Fatal(err)
 	}
 	// The registry reaches the service and the users through the access
@@ -112,7 +113,7 @@ func (w *tokenWorld) get(
 }
 
 // grants requests a token and returns what it grants.
-func (w *tokenWorld) grants(target string, p kernel.Principal, host string) *types.RegistryAccess {
+func (w *tokenWorld) grants(target string, p kernel.Principal, host string) *kernel.RegistryAccess {
 	w.t.Helper()
 	rec := w.get(target, &p, host)
 	if rec.Code != http.StatusOK {
@@ -136,20 +137,20 @@ func TestAccTokenGrants(t *testing.T) {
 	w := newTokenWorld(t)
 	reader := kernel.Principal{Name: "reader"}
 	writer := kernel.Principal{Name: "writer"}
-	repoGrant := func(name string, actions ...string) types.RegistryGrant {
-		return types.RegistryGrant{Type: scopeRepository, Name: name, Actions: actions}
+	repoGrant := func(name string, actions ...string) kernel.RegistryGrant {
+		return kernel.RegistryGrant{Type: scopeRepository, Name: name, Actions: actions}
 	}
 	cases := []struct {
 		name, target, host string
 		p                  kernel.Principal
-		expected           types.RegistryAccess
+		expected           kernel.RegistryAccess
 	}{
 		{
 			"no scope",
 			"/v2/token",
 			"",
 			reader,
-			types.RegistryAccess{Grants: []types.RegistryGrant{}},
+			kernel.RegistryAccess{Grants: []kernel.RegistryGrant{}},
 		},
 		{
 			"null realm, repository path name",
@@ -157,24 +158,24 @@ func TestAccTokenGrants(t *testing.T) {
 				"?scope=repository:docker-local/pub/app:pull,push&service=reg.example.com",
 			"",
 			reader,
-			types.RegistryAccess{
-				Grants: []types.RegistryGrant{repoGrant("docker-local/pub/app", "pull")},
+			kernel.RegistryAccess{
+				Grants: []kernel.RegistryGrant{repoGrant("docker-local/pub/app", "pull")},
 			},
 		},
 		{
 			"realm with the image alone", "/artifactory/api/docker/docker-local/v2/token" +
 				"?scope=repository:pub/app:pull", "", reader,
-			types.RegistryAccess{
-				Realm: "docker-local", Grants: []types.RegistryGrant{repoGrant("pub/app", "pull")},
+			kernel.RegistryAccess{
+				Realm: "docker-local", Grants: []kernel.RegistryGrant{repoGrant("pub/app", "pull")},
 			},
 		},
 		{
 			// The repository path's own challenge names the realm too.
 			"realm with the repository path name", "/artifactory/api/docker/Docker-Local/v2/token" +
 				"?scope=repository:docker-local/pub/app:pull", "", reader,
-			types.RegistryAccess{
+			kernel.RegistryAccess{
 				Realm:  "Docker-Local",
-				Grants: []types.RegistryGrant{repoGrant("docker-local/pub/app", "pull")},
+				Grants: []kernel.RegistryGrant{repoGrant("docker-local/pub/app", "pull")},
 			},
 		},
 		{
@@ -182,7 +183,7 @@ func TestAccTokenGrants(t *testing.T) {
 			"/v2/token?scope=repository:docker-local/priv/app:pull",
 			"",
 			reader,
-			types.RegistryAccess{Grants: []types.RegistryGrant{}},
+			kernel.RegistryAccess{Grants: []kernel.RegistryGrant{}},
 		},
 		{
 			"everything, scopes in one parameter and in two", "/v2/token?scope=" +
@@ -192,7 +193,7 @@ func TestAccTokenGrants(t *testing.T) {
 				"&scope=repository(plugin):docker-local/app:pull&scope=nonsense&scope=a:b" +
 				"&scope=repository:docker-local:pull",
 			"", writer,
-			types.RegistryAccess{Grants: []types.RegistryGrant{
+			kernel.RegistryAccess{Grants: []kernel.RegistryGrant{
 				repoGrant("docker-local/app", "pull", "push", "delete"),
 				{Type: scopeRegistry, Name: "catalog", Actions: []string{"*"}},
 				repoGrant("docker-local/app", "pull"),
@@ -203,9 +204,9 @@ func TestAccTokenGrants(t *testing.T) {
 			"/v2/token?scope=repository:app:pull,push",
 			"docker-local.reg.example.com",
 			writer,
-			types.RegistryAccess{
+			kernel.RegistryAccess{
 				Realm:  "docker-local",
-				Grants: []types.RegistryGrant{repoGrant("app", "pull", "push")},
+				Grants: []kernel.RegistryGrant{repoGrant("app", "pull", "push")},
 			},
 		},
 		{
@@ -213,8 +214,8 @@ func TestAccTokenGrants(t *testing.T) {
 			"/v2/token?scope=repository:docker-local/pub/x:pull,push",
 			"",
 			kernel.Anonymous,
-			types.RegistryAccess{
-				Grants: []types.RegistryGrant{repoGrant("docker-local/pub/x", "pull")},
+			kernel.RegistryAccess{
+				Grants: []kernel.RegistryGrant{repoGrant("docker-local/pub/x", "pull")},
 			},
 		},
 	}
@@ -230,7 +231,7 @@ func TestAccTokenGrants(t *testing.T) {
 // the realm it was issued for; and the new one lives no longer than it.
 func TestAccTokenFromARegistryToken(t *testing.T) {
 	w := newTokenWorld(t)
-	have := &types.RegistryAccess{Grants: []types.RegistryGrant{
+	have := &kernel.RegistryAccess{Grants: []kernel.RegistryGrant{
 		{Type: scopeRepository, Name: "docker-local/app", Actions: []string{"pull"}},
 		{Type: scopeRepository, Name: "docker-local/all", Actions: []string{"*"}},
 	}}
@@ -239,7 +240,7 @@ func TestAccTokenFromARegistryToken(t *testing.T) {
 	}
 	got := w.grants("/v2/token?scope=repository:docker-local/app:pull,push"+
 		"&scope=repository:docker-local/all:push&scope=repository:docker-local/other:pull", p, "")
-	want := &types.RegistryAccess{Grants: []types.RegistryGrant{
+	want := &kernel.RegistryAccess{Grants: []kernel.RegistryGrant{
 		{Type: scopeRepository, Name: "docker-local/app", Actions: []string{"pull"}},
 		{Type: scopeRepository, Name: "docker-local/all", Actions: []string{"push"}},
 	}}
@@ -263,7 +264,7 @@ func TestAccTokenFromARegistryToken(t *testing.T) {
 // so it later resolves to the same transient or synthetic user.
 func TestAccTokenKeepsTheCallersIdentityAndScope(t *testing.T) {
 	w := newTokenWorld(t)
-	groups, err := types.ParseScope("applied-permissions/groups:ci")
+	groups, err := kernel.ParseScope("applied-permissions/groups:ci")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,11 +274,11 @@ func TestAccTokenKeepsTheCallersIdentityAndScope(t *testing.T) {
 	}{
 		// reader holds Read on docker-local/pub/ but is not a stored user.
 		"transient": {
-			kernel.Principal{Name: "reader", Identity: types.IdentityTransient},
+			kernel.Principal{Name: "reader", Identity: kernel.IdentityTransient},
 			"applied-permissions/user",
 		},
 		"synthetic": {
-			kernel.Principal{Name: "oidc-github-ci", Identity: types.IdentitySynthetic, Scope: groups},
+			kernel.Principal{Name: "oidc-github-ci", Identity: kernel.IdentitySynthetic, Scope: groups},
 			"applied-permissions/groups:ci",
 		},
 	} {
@@ -313,7 +314,7 @@ func TestAccTokenBindsToTheParentToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	have := &types.RegistryAccess{Grants: []types.RegistryGrant{
+	have := &kernel.RegistryAccess{Grants: []kernel.RegistryGrant{
 		{Type: scopeRepository, Name: "docker-local/app", Actions: []string{"pull"}},
 	}}
 	for name, p := range map[string]kernel.Principal{
@@ -614,13 +615,13 @@ func TestAccRequireRegistryToken(t *testing.T) {
 		Name:    "app",
 		base:    prefix + "Docker-Local/v2",
 	}
-	grants := func(realm string, gs ...types.RegistryGrant) *types.RegistryAccess {
-		return &types.RegistryAccess{Realm: realm, Grants: gs}
+	grants := func(realm string, gs ...kernel.RegistryGrant) *kernel.RegistryAccess {
+		return &kernel.RegistryAccess{Realm: realm, Grants: gs}
 	}
-	pull := func(name string) types.RegistryGrant {
-		return types.RegistryGrant{Type: scopeRepository, Name: name, Actions: []string{"pull"}}
+	pull := func(name string) kernel.RegistryGrant {
+		return kernel.RegistryGrant{Type: scopeRepository, Name: name, Actions: []string{"pull"}}
 	}
-	all := types.RegistryGrant{
+	all := kernel.RegistryGrant{
 		Type:    scopeRepository,
 		Name:    "docker-local/app",
 		Actions: []string{"*"},
@@ -628,68 +629,74 @@ func TestAccRequireRegistryToken(t *testing.T) {
 	cases := []struct {
 		name     string
 		q        Request
-		have     *types.RegistryAccess
-		expected types.Actions
+		have     *kernel.RegistryAccess
+		expected accessapi.Actions
 		ok       bool
 	}{
 		{
 			"null realm on the path",
 			pathMethod,
 			grants("", pull("docker-local/app")),
-			types.ActionRead,
+			accessapi.ActionRead,
 			true,
 		},
-		{"null realm on the prefix", prefixed, grants("", pull("app")), types.ActionRead, false},
+		{
+			"null realm on the prefix",
+			prefixed,
+			grants("", pull("app")),
+			accessapi.ActionRead,
+			false,
+		},
 		{
 			"realm on the prefix",
 			prefixed,
 			grants("docker-local", pull("app")),
-			types.ActionRead,
+			accessapi.ActionRead,
 			true,
 		},
 		{
 			"realm on the path", pathMethod, grants("docker-local", pull("docker-local/app")),
-			types.ActionRead, true,
+			accessapi.ActionRead, true,
 		},
-		{"another realm", prefixed, grants("oci-local", pull("app")), types.ActionRead, false},
+		{"another realm", prefixed, grants("oci-local", pull("app")), accessapi.ActionRead, false},
 		{
 			"another image",
 			pathMethod,
 			grants("", pull("docker-local/other")),
-			types.ActionRead,
+			accessapi.ActionRead,
 			false,
 		},
 		{
 			"pull is not push",
 			pathMethod,
 			grants("", pull("docker-local/app")),
-			types.ActionWrite,
+			accessapi.ActionWrite,
 			false,
 		},
 		{
 			"star",
 			pathMethod,
 			grants("", all),
-			types.ActionRead | types.ActionWrite | types.ActionDelete,
+			accessapi.ActionRead | accessapi.ActionWrite | accessapi.ActionDelete,
 			true,
 		},
-		{"annotate is push", pathMethod, grants("", all), types.ActionAnnotate, true},
-		{"delete in a push is push", pathMethod, grants("", types.RegistryGrant{
+		{"annotate is push", pathMethod, grants("", all), accessapi.ActionAnnotate, true},
+		{"delete in a push is push", pathMethod, grants("", kernel.RegistryGrant{
 			Type: scopeRepository, Name: "docker-local/app", Actions: []string{"push"},
-		}), types.ActionDelete, true},
-		{"manage never", pathMethod, grants("", all), types.ActionManage, false},
+		}), accessapi.ActionDelete, true},
+		{"manage never", pathMethod, grants("", all), accessapi.ActionManage, false},
 		{
 			"catalog grant is no image",
 			pathMethod,
 			grants(
 				"",
-				types.RegistryGrant{
+				kernel.RegistryGrant{
 					Type:    scopeRegistry,
 					Name:    "docker-local/app",
 					Actions: []string{"*"},
 				},
 			),
-			types.ActionRead,
+			accessapi.ActionRead,
 			false,
 		},
 	}
@@ -711,12 +718,12 @@ func TestAccRequireRegistryToken(t *testing.T) {
 		r = r.WithContext(
 			w.as(
 				r.Context(),
-				kernel.Principal{Name: "writer", Registry: grants("", types.RegistryGrant{
+				kernel.Principal{Name: "writer", Registry: grants("", kernel.RegistryGrant{
 					Type: scopeRepository, Name: "docker-local/app", Actions: []string{actions},
 				})},
 			),
 		)
-		if err := pathMethod.Require(r, "app/v1/", types.ActionDelete); (err == nil) != ok {
+		if err := pathMethod.Require(r, "app/v1/", accessapi.ActionDelete); (err == nil) != ok {
 			t.Errorf("DELETE with %s: %v", actions, err)
 		}
 	}
@@ -731,7 +738,12 @@ func TestAccRequireRegistryToken(t *testing.T) {
 	)
 	q := Request{RepoKey: "docker-local", Repo: c, Name: "priv", base: "/v2/docker-local"}
 	var e *apierror.Error
-	if err := q.Require(r, "priv", types.ActionRead); !errors.As(err, &e) || e.Code != CodeDenied {
+	if err := q.Require(
+		r,
+		"priv",
+		accessapi.ActionRead,
+	); !errors.As(err, &e) ||
+		e.Code != CodeDenied {
 		t.Fatalf("permissions: %v", err)
 	}
 }
@@ -741,16 +753,16 @@ func TestAccGrantsCatalog(t *testing.T) {
 	with := func(p kernel.Principal) *http.Request {
 		return r.WithContext(kernel.WithPrincipal(r.Context(), p))
 	}
-	catalog := types.RegistryGrant{Type: scopeRegistry, Name: "catalog", Actions: []string{"*"}}
+	catalog := kernel.RegistryGrant{Type: scopeRegistry, Name: "catalog", Actions: []string{"*"}}
 	for name, c := range map[string]struct {
 		r        *http.Request
 		expected bool
 	}{
 		"no principal":  {r, true},
 		"password":      {with(kernel.Principal{Name: "a"}), true},
-		"granted":       {with(kernel.Principal{Registry: &types.RegistryAccess{Grants: []types.RegistryGrant{catalog}}}), true},
-		"not granted":   {with(kernel.Principal{Registry: &types.RegistryAccess{}}), false},
-		"empty actions": {with(kernel.Principal{Registry: &types.RegistryAccess{Grants: []types.RegistryGrant{{Type: scopeRegistry, Name: "catalog"}}}}), false},
+		"granted":       {with(kernel.Principal{Registry: &kernel.RegistryAccess{Grants: []kernel.RegistryGrant{catalog}}}), true},
+		"not granted":   {with(kernel.Principal{Registry: &kernel.RegistryAccess{}}), false},
+		"empty actions": {with(kernel.Principal{Registry: &kernel.RegistryAccess{Grants: []kernel.RegistryGrant{{Type: scopeRegistry, Name: "catalog"}}}}), false},
 	} {
 		if got := GrantsCatalog(c.r); got != c.expected {
 			t.Errorf("%s: %v", name, got)

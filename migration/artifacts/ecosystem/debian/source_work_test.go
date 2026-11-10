@@ -16,9 +16,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	platformwork "github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
@@ -29,7 +30,7 @@ func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
 	}
 	entry := dpkgSourceIndexEntry(t)
 	const folder = "pool/main/a/alpha/"
-	var descriptor types.Item
+	var descriptor model.Item
 	for _, name := range []string{
 		"alpha_1.0-1.dsc", "alpha_1.0.orig.tar.gz", "alpha_1.0-1.debian.tar.xz",
 	} {
@@ -37,7 +38,7 @@ func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		it, err := st.Items().Put(t.Context(), types.Item{
+		it, err := st.Items().Put(t.Context(), model.Item{
 			RepoKey: c.Key, Name: folder + name, Size: int64(len(body)),
 			Actual: sourceTestChecksums(body),
 		})
@@ -48,7 +49,7 @@ func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
 			descriptor = it
 		}
 	}
-	if err := st.Items().SetProperties(t.Context(), descriptor.ID, types.Properties{
+	if err := st.Items().SetProperties(t.Context(), descriptor.ID, model.Properties{
 		"dsc.distribution": {"stable"}, "dsc.component": {"main"},
 	}, time.Time{}); err != nil {
 		t.Fatal(err)
@@ -56,18 +57,18 @@ func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
 	generated := map[string][]byte{}
 	env := format.Env{Store: st, Inspection: sourceInspection{
 		sha: descriptor.Actual.SHA256, path: descriptor.FullPath(), source: entry.Source,
-	}, Derive: func(_ context.Context, d format.Derived) (types.Item, error) {
+	}, Derive: func(_ context.Context, d format.Derived) (model.Item, error) {
 		body, err := io.ReadAll(d.Body)
 		if err != nil {
-			return types.Item{}, err
+			return model.Item{}, err
 		}
 		generated[d.Path] = body
-		return types.Item{}, nil
+		return model.Item{}, nil
 	}, Underive: func(_ context.Context, _ repo.Config, _ bool, path string) error {
 		delete(generated, path)
 		return nil
 	}}
-	work := types.WorkItem{Kind: KindIndex, Key: c.Key}
+	work := platformwork.WorkItem{Kind: KindIndex, Key: c.Key}
 	if err := (Handler{}).Work(t.Context(), env, work); err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +89,7 @@ func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
 		t.Fatal("source-only Release omits source architecture")
 	}
 	if err := (Handler{}).Work(t.Context(), env,
-		types.WorkItem{Kind: KindIndex, Key: "unknown-repository"}); err != nil {
+		platformwork.WorkItem{Kind: KindIndex, Key: "unknown-repository"}); err != nil {
 		t.Fatalf("work for removed repository: %v", err)
 	}
 	pairs := &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{}}
@@ -98,13 +99,13 @@ func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
 	if err := buildIndex(t.Context(), env, keyed); err == nil {
 		t.Fatal("source Release published without its configured signing key")
 	}
-	pairs.Keypairs["rsa-key"] = types.Keypair{Name: "rsa-key", Type: types.KeypairRSA}
+	pairs.Keypairs["rsa-key"] = accessapi.Keypair{Name: "rsa-key", Type: accessapi.KeypairRSA}
 	keyed.PrimaryKeyPairRef = "rsa-key"
 	if err := buildIndex(t.Context(), env, keyed); err == nil {
 		t.Fatal("source Release published with a non-GPG key")
 	}
-	pairs.Keypairs["invalid-gpg"] = types.Keypair{
-		Name: "invalid-gpg", Type: types.KeypairGPG, PrivateKey: "not a key",
+	pairs.Keypairs["invalid-gpg"] = accessapi.Keypair{
+		Name: "invalid-gpg", Type: accessapi.KeypairGPG, PrivateKey: "not a key",
 	}
 	keyed.PrimaryKeyPairRef = "invalid-gpg"
 	if err := buildIndex(t.Context(), env, keyed); err == nil {
@@ -114,8 +115,8 @@ func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pairs.Keypairs["source-gpg"] = types.Keypair{
-		Name: "source-gpg", Type: types.KeypairGPG, PrivateKey: key.Private,
+	pairs.Keypairs["source-gpg"] = accessapi.Keypair{
+		Name: "source-gpg", Type: accessapi.KeypairGPG, PrivateKey: key.Private,
 	}
 	keyed.PrimaryKeyPairRef = "source-gpg"
 	if err := buildIndex(t.Context(), env, keyed); err != nil {
@@ -125,17 +126,17 @@ func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
 		len(generated["dists/stable/Release.gpg"]) == 0 {
 		t.Fatal("signed source Release missing either apt signature")
 	}
-	env.Derive = func(context.Context, format.Derived) (types.Item, error) {
-		return types.Item{}, errors.New("publication refused")
+	env.Derive = func(context.Context, format.Derived) (model.Item, error) {
+		return model.Item{}, errors.New("publication refused")
 	}
 	if err := (Handler{}).Work(t.Context(), env, work); err == nil {
 		t.Fatal("derived metadata publication failure ignored")
 	}
-	env.Derive = func(_ context.Context, d format.Derived) (types.Item, error) {
-		return types.Item{}, nil
+	env.Derive = func(_ context.Context, d format.Derived) (model.Item, error) {
+		return model.Item{}, nil
 	}
 	stale := []byte("obsolete")
-	if _, err := st.Items().Put(t.Context(), types.Item{
+	if _, err := st.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key,
 		Name:    "dists/stable/old/Release", Size: int64(len(stale)),
 		Actual: sourceTestChecksums(stale),

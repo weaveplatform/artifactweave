@@ -14,10 +14,10 @@ import (
 	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (w *world) registerCacheMaintenance(sc *godog.ScenarioContext) {
@@ -61,7 +61,7 @@ func (w *world) agedCacheContent(remote, kind, path, body string) error {
 	if err != nil {
 		return err
 	}
-	token, err := st.RemoteCache().Begin(ctx, types.RemoteCacheKey{RepoKey: remote, Path: path})
+	token, err := st.RemoteCache().Begin(ctx, model.RemoteCacheKey{RepoKey: remote, Path: path})
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,7 @@ func (w *world) agedCacheContent(remote, kind, path, body string) error {
 		item.CacheUpload{
 			Token:  token,
 			Repo:   c,
-			Kind:   types.RemoteKind(kind),
+			Kind:   model.RemoteKind(kind),
 			Body:   strings.NewReader(body),
 			Length: int64(len(body)),
 		},
@@ -87,7 +87,7 @@ func (w *world) negativeCacheEntry(remote, path string) error {
 	}
 	defer func() { _ = st.Close() }()
 	ctx := context.Background()
-	token, err := st.RemoteCache().Begin(ctx, types.RemoteCacheKey{RepoKey: remote, Path: path})
+	token, err := st.RemoteCache().Begin(ctx, model.RemoteCacheKey{RepoKey: remote, Path: path})
 	if err != nil {
 		return err
 	}
@@ -101,11 +101,11 @@ func (w *world) expiredCacheMetadata(remote, path, body string) error {
 	}
 	defer func() { _ = st.Close() }()
 	ctx := context.Background()
-	e, err := st.RemoteCache().Read(ctx, types.RemoteCacheKey{RepoKey: remote, Path: path})
+	e, err := st.RemoteCache().Read(ctx, model.RemoteCacheKey{RepoKey: remote, Path: path})
 	if err != nil {
 		return err
 	}
-	if e.Kind != types.RemoteMetadata || !e.ValidatedAt.IsZero() {
+	if e.Kind != model.RemoteMetadata || !e.ValidatedAt.IsZero() {
 		return fmt.Errorf("metadata not expired: %+v", e)
 	}
 	r, _, err := svc.Blobs.Open(ctx, e.Blob.Checksums.SHA256)

@@ -14,7 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const remoteList = "/api/v3/collections/weave/sample/versions/"
@@ -186,7 +186,7 @@ func TestAccGalaxyNoStoreAndInvalidArchiveAreNeverCached(t *testing.T) {
 	if _, err := f.db.Items().
 		Get(t.Context(), c.Key, true, "collections/weave/sample/1.2.3/weave-sample-1.2.3.tar.gz"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("no-store archive published: %v", err)
 	}

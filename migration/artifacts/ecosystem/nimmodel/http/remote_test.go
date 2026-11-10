@@ -13,12 +13,15 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -28,8 +31,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -70,13 +71,13 @@ func newFixture(t *testing.T) *fixture {
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Permissions().Create(t.Context(), types.Permission{
-		Name: "nim-read", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					"reader": types.ActionRead, "nim-only": types.ActionRead,
+	if err := db.Permissions().Create(t.Context(), model.Permission{
+		Name: "nim-read", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{
+					"reader": api.ActionRead, "nim-only": api.ActionRead,
 				}},
-				Targets: map[string]types.Target{"nim-remote": {Include: []string{"**"}}},
+				Targets: map[string]model.Target{"nim-remote": {Include: []string{"**"}}},
 			},
 		},
 	}); err != nil {
@@ -104,7 +105,7 @@ func newFixture(t *testing.T) *fixture {
 	t.Cleanup(pool.Close)
 	svc := &source.Service{
 		HTTP: policy, Cache: policy,
-		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			return db.RemoteCache().Source(ctx, c.Key)
 		},
 	}
@@ -118,7 +119,7 @@ func newFixture(t *testing.T) *fixture {
 	}))
 	pkgroute.Mount(router, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 			body, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				t.Fatal(err)
@@ -244,7 +245,7 @@ func TestAccNIMDenialAndInvalidUpstreamDoNotPublish(t *testing.T) {
 		t.Fatalf("invalid metadata %d %s", rec.Code, rec.Body)
 	}
 	if _, err := f.store.Items().Get(t.Context(), "nim-remote", true,
-		"models/nim/meta/llama/1.3/.jfrog_nim_model_info.json"); !errors.Is(err, store.ErrNotFound) {
+		"models/nim/meta/llama/1.3/.jfrog_nim_model_info.json"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("malformed NIM metadata published an item: %v", err)
 	}
 	if rec := f.get(metadata, "denied"); rec.Code != http.StatusForbidden {
@@ -345,13 +346,13 @@ func TestAccNIMMetadataAndPairedDockerRegistryKeepSeparateAuthority(t *testing.T
 	if err := f.store.Repos().Create(t.Context(), dockerRepo); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.store.Permissions().Create(t.Context(), types.Permission{
-		Name: "nvcr-read", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					"reader": types.ActionRead, "docker-only": types.ActionRead,
+	if err := f.store.Permissions().Create(t.Context(), model.Permission{
+		Name: "nvcr-read", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{
+					"reader": api.ActionRead, "docker-only": api.ActionRead,
 				}},
-				Targets: map[string]types.Target{
+				Targets: map[string]model.Target{
 					"nvcr-remote": {Include: []string{"nim/meta/llama/**"}},
 				},
 			},
@@ -374,7 +375,7 @@ func TestAccNIMMetadataAndPairedDockerRegistryKeepSeparateAuthority(t *testing.T
 	content.Install()
 	registrySvc := &source.Service{
 		HTTP: content, Cache: content,
-		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			return f.store.RemoteCache().Source(ctx, c.Key)
 		},
 	}

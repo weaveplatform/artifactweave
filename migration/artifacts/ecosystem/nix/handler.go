@@ -14,10 +14,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // Handler is the format of Nix repositories, which the item service calls
@@ -157,7 +158,7 @@ func checkExisting(
 	in inspection,
 ) error {
 	old, err := env.Store.Items().Get(ctx, c.Key, w.Cached, w.Path)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -198,7 +199,7 @@ func (Handler) GuardWrite(
 	holder, now := rand.Text(), time.Now()
 	// Acquire and Release join the item transaction. PostgreSQL keeps the
 	// unique-index lock until commit even though no lease row survives it.
-	took, err := env.Leases.Acquire(ctx, types.Lease{
+	took, err := env.Leases.Acquire(ctx, work.Lease{
 		Name: name, Holder: holder, Task: "Nix publication", Acquired: now,
 		Expires: time.Unix(1, 0),
 	}, now)
@@ -225,22 +226,22 @@ func ReferencedArchive(
 	c repo.Config,
 	info Info,
 	cached bool,
-) (types.Item, error) {
+) (model.Item, error) {
 	it, err := env.Store.Items().Get(ctx, c.Key, cached, info.URL)
 	if err != nil {
-		return types.Item{}, fmt.Errorf("nix: archive item: %w", err)
+		return model.Item{}, fmt.Errorf("nix: archive item: %w", err)
 	}
 	if it.Folder || it.Size != info.FileSize || it.Actual.SHA256 != info.FileHash {
-		return types.Item{}, ErrInvalid
+		return model.Item{}, ErrInvalid
 	}
 	rc, bi, err := env.Blobs.Open(ctx, it.Actual.SHA256)
 	if err != nil {
-		return types.Item{}, fmt.Errorf("nix: archive blob: %w", err)
+		return model.Item{}, fmt.Errorf("nix: archive blob: %w", err)
 	}
 	defer rc.Close()
 	a, err := ReadArchive(rc, bi.Size, info.Compression)
 	if err != nil || !a.Matches(info) {
-		return types.Item{}, ErrInvalid
+		return model.Item{}, ErrInvalid
 	}
 	return it, nil
 }
@@ -248,7 +249,7 @@ func ReferencedArchive(
 // ReadInfo parses the narinfo stored as item it, against its full path, as
 // Parse does. A blob that cannot be opened or read is a wrapped error, and
 // content that does not parse is ErrInvalid.
-func ReadInfo(ctx context.Context, env format.Env, it types.Item) (Info, error) {
+func ReadInfo(ctx context.Context, env format.Env, it model.Item) (Info, error) {
 	rc, _, err := env.Blobs.Open(ctx, it.Actual.SHA256)
 	if err != nil {
 		return Info{}, fmt.Errorf("nix: open narinfo: %w", err)
@@ -268,7 +269,7 @@ func ReadInfo(ctx context.Context, env format.Env, it types.Item) (Info, error) 
 // rest of the store path's name, with the narinfo's Info as JSON metadata
 // and both items as its files. Folders are skipped, and nix-cache-info is
 // checked but not indexed.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder {
 		return nil
 	}
@@ -292,12 +293,12 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	// A copy or restore can bring metadata before its archive. Only publish a
 	// version after the pair verifies; an archive arrival visits metadata only,
 	// without decompressing unrelated NARs in the repository.
-	return visitInfo(ctx, env, c, func(meta types.Item, info Info) error {
+	return visitInfo(ctx, env, c, func(meta model.Item, info Info) error {
 		if meta.ID != it.ID && info.URL != it.FullPath() {
 			return nil
 		}
 		archive, err := ReferencedArchive(ctx, env, c, info, it.Cached)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			return nil
 		}
 		if err != nil {
@@ -305,7 +306,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 		}
 		name := strings.TrimPrefix(info.StorePath, "/nix/store/")[33:]
 		pkg, err := env.Store.Packages().
-			Ensure(ctx, types.Package{RepoKey: c.Key, Type: c.PackageType, Name: name, Created: meta.Created})
+			Ensure(ctx, model.Package{RepoKey: c.Key, Type: c.PackageType, Name: name, Created: meta.Created})
 		if err != nil {
 			return fmt.Errorf("nix: package: %w", err)
 		}
@@ -330,7 +331,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 
 // Deleted rebuilds the repository's index with Reindex, so a store path
 // whose narinfo or archive was removed leaves it.
-func (Handler) Deleted(ctx context.Context, env format.Env, c repo.Config, _ []types.Item) error {
+func (Handler) Deleted(ctx context.Context, env format.Env, c repo.Config, _ []model.Item) error {
 	return (Handler{}).Reindex(ctx, env, c)
 }
 
@@ -392,9 +393,9 @@ func (Handler) Classify(_ repo.Config, path string) format.Class {
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	byName := map[string]*pkgindex.Indexed{}
 	cached := c.Class == repo.Remote
-	err := visitInfo(ctx, env, c, func(it types.Item, info Info) error {
+	err := visitInfo(ctx, env, c, func(it model.Item, info Info) error {
 		archive, err := ReferencedArchive(ctx, env, c, info, cached)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			return nil
 		}
 		if err != nil {
@@ -440,9 +441,9 @@ func visitInfo(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	visit func(types.Item, Info) error,
+	visit func(model.Item, Info) error,
 ) error {
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		items, next, err := env.Store.Items().
 			Descendants(ctx, c.Key, c.Class == repo.Remote, "", page)

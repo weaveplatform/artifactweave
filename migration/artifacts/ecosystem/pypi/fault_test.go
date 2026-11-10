@@ -10,11 +10,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errFault = errors.New("injected fault")
@@ -43,17 +43,17 @@ type faulty struct {
 	f *faults
 }
 
-func (s *faulty) Packages() store.PackageStore { return faultyPackages{s.Store.Packages(), s.f} }
+func (s *faulty) Packages() port.PackageStore { return faultyPackages{s.Store.Packages(), s.f} }
 
-func (s *faulty) Items() store.ItemStore { return faultyItems{s.Store.Items(), s.f} }
+func (s *faulty) Items() port.ItemStore { return faultyItems{s.Store.Items(), s.f} }
 
 type faultyPackages struct {
-	store.PackageStore
+	port.PackageStore
 	f *faults
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Ensure(ctx context.Context, v types.Package) (types.Package, error) {
+func (p faultyPackages) Ensure(ctx context.Context, v model.Package) (model.Package, error) {
 	if p.f.fail("Ensure") {
 		return v, errFault
 	}
@@ -61,9 +61,9 @@ func (p faultyPackages) Ensure(ctx context.Context, v types.Package) (types.Pack
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Get(ctx context.Context, id int64) (types.Package, error) {
+func (p faultyPackages) Get(ctx context.Context, id int64) (model.Package, error) {
 	if p.f.fail("Get") {
-		return types.Package{}, errFault
+		return model.Package{}, errFault
 	}
 	return p.PackageStore.Get(ctx, id)
 }
@@ -73,15 +73,15 @@ func (p faultyPackages) Version(
 	ctx context.Context,
 	id int64,
 	v string,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	if p.f.fail("Version") {
-		return types.PackageVersion{}, errFault
+		return model.PackageVersion{}, errFault
 	}
 	return p.PackageStore.Version(ctx, id, v)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (p faultyPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if p.f.fail("Versions") {
 		return nil, errFault
 	}
@@ -89,9 +89,9 @@ func (p faultyPackages) Versions(ctx context.Context, id int64) ([]types.Package
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) VersionOf(ctx context.Context, id int64) (types.PackageVersion, error) {
+func (p faultyPackages) VersionOf(ctx context.Context, id int64) (model.PackageVersion, error) {
 	if p.f.fail("VersionOf") {
-		return types.PackageVersion{}, errFault
+		return model.PackageVersion{}, errFault
 	}
 	return p.PackageStore.VersionOf(ctx, id)
 }
@@ -99,8 +99,8 @@ func (p faultyPackages) VersionOf(ctx context.Context, id int64) (types.PackageV
 //nolint:wrapcheck // test double
 func (p faultyPackages) PutVersion(
 	ctx context.Context,
-	v types.PackageVersion,
-) (types.PackageVersion, error) {
+	v model.PackageVersion,
+) (model.PackageVersion, error) {
 	if p.f.fail("PutVersion") {
 		return v, errFault
 	}
@@ -132,20 +132,20 @@ func (p faultyPackages) Files(ctx context.Context, id int64) ([]int64, error) {
 }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	f *faults
 }
 
 //nolint:wrapcheck // test double
-func (i faultyItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
+func (i faultyItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
 	if i.f.fail("GetByID") {
-		return types.Item{}, errFault
+		return model.Item{}, errFault
 	}
 	return i.ItemStore.GetByID(ctx, id)
 }
 
 //nolint:wrapcheck // test double
-func (i faultyItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (i faultyItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if i.f.fail("Properties") {
 		return nil, errFault
 	}
@@ -156,7 +156,7 @@ func (i faultyItems) Properties(ctx context.Context, id int64) (types.Properties
 func (i faultyItems) PatchProperties(
 	ctx context.Context,
 	id int64,
-	set types.Properties,
+	set model.Properties,
 	remove []string,
 	at time.Time,
 ) error {
@@ -206,13 +206,13 @@ func scenario(w *world) error {
 	whl, tgz := "x/1.0/"+wheelName("x", "1.0"), "x/1.0/x-1.0.tar.gz"
 	x, y := meta("x", "1.0", "Summary: x"), meta("y", "1.0")
 	bin := trash.Service{Store: w.st, Items: w.items, Now: func() time.Time { return w.now }}
-	step := func(p string, body []byte, props types.Properties) func() error {
+	step := func(p string, body []byte, props model.Properties) func() error {
 		return func() error {
 			_, err := w.tryDeploy(w.c, p, body, props)
 			return err
 		}
 	}
-	annotate := func(p string, set types.Properties, remove ...string) func() error {
+	annotate := func(p string, set model.Properties, remove ...string) func() error {
 		return func() error {
 			it, err := w.st.Items().Get(w.ctx, w.c.Key, false, p)
 			if err != nil {
@@ -228,15 +228,15 @@ func scenario(w *world) error {
 		}
 	}
 	for _, s := range []func() error{
-		step(whl, wheel("x", "1.0", x), types.Properties{pypi.PropYanked: {"true"}}),
+		step(whl, wheel("x", "1.0", x), model.Properties{pypi.PropYanked: {"true"}}),
 		step(tgz, sdist("x", "1.0", x), nil),
 		step("y/"+wheelName("x", "1.0"), wheel("x", "1.0", x), nil),
-		annotate(whl, types.Properties{pypi.PropYanked: {"reason"}}),
-		step(tgz, sdist("y", "1.0", y), types.Properties{pypi.PropSummary: {"stale"}}),
-		step("m/m.zip", []byte("x"), types.Properties{
+		annotate(whl, model.Properties{pypi.PropYanked: {"reason"}}),
+		step(tgz, sdist("y", "1.0", y), model.Properties{pypi.PropSummary: {"stale"}}),
+		step("m/m.zip", []byte("x"), model.Properties{
 			pypi.PropName: {"m"}, pypi.PropVersion: {"1"},
 		}),
-		annotate("m/m.zip", types.Properties{pypi.PropVersion: {"2"}}),
+		annotate("m/m.zip", model.Properties{pypi.PropVersion: {"2"}}),
 		annotate("m/m.zip", nil, pypi.PropName),
 		step(tgz, []byte("unreadable"), nil),
 		remove("y/" + wheelName("x", "1.0")),
@@ -318,7 +318,7 @@ func TestUnitCorruptMetadata(t *testing.T) {
 		},
 		"a yank": func() error {
 			return w.items.Annotate(w.ctx, w.c, w.item(whl), //nolint:wrapcheck // test
-				types.Properties{pypi.PropYanked: {"true"}}, nil)
+				model.Properties{pypi.PropYanked: {"true"}}, nil)
 		},
 		"a delete": func() error {
 			_, err := w.items.Delete(w.ctx, item.Target{Repo: w.c, Path: tgz}, "tester")
@@ -343,7 +343,7 @@ func TestUnitCorruptMetadata(t *testing.T) {
 	// indexes the file again by the properties its deploy set, and a
 	// reindex brings its core metadata back.
 	w.corrupt("x", "1.0", []byte(`{"files":[]}`))
-	w.annotate(whl, types.Properties{pypi.PropYanked: {"true"}})
+	w.annotate(whl, model.Properties{pypi.PropYanked: {"true"}})
 	if m := w.index()["x"]["1.0"]; len(m.Files) != 1 || !m.Files[0].Yanked ||
 		m.Files[0].Metadata != "" {
 		t.Fatalf("after the yank: %+v", m)
@@ -364,10 +364,10 @@ type changing struct {
 	searches *int
 }
 
-func (s changing) Items() store.ItemStore { return changingItems{s.Store.Items(), s.searches} }
+func (s changing) Items() port.ItemStore { return changingItems{s.Store.Items(), s.searches} }
 
 type changingItems struct {
-	store.ItemStore
+	port.ItemStore
 	searches *int
 }
 

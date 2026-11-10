@@ -13,11 +13,10 @@ import (
 	"testing"
 
 	baseformat "github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitRemoteBatchRejectsInvalidMetadata(t *testing.T) {
@@ -182,20 +181,20 @@ func TestUnitCachedObjectIdentityRequiresDigestAndSize(t *testing.T) {
 		result source.Result
 		valid  bool
 	}{
-		{name: "matching cached item", result: source.Result{Item: &types.Item{
-			Size: 5, Actual: types.Checksums{SHA256: oid},
+		{name: "matching cached item", result: source.Result{Item: &model.Item{
+			Size: 5, Actual: kernel.Checksums{SHA256: oid},
 		}}, valid: true},
-		{name: "wrong cached digest", result: source.Result{Item: &types.Item{
-			Size: 5, Actual: types.Checksums{SHA256: strings.Repeat("b", 64)},
+		{name: "wrong cached digest", result: source.Result{Item: &model.Item{
+			Size: 5, Actual: kernel.Checksums{SHA256: strings.Repeat("b", 64)},
 		}}},
-		{name: "folder masquerading as object", result: source.Result{Item: &types.Item{
-			Folder: true, Size: 5, Actual: types.Checksums{SHA256: oid},
+		{name: "folder masquerading as object", result: source.Result{Item: &model.Item{
+			Folder: true, Size: 5, Actual: kernel.Checksums{SHA256: oid},
 		}}},
 		{name: "wrong stream size", result: source.Result{Stream: &source.Stream{
-			Size: 4, Checksums: types.Checksums{SHA256: oid},
+			Size: 4, Checksums: kernel.Checksums{SHA256: oid},
 		}}},
 		{name: "matching stream", result: source.Result{Stream: &source.Stream{
-			Size: 5, Checksums: types.Checksums{SHA256: oid},
+			Size: 5, Checksums: kernel.Checksums{SHA256: oid},
 		}}, valid: true},
 		{name: "missing source", result: source.Result{}},
 	} {
@@ -246,8 +245,8 @@ func TestUnitBatchErrorStatusPreservesClientMeaning(t *testing.T) {
 		{name: "permission denied", err: kernel.ErrForbidden, expected: http.StatusForbidden},
 		{name: "source denied", err: source.ErrDenied, expected: http.StatusForbidden},
 		{name: "authentication required", err: kernel.ErrUnauthenticated, expected: http.StatusUnauthorized},
-		{name: "missing object", err: store.ErrNotFound, expected: http.StatusNotFound},
-		{name: "conflicting object", err: store.ErrConflict, expected: http.StatusConflict},
+		{name: "missing object", err: kernel.ErrNotFound, expected: http.StatusNotFound},
+		{name: "conflicting object", err: kernel.ErrConflict, expected: http.StatusConflict},
 		{name: "upstream fault", err: errors.New("upstream fault"), expected: http.StatusBadGateway},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

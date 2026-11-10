@@ -22,8 +22,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const rpmMetadataLimit = 36 << 20
@@ -79,7 +77,8 @@ func (s RPMAPI) serveVirtualRPMMetadata(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.Folder(c, req.Path, types.ActionRead) || !acc.File(c, req.Path, types.ActionRead) ||
+	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
+		!acc.File(c, req.Path, accessapi.ActionRead) ||
 		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
@@ -125,7 +124,7 @@ func signVirtualRPM(
 	if err != nil {
 		return fmt.Errorf("rpm: virtual signing key: %w", err)
 	}
-	if pair.Type != types.KeypairGPG {
+	if pair.Type != accessapi.KeypairGPG {
 		return errRPMVirtualKey
 	}
 	sig, err := rpm.SignRepomd(files["repodata/repomd.xml"], pair.PrivateKey, pair.Passphrase)
@@ -145,7 +144,8 @@ func (s RPMAPI) serveVirtualRPMPackage(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.Folder(c, req.Path, types.ActionRead) || !acc.File(c, req.Path, types.ActionRead) ||
+	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
+		!acc.File(c, req.Path, accessapi.ActionRead) ||
 		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
@@ -264,7 +264,7 @@ func (s RPMAPI) rpmCandidates(
 	indexPath := root + "repodata/repomd.xml"
 	for _, key := range c.Repositories {
 		member, err := st.Repos().Get(ctx, key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -273,8 +273,8 @@ func (s RPMAPI) rpmCandidates(
 		if member.PackageType != repo.RPM {
 			return nil, fmt.Errorf("%w: %s", errRPMMemberType, key)
 		}
-		if !acc.Folder(member, indexPath, types.ActionRead) ||
-			!acc.File(member, indexPath, types.ActionRead) ||
+		if !acc.Folder(member, indexPath, accessapi.ActionRead) ||
+			!acc.File(member, indexPath, accessapi.ActionRead) ||
 			generic.CheckDownload(member, indexPath, false) != nil {
 			continue
 		}
@@ -288,15 +288,15 @@ func (s RPMAPI) rpmCandidates(
 				entries = append(entries, rpmCandidate{repo: member, pkg: pkg})
 			}
 		}
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
 			return nil, fmt.Errorf("rpm: member %s index: %w", key, err)
 		}
 		for _, entry := range entries {
-			if selected[entry.pkg.Path] || !acc.File(c, entry.pkg.Path, types.ActionRead) ||
-				!acc.File(entry.repo, entry.pkg.Path, types.ActionRead) ||
+			if selected[entry.pkg.Path] || !acc.File(c, entry.pkg.Path, accessapi.ActionRead) ||
+				!acc.File(entry.repo, entry.pkg.Path, accessapi.ActionRead) ||
 				generic.CheckDownload(c, entry.pkg.Path, false) != nil ||
 				generic.CheckDownload(entry.repo, entry.pkg.Path, false) != nil {
 				continue
@@ -320,9 +320,9 @@ func (s RPMAPI) rpmMemberPackages(
 	if err != nil {
 		return nil, fmt.Errorf("rpm: parse member repomd: %w", err)
 	}
-	if !acc.File(c, primaryPath, types.ActionRead) ||
+	if !acc.File(c, primaryPath, accessapi.ActionRead) ||
 		generic.CheckDownload(c, primaryPath, false) != nil {
-		return nil, store.ErrNotFound
+		return nil, kernel.ErrNotFound
 	}
 	primary, err := s.rpmMemberBytes(ctx, st, c, primaryPath, p, acc)
 	if err != nil {
@@ -397,14 +397,14 @@ func (s RPMAPI) rpmMemberBytes(
 		return body, nil
 	}
 	if c.Class != repo.Local && c.Class != repo.Federated {
-		return nil, store.ErrNotFound
+		return nil, kernel.ErrNotFound
 	}
 	it, err := st.Items().Get(ctx, c.Key, false, path)
 	if err != nil {
 		return nil, fmt.Errorf("rpm: member metadata item: %w", err)
 	}
 	if it.Folder {
-		return nil, store.ErrNotFound
+		return nil, kernel.ErrNotFound
 	}
 	return s.rpmBlob(ctx, it.Actual.SHA256)
 }

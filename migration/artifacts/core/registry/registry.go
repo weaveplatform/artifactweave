@@ -14,11 +14,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Backend names registry sessions in the uploads table, so the garbage
@@ -112,7 +113,7 @@ func (s *Service) Begin(ctx context.Context, o Owner) (string, error) {
 	id, err := blob.NewUploadID()
 	if err == nil {
 		now := s.now()
-		err = s.save(ctx, store.Upload{
+		err = s.save(ctx, session.Upload{
 			ID: id, Backend: Backend, RepoKey: o.Repo.Key, Path: o.Name,
 			Started: now, Updated: now,
 		}, state{Name: o.Name, By: o.By, Blob: up.ID()})
@@ -124,7 +125,7 @@ func (s *Service) Begin(ctx context.Context, o Owner) (string, error) {
 	return id, nil
 }
 
-func (s *Service) save(ctx context.Context, u store.Upload, st state) error {
+func (s *Service) save(ctx context.Context, u session.Upload, st state) error {
 	raw, err := json.Marshal(st)
 	if err != nil {
 		return fmt.Errorf("registry: encode session: %w", err)
@@ -143,12 +144,12 @@ func (s *Service) open(
 	ctx context.Context,
 	o Owner,
 	id string,
-) (store.Upload, blob.Upload, error) {
+) (session.Upload, blob.Upload, error) {
 	if !blob.ValidUploadID(id) {
-		return store.Upload{}, nil, ErrUnknown
+		return session.Upload{}, nil, ErrUnknown
 	}
 	u, err := s.Store.Uploads().Get(ctx, id)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return u, nil, ErrUnknown
 	}
 	if err != nil {
@@ -172,7 +173,7 @@ func (s *Service) open(
 
 func (s *Service) forget(ctx context.Context, id string) error {
 	err := s.Store.Uploads().Delete(ctx, id)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		return fmt.Errorf("registry: drop session %s: %w", id, err)
 	}
 	return nil
@@ -216,7 +217,7 @@ func (s *Service) Append(
 // being reaped.
 func (s *Service) appendTo(
 	ctx context.Context,
-	u store.Upload,
+	u session.Upload,
 	up blob.Upload,
 	offset int64,
 	body io.Reader,
@@ -244,22 +245,22 @@ func (s *Service) Finish(
 	offset int64,
 	body io.Reader,
 	hex string,
-) (types.Item, error) {
+) (model.Item, error) {
 	defer s.lock(id)()
 	u, up, err := s.open(ctx, o, id)
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	if err := s.appendTo(ctx, u, up, offset, body); err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	info, err := up.Commit(ctx, blob.Digests{SHA256: hex})
 	if errors.Is(err, blob.ErrDigestMismatch) {
 		// The blob store aborted the upload; the session goes with it.
-		return types.Item{}, errors.Join(ErrDigest, s.forget(ctx, id))
+		return model.Item{}, errors.Join(ErrDigest, s.forget(ctx, id))
 	}
 	if err != nil {
-		return types.Item{}, fmt.Errorf("registry: commit session %s: %w", id, err)
+		return model.Item{}, fmt.Errorf("registry: commit session %s: %w", id, err)
 	}
 	// The upload is committed and cannot be resumed, so the session ends
 	// whether or not the item is stored; content left unreferenced is
@@ -288,14 +289,14 @@ func (s *Service) Upload(
 	o Owner,
 	body io.Reader,
 	hex string,
-) (types.Item, error) {
+) (model.Item, error) {
 	up, err := s.Blobs.BeginUpload(ctx, blob.WithExpectedSHA256(hex))
 	if err != nil {
-		return types.Item{}, fmt.Errorf("registry: begin upload: %w", err)
+		return model.Item{}, fmt.Errorf("registry: begin upload: %w", err)
 	}
 	info, err := commit(ctx, up, body, hex)
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	return s.store(ctx, o, hex, info)
 }
@@ -324,10 +325,10 @@ func (s *Service) store(
 	o Owner,
 	hex string,
 	info blob.Info,
-) (types.Item, error) {
+) (model.Item, error) {
 	it, err := s.items().DeployCommitted(ctx, uploadDeploy(o, hex), info)
 	if err != nil {
-		return types.Item{}, fmt.Errorf("registry: store upload: %w", err)
+		return model.Item{}, fmt.Errorf("registry: store upload: %w", err)
 	}
 	return it, nil
 }
@@ -337,7 +338,7 @@ func (s *Service) store(
 func uploadDeploy(o Owner, hex string) item.Deploy {
 	return item.Deploy{
 		Target:   item.Target{Repo: o.Repo, Path: layout.UploadPath(o.Name, hex)},
-		Declared: types.Checksums{SHA256: hex}, By: o.By, Trusted: true,
+		Declared: kernel.Checksums{SHA256: hex}, By: o.By, Trusted: true,
 	}
 }
 
@@ -351,27 +352,27 @@ func (s *Service) Mount(
 	o Owner,
 	src repo.Config,
 	srcName, hex string,
-) (types.Item, bool, error) {
+) (model.Item, bool, error) {
 	_, err := layout.FindBlob(ctx, s.Store.Items(), src.Key, srcName, hex)
-	if errors.Is(err, store.ErrNotFound) {
-		return types.Item{}, false, nil
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.Item{}, false, nil
 	}
 	if err != nil {
-		return types.Item{}, false, err //nolint:wrapcheck // the layout names itself
+		return model.Item{}, false, err //nolint:wrapcheck // the layout names itself
 	}
 	it, err := s.items().DeployByChecksum(ctx, uploadDeploy(o, hex))
 	if errors.Is(err, item.ErrNoBlob) {
-		return types.Item{}, false, nil
+		return model.Item{}, false, nil
 	}
 	if err != nil {
-		return types.Item{}, false, fmt.Errorf("registry: mount: %w", err)
+		return model.Item{}, false, fmt.Errorf("registry: mount: %w", err)
 	}
 	return it, true, nil
 }
 
 // Reap discards a stale session for the garbage collector: its blob store
 // upload, when that still exists, then its row.
-func (s *Service) Reap(ctx context.Context, u store.Upload) error {
+func (s *Service) Reap(ctx context.Context, u session.Upload) error {
 	var st state
 	if json.Unmarshal(u.State, &st) == nil && st.Blob != "" {
 		if up, err := s.Blobs.ResumeUpload(ctx, st.Blob); err == nil {
@@ -392,7 +393,7 @@ const expirePage = 500
 // folder, so an upload no manifest took by then was abandoned (decision
 // 0031). They bypass the trash can: nobody deployed them as files.
 func (s *Service) ExpireUploads(ctx context.Context, before time.Time) (int, error) {
-	all, err := s.Store.Repos().List(ctx, store.RepoFilter{})
+	all, err := s.Store.Repos().List(ctx, port.RepoFilter{})
 	if err != nil {
 		return 0, fmt.Errorf("registry: list repositories: %w", err)
 	}
@@ -429,7 +430,7 @@ func (s *Service) ExpireUploads(ctx context.Context, before time.Time) (int, err
 			it := h.Item
 			_, err := s.items().
 				Purge(ctx, item.Target{Repo: configs[it.RepoKey], Path: it.FullPath()})
-			if err != nil && !errors.Is(err, store.ErrNotFound) {
+			if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 				return removed, fmt.Errorf("registry: expire %s: %w", it.FullPath(), err)
 			}
 			removed++

@@ -7,7 +7,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -21,7 +21,7 @@ func newNPMStatusWorld(t *testing.T, anonymous bool) npmStatusWorld {
 	h, _, tokens := npmServer(t, func(cfg *harness.Config) {
 		if anonymous {
 			if err := cfg.Store.Settings().
-				Put(t.Context(), types.SettingAnonymousAccess, true); err != nil {
+				Put(t.Context(), settings.SettingAnonymousAccess, true); err != nil {
 				t.Fatal(err)
 			}
 		}

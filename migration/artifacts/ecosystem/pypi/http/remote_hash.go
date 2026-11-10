@@ -18,8 +18,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var hashNames = []string{"sha512", "sha384", "sha256", "sha224", "blake2b_256", "sha1", "md5"}
@@ -56,8 +56,8 @@ func validateHashes(hashes map[string]string) error {
 	return nil
 }
 
-func checksumPins(hashes map[string]string) types.Checksums {
-	return types.Checksums{
+func checksumPins(hashes map[string]string) kernel.Checksums {
+	return kernel.Checksums{
 		MD5:    strings.ToLower(hashes["md5"]),
 		SHA1:   strings.ToLower(hashes["sha1"]),
 		SHA256: strings.ToLower(hashes["sha256"]),

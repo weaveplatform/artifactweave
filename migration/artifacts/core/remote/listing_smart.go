@@ -8,7 +8,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func parseSmartListing(ctx context.Context, r io.Reader, key, folder string) (listingPage, error) {
@@ -26,7 +27,7 @@ func parseSmartListing(ctx context.Context, r io.Reader, key, folder string) (li
 	if json.Unmarshal(raw["repo"], &reportedRepo) != nil ||
 		json.Unmarshal(raw["path"], &reportedPath) != nil ||
 		json.Unmarshal(raw["children"], &children) != nil || children == nil ||
-		(reportedRepo != key && reportedRepo != key+types.CacheSuffix) ||
+		(reportedRepo != key && reportedRepo != key+model.CacheSuffix) ||
 		reportedPath != "/"+folder || len(children) > 10000 {
 		return page, listingError()
 	}
@@ -46,7 +47,7 @@ func parseSmartListing(ctx context.Context, r io.Reader, key, folder string) (li
 			strings.IndexFunc(name, unicode.IsControl) >= 0 {
 			continue
 		}
-		if _, _, _, err = types.SplitItemPath(name); err != nil || name == "" {
+		if _, _, _, err = kernel.SplitItemPath(name); err != nil || name == "" {
 			continue
 		}
 		childPath := name

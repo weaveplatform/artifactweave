@@ -10,9 +10,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Handler is the format of Hex repositories, which the item service calls
@@ -99,7 +99,7 @@ func (Handler) Admit(
 // into the package index. Folders and other paths are not indexed. A
 // tarball that no longer validates at its path fails the hook, which rolls
 // the change back.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || !IsTarballPath(it.FullPath()) {
 		return nil
 	}
@@ -125,7 +125,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	if err != nil {
 		return err
 	}
-	by := map[string]map[string][]types.Item{}
+	by := map[string]map[string][]model.Item{}
 	for _, it := range items {
 		if !IsTarballPath(it.FullPath()) {
 			continue
@@ -135,7 +135,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 			return err
 		}
 		if by[p.Name] == nil {
-			by[p.Name] = map[string][]types.Item{}
+			by[p.Name] = map[string][]model.Item{}
 		}
 		by[p.Name][p.Version] = append(by[p.Name][p.Version], it)
 	}
@@ -212,7 +212,7 @@ func stored(ctx context.Context, blobs format.Blobs, sha, p string) (Package, er
 // Files lists the files repository c's package index reads
 // (pkgindex.Stored): a remote's cached files, or a hosted repository's
 // own, in no promised order. A search failure is returned wrapped.
-func Files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, error) {
+func Files(ctx context.Context, st format.Store, c repo.Config) ([]model.Item, error) {
 	hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
@@ -220,7 +220,7 @@ func Files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, e
 	if err != nil {
 		return nil, fmt.Errorf("hex: list files: %w", err)
 	}
-	out := make([]types.Item, 0, len(hits))
+	out := make([]model.Item, 0, len(hits))
 	for _, h := range hits {
 		out = append(out, h.Item)
 	}

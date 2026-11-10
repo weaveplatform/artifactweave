@@ -13,13 +13,14 @@ import (
 
 	"golang.org/x/net/idna"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	tf "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type providerOp struct {
@@ -104,10 +105,10 @@ func validHostname(s string) bool {
 type providerVersion struct {
 	version                   string
 	archives                  []providerArchive
-	sums, signature, manifest types.Item
+	sums, signature, manifest model.Item
 }
 type providerArchive struct {
-	item         types.Item
+	item         model.Item
 	os, arch, h1 string
 }
 
@@ -125,7 +126,7 @@ func (h handler) provider(w http.ResponseWriter, r *http.Request, q providerOp) 
 		return
 	}
 	// Indexed provider paths can have arbitrary folders before the namespace.
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	vs, err := h.providerVersions(r, q.name, q.isMirror, q.isList || q.isMirror)
@@ -164,7 +165,7 @@ func (h handler) providerVersions(
 ) ([]providerVersion, error) {
 	db, ctx := h.k.DB(), r.Context()
 	p, err := db.Packages().Find(ctx, pkgroute.RequestFrom(r).Repo.Key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil, missing()
 	}
 	if err != nil {
@@ -190,7 +191,7 @@ func (h handler) providerVersions(
 		v := providerVersion{version: pv.Version}
 		for _, id := range ids {
 			it, err := db.Items().GetByID(ctx, id)
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, kernel.ErrNotFound) {
 				continue
 			}
 			if err != nil {
@@ -199,7 +200,7 @@ func (h handler) providerVersions(
 			f, ok := tf.ParseProviderPackageFile(it.FullPath())
 			if !ok || it.Folder ||
 				(filter && f.Kind == tf.KindArchive || f.Kind == tf.KindManifest) &&
-					!h.k.Can(r, it.FullPath(), types.ActionRead) {
+					!h.k.Can(r, it.FullPath(), api.ActionRead) {
 				continue
 			}
 			switch f.Kind {
@@ -294,7 +295,7 @@ func (h handler) mirrorVersion(w http.ResponseWriter, r *http.Request, v provide
 	writeJSON(w, r, map[string]any{"archives": archives})
 }
 
-func (h handler) read(r *http.Request, it types.Item) ([]byte, error) {
+func (h handler) read(r *http.Request, it model.Item) ([]byte, error) {
 	b, _, err := h.k.Blobs().Open(r.Context(), it.Actual.SHA256)
 	if err != nil {
 		return nil, fmt.Errorf("terraform: read %s: %w", it.FullPath(), err)
@@ -307,7 +308,7 @@ func (h handler) read(r *http.Request, it types.Item) ([]byte, error) {
 	return data, nil
 }
 
-func (h handler) protocols(r *http.Request, it types.Item) ([]string, error) {
+func (h handler) protocols(r *http.Request, it model.Item) ([]string, error) {
 	fallback := []string{"5.0"}
 	if it.ID == 0 {
 		return fallback, nil
@@ -359,7 +360,7 @@ func (h handler) providerKeys(r *http.Request) ([]publicKey, error) {
 			continue
 		}
 		k, err := h.o.KeyPairs.Keypair(r.Context(), name)
-		if errors.Is(err, store.ErrNotFound) || err == nil && k.Type != types.KeypairGPG {
+		if errors.Is(err, kernel.ErrNotFound) || err == nil && k.Type != api.KeypairGPG {
 			if i == 0 {
 				return keys, nil
 			}
@@ -383,8 +384,8 @@ func (h handler) providerDownload(
 	v providerVersion,
 	a providerArchive,
 ) {
-	for _, it := range []types.Item{a.item, v.sums, v.signature} {
-		if !h.k.Require(w, r, it.FullPath(), types.ActionRead) {
+	for _, it := range []model.Item{a.item, v.sums, v.signature} {
+		if !h.k.Require(w, r, it.FullPath(), api.ActionRead) {
 			return
 		}
 	}
@@ -429,7 +430,7 @@ func (h handler) providerDownload(
 		return
 	}
 	urls := []string{}
-	for _, it := range []types.Item{a.item, v.sums, v.signature} {
+	for _, it := range []model.Item{a.item, v.sums, v.signature} {
 		u, err := h.downloadURL(r, it)
 		if err != nil {
 			h.k.Error(w, r, err)
@@ -454,7 +455,7 @@ func (h handler) providerDownload(
 	)
 }
 
-func (h handler) archiveH1(r *http.Request, it types.Item) (string, error) {
+func (h handler) archiveH1(r *http.Request, it model.Item) (string, error) {
 	b, info, err := h.k.Blobs().Open(r.Context(), it.Actual.SHA256)
 	if err != nil {
 		return "", fmt.Errorf("terraform: open archive: %w", err)

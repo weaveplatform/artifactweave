@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -27,8 +28,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const debianSnapshotKind = "debian-snapshot"
@@ -88,7 +87,7 @@ func (s DebianAPI) CreateDebianSnapshot(
 			return nil, s.InternalError(ctx, "Debian snapshot request", err)
 		}
 		key := job.Target + "/" + job.Tag
-		if len(key) > store.MaxWorkKey {
+		if len(key) > work.MaxWorkKey {
 			return nil, httpkit.BadRequestf("Debian snapshot key is too long")
 		}
 		if err := s.Work.Enqueue(ctx, debianSnapshotKind, key, payload); err != nil {
@@ -129,10 +128,10 @@ func claimDebianSnapshot(
 			}
 			return apierror.New(http.StatusConflict, "Debian snapshot already exists")
 		}
-		if !errors.Is(err, store.ErrNotFound) {
+		if !errors.Is(err, kernel.ErrNotFound) {
 			return fmt.Errorf("snapshot claim lookup: %w", err)
 		}
-		marker, err = st.Items().Put(ctx, types.Item{
+		marker, err = st.Items().Put(ctx, model.Item{
 			RepoKey: job.Target, Name: snapshotRoot(job), Folder: true,
 			Created: time.Now().UTC(), CreatedBy: p.Name,
 		})
@@ -140,7 +139,7 @@ func claimDebianSnapshot(
 			return fmt.Errorf("snapshot claim folder: %w", err)
 		}
 		if err := st.Items().SetProperties(ctx, marker.ID,
-			types.Properties{
+			model.Properties{
 				"deb.snapshot.pending.source":       {job.Source},
 				"deb.snapshot.pending.distribution": {job.Distribution},
 			}, time.Now().UTC()); err != nil {
@@ -158,14 +157,14 @@ func snapshotRepos(
 	p kernel.Principal, acc itemkit.Access,
 ) (repo.Config, repo.Config, error) {
 	sourceRepo, err := st.Repos().Get(ctx, job.Source)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return repo.Config{}, repo.Config{}, itemkit.NotFoundRepo(job.Source)
 	}
 	if err != nil {
 		return repo.Config{}, repo.Config{}, fmt.Errorf("snapshot source repository: %w", err)
 	}
 	targetRepo, err := st.Repos().Get(ctx, job.Target)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return repo.Config{}, repo.Config{}, itemkit.NotFoundRepo(job.Target)
 	}
 	if err != nil {
@@ -178,8 +177,8 @@ func snapshotRepos(
 			"Debian snapshots require a Debian source and local Debian target",
 		)
 	}
-	if !acc.File(sourceRepo, "dists/"+job.Distribution+"/Release", types.ActionRead) ||
-		!acc.File(targetRepo, snapshotRoot(job), types.ActionWrite|types.ActionManage) {
+	if !acc.File(sourceRepo, "dists/"+job.Distribution+"/Release", accessapi.ActionRead) ||
+		!acc.File(targetRepo, snapshotRoot(job), accessapi.ActionWrite|accessapi.ActionManage) {
 		return repo.Config{}, repo.Config{}, httpkit.Denied(p)
 	}
 	return sourceRepo, targetRepo, nil
@@ -199,7 +198,7 @@ func snapshotSourceClass(c repo.Class) bool {
 // the job is refused for good.
 func RegisterDebianSnapshotWork(q *work.Queue, k *itemkit.Kit) error {
 	s := DebianAPI{k}
-	err := q.Handle(debianSnapshotKind, func(ctx context.Context, it types.WorkItem) error {
+	err := q.Handle(debianSnapshotKind, func(ctx context.Context, it work.WorkItem) error {
 		var job debianSnapshotRequest
 		if err := json.Unmarshal(it.Payload, &job); err != nil ||
 			!debianSnapshotSegment.MatchString(job.Tag) ||
@@ -262,7 +261,7 @@ func (s DebianAPI) createDebianSnapshot(
 			props["deb.snapshot.pending.distribution"][0] != job.Distribution {
 			return apierror.New(http.StatusConflict, "Debian snapshot claim changed")
 		}
-	} else if !errors.Is(err, store.ErrNotFound) {
+	} else if !errors.Is(err, kernel.ErrNotFound) {
 		return fmt.Errorf("snapshot marker lookup: %w", err)
 	}
 	files, err := s.debianSnapshotFiles(ctx, st, sourceRepo, job.Distribution, p, acc)
@@ -275,7 +274,7 @@ func (s DebianAPI) createDebianSnapshot(
 	}
 	slices.Sort(paths)
 	for _, name := range paths {
-		if !acc.File(targetRepo, root+"/"+name, types.ActionWrite) {
+		if !acc.File(targetRepo, root+"/"+name, accessapi.ActionWrite) {
 			return httpkit.Denied(p)
 		}
 		_, err := s.Items(st).Deploy(debian.WithSnapshotWrite(ctx), item.Deploy{
@@ -286,7 +285,7 @@ func (s DebianAPI) createDebianSnapshot(
 			return fmt.Errorf("snapshot metadata %s: %w", name, err)
 		}
 	}
-	marker, err := st.Items().Put(ctx, types.Item{
+	marker, err := st.Items().Put(ctx, model.Item{
 		RepoKey: targetRepo.Key, Name: root, Folder: true,
 		Created: time.Now().UTC(), CreatedBy: p.Name,
 	})
@@ -294,7 +293,7 @@ func (s DebianAPI) createDebianSnapshot(
 		return fmt.Errorf("snapshot marker: %w", err)
 	}
 	if err := st.Items().SetProperties(ctx, marker.ID,
-		types.Properties{
+		model.Properties{
 			"deb.snapshot.source":       {sourceRepo.Key},
 			"deb.snapshot.distribution": {job.Distribution},
 		}, time.Now().UTC()); err != nil {
@@ -340,7 +339,7 @@ func (s DebianAPI) debianSnapshotFiles(
 				return nil, err
 			}
 			for _, artifact := range paths {
-				if !acc.File(c, artifact, types.ActionRead) ||
+				if !acc.File(c, artifact, accessapi.ActionRead) ||
 					generic.CheckDownload(c, artifact, false) != nil {
 					return nil, httpkit.Denied(p)
 				}
@@ -360,7 +359,7 @@ func (s DebianAPI) debianSnapshotFiles(
 	}
 	for _, suffix := range []string{"InRelease", "Release.gpg"} {
 		body, _, err := s.debianMemberBytes(ctx, st, c, base+suffix, p, acc)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -428,8 +427,8 @@ func (s DebianAPI) getDebianSnapshot(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.File(c, root+"/"+rel, types.ActionRead) ||
-		!acc.File(sourceRepo, rel, types.ActionRead) {
+	if !acc.File(c, root+"/"+rel, accessapi.ActionRead) ||
+		!acc.File(sourceRepo, rel, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -456,7 +455,7 @@ func (s DebianAPI) getDebianSnapshot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s DebianAPI) checkDebianSnapshotIndex(
-	ctx context.Context, rel string, it types.Item, sourceRepo repo.Config,
+	ctx context.Context, rel string, it model.Item, sourceRepo repo.Config,
 	p kernel.Principal, acc itemkit.Access,
 ) error {
 	_, byHash := debian.ByHashMetadataPath(rel)
@@ -472,7 +471,7 @@ func (s DebianAPI) checkDebianSnapshotIndex(
 		return err
 	}
 	for _, artifact := range paths {
-		if !acc.File(sourceRepo, artifact, types.ActionRead) ||
+		if !acc.File(sourceRepo, artifact, accessapi.ActionRead) ||
 			generic.CheckDownload(sourceRepo, artifact, false) != nil {
 			return httpkit.Denied(p)
 		}

@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccMetadataResponseBaseAdmissionCacheOfflineAndNoStore(t *testing.T) {
@@ -64,7 +64,7 @@ func TestAccMetadataResponseBaseAdmissionCacheOfflineAndNoStore(t *testing.T) {
 				t.Fatal("private context lacks JSON exclusion")
 			}
 
-			entries, _, err := w.db.RemoteCache().List(t.Context(), w.c.Key, "", store.Page{})
+			entries, _, err := w.db.RemoteCache().List(t.Context(), w.c.Key, "", kernel.Page{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -134,7 +134,7 @@ func TestAccMetadataResponseBaseRevalidationRejectsInvalidNewBase(t *testing.T) 
 	if _, err := w.read(q); err == nil {
 		t.Fatal("304 base changed without valid admission")
 	}
-	entries, _, err := w.db.RemoteCache().List(t.Context(), w.c.Key, "", store.Page{})
+	entries, _, err := w.db.RemoteCache().List(t.Context(), w.c.Key, "", kernel.Page{})
 	if err != nil || len(entries) != 1 || entries[0].MetadataBaseURL != allowed {
 		t.Fatal("failed admission changed stored base", entries, err)
 	}
@@ -143,7 +143,7 @@ func TestAccMetadataResponseBaseRevalidationRejectsInvalidNewBase(t *testing.T) 
 	if result.Metadata.BaseURL != allowed || calls != 3 {
 		t.Fatalf("corrected 304 failed immediate retry: %+v calls=%d", result.Metadata, calls)
 	}
-	entries, _, err = w.db.RemoteCache().List(t.Context(), w.c.Key, "", store.Page{})
+	entries, _, err = w.db.RemoteCache().List(t.Context(), w.c.Key, "", kernel.Page{})
 	if err != nil || entries[0].MetadataBaseURL != allowed {
 		t.Fatal("validated base not persisted", err)
 	}
@@ -163,7 +163,7 @@ func TestUnitResponseBaseSanitizationAndLegacyCompatibility(t *testing.T) {
 	if got := remote.ResponseBase(res); got != "https://example.com/dir/index.json" {
 		t.Fatal(got)
 	}
-	if remote.MetadataResponse(res, types.RemoteUnique).BaseURL != "" ||
+	if remote.MetadataResponse(res, model.RemoteUnique).BaseURL != "" ||
 		remote.ResponseBase(&http.Response{}) != "" {
 		t.Fatal("artifact or absent URL gained context")
 	}
@@ -171,7 +171,7 @@ func TestUnitResponseBaseSanitizationAndLegacyCompatibility(t *testing.T) {
 	w.up.Set("/index.json", fakeupstream.Resource{Body: []byte("legacy")})
 	q := w.request("index.json", source.ResourceKindMetadata)
 	w.mustRead(q, "legacy")
-	entries, _, err := w.db.RemoteCache().List(t.Context(), w.c.Key, "", store.Page{})
+	entries, _, err := w.db.RemoteCache().List(t.Context(), w.c.Key, "", kernel.Page{})
 	if err != nil {
 		t.Fatal(err)
 	}

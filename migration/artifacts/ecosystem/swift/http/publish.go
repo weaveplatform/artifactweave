@@ -11,9 +11,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	swiftfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxPublishMetadata = 64 << 10
@@ -39,7 +41,7 @@ func (d *decodeReader) Read(p []byte) (int, error) {
 
 func (h handler) localPublish(w http.ResponseWriter, r *http.Request, p swiftfmt.Package) {
 	path := p.ArchivePath()
-	if !h.k.Require(w, r, path, types.ActionWrite) {
+	if !h.k.Require(w, r, path, api.ActionWrite) {
 		return
 	}
 	info, metadata, err := h.uploadRelease(w, r)
@@ -58,11 +60,11 @@ func (h handler) localPublish(w http.ResponseWriter, r *http.Request, p swiftfmt
 		h.k.Error(w, r, bad(http.StatusUnprocessableEntity, "invalid Swift source archive"))
 		return
 	}
-	props := types.Properties{}
+	props := model.Properties{}
 	if len(metadata) > 0 {
 		props["swift.metadata"] = []string{string(metadata)}
 	}
-	_, err = h.k.StoreNew(r, path, info, props, types.Checksums{}, func() error {
+	_, err = h.k.StoreNew(r, path, info, props, kernel.Checksums{}, func() error {
 		return bad(http.StatusConflict, "Swift release already exists")
 	})
 	if err != nil {

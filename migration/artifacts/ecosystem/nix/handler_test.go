@@ -11,10 +11,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 var errDisk = errors.New("storage fault")
@@ -37,7 +39,7 @@ func (b brokenBlobs) Open(context.Context, string) (io.ReadSeekCloser, blob.Info
 }
 
 type faultItems struct {
-	store.ItemStore
+	port.ItemStore
 	get, list bool
 }
 
@@ -46,9 +48,9 @@ func (f faultItems) Get(
 	key string,
 	cached bool,
 	path string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if f.get {
-		return types.Item{}, errDisk
+		return model.Item{}, errDisk
 	}
 	return f.ItemStore.Get(ctx, key, cached, path)
 }
@@ -58,8 +60,8 @@ func (f faultItems) Descendants(
 	key string,
 	cached bool,
 	path string,
-	page store.Page,
-) ([]types.Item, string, error) {
+	page kernel.Page,
+) ([]model.Item, string, error) {
 	if f.list {
 		return nil, "", errDisk
 	}
@@ -68,12 +70,12 @@ func (f faultItems) Descendants(
 
 type faultDB struct {
 	format.Store
-	items store.ItemStore
+	items port.ItemStore
 }
 
-func (f faultDB) Items() store.ItemStore { return f.items }
+func (f faultDB) Items() port.ItemStore { return f.items }
 
-func handlerFixture(t *testing.T) (format.Env, repo.Config, types.Item, types.Item, Info) {
+func handlerFixture(t *testing.T) (format.Env, repo.Config, model.Item, model.Item, Info) {
 	t.Helper()
 	db := inmem.New()
 	blobs, err := fs.New(t.TempDir())
@@ -85,7 +87,7 @@ func handlerFixture(t *testing.T) (format.Env, repo.Config, types.Item, types.It
 		t.Fatal(err)
 	}
 	info, archive, _ := fixture(t)
-	put := func(path string, data []byte) types.Item {
+	put := func(path string, data []byte) model.Item {
 		up, err := blobs.BeginUpload(t.Context())
 		if err != nil {
 			t.Fatal(err)
@@ -98,7 +100,7 @@ func handlerFixture(t *testing.T) (format.Env, repo.Config, types.Item, types.It
 			t.Fatal(err)
 		}
 		it, err := db.Items().
-			Put(t.Context(), types.Item{RepoKey: c.Key, Name: path, Size: bi.Size, Actual: types.Checksums{SHA256: bi.Digests.SHA256}})
+			Put(t.Context(), model.Item{RepoKey: c.Key, Name: path, Size: bi.Size, Actual: kernel.Checksums{SHA256: bi.Digests.SHA256}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -138,7 +140,7 @@ func TestUnitNixAdmissionAndGenericReadFences(t *testing.T) {
 	if err = h.Deployed(t.Context(), env, c, meta); err != nil {
 		t.Fatal(err)
 	}
-	if err = h.Deployed(t.Context(), env, c, types.Item{Folder: true}); err != nil {
+	if err = h.Deployed(t.Context(), env, c, model.Item{Folder: true}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = h.Resolve(
@@ -167,7 +169,7 @@ func TestUnitNixAdmissionAndGenericReadFences(t *testing.T) {
 		format.Download{Path: "00000000000000000000000000000000.narinfo"},
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal(err)
 	}
@@ -302,11 +304,11 @@ func TestUnitNixStorageFailuresRemainFailures(t *testing.T) {
 }
 
 type failedLease struct {
-	store.LeaseStore
+	work.LeaseStore
 	mode string
 }
 
-func (s failedLease) Acquire(context.Context, types.Lease, time.Time) (bool, error) {
+func (s failedLease) Acquire(context.Context, work.Lease, time.Time) (bool, error) {
 	if s.mode == "acquire" {
 		return false, errDisk
 	}

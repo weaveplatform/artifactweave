@@ -9,12 +9,12 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (h handler) remoteV2(next http.Handler) http.Handler {
@@ -252,7 +252,7 @@ func (s *remoteSession) legacyDownload(
 		s.h.k.Error(w, s.r, notFound(s.r))
 		return
 	}
-	if !s.h.k.Require(w, s.r, remotePackagePath(id, key), types.ActionRead) {
+	if !s.h.k.Require(w, s.r, remotePackagePath(id, key), api.ActionRead) {
 		return
 	}
 	entries, err := s.legacyEntries(id)

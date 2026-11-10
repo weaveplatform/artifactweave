@@ -12,11 +12,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // aqlBuildsRestricted is the 400 for a non-admin caller whose token has no
@@ -135,20 +135,20 @@ func (s ArtifactoryAPI) nestBuilds(
 }
 
 // buildScoped reports whether the token's scope grants reading builds.
-func buildScoped(sc types.Scope) bool {
-	return slices.ContainsFunc(sc.Entries, func(e types.ScopeEntry) bool {
-		return e.Kind == types.ScopeBuild && e.Actions.Covers(types.ScopeRead)
+func buildScoped(sc kernel.Scope) bool {
+	return slices.ContainsFunc(sc.Entries, func(e kernel.ScopeEntry) bool {
+		return e.Kind == kernel.ScopeBuild && e.Actions.Covers(kernel.ScopeRead)
 	})
 }
 
 // readsRun reports whether a may read run b: the build resource on the
 // build-info repository, at the run's document path.
-func readsRun(a itemkit.Access, b types.Build) bool {
+func readsRun(a itemkit.Access, b model.Build) bool {
 	repoKey, path := b.DocumentItem()
 	return a.Decider.Allows(
-		types.ResourceBuild,
+		accessapi.ResourceBuild,
 		accessapi.Repo{Key: repoKey, Class: string(repo.Local)},
 		path,
-		types.ActionRead,
+		accessapi.ActionRead,
 	)
 }

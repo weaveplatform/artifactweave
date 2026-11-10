@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 func TestUnitResolve(t *testing.T) {
@@ -99,7 +99,7 @@ func TestUnitResolve(t *testing.T) {
 
 	// A virtual repository without members matches nothing, and its $ne
 	// everything.
-	it := Hit{Item: types.Item{RepoKey: "libs", Name: "a"}}
+	it := Hit{Item: model.Item{RepoKey: "libs", Name: "a"}}
 	for src, want := range map[string]bool{
 		`items.find({"repo":"empty"})`:            false,
 		`items.find({"repo":{"$ne":"empty"}})`:    true,

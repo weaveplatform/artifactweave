@@ -13,17 +13,19 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -78,11 +80,11 @@ func newFixtureOn(t *testing.T, seed *inmem.Store, serve pkgroute.Store) *fixtur
 	}
 	grant := func(user, include string) {
 		t.Helper()
-		if err := seed.Permissions().Create(ctx, types.Permission{
+		if err := seed.Permissions().Create(ctx, model.Permission{
 			Name: user,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{user: types.ActionRead}},
-				Targets: map[string]types.Target{
+			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{user: api.ActionRead}},
+				Targets: map[string]model.Target{
 					local: {Include: []string{include}}, "go-fed": {Include: []string{include}},
 				},
 			}},
@@ -134,7 +136,7 @@ func newFixtureOn(t *testing.T, seed *inmem.Store, serve pkgroute.Store) *fixtur
 	o := pkgroute.Options{
 		Store: serve,
 		Items: func() *item.Service { return items },
-		ServeItem: func(w http.ResponseWriter, _ *http.Request, c repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, _ *http.Request, c repo.Config, it model.Item) {
 			f.served = append(f.served, c.Key+"/"+it.FullPath())
 			_, _ = io.WriteString(w, "served "+it.FullPath())
 		},
@@ -623,14 +625,14 @@ type faulty struct {
 	fail map[string]bool
 }
 
-func (f faulty) Items() store.ItemStore { return faultyItems{f.Store.Items(), f.fail} }
+func (f faulty) Items() port.ItemStore { return faultyItems{f.Store.Items(), f.fail} }
 
-func (f faulty) Packages() store.PackageStore {
+func (f faulty) Packages() port.PackageStore {
 	return faultyPackages{f.Store.Packages(), f.fail}
 }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	fail map[string]bool
 }
 
@@ -640,9 +642,9 @@ func (f faultyItems) Get(
 	key string,
 	cached bool,
 	p string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if f.fail["Get"] {
-		return types.Item{}, errStore
+		return model.Item{}, errStore
 	}
 	return f.ItemStore.Get(ctx, key, cached, p)
 }
@@ -653,8 +655,8 @@ func (f faultyItems) Children(
 	key string,
 	cached bool,
 	folder string,
-	p store.Page,
-) ([]types.Item, string, error) {
+	p kernel.Page,
+) ([]model.Item, string, error) {
 	if f.fail["Children"] {
 		return nil, "", errStore
 	}
@@ -665,20 +667,20 @@ func (f faultyItems) Children(
 }
 
 type faultyPackages struct {
-	store.PackageStore
+	port.PackageStore
 	fail map[string]bool
 }
 
 //nolint:wrapcheck // test double
-func (f faultyPackages) Find(ctx context.Context, key, name string) (types.Package, error) {
+func (f faultyPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
 	if f.fail["Find"] {
-		return types.Package{}, errStore
+		return model.Package{}, errStore
 	}
 	return f.PackageStore.Find(ctx, key, name)
 }
 
 //nolint:wrapcheck // test double
-func (f faultyPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (f faultyPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if f.fail["Versions"] {
 		return nil, errStore
 	}
@@ -690,9 +692,9 @@ func (f faultyPackages) Version(
 	ctx context.Context,
 	id int64,
 	v string,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	if f.fail["Version"] {
-		return types.PackageVersion{}, errStore
+		return model.PackageVersion{}, errStore
 	}
 	return f.PackageStore.Version(ctx, id, v)
 }

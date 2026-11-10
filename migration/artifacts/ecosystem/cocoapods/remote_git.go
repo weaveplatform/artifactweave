@@ -27,8 +27,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 const (
@@ -230,7 +230,7 @@ func cocoaPodsGitWant(spec source.CocoaPodsGitSource, refs *packp.AdvRefs) (plum
 		hash = *refs.Head
 	}
 	if hash.IsZero() {
-		return plumbing.ZeroHash, store.ErrNotFound
+		return plumbing.ZeroHash, kernel.ErrNotFound
 	}
 	return hash, nil
 }
@@ -553,9 +553,9 @@ func cocoaPodsGitError(err error) error {
 	}
 	if errors.Is(err, transport.ErrRepositoryNotFound) ||
 		errors.Is(err, transport.ErrEmptyRemoteRepository) {
-		return store.ErrNotFound
+		return kernel.ErrNotFound
 	}
-	for _, allowed := range []error{source.ErrDenied, source.ErrSuperseded, source.ErrInvalidResult, context.Canceled, context.DeadlineExceeded, store.ErrNotFound} {
+	for _, allowed := range []error{source.ErrDenied, source.ErrSuperseded, source.ErrInvalidResult, context.Canceled, context.DeadlineExceeded, kernel.ErrNotFound} {
 		if errors.Is(err, allowed) {
 			return allowed
 		}

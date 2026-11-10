@@ -9,9 +9,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccPrepareUploadPublishesOnlyNIMMetadataIdentity(t *testing.T) {
@@ -19,17 +19,17 @@ func TestAccPrepareUploadPublishesOnlyNIMMetadataIdentity(t *testing.T) {
 	for _, tc := range []struct {
 		name, path, variant, model, version string
 		packageType                         repo.PackageType
-		kind                                types.RemoteKind
+		kind                                model.RemoteKind
 	}{
-		{"tag metadata", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "nim-tag-metadata-v1", "llama", "1.3", repo.NIMModel, types.RemoteMetadata},
-		{"repository metadata", "catalog/nim/meta/llama/repo.json", "nim-repository-v1", "llama", "", repo.NIMModel, types.RemoteMetadata},
-		{"another package type", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "nim-tag-metadata-v1", "", "", repo.Generic, types.RemoteMetadata},
-		{"model artifact", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "nim-tag-metadata-v1", "", "", repo.NIMModel, types.RemoteUnique},
-		{"malformed metadata path", "models/nim/meta/llama/1.3/other.json", "nim-tag-metadata-v1", "", "", repo.NIMModel, types.RemoteMetadata},
-		{"short tag path", "models/llama/.jfrog_nim_model_info.json", "nim-tag-metadata-v1", "", "", repo.NIMModel, types.RemoteMetadata},
-		{"malformed repository path", "catalog/nim/meta/llama/other.json", "nim-repository-v1", "", "", repo.NIMModel, types.RemoteMetadata},
-		{"short repository path", "catalog/llama/repo.json", "nim-repository-v1", "", "", repo.NIMModel, types.RemoteMetadata},
-		{"unknown metadata variant", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "unknown", "", "", repo.NIMModel, types.RemoteMetadata},
+		{"tag metadata", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "nim-tag-metadata-v1", "llama", "1.3", repo.NIMModel, model.RemoteMetadata},
+		{"repository metadata", "catalog/nim/meta/llama/repo.json", "nim-repository-v1", "llama", "", repo.NIMModel, model.RemoteMetadata},
+		{"another package type", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "nim-tag-metadata-v1", "", "", repo.Generic, model.RemoteMetadata},
+		{"model artifact", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "nim-tag-metadata-v1", "", "", repo.NIMModel, model.RemoteUnique},
+		{"malformed metadata path", "models/nim/meta/llama/1.3/other.json", "nim-tag-metadata-v1", "", "", repo.NIMModel, model.RemoteMetadata},
+		{"short tag path", "models/llama/.jfrog_nim_model_info.json", "nim-tag-metadata-v1", "", "", repo.NIMModel, model.RemoteMetadata},
+		{"malformed repository path", "catalog/nim/meta/llama/other.json", "nim-repository-v1", "", "", repo.NIMModel, model.RemoteMetadata},
+		{"short repository path", "catalog/llama/repo.json", "nim-repository-v1", "", "", repo.NIMModel, model.RemoteMetadata},
+		{"unknown metadata variant", "models/nim/meta/llama/1.3/.jfrog_nim_model_info.json", "unknown", "", "", repo.NIMModel, model.RemoteMetadata},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			u := &item.CacheUpload{Kind: tc.kind}

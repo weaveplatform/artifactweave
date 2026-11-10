@@ -11,10 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 type aptFolder struct{ distribution, component, architecture string }
@@ -24,13 +26,13 @@ type aptCoordinates struct{ distribution, component string }
 // Work rebuilds apt metadata from the committed item tree. It never builds a
 // remote repository's index from a partial cache: remote metadata is fetched
 // from the upstream with the source/cache policy instead.
-func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) error {
+func (Handler) Work(ctx context.Context, env format.Env, work work.WorkItem) error {
 	if work.Kind != KindIndex && work.Kind != KindReindexNoProps {
 		return nil
 	}
 	c, err := env.Store.Repos().Get(ctx, work.Key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	case err != nil:
 		return fmt.Errorf("debian: repository: %w", err)
@@ -137,7 +139,7 @@ func buildIndex(ctx context.Context, env format.Env, c repo.Config) error {
 			if err != nil {
 				return fmt.Errorf("debian: signing key: %w", err)
 			}
-			if pair.Type != types.KeypairGPG {
+			if pair.Type != api.KeypairGPG {
 				return fmt.Errorf(
 					"%w: repository %s needs a gpg signing pair",
 					errInvalidBinary,
@@ -171,9 +173,9 @@ func buildIndex(ctx context.Context, env format.Env, c repo.Config) error {
 }
 
 func collectSourceGroups(
-	ctx context.Context, env format.Env, items []types.Item,
+	ctx context.Context, env format.Env, items []model.Item,
 ) (map[aptCoordinates][]IndexedSource, error) {
-	byPath := make(map[string]types.Item, len(items))
+	byPath := make(map[string]model.Item, len(items))
 	for _, it := range items {
 		byPath[it.FullPath()] = it
 	}
@@ -228,7 +230,7 @@ func collectSourceGroups(
 }
 
 func collectAptGroups(
-	ctx context.Context, env format.Env, items []types.Item,
+	ctx context.Context, env format.Env, items []model.Item,
 ) (map[string]bool, map[aptFolder][]IndexedBinary, error) {
 	old := map[string]bool{}
 	groups := map[aptFolder][]IndexedBinary{}

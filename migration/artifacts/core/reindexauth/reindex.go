@@ -11,8 +11,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errReindexDenied = fmt.Errorf(
@@ -46,7 +44,7 @@ func New(
 		if err != nil {
 			if errors.Is(err, kernel.ErrBadCredentials) ||
 				errors.Is(err, kernel.ErrPasswordExpired) ||
-				errors.Is(err, store.ErrNotFound) {
+				errors.Is(err, kernel.ErrNotFound) {
 				return errReindexDenied
 			}
 			return fmt.Errorf("reindex current credential: %w", err)
@@ -56,10 +54,10 @@ func New(
 			return fmt.Errorf("reindex current permissions: %w", err)
 		}
 		if !d.Allows(
-			types.ResourceArtifact,
+			accessapi.ResourceArtifact,
 			accessapi.Repo{Key: c.Key, Class: string(c.Class)},
 			"",
-			types.ActionManage,
+			accessapi.ActionManage,
 		) {
 			return errReindexDenied
 		}

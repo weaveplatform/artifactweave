@@ -12,13 +12,13 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // zipFile is an entry of a test zip.
@@ -130,7 +130,7 @@ func (w *world) repo(key string, class repo.Class, tune func(*repo.Config)) repo
 	return stored
 }
 
-func (w *world) deploy(p string, body []byte, props types.Properties) types.Item {
+func (w *world) deploy(p string, body []byte, props model.Properties) model.Item {
 	w.t.Helper()
 	it, err := w.tryDeploy(w.c, p, body, props)
 	if err != nil {
@@ -143,8 +143,8 @@ func (w *world) tryDeploy(
 	c repo.Config,
 	p string,
 	body []byte,
-	props types.Properties,
-) (types.Item, error) {
+	props model.Properties,
+) (model.Item, error) {
 	w.now = w.now.Add(time.Minute)
 	return w.items.Deploy(w.ctx, item.Deploy{ //nolint:wrapcheck // test helper
 		Target: item.Target{Repo: c, Path: p}, Body: bytes.NewReader(body),
@@ -197,7 +197,7 @@ func (w *world) transfer(
 	return out
 }
 
-func (w *world) props(p string) types.Properties {
+func (w *world) props(p string) model.Properties {
 	w.t.Helper()
 	it := w.item(p)
 	props, err := w.st.Items().Properties(w.ctx, it.ID)
@@ -207,7 +207,7 @@ func (w *world) props(p string) types.Properties {
 	return props
 }
 
-func (w *world) item(p string) types.Item {
+func (w *world) item(p string) model.Item {
 	w.t.Helper()
 	it, err := w.st.Items().Get(w.ctx, w.c.Key, false, p)
 	if err != nil {
@@ -232,7 +232,7 @@ type indexed struct {
 func (w *world) index(c repo.Config) map[string]map[string]indexed {
 	w.t.Helper()
 	out := map[string]map[string]indexed{}
-	pkgs, _, err := w.st.Packages().List(w.ctx, c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := w.st.Packages().List(w.ctx, c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		w.t.Fatal(err)
 	}

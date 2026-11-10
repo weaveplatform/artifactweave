@@ -10,10 +10,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Serves reports whether t is the Agent Plugins package type.
@@ -98,7 +98,7 @@ func (Handler) Admit(
 // as the version's metadata. A bundle without a harness manifest fails with
 // ErrArchive: the 7.161.32 target indexes harness manifests only, so a
 // root-only Agent Plugins Standard bundle is not indexed.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || it.Cached || !strings.HasSuffix(it.FullPath(), ".zip") {
 		return nil
 	}
@@ -126,13 +126,13 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 
 // Deleting does nothing: the item service drops a removed bundle's version
 // link with it.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted does nothing: a version is one bundle, so the item service's
 // pruning of versions left without files is all a delete needs.
-func (Handler) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
+func (Handler) Deleted(context.Context, format.Env, repo.Config, []model.Item) error { return nil }
 
-func metadataOf(ctx context.Context, env format.Env, it types.Item) (Metadata, error) {
+func metadataOf(ctx context.Context, env format.Env, it model.Item) (Metadata, error) {
 	if in, ok := env.Inspection.(*inspection); ok && in.sha == it.Actual.SHA256 {
 		return in.meta, in.err
 	}
@@ -144,19 +144,19 @@ func metadataOf(ctx context.Context, env format.Env, it types.Item) (Metadata, e
 	return ReadArchive(rc, info.Size)
 }
 
-func setProperties(ctx context.Context, st format.Store, it types.Item, meta Metadata) error {
+func setProperties(ctx context.Context, st format.Store, it model.Item, meta Metadata) error {
 	current, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("agentplugins: properties of %s: %w", it.FullPath(), err)
 	}
-	wanted := types.Properties{
+	wanted := model.Properties{
 		"agentplugins.name": {meta.Name}, "agentplugins.version": {meta.Version},
 		"agentplugins.type": meta.Harnesses, "agentplugins.sha256": {meta.SHA256},
 	}
 	if meta.SHA1 != "" {
 		wanted["agentplugins.sha1"] = []string{meta.SHA1}
 	}
-	set := types.Properties{}
+	set := model.Properties{}
 	var remove []string
 	for _, key := range []string{"agentplugins.name", "agentplugins.version", "agentplugins.type", "agentplugins.sha256", "agentplugins.sha1"} {
 		want, yes := wanted[key]
@@ -181,11 +181,11 @@ func index(
 	ctx context.Context,
 	st format.Store,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	meta Metadata,
 ) error {
 	p, err := st.Packages().
-		Ensure(ctx, types.Package{RepoKey: c.Key, Type: c.PackageType, Name: meta.Name, Created: it.Created})
+		Ensure(ctx, model.Package{RepoKey: c.Key, Type: c.PackageType, Name: meta.Name, Created: it.Created})
 	if err != nil {
 		return fmt.Errorf("agentplugins: package %s: %w", meta.Name, err)
 	}
@@ -206,7 +206,7 @@ func index(
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	var all []pkgindex.Indexed
 	byName := map[string]int{}
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		items, next, err := env.Store.Items().Descendants(ctx, c.Key, false, "", page)
 		if err != nil {

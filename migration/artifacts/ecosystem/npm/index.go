@@ -12,9 +12,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // index makes the tarball it, at its canonical path, the one file of its
@@ -26,7 +26,7 @@ func (h Handler) index(
 	ctx context.Context,
 	st format.Store,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	t *Tarball,
 ) error {
 	props, err := setProperties(ctx, st, it, t)
@@ -34,14 +34,14 @@ func (h Handler) index(
 		return err
 	}
 	at := published(it)
-	p, err := st.Packages().Ensure(ctx, types.Package{
+	p, err := st.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Name: t.Name, Type: c.PackageType, Created: at,
 	})
 	if err != nil {
 		return fmt.Errorf("npm: package %s: %w", t.Name, err)
 	}
 	_, err = st.Packages().Version(ctx, p.ID, t.Version)
-	isNew := errors.Is(err, store.ErrNotFound)
+	isNew := errors.Is(err, kernel.ErrNotFound)
 	if err != nil && !isNew {
 		return fmt.Errorf("npm: version %s of %s: %w", t.Version, t.Name, err)
 	}
@@ -69,18 +69,18 @@ func (h Handler) index(
 func setProperties(
 	ctx context.Context,
 	st format.Store,
-	it types.Item,
+	it model.Item,
 	t *Tarball,
-) (types.Properties, error) {
+) (model.Properties, error) {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return nil, fmt.Errorf("npm: properties of %s: %w", it.FullPath(), err)
 	}
-	want := types.Properties{PropName: {t.Name}, PropVersion: {t.Version}}
+	want := model.Properties{PropName: {t.Name}, PropVersion: {t.Version}}
 	var remove []string
 	if t.Description != "" {
 		want[PropDescription] = []string{
-			types.TruncatePropertyValue(t.Description, types.PropertyValueMax),
+			model.TruncatePropertyValue(t.Description, model.PropertyValueMax),
 		}
 	} else if _, ok := props[PropDescription]; ok {
 		remove = append(remove, PropDescription)
@@ -92,10 +92,10 @@ func setProperties(
 	}
 	if t.License != "" {
 		want[PropLicenses] = []string{
-			types.TruncatePropertyValue(t.License, types.PropertyValueMax),
+			model.TruncatePropertyValue(t.License, model.PropertyValueMax),
 		}
 	}
-	set := types.Properties{}
+	set := model.Properties{}
 	for k, v := range want {
 		if !slices.Equal(props[k], v) {
 			set[k] = v
@@ -122,7 +122,7 @@ func setProperties(
 func keywordsValue(keywords []string) string {
 	for n := len(keywords); n > 0; n-- {
 		v := string(jsonText(keywords[:n]))
-		if types.TruncatePropertyValue(v, types.PropertyValueMax) == v {
+		if model.TruncatePropertyValue(v, model.PropertyValueMax) == v {
 			return v
 		}
 	}
@@ -130,7 +130,7 @@ func keywordsValue(keywords []string) string {
 }
 
 // versionOf is the version the item with id is the tarball of.
-func versionOf(ctx context.Context, st format.Store, id int64) (types.PackageVersion, bool, error) {
+func versionOf(ctx context.Context, st format.Store, id int64) (model.PackageVersion, bool, error) {
 	return pkgindex.VersionOf(ctx, st, id) //nolint:wrapcheck // pkgindex wraps its own
 }
 
@@ -145,7 +145,7 @@ func versionOf(ctx context.Context, st format.Store, id int64) (types.PackageVer
 // properties the write brings (decision 0034), so none is left for a later
 // move to its own canonical path, by a conversion say, to hand to a
 // version that never had it, latest included (rule 1).
-func (h Handler) unindex(ctx context.Context, st format.Store, it types.Item) error {
+func (h Handler) unindex(ctx context.Context, st format.Store, it model.Item) error {
 	pv, ok, err := versionOf(ctx, st, it.ID)
 	if err != nil || !ok {
 		return err
@@ -170,7 +170,7 @@ func (h Handler) unindex(ctx context.Context, st format.Store, it types.Item) er
 // names to alone. The versions' Metadata says which carry them, so only
 // those tarballs are read.
 func moveTags(
-	ctx context.Context, st format.Store, to types.PackageVersion, tags []string, now time.Time,
+	ctx context.Context, st format.Store, to model.PackageVersion, tags []string, now time.Time,
 ) error {
 	versions, err := st.Packages().Versions(ctx, to.PackageID)
 	if err != nil {
@@ -211,10 +211,10 @@ func dropTags(ctx context.Context, st format.Store, id int64, tags []string, now
 	}
 	kept := slices.DeleteFunc(slices.Clone(props[PropDistTag]),
 		func(t string) bool { return slices.Contains(tags, t) })
-	var set types.Properties
+	var set model.Properties
 	remove := []string{PropDistTag}
 	if len(kept) > 0 {
-		set, remove = types.Properties{PropDistTag: kept}, nil
+		set, remove = model.Properties{PropDistTag: kept}, nil
 	}
 	if err := st.Items().PatchProperties(ctx, id, set, remove, now); err != nil {
 		return fmt.Errorf("npm: dist-tags of item %d: %w", id, err)
@@ -225,7 +225,7 @@ func dropTags(ctx context.Context, st format.Store, id int64, tags []string, now
 // refresh brings pv's Metadata in line with the properties of its tarball,
 // the item with id. Nothing else in it follows from properties, so the
 // tarball need not be read.
-func refresh(ctx context.Context, st format.Store, pv types.PackageVersion, id int64) error {
+func refresh(ctx context.Context, st format.Store, pv model.PackageVersion, id int64) error {
 	props, err := st.Items().Properties(ctx, id)
 	if err != nil {
 		return fmt.Errorf("npm: properties of item %d: %w", id, err)
@@ -335,7 +335,7 @@ func readOnce(
 	ctx context.Context,
 	env format.Env,
 	read map[string]*Tarball,
-	it types.Item,
+	it model.Item,
 ) (*Tarball, error) {
 	if !candidate(it.FullPath()) {
 		return nil, nil //nolint:nilnil // no tarball to read is no failure

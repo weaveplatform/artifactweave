@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 )
 
 // The properties a manifest with a subject carries, from which the referrers
@@ -51,7 +51,7 @@ func (m Manifest) Children() []string {
 // hit carries its properties.
 func ImageManifests(
 	ctx context.Context,
-	items store.ItemStore,
+	items port.ItemStore,
 	repoKey, name string,
 ) ([]aql.Hit, error) {
 	hits, err := searchManifests(ctx, items, repoKey, name)
@@ -67,7 +67,7 @@ func ImageManifests(
 // folders, by digest and by tag, is a hit in each.
 func FindReferrers(
 	ctx context.Context,
-	items store.ItemStore,
+	items port.ItemStore,
 	repoKey, name, subject, artifactType string,
 ) ([]aql.Hit, error) {
 	by := []aql.Node{&aql.PropertyCriterion{
@@ -90,7 +90,7 @@ func FindReferrers(
 // properties.
 func searchManifests(
 	ctx context.Context,
-	items store.ItemStore,
+	items port.ItemStore,
 	repoKey, name string,
 	more ...aql.Node,
 ) ([]aql.Hit, error) {

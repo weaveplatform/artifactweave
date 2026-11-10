@@ -13,11 +13,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitP2ReadFailsClosedAtSourceAndDeliveryFences(t *testing.T) {
@@ -180,9 +180,9 @@ func TestUnitP2ReadCachedMetadataUsesItsStoredBytes(t *testing.T) {
 			if permit.Intent != source.RetrievalIntentCacheOnly || permit.UpstreamNetworkAllowed {
 				t.Fatalf("cache-only read used network permit: %+v", permit)
 			}
-			return source.Result{Item: &types.Item{
-				RepoKey: c.Key, Path: types.RootPath, Name: q.Resource.Path,
-				Cached: true, Actual: types.Checksums{SHA256: sha},
+			return source.Result{Item: &model.Item{
+				RepoKey: c.Key, Path: kernel.RootPath, Name: q.Resource.Path,
+				Cached: true, Actual: kernel.Checksums{SHA256: sha},
 			}}, nil
 		},
 	)

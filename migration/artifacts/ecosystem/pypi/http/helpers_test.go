@@ -21,17 +21,19 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
 	pypihttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden pages")
@@ -85,13 +87,13 @@ func newFixture(
 			t.Fatal(err)
 		}
 	}
-	grant := func(user, include string, actions types.Actions) {
+	grant := func(user, include string, actions accessapi.Actions) {
 		t.Helper()
-		if err := db.Permissions().Create(ctx, types.Permission{
+		if err := db.Permissions().Create(ctx, model.Permission{
 			Name: user,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{user: actions}},
-				Targets: map[string]types.Target{
+			Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]accessapi.Actions{user: actions}},
+				Targets: map[string]model.Target{
 					"pypi-local": {Include: []string{include}},
 					"pypi-fed":   {Include: []string{include}},
 				},
@@ -100,7 +102,7 @@ func newFixture(
 			t.Fatal(err)
 		}
 	}
-	read, write, del := types.ActionRead, types.ActionWrite, types.ActionDelete
+	read, write, del := accessapi.ActionRead, accessapi.ActionWrite, accessapi.ActionDelete
 	grant("reader", "**", read)
 	grant("partial", "demo/1.0/**", read)
 	grant("writer", "**", read|write|del)
@@ -121,7 +123,7 @@ func newFixture(
 	f.opts = pkgroute.Options{
 		Store: backend,
 		Items: func() *item.Service { return f.items },
-		ServeItem: func(w http.ResponseWriter, _ *http.Request, c repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, _ *http.Request, c repo.Config, it model.Item) {
 			f.served = append(f.served, c.Key+"/"+it.FullPath())
 			_, _ = io.WriteString(w, "served "+c.Key+"/"+it.FullPath())
 		},
@@ -164,8 +166,8 @@ func (f *fixture) deploy(
 	t *testing.T,
 	key, path string,
 	body []byte,
-	props types.Properties,
-) types.Item {
+	props model.Properties,
+) model.Item {
 	t.Helper()
 	ctx := context.Background()
 	c, err := f.db.Repos().Get(ctx, key)

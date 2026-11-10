@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -17,7 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/keymaterial"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // maxCertificateBundle bounds a certificate upload: a PEM certificate, its
@@ -38,7 +38,7 @@ func certificateNotFound(alias string) error {
 	return apierror.New(http.StatusNotFound, fmt.Sprintf("Certificate '%s' does not exist", alias))
 }
 
-func keypairSummary(k types.Keypair) artgen.KeyPairSummary {
+func keypairSummary(k api.Keypair) artgen.KeyPairSummary {
 	typ := string(k.Type)
 	return artgen.KeyPairSummary{
 		PairName: &k.Name, PairType: &typ, Alias: &k.Alias, PublicKey: &k.PublicKey,
@@ -48,9 +48,9 @@ func keypairSummary(k types.Keypair) artgen.KeyPairSummary {
 // keypairFrom validates a key pair body: the required fields, no vault key
 // without a private key (artifactweave has no vault integration), and
 // halves that belong together.
-func keypairFrom(in *artgen.KeyPairInput) (types.Keypair, error) {
+func keypairFrom(in *artgen.KeyPairInput) (api.Keypair, error) {
 	if in == nil {
-		return types.Keypair{}, httpkit.BadRequestf("A key pair body is required")
+		return api.Keypair{}, httpkit.BadRequestf("A key pair body is required")
 	}
 	priv, pass := "", ""
 	if in.PrivateKey != nil {
@@ -60,7 +60,7 @@ func keypairFrom(in *artgen.KeyPairInput) (types.Keypair, error) {
 		pass = *in.Passphrase
 	}
 	if in.VaultKey != nil && *in.VaultKey != "" && priv == "" {
-		return types.Keypair{}, httpkit.BadRequestf(
+		return api.Keypair{}, httpkit.BadRequestf(
 			"Vault keys are not supported; supply privateKey",
 		)
 	}
@@ -69,14 +69,14 @@ func keypairFrom(in *artgen.KeyPairInput) (types.Keypair, error) {
 		"privateKey": priv, "publicKey": in.PublicKey,
 	} {
 		if strings.TrimSpace(value) == "" {
-			return types.Keypair{}, httpkit.BadRequestf("'%s' is required", field)
+			return api.Keypair{}, httpkit.BadRequestf("'%s' is required", field)
 		}
 	}
 	if err := keymaterial.CheckPair(string(in.PairType), priv, in.PublicKey, pass); err != nil {
-		return types.Keypair{}, httpkit.BadRequestf("%s", err.Error())
+		return api.Keypair{}, httpkit.BadRequestf("%s", err.Error())
 	}
-	return types.Keypair{
-		Name: in.PairName, Type: types.KeypairType(in.PairType), Alias: in.Alias,
+	return api.Keypair{
+		Name: in.PairName, Type: api.KeypairType(in.PairType), Alias: in.Alias,
 		PublicKey: in.PublicKey, PrivateKey: priv, Passphrase: pass,
 	}, nil
 }
@@ -134,7 +134,7 @@ func (s SecurityAPI) CreateKeyPair(
 // putKeypair creates k or replaces the pair of its name. A pair deleted
 // between the refused create and the update is created after all, so a
 // concurrent delete cannot fail the request with a 500.
-func putKeypair(ctx context.Context, keys port.KeyStore, k types.Keypair) error {
+func putKeypair(ctx context.Context, keys port.KeyStore, k api.Keypair) error {
 	err := keys.CreateKeypair(ctx, k)
 	if errors.Is(err, kernel.ErrConflict) {
 		err = keys.UpdateKeypair(ctx, k)
@@ -272,7 +272,7 @@ func dropKeypairRefs(ctx context.Context, repos artifactsapi.Repositories, name 
 // publicKeyFile is the file name a repository's public key is sent under:
 // the pair's alias, which the jfrog/artifactory provider documents as the
 // file name of this download, then its type (rsa or gpg) and pub.
-func publicKeyFile(k types.Keypair) string {
+func publicKeyFile(k api.Keypair) string {
 	return k.Alias + "." + strings.ToLower(string(k.Type)) + ".pub"
 }
 
@@ -384,7 +384,7 @@ func (s SecurityAPI) AddCertificate(
 	if err != nil {
 		return nil, httpkit.BadRequestf("%s", err.Error())
 	}
-	if err := st.Keys().PutCertificate(ctx, types.Certificate{
+	if err := st.Keys().PutCertificate(ctx, api.Certificate{
 		Alias: alias, PEM: b.Certificates, PrivateKey: b.PrivateKey,
 		IssuedTo: b.IssuedTo, IssuedBy: b.IssuedBy, IssuedOn: b.IssuedOn,
 		ValidUntil: b.ValidUntil, Fingerprint: b.Fingerprint,

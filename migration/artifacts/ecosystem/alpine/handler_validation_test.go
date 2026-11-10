@@ -10,8 +10,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type invalidBlobs struct{}
@@ -87,18 +88,18 @@ func TestUnitHandlerQueuesOnlyLocalPackageChanges(t *testing.T) {
 		}
 		return refused
 	}}
-	file := types.Item{RepoKey: local.Key, Path: "v3.20/main/x86_64", Name: "hello-1.0-r0.apk"}
+	file := model.Item{RepoKey: local.Key, Path: "v3.20/main/x86_64", Name: "hello-1.0-r0.apk"}
 	if err := h.Deleting(t.Context(), env, local, file); !errors.Is(err, refused) {
 		t.Fatalf("local package delete did not surface queue failure: %v", err)
 	}
 	for _, tc := range []struct {
 		c    repo.Config
-		item types.Item
+		item model.Item
 	}{
 		{remote, file},
-		{local, types.Item{Folder: true, Name: "hello-1.0-r0.apk"}},
-		{local, types.Item{Name: "README"}},
-		{local, types.Item{Name: "cached.apk", Cached: true}},
+		{local, model.Item{Folder: true, Name: "hello-1.0-r0.apk"}},
+		{local, model.Item{Name: "README"}},
+		{local, model.Item{Name: "cached.apk", Cached: true}},
 	} {
 		if err := h.Deleting(t.Context(), env, tc.c, tc.item); err != nil {
 			t.Fatalf("unrelated delete queued work: %v", err)
@@ -108,7 +109,7 @@ func TestUnitHandlerQueuesOnlyLocalPackageChanges(t *testing.T) {
 		t.Context(),
 		env,
 		local,
-		types.Item{Folder: true, Name: "foo.apk"},
+		model.Item{Folder: true, Name: "foo.apk"},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +125,7 @@ func TestUnitHandlerRejectsMissingAndInvalidStoredPackages(t *testing.T) {
 	for _, sha := range []string{"", "missing", "invalid"} {
 		w := format.Write{
 			Op: format.OpDeploy, Path: testPackagePath,
-			Checksums: types.Checksums{SHA256: sha},
+			Checksums: kernel.Checksums{SHA256: sha},
 		}
 		if _, err := h.Inspect(t.Context(), env, c, w); err == nil {
 			t.Errorf("inspection accepted %q content", sha)
@@ -137,7 +138,7 @@ func TestUnitHandlerRejectsMissingAndInvalidStoredPackages(t *testing.T) {
 	if err := setProperties(
 		t.Context(),
 		st,
-		types.Item{ID: 987},
+		model.Item{ID: 987},
 		Package{Name: "hello"},
 	); err == nil {
 		t.Fatal("missing item properties accepted")

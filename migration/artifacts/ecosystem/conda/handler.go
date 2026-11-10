@@ -12,10 +12,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // KindIndex is the work kind that regenerates a hosted repository's channel
@@ -123,7 +124,7 @@ func (Handler) GuardTransferSource(
 	_ context.Context,
 	_ format.Env,
 	_ repo.Config,
-	it types.Item,
+	it model.Item,
 ) error {
 	if id, ok := ParseMetadataPath(it.FullPath()); ok &&
 		(id.Filename == ShardIndexFilename || IsShardFilename(id.Filename)) {
@@ -139,7 +140,7 @@ func (Handler) GuardTransferSource(
 // version in the package index up to date and, for a local or federated
 // repository's own write, queues the channel metadata rebuild. Folders and
 // other paths change nothing.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder {
 		return nil
 	}
@@ -163,7 +164,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 // Deleting queues the channel metadata rebuild when a local or federated
 // repository's own package archive is about to be deleted, so the rebuild
 // is asked for exactly when the delete commits.
-func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder {
 		return nil
 	}
@@ -181,7 +182,7 @@ func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	seen := map[string]bool{}
 	for _, it := range removed {
@@ -243,7 +244,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	if err != nil {
 		return err
 	}
-	by := map[string]map[string][]types.Item{}
+	by := map[string]map[string][]model.Item{}
 	for _, it := range items {
 		id, ok := ParsePackagePath(it.FullPath())
 		if !ok {
@@ -258,7 +259,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 			}
 		}
 		if by[id.Name] == nil {
-			by[id.Name] = map[string][]types.Item{}
+			by[id.Name] = map[string][]model.Item{}
 		}
 		by[id.Name][id.Version] = append(by[id.Name][id.Version], it)
 	}
@@ -294,13 +295,13 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 // from the stored archives, with sizes and digests from the stored bytes,
 // and generated metadata no longer produced is removed. It reads the
 // repository afresh, so a repeated run gives the same result.
-func (h Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) error {
+func (h Handler) Work(ctx context.Context, env format.Env, work work.WorkItem) error {
 	if work.Kind != KindIndex {
 		return nil
 	}
 	c, err := env.Store.Repos().Get(ctx, work.Key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	case err != nil:
 		return fmt.Errorf("conda: repository: %w", err)
@@ -376,7 +377,7 @@ func (h Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) 
 func packageFor(
 	ctx context.Context,
 	env format.Env,
-	it types.Item,
+	it model.Item,
 	id PackagePath,
 ) (Record, error) {
 	if in, ok := env.Inspection.(inspection); ok && in.sha == it.Actual.SHA256 &&
@@ -407,16 +408,16 @@ func readStored(
 	return rec, nil
 }
 
-func setProperties(ctx context.Context, st format.Store, it types.Item, id PackagePath) error {
+func setProperties(ctx context.Context, st format.Store, it model.Item, id PackagePath) error {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("conda: item properties: %w", err)
 	}
-	want := types.Properties{
+	want := model.Properties{
 		PropName: {id.Name}, PropVersion: {id.Version}, PropBuild: {id.Build},
 		PropSubdir: {id.Subdir}, PropChannel: {id.Channel},
 	}
-	set := types.Properties{}
+	set := model.Properties{}
 	for key, values := range want {
 		if !slices.Equal(props[key], values) {
 			set[key] = values
@@ -433,7 +434,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, versi
 	if err != nil {
 		return err
 	}
-	var selected []types.Item
+	var selected []model.Item
 	for _, it := range items {
 		id, ok := ParsePackagePath(it.FullPath())
 		if ok && id.Name == name && id.Version == version {
@@ -444,7 +445,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, versi
 		return nil
 	}
 	v := indexedVersion(version, selected)
-	p, err := env.Store.Packages().Ensure(ctx, types.Package{
+	p, err := env.Store.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Type: c.PackageType, Name: name, Created: v.Created,
 	})
 	if err != nil {
@@ -454,7 +455,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, versi
 	return err //nolint:wrapcheck
 }
 
-func indexedVersion(version string, items []types.Item) pkgindex.IndexedVersion {
+func indexedVersion(version string, items []model.Item) pkgindex.IndexedVersion {
 	v := pkgindex.IndexedVersion{Version: version}
 	for _, it := range items {
 		if v.Created.IsZero() || it.Created.Before(v.Created) {
@@ -466,7 +467,7 @@ func indexedVersion(version string, items []types.Item) pkgindex.IndexedVersion 
 	return v
 }
 
-func files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, error) {
+func files(ctx context.Context, st format.Store, c repo.Config) ([]model.Item, error) {
 	hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
@@ -474,7 +475,7 @@ func files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, e
 	if err != nil {
 		return nil, fmt.Errorf("conda: files of %s: %w", c.Key, err)
 	}
-	out := make([]types.Item, 0, len(hits))
+	out := make([]model.Item, 0, len(hits))
 	for _, hit := range hits {
 		out = append(out, hit.Item)
 	}

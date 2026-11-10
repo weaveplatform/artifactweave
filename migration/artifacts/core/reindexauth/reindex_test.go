@@ -10,14 +10,14 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/reindexauth"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
@@ -26,22 +26,22 @@ func TestUnitQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
 			st := inmem.New()
 			now := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
 			clock := func() time.Time { return now }
-			if err := st.Users().Create(t.Context(), types.User{Name: "manager"}); err != nil {
+			if err := st.Users().Create(t.Context(), model.User{Name: "manager"}); err != nil {
 				t.Fatal(err)
 			}
 			if err := st.Permissions().
-				Create(t.Context(), types.Permission{Name: "manage", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"manager": types.ActionManage}}, Targets: map[string]types.Target{"remote": {Include: []string{"**"}}}}}}); err != nil {
+				Create(t.Context(), model.Permission{Name: "manage", Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {Actions: model.Grants{Users: map[string]accessapi.Actions{"manager": accessapi.ActionManage}}, Targets: map[string]model.Target{"remote": {Include: []string{"**"}}}}}}); err != nil {
 				t.Fatal(err)
 			}
 			scopeText := "applied-permissions/user"
 			if change == "read scope" {
 				scopeText = "applied-permissions/groups:readers"
 			}
-			scope, err := types.ParseScope(scopeText)
+			scope, err := kernel.ParseScope(scopeText)
 			if err != nil {
 				t.Fatal(err)
 			}
-			tok := types.Token{
+			tok := model.Token{
 				ID:        "opaque-id",
 				Subject:   "jfac@test/users/manager",
 				Scope:     scope,
@@ -65,7 +65,7 @@ func TestUnitQueuedTokenKeepsScopeAndCurrentAuthority(t *testing.T) {
 				}
 			case "disabled":
 				if err = st.Users().
-					Update(t.Context(), types.User{Name: "manager", Status: types.UserDisabled}); err != nil {
+					Update(t.Context(), model.User{Name: "manager", Status: model.UserDisabled}); err != nil {
 					t.Fatal(err)
 				}
 			case "anonymous off":
@@ -152,9 +152,9 @@ func TestUnitReindexRefusesCallerThatLostManage(t *testing.T) {
 		return &accessapitest.Decider{AllowsFunc: func(
 			rt accessapi.ResourceType, r accessapi.Repo, path string, want accessapi.Actions,
 		) bool {
-			return manage && s.Name == "manager" && rt == types.ResourceArtifact &&
+			return manage && s.Name == "manager" && rt == accessapi.ResourceArtifact &&
 				r == accessapi.Repo{Key: c.Key, Class: string(c.Class)} && path == "" &&
-				want == types.ActionManage
+				want == accessapi.ActionManage
 		}}, nil
 	}}
 	check := reindexauth.New(&accessapitest.Authenticator{}, authz)
@@ -180,24 +180,24 @@ var errStore = errors.New("permission storage failure")
 
 type permissionFailure struct{ accesstest.Store }
 
-func (s permissionFailure) Permissions() store.PermissionStore {
+func (s permissionFailure) Permissions() port.PermissionStore {
 	return brokenPermissions{s.Store.Permissions()}
 }
 
-type brokenPermissions struct{ store.PermissionStore }
+type brokenPermissions struct{ port.PermissionStore }
 
 func (p brokenPermissions) ForPrincipal(
 	context.Context, string, []string,
-) ([]types.Permission, error) {
+) ([]model.Permission, error) {
 	return nil, errStore
 }
 
 type tokenFailure struct{ accesstest.Store }
 
-func (s tokenFailure) Tokens() store.TokenStore { return brokenTokens{s.Store.Tokens()} }
+func (s tokenFailure) Tokens() port.TokenStore { return brokenTokens{s.Store.Tokens()} }
 
-type brokenTokens struct{ store.TokenStore }
+type brokenTokens struct{ port.TokenStore }
 
-func (t brokenTokens) Get(context.Context, string) (types.Token, error) {
-	return types.Token{}, errStore
+func (t brokenTokens) Get(context.Context, string) (model.Token, error) {
+	return model.Token{}, errStore
 }

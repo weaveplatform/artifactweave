@@ -12,10 +12,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const (
@@ -137,7 +137,7 @@ func (Handler) Admit(
 // version from every stored file of that version, and queues the manifest
 // work, as a stored manifest file does too. Folders and other items change
 // nothing, and the work is queued only in a local or federated repository.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || it.Cached != pkgindex.Stored(c).Cached {
 		return nil
 	}
@@ -159,7 +159,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 // Deleting queues the manifest work when a rockspec, rock or manifest file
 // of a local or federated repository is about to be deleted; folders and
 // other files change nothing.
-func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder {
 		return nil
 	}
@@ -179,7 +179,7 @@ func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	seen := map[Identity]bool{}
 	for _, it := range removed {
@@ -247,14 +247,14 @@ func (Handler) Resolve(
 	if err == nil {
 		return d.Path, nil
 	}
-	if !errors.Is(err, store.ErrNotFound) {
+	if !errors.Is(err, kernel.ErrNotFound) {
 		return "", fmt.Errorf("luarocks: manifest: %w", err)
 	}
 	_, err = env.WorkQueue.Get(ctx, KindManifest, c.Key)
 	if err == nil {
 		return d.Path, nil
 	}
-	if !errors.Is(err, store.ErrNotFound) {
+	if !errors.Is(err, kernel.ErrNotFound) {
 		return "", fmt.Errorf("luarocks: manifest work: %w", err)
 	}
 	return d.Path, queue(ctx, env, c, false)
@@ -281,7 +281,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 		if err != nil {
 			return err
 		}
-		by := map[string]map[string][]types.Item{}
+		by := map[string]map[string][]model.Item{}
 		for _, it := range hits {
 			id, ok := Parse(it.FullPath())
 			if !ok {
@@ -294,7 +294,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 				return err
 			}
 			if by[id.Name] == nil {
-				by[id.Name] = map[string][]types.Item{}
+				by[id.Name] = map[string][]model.Item{}
 			}
 			by[id.Name][id.Version] = append(by[id.Name][id.Version], it)
 		}
@@ -329,7 +329,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	return nil
 }
 
-func files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, error) {
+func files(ctx context.Context, st format.Store, c repo.Config) ([]model.Item, error) {
 	hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
@@ -337,7 +337,7 @@ func files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, e
 	if err != nil {
 		return nil, fmt.Errorf("luarocks: files of %s: %w", c.Key, err)
 	}
-	out := make([]types.Item, 0, len(hits))
+	out := make([]model.Item, 0, len(hits))
 	for _, hit := range hits {
 		out = append(out, hit.Item)
 	}

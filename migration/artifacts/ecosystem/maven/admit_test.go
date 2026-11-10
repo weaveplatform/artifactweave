@@ -14,10 +14,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // try deploys body at p and returns the error.
@@ -33,7 +33,7 @@ func (w *world) try(p, body string) error {
 func (w *world) stored(p string) bool {
 	w.t.Helper()
 	_, err := w.db.Items().Get(w.ctx, w.c.Key, false, p)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		w.t.Fatal(err)
 	}
 	return err == nil
@@ -379,7 +379,7 @@ func TestUnitChecksumUploads(t *testing.T) {
 	_, err := w.items.RecordSidecar(w.ctx, tgt("com/acme/app/1.0/app-1.0.war"), item.MD5,
 		strings.Repeat("0", 32), 32)
 	var side *item.SidecarError
-	if !errors.As(err, &side) || !errors.Is(err, store.ErrNotFound) || side.Message !=
+	if !errors.As(err, &side) || !errors.Is(err, kernel.ErrNotFound) || side.Message !=
 		"Target file to set checksum on doesn't exist: maven-local:com/acme/app/1.0/app-1.0.war" {
 		t.Fatalf("missing: %v", err)
 	}
@@ -614,7 +614,7 @@ func equal(a, b map[string]string) bool {
 	return true
 }
 
-func (w *world) item(p string) types.Item {
+func (w *world) item(p string) model.Item {
 	w.t.Helper()
 	it, err := w.db.Items().Get(context.Background(), w.c.Key, false, p)
 	if err != nil {

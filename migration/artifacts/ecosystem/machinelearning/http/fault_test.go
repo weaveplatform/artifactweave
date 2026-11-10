@@ -8,9 +8,10 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -35,10 +36,10 @@ type faultyStore struct {
 	fault *fault
 }
 
-func (s faultyStore) Items() store.ItemStore { return faultyItems{s.Store.Items(), s.fault} }
+func (s faultyStore) Items() port.ItemStore { return faultyItems{s.Store.Items(), s.fault} }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	fault *fault
 }
 
@@ -47,21 +48,21 @@ func (s faultyItems) Get(
 	key string,
 	cached bool,
 	path string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if s.fault.fails("get", path) {
-		return types.Item{}, errInjected
+		return model.Item{}, errInjected
 	}
 	return s.ItemStore.Get(ctx, key, cached, path)
 }
 
-func (s faultyItems) Create(ctx context.Context, it types.Item) (types.Item, error) {
+func (s faultyItems) Create(ctx context.Context, it model.Item) (model.Item, error) {
 	if s.fault.fails("create", it.FullPath()) {
-		return types.Item{}, errInjected
+		return model.Item{}, errInjected
 	}
 	return s.ItemStore.Create(ctx, it)
 }
 
-func (s faultyItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (s faultyItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if s.fault.fails("properties", "") {
 		return nil, errInjected
 	}
@@ -73,8 +74,8 @@ func (s faultyItems) Descendants(
 	key string,
 	cached bool,
 	path string,
-	page store.Page,
-) ([]types.Item, string, error) {
+	page kernel.Page,
+) ([]model.Item, string, error) {
 	if s.fault.fails("descendants", path) {
 		return nil, "", errInjected
 	}
@@ -142,7 +143,7 @@ func TestAccModelPublicationRollbackOnStorageFailure(t *testing.T) {
 				if _, err := f.db.Items().
 					Get(t.Context(), "ml", false, path); !errors.Is(
 					err,
-					store.ErrNotFound,
+					kernel.ErrNotFound,
 				) {
 					t.Fatalf("failed transaction exposed %s: %v", path, err)
 				}

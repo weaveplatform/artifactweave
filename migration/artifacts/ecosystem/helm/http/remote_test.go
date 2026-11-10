@@ -19,19 +19,22 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	helmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
 	helmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const remoteEndpoint = "/artifactory/api/helm/remote/"
@@ -59,7 +62,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	}
 	for user, pattern := range map[string]string{"reader": "**", "partial": "visible/**"} {
 		err = f.db.Permissions().
-			Create(t.Context(), types.Permission{Name: "remote-" + user, Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{user: types.ActionRead}}, Targets: map[string]types.Target{"remote": {Include: []string{pattern}}}}}})
+			Create(t.Context(), model.Permission{Name: "remote-" + user, Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{user: api.ActionRead}}, Targets: map[string]model.Target{"remote": {Include: []string{pattern}}}}}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -87,7 +90,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	svc := &source.Service{
 		HTTP:  policy,
 		Cache: policy,
-		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			return f.items.Store.RemoteCache().Source(ctx, c.Key)
 		},
 	}
@@ -113,7 +116,7 @@ func (f *remoteFixture) mount(t *testing.T, public string, relative bool) {
 		pkgroute.Options{
 			Store: f.db,
 			Items: func() *item.Service { return f.items },
-			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 				body, _, err := f.items.Blobs.Open(r.Context(), it.Actual.SHA256)
 				if err != nil {
 					t.Error(err)
@@ -470,7 +473,7 @@ func TestAccRemoteOriginCredentialsAndProxy(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err = f.items.Store.Configs().
-		Put(t.Context(), types.ConfigDocument{Kind: types.ConfigProxy, Key: "helm-proxy", Enabled: true, Document: doc}); err != nil {
+		Put(t.Context(), configdoc.ConfigDocument{Kind: configdoc.ConfigProxy, Key: "helm-proxy", Enabled: true, Document: doc}); err != nil {
 		t.Fatal(err)
 	}
 	f.configure(func(c *repo.Config) { c.Proxy = "helm-proxy" })

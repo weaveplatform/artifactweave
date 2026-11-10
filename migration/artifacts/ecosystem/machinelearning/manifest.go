@@ -14,8 +14,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Checksums is a declared file's digest. The SDK calls its SHA-256 "sha2".
@@ -135,7 +135,7 @@ func Read(
 	env format.Env,
 	c repo.Config,
 	id Identity,
-) (Manifest, types.Item, error) {
+) (Manifest, model.Item, error) {
 	it, err := env.Store.Items().Get(ctx, c.Key, false, id.Manifest())
 	if err != nil {
 		return Manifest{}, it, fmt.Errorf("machinelearning: find manifest: %w", err)
@@ -163,8 +163,8 @@ func Verify(
 	c repo.Config,
 	prefix string,
 	m Manifest,
-) ([]types.Item, error) {
-	files := make([]types.Item, 0, len(m.Files()))
+) ([]model.Item, error) {
+	files := make([]model.Item, 0, len(m.Files()))
 	for _, file := range m.Files() {
 		it, err := env.Store.Items().Get(ctx, c.Key, false, prefix+"/"+file.Path)
 		if err != nil {
@@ -188,7 +188,7 @@ func Verify(
 // Missing reports whether err, from Read or Verify, means an item is not
 // stored (store.ErrNotFound): the version has no manifest or has lost a
 // declared file, so it is unpublished or withdrawn rather than broken.
-func Missing(err error) bool { return errors.Is(err, store.ErrNotFound) }
+func Missing(err error) bool { return errors.Is(err, kernel.ErrNotFound) }
 
 func sdkTimestamp(s string) bool {
 	_, err := time.Parse("2006-01-02T15:04:05.999999999", s)

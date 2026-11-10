@@ -6,11 +6,12 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -58,13 +59,13 @@ func goServer(
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(t.Context(), types.User{Name: "user", PasswordHash: cheapHash}); err != nil {
+		Create(t.Context(), model.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Repos().Create(t.Context(), *repo.Defaults(&goRepos[0])); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Instance().Init(t.Context(), types.InstanceIdentity{
+	if err := db.Instance().Init(t.Context(), instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)

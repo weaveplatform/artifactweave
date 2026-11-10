@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var puppetStatusPart = statusPart{
@@ -81,7 +81,7 @@ var puppetMatrixPart = matrixPart{
 					c.route,
 					strings.Replace(c.path, "puppet-status", "puppet-matrix", 1),
 					"",
-					holds("puppet-matrix", "acme-widget", types.ActionRead),
+					holds("puppet-matrix", "acme-widget", api.ActionRead),
 					c.expected,
 				),
 			)
@@ -92,7 +92,7 @@ var puppetMatrixPart = matrixPart{
 				"POST /artifactory/api/puppet/{repoKey}/reindex",
 				"/artifactory/api/puppet/puppet-matrix/reindex",
 				"",
-				holds("puppet-matrix", "", types.ActionManage),
+				holds("puppet-matrix", "", api.ActionManage),
 				200,
 			),
 		)

@@ -19,12 +19,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/upstreamtest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type policyWorld struct {
@@ -151,7 +151,7 @@ func TestAccPolicyUniqueCacheOnlyOfflineAndNoStore(t *testing.T) {
 		t.Fatal(err)
 	} // R8
 	missing := w.request("missing", source.ResourceKindArtifact)
-	if _, err = w.p.Read(t.Context(), missing, cachePermit); !errors.Is(err, store.ErrNotFound) {
+	if _, err = w.p.Read(t.Context(), missing, cachePermit); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal(err)
 	}
 	q.Repo.Offline = ptr(true)
@@ -211,11 +211,11 @@ func TestAccPolicyMetadataRevalidationAndNegativeExpiry(t *testing.T) {
 	w.clock.Advance(30 * time.Second)
 	w.mustRead(q, `{"version":2}`)
 	missing := w.request("new.txt", source.ResourceKindArtifact)
-	if _, err := w.read(missing); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.read(missing); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal(err)
 	}
 	w.up.Set("/new.txt", fakeupstream.Resource{Body: []byte("arrived")})
-	if _, err := w.read(missing); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.read(missing); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal(err)
 	} // R7
 	if w.up.Count("HEAD", "/new.txt") != 1 {
@@ -260,7 +260,7 @@ func TestAccPolicyFailureClassesPreserveGoodMetadata(t *testing.T) {
 					t.Fatal(err)
 				}
 			} else if tc.expected == 404 {
-				if !errors.Is(err, store.ErrNotFound) {
+				if !errors.Is(err, kernel.ErrNotFound) {
 					t.Fatal(err)
 				}
 			} else {
@@ -352,14 +352,14 @@ func TestAccPolicyNoStoreLeavesNoEntriesAndHTTPNoStoreIsNotShared(t *testing.T) 
 	if _, err := w.db.Items().
 		Get(t.Context(), w.c.Key, true, "private.txt"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal(err)
 	}
 	if _, err := w.db.RemoteCache().
 		Read(t.Context(), w.p.CacheKey(q, "credential-1")); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("no-store cache record", err)
 	}
@@ -368,7 +368,7 @@ func TestAccPolicyNoStoreLeavesNoEntriesAndHTTPNoStoreIsNotShared(t *testing.T) 
 	if _, err := w.db.Items().
 		Get(t.Context(), w.c.Key, true, "private.txt"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal(err)
 	}
@@ -420,18 +420,18 @@ func TestAccPolicyAdapterTargetsAndPreparation(t *testing.T) {
 	if _, err := w.read(q); err == nil {
 		t.Fatal("offline bytes reused replaced representation")
 	}
-	q.Resource.Checksums = types.Checksums{SHA256: "invalid"}
+	q.Resource.Checksums = kernel.Checksums{SHA256: "invalid"}
 	if _, err := w.read(q); err == nil {
 		t.Fatal("invalid offline pin accepted")
 	}
-	q.Resource.Checksums = types.Checksums{}
+	q.Resource.Checksums = kernel.Checksums{}
 	w.mustRead(q, "second")
 	q.Resource.ExternalURL = w.up.URL + "/other"
 	q.Resource.UpstreamPath = ""
 	if w.p.CacheKey(q, "credential-1") == oldKey {
 		t.Fatal("URL absent from identity")
 	}
-	r := remote.TransportRequest(q, types.RemoteCacheEntry{})
+	r := remote.TransportRequest(q, model.RemoteCacheEntry{})
 	if r.ExternalURL != q.Resource.ExternalURL || r.Path != "" || r.Query != "" {
 		t.Fatal(r)
 	}
@@ -450,7 +450,7 @@ func TestAccPolicyAdapterPreparationFailureAndFence(t *testing.T) {
 	if _, err := w.db.Items().
 		Get(t.Context(), q.Repo.Key, true, q.Resource.Path); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("failure published", err)
 	}

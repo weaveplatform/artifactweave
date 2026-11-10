@@ -6,11 +6,11 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/access/core/roles"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errBoom = errors.New("boom")
@@ -41,7 +41,7 @@ func (p failingProjects) err(name string) error {
 	return nil
 }
 
-func (p failingProjects) List(ctx context.Context) ([]types.Project, error) {
+func (p failingProjects) List(ctx context.Context) ([]model.Project, error) {
 	if err := p.err("List"); err != nil {
 		return nil, err
 	}
@@ -51,14 +51,14 @@ func (p failingProjects) List(ctx context.Context) ([]types.Project, error) {
 func (p failingProjects) Environments(
 	ctx context.Context,
 	key string,
-) ([]types.Environment, error) {
+) ([]model.Environment, error) {
 	if err := p.err("Environments"); err != nil {
 		return nil, err
 	}
 	return p.ProjectStore.Environments(ctx, key) //nolint:wrapcheck // test double
 }
 
-func (p failingProjects) CreateEnvironment(ctx context.Context, e types.Environment) error {
+func (p failingProjects) CreateEnvironment(ctx context.Context, e model.Environment) error {
 	if err := p.err("CreateEnvironment"); err != nil {
 		return err
 	}
@@ -79,21 +79,21 @@ func (p failingProjects) DeleteEnvironment(ctx context.Context, key, name string
 	return p.ProjectStore.DeleteEnvironment(ctx, key, name) //nolint:wrapcheck // test double
 }
 
-func (p failingProjects) Roles(ctx context.Context, key string) ([]types.Role, error) {
+func (p failingProjects) Roles(ctx context.Context, key string) ([]model.Role, error) {
 	if err := p.err("Roles"); err != nil {
 		return nil, err
 	}
 	return p.ProjectStore.Roles(ctx, key) //nolint:wrapcheck // test double
 }
 
-func (p failingProjects) Role(ctx context.Context, key, name string) (types.Role, error) {
+func (p failingProjects) Role(ctx context.Context, key, name string) (model.Role, error) {
 	if err := p.err("Role"); err != nil {
-		return types.Role{}, err
+		return model.Role{}, err
 	}
 	return p.ProjectStore.Role(ctx, key, name) //nolint:wrapcheck // test double
 }
 
-func (p failingProjects) PutRole(ctx context.Context, r types.Role) error {
+func (p failingProjects) PutRole(ctx context.Context, r model.Role) error {
 	if err := p.err("PutRole"); err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func (p failingProjects) DeleteRole(ctx context.Context, key, name string) error
 func (p failingProjects) Assignments(
 	ctx context.Context,
 	key string,
-) ([]types.RepositoryAssignment, error) {
+) ([]model.RepositoryAssignment, error) {
 	if err := p.err("Assignments"); err != nil {
 		return nil, err
 	}
@@ -118,15 +118,15 @@ func (p failingProjects) Assignments(
 }
 
 func (p failingProjects) Members(
-	ctx context.Context, key string, typ types.PrincipalType,
-) ([]types.ProjectMember, error) {
+	ctx context.Context, key string, typ model.PrincipalType,
+) ([]model.ProjectMember, error) {
 	if err := p.err("Members"); err != nil {
 		return nil, err
 	}
 	return p.ProjectStore.Members(ctx, key, typ) //nolint:wrapcheck // test double
 }
 
-func (p failingProjects) PutMember(ctx context.Context, m types.ProjectMember) error {
+func (p failingProjects) PutMember(ctx context.Context, m model.ProjectMember) error {
 	if err := p.err("PutMember"); err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (p failingProjects) PutMember(ctx context.Context, m types.ProjectMember) e
 func (p failingProjects) DeleteMember(
 	ctx context.Context,
 	key string,
-	typ types.PrincipalType,
+	typ model.PrincipalType,
 	name string,
 ) error {
 	if err := p.err("DeleteMember"); err != nil {
@@ -163,17 +163,17 @@ func TestUnitStoreFailures(t *testing.T) {
 			t,
 			s.CreateRole(
 				ctx,
-				types.Role{Name: "ci", Type: types.RoleCustomGlobal},
+				model.Role{Name: "ci", Type: model.RoleCustomGlobal},
 			),
 		)
-		must(t, db.Projects().PutMember(ctx, types.ProjectMember{
+		must(t, db.Projects().PutMember(ctx, model.ProjectMember{
 			ProjectKey: "p",
-			Type:       types.PrincipalUser,
+			Type:       model.PrincipalUser,
 			Name:       "ann",
 			Roles:      []string{"ci", "Viewer"},
 		}))
-		must(t, db.Projects().PutMember(ctx, types.ProjectMember{
-			ProjectKey: "p", Type: types.PrincipalGroup, Name: "devs", Roles: []string{"ci"},
+		must(t, db.Projects().PutMember(ctx, model.ProjectMember{
+			ProjectKey: "p", Type: model.PrincipalGroup, Name: "devs", Roles: []string{"ci"},
 		}))
 		f := &failing{Store: db}
 		return f, roles.Service{Store: f, Repositories: repositories{db: db, fail: &f.fail}}, db
@@ -213,29 +213,29 @@ func TestUnitStoreFailures(t *testing.T) {
 		{"Environments", func(s roles.Service) error {
 			return s.CreateRole(
 				ctx,
-				types.Role{Name: "x", Type: types.RoleCustomGlobal, Environments: []string{"DEV"}},
+				model.Role{Name: "x", Type: model.RoleCustomGlobal, Environments: []string{"DEV"}},
 			)
 		}},
 		{"Roles", func(s roles.Service) error {
-			return s.CreateRole(ctx, types.Role{Name: "x", Type: types.RoleCustomGlobal})
+			return s.CreateRole(ctx, model.Role{Name: "x", Type: model.RoleCustomGlobal})
 		}},
 		{"PutRole", func(s roles.Service) error {
-			return s.CreateRole(ctx, types.Role{Name: "x", Type: types.RoleCustomGlobal})
+			return s.CreateRole(ctx, model.Role{Name: "x", Type: model.RoleCustomGlobal})
 		}},
 		{"Role", func(s roles.Service) error {
-			return s.UpdateRole(ctx, "ci", types.Role{Name: "ci", Type: types.RoleCustomGlobal})
+			return s.UpdateRole(ctx, "ci", model.Role{Name: "ci", Type: model.RoleCustomGlobal})
 		}},
 		{"Role", func(s roles.Service) error { _, err := s.Role(ctx, "Viewer"); return err }},
 		{"PutRole", func(s roles.Service) error {
 			return s.UpdateRole(
 				ctx,
 				"Viewer",
-				types.Role{Name: "Viewer", Type: types.RolePredefined},
+				model.Role{Name: "Viewer", Type: model.RolePredefined},
 			)
 		}},
 		{"Environments", func(s roles.Service) error {
-			return s.UpdateRole(ctx, "Viewer", types.Role{
-				Name: "Viewer", Type: types.RolePredefined, Environments: []string{"DEV"},
+			return s.UpdateRole(ctx, "Viewer", model.Role{
+				Name: "Viewer", Type: model.RolePredefined, Environments: []string{"DEV"},
 			})
 		}},
 		{"DeleteRole", func(s roles.Service) error { return s.DeleteRole(ctx, "ci") }},
@@ -303,10 +303,10 @@ func TestUnitRenameEnvironmentRollsBackRepositoryUpdates(t *testing.T) {
 			Key: key, Class: repo.Local, Environments: []string{"QA"},
 		}))
 	}
-	must(t, s.CreateRole(ctx, types.Role{
-		Name: "ci", Type: types.RoleCustomGlobal, Environments: []string{"QA"},
+	must(t, s.CreateRole(ctx, model.Role{
+		Name: "ci", Type: model.RoleCustomGlobal, Environments: []string{"QA"},
 	}))
-	must(t, db.Projects().PutAssignment(ctx, types.RepositoryAssignment{
+	must(t, db.Projects().PutAssignment(ctx, model.RepositoryAssignment{
 		RepoKey: "a", ProjectKey: "p", Environments: []string{"QA"},
 	}))
 	updates := &secondUpdateFails{repositories: repositories{db: db}}

@@ -8,9 +8,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // annotatedImages is the image format, recording the property changes it
@@ -24,7 +24,7 @@ func (f *annotatedImages) Annotated(
 	_ context.Context,
 	_ format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	_ format.Annotation,
 ) error {
 	f.tagged = append(f.tagged, c.Key+":"+it.FullPath())

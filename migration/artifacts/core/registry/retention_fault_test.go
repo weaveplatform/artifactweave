@@ -10,12 +10,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // retentionFaults fails the item reads and deletes, the version listing
@@ -27,14 +27,14 @@ type retentionFaults struct {
 	versions bool
 }
 
-func (f *retentionFaults) Items() store.ItemStore { return faultyItemOps{f.Store.Items(), f} }
+func (f *retentionFaults) Items() port.ItemStore { return faultyItemOps{f.Store.Items(), f} }
 
-func (f *retentionFaults) Packages() store.PackageStore {
+func (f *retentionFaults) Packages() port.PackageStore {
 	return faultyVersions{f.Store.Packages(), f.versions}
 }
 
 type faultyItemOps struct {
-	store.ItemStore
+	port.ItemStore
 	f *retentionFaults
 }
 
@@ -44,9 +44,9 @@ func (i faultyItemOps) Get(
 	key string,
 	cached bool,
 	p string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if i.f.get != nil && i.f.get(p) {
-		return types.Item{}, errBoom
+		return model.Item{}, errBoom
 	}
 	return i.ItemStore.Get(ctx, key, cached, p)
 }
@@ -62,20 +62,20 @@ func (i faultyItemOps) Search(ctx context.Context, q *aql.Query, o aql.Options) 
 //nolint:wrapcheck // test double
 func (i faultyItemOps) Delete(
 	ctx context.Context, key string, cached bool, p string,
-) (store.DeleteResult, error) {
+) (port.DeleteResult, error) {
 	if i.f.del != nil && i.f.del(p) {
-		return store.DeleteResult{}, errBoom
+		return port.DeleteResult{}, errBoom
 	}
 	return i.ItemStore.Delete(ctx, key, cached, p)
 }
 
 type faultyVersions struct {
-	store.PackageStore
+	port.PackageStore
 	fail bool
 }
 
 //nolint:wrapcheck // test double
-func (v faultyVersions) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (v faultyVersions) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if v.fail {
 		return nil, errBoom
 	}

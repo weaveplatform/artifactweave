@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type sourceBackend func(context.Context, source.Request, source.Permit) (source.Result, error)
@@ -26,9 +26,9 @@ func (f sourceBackend) Read(
 	return f(ctx, q, p)
 }
 
-func sourceIdentity(context.Context, repo.Config) (types.SourceIdentity, error) {
-	return types.SourceIdentity{
-		Kind:       types.ExternalHTTP,
+func sourceIdentity(context.Context, repo.Config) (model.SourceIdentity, error) {
+	return model.SourceIdentity{
+		Kind:       model.ExternalHTTP,
 		Repository: "repo-1",
 		ID:         "http-1",
 		Generation: "revision-1",

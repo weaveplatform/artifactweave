@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/idempotency"
 )
 
 // AppendOnce commits the append and its receipt together. A replay stays bound
@@ -16,11 +17,11 @@ import (
 func (s *Service) AppendOnce(
 	ctx context.Context,
 	ap Append,
-	r store.ReplayRequest,
+	r idempotency.ReplayRequest,
 	current func(context.Context) (Access, error),
-) (store.ReplayReceipt, error) {
-	var receipt store.ReplayReceipt
-	ap.Started = store.Normalise(ap.Started)
+) (idempotency.ReplayReceipt, error) {
+	var receipt idempotency.ReplayReceipt
+	ap.Started = kernel.Normalise(ap.Started)
 	if current == nil {
 		return receipt, ErrForbidden
 	}
@@ -64,7 +65,7 @@ func (s *Service) AppendOnce(
 			return err
 		}
 		_, path := b.DocumentItem()
-		if !a.Build(c.Key, path, false, types.ActionWrite|types.ActionDelete) {
+		if !a.Build(c.Key, path, false, api.ActionWrite|api.ActionDelete) {
 			return ErrForbidden
 		}
 		return nil

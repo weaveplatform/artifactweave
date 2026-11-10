@@ -3,11 +3,12 @@ package pkgroute
 import (
 	"net/http"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // StoreResolved commits an upload whose inspection determines its destination.
@@ -19,23 +20,23 @@ func (k *Kit) StoreResolved(
 	r *http.Request,
 	filename string,
 	info blob.Info,
-	declared types.Checksums,
+	declared kernel.Checksums,
 	resolve func(any) (string, error),
-) (types.Item, error) {
+) (model.Item, error) {
 	d := k.fileDeploy(r, filename, nil, declared)
 	d.ResolvePath = func(inspection any) (string, error) {
 		path, err := resolve(inspection)
 		if err != nil {
 			return "", err
 		}
-		if !can(r, d.Repo, path, types.ActionWrite) {
+		if !can(r, d.Repo, path, api.ActionWrite) {
 			return "", refusal(r)
 		}
 		return path, nil
 	}
 	it, err := k.o.Items().DeployCommitted(r.Context(), d, info)
 	if err != nil {
-		return types.Item{}, k.o.ItemError(r.Context(), "deploy", err)
+		return model.Item{}, k.o.ItemError(r.Context(), "deploy", err)
 	}
 	return it, nil
 }
@@ -54,8 +55,8 @@ func (k *Kit) DeployItem(w http.ResponseWriter, r *http.Request) {
 func (k *Kit) fileDeploy(
 	r *http.Request,
 	path string,
-	props types.Properties,
-	declared types.Checksums,
+	props model.Properties,
+	declared kernel.Checksums,
 ) item.Deploy {
 	c := RequestFrom(r).Repo
 	by, _ := kernel.FromContext(r.Context())
@@ -68,6 +69,6 @@ func (k *Kit) fileDeploy(
 		Declared:           declared,
 		By:                 by.Name,
 		OverwriteIdentical: true,
-		CanOverwritePath:   func(path string) bool { return can(r, c, path, types.ActionDelete) },
+		CanOverwritePath:   func(path string) bool { return can(r, c, path, api.ActionDelete) },
 	}
 }

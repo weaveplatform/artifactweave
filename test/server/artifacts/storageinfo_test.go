@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // TestAccStorageSummaryAccess: an administrator, or a token scoped
@@ -14,7 +14,7 @@ import (
 // recalculation stays with administrators.
 func TestAccStorageSummaryAccess(t *testing.T) {
 	w := newIdentityWorld(t)
-	if err := w.db.Users().Create(context.Background(), types.User{
+	if err := w.db.Users().Create(context.Background(), model.User{
 		Name: "watcher", PasswordHash: cheapHash,
 	}); err != nil {
 		t.Fatal(err)

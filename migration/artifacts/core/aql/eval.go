@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // Hit is one item a query found, with its properties and statistics when
@@ -13,9 +13,9 @@ import (
 // record. VirtualRepos is filled by the caller, which knows the repository
 // configurations, when the query includes virtual_repos.
 type Hit struct {
-	Item         types.Item
-	Properties   types.Properties
-	Stats        *types.ItemStats
+	Item         model.Item
+	Properties   model.Properties
+	Stats        *model.ItemStats
 	VirtualRepos []string
 }
 
@@ -69,7 +69,7 @@ func match(n Node, h Hit, now time.Time) bool {
 	return false
 }
 
-func (c *FieldCriterion) match(it types.Item, now time.Time) bool {
+func (c *FieldCriterion) match(it model.Item, now time.Time) bool {
 	switch fieldKinds[c.Field] {
 	case kindType:
 		if c.Text == "any" {
@@ -104,7 +104,7 @@ func (c *FieldCriterion) match(it types.Item, now time.Time) bool {
 
 // match holds when some property satisfies the positive operator; $ne and
 // $nmatch hold when none does.
-func (c *PropertyCriterion) match(props types.Properties) bool {
+func (c *PropertyCriterion) match(props model.Properties) bool {
 	positive, negate := c.Op, false
 	switch c.Op {
 	case OpNe:
@@ -138,7 +138,7 @@ func (c *PropertyCriterion) row(op Op, k, v string) bool {
 // match holds when one property satisfies every criterion. A negative
 // operator tests that property's own key or value, so "*" there excludes
 // everything.
-func (m MSP) match(props types.Properties) bool {
+func (m MSP) match(props model.Properties) bool {
 	for k, vs := range props {
 		for _, v := range vs {
 			if m.row(k, v) {
@@ -179,7 +179,7 @@ func (m MSP) row(k, v string) bool {
 // match compares the statistic. With no statistics record every field is
 // NULL; an existing record's empty time is NULL too, while its texts and
 // counts are values ("" and 0), as the SQL columns hold them.
-func (c *StatCriterion) match(st *types.ItemStats, now time.Time) bool {
+func (c *StatCriterion) match(st *model.ItemStats, now time.Time) bool {
 	null := st == nil
 	if !null && statKinds[c.Field] == kindTime {
 		null = statTime(st, c.Field).IsZero()
@@ -213,7 +213,7 @@ func (c *StatCriterion) match(st *types.ItemStats, now time.Time) bool {
 	return compareOp(c.Op, strings.Compare(s, c.Text))
 }
 
-func statNumber(st *types.ItemStats, f StatField) int64 {
+func statNumber(st *model.ItemStats, f StatField) int64 {
 	if f == StatRemoteDownloads {
 		return st.RemoteDownloadCount
 	}
@@ -222,7 +222,7 @@ func statNumber(st *types.ItemStats, f StatField) int64 {
 
 // statTime is a statistic time truncated to the microseconds the SQL stores
 // keep.
-func statTime(st *types.ItemStats, f StatField) time.Time {
+func statTime(st *model.ItemStats, f StatField) time.Time {
 	t := st.LastDownloaded
 	if f == StatRemoteDownloaded {
 		t = st.RemoteLastDownloaded
@@ -233,7 +233,7 @@ func statTime(st *types.ItemStats, f StatField) time.Time {
 	return micro(t)
 }
 
-func statText(st *types.ItemStats, f StatField) string {
+func statText(st *model.ItemStats, f StatField) string {
 	switch f {
 	case StatDownloadedBy:
 		return st.LastDownloadedBy
@@ -279,7 +279,7 @@ func compareOp(op Op, c int) bool {
 // Compare orders two items by the query's sort, then by ID, as the SQL
 // ORDER BY does. A missing time sorts first ascending and last descending.
 // IDs tie only between roots without a record.
-func (q *Query) Compare(a, b types.Item) int {
+func (q *Query) Compare(a, b model.Item) int {
 	if q.Sort != nil {
 		for _, f := range q.Sort.Fields {
 			var c int
@@ -319,21 +319,21 @@ func compareBool(a, b bool) int {
 	return -1
 }
 
-func itemType(it types.Item) string {
+func itemType(it model.Item) string {
 	if it.Folder {
 		return "folder"
 	}
 	return "file"
 }
 
-func number(it types.Item, f Field) int64 {
+func number(it model.Item, f Field) int64 {
 	if f == FieldDepth {
 		return int64(it.Depth)
 	}
 	return it.Size
 }
 
-func itemTime(it types.Item, f Field) time.Time {
+func itemTime(it model.Item, f Field) time.Time {
 	switch f {
 	case FieldCreated:
 		return it.Created
@@ -344,7 +344,7 @@ func itemTime(it types.Item, f Field) time.Time {
 	}
 }
 
-func text(it types.Item, f Field) string {
+func text(it model.Item, f Field) string {
 	switch f {
 	case FieldRepo:
 		return it.ReportedRepoKey()

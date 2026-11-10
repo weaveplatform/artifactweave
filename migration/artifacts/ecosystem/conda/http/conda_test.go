@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitUpstreamIndexBodyRequiresAReadableSource(t *testing.T) {
@@ -73,7 +73,7 @@ func TestUnitCondaRecursionAndPathGuardsBeforeAnySourceRead(t *testing.T) {
 		map[string]bool{},
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("unsafe index path reached a repository source: %v", err)
 	}

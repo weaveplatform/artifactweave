@@ -12,8 +12,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type (
@@ -58,7 +59,7 @@ func TestUnitAdmissionChecksArchiveIdentityAndRepositoryPolicy(t *testing.T) {
 	write := format.Write{
 		Op:        format.OpDeploy,
 		Path:      path,
-		Checksums: types.Checksums{SHA256: "good"},
+		Checksums: kernel.Checksums{SHA256: "good"},
 	}
 	inspected, err := h.Inspect(t.Context(), env, c, write)
 	if err != nil {
@@ -76,8 +77,8 @@ func TestUnitAdmissionChecksArchiveIdentityAndRepositoryPolicy(t *testing.T) {
 	}{
 		{"wrong path identity", format.Write{Op: format.OpDeploy, Path: Path("other_pub", "1.2.3"), Checksums: write.Checksums}, env, http.StatusConflict},
 		{"noncanonical path", format.Write{Op: format.OpDeploy, Path: "widget_pub/../widget_pub-1.2.3.tar.gz", Checksums: write.Checksums}, env, http.StatusBadRequest},
-		{"missing archive", format.Write{Op: format.OpDeploy, Path: path, Checksums: types.Checksums{SHA256: "missing"}}, env, 0},
-		{"invalid archive", format.Write{Op: format.OpDeploy, Path: path, Checksums: types.Checksums{SHA256: "bad"}}, env, 0},
+		{"missing archive", format.Write{Op: format.OpDeploy, Path: path, Checksums: kernel.Checksums{SHA256: "missing"}}, env, 0},
+		{"invalid archive", format.Write{Op: format.OpDeploy, Path: path, Checksums: kernel.Checksums{SHA256: "bad"}}, env, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := h.Admit(t.Context(), tc.env, c, tc.write)
@@ -132,16 +133,16 @@ func TestUnitDeployedAndReindexRejectStaleOrInvalidContent(t *testing.T) {
 		t.Context(),
 		env,
 		c,
-		types.Item{Folder: true, Name: "widget_pub"},
+		model.Item{Folder: true, Name: "widget_pub"},
 	); err != nil {
 		t.Fatalf("folder should not publish a version: %v", err)
 	}
-	if err := h.Deployed(t.Context(), env, c, types.Item{Name: "README"}); err != nil {
+	if err := h.Deployed(t.Context(), env, c, model.Item{Name: "README"}); err != nil {
 		t.Fatalf("unrelated file should not publish a version: %v", err)
 	}
-	item := types.Item{
+	item := model.Item{
 		RepoKey: c.Key, Path: "other_pub", Name: "other_pub-1.2.3.tar.gz",
-		Actual: types.Checksums{SHA256: "good"},
+		Actual: kernel.Checksums{SHA256: "good"},
 	}
 	if err := h.Deployed(t.Context(), env, c, item); !errors.Is(err, ErrArchive) {
 		t.Fatalf("path/manifest mismatch: %v", err)
@@ -151,7 +152,7 @@ func TestUnitDeployedAndReindexRejectStaleOrInvalidContent(t *testing.T) {
 	if err := h.Deployed(t.Context(), env, c, item); err == nil {
 		t.Fatal("missing stored archive indexed")
 	}
-	if err := setProperties(t.Context(), st, types.Item{ID: 999}, Metadata{
+	if err := setProperties(t.Context(), st, model.Item{ID: 999}, Metadata{
 		Name: "widget_pub", Version: "1.2.3", SHA256: "good",
 	}); err == nil {
 		t.Fatal("missing item properties changed")

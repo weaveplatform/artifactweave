@@ -10,12 +10,12 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type vcsBody struct {
@@ -140,7 +140,7 @@ func (s VCSAPI) vcsArchive(
 		}
 	}
 	permissionPath := owner + "/" + name + "/refs/" + kind + "/" + ref
-	if !a.access.File(a.repo, permissionPath, types.ActionRead) {
+	if !a.access.File(a.repo, permissionPath, api.ActionRead) {
 		return nil, 0, fmt.Errorf(
 			"vcs archive read denied: %w",
 			pkgroute.SourceError(source.ErrDenied, a.principal.Anonymous),
@@ -475,7 +475,7 @@ func (s VCSAPI) vcsFile(
 	if err != nil {
 		return nil, 0, err
 	}
-	if !a.access.File(a.repo, owner+"/"+name+"/refs/"+kind+"/"+ref+"/"+filename, types.ActionRead) {
+	if !a.access.File(a.repo, owner+"/"+name+"/refs/"+kind+"/"+ref+"/"+filename, api.ActionRead) {
 		return nil, 0, fmt.Errorf(
 			"vcs file read denied: %w",
 			pkgroute.SourceError(source.ErrDenied, a.principal.Anonymous),

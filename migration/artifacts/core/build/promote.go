@@ -8,10 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // ErrNoTarget is a promotion to a repository that does not exist.
@@ -46,7 +47,7 @@ type Promotion struct {
 	Scopes                  []string
 	// Properties replace the values of their keys on every promoted file:
 	// where it landed, or where it is without a target.
-	Properties types.Properties
+	Properties model.Properties
 	DryRun     bool
 	// FailFast aborts at the first error or warning, changing nothing.
 	FailFast bool
@@ -73,7 +74,7 @@ func (s *Service) Promote(ctx context.Context, p Promotion, a Access) (Promotion
 		return PromotionResult{}, fmt.Errorf("build: get run: %w", err)
 	}
 	repoKey, path := b.DocumentItem()
-	if !a.Build(repoKey, path, false, types.ActionWrite) {
+	if !a.Build(repoKey, path, false, api.ActionWrite) {
 		return PromotionResult{}, ErrForbidden
 	}
 	pr := &promoter{s: s, p: p, a: a, run: b}
@@ -120,7 +121,7 @@ func (s *Service) Promote(ctx context.Context, p Promotion, a Access) (Promotion
 func (s *Service) promotionTarget(ctx context.Context, key string) (repo.Config, error) {
 	c, err := s.Store.Repos().Get(ctx, key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return c, fmt.Errorf("%w: %s", ErrNoTarget, key)
 	case err != nil:
 		return c, fmt.Errorf("build: repository %s: %w", key, err)
@@ -143,7 +144,7 @@ type promoter struct {
 	s      *Service
 	p      Promotion
 	a      Access
-	run    types.Build
+	run    model.Build
 	target repo.Config
 	msgs   []item.Message
 }
@@ -151,7 +152,7 @@ type promoter struct {
 // located is an item a promotion acts on, with its repository.
 type located struct {
 	repo repo.Config
-	it   types.Item
+	it   model.Item
 }
 
 func (pr *promoter) sayf(level, format string, args ...any) {
@@ -201,7 +202,7 @@ func (pr *promoter) collect(ctx context.Context) ([]located, error) {
 	label := fmt.Sprintf("of build '%s' #%s", pr.run.Name, pr.run.Number)
 	// A file without a checksum is found nowhere and reported nowhere, as
 	// Artifactory leaves it out.
-	unsummed := func(bf types.BuildFile) bool { return bf.Checksums == (types.Checksums{}) }
+	unsummed := func(bf model.BuildFile) bool { return bf.Checksums == (kernel.Checksums{}) }
 	for _, m := range pr.run.Modules {
 		if pr.p.Artifacts {
 			for _, bf := range slices.DeleteFunc(slices.Clone(m.Artifacts), unsummed) {
@@ -249,7 +250,7 @@ func (pr *promoter) collect(ctx context.Context) ([]located, error) {
 
 // fromSource accepts the items in the promotion's source repository, or
 // every item when it names none.
-func (pr *promoter) fromSource(it types.Item) bool {
+func (pr *promoter) fromSource(it model.Item) bool {
 	return pr.p.SourceRepo == "" || it.ReportedRepoKey() == pr.p.SourceRepo
 }
 
@@ -274,18 +275,18 @@ func (c claims) free(id int64, key string) bool {
 // (research 22 §3.6). The item found is claimed for key.
 func (s *Service) findFile(
 	ctx context.Context,
-	bf types.BuildFile,
-	keep func(context.Context, types.Item) (bool, error),
+	bf model.BuildFile,
+	keep func(context.Context, model.Item) (bool, error),
 	taken claims,
 	key string,
 ) (located, bool, error) {
-	found, err := collect(s.Page, func(pg store.Page) ([]types.Item, string, error) {
+	found, err := collect(s.Page, func(pg kernel.Page) ([]model.Item, string, error) {
 		return s.Store.Items().FindByChecksum(ctx, bf.Checksums, pg)
 	})
 	if err != nil {
 		return located{}, false, fmt.Errorf("build: find %s: %w", bf.Name, err)
 	}
-	var match types.Item
+	var match model.Item
 	for _, it := range found {
 		if keep != nil {
 			ok, err := keep(ctx, it)
@@ -316,7 +317,7 @@ func (s *Service) findFile(
 // better reports whether it is a better match than match for the build file
 // key named name: free where match is taken, else named name where match
 // is not.
-func better(taken claims, key, name string, match, it types.Item) bool {
+func better(taken claims, key, name string, match, it model.Item) bool {
 	if m, i := taken.free(match.ID, key), taken.free(it.ID, key); m != i {
 		return i
 	}
@@ -327,10 +328,10 @@ func better(taken claims, key, name string, match, it types.Item) bool {
 // finds them: the items that in passes (nil passes all) and that carry the
 // run's build.name and build.number.
 func (s *Service) artifactOf(
-	run types.Build,
-	in func(types.Item) bool,
-) func(context.Context, types.Item) (bool, error) {
-	return func(ctx context.Context, it types.Item) (bool, error) {
+	run model.Build,
+	in func(model.Item) bool,
+) func(context.Context, model.Item) (bool, error) {
+	return func(ctx context.Context, it model.Item) (bool, error) {
 		if in != nil && !in(it) {
 			return false, nil
 		}
@@ -357,8 +358,8 @@ func (pr *promoter) relocate(ctx context.Context, files []located) ([]located, e
 		case f.repo.Key == pr.target.Key && !f.it.Cached:
 			pr.sayf(item.LevelInfo, "%s is already in %s", label, pr.target.Key)
 			landed = append(landed, f)
-		case !pr.a.Item(f.repo, full, types.ActionRead) ||
-			(!pr.p.Copy && !pr.a.Item(f.repo, full, types.ActionDelete)):
+		case !pr.a.Item(f.repo, full, api.ActionRead) ||
+			(!pr.p.Copy && !pr.a.Item(f.repo, full, api.ActionDelete)):
 			pr.sayf(item.LevelError, "Cannot %s %s: no permission to %s it", verb, label, verb)
 		case !pr.p.Copy && f.it.Cached:
 			pr.sayf(
@@ -367,7 +368,7 @@ func (pr *promoter) relocate(ctx context.Context, files []located) ([]located, e
 				verb,
 				label,
 			)
-		case !pr.a.Item(pr.target, full, types.ActionWrite):
+		case !pr.a.Item(pr.target, full, api.ActionWrite):
 			pr.sayf(item.LevelError, "Cannot %s %s: no permission to deploy to %s:%s",
 				verb, label, pr.target.Key, full)
 		default:
@@ -383,7 +384,7 @@ func (pr *promoter) relocate(ctx context.Context, files []located) ([]located, e
 				From: item.Target{Repo: f.repo, Cached: f.it.Cached, Path: full},
 				To:   item.Target{Repo: pr.target, Path: full},
 				Move: !pr.p.Copy, Dry: pr.p.DryRun, FailFast: pr.p.FailFast,
-				CanOverwrite: overwrite && pr.a.Item(pr.target, full, types.ActionDelete),
+				CanOverwrite: overwrite && pr.a.Item(pr.target, full, api.ActionDelete),
 				By:           pr.p.By,
 			})
 			if errors.Is(err, item.ErrInvalidTransfer) {
@@ -396,7 +397,7 @@ func (pr *promoter) relocate(ctx context.Context, files []located) ([]located, e
 			}
 			pr.msgs = append(pr.msgs, res.Messages...)
 			if res.Failed == 0 {
-				landed = append(landed, located{repo: pr.target, it: types.Item{
+				landed = append(landed, located{repo: pr.target, it: model.Item{
 					RepoKey: pr.target.Key, Path: f.it.Path, Name: f.it.Name,
 				}})
 			}
@@ -427,18 +428,18 @@ func (pr *promoter) sidecars(
 	overwrite = true
 	for _, m := range moves {
 		switch {
-		case !pr.a.Item(f.repo, m.From, types.ActionRead) ||
-			(!pr.p.Copy && !pr.a.Item(f.repo, m.From, types.ActionDelete)):
+		case !pr.a.Item(f.repo, m.From, api.ActionRead) ||
+			(!pr.p.Copy && !pr.a.Item(f.repo, m.From, api.ActionDelete)):
 			return fmt.Sprintf("no permission to %s its sidecar %s", verb, m.From), false, nil
-		case !pr.a.Item(pr.target, m.To, types.ActionWrite):
+		case !pr.a.Item(pr.target, m.To, api.ActionWrite):
 			return fmt.Sprintf("no permission to deploy its sidecar to %s:%s", pr.target.Key, m.To),
 				false, nil
-		case pr.a.Item(pr.target, m.To, types.ActionDelete):
+		case pr.a.Item(pr.target, m.To, api.ActionDelete):
 			continue
 		}
 		_, err := pr.s.Store.Items().Get(ctx, pr.target.Key, false, m.To)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 		case err != nil:
 			return "", false, fmt.Errorf("build: get %s: %w", m.To, err)
 		default:
@@ -455,7 +456,7 @@ func (pr *promoter) tag(ctx context.Context, files []located) error {
 	items := pr.s.items()
 	for _, f := range files {
 		full := f.it.FullPath()
-		if !pr.a.Item(f.repo, full, types.ActionAnnotate) {
+		if !pr.a.Item(f.repo, full, api.ActionAnnotate) {
 			pr.sayf(item.LevelWarning, "User doesn't have permissions to annotate '%s:%s'",
 				f.it.ReportedRepoKey(), full)
 			if pr.aborted() {
@@ -495,7 +496,7 @@ func (pr *promoter) record(ctx context.Context) error {
 	if ci == "" {
 		ci = pr.p.By
 	}
-	if _, err := pr.s.Store.Builds().AddPromotion(ctx, types.BuildPromotion{
+	if _, err := pr.s.Store.Builds().AddPromotion(ctx, model.BuildPromotion{
 		BuildID: pr.run.ID, Created: created.UTC(), CreatedBy: pr.p.By, Status: pr.p.Status,
 		Comment: pr.p.Comment, CIUser: ci, SourceRepo: pr.p.SourceRepo, Repo: pr.target.Key,
 	}); err != nil {

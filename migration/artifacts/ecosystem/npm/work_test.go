@@ -9,10 +9,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // run queues kind's work on the world's repository and runs it now, through
@@ -41,7 +41,7 @@ func TestUnitWorkReindex(t *testing.T) {
 	w := newWorld(t)
 	w.deploy(canonical("1.0.0"), pkg("left-pad", "1.0.0", ""), nil)
 	want := w.index()
-	pkgs, _, err := w.st.Packages().List(w.ctx, w.c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := w.st.Packages().List(w.ctx, w.c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestUnitConvert(t *testing.T) {
 	w := newWorld(t)
 	w.deploy("left-pad-1.0.0.tgz", pkg("left-pad", "1.0.0", ""), nil)
 	w.deploy("deep/stray.tgz", pkg("left-pad", "2.0.0", ""), nil)
-	w.deploy("scoped.tgz", pkg("@s/p", "1.0.0", ""), types.Properties{npm.PropDistTag: {"beta"}})
+	w.deploy("scoped.tgz", pkg("@s/p", "1.0.0", ""), model.Properties{npm.PropDistTag: {"beta"}})
 	// The same content as a version already at its canonical path needs
 	// nothing; content that is no tarball stays.
 	w.deploy(canonical("3.0.0"), pkg("left-pad", "3.0.0", ""), nil)
@@ -98,7 +98,7 @@ func TestUnitConvert(t *testing.T) {
 		if _, err := w.st.Items().
 			Get(w.ctx, w.c.Key, false, p); !errors.Is(
 			err,
-			store.ErrNotFound,
+			kernel.ErrNotFound,
 		) {
 			t.Errorf("%s stayed: %v", p, err)
 		}
@@ -165,7 +165,7 @@ func TestUnitWorkFailures(t *testing.T) {
 	env := format.Env{Store: w.st, Blobs: w.items.Blobs}
 	for _, key := range []string{"missing", "generic-local"} {
 		for _, kind := range h.WorkKinds() {
-			if err := h.Work(w.ctx, env, types.WorkItem{Kind: kind, Key: key}); err != nil {
+			if err := h.Work(w.ctx, env, work.WorkItem{Kind: kind, Key: key}); err != nil {
 				t.Errorf("%s on %s: %v", kind, key, err)
 			}
 		}
@@ -175,7 +175,7 @@ func TestUnitWorkFailures(t *testing.T) {
 	}
 	// An item of a kind the format no longer runs, left by an earlier
 	// build, is finished without reading anything.
-	if err := h.Work(w.ctx, format.Env{}, types.WorkItem{
+	if err := h.Work(w.ctx, format.Env{}, work.WorkItem{
 		Kind: "npm.snapshots", Key: w.c.Key + "/left-pad",
 	}); err != nil {
 		t.Errorf("a stale kind: %v", err)
@@ -188,7 +188,7 @@ func TestUnitWorkFailures(t *testing.T) {
 	if err := h.Work(
 		w.ctx,
 		moveFails,
-		types.WorkItem{Kind: npm.KindConvert, Key: w.c.Key},
+		work.WorkItem{Kind: npm.KindConvert, Key: w.c.Key},
 	); !errors.Is(
 		err,
 		errFault,
@@ -211,7 +211,7 @@ func TestUnitWorkFailures(t *testing.T) {
 		if err := h.Work(
 			w.ctx,
 			env,
-			types.WorkItem{Kind: c.kind, Key: w.c.Key},
+			work.WorkItem{Kind: c.kind, Key: w.c.Key},
 		); !errors.Is(
 			err,
 			errFault,
@@ -227,7 +227,7 @@ func TestUnitWorkFailures(t *testing.T) {
 	if err := w.items.Blobs.Delete(w.ctx, it.Actual.SHA256); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Work(w.ctx, env, types.WorkItem{Kind: npm.KindConvert, Key: w.c.Key}); err == nil {
+	if err := h.Work(w.ctx, env, work.WorkItem{Kind: npm.KindConvert, Key: w.c.Key}); err == nil {
 		t.Error("converted lost content")
 	}
 }

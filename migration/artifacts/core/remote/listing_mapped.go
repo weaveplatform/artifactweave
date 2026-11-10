@@ -10,7 +10,6 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // MappedFolderListing exposes only authorized canonical files. Folders are
@@ -137,9 +136,9 @@ func ListMappedFolder(ctx context.Context, service *source.Service, q source.Req
 func mappedFileAllowed(q source.Request, canonical string) bool {
 	return repo.PatternsOf(q.Repo).Accepts(canonical, false) &&
 		q.Access.Allows(
-			types.ResourceArtifact,
+			accessapi.ResourceArtifact,
 			accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
 			canonical,
-			types.ActionRead,
+			accessapi.ActionRead,
 		)
 }

@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const pageSize = 200
@@ -42,13 +42,13 @@ type IndexedVersion struct {
 func Sync(
 	ctx context.Context,
 	st Store,
-	p types.Package,
+	p model.Package,
 	v IndexedVersion,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	pv, err := st.Packages().Version(ctx, p.ID, v.Version)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
-		pv, err = st.Packages().PutVersion(ctx, types.PackageVersion{
+	case errors.Is(err, kernel.ErrNotFound):
+		pv, err = st.Packages().PutVersion(ctx, model.PackageVersion{
 			PackageID: p.ID, Version: v.Version, Created: v.Created, Metadata: v.Metadata,
 		})
 	case err == nil && (!pv.Created.Equal(v.Created) || !bytes.Equal(pv.Metadata, v.Metadata)):
@@ -72,7 +72,7 @@ func Sync(
 	}
 	for _, id := range v.Files {
 		if err := st.Packages().
-			LinkFile(ctx, types.VersionFile{VersionID: pv.ID, ItemID: id}); err != nil {
+			LinkFile(ctx, model.VersionFile{VersionID: pv.ID, ItemID: id}); err != nil {
 			return pv, fmt.Errorf("pkgindex: link item %d to %s %s: %w", id, p.Name, v.Version, err)
 		}
 	}
@@ -91,7 +91,7 @@ func Reconcile(ctx context.Context, st Store, c repo.Config, want []Indexed) err
 	for _, p := range want {
 		byName[p.Name] = p
 	}
-	for page := (store.Page{Limit: pageSize}); ; {
+	for page := (kernel.Page{Limit: pageSize}); ; {
 		pkgs, next, err := st.Packages().List(ctx, c.Key, page)
 		if err != nil {
 			return fmt.Errorf("pkgindex: packages of %s: %w", c.Key, err)
@@ -109,7 +109,7 @@ func Reconcile(ctx context.Context, st Store, c repo.Config, want []Indexed) err
 	want = slices.Clone(want)
 	slices.SortFunc(want, func(a, b Indexed) int { return strings.Compare(a.Name, b.Name) })
 	for _, w := range want {
-		p, err := st.Packages().Ensure(ctx, types.Package{
+		p, err := st.Packages().Ensure(ctx, model.Package{
 			RepoKey: c.Key, Name: w.Name, Type: c.PackageType, Created: w.Created,
 		})
 		if err != nil {
@@ -133,7 +133,7 @@ func Reconcile(ctx context.Context, st Store, c repo.Config, want []Indexed) err
 func dropUnbacked(
 	ctx context.Context,
 	st Store,
-	p types.Package,
+	p model.Package,
 	want map[string]Indexed,
 ) error {
 	w, ok := want[p.Name]

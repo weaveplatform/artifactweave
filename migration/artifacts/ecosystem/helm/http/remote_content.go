@@ -17,8 +17,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	helmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func validateRemoteChart(
@@ -198,7 +198,7 @@ func validateRemoteProvenance(
 		if !ok || value == "" {
 			return remoteError()
 		}
-		parsed, err := item.ParseChecksums(types.Checksums{SHA256: value})
+		parsed, err := item.ParseChecksums(kernel.Checksums{SHA256: value})
 		if err != nil || entry.Digest != "" && parsed.SHA256 != entry.Digest {
 			return remoteError()
 		}

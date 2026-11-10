@@ -11,10 +11,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Serves reports whether t is the Machine Learning package type.
@@ -108,7 +108,7 @@ func CheckTransaction(
 // manifest declares, with that size and SHA-256, whenever the manifest is
 // stored (409). The index is then rebuilt (Reindex), so a version made
 // complete again is published again.
-func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || ctx.Value(publicationKey{}) == true {
 		return nil
 	}
@@ -145,7 +145,7 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 
 // Deleted rebuilds the index (Reindex) after any delete outside the native
 // transaction, so removing a declared file withdraws its version at once.
-func (h Handler) Deleted(ctx context.Context, env format.Env, c repo.Config, _ []types.Item) error {
+func (h Handler) Deleted(ctx context.Context, env format.Env, c repo.Config, _ []model.Item) error {
 	if ctx.Value(publicationKey{}) == true {
 		return nil
 	}
@@ -160,7 +160,7 @@ func (Handler) GuardTransferSource(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 ) error {
 	if Private(it.FullPath()) {
 		return format.Rejectf(
@@ -216,7 +216,7 @@ func (Handler) Resolve(
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	err := env.Store.Tx(ctx, func(ctx context.Context) error {
 		groups := map[string]*pkgindex.Indexed{}
-		page := store.Page{Limit: store.MaxLimit}
+		page := kernel.Page{Limit: kernel.MaxLimit}
 		for {
 			items, next, err := env.Store.Items().Descendants(ctx, c.Key, false, "models", page)
 			if err != nil {
@@ -232,7 +232,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 					return err
 				}
 				files, err := Verify(ctx, env, c, id.Prefix(), m)
-				if errors.Is(err, store.ErrNotFound) {
+				if errors.Is(err, kernel.ErrNotFound) {
 					continue
 				}
 				if err != nil {

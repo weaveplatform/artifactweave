@@ -10,8 +10,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 func pdbPackage(id string, files ...zipFile) []byte {
@@ -193,7 +194,7 @@ func TestUnitSymbolWorkFaultsAndObsoleteRepositories(t *testing.T) {
 	w := newWorld(t, nil)
 	w.deploy("A.1.0.0.snupkg", pdbPackage("A", zipFile{"lib/app.pdb", string(portablePDB())}), nil)
 	run := func(env format.Env, key string) error {
-		return (nuget.Handler{}).Work(w.ctx, env, types.WorkItem{Kind: nuget.KindSymbols, Key: key})
+		return (nuget.Handler{}).Work(w.ctx, env, work.WorkItem{Kind: nuget.KindSymbols, Key: key})
 	}
 	for _, method := range []string{"RepoGet", "Versions", "Search"} {
 		env := w.items.Env()
@@ -203,7 +204,7 @@ func TestUnitSymbolWorkFaultsAndObsoleteRepositories(t *testing.T) {
 		}
 	}
 	env := w.items.Env()
-	env.Derive = func(context.Context, format.Derived) (types.Item, error) { return types.Item{}, errFault }
+	env.Derive = func(context.Context, format.Derived) (model.Item, error) { return model.Item{}, errFault }
 	if err := run(env, w.c.Key); !errors.Is(err, errFault) {
 		t.Fatal("derive", err)
 	}

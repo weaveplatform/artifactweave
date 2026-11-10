@@ -18,9 +18,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -231,7 +230,7 @@ func TestAccRemoteNuGetSnapshotCacheRetention(t *testing.T) {
 	if err = q.HandleEvery(
 		nugetfmt.KindSnapshots,
 		time.Minute,
-		func(ctx context.Context, it types.WorkItem) error {
+		func(ctx context.Context, it work.WorkItem) error {
 			return (nugetfmt.Handler{}).Work(ctx, f.items.Env(), it)
 		},
 	); err != nil {
@@ -245,7 +244,7 @@ func TestAccRemoteNuGetSnapshotCacheRetention(t *testing.T) {
 	if _, err := f.db.Items().
 		Get(t.Context(), c.Key, true, old); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("old cache item retained", err)
 	}

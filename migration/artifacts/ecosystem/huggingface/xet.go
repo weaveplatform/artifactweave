@@ -7,8 +7,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/xet"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type xetWriteKey struct{}
@@ -52,7 +52,7 @@ func (Handler) GuardTransferSource(
 	_ context.Context,
 	_ format.Env,
 	_ repo.Config,
-	it types.Item,
+	it model.Item,
 ) error {
 	if IsXetPath(it.FullPath()) {
 		return format.Rejectf(

@@ -12,11 +12,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	swiftfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const remoteMetadataLimit = 2 << 20
@@ -192,7 +192,7 @@ func archiveChecksum(info releaseInfo) string {
 
 func (h handler) remoteArchive(r *http.Request, p swiftfmt.Package) (source.Result, error) {
 	path := p.ArchivePath()
-	if !h.k.Can(r, path, types.ActionRead) {
+	if !h.k.Can(r, path, api.ActionRead) {
 		return source.Result{}, source.ErrDenied
 	}
 	info, metadata, err := h.remoteInfo(r, p)
@@ -265,7 +265,7 @@ func remoteJSONResult(result source.Result, body any) (source.Result, error) {
 				`"%x"`,
 				digest,
 			),
-			Checksums: types.Checksums{SHA256: hex.EncodeToString(digest[:])},
+			Checksums: kernel.Checksums{SHA256: hex.EncodeToString(digest[:])},
 		},
 	}
 	return result, nil
@@ -273,12 +273,12 @@ func remoteJSONResult(result source.Result, body any) (source.Result, error) {
 
 func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, q request) {
 	p := q.packageID
-	if q.kind != "releases" && !h.k.Require(w, r, p.ArchivePath(), types.ActionRead) {
+	if q.kind != "releases" && !h.k.Require(w, r, p.ArchivePath(), api.ActionRead) {
 		return
 	}
 	switch q.kind {
 	case "releases":
-		if !h.k.RequireFolder(w, r, p.Scope+"/"+p.Name, types.ActionRead) {
+		if !h.k.RequireFolder(w, r, p.Scope+"/"+p.Name, api.ActionRead) {
 			return
 		}
 		out, result, err := h.remoteReleases(r, p)
@@ -290,7 +290,7 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, q request) {
 		for version := range out.Releases {
 			p.Version = version
 			path := p.ArchivePath()
-			if !h.k.Can(r, path, types.ActionRead) {
+			if !h.k.Can(r, path, api.ActionRead) {
 				delete(out.Releases, version)
 				continue
 			}
@@ -342,7 +342,7 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, q request) {
 	case "manifest":
 		h.remoteManifest(w, r, p)
 	default:
-		h.k.Error(w, r, store.ErrNotFound)
+		h.k.Error(w, r, kernel.ErrNotFound)
 	}
 }
 

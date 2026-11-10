@@ -10,7 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // RetentionSettings are retention settings as clients send them, in a
@@ -30,8 +31,8 @@ type RetentionSettings struct {
 // count of 0 keeps every run too unless strict, which refuses it as
 // Artifactory's retention endpoint does ("Max count retention needs to be
 // a positive number").
-func (r RetentionSettings) Retention(strict bool) (types.BuildRetention, error) {
-	var out types.BuildRetention
+func (r RetentionSettings) Retention(strict bool) (model.BuildRetention, error) {
+	var out model.BuildRetention
 	if r.Count != "" {
 		n, err := strconv.ParseInt(r.Count.String(), 10, 32)
 		switch {
@@ -89,7 +90,7 @@ func minimumBuildDate(raw json.RawMessage) (time.Time, error) {
 // documentRetention reads a build-info document's buildRetention; ok is
 // false when it has none. The document is read by key, as JFrog names
 // them, rather than through a tagged struct.
-func documentRetention(raw []byte) (r types.BuildRetention, ok bool, err error) {
+func documentRetention(raw []byte) (r model.BuildRetention, ok bool, err error) {
 	var doc, fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return r, false, fmt.Errorf("%w: the build-info document: %w", ErrInvalid, err)
@@ -120,14 +121,14 @@ func documentRetention(raw []byte) (r types.BuildRetention, ok bool, err error) 
 // Discard applies retention settings to the runs of a build.
 type Discard struct {
 	ProjectKey, Name string
-	Retention        types.BuildRetention
+	Retention        model.BuildRetention
 	By               string
 }
 
 // Discards returns the runs d discards, oldest first, having checked that
 // the caller may: it needs delete on the build and on each run discarded.
 // ErrNotFound when the build has no runs.
-func (s *Service) Discards(ctx context.Context, d Discard, a Access) ([]types.BuildRun, error) {
+func (s *Service) Discards(ctx context.Context, d Discard, a Access) ([]model.BuildRun, error) {
 	projectKey := ProjectKey(d.ProjectKey)
 	runs, err := s.runs(ctx, projectKey, d.Name)
 	if err != nil {
@@ -136,13 +137,13 @@ func (s *Service) Discards(ctx context.Context, d Discard, a Access) ([]types.Bu
 	if len(runs) == 0 {
 		return nil, fmt.Errorf("build: runs of %s: %w", d.Name, ErrNotFound)
 	}
-	repoKey := types.BuildInfoRepo(projectKey)
-	if !a.Build(repoKey, types.EncodeBuildInfoSegment(d.Name), true, types.ActionDelete) {
+	repoKey := model.BuildInfoRepo(projectKey)
+	if !a.Build(repoKey, model.EncodeBuildInfoSegment(d.Name), true, api.ActionDelete) {
 		return nil, ErrForbidden
 	}
 	out := discards(runs, d.Retention)
 	for _, r := range out {
-		if !a.Build(repoKey, documentPath(r), false, types.ActionDelete) {
+		if !a.Build(repoKey, documentPath(r), false, api.ActionDelete) {
 			return nil, ErrForbidden
 		}
 	}
@@ -152,8 +153,8 @@ func (s *Service) Discards(ctx context.Context, d Discard, a Access) ([]types.Bu
 // Discard deletes the runs of a build that d does not keep, as a delete of
 // them would (Delete): with their documents, and with their artifacts when
 // d asks. It returns the deleted runs.
-func (s *Service) Discard(ctx context.Context, d Discard, a Access) ([]types.BuildRun, error) {
-	var gone []types.BuildRun
+func (s *Service) Discard(ctx context.Context, d Discard, a Access) ([]model.BuildRun, error) {
+	var gone []model.BuildRun
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
 		runs, err := s.Discards(ctx, d, a)
 		if err != nil || len(runs) == 0 {
@@ -184,8 +185,8 @@ func (s *Service) Discard(ctx context.Context, d Discard, a Access) ([]types.Bui
 // runs still count towards r.Count, as the builds Jenkins keeps forever
 // count in its log rotation, which build retention mirrors. They are
 // returned oldest first.
-func discards(runs []types.BuildRun, r types.BuildRetention) []types.BuildRun {
-	var out []types.BuildRun
+func discards(runs []model.BuildRun, r model.BuildRetention) []model.BuildRun {
+	var out []model.BuildRun
 	for i, run := range slices.Backward(runs) {
 		if slices.Contains(r.KeepNumbers, run.Number) {
 			continue

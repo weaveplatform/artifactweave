@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	baseformat "github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -25,8 +26,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -199,10 +198,10 @@ func statusOf(err error) int {
 	if errors.Is(err, kernel.ErrUnauthenticated) {
 		return http.StatusUnauthorized
 	}
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return http.StatusNotFound
 	}
-	if errors.Is(err, store.ErrConflict) {
+	if errors.Is(err, kernel.ErrConflict) {
 		return http.StatusConflict
 	}
 	return http.StatusBadGateway
@@ -225,7 +224,7 @@ func (h handler) uploadEntry(r *http.Request, obj batchObject, out *batchResult)
 	}
 	// A write-only principal may upload an already present OID. The batch
 	// response must not reveal whether that OID exists or its stored size.
-	if !h.k.Can(target, path, types.ActionRead) {
+	if !h.k.Can(target, path, api.ActionRead) {
 		out.Actions = map[string]batchAction{"upload": {Href: objectURL(r, obj.OID, obj.Size)}}
 		return nil
 	}
@@ -237,7 +236,7 @@ func (h handler) uploadEntry(r *http.Request, obj batchObject, out *batchResult)
 		}
 		return apierror.New(http.StatusConflict, "Git LFS object identity conflict")
 	}
-	if !errors.Is(err, store.ErrNotFound) {
+	if !errors.Is(err, kernel.ErrNotFound) {
 		return fmt.Errorf("gitlfs: check existing object: %w", err)
 	}
 	out.Actions = map[string]batchAction{"upload": {Href: objectURL(r, obj.OID, obj.Size)}}
@@ -267,7 +266,7 @@ func (h handler) available(r *http.Request, obj batchObject) error {
 		}
 		readable := false
 		for _, member := range members {
-			if !h.k.Can(member, path, types.ActionRead) {
+			if !h.k.Can(member, path, api.ActionRead) {
 				continue
 			}
 			readable = true
@@ -279,7 +278,7 @@ func (h handler) available(r *http.Request, obj batchObject) error {
 		if !readable {
 			return apierror.New(http.StatusForbidden, "Git LFS read denied")
 		}
-		return store.ErrNotFound
+		return kernel.ErrNotFound
 	default:
 		found, err := h.find(r, path)
 		if err != nil {
@@ -300,7 +299,7 @@ func (h handler) targetRequest(r *http.Request, path string) (*http.Request, err
 			"remote Git LFS repository is read-only",
 		)
 	}
-	if c.Class != repo.Virtual && !h.k.Can(r, path, types.ActionWrite) {
+	if c.Class != repo.Virtual && !h.k.Can(r, path, api.ActionWrite) {
 		return nil, apierror.New(http.StatusForbidden, "Git LFS upload denied")
 	}
 	if c.Class != repo.Virtual {
@@ -310,7 +309,7 @@ func (h handler) targetRequest(r *http.Request, path string) (*http.Request, err
 	if err != nil {
 		return nil, err
 	}
-	if !h.k.Can(mr, path, types.ActionWrite) {
+	if !h.k.Can(mr, path, api.ActionWrite) {
 		return nil, apierror.New(http.StatusForbidden, "Git LFS deployment target denied")
 	}
 	return mr, nil
@@ -351,7 +350,7 @@ func (h handler) members(r *http.Request) ([]*http.Request, error) {
 		}
 		seen[key] = true
 		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -375,7 +374,7 @@ func (h handler) find(r *http.Request, path string) (pkgroute.Found, error) {
 	// Virtual reads select a permitted member in available or serveObject,
 	// then call find with that member request. A virtual key itself is never a
 	// permission target.
-	if !h.k.Can(r, path, types.ActionRead) {
+	if !h.k.Can(r, path, api.ActionRead) {
 		return pkgroute.Found{}, apierror.New(http.StatusForbidden, "Git LFS read denied")
 	}
 	if err := generic.CheckDownload(pkgroute.RequestFrom(r).Repo, path, false); err != nil {
@@ -434,7 +433,7 @@ func (h handler) download(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) objectError(w http.ResponseWriter, r *http.Request, err error) {
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		err = apierror.New(http.StatusNotFound, "Git LFS object unavailable")
 	}
 	h.k.Error(w, r, err)
@@ -457,7 +456,7 @@ func (h handler) serveObject(w http.ResponseWriter, r *http.Request, obj batchOb
 		}
 		readable := false
 		for _, member := range members {
-			if !h.k.Can(member, path, types.ActionRead) {
+			if !h.k.Can(member, path, api.ActionRead) {
 				continue
 			}
 			readable = true
@@ -480,7 +479,7 @@ func (h handler) serveObject(w http.ResponseWriter, r *http.Request, obj batchOb
 		if !readable {
 			return apierror.New(http.StatusForbidden, "Git LFS read denied")
 		}
-		return store.ErrNotFound
+		return kernel.ErrNotFound
 	default:
 		return source.ErrUnsupported
 	}
@@ -515,7 +514,7 @@ func (h handler) upload(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	_, err = h.k.StoreNew(target, path, info, nil, types.Checksums{SHA256: oid},
+	_, err = h.k.StoreNew(target, path, info, nil, kernel.Checksums{SHA256: oid},
 		func() error { return apierror.New(http.StatusConflict, "Git LFS object already exists") })
 	if err != nil {
 		if statusOf(err) != http.StatusConflict {

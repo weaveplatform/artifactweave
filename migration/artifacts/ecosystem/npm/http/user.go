@@ -14,8 +14,6 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Accounts is what npm's legacy login and logout need from the server: the
@@ -144,7 +142,7 @@ func (a Accounts) verify(ctx context.Context, name, password string) (kernel.Pri
 	if err != nil {
 		return kernel.Principal{}, err //nolint:wrapcheck // apierror values
 	}
-	if p.Registry != nil || p.Identity != types.IdentityStored || !wholeIdentity(p.Scope) {
+	if p.Registry != nil || p.Identity != kernel.IdentityStored || !wholeIdentity(p.Scope) {
 		return kernel.Principal{}, kernel.ErrBadCredentials
 	}
 	return p, nil
@@ -152,9 +150,9 @@ func (a Accounts) verify(ctx context.Context, name, password string) (kernel.Pri
 
 // wholeIdentity reports whether a token's scope acts as its user or as an
 // administrator, rather than narrowing to groups or resources.
-func wholeIdentity(s types.Scope) bool {
+func wholeIdentity(s kernel.Scope) bool {
 	for _, e := range s.Entries {
-		if e.Kind == types.ScopeUser || e.Kind == types.ScopeAdmin {
+		if e.Kind == kernel.ScopeUser || e.Kind == kernel.ScopeAdmin {
 			return true
 		}
 	}
@@ -186,7 +184,7 @@ func (h handler) logout(w http.ResponseWriter, r *http.Request) {
 		err := h.accounts.Tokens.RevokeValue(r.Context(), raw)
 		switch {
 		case err == nil,
-			errors.Is(err, store.ErrNotFound),
+			errors.Is(err, kernel.ErrNotFound),
 			errors.Is(err, accessapi.ErrNotRevocable):
 		default:
 			h.k.Error(w, r, fmt.Errorf("npm: logout: %w", err))

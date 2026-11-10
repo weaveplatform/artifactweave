@@ -7,7 +7,8 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // The CLI fixtures are the AQL the pinned JFrog CLI sends, captured from
@@ -31,24 +32,24 @@ var Now = Base.Add(time.Hour)
 // Seed is one item to store, with its properties and its statistics; nil
 // Stats stores no statistics record.
 type Seed struct {
-	Item       types.Item
-	Properties types.Properties
-	Stats      *types.ItemStats
+	Item       model.Item
+	Properties model.Properties
+	Stats      *model.ItemStats
 }
 
 // Seeds returns the items in insertion order; stores give them ascending
 // IDs, which break ties in every ordering.
 func Seeds() []Seed {
 	var out []Seed
-	add := func(repoKey, full string, folder bool, size int64, by string, props types.Properties) {
+	add := func(repoKey, full string, folder bool, size int64, by string, props model.Properties) {
 		n := len(out) + 1
 		parent, name := path.Split(full)
 		parent = strings.TrimSuffix(parent, "/")
 		if parent == "" {
-			parent = types.RootPath
+			parent = kernel.RootPath
 		}
-		stored, cached := types.ResolveRepoKey(repoKey)
-		it := types.Item{
+		stored, cached := model.ResolveRepoKey(repoKey)
+		it := model.Item{
 			RepoKey: stored, Cached: cached, Path: parent, Name: name, Folder: folder,
 			Size: size, CreatedBy: by,
 			Created: Base.Add(time.Duration(n) * time.Minute),
@@ -58,7 +59,7 @@ func Seeds() []Seed {
 		}
 		if !folder {
 			//nolint:gosec // n numbers a seed, far inside rune's range.
-			it.Actual = types.Checksums{
+			it.Actual = kernel.Checksums{
 				SHA1: strings.Repeat(string(rune('a'+n)), 40),
 				MD5:  strings.Repeat(string(rune('a'+n)), 32),
 			}
@@ -69,20 +70,20 @@ func Seeds() []Seed {
 	add("libs-local", "org/acme", true, 0, "", nil)
 	add("libs-local", "org/acme/lib", true, 0, "", nil)
 	add("libs-local", "org/acme/app-1.0.jar", false, 100, "alice",
-		types.Properties{"build.name": {"app"}, "release": {"1.0"}})
+		model.Properties{"build.name": {"app"}, "release": {"1.0"}})
 	add("libs-local", "org/acme/app-1.0.pom", false, 10, "bob",
-		types.Properties{"build.name": {"app"}})
+		model.Properties{"build.name": {"app"}})
 	add("libs-local", "org/acme/lib/util-2.0.jar", false, 300, "alice",
-		types.Properties{"release": {"2.0"}, "owner": {"team-a"}})
+		model.Properties{"release": {"2.0"}, "owner": {"team-a"}})
 	add("libs-local", "readme.md", false, 5, "carol", nil)
 	add("generic-local", "docs", true, 0, "", nil)
 	add("generic-local", "docs/guide [1].txt", false, 7, "", nil)
 	// The two license items are $msp's documented example (research 22
 	// §1.1): a_b.txt is item B, axb.txt item A.
 	add("generic-local", "docs/a_b.txt", false, 8, "",
-		types.Properties{"license": {"LGPL-2.1", "LGPL-2.2"}})
+		model.Properties{"license": {"LGPL-2.1", "LGPL-2.2"}})
 	add("generic-local", "docs/axb.txt", false, 8, "",
-		types.Properties{"license": {"AGPL-V3"}})
+		model.Properties{"license": {"AGPL-V3"}})
 	add("generic-local", "docs/50%.txt", false, 9, "", nil)
 	add("generic-local", "docs/50abc.txt", false, 9, "", nil)
 	add("generic-local", "docs/naïve.txt", false, 11, "", nil)
@@ -91,24 +92,24 @@ func Seeds() []Seed {
 	// leaves one (#444): a query finds it in place of the record-less root
 	// the other repositories answer with (aql.RootHit). Stores create it
 	// with EnsureRoot.
-	root := types.RootItem("generic-local", false)
+	root := model.RootItem("generic-local", false)
 	root.Created, root.Updated = Base.Add(16*time.Minute), Base.Add(16*time.Minute)
 	root.Modified = Base.Add(4 * time.Minute)
-	out = append(out, Seed{Item: root, Properties: types.Properties{"team": {"docs"}}})
+	out = append(out, Seed{Item: root, Properties: model.Properties{"team": {"docs"}}})
 	// readme.md has no modification time, which SQL stores as NULL.
 	out[6].Item.Modified = time.Time{}
 	// util-2.0.jar has no statistics record and app-1.0.pom an empty one:
 	// a never-downloaded item compares as NULL in the first case and as 0
 	// or "" in the second.
-	out[3].Stats = &types.ItemStats{
+	out[3].Stats = &model.ItemStats{
 		DownloadCount: 5, LastDownloaded: Base.Add(30 * time.Minute), LastDownloadedBy: "alice",
 	}
-	out[4].Stats = &types.ItemStats{}
-	out[6].Stats = &types.ItemStats{
+	out[4].Stats = &model.ItemStats{}
+	out[6].Stats = &model.ItemStats{
 		RemoteDownloadCount: 2, RemoteLastDownloaded: Base.Add(40 * time.Minute),
 		RemoteLastDownloadedBy: "bob", RemoteOrigin: "https://up", RemotePath: "readme.md",
 	}
-	out[14].Stats = &types.ItemStats{
+	out[14].Stats = &model.ItemStats{
 		DownloadCount: 1, LastDownloaded: Base.Add(50 * time.Minute), LastDownloadedBy: "carol",
 	}
 	return out
@@ -122,7 +123,7 @@ func Hits() []aql.Hit {
 	for n, s := range seeds {
 		it := s.Item
 		it.ID = int64(n + 1)
-		_, _, it.Depth, _ = types.SplitItemPath(it.FullPath())
+		_, _, it.Depth, _ = kernel.SplitItemPath(it.FullPath())
 		out[n] = aql.Hit{Item: it, Properties: s.Properties, Stats: s.Stats}
 	}
 	return out

@@ -14,7 +14,7 @@ import (
 	"github.com/ulikunitz/xz"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitParsePackagesIndexBindsRealPackage(t *testing.T) {
@@ -28,7 +28,7 @@ func TestUnitParsePackagesIndexBindsRealPackage(t *testing.T) {
 	}
 	index, err := Packages([]IndexedBinary{{
 		Binary: binary, Path: "pool/alpha_1.0_amd64_0.deb", Size: int64(len(body)),
-		Checksums: types.Checksums{
+		Checksums: kernel.Checksums{
 			SHA256: fmt.Sprintf("%x", sha256.Sum256(body)),
 			MD5:    fmt.Sprintf("%x", md5.Sum(body)),
 		},

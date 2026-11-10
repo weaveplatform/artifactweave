@@ -12,8 +12,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 var luaVersions = []string{"5.1", "5.2", "5.3", "5.4", "5.5"}
@@ -30,13 +30,13 @@ type manifestEntry struct{ name, version, arch string }
 // Work builds one plain Lua manifest and the five version-specific variants
 // the current LuaRocks client requests. The tree is read afresh on each run,
 // so queued bursts and restores settle to the final committed state.
-func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) error {
+func (Handler) Work(ctx context.Context, env format.Env, work work.WorkItem) error {
 	if work.Kind != KindManifest {
 		return nil
 	}
 	c, err := env.Store.Repos().Get(ctx, work.Key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	case err != nil:
 		return fmt.Errorf("luarocks: repository: %w", err)
@@ -150,7 +150,7 @@ func filterVersion(
 			filename := e.name + "-" + e.version + ".rockspec"
 			it, err := env.Store.Items().Get(ctx, c.Key, false, filename)
 			switch {
-			case errors.Is(err, store.ErrNotFound):
+			case errors.Is(err, kernel.ErrNotFound):
 			case err != nil:
 				return nil, fmt.Errorf("luarocks: rockspec %s: %w", filename, err)
 			default:

@@ -16,10 +16,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 func TestAccSmartDiscoveryRejectsProtocolFailures(t *testing.T) {
@@ -59,7 +61,7 @@ func TestAccSmartDiscoveryRejectsProtocolFailures(t *testing.T) {
 			if _, err := w.db.Items().
 				Get(w.ctx, w.c.Key, true, "file.bin"); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("discovery failure published", err)
 			}
@@ -281,18 +283,18 @@ func (f *faultStore) fault(call string) error {
 	return nil
 }
 
-func (f *faultStore) Repos() store.RepoStore { return faultRepos{f.Store.Repos(), f} }
+func (f *faultStore) Repos() port.RepoStore { return faultRepos{f.Store.Repos(), f} }
 
-func (f *faultStore) RemoteCache() store.RemoteCacheStore {
+func (f *faultStore) RemoteCache() port.RemoteCacheStore {
 	return faultRemoteCache{f.Store.RemoteCache(), f}
 }
 
-func (f *faultStore) Items() store.ItemStore { return faultItems{f.Store.Items(), f} }
+func (f *faultStore) Items() port.ItemStore { return faultItems{f.Store.Items(), f} }
 
-func (f *faultStore) WorkQueue() store.WorkQueue { return faultWork{f.Store.WorkQueue(), f} }
+func (f *faultStore) WorkQueue() work.WorkQueue { return faultWork{f.Store.WorkQueue(), f} }
 
 type faultRepos struct {
-	store.RepoStore
+	port.RepoStore
 	f *faultStore
 }
 
@@ -304,33 +306,33 @@ func (r faultRepos) Get(ctx context.Context, key string) (repo.Config, error) {
 }
 
 type faultRemoteCache struct {
-	store.RemoteCacheStore
+	port.RemoteCacheStore
 	f *faultStore
 }
 
-func (c faultRemoteCache) Source(ctx context.Context, key string) (types.SourceIdentity, error) {
+func (c faultRemoteCache) Source(ctx context.Context, key string) (model.SourceIdentity, error) {
 	if err := c.f.fault("RemoteCache.Source"); err != nil {
-		return types.SourceIdentity{}, err
+		return model.SourceIdentity{}, err
 	}
 	return c.RemoteCacheStore.Source(ctx, key)
 }
 
 func (c faultRemoteCache) Begin(
 	ctx context.Context,
-	key types.RemoteCacheKey,
-) (types.RemoteCacheToken, error) {
+	key model.RemoteCacheKey,
+) (model.RemoteCacheToken, error) {
 	if err := c.f.fault("RemoteCache.Begin"); err != nil {
-		return types.RemoteCacheToken{}, err
+		return model.RemoteCacheToken{}, err
 	}
 	return c.RemoteCacheStore.Begin(ctx, key)
 }
 
 func (c faultRemoteCache) Read(
 	ctx context.Context,
-	key types.RemoteCacheKey,
-) (types.RemoteCacheEntry, error) {
+	key model.RemoteCacheKey,
+) (model.RemoteCacheEntry, error) {
 	if err := c.f.fault("RemoteCache.Read"); err != nil {
-		return types.RemoteCacheEntry{}, err
+		return model.RemoteCacheEntry{}, err
 	}
 	return c.RemoteCacheStore.Read(ctx, key)
 }
@@ -338,8 +340,8 @@ func (c faultRemoteCache) Read(
 func (c faultRemoteCache) Exact(
 	ctx context.Context,
 	key, path string,
-	p store.Page,
-) ([]types.RemoteCacheEntry, string, error) {
+	p kernel.Page,
+) ([]model.RemoteCacheEntry, string, error) {
 	if err := c.f.fault("RemoteCache.Exact"); err != nil {
 		return nil, "", err
 	}
@@ -348,18 +350,18 @@ func (c faultRemoteCache) Exact(
 
 func (c faultRemoteCache) Put(
 	ctx context.Context,
-	token types.RemoteCacheToken,
-	entry types.RemoteCacheEntry,
-) (types.RemoteCacheEntry, error) {
+	token model.RemoteCacheToken,
+	entry model.RemoteCacheEntry,
+) (model.RemoteCacheEntry, error) {
 	if err := c.f.fault("RemoteCache.Put"); err != nil {
-		return types.RemoteCacheEntry{}, err
+		return model.RemoteCacheEntry{}, err
 	}
 	return c.RemoteCacheStore.Put(ctx, token, entry)
 }
 
 func (c faultRemoteCache) Touch(
 	ctx context.Context,
-	token types.RemoteCacheToken,
+	token model.RemoteCacheToken,
 	at time.Time,
 ) error {
 	if err := c.f.fault("RemoteCache.Touch"); err != nil {
@@ -368,26 +370,26 @@ func (c faultRemoteCache) Touch(
 	return c.RemoteCacheStore.Touch(ctx, token, at)
 }
 
-func (c faultRemoteCache) State(ctx context.Context, key string) (types.RemoteSourceState, error) {
+func (c faultRemoteCache) State(ctx context.Context, key string) (model.RemoteSourceState, error) {
 	if err := c.f.fault("RemoteCache.State"); err != nil {
-		return types.RemoteSourceState{}, err
+		return model.RemoteSourceState{}, err
 	}
 	return c.RemoteCacheStore.State(ctx, key)
 }
 
 type faultItems struct {
-	store.ItemStore
+	port.ItemStore
 	f *faultStore
 }
 
-func (i faultItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
+func (i faultItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
 	if err := i.f.fault("Items.GetByID"); err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	return i.ItemStore.GetByID(ctx, id)
 }
 
-func (i faultItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (i faultItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if err := i.f.fault("Items.Properties"); err != nil {
 		return nil, err
 	}
@@ -397,7 +399,7 @@ func (i faultItems) Properties(ctx context.Context, id int64) (types.Properties,
 func (i faultItems) PatchProperties(
 	ctx context.Context,
 	id int64,
-	set types.Properties,
+	set model.Properties,
 	remove []string,
 	at time.Time,
 ) error {
@@ -408,18 +410,18 @@ func (i faultItems) PatchProperties(
 }
 
 type faultWork struct {
-	store.WorkQueue
+	work.WorkQueue
 	f *faultStore
 }
 
-func (q faultWork) Get(ctx context.Context, kind, key string) (types.WorkItem, error) {
+func (q faultWork) Get(ctx context.Context, kind, key string) (work.WorkItem, error) {
 	if err := q.f.fault("WorkQueue.Get"); err != nil {
-		return types.WorkItem{}, err
+		return work.WorkItem{}, err
 	}
 	return q.WorkQueue.Get(ctx, kind, key)
 }
 
-func (q faultWork) Stats(ctx context.Context) ([]types.WorkStats, error) {
+func (q faultWork) Stats(ctx context.Context) ([]work.WorkStats, error) {
 	if err := q.f.fault("WorkQueue.Stats"); err != nil {
 		return nil, err
 	}
@@ -781,7 +783,7 @@ func TestAccSmartStorageRequestsFailClosed(t *testing.T) {
 func TestAccSmartPeerSystemPropertiesNotCopied(t *testing.T) {
 	w := smartFixture(t)
 	w.mu.Lock()
-	w.props = types.Properties{
+	w.props = model.Properties{
 		"color":                {"blue"},
 		"artifactory.licenses": {"MIT"},
 		"docker.manifest.type": {"v2"},
@@ -834,7 +836,7 @@ func TestAccSmartUploadPropertiesFailClosed(t *testing.T) {
 				t.Fatal(err)
 			}
 			key := w.p.CacheKey(q, opts.Revision)
-			u := &item.CacheUpload{Token: types.RemoteCacheToken{Key: key}}
+			u := &item.CacheUpload{Token: model.RemoteCacheToken{Key: key}}
 			before := w.peerCalls()
 			err = w.s.prepareUpload(ctx, q, w.permit, opts, u)
 			if !errors.Is(err, tc.want) || !strings.Contains(fmt.Sprint(err), tc.text) {

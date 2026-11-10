@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 )
 
 // Pages require some Read grant in the repository and then filter files;
@@ -19,7 +19,7 @@ var pypiMatrixPart = matrixPart{
 	tune: pypiStatusPart.tune,
 	rows: func() []matrixRow {
 		local := pypiBase + "pypi-local/"
-		reads := holds("pypi-local", pypiWheelPath, types.ActionRead)
+		reads := holds("pypi-local", pypiWheelPath, api.ActionRead)
 		return []matrixRow{
 			row(pypiJSONLatest, local+"pypi/status-pkg/json", "", pypiProjectReads, 200),
 			row(pypiJSONVersion, local+"pypi/status-pkg/1.0/json", "", pypiProjectReads, 200),
@@ -29,14 +29,14 @@ var pypiMatrixPart = matrixPart{
 				pypiUpload,
 				strings.TrimSuffix(local, "/"),
 				pypiUploadBody("work"),
-				holds("pypi-local", "work/1.0/work-1.0-py3-none-any.whl", types.ActionWrite),
+				holds("pypi-local", "work/1.0/work-1.0-py3-none-any.whl", api.ActionWrite),
 				200,
 			).alone(),
 			row(
 				pypiUploadSlash,
 				local,
 				pypiUploadBody("work"),
-				holds("pypi-local", "work/1.0/work-1.0-py3-none-any.whl", types.ActionWrite),
+				holds("pypi-local", "work/1.0/work-1.0-py3-none-any.whl", api.ActionWrite),
 				200,
 			).alone(),
 			row(pypiUploadFolder, local+"folder", pypiUploadBody("work"), anyone, 405),
@@ -44,7 +44,7 @@ var pypiMatrixPart = matrixPart{
 				pypiPut,
 				local+"work/{p}.txt",
 				"file",
-				holds("pypi-local", "work/file.txt", types.ActionWrite),
+				holds("pypi-local", "work/file.txt", api.ActionWrite),
 				201,
 			),
 			row(pypiSimple, local+"simple", "", anyone, 302),
@@ -66,7 +66,7 @@ func pypiLists(p matrixPrincipal) int {
 		return 0
 	}
 	for _, g := range p.grants {
-		if (g.repo == "pypi-local" || g.repo == "*") && g.actions&types.ActionRead != 0 {
+		if (g.repo == "pypi-local" || g.repo == "*") && g.actions&api.ActionRead != 0 {
 			return 0
 		}
 	}
@@ -77,7 +77,7 @@ func pypiProjectReads(p matrixPrincipal) int {
 	if status := pypiLists(p); status != 0 {
 		return status
 	}
-	if p.holds("pypi-local", pypiWheelPath, types.ActionRead) {
+	if p.holds("pypi-local", pypiWheelPath, api.ActionRead) {
 		return 0
 	}
 	return http.StatusNotFound

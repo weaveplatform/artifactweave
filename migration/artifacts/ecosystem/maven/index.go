@@ -13,9 +13,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // files is the AQL criterion for the files c's index reads: a remote
@@ -33,7 +33,7 @@ func files(c repo.Config) aql.And {
 func under(prefixes []string) aql.Or {
 	either := make(aql.Or, 0, 2*len(prefixes))
 	for _, p := range prefixes {
-		dir, rest := types.RootPath, p
+		dir, rest := kernel.RootPath, p
 		if i := strings.LastIndexByte(p, '/'); i >= 0 {
 			dir, rest = p[:i], p[i+1:]
 		}
@@ -60,7 +60,7 @@ func versionFiles(
 	r reader,
 	cached bool,
 	co Coordinates,
-) ([]types.Item, error) {
+) ([]model.Item, error) {
 	prefixes := r.l.Prefixes(layout.Values{
 		layout.TokenOrg: co.Org, layout.TokenModule: co.Module, layout.TokenBaseRev: co.BaseRev,
 	})
@@ -69,7 +69,7 @@ func versionFiles(
 	if err != nil {
 		return nil, fmt.Errorf("maven: files of %s %s: %w", co.Package, co.Version, err)
 	}
-	var out []types.Item
+	var out []model.Item
 	for _, h := range hits {
 		got, ok := r.read(h.Item.FullPath())
 		if ok && h.Item.Cached == cached && got.Package == co.Package && got.Version == co.Version {
@@ -81,7 +81,7 @@ func versionFiles(
 
 // indexedVersion is version v as the index records it: dated by its
 // earliest file, which an overwrite keeps, and linking every file.
-func indexedVersion(v string, its []types.Item) pkgindex.IndexedVersion {
+func indexedVersion(v string, its []model.Item) pkgindex.IndexedVersion {
 	out := pkgindex.IndexedVersion{Version: v}
 	for _, it := range its {
 		out.Created = earliest(out.Created, it.Created)
@@ -111,7 +111,7 @@ func syncVersion(
 		return dropVersion(ctx, st, c, co)
 	}
 	v := indexedVersion(co.Version, its)
-	p, err := st.Packages().Ensure(ctx, types.Package{
+	p, err := st.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Name: co.Package, Type: c.PackageType, Created: v.Created,
 	})
 	if err != nil {
@@ -121,7 +121,7 @@ func syncVersion(
 	switch pv, err := st.Packages().Version(ctx, p.ID, co.Version); {
 	case err == nil:
 		prev = pv.Metadata
-	case !errors.Is(err, store.ErrNotFound):
+	case !errors.Is(err, kernel.ErrNotFound):
 		return fmt.Errorf("maven: version %s of %s: %w", co.Version, co.Package, err)
 	}
 	if v.Metadata, err = metadataOf(ctx, env, prev, its); err != nil {
@@ -136,7 +136,7 @@ func syncVersion(
 // removed before Deleted runs, so either may already be gone.
 func dropVersion(ctx context.Context, st format.Store, c repo.Config, co Coordinates) error {
 	p, err := st.Packages().Find(ctx, c.Key, co.Package)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -148,7 +148,7 @@ func dropVersion(ctx context.Context, st format.Store, c repo.Config, co Coordin
 		if err := st.Packages().DeleteVersion(ctx, pv.ID); err != nil {
 			return fmt.Errorf("maven: drop %s %s: %w", co.Package, co.Version, err)
 		}
-	case !errors.Is(err, store.ErrNotFound):
+	case !errors.Is(err, kernel.ErrNotFound):
 		return fmt.Errorf("maven: version %s of %s: %w", co.Version, co.Package, err)
 	}
 	rest, err := st.Packages().Versions(ctx, p.ID)
@@ -177,14 +177,14 @@ func reindex(ctx context.Context, env format.Env, c repo.Config, r reader) error
 		if err != nil {
 			return fmt.Errorf("maven: files of %s: %w", c.Key, err)
 		}
-		byVersion := map[string]map[string][]types.Item{}
+		byVersion := map[string]map[string][]model.Item{}
 		for _, h := range hits {
 			co, ok := r.read(h.Item.FullPath())
 			if !ok {
 				continue
 			}
 			if byVersion[co.Package] == nil {
-				byVersion[co.Package] = map[string][]types.Item{}
+				byVersion[co.Package] = map[string][]model.Item{}
 			}
 			byVersion[co.Package][co.Version] = append(byVersion[co.Package][co.Version], h.Item)
 		}
@@ -223,7 +223,7 @@ func indexedMetadata(
 	name string,
 ) (map[string][]byte, error) {
 	p, err := st.Packages().Find(ctx, c.Key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return map[string][]byte{}, nil
 	}
 	if err != nil {

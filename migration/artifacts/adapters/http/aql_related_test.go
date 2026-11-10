@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // compactAQL runs query with ?compact=true and returns the status and the
@@ -99,12 +99,12 @@ func TestAccSearchAQLTimeout(t *testing.T) {
 // search then finishes before the timer fires.
 type deadlineStore struct{ serverStore }
 
-func (s deadlineStore) Items() store.ItemStore { return deadlineItems{s.serverStore.Items()} }
-func (s deadlineStore) Builds() store.BuildStore {
+func (s deadlineStore) Items() port.ItemStore { return deadlineItems{s.serverStore.Items()} }
+func (s deadlineStore) Builds() port.BuildStore {
 	return deadlineBuilds{s.serverStore.Builds()}
 }
 
-type deadlineItems struct{ store.ItemStore }
+type deadlineItems struct{ port.ItemStore }
 
 func (d deadlineItems) Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.Hit, error) {
 	if _, ok := ctx.Deadline(); ok {
@@ -114,7 +114,7 @@ func (d deadlineItems) Search(ctx context.Context, q *aql.Query, o aql.Options) 
 	return d.ItemStore.Search(ctx, q, o) //nolint:wrapcheck // the store's own error
 }
 
-type deadlineBuilds struct{ store.BuildStore }
+type deadlineBuilds struct{ port.BuildStore }
 
 func (d deadlineBuilds) Search(
 	ctx context.Context,

@@ -8,38 +8,38 @@ import (
 	"slices"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // statsFields are the download statistics PATCH /api/metadata merges, named
 // as the ?stats view and 6.20's StatsInfo name them. Counts are whole
 // numbers and times Unix milliseconds, as ?stats renders them; null clears
 // a field, as a JSON merge patch does.
-var statsFields = map[string]func(*types.ItemStats, json.RawMessage) error{
-	"downloadCount": func(s *types.ItemStats, raw json.RawMessage) error {
+var statsFields = map[string]func(*model.ItemStats, json.RawMessage) error{
+	"downloadCount": func(s *model.ItemStats, raw json.RawMessage) error {
 		return statsCount(&s.DownloadCount, "downloadCount", raw)
 	},
-	"lastDownloaded": func(s *types.ItemStats, raw json.RawMessage) error {
+	"lastDownloaded": func(s *model.ItemStats, raw json.RawMessage) error {
 		return statsTime(&s.LastDownloaded, "lastDownloaded", raw)
 	},
-	"lastDownloadedBy": func(s *types.ItemStats, raw json.RawMessage) error {
+	"lastDownloadedBy": func(s *model.ItemStats, raw json.RawMessage) error {
 		return statsName(&s.LastDownloadedBy, "lastDownloadedBy", raw)
 	},
-	"remoteDownloadCount": func(s *types.ItemStats, raw json.RawMessage) error {
+	"remoteDownloadCount": func(s *model.ItemStats, raw json.RawMessage) error {
 		return statsCount(&s.RemoteDownloadCount, "remoteDownloadCount", raw)
 	},
-	"remoteLastDownloaded": func(s *types.ItemStats, raw json.RawMessage) error {
+	"remoteLastDownloaded": func(s *model.ItemStats, raw json.RawMessage) error {
 		return statsTime(&s.RemoteLastDownloaded, "remoteLastDownloaded", raw)
 	},
-	"remoteLastDownloadedBy": func(s *types.ItemStats, raw json.RawMessage) error {
+	"remoteLastDownloadedBy": func(s *model.ItemStats, raw json.RawMessage) error {
 		return statsName(&s.RemoteLastDownloadedBy, "remoteLastDownloadedBy", raw)
 	},
 }
 
 // mergeStats applies patch's fields to s. A field it does not know is
 // refused rather than dropped, so a misspelt count is not silently lost.
-func mergeStats(s *types.ItemStats, patch map[string]json.RawMessage) error {
+func mergeStats(s *model.ItemStats, patch map[string]json.RawMessage) error {
 	// Sorted, so the first bad field named is the same on every call.
 	for _, name := range slices.Sorted(maps.Keys(patch)) {
 		set, ok := statsFields[name]
@@ -58,7 +58,7 @@ func mergeStats(s *types.ItemStats, patch map[string]json.RawMessage) error {
 func setStats(
 	ctx context.Context,
 	st Store,
-	it types.Item,
+	it model.Item,
 	patch map[string]json.RawMessage,
 ) error {
 	if it.Folder {

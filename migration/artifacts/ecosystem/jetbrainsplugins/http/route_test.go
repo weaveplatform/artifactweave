@@ -21,12 +21,15 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -34,8 +37,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const routeBase = "/artifactory/api/jetbrainsplugins/jetbrains-remote/"
@@ -68,13 +69,13 @@ func newRouteFixture(t *testing.T) *routeFixture {
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Permissions().Create(t.Context(), types.Permission{
-		Name: "jetbrains-read", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					"reader": types.ActionRead,
+	if err := db.Permissions().Create(t.Context(), model.Permission{
+		Name: "jetbrains-read", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{
+					"reader": api.ActionRead,
 				}},
-				Targets: map[string]types.Target{"jetbrains-remote": {Include: []string{"**"}}},
+				Targets: map[string]model.Target{"jetbrains-remote": {Include: []string{"**"}}},
 			},
 		},
 	}); err != nil {
@@ -96,7 +97,7 @@ func newRouteFixture(t *testing.T) *routeFixture {
 	t.Cleanup(pool.Close)
 	svc := &source.Service{
 		HTTP: policy, Cache: policy,
-		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			return db.RemoteCache().Source(ctx, c.Key)
 		},
 	}
@@ -110,7 +111,7 @@ func newRouteFixture(t *testing.T) *routeFixture {
 	}))
 	pkgroute.Mount(router, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 			body, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				t.Fatal(err)
@@ -427,7 +428,7 @@ func TestAccRemoteCacheDeletionRepopulatesNativeMetadata(t *testing.T) {
 		t.Fatalf("initial metadata = %d %s", rec.Code, rec.Body.String())
 	}
 	entries, _, err := f.db.RemoteCache().List(t.Context(), "jetbrains-remote",
-		"plugins/com.weave.fixture", store.Page{Limit: 100})
+		"plugins/com.weave.fixture", kernel.Page{Limit: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -472,13 +473,13 @@ func TestAccPinnedIDEInstallsThroughNativeMarketplaceHost(t *testing.T) {
 	}
 	f := newRouteFixture(t)
 	f.seed(fixtureJar(t, "com.weave.fixture"))
-	if err := f.db.Permissions().Create(t.Context(), types.Permission{
-		Name: "jetbrains-anonymous", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					"anonymous": types.ActionRead,
+	if err := f.db.Permissions().Create(t.Context(), model.Permission{
+		Name: "jetbrains-anonymous", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{
+					"anonymous": api.ActionRead,
 				}},
-				Targets: map[string]types.Target{"jetbrains-remote": {Include: []string{"**"}}},
+				Targets: map[string]model.Target{"jetbrains-remote": {Include: []string{"**"}}},
 			},
 		},
 	}); err != nil {

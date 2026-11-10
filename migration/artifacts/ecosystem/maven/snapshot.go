@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // buildTimestamp is the matrix parameter that dates a deploy's build: the
@@ -110,7 +110,7 @@ func uniquePath(
 // clientTimestamp reads a deploy's build.timestamp; a value that is not a
 // number is ignored, as MavenSnapshotVersionAdapterContext.setTimestamp
 // logs and ignores it.
-func clientTimestamp(props types.Properties) int64 {
+func clientTimestamp(props model.Properties) int64 {
 	vs := props[buildTimestamp]
 	if len(vs) == 0 {
 		return 0

@@ -22,11 +22,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit/kittest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
@@ -145,7 +145,7 @@ func (w *itemWorld) do(
 
 // item returns the stored item at p in key, or its cache when cached, and
 // fails the test when there is none.
-func (w *itemWorld) item(key string, cached bool, p string) types.Item {
+func (w *itemWorld) item(key string, cached bool, p string) model.Item {
 	w.t.Helper()
 	it, err := w.db.Items().Get(w.t.Context(), key, cached, p)
 	if err != nil {

@@ -17,14 +17,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitRemoteCacheAndOffline(t *testing.T) {
@@ -141,7 +143,7 @@ func remoteSetup(t *testing.T, upstreamURL string, ttl int) func(*fixture) *sour
 		return &source.Service{
 			HTTP:  policy,
 			Cache: policy,
-			Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+			Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 				return f.db.RemoteCache().Source(ctx, c.Key)
 			},
 		}
@@ -188,7 +190,7 @@ func TestUnitRemoteRedirectAndIntegrity(t *testing.T) {
 				}
 				_, e := f.db.Items().
 					Get(t.Context(), "hf", true, "models--acme--demo/snapshots/"+sha+"/config.json")
-				if !errors.Is(e, store.ErrNotFound) {
+				if !errors.Is(e, kernel.ErrNotFound) {
 					t.Fatalf("corrupt asset cached: %v", e)
 				}
 			} else if r.StatusCode != 200 || string(b) != string(good) {
@@ -450,7 +452,7 @@ func TestUnitRemoteMetadataFailuresNeverPublishAnIdentity(t *testing.T) {
 				t.Fatalf("invalid upstream published metadata: %d %s", r.StatusCode, b)
 			}
 			if _, err := f.db.Items().Get(t.Context(), "hf", true,
-				"models--acme--demo/api/main.json"); !errors.Is(err, store.ErrNotFound) {
+				"models--acme--demo/api/main.json"); !errors.Is(err, kernel.ErrNotFound) {
 				t.Fatalf("invalid metadata cached: %v", err)
 			}
 		})
@@ -469,13 +471,13 @@ func TestUnitRemoteMetadataDoesNotListFilesOutsideReadGrant(t *testing.T) {
 	}))
 	defer up.Close()
 	f := newFixture(t, repo.Remote, remoteSetup(t, up.URL, 3600))
-	if err := f.db.Permissions().Create(t.Context(), types.Permission{
+	if err := f.db.Permissions().Create(t.Context(), model.Permission{
 		Name: "metadata-only",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{
-				Users: map[string]types.Actions{"metadata-only": types.ActionRead},
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{
+				Users: map[string]api.Actions{"metadata-only": api.ActionRead},
 			},
-			Targets: map[string]types.Target{
+			Targets: map[string]model.Target{
 				"hf": {Include: []string{"models--acme--demo/api/**"}},
 			},
 		}},
@@ -604,7 +606,7 @@ func TestUnitRemoteDatasetUsesDatasetIdentityAndResolvePath(t *testing.T) {
 		t.Fatalf("remote dataset path: %d %s", r.StatusCode, b)
 	}
 	if _, err := f.db.Items().Get(t.Context(), "hf", true,
-		"models--acme--demo/snapshots/"+sha+"/config.json"); !errors.Is(err, store.ErrNotFound) {
+		"models--acme--demo/snapshots/"+sha+"/config.json"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("dataset materialized under model identity: %v", err)
 	}
 }

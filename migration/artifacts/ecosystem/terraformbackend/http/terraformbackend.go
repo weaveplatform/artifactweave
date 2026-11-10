@@ -20,8 +20,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Prefix is the service URL advertised by Terraform discovery.
@@ -158,7 +156,7 @@ func (h handler) error(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, terraformstate.ErrWorkspaceChanged):
 		err = forbidden
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		err = apierror.New(404, err.Error())
 	case errors.Is(err, terraformstate.ErrTaken),
 		errors.Is(err, terraformstate.ErrInvalidName),
@@ -206,7 +204,7 @@ func parameter(r *http.Request, name string) string {
 	return s
 }
 
-func can(r *http.Request, c repo.Config, path string, action types.Actions, folder bool) bool {
+func can(r *http.Request, c repo.Config, path string, action accessapi.Actions, folder bool) bool {
 	p, ok := kernel.FromContext(r.Context())
 	d, _ := accessapi.DeciderFrom(r.Context())
 	if !ok || p.Anonymous || d == nil {
@@ -214,12 +212,18 @@ func can(r *http.Request, c repo.Config, path string, action types.Actions, fold
 	}
 	target := accessapi.Repo{Key: c.Key, Class: string(c.Class)}
 	if folder {
-		return d.AllowsFolder(types.ResourceArtifact, target, path, action)
+		return d.AllowsFolder(accessapi.ResourceArtifact, target, path, action)
 	}
-	return d.Allows(types.ResourceArtifact, target, path, action)
+	return d.Allows(accessapi.ResourceArtifact, target, path, action)
 }
 
-func require(r *http.Request, c repo.Config, path string, action types.Actions, folder bool) error {
+func require(
+	r *http.Request,
+	c repo.Config,
+	path string,
+	action accessapi.Actions,
+	folder bool,
+) error {
 	if !can(r, c, path, action, folder) {
 		return kernel.ErrForbidden
 	}
@@ -236,7 +240,7 @@ func (h handler) repository(r *http.Request) (repo.Config, error) {
 
 func (h handler) resolveWorkspace(
 	r *http.Request,
-	action types.Actions,
+	action accessapi.Actions,
 ) (repo.Config, terraformstate.Workspace, error) {
 	var c repo.Config
 	var ws terraformstate.Workspace

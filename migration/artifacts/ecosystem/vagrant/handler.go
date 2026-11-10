@@ -9,10 +9,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Serves reports whether t is the Vagrant package type.
@@ -100,7 +100,7 @@ func (Handler) Admit(
 // every box's properties. Folders, a remote's cached items and files at
 // other paths change nothing; a box that no longer reads as valid fails
 // with 400.
-func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || it.Cached || !strings.HasSuffix(it.FullPath(), ".box") {
 		return nil
 	}
@@ -115,11 +115,11 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 }
 
 // Deleting does nothing: Deleted rebuilds the index once the box is gone.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted rebuilds the package index from the properties of the boxes
 // left.
-func (Handler) Deleted(ctx context.Context, env format.Env, c repo.Config, _ []types.Item) error {
+func (Handler) Deleted(ctx context.Context, env format.Env, c repo.Config, _ []model.Item) error {
 	return rebuild(ctx, env, c)
 }
 
@@ -130,7 +130,7 @@ func (Handler) AdmitAnnotation(
 	_ context.Context,
 	_ format.Env,
 	_ repo.Config,
-	_ types.Item,
+	_ model.Item,
 	a format.Annotation,
 ) error {
 	for _, key := range []string{propProvider, propArchitecture, propDigest} {
@@ -149,7 +149,7 @@ func (Handler) Annotated(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	a format.Annotation,
 ) error {
 	if it.Folder || it.Cached {
@@ -168,7 +168,7 @@ func (Handler) Annotated(
 // properties. A box that does not read as valid fails the reindex with
 // 400.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
-	if err := eachItem(ctx, env.Store, c.Key, func(it types.Item) error {
+	if err := eachItem(ctx, env.Store, c.Key, func(it model.Item) error {
 		b, err := readStored(ctx, env, it.Actual.SHA256)
 		if err != nil {
 			return err
@@ -200,8 +200,8 @@ func readStored(ctx context.Context, env format.Env, sha string) (Box, error) {
 	return b, nil
 }
 
-func saveProof(ctx context.Context, env format.Env, it types.Item, b Box) error {
-	props := types.Properties{
+func saveProof(ctx context.Context, env format.Env, it model.Item, b Box) error {
+	props := model.Properties{
 		propProvider:     {b.Provider},
 		propDigest:       {it.Actual.SHA256},
 		propArchitecture: {b.Architecture},
@@ -216,9 +216,9 @@ func eachItem(
 	ctx context.Context,
 	st format.Store,
 	key string,
-	visit func(types.Item) error,
+	visit func(model.Item) error,
 ) error {
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		items, next, err := st.Items().Descendants(ctx, key, false, "", page)
 		if err != nil {
@@ -243,7 +243,7 @@ func eachItem(
 // ordinary metadata and property updates never decompress existing VM disks.
 func rebuild(ctx context.Context, env format.Env, c repo.Config) error {
 	byName := map[string]*pkgindex.Indexed{}
-	if err := eachItem(ctx, env.Store, c.Key, func(it types.Item) error {
+	if err := eachItem(ctx, env.Store, c.Key, func(it model.Item) error {
 		props, err := env.Store.Items().Properties(ctx, it.ID)
 		if err != nil {
 			return fmt.Errorf("vagrant: properties: %w", err)

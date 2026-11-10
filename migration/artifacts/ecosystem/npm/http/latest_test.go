@@ -9,10 +9,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // byPublish turns npm.tag_latest_by_publish on for the format the fixture
@@ -97,7 +97,7 @@ func TestAccPublishedVersionOverwritten(t *testing.T) {
 	}
 	// npm dist-tag add over@2.0.0 beta, as the property API sets it.
 	if err := f.items.Annotate(ctx, c, it,
-		types.Properties{npmfmt.PropDistTag: {"latest", "beta"}}, nil); err != nil {
+		model.Properties{npmfmt.PropDistTag: {"latest", "beta"}}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if diff := cmp.Diff(map[string]any{"latest": "2.0.0", "beta": "2.0.0"},

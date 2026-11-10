@@ -15,9 +15,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitRemoteCompressedTarLabelsRequireGzipBytes(t *testing.T) {
@@ -88,7 +89,7 @@ func TestUnitRemoteBinaryGzipRequiresArtifactValidator(t *testing.T) {
 			case "no-validator":
 				u.Validate = nil
 			case "metadata":
-				u.Kind = types.RemoteMetadata
+				u.Kind = model.RemoteMetadata
 			case "html":
 				data = []byte("<!DOCTYPE html><html>login</html>")
 			case "json":
@@ -121,7 +122,7 @@ func TestUnitRemoteBinaryGzipRequiresArtifactValidator(t *testing.T) {
 				if _, err = w.db.RemoteCache().
 					Read(t.Context(), u.Token.Key); !errors.Is(
 					err,
-					store.ErrNotFound,
+					kernel.ErrNotFound,
 				) {
 					t.Fatal("rejected body published", err)
 				}
@@ -138,7 +139,7 @@ func remoteWorld(t *testing.T) (*world, CacheUpload) {
 		t.Fatal(err)
 	}
 	token, err := w.db.RemoteCache().
-		Begin(context.Background(), types.RemoteCacheKey{RepoKey: c.Key, Path: "a.bin"})
+		Begin(context.Background(), model.RemoteCacheKey{RepoKey: c.Key, Path: "a.bin"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +148,7 @@ func remoteWorld(t *testing.T) (*world, CacheUpload) {
 		Repo:        c,
 		Body:        strings.NewReader("payload"),
 		Length:      7,
-		Kind:        types.RemoteUnique,
+		Kind:        model.RemoteUnique,
 		By:          "reader",
 		ContentType: "application/octet-stream",
 	}
@@ -157,21 +158,21 @@ func TestUnitRemoteCacheIngestion(t *testing.T) {
 	ctx := context.Background()
 	w, u := remoteWorld(t)
 	r := &recorder{calls: map[string]bool{}}
-	r.deployed = func(ctx context.Context, env format.Env, it types.Item) error {
+	r.deployed = func(ctx context.Context, env format.Env, it model.Item) error {
 		if !it.Cached {
 			t.Fatal("format did not get cache flag")
 		}
 		p, err := env.Store.Packages().
-			Ensure(ctx, types.Package{RepoKey: it.RepoKey, Name: "package"})
+			Ensure(ctx, model.Package{RepoKey: it.RepoKey, Name: "package"})
 		if err != nil {
 			return err
 		}
 		v, err := env.Store.Packages().
-			PutVersion(ctx, types.PackageVersion{PackageID: p.ID, Version: "1.0"})
+			PutVersion(ctx, model.PackageVersion{PackageID: p.ID, Version: "1.0"})
 		if err != nil {
 			return err
 		}
-		return env.Store.Packages().LinkFile(ctx, types.VersionFile{VersionID: v.ID, ItemID: it.ID})
+		return env.Store.Packages().LinkFile(ctx, model.VersionFile{VersionID: v.ID, ItemID: it.ID})
 	}
 	w.svc.Formats = func(repo.PackageType) format.Handler { return r }
 	result, err := w.svc.Cache(ctx, u)
@@ -208,7 +209,7 @@ func TestUnitRemoteCacheIngestion(t *testing.T) {
 	if _, err = w.svc.Cache(ctx, other); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = w.db.RemoteCache().Read(ctx, u.Token.Key); !errors.Is(err, store.ErrNotFound) {
+	if _, err = w.db.RemoteCache().Read(ctx, u.Token.Key); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal("old variant served replacement bytes", err)
 	}
 }
@@ -216,7 +217,7 @@ func TestUnitRemoteCacheIngestion(t *testing.T) {
 func TestUnitRemoteMetadataOwnsRawBytes(t *testing.T) {
 	ctx := context.Background()
 	w, u := remoteWorld(t)
-	u.Kind = types.RemoteMetadata
+	u.Kind = model.RemoteMetadata
 	u.Body = strings.NewReader("all upstream versions")
 	u.Length = -1
 	result, err := w.svc.Cache(ctx, u)
@@ -260,14 +261,14 @@ func TestUnitRemoteMetadataOwnsRawBytes(t *testing.T) {
 
 func TestUnitRemoteMetadataOptInPublishesItemAndExpiresOnZap(t *testing.T) {
 	w, u := remoteWorld(t)
-	u.Kind = types.RemoteMetadata
+	u.Kind = model.RemoteMetadata
 	u.PublishMetadata = true
 	result, err := w.svc.Cache(t.Context(), u)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result.Item.ID == 0 || result.Entry.ItemID != result.Item.ID ||
-		result.Entry.Kind != types.RemoteMetadata ||
+		result.Entry.Kind != model.RemoteMetadata ||
 		result.Item.FullPath() != u.Token.Key.Path {
 		t.Fatalf("metadata publication: %+v", result)
 	}
@@ -287,18 +288,18 @@ func TestUnitRemoteChecksumPolicies(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		policy   repo.RemoteChecksumPolicy
-		declared types.Checksums
+		declared kernel.Checksums
 		expected error
 	}{
-		{"generated", repo.GenerateIfAbsent, types.Checksums{}, nil},
+		{"generated", repo.GenerateIfAbsent, kernel.Checksums{}, nil},
 		{"matches", repo.Fail, sums("payload"), nil},
-		{"missing", repo.Fail, types.Checksums{}, ErrRemoteChecksumRequired},
+		{"missing", repo.Fail, kernel.Checksums{}, ErrRemoteChecksumRequired},
 		{"wrong", repo.GenerateIfAbsent, sums("wrong"), ErrChecksumMismatch},
 		{"failwrong", repo.Fail, sums("wrong"), ErrChecksumMismatch},
 		{"ignore", repo.IgnoreAndGenerate, sums("wrong"), nil},
 		{"pass", repo.PassThru, sums("wrong"), nil},
-		{"malformed", repo.PassThru, types.Checksums{SHA256: "invalid"}, ErrBadChecksum},
-		{"invalid", repo.RemoteChecksumPolicy("bad"), types.Checksums{}, store.ErrInvalid},
+		{"malformed", repo.PassThru, kernel.Checksums{SHA256: "invalid"}, ErrBadChecksum},
+		{"invalid", repo.RemoteChecksumPolicy("bad"), kernel.Checksums{}, kernel.ErrInvalid},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			w, u := remoteWorld(t)
@@ -327,8 +328,8 @@ func TestUnitRemoteCacheRejectsIncompleteAndUnsafe(t *testing.T) {
 		change   func(*CacheUpload)
 		expected error
 	}{
-		{"invalidlength", func(u *CacheUpload) { u.Length = -2 }, store.ErrInvalid},
-		{"invalidlimit", func(u *CacheUpload) { u.MaxBytes = -1 }, store.ErrInvalid},
+		{"invalidlength", func(u *CacheUpload) { u.Length = -2 }, kernel.ErrInvalid},
+		{"invalidlimit", func(u *CacheUpload) { u.MaxBytes = -1 }, kernel.ErrInvalid},
 		{"short", func(u *CacheUpload) { u.Length = 8 }, ErrRemoteLength},
 		{"long", func(u *CacheUpload) { u.Length = 6 }, ErrRemoteLength},
 		{"limit", func(u *CacheUpload) { u.MaxBytes = 3 }, ErrRemoteLimit},
@@ -338,12 +339,12 @@ func TestUnitRemoteCacheRejectsIncompleteAndUnsafe(t *testing.T) {
 		{"html", func(u *CacheUpload) { u.Body = strings.NewReader("<!DOCTYPE HTML><html>login</html>"); u.Length = -1 }, ErrRemoteMIME},
 		{"badtype", func(u *CacheUpload) { u.ContentType = "invalid;" }, ErrRemoteMIME},
 		{"denied", func(u *CacheUpload) { u.CheckCurrent = func(context.Context, Store) error { return errBoom } }, errBoom},
-		{"wrongclass", func(u *CacheUpload) { u.Repo.Class = repo.Local }, store.ErrInvalid},
-		{"wrongkey", func(u *CacheUpload) { u.Repo.Key = "elsewhere" }, store.ErrInvalid},
-		{"nilbody", func(u *CacheUpload) { u.Body = nil }, store.ErrInvalid},
-		{"derived", func(u *CacheUpload) { u.Kind = types.RemoteDerived }, store.ErrInvalid},
-		{"badkind", func(u *CacheUpload) { u.Kind = "bad" }, store.ErrInvalid},
-		{"badpath", func(u *CacheUpload) { u.Token.Key.Path = "../bad" }, store.ErrInvalid},
+		{"wrongclass", func(u *CacheUpload) { u.Repo.Class = repo.Local }, kernel.ErrInvalid},
+		{"wrongkey", func(u *CacheUpload) { u.Repo.Key = "elsewhere" }, kernel.ErrInvalid},
+		{"nilbody", func(u *CacheUpload) { u.Body = nil }, kernel.ErrInvalid},
+		{"derived", func(u *CacheUpload) { u.Kind = model.RemoteDerived }, kernel.ErrInvalid},
+		{"badkind", func(u *CacheUpload) { u.Kind = "bad" }, kernel.ErrInvalid},
+		{"badpath", func(u *CacheUpload) { u.Token.Key.Path = "../bad" }, kernel.ErrInvalid},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			w, u := remoteWorld(t)
@@ -355,7 +356,7 @@ func TestUnitRemoteCacheRejectsIncompleteAndUnsafe(t *testing.T) {
 			if _, err = w.db.Items().
 				Get(context.Background(), "remote", true, "a.bin"); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("failed body visible", err)
 			}
@@ -385,7 +386,7 @@ func TestUnitRemoteCacheAtomicFailureAndFence(t *testing.T) {
 			case "format":
 				r := &recorder{
 					calls:    map[string]bool{},
-					deployed: func(context.Context, format.Env, types.Item) error { return errBoom },
+					deployed: func(context.Context, format.Env, model.Item) error { return errBoom },
 				}
 				w.svc.Formats = func(repo.PackageType) format.Handler { return r }
 			case "source":
@@ -489,21 +490,21 @@ func TestUnitRemoteNoStore(t *testing.T) {
 			if _, err = w.db.Blobs().
 				Get(context.Background(), sums("payload").SHA256); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("no-store durable blob index", err)
 			}
 			if _, err = w.db.Items().
 				Get(context.Background(), u.Repo.Key, true, u.Token.Key.Path); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("no-store durable item", err)
 			}
 			if _, err = w.db.RemoteCache().
 				Read(context.Background(), u.Token.Key); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("no-store durable cache", err)
 			}
@@ -564,7 +565,7 @@ func TestUnitRemoteCacheStreamingFence(t *testing.T) {
 			}
 			select {
 			case err := <-done:
-				if !errors.Is(err, store.ErrConflict) {
+				if !errors.Is(err, kernel.ErrConflict) {
 					t.Fatal("stale stream committed", err)
 				}
 			case <-ctx.Done():
@@ -573,7 +574,7 @@ func TestUnitRemoteCacheStreamingFence(t *testing.T) {
 			if _, err := w.db.Items().
 				Get(ctx, u.Repo.Key, true, u.Token.Key.Path); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("stale body visible", err)
 			}
@@ -585,9 +586,9 @@ func TestUnitRemoteMetadataCollectionFence(t *testing.T) {
 	for _, mode := range []string{"removed", "deleting", "exists-error", "restored"} {
 		t.Run(mode, func(t *testing.T) {
 			w, u := remoteWorld(t)
-			u.Kind = types.RemoteMetadata
+			u.Kind = model.RemoteMetadata
 			u.CheckCurrent = func(ctx context.Context, _ Store) error {
-				b := types.Blob{Checksums: sums("payload"), Size: 7, Created: at}
+				b := blob.Blob{Checksums: sums("payload"), Size: 7, Created: at}
 				if _, err := w.db.Blobs().MarkDeleting(ctx, b, at); err != nil {
 					return err
 				}
@@ -613,7 +614,7 @@ func TestUnitRemoteMetadataCollectionFence(t *testing.T) {
 			}
 			want := ErrCollected
 			if mode == "deleting" {
-				want = store.ErrDeleting
+				want = port.ErrDeleting
 			}
 			if mode == "exists-error" {
 				want = errBoom
@@ -624,7 +625,7 @@ func TestUnitRemoteMetadataCollectionFence(t *testing.T) {
 			if _, err = w.db.RemoteCache().
 				Read(context.Background(), u.Token.Key); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("collected metadata visible", err)
 			}
@@ -683,15 +684,15 @@ func TestUnitRemoteMIMERules(t *testing.T) {
 func TestUnitRemoteExpectedMetadataMIME(t *testing.T) {
 	for _, tc := range []struct {
 		name, expected string
-		kind           types.RemoteKind
+		kind           model.RemoteKind
 		expectedErr    error
 	}{
-		{"html-index", "text/html", types.RemoteMetadata, nil},
-		{"artifact-masquerade", "", types.RemoteUnique, ErrRemoteMIME},
-		{"json-masquerade", "application/json", types.RemoteMetadata, ErrRemoteMIME},
-		{"artifact-hint", "text/html", types.RemoteUnique, ErrRemoteMIME},
-		{"wildcard", "text/*", types.RemoteMetadata, ErrRemoteMIME},
-		{"invalid", "broken;", types.RemoteMetadata, ErrRemoteMIME},
+		{"html-index", "text/html", model.RemoteMetadata, nil},
+		{"artifact-masquerade", "", model.RemoteUnique, ErrRemoteMIME},
+		{"json-masquerade", "application/json", model.RemoteMetadata, ErrRemoteMIME},
+		{"artifact-hint", "text/html", model.RemoteUnique, ErrRemoteMIME},
+		{"wildcard", "text/*", model.RemoteMetadata, ErrRemoteMIME},
+		{"invalid", "broken;", model.RemoteMetadata, ErrRemoteMIME},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			w, u := remoteWorld(t)
@@ -704,14 +705,14 @@ func TestUnitRemoteExpectedMetadataMIME(t *testing.T) {
 			if !errors.Is(err, tc.expectedErr) {
 				t.Fatalf("MIME: %v want %v", err, tc.expectedErr)
 			}
-			if err == nil && result.Entry.Kind != types.RemoteMetadata {
+			if err == nil && result.Entry.Kind != model.RemoteMetadata {
 				t.Fatal("HTML did not stay raw metadata")
 			}
 			if err != nil {
 				if _, err = w.db.RemoteCache().
 					Read(context.Background(), u.Token.Key); !errors.Is(
 					err,
-					store.ErrNotFound,
+					kernel.ErrNotFound,
 				) {
 					t.Fatal("masquerading body cached", err)
 				}
@@ -739,7 +740,7 @@ func TestUnitRemoteAdapterValidationAndPins(t *testing.T) {
 					if _, err := w.db.RemoteCache().
 						Read(ctx, u.Token.Key); !errors.Is(
 						err,
-						store.ErrNotFound,
+						kernel.ErrNotFound,
 					) {
 						t.Fatal("published before validation", err)
 					}
@@ -763,7 +764,7 @@ func TestUnitRemoteAdapterValidationAndPins(t *testing.T) {
 					if _, err = w.db.Items().
 						Get(t.Context(), u.Repo.Key, true, u.Token.Key.Path); !errors.Is(
 						err,
-						store.ErrNotFound,
+						kernel.ErrNotFound,
 					) {
 						t.Fatal("rejected body published", err)
 					}
@@ -807,7 +808,7 @@ func TestUnitRemoteJSONMetadataMIMECompatibility(t *testing.T) {
 	} {
 		t.Run(tc.contentType, func(t *testing.T) {
 			w, u := remoteWorld(t)
-			u.Kind, u.ExpectedContentType, u.ContentType = types.RemoteMetadata, "application/json", tc.contentType
+			u.Kind, u.ExpectedContentType, u.ContentType = model.RemoteMetadata, "application/json", tc.contentType
 			u.Body, u.Length = strings.NewReader(`{"versions":{}}`), 15
 			_, err := w.svc.Cache(t.Context(), u)
 			if (err == nil) != tc.good {
@@ -834,7 +835,7 @@ func TestUnitRemoteMetadataMIMEAlternatives(t *testing.T) {
 	} {
 		t.Run(tc.media+tc.body, func(t *testing.T) {
 			w, u := remoteWorld(t)
-			u.Kind = types.RemoteMetadata
+			u.Kind = model.RemoteMetadata
 			u.ExpectedContentTypes = []string{
 				"application/json",
 				"application/vnd.pypi.simple.v1+json",
@@ -853,16 +854,16 @@ func TestUnitRemoteMetadataMIMEAlternatives(t *testing.T) {
 	}
 	for _, bad := range [][]string{{"text/html", "text/html"}, {"Text/HTML"}, {"text/*"}, {"text/html; charset=utf-8"}, {"invalid"}} {
 		w, u := remoteWorld(t)
-		u.Kind = types.RemoteMetadata
+		u.Kind = model.RemoteMetadata
 		u.ExpectedContentTypes = bad
 		u.Validate = func(context.Context, io.ReadSeeker, int64) error { return nil }
 		if _, err := w.svc.Cache(t.Context(), u); !errors.Is(err, ErrRemoteMIME) {
 			t.Fatalf("accepted invalid alternatives %v: %v", bad, err)
 		}
 	}
-	for _, change := range []func(*CacheUpload){func(u *CacheUpload) { u.Kind = types.RemoteUnique }, func(u *CacheUpload) { u.Validate = nil }, func(u *CacheUpload) { u.ExpectedContentType = "text/html" }} {
+	for _, change := range []func(*CacheUpload){func(u *CacheUpload) { u.Kind = model.RemoteUnique }, func(u *CacheUpload) { u.Validate = nil }, func(u *CacheUpload) { u.ExpectedContentType = "text/html" }} {
 		w, u := remoteWorld(t)
-		u.Kind = types.RemoteMetadata
+		u.Kind = model.RemoteMetadata
 		u.ExpectedContentTypes = []string{"text/html"}
 		u.Validate = func(context.Context, io.ReadSeeker, int64) error { return nil }
 		change(&u)

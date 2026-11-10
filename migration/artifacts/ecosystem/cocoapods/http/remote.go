@@ -15,13 +15,14 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxCDNMetadata = 16 << 20
@@ -355,8 +356,8 @@ func (h handler) remoteSpec(
 			return
 		}
 		ext := archiveExtension(fields, target)
-		if !h.k.Can(r, sourcePath(name, version, ext), types.ActionRead) ||
-			!h.k.Can(visible, sourcePath(name, version, ext), types.ActionRead) {
+		if !h.k.Can(r, sourcePath(name, version, ext), api.ActionRead) ||
+			!h.k.Can(visible, sourcePath(name, version, ext), api.ActionRead) {
 			h.k.Error(w, r, notFound())
 			return
 		}
@@ -416,7 +417,7 @@ func (h handler) remoteIndexRows(
 			continue
 		}
 		if p == "all_pods.txt" {
-			if podfmt.ValidName(row) && h.k.CanFolder(r, row, types.ActionRead) {
+			if podfmt.ValidName(row) && h.k.CanFolder(r, row, api.ActionRead) {
 				visible = append(visible, row)
 			}
 			continue
@@ -427,7 +428,7 @@ func (h handler) remoteIndexRows(
 		}
 		kept := []string{parts[0]}
 		for _, v := range parts[1:] {
-			if podfmt.ValidVersion(v) && h.k.CanFolder(r, parts[0]+"/"+v, types.ActionRead) {
+			if podfmt.ValidVersion(v) && h.k.CanFolder(r, parts[0]+"/"+v, api.ActionRead) {
 				kept = append(kept, v)
 			}
 		}
@@ -451,7 +452,7 @@ func (h handler) serveRewritten(
 		Representation: source.Representation{
 			MediaType: media, Size: int64(len(data)),
 			ETag:      `"` + hex.EncodeToString(sum[:]) + `"`,
-			Checksums: types.Checksums{SHA256: hex.EncodeToString(sum[:])},
+			Checksums: kernel.Checksums{SHA256: hex.EncodeToString(sum[:])},
 		},
 	}
 	h.k.ServeResult(w, r, result)

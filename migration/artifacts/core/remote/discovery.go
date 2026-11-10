@@ -17,10 +17,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Discovery retains an atomic layout/source snapshot. Upstream paths are
@@ -29,7 +29,7 @@ import (
 type Discovery struct {
 	store       interface{ RemoteCache() port.RemoteCacheStore }
 	repository  repo.Config
-	identity    types.SourceIdentity
+	identity    model.SourceIdentity
 	canonical   *layout.Layout
 	upstream    *layout.Layout
 	fingerprint string
@@ -58,7 +58,7 @@ func NewDiscovery(ctx context.Context, items *item.Service, c repo.Config) (*Dis
 	d := &Discovery{store: items.Store, repository: c}
 	err := items.Store.Tx(ctx, func(tx context.Context) error {
 		current, err := items.Store.Repos().Get(tx, c.Key)
-		if err != nil || store.RemotePolicyChanged(c, current) {
+		if err != nil || port.RemotePolicyChanged(c, current) {
 			return source.ErrSuperseded
 		}
 		d.identity, err = items.Store.RemoteCache().Source(tx, c.Key)
@@ -161,8 +161,8 @@ func (s DiscoveryScope) Allows(q source.Request) bool {
 	if s.Root {
 		allows = q.Access.Allows
 	}
-	return repo.PatternsOf(q.Repo).Accepts(s.Path, true) && allows(types.ResourceArtifact,
-		accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, s.Path, types.ActionRead)
+	return repo.PatternsOf(q.Repo).Accepts(s.Path, true) && allows(accessapi.ResourceArtifact,
+		accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)}, s.Path, accessapi.ActionRead)
 }
 
 func (s DiscoveryScope) valid() bool {
@@ -172,7 +172,7 @@ func (s DiscoveryScope) valid() bool {
 	if s.Path == "" || s.Path != strings.Trim(s.Path, "/") {
 		return false
 	}
-	_, _, _, err := types.SplitItemPath(s.Path)
+	_, _, _, err := kernel.SplitItemPath(s.Path)
 	return err == nil
 }
 
@@ -194,7 +194,7 @@ func (d *Discovery) MapFile(upstream string) (string, bool, error) {
 	if err != nil || back != upstream {
 		return "", false, discoveryMappingError()
 	}
-	if _, _, _, err = types.SplitItemPath(canonical); err != nil {
+	if _, _, _, err = kernel.SplitItemPath(canonical); err != nil {
 		return "", false, discoveryMappingError()
 	}
 	return canonical, true, nil
@@ -228,7 +228,7 @@ func (d *Discovery) Read(
 		return source.Result{}, source.ErrUnsupported
 	}
 	checked := *service
-	checked.Resolve = func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+	checked.Resolve = func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 		id, err := service.Resolve(ctx, c)
 		if err != nil {
 			return id, fmt.Errorf("resolve mapped discovery: %w", err)
@@ -254,7 +254,7 @@ func (d *Discovery) MetadataResource(
 	if upstream != strings.Trim(upstream, "/") || !scope.valid() || variant == "" {
 		return source.Resource{}, source.ErrInvalidRequest
 	}
-	if _, _, _, err := types.SplitItemPath(upstream); err != nil {
+	if _, _, _, err := kernel.SplitItemPath(upstream); err != nil {
 		return source.Resource{}, source.ErrInvalidRequest
 	}
 	hash := sha256.Sum256([]byte(upstream))

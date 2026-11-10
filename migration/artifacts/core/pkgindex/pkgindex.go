@@ -8,9 +8,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Store is the one store the index functions use: the package index. Its
@@ -41,15 +41,15 @@ type Version struct {
 // Link records that the item with itemID is a file of v, creating the
 // package and version when they are new.
 func Link(ctx context.Context, st Store, v Version, itemID int64, at time.Time) error {
-	p, err := st.Packages().Ensure(ctx, types.Package{
+	p, err := st.Packages().Ensure(ctx, model.Package{
 		RepoKey: v.RepoKey, Name: v.Package, Type: v.PackageType, Created: at,
 	})
 	if err != nil {
 		return fmt.Errorf("pkgindex: package %s: %w", v.Package, err)
 	}
 	pv, err := st.Packages().Version(ctx, p.ID, v.Version)
-	if errors.Is(err, store.ErrNotFound) {
-		pv, err = st.Packages().PutVersion(ctx, types.PackageVersion{
+	if errors.Is(err, kernel.ErrNotFound) {
+		pv, err = st.Packages().PutVersion(ctx, model.PackageVersion{
 			PackageID: p.ID, Version: v.Version, Created: at,
 		})
 	}
@@ -57,7 +57,7 @@ func Link(ctx context.Context, st Store, v Version, itemID int64, at time.Time) 
 		return fmt.Errorf("pkgindex: version %s of %s: %w", v.Version, v.Package, err)
 	}
 	if err := st.Packages().
-		LinkFile(ctx, types.VersionFile{VersionID: pv.ID, ItemID: itemID}); err != nil {
+		LinkFile(ctx, model.VersionFile{VersionID: pv.ID, ItemID: itemID}); err != nil {
 		return fmt.Errorf("pkgindex: link %s %s: %w", v.Package, v.Version, err)
 	}
 	return nil
@@ -69,9 +69,9 @@ func VersionOf(
 	ctx context.Context,
 	st Store,
 	itemID int64,
-) (types.PackageVersion, bool, error) {
+) (model.PackageVersion, bool, error) {
 	pv, err := st.Packages().VersionOf(ctx, itemID)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return pv, false, nil
 	}
 	if err != nil {
@@ -83,7 +83,7 @@ func VersionOf(
 // Prune runs after items were deleted, which removes their file links with
 // them: each of versions left with no files is deleted, and with it a
 // package left with no versions.
-func Prune(ctx context.Context, st Store, versions []types.PackageVersion) error {
+func Prune(ctx context.Context, st Store, versions []model.PackageVersion) error {
 	done := map[int64]bool{}
 	for _, pv := range versions {
 		if done[pv.ID] {

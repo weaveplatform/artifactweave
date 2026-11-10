@@ -10,9 +10,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // ErrSamePlace is a promotion onto itself: the same repository, image and
@@ -45,7 +45,7 @@ func (s *Service) PromotedTags(ctx context.Context, o Owner, tag string) ([]stri
 			return nil, err //nolint:wrapcheck // the layout names itself
 		}
 		if len(tags) == 0 {
-			return nil, fmt.Errorf("registry: image %s: %w", o.Name, store.ErrNotFound)
+			return nil, fmt.Errorf("registry: image %s: %w", o.Name, kernel.ErrNotFound)
 		}
 		return tags, nil
 	}
@@ -57,25 +57,25 @@ func (s *Service) PromotedTags(ctx context.Context, o Owner, tag string) ([]stri
 
 // TagManifest is the manifest file tag holds in o's image; store.ErrNotFound
 // for a reserved name, a digest folder or a folder holding none.
-func (s *Service) TagManifest(ctx context.Context, o Owner, tag string) (types.Item, error) {
+func (s *Service) TagManifest(ctx context.Context, o Owner, tag string) (model.Item, error) {
 	if layout.ReservedTag(tag) || layout.IsDigestFolder(tag) {
-		return types.Item{}, fmt.Errorf(
+		return model.Item{}, fmt.Errorf(
 			"registry: tag %s of %s: %w",
 			tag,
 			o.Name,
-			store.ErrNotFound,
+			kernel.ErrNotFound,
 		)
 	}
 	m, ok, err := layout.FolderManifest(ctx, s.Store.Items(), o.Repo.Key, false, o.Name+"/"+tag)
 	switch {
 	case err != nil:
-		return types.Item{}, err //nolint:wrapcheck // the layout names itself
+		return model.Item{}, err //nolint:wrapcheck // the layout names itself
 	case !ok:
-		return types.Item{}, fmt.Errorf(
+		return model.Item{}, fmt.Errorf(
 			"registry: tag %s of %s: %w",
 			tag,
 			o.Name,
-			store.ErrNotFound,
+			kernel.ErrNotFound,
 		)
 	}
 	return m, nil
@@ -208,10 +208,10 @@ func (s *Service) promotePlatforms(
 	ctx context.Context,
 	items *item.Service,
 	p Promotion,
-	list types.Item,
+	list model.Item,
 ) ([]string, error) {
 	props, err := s.Store.Items().Properties(ctx, list.ID)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		return nil, fmt.Errorf("registry: properties of %s: %w", list.FullPath(), err)
 	}
 	m, err := s.stored(ctx, aql.Hit{Item: list, Properties: props})
@@ -249,7 +249,7 @@ func (s *Service) promotePlatforms(
 func (s *Service) isFolder(ctx context.Context, o Owner, dir string) (bool, error) {
 	_, err := s.Store.Items().Get(ctx, o.Repo.Key, false, dir)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return false, nil
 	case err != nil:
 		return false, fmt.Errorf("registry: get %s: %w", dir, err)
@@ -288,7 +288,7 @@ func (s *Service) landFolder(
 	case !ok:
 		return nil
 	}
-	set := types.Properties{}
+	set := model.Properties{}
 	set.Set(layout.RepoNameProperty, dst.Name)
 	set.Set(layout.ManifestProperty, folder)
 	if err := items.Annotate(ctx, dst.Repo, landed, set, nil); err != nil {

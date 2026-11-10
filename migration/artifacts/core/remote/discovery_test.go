@@ -11,14 +11,15 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 )
 
 func discoveryFixture(
@@ -52,10 +53,10 @@ func discoveryFixture(
 			full, allows = q.Resource.PermissionPath, access.AllowsFolder
 		}
 		if !allows(
-			types.ResourceArtifact,
+			accessapi.ResourceArtifact,
 			accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
 			full,
-			types.ActionRead,
+			accessapi.ActionRead,
 		) {
 			return source.ErrDenied
 		}
@@ -73,14 +74,16 @@ func discoveryFixture(
 
 func discoveryGrant(t *testing.T, w *policyWorld, q *source.Request, includes ...string) {
 	t.Helper()
-	grant := types.Permission{Name: "mapped", Resources: map[types.ResourceType]types.Resource{
-		types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"mapped": types.ActionRead}},
-			Targets: map[string]types.Target{q.Repo.Key: {Include: includes}},
+	grant := model.Permission{Name: "mapped", Resources: map[accessapi.ResourceType]model.Resource{
+		accessapi.ResourceArtifact: {
+			Actions: model.Grants{
+				Users: map[string]accessapi.Actions{"mapped": accessapi.ActionRead},
+			},
+			Targets: map[string]model.Target{q.Repo.Key: {Include: includes}},
 		},
 	}}
 	err := w.db.Permissions().Create(t.Context(), grant)
-	if errors.Is(err, store.ErrConflict) {
+	if errors.Is(err, kernel.ErrConflict) {
 		err = w.db.Permissions().Update(t.Context(), grant)
 	}
 	if err != nil {
@@ -153,7 +156,7 @@ func TestAccMappedListingCanonicalAuthorityCacheAndRevocation(t *testing.T) {
 		strings.Contains(string(encoded), "child") {
 		t.Fatal("upstream traversal cursor leaked", string(encoded), err)
 	}
-	entries, _, err := w.db.RemoteCache().List(t.Context(), q.Repo.Key, "", store.Page{Limit: 100})
+	entries, _, err := w.db.RemoteCache().List(t.Context(), q.Repo.Key, "", kernel.Page{Limit: 100})
 	if err != nil || len(entries) != 1 ||
 		!strings.HasPrefix(entries[0].Token.Key.Path, "org.acme/lib/.remote-discovery/") {
 		t.Fatal("cache path used upstream authority", entries, err)
@@ -193,8 +196,8 @@ func TestAccMappedListingCanonicalAuthorityCacheAndRevocation(t *testing.T) {
 
 func TestAccMappedListingRootScopeAndLossyAdmission(t *testing.T) {
 	w, service, q, _ := discoveryFixture(t, "gradle-default", "maven-2-default")
-	doc := types.ConfigDocument{
-		Kind: types.ConfigLayout,
+	doc := configdoc.ConfigDocument{
+		Kind: configdoc.ConfigLayout,
 		Key:  "filename-module",
 		Document: json.RawMessage(
 			`{"artifactPathPattern":"[org]/[module]-[baseRev](-[classifier]).[ext]"}`,
@@ -269,7 +272,7 @@ func TestAccMappedListingRootScopeAndLossyAdmission(t *testing.T) {
 				t.Fatal("lossy classifier was admitted", err)
 			}
 			entries, _, err := w.db.RemoteCache().
-				List(t.Context(), q.Repo.Key, "", store.Page{Limit: 100})
+				List(t.Context(), q.Repo.Key, "", kernel.Page{Limit: 100})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -306,8 +309,8 @@ func TestAccMappedLayoutEditFencesBeforeReadAndPublication(t *testing.T) {
 				done <- err
 			}()
 			<-gate.Reached()
-			err := w.db.Configs().Put(t.Context(), types.ConfigDocument{
-				Kind: types.ConfigLayout,
+			err := w.db.Configs().Put(t.Context(), configdoc.ConfigDocument{
+				Kind: configdoc.ConfigLayout,
 				Key:  "gradle-default",
 				Document: json.RawMessage(
 					`{"artifactPathPattern":"new/[org]/[module]/[baseRev]/[module]-[baseRev].[ext]"}`,
@@ -334,7 +337,7 @@ func TestAccMappedLayoutEditFencesBeforeReadAndPublication(t *testing.T) {
 				t.Fatal("old mapping acquired new source generation", err)
 			}
 			entries, _, err := w.db.RemoteCache().
-				List(t.Context(), q.Repo.Key, "", store.Page{Limit: 100})
+				List(t.Context(), q.Repo.Key, "", kernel.Page{Limit: 100})
 			if err != nil {
 				t.Fatal(err)
 			}

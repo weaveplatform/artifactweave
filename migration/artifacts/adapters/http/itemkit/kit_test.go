@@ -19,10 +19,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // errFault is a failure no mapping knows.
@@ -165,7 +164,7 @@ func TestUnitItemErrorStatuses(t *testing.T) {
 		{
 			"sidecar of a missing file",
 			anonymous,
-			&item.SidecarError{Err: store.ErrNotFound, Message: "no file"},
+			&item.SidecarError{Err: kernel.ErrNotFound, Message: "no file"},
 			http.StatusNotFound,
 			"no file",
 		},
@@ -197,18 +196,18 @@ func TestUnitItemErrorStatuses(t *testing.T) {
 		{
 			"invalid path",
 			anonymous,
-			types.ErrInvalidItemPath,
+			kernel.ErrInvalidItemPath,
 			http.StatusBadRequest,
-			types.ErrInvalidItemPath.Error(),
+			kernel.ErrInvalidItemPath.Error(),
 		},
 		{
 			"long property key",
 			anonymous,
-			fmt.Errorf("set: %w", types.ErrPropertyKeyTooLong),
+			fmt.Errorf("set: %w", model.ErrPropertyKeyTooLong),
 			http.StatusBadRequest,
-			types.ErrPropertyKeyTooLong.Error(),
+			model.ErrPropertyKeyTooLong.Error(),
 		},
-		{"not found", anonymous, store.ErrNotFound, http.StatusNotFound, "Could not find resource"},
+		{"not found", anonymous, kernel.ErrNotFound, http.StatusNotFound, "Could not find resource"},
 		{"anything else", anonymous, errFault, http.StatusInternalServerError, "internal error"},
 	} {
 		var got *apierror.Error
@@ -267,7 +266,7 @@ func TestUnitLookupSearchesVirtualMembersInOrder(t *testing.T) {
 	}
 	if _, err := itemkit.Lookup(
 		ctx, w.Store, w.Virtual, false, "c.txt", admin, nil, map[string]bool{},
-	); !errors.Is(err, store.ErrNotFound) {
+	); !errors.Is(err, kernel.ErrNotFound) {
 		t.Errorf("a file no member holds: %v; want ErrNotFound", err)
 	}
 	if _, err := itemkit.Lookup(
@@ -279,7 +278,7 @@ func TestUnitLookupSearchesVirtualMembersInOrder(t *testing.T) {
 		admin,
 		nil,
 		map[string]bool{kittest.VirtualKey: true},
-	); !errors.Is(err, store.ErrNotFound) {
+	); !errors.Is(err, kernel.ErrNotFound) {
 		t.Errorf("a repository searched already: %v; want ErrNotFound", err)
 	}
 }

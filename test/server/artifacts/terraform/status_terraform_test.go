@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -40,9 +40,9 @@ var terraformRepos = []repo.Config{
 func seedTerraform(t *testing.T, db harness.Store) {
 	t.Helper()
 	ctx := context.Background()
-	for _, k := range []types.Keypair{
-		{Name: "tf-gpg", Type: types.KeypairGPG, Alias: "tf-gpg"},
-		{Name: "tf-rsa", Type: types.KeypairRSA, Alias: "tf-rsa"},
+	for _, k := range []api.Keypair{
+		{Name: "tf-gpg", Type: api.KeypairGPG, Alias: "tf-gpg"},
+		{Name: "tf-rsa", Type: api.KeypairRSA, Alias: "tf-rsa"},
 	} {
 		if err := db.Keys().CreateKeypair(ctx, k); err != nil {
 			t.Fatal(err)
@@ -112,14 +112,14 @@ var terraformStatusPart = statusPart{
 }
 
 // WorkQueue fails queueing under "enqueue".
-func (f faultyStore) WorkQueue() store.WorkQueue {
+func (f faultyStore) WorkQueue() work.WorkQueue {
 	if f.fail["enqueue"] {
 		return failingWork{f.Store.WorkQueue()}
 	}
 	return f.Store.WorkQueue()
 }
 
-type failingWork struct{ store.WorkQueue }
+type failingWork struct{ work.WorkQueue }
 
 func (failingWork) Enqueue(context.Context, string, string, []byte, time.Time) error {
 	return errBoom

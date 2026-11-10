@@ -12,9 +12,9 @@ import (
 	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/postgres"
 	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
+	"github.com/weaveplatform/artifactweave/migration/platform/idempotency"
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 func TestAccReplayProcessCrash(t *testing.T) {
@@ -56,7 +56,7 @@ func TestAccReplayPruneDoesNotDeleteRenewal(t *testing.T) {
 	appstoretest.Reset(t, s.DB(), pgdrv.Dialect)
 	now := time.Now().UTC()
 	digest := fmt.Sprintf("%x", sha256.Sum256([]byte("prune-race")))
-	r := store.ReplayRequest{
+	r := idempotency.ReplayRequest{
 		Scope:       digest,
 		Key:         digest,
 		Fingerprint: digest,

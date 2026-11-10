@@ -20,11 +20,15 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	puppethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet/http"
@@ -35,8 +39,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const base = "/artifactory/api/puppet/puppet-local"
@@ -108,7 +110,7 @@ func newFixtureStore(
 			}
 			return err
 		},
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 			rc, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				t.Fatal(err)
@@ -126,7 +128,7 @@ func newFixtureStore(
 type metadataSource struct {
 	bodyAt                 func(source.Resource) string
 	metadataBase           string
-	cachedItem             *types.Item
+	cachedItem             *model.Item
 	skipMetadataValidation bool
 	redirect               *url.URL
 	checkNilURL            bool
@@ -246,7 +248,7 @@ func (s metadataSource) Read(
 	}
 	if s.badCachedItem {
 		result.Stream = nil
-		result.Item = &types.Item{Actual: types.Checksums{SHA256: "missing"}}
+		result.Item = &model.Item{Actual: kernel.Checksums{SHA256: "missing"}}
 	}
 	if s.cachedItem != nil {
 		result.Stream = nil
@@ -269,7 +271,7 @@ func fixtureArchive(t *testing.T) []byte {
 	return repopath.Read(t, "test/acceptance/fixtures/puppet/acme-widget-1.0.0.tar.gz")
 }
 
-func (f *fixture) deploy(c repo.Config, body []byte) types.Item {
+func (f *fixture) deploy(c repo.Config, body []byte) model.Item {
 	f.t.Helper()
 	it, err := f.items.Deploy(
 		f.t.Context(),
@@ -422,12 +424,12 @@ func TestAccVirtualOrderedVersionsAndMemberPermissions(t *testing.T) {
 			t.Fatalf("virtual: %d %s", r.Code, r.Body.String())
 		}
 	}
-	permission := types.Permission{
+	permission := model.Permission{
 		Name: "virtual-only",
-		Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"viewer": types.ActionRead}},
-				Targets: map[string]types.Target{"virtual": {}},
+		Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{"viewer": api.ActionRead}},
+				Targets: map[string]model.Target{"virtual": {}},
 			},
 		},
 	}
@@ -578,36 +580,36 @@ type faultStore struct {
 	huge     bool
 }
 
-func (f *faultStore) Packages() store.PackageStore {
+func (f *faultStore) Packages() port.PackageStore {
 	return faultPackages{PackageStore: f.Store.Packages(), f: f}
 }
-func (f *faultStore) Items() store.ItemStore { return faultItems{ItemStore: f.Store.Items(), f: f} }
-func (f *faultStore) Repos() store.RepoStore { return faultRepos{RepoStore: f.Store.Repos(), f: f} }
+func (f *faultStore) Items() port.ItemStore { return faultItems{ItemStore: f.Store.Items(), f: f} }
+func (f *faultStore) Repos() port.RepoStore { return faultRepos{RepoStore: f.Store.Repos(), f: f} }
 
 type faultPackages struct {
-	store.PackageStore
+	port.PackageStore
 	f *faultStore
 }
 
-func (f faultPackages) Find(ctx context.Context, key, name string) (types.Package, error) {
+func (f faultPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
 	if f.f.find {
-		return types.Package{}, context.Canceled
+		return model.Package{}, context.Canceled
 	}
 	return f.PackageStore.Find(ctx, key, name)
 }
 
-func (f faultPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (f faultPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if f.f.versions {
 		return nil, context.Canceled
 	}
 	if f.f.huge {
-		return make([]types.PackageVersion, 4097), nil
+		return make([]model.PackageVersion, 4097), nil
 	}
 	return f.PackageStore.Versions(ctx, id)
 }
 
 type faultItems struct {
-	store.ItemStore
+	port.ItemStore
 	f *faultStore
 }
 
@@ -616,15 +618,15 @@ func (f faultItems) Get(
 	key string,
 	cached bool,
 	path string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if f.f.items {
-		return types.Item{}, context.Canceled
+		return model.Item{}, context.Canceled
 	}
 	return f.ItemStore.Get(ctx, key, cached, path)
 }
 
 type faultRepos struct {
-	store.RepoStore
+	port.RepoStore
 	f *faultStore
 }
 
@@ -763,7 +765,7 @@ func TestAccCachedMetadataAuthorityAndURLFence(t *testing.T) {
 			)
 			if tc.cached {
 				info := blobtest.Put(t.Context(), t, f.items.Blobs, []byte(src.body))
-				src.cachedItem = &types.Item{Actual: types.Checksums{SHA256: info.Digests.SHA256}}
+				src.cachedItem = &model.Item{Actual: kernel.Checksums{SHA256: info.Digests.SHA256}}
 			}
 			r := f.do("GET", base+"/v3/releases?module=acme-widget", "admin")
 			if r.Code != tc.want {
@@ -810,7 +812,7 @@ func TestAccVirtualMemberFailuresAndFiltering(t *testing.T) {
 		repoFault, excluded bool
 		want                int
 	}{
-		{name: "missing member", failure: store.ErrNotFound, want: 200},
+		{name: "missing member", failure: kernel.ErrNotFound, want: 200},
 		{name: "unavailable member", failure: source.ErrUnavailable, want: 502},
 		{name: "member store failure", repoFault: true, want: 500},
 		{name: "virtual excludes member item", excluded: true, want: 200},

@@ -13,9 +13,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errFault = errors.New("store fault")
@@ -47,35 +48,35 @@ type faulty struct {
 	f *faults
 }
 
-func (s *faulty) Packages() store.PackageStore { return faultyPackages{s.Store.Packages(), s.f} }
+func (s *faulty) Packages() port.PackageStore { return faultyPackages{s.Store.Packages(), s.f} }
 
-func (s *faulty) Items() store.ItemStore { return faultyItems{s.Store.Items(), s.f} }
+func (s *faulty) Items() port.ItemStore { return faultyItems{s.Store.Items(), s.f} }
 
 type faultyPackages struct {
-	store.PackageStore
+	port.PackageStore
 	f *faults
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Ensure(ctx context.Context, v types.Package) (types.Package, error) {
+func (p faultyPackages) Ensure(ctx context.Context, v model.Package) (model.Package, error) {
 	if p.f.fail("Ensure") {
-		return types.Package{}, errFault
+		return model.Package{}, errFault
 	}
 	return p.PackageStore.Ensure(ctx, v)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Get(ctx context.Context, id int64) (types.Package, error) {
+func (p faultyPackages) Get(ctx context.Context, id int64) (model.Package, error) {
 	if p.f.fail("Get") {
-		return types.Package{}, errFault
+		return model.Package{}, errFault
 	}
 	return p.PackageStore.Get(ctx, id)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Find(ctx context.Context, key, name string) (types.Package, error) {
+func (p faultyPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
 	if p.f.fail("Find") {
-		return types.Package{}, errFault
+		return model.Package{}, errFault
 	}
 	return p.PackageStore.Find(ctx, key, name)
 }
@@ -84,8 +85,8 @@ func (p faultyPackages) Find(ctx context.Context, key, name string) (types.Packa
 func (p faultyPackages) List(
 	ctx context.Context,
 	key string,
-	pg store.Page,
-) ([]types.Package, string, error) {
+	pg kernel.Page,
+) ([]model.Package, string, error) {
 	if p.f.fail("List") {
 		return nil, "", errFault
 	}
@@ -103,10 +104,10 @@ func (p faultyPackages) Delete(ctx context.Context, id int64) error {
 //nolint:wrapcheck // test double
 func (p faultyPackages) PutVersion(
 	ctx context.Context,
-	v types.PackageVersion,
-) (types.PackageVersion, error) {
+	v model.PackageVersion,
+) (model.PackageVersion, error) {
 	if p.f.fail("PutVersion") {
-		return types.PackageVersion{}, errFault
+		return model.PackageVersion{}, errFault
 	}
 	return p.PackageStore.PutVersion(ctx, v)
 }
@@ -116,15 +117,15 @@ func (p faultyPackages) Version(
 	ctx context.Context,
 	id int64,
 	v string,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	if p.f.fail("Version") {
-		return types.PackageVersion{}, errFault
+		return model.PackageVersion{}, errFault
 	}
 	return p.PackageStore.Version(ctx, id, v)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (p faultyPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if p.f.fail("Versions") {
 		return nil, errFault
 	}
@@ -140,7 +141,7 @@ func (p faultyPackages) DeleteVersion(ctx context.Context, id int64) error {
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) LinkFile(ctx context.Context, f types.VersionFile) error {
+func (p faultyPackages) LinkFile(ctx context.Context, f model.VersionFile) error {
 	if p.f.fail("LinkFile") {
 		return errFault
 	}
@@ -156,28 +157,28 @@ func (p faultyPackages) Files(ctx context.Context, id int64) ([]int64, error) {
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) VersionOf(ctx context.Context, id int64) (types.PackageVersion, error) {
+func (p faultyPackages) VersionOf(ctx context.Context, id int64) (model.PackageVersion, error) {
 	if p.f.fail("VersionOf") {
-		return types.PackageVersion{}, errFault
+		return model.PackageVersion{}, errFault
 	}
 	return p.PackageStore.VersionOf(ctx, id)
 }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	f *faults
 }
 
 //nolint:wrapcheck // test double
-func (i faultyItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
+func (i faultyItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
 	if i.f.fail("GetByID") {
-		return types.Item{}, errFault
+		return model.Item{}, errFault
 	}
 	return i.ItemStore.GetByID(ctx, id)
 }
 
 //nolint:wrapcheck // test double
-func (i faultyItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (i faultyItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if i.f.fail("Properties") {
 		return nil, errFault
 	}
@@ -186,7 +187,7 @@ func (i faultyItems) Properties(ctx context.Context, id int64) (types.Properties
 
 //nolint:wrapcheck // test double
 func (i faultyItems) PatchProperties(
-	ctx context.Context, id int64, set types.Properties, remove []string, at time.Time,
+	ctx context.Context, id int64, set model.Properties, remove []string, at time.Time,
 ) error {
 	if i.f.fail("PatchProperties") {
 		return errFault

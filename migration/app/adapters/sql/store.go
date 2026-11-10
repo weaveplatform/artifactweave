@@ -6,16 +6,30 @@ import (
 	"fmt"
 
 	accsql "github.com/weaveplatform/artifactweave/migration/access/adapters/sql"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	artsql "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/sql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	fedsql "github.com/weaveplatform/artifactweave/migration/federation/adapters/sql"
+	"github.com/weaveplatform/artifactweave/migration/federation/core/port"
 	ntfsql "github.com/weaveplatform/artifactweave/migration/notifications/adapters/sql"
+	"github.com/weaveplatform/artifactweave/migration/notifications/core/port"
+	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
+	"github.com/weaveplatform/artifactweave/migration/platform/idempotency"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
+	"github.com/weaveplatform/artifactweave/migration/platform/outbox"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	platsql "github.com/weaveplatform/artifactweave/migration/platform/store/sql"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	relsql "github.com/weaveplatform/artifactweave/migration/releases/adapters/sql"
+	"github.com/weaveplatform/artifactweave/migration/releases/core/port"
 	retsql "github.com/weaveplatform/artifactweave/migration/retention/adapters/sql"
+	"github.com/weaveplatform/artifactweave/migration/retention/core/port"
 	wrksql "github.com/weaveplatform/artifactweave/migration/workers/adapters/sql"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/workers/core/port"
 )
 
 // Store is the composite SQL store over database/sql for one Dialect. The
@@ -94,121 +108,121 @@ func New(db *sql.DB, d dialect.Dialect, keys *crypt.Keyring) *Store {
 }
 
 // Settings is the platform's settings store.
-func (s *Store) Settings() store.SettingsStore { return s.platform.Settings() }
+func (s *Store) Settings() settings.SettingsStore { return s.platform.Settings() }
 
 // Leases is the platform's lease store.
-func (s *Store) Leases() store.LeaseStore { return s.platform.Leases() }
+func (s *Store) Leases() work.LeaseStore { return s.platform.Leases() }
 
 // WorkQueue is the platform's work queue.
-func (s *Store) WorkQueue() store.WorkQueue { return s.platform.WorkQueue() }
+func (s *Store) WorkQueue() work.WorkQueue { return s.platform.WorkQueue() }
 
 // Configs is the platform's config document store, which fences layouts as New
 // registered.
-func (s *Store) Configs() store.ConfigStore { return s.platform.Configs() }
+func (s *Store) Configs() configdoc.ConfigStore { return s.platform.Configs() }
 
 // Instance is the platform's instance store.
-func (s *Store) Instance() store.InstanceStore { return s.platform.Instance() }
+func (s *Store) Instance() instance.InstanceStore { return s.platform.Instance() }
 
 // Outbox is the platform's federation outbox store.
-func (s *Store) Outbox() store.OutboxStore { return s.platform.Outbox() }
+func (s *Store) Outbox() outbox.OutboxStore { return s.platform.Outbox() }
 
 // Uploads is the platform's upload session store.
-func (s *Store) Uploads() store.UploadStore { return s.platform.Uploads() }
+func (s *Store) Uploads() session.UploadStore { return s.platform.Uploads() }
 
 // Replays is the platform's API replay store.
-func (s *Store) Replays() store.ReplayStore { return s.platform.Replays() }
+func (s *Store) Replays() idempotency.ReplayStore { return s.platform.Replays() }
 
 // RequestBudgets is the platform's request budget store.
-func (s *Store) RequestBudgets() store.RequestBudgetStore { return s.platform.RequestBudgets() }
+func (s *Store) RequestBudgets() apilimit.RequestBudgetStore { return s.platform.RequestBudgets() }
 
 // Repos is the artifacts module's repository store.
-func (s *Store) Repos() store.RepoStore { return s.artifacts.Repos() }
+func (s *Store) Repos() port.RepoStore { return s.artifacts.Repos() }
 
 // RemoteCache is the artifacts module's remote cache store.
-func (s *Store) RemoteCache() store.RemoteCacheStore { return s.artifacts.RemoteCache() }
+func (s *Store) RemoteCache() port.RemoteCacheStore { return s.artifacts.RemoteCache() }
 
 // Items is the artifacts module's item store.
-func (s *Store) Items() store.ItemStore { return s.artifacts.Items() }
+func (s *Store) Items() port.ItemStore { return s.artifacts.Items() }
 
 // Trash is the artifacts module's trash store.
-func (s *Store) Trash() store.TrashStore { return s.artifacts.Trash() }
+func (s *Store) Trash() port.TrashStore { return s.artifacts.Trash() }
 
 // Packages is the artifacts module's package store.
-func (s *Store) Packages() store.PackageStore { return s.artifacts.Packages() }
+func (s *Store) Packages() port.PackageStore { return s.artifacts.Packages() }
 
 // Blobs is the artifacts module's blob index.
-func (s *Store) Blobs() store.BlobIndex { return s.artifacts.Blobs() }
+func (s *Store) Blobs() port.BlobIndex { return s.artifacts.Blobs() }
 
 // Replicas is the artifacts module's replica index.
-func (s *Store) Replicas() store.ReplicaIndex { return s.artifacts.Replicas() }
+func (s *Store) Replicas() port.ReplicaIndex { return s.artifacts.Replicas() }
 
 // GitLFSLocks is the artifacts module's Git LFS lock store.
-func (s *Store) GitLFSLocks() store.GitLFSLockStore { return s.artifacts.GitLFSLocks() }
+func (s *Store) GitLFSLocks() port.GitLFSLockStore { return s.artifacts.GitLFSLocks() }
 
 // BowerRegistrations is the artifacts module's Bower registration store.
-func (s *Store) BowerRegistrations() store.BowerRegistrationStore {
+func (s *Store) BowerRegistrations() port.BowerRegistrationStore {
 	return s.artifacts.BowerRegistrations()
 }
 
 // Builds is the artifacts module's build store.
-func (s *Store) Builds() store.BuildStore { return s.artifacts.Builds() }
+func (s *Store) Builds() port.BuildStore { return s.artifacts.Builds() }
 
 // ArchivedItems is the artifacts module's archived-item store.
-func (s *Store) ArchivedItems() store.ArchivedItemStore { return s.artifacts.ArchivedItems() }
+func (s *Store) ArchivedItems() port.ArchivedItemStore { return s.artifacts.ArchivedItems() }
 
 // ColdBlobs is the artifacts module's blob index over the archive tier.
-func (s *Store) ColdBlobs() store.BlobIndex { return s.artifacts.ColdBlobs() }
+func (s *Store) ColdBlobs() port.BlobIndex { return s.artifacts.ColdBlobs() }
 
 // ColdReplicas is the artifacts module's replica index over the archive tier.
-func (s *Store) ColdReplicas() store.ReplicaIndex { return s.artifacts.ColdReplicas() }
+func (s *Store) ColdReplicas() port.ReplicaIndex { return s.artifacts.ColdReplicas() }
 
 // Users is the access module's user store.
-func (s *Store) Users() store.UserStore { return s.access.Users() }
+func (s *Store) Users() port.UserStore { return s.access.Users() }
 
 // Groups is the access module's group store.
-func (s *Store) Groups() store.GroupStore { return s.access.Groups() }
+func (s *Store) Groups() port.GroupStore { return s.access.Groups() }
 
 // Permissions is the access module's permission store.
-func (s *Store) Permissions() store.PermissionStore { return s.access.Permissions() }
+func (s *Store) Permissions() port.PermissionStore { return s.access.Permissions() }
 
 // Tokens is the access module's token store.
-func (s *Store) Tokens() store.TokenStore { return s.access.Tokens() }
+func (s *Store) Tokens() port.TokenStore { return s.access.Tokens() }
 
 // Keys is the access module's key store.
-func (s *Store) Keys() store.KeyStore { return s.access.Keys() }
+func (s *Store) Keys() port.KeyStore { return s.access.Keys() }
 
 // Projects is the access module's project store.
-func (s *Store) Projects() store.ProjectStore { return s.access.Projects() }
+func (s *Store) Projects() port.ProjectStore { return s.access.Projects() }
 
 // APIRestrictions is the access module's API restriction store.
-func (s *Store) APIRestrictions() store.APIRestrictionStore { return s.access.APIRestrictions() }
+func (s *Store) APIRestrictions() port.APIRestrictionStore { return s.access.APIRestrictions() }
 
 // Webhooks is the notifications module's webhook store.
-func (s *Store) Webhooks() store.WebhookStore { return s.notifications.Webhooks() }
+func (s *Store) Webhooks() port.WebhookStore { return s.notifications.Webhooks() }
 
 // Cleanup is the retention module's cleanup store.
-func (s *Store) Cleanup() store.CleanupStore { return s.retention.Cleanup() }
+func (s *Store) Cleanup() port.CleanupStore { return s.retention.Cleanup() }
 
 // Archive is the retention module's archive store.
-func (s *Store) Archive() store.ArchiveStore { return s.retention.Archive() }
+func (s *Store) Archive() port.ArchiveStore { return s.retention.Archive() }
 
 // Replications is the federation module's replication store.
-func (s *Store) Replications() store.ReplicationStore { return s.federation.Replications() }
+func (s *Store) Replications() port.ReplicationStore { return s.federation.Replications() }
 
 // Peers is the federation module's peer store.
-func (s *Store) Peers() store.PeerStore { return s.federation.Peers() }
+func (s *Store) Peers() port.PeerStore { return s.federation.Peers() }
 
 // Federation is the federation module's federated repository store.
-func (s *Store) Federation() store.FederationStore { return s.federation.Federation() }
+func (s *Store) Federation() port.FederationStore { return s.federation.Federation() }
 
 // Platform is the federation module's platform federation store.
-func (s *Store) Platform() store.PlatformStore { return s.federation.Platform() }
+func (s *Store) Platform() port.PlatformStore { return s.federation.Platform() }
 
 // Bundles is the releases module's bundle store.
-func (s *Store) Bundles() store.BundleStore { return s.releases.Bundles() }
+func (s *Store) Bundles() port.BundleStore { return s.releases.Bundles() }
 
 // Distribution is the releases module's distribution store.
-func (s *Store) Distribution() store.DistributionStore { return s.releases.Distribution() }
+func (s *Store) Distribution() port.DistributionStore { return s.releases.Distribution() }
 
 // Workers is the workers module's worker store.
-func (s *Store) Workers() store.WorkerStore { return s.workers.Workers() }
+func (s *Store) Workers() port.WorkerStore { return s.workers.Workers() }

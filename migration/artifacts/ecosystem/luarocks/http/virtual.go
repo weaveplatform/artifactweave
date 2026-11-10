@@ -11,13 +11,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	luafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The virtual class is served by the protocol's package-aware resolver. A
@@ -57,7 +57,7 @@ func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
 		}
 		seen[key] = true
 		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -77,7 +77,7 @@ func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
 }
 
 func (h handler) virtualDeployment(
-	w http.ResponseWriter, r *http.Request, action types.Actions,
+	w http.ResponseWriter, r *http.Request, action api.Actions,
 ) (*http.Request, bool) {
 	if !h.k.RequireFolder(w, r, "", action) {
 		return nil, false
@@ -91,7 +91,7 @@ func (h handler) virtualDeployment(
 	}
 	target, err := h.k.DB().Repos().Get(r.Context(), virtual.DefaultDeploymentRepo)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			h.k.Error(w, r, apierror.New(http.StatusBadRequest,
 				"virtual LuaRocks deployment target is missing"))
 			return nil, false
@@ -129,7 +129,7 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, path string
 		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Could not find resource"))
 		return
 	}
-	if !h.k.Require(w, r, path, types.ActionRead) {
+	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
 	members, err := h.virtualMembers(r)
@@ -138,12 +138,12 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, path string
 		return
 	}
 	for _, mr := range members {
-		if !h.k.Can(mr, path, types.ActionRead) {
+		if !h.k.Can(mr, path, api.ActionRead) {
 			continue
 		}
 		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
 			result, err := h.remoteRock(mr, path)
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, kernel.ErrNotFound) {
 				continue
 			}
 			if err != nil {
@@ -154,7 +154,7 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, path string
 			return
 		}
 		found, err := h.k.ResolveItem(mr, path)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -214,7 +214,7 @@ func (h handler) memberManifest(
 		return remoteManifest{}, nil, fmt.Errorf("luarocks member manifest: %w", err)
 	}
 	if f.Item.Folder {
-		return remoteManifest{}, nil, store.ErrNotFound
+		return remoteManifest{}, nil, kernel.ErrNotFound
 	}
 	rc, _, err := h.k.Blobs().Open(r.Context(), f.Item.Actual.SHA256)
 	if err != nil {
@@ -239,7 +239,7 @@ func filteredMemberManifest(
 ) (remoteManifest, []string, error) {
 	var checkErr error
 	data, paths, err := manifest.filtered(func(path string) bool {
-		if !k.Can(r, path, types.ActionRead) {
+		if !k.Can(r, path, api.ActionRead) {
 			return false
 		}
 		if check != nil {
@@ -260,7 +260,7 @@ func filteredMemberManifest(
 }
 
 func (h handler) virtualManifest(w http.ResponseWriter, r *http.Request, path string) {
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	members, err := h.virtualMembers(r)
@@ -271,11 +271,11 @@ func (h handler) virtualManifest(w http.ResponseWriter, r *http.Request, path st
 	var manifests []remoteManifest
 	var revalidate []func(context.Context) error
 	for _, mr := range members {
-		if !h.k.CanFolder(mr, "", types.ActionRead) {
+		if !h.k.CanFolder(mr, "", api.ActionRead) {
 			continue
 		}
 		manifest, check, err := h.memberManifest(mr, path)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -307,7 +307,7 @@ func (h handler) virtualManifest(w http.ResponseWriter, r *http.Request, path st
 			MediaType: "text/plain; charset=utf-8",
 			Size:      int64(len(data)),
 			ETag:      fmt.Sprintf(`"%x"`, digest),
-			Checksums: types.Checksums{
+			Checksums: kernel.Checksums{
 				SHA256: fmt.Sprintf("%x", digest),
 			},
 		},

@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitRemoteLockPagesRejectUntrustedMetadata(t *testing.T) {
@@ -87,7 +87,7 @@ func TestUnitLockCursorCannotChangeRepositoryOrFilter(t *testing.T) {
 				2,
 			); !errors.Is(
 				err,
-				store.ErrInvalidCursor,
+				kernel.ErrInvalidCursor,
 			) {
 				t.Fatalf("unsafe cursor accepted: %v", err)
 			}
@@ -110,7 +110,7 @@ func TestUnitLockCursorCannotChangeRepositoryOrFilter(t *testing.T) {
 			2,
 		); !errors.Is(
 			err,
-			store.ErrInvalidCursor,
+			kernel.ErrInvalidCursor,
 		) {
 			t.Fatalf("malformed member cursor accepted: %+v, err=%v", malformed, err)
 		}

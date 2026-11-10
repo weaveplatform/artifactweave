@@ -19,9 +19,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -60,9 +62,9 @@ var testHash = support.TestHash
 
 // sourceIdentity resolves every remote repository to one fixed HTTP source
 // identity, as the root fixture of the same name does.
-func sourceIdentity(context.Context, repo.Config) (types.SourceIdentity, error) {
-	return types.SourceIdentity{
-		Kind:       types.ExternalHTTP,
+func sourceIdentity(context.Context, repo.Config) (model.SourceIdentity, error) {
+	return model.SourceIdentity{
+		Kind:       model.ExternalHTTP,
 		Repository: "repo-1",
 		ID:         "http-1",
 		Generation: "revision-1",
@@ -87,8 +89,8 @@ func md5Hex(s string) string {
 
 func setTrashcan(t *testing.T, db *inmem.Store, on bool) {
 	t.Helper()
-	if err := db.Settings().Put(context.Background(), types.SettingTrashcan,
-		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
+	if err := db.Settings().Put(context.Background(), settings.SettingTrashcan,
+		model.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -110,7 +112,7 @@ func conanTestArchiveEntries(t *testing.T, entries map[string]string) string {
 func seedTokens(t *testing.T, db harness.Store) (*token.Service, map[string]string) {
 	t.Helper()
 	ctx := context.Background()
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)

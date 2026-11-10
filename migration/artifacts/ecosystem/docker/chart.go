@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // MediaTypeHelmConfig is the config of a Helm chart pushed as an OCI
@@ -40,7 +40,7 @@ type tagMeta struct {
 // (ReadConfig): a push never fails for its metadata, and a reindex records
 // it once the content reads again. Without a blob store, as in a hook run
 // on a store alone, it reads nothing.
-func tagMetadata(ctx context.Context, blobs format.Blobs, m types.Item) []byte {
+func tagMetadata(ctx context.Context, blobs format.Blobs, m model.Item) []byte {
 	if blobs == nil || m.Name != ManifestFile {
 		return nil
 	}

@@ -9,10 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // promotionWorld adds release-local, a federated repository, a virtual
@@ -39,7 +40,7 @@ func promotionWorld(t *testing.T) *world {
 }
 
 // put deploys content at path in a repository, or its cache.
-func (w *world) put(key string, cached bool, path, content string, props types.Properties) {
+func (w *world) put(key string, cached bool, path, content string, props model.Properties) {
 	w.t.Helper()
 	ctx := context.Background()
 	c, err := w.db.Repos().Get(ctx, key)
@@ -56,7 +57,7 @@ func (w *world) put(key string, cached bool, path, content string, props types.P
 	}
 }
 
-func (w *world) props(key, path string) types.Properties {
+func (w *world) props(key, path string) model.Properties {
 	w.t.Helper()
 	ctx := context.Background()
 	it, err := w.db.Items().Get(ctx, key, false, path)
@@ -70,7 +71,7 @@ func (w *world) props(key, path string) types.Properties {
 	return p
 }
 
-func (w *world) promotions(name, number string) []types.BuildPromotion {
+func (w *world) promotions(name, number string) []model.BuildPromotion {
 	w.t.Helper()
 	ctx := context.Background()
 	b, err := w.db.Builds().Get(ctx, "", name, number, time.Time{})
@@ -85,8 +86,8 @@ func (w *world) promotions(name, number string) []types.BuildPromotion {
 }
 
 // buildProps are the properties the JFrog CLI gives a build's upload.
-func buildProps(name, number string) types.Properties {
-	return types.Properties{"build.name": {name}, "build.number": {number}}
+func buildProps(name, number string) model.Properties {
+	return model.Properties{"build.name": {name}, "build.number": {number}}
 }
 
 // fileModule is a module with artifacts and dependencies, each "name" or
@@ -178,7 +179,7 @@ func TestUnitPromoteCopyProperties(t *testing.T) {
 	w.publish(doc("app", "1", started0, fileModule([]string{"a.bin"}, nil)))
 	_, err := w.svc.Promote(ctx, Promotion{
 		Name: "app", Number: "1", Status: "staged", CIUser: "jenkins", TargetRepo: "fed",
-		Copy: true, Artifacts: true, Properties: types.Properties{"stage": {"qa", "prod"}},
+		Copy: true, Artifacts: true, Properties: model.Properties{"stage": {"qa", "prod"}},
 		FailFast: true, By: "admin",
 	}, everyone)
 	if err != nil {
@@ -208,7 +209,7 @@ func TestUnitPromoteWithoutTarget(t *testing.T) {
 	w.publish(doc("app", "1", started0, fileModule([]string{"a.bin"}, nil)))
 	res, err := w.svc.Promote(ctx, Promotion{
 		Name: "app", Number: "1", Artifacts: true,
-		Properties: types.Properties{"stage": {"qa"}}, FailFast: true, By: "admin",
+		Properties: model.Properties{"stage": {"qa"}}, FailFast: true, By: "admin",
 	}, everyone)
 	if err != nil {
 		t.Fatal(err)
@@ -242,7 +243,7 @@ func TestUnitPromoteDryRun(t *testing.T) {
 	w.publish(doc("app", "1", started0, fileModule([]string{"a.bin"}, nil)))
 	res, err := w.svc.Promote(ctx, Promotion{
 		Name: "app", Number: "1", Status: "released", TargetRepo: "release-local",
-		Artifacts: true, Properties: types.Properties{"k": {"v"}}, DryRun: true,
+		Artifacts: true, Properties: model.Properties{"k": {"v"}}, DryRun: true,
 		FailFast: true, By: "admin",
 	}, everyone)
 	if err != nil {
@@ -316,8 +317,8 @@ func TestUnitPromoteFailFast(t *testing.T) {
 	res, err := w.svc.Promote(ctx, Promotion{
 		Name: "app", Number: "1", TargetRepo: "release-local", Artifacts: true, FailFast: true,
 		By: "deployer",
-	}, perms{item: func(c repo.Config, _ string, want types.Actions) bool {
-		return c.Key == "libs-local" || want != types.ActionDelete
+	}, perms{item: func(c repo.Config, _ string, want api.Actions) bool {
+		return c.Key == "libs-local" || want != api.ActionDelete
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -347,22 +348,22 @@ func TestUnitPromoteRefusals(t *testing.T) {
 	w.put("release-local", false, "x", "file", nil)
 	w.publish(doc("app", "1", started0,
 		fileModule([]string{"r.bin", "d.bin", "w.bin", "c.bin", "in.bin", "x.bin"}, nil)))
-	a := perms{item: func(c repo.Config, path string, want types.Actions) bool {
+	a := perms{item: func(c repo.Config, path string, want api.Actions) bool {
 		switch {
 		case strings.HasPrefix(path, "r/"):
-			return want != types.ActionRead
+			return want != api.ActionRead
 		case strings.HasPrefix(path, "d/"):
-			return want != types.ActionDelete
+			return want != api.ActionDelete
 		case strings.HasPrefix(path, "w/") && c.Key == "release-local":
-			return want != types.ActionWrite
+			return want != api.ActionWrite
 		case strings.HasPrefix(path, "in/"):
-			return want != types.ActionAnnotate
+			return want != api.ActionAnnotate
 		}
 		return true
 	}}
 	res, err := w.svc.Promote(ctx, Promotion{
 		Name: "app", Number: "1", TargetRepo: "release-local", Artifacts: true,
-		Properties: types.Properties{"k": {"v"}}, By: "deployer",
+		Properties: model.Properties{"k": {"v"}}, By: "deployer",
 	}, a)
 	if err != nil {
 		t.Fatal(err)
@@ -386,14 +387,14 @@ func TestUnitPromoteRefusals(t *testing.T) {
 	}
 
 	if _, err := w.svc.Promote(ctx, Promotion{Name: "app", Number: "1"},
-		only(types.ActionRead)); !errors.Is(err, ErrForbidden) {
+		only(api.ActionRead)); !errors.Is(err, ErrForbidden) {
 		t.Errorf("without deploy on the build: %v", err)
 	}
 	// A warning aborts a fail-fast promotion as an error does.
 	w.put("release-local", false, "in/solo.bin", "solo.bin", buildProps("solo", "1"))
 	w.publish(doc("solo", "1", started0, fileModule([]string{"solo.bin"}, nil)))
 	res, err = w.svc.Promote(ctx, Promotion{
-		Name: "solo", Number: "1", Properties: types.Properties{"k": {"v"}}, Artifacts: true,
+		Name: "solo", Number: "1", Properties: model.Properties{"k": {"v"}}, Artifacts: true,
 		SourceRepo: "release-local", FailFast: true, By: "deployer",
 	}, a)
 	if err != nil || !res.Aborted || !strings.Contains(texts(res.Messages), "WARNING") {
@@ -409,7 +410,7 @@ func TestUnitPromoteCopiesFromCache(t *testing.T) {
 	w.publish(doc("app", "1", started0, fileModule(nil, []string{"d.jar"})))
 	res, err := w.svc.Promote(context.Background(), Promotion{
 		Name: "app", Number: "1", TargetRepo: "release-local", Copy: true, Dependencies: true,
-		Properties: types.Properties{"k": {"v"}}, FailFast: true, By: "admin",
+		Properties: model.Properties{"k": {"v"}}, FailFast: true, By: "admin",
 	}, everyone)
 	if err != nil || res.Aborted {
 		t.Fatalf("%v: report:\n%s", err, texts(res.Messages))

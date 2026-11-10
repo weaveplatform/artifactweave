@@ -5,13 +5,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentplugins"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // RegisterAgentMarketplaceRoutes serves the agent plugin marketplace
@@ -82,12 +82,12 @@ func (s AgentPluginItems) serveAgentMarketplace(
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "download check", err))
 		return
 	}
-	if !acc.Folder(c, "", types.ActionRead) {
+	if !acc.Folder(c, "", api.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	data, err := agentplugins.Marketplace(r.Context(), st, c.Key, name, func(path string) bool {
-		return acc.File(c, path, types.ActionRead) && generic.CheckDownload(c, path, false) == nil
+		return acc.File(c, path, api.ActionRead) && generic.CheckDownload(c, path, false) == nil
 	})
 	if err != nil {
 		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "agent plugin marketplace", err))

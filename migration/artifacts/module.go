@@ -15,6 +15,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/reindexauth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
@@ -31,8 +33,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // errNoStore refuses Deps without a store, which every service the module
@@ -293,17 +293,17 @@ func (m *Module) OpenRemoteSources(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("remote resolver: %w", err)
 	}
-	resolve := func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+	resolve := func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 		current, err := m.store.Repos().Get(ctx, c.Key)
 		if err != nil {
-			return types.SourceIdentity{}, source.ErrSuperseded
+			return model.SourceIdentity{}, source.ErrSuperseded
 		}
-		if store.RemotePolicyChanged(c, current) {
-			return types.SourceIdentity{}, source.ErrSuperseded
+		if port.RemotePolicyChanged(c, current) {
+			return model.SourceIdentity{}, source.ErrSuperseded
 		}
 		id, err := m.store.RemoteCache().Source(ctx, c.Key)
 		if err != nil {
-			return types.SourceIdentity{}, fmt.Errorf("remote identity: %w", err)
+			return model.SourceIdentity{}, fmt.Errorf("remote identity: %w", err)
 		}
 		return id, nil
 	}
@@ -343,10 +343,10 @@ func (m *Module) OpenRemoteSources(ctx context.Context) error {
 			path = path[:len(path)-len(".sha256")]
 		}
 		if !allows(
-			types.ResourceArtifact,
+			accessapi.ResourceArtifact,
 			accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
 			path,
-			types.ActionRead,
+			accessapi.ActionRead,
 		) {
 			return source.ErrDenied
 		}
@@ -485,7 +485,7 @@ func (m *Module) remotePolicyKey(ctx context.Context) ([]byte, error) {
 		holder := rand.Text()
 		now := time.Now().UTC()
 		held, err := m.store.Leases().
-			Acquire(tx, types.Lease{Name: remotePolicyKeySetting, Holder: holder, Acquired: now, Expires: now.Add(time.Minute)}, now)
+			Acquire(tx, work.Lease{Name: remotePolicyKeySetting, Holder: holder, Acquired: now, Expires: now.Add(time.Minute)}, now)
 		if err != nil {
 			return fmt.Errorf("lock remote key: %w", err)
 		}
@@ -493,7 +493,7 @@ func (m *Module) remotePolicyKey(ctx context.Context) ([]byte, error) {
 			return source.ErrUnavailable
 		}
 		err = m.store.Settings().Get(tx, remotePolicyKeySetting, &key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			key = make([]byte, 32)
 			if _, err = rand.Read(key); err != nil {
 				return fmt.Errorf("generate remote key: %w", err)

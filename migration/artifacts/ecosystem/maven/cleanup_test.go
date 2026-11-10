@@ -12,9 +12,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // limited sets maxUniqueSnapshots.
@@ -48,8 +50,8 @@ func (w *metaWorld) files(dir string) []string {
 // tree lists every item of the repository.
 func (w *metaWorld) tree() []string {
 	w.t.Helper()
-	its, _, err := w.db.Items().Descendants(w.ctx, w.c.Key, false, "", store.Page{
-		Limit: store.MaxLimit,
+	its, _, err := w.db.Items().Descendants(w.ctx, w.c.Key, false, "", kernel.Page{
+		Limit: kernel.MaxLimit,
 	})
 	if err != nil {
 		w.t.Fatal(err)
@@ -243,7 +245,7 @@ func TestUnitMaxUniqueSnapshotsStoreFailures(t *testing.T) {
 	err := maven.Handler{}.Work(
 		w.ctx,
 		format.Env{Store: workFaults{w.db, "Find"}, Layouts: layouts{}},
-		types.WorkItem{Kind: maven.KindSnapshots, Key: w.c.Key + "/com.acme:app"},
+		work.WorkItem{Kind: maven.KindSnapshots, Key: w.c.Key + "/com.acme:app"},
 	)
 	if !errors.Is(err, errWork) {
 		t.Fatalf("a failed read: %v", err)
@@ -255,10 +257,10 @@ var errTrash = errors.New("trash can full")
 // failingTrash refuses every trash entry.
 type failingTrash struct{ item.Store }
 
-func (f failingTrash) Trash() store.TrashStore { return refusingTrash{f.Store.Trash()} }
+func (f failingTrash) Trash() port.TrashStore { return refusingTrash{f.Store.Trash()} }
 
-type refusingTrash struct{ store.TrashStore }
+type refusingTrash struct{ port.TrashStore }
 
-func (refusingTrash) Add(context.Context, types.TrashEntry) (types.TrashEntry, error) {
-	return types.TrashEntry{}, errTrash
+func (refusingTrash) Add(context.Context, model.TrashEntry) (model.TrashEntry, error) {
+	return model.TrashEntry{}, errTrash
 }

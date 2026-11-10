@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 )
 
 // flat answers the flat container, PackageBaseAddress (decision 0038),
@@ -81,7 +81,7 @@ func (h handler) flatFile(w http.ResponseWriter, r *http.Request, id, ver, file 
 		h.k.Error(w, r, notFound(r))
 	case isPackage:
 		h.k.ServeItem(w, r, v.meta.Path)
-	case h.k.Require(w, r, v.meta.Path, types.ActionRead):
+	case h.k.Require(w, r, v.meta.Path, api.ActionRead):
 		w.Header().Set("Content-Type", "application/xml")
 		_, _ = io.WriteString(w, v.meta.Nuspec)
 	}

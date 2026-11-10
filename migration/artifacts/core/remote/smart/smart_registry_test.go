@@ -8,7 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccSmartRegistryGrantAndPropertyPath(t *testing.T) {
@@ -17,9 +17,9 @@ func TestAccSmartRegistryGrantAndPropertyPath(t *testing.T) {
 		if realm == "" {
 			name = "remote/image"
 		}
-		access := &types.RegistryAccess{
+		access := &kernel.RegistryAccess{
 			Realm: realm,
-			Grants: []types.RegistryGrant{
+			Grants: []kernel.RegistryGrant{
 				{Type: "repository", Name: name, Actions: []string{"pull"}},
 			},
 		}
@@ -60,9 +60,9 @@ func TestUnitSmartRegistryPathNilParserFailsClosed(t *testing.T) {
 	if smart.SmartPropertyPath(nil, q) {
 		t.Fatal("a nil parser gave a registry request a property path")
 	}
-	access := &types.RegistryAccess{
+	access := &kernel.RegistryAccess{
 		Realm: "remote",
-		Grants: []types.RegistryGrant{
+		Grants: []kernel.RegistryGrant{
 			{Type: "repository", Name: "image", Actions: []string{"pull"}},
 		},
 	}

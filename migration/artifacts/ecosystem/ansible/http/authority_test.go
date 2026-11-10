@@ -16,14 +16,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	ansiblefmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/ansible"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func remoteVersionJSON(version, download string, data []byte) []byte {
@@ -215,12 +216,12 @@ func TestAccGalaxyFiltersUnreadableRemoteVersions(t *testing.T) {
 			Body:   []byte(`{"data":[{"version":"1.2.3"},{"version":"2.0.0"}]}`),
 		},
 	)
-	permission := types.Permission{
+	permission := model.Permission{
 		Name: "selected-version",
-		Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}},
-				Targets: map[string]types.Target{
+		Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]model.Target{
 					c.Key: {Include: []string{"collections/weave/sample/1.2.3/**"}},
 				},
 			},
@@ -317,7 +318,7 @@ func TestAccGalaxyRejectsArchiveIdentityEvenWhenAdvertisedHashMatches(t *testing
 	if _, err := f.db.Items().
 		Get(t.Context(), c.Key, true, ansiblefmt.Path("weave", "sample", "1.2.4")); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("invalid archive identity cached: %v", err)
 	}

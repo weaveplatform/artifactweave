@@ -9,8 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func xetProvenanceData() []byte {
@@ -23,15 +24,15 @@ func xetProvenanceData() []byte {
 
 func xetProvenancePermission(t *testing.T, w *itemWorld, read bool) {
 	t.Helper()
-	actions := types.ActionWrite
+	actions := api.ActionWrite
 	if read {
-		actions |= types.ActionRead
+		actions |= api.ActionRead
 	}
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+	if err := w.db.Permissions().Create(t.Context(), model.Permission{
 		Name: "model-content-provenance",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": actions}},
-			Targets: map[string]types.Target{"hf": {Include: []string{"models--acme--demo/**"}}},
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"user": actions}},
+			Targets: map[string]model.Target{"hf": {Include: []string{"models--acme--demo/**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -43,11 +44,11 @@ func xetProvenancePermission(t *testing.T, w *itemWorld, read bool) {
 // grant for the target model.
 func xetProvenanceReadableOrigin(t *testing.T, w *itemWorld, key, prefix string) {
 	t.Helper()
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+	if err := w.db.Permissions().Create(t.Context(), model.Permission{
 		Name: "read-other-model-content",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
-			Targets: map[string]types.Target{key: {Include: []string{prefix + "/**"}}},
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]model.Target{key: {Include: []string{prefix + "/**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

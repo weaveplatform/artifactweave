@@ -9,16 +9,21 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 type world struct {
@@ -55,7 +60,7 @@ func (w *world) advance(d time.Duration) { w.set(w.now().Add(d)) }
 // collector's Tokens option reaches, as the access module's binding does.
 type tokenStore interface {
 	gc.Store
-	Tokens() store.TokenStore
+	Tokens() port.TokenStore
 }
 
 // collector builds a collector over st whose Tokens removes expired records
@@ -73,7 +78,7 @@ func (w *world) collector(t *testing.T, st tokenStore) *gc.Collector {
 	return c
 }
 
-func (w *world) deploy(t *testing.T, p, body string) types.Item {
+func (w *world) deploy(t *testing.T, p, body string) model.Item {
 	t.Helper()
 	it, err := w.items.Deploy(context.Background(), item.Deploy{
 		Target: item.Target{Repo: w.libs, Path: p}, Body: strings.NewReader(body),
@@ -97,8 +102,8 @@ func (w *world) remove(t *testing.T, p string) {
 
 func (w *world) trashOff(t *testing.T) {
 	t.Helper()
-	if err := w.db.Settings().Put(context.Background(), types.SettingTrashcan,
-		types.TrashcanSettings{Enabled: false, RetentionDays: 1}); err != nil {
+	if err := w.db.Settings().Put(context.Background(), settings.SettingTrashcan,
+		model.TrashcanSettings{Enabled: false, RetentionDays: 1}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -139,14 +144,14 @@ func TestUnitUnreferencedAfterGrace(t *testing.T) {
 	// racing the removal finds out; then it is pruned.
 	if b, err := w.db.Blobs().
 		Get(context.Background(), sha); err != nil ||
-		b.State != types.BlobDeleted {
+		b.State != blob.BlobDeleted {
 		t.Fatalf("tombstone: %+v, %v", b, err)
 	}
 	w.advance(25 * time.Hour)
 	if rep := run(t, c); rep.Pruned != 1 {
 		t.Fatalf("prune: %+v", rep)
 	}
-	if _, err := w.db.Blobs().Get(context.Background(), sha); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.db.Blobs().Get(context.Background(), sha); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("tombstone left after a day: %v", err)
 	}
 }
@@ -175,7 +180,7 @@ func TestUnitReapUploads(t *testing.T) {
 		t.Fatal(err)
 	}
 	old := w.now().Add(-48 * time.Hour)
-	for _, u := range []store.Upload{
+	for _, u := range []session.Upload{
 		{ID: live.ID(), Backend: "fs", Started: old, Updated: old},
 		{ID: "gone", Backend: "s3:cold_blob", Started: old, Updated: old},
 		{ID: "fresh", Backend: "fs", Started: w.now(), Updated: w.now()},
@@ -202,7 +207,7 @@ func TestUnitReapers(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	old := w.now().Add(-48 * time.Hour)
-	if err := w.db.Uploads().Put(ctx, store.Upload{
+	if err := w.db.Uploads().Put(ctx, session.Upload{
 		ID: "mp", Backend: "jfrog-multipart", Started: old, Updated: old,
 	}); err != nil {
 		t.Fatal(err)
@@ -213,8 +218,8 @@ func TestUnitReapers(t *testing.T) {
 	c, err := gc.New(
 		w.db,
 		w.blobs,
-		gc.Options{Now: w.now, Reapers: map[string]func(context.Context, store.Upload) error{
-			"jfrog-multipart": func(ctx context.Context, u store.Upload) error {
+		gc.Options{Now: w.now, Reapers: map[string]func(context.Context, session.Upload) error{
+			"jfrog-multipart": func(ctx context.Context, u session.Upload) error {
 				if fail {
 					return boom
 				}
@@ -283,8 +288,8 @@ func TestUnitOrphans(t *testing.T) {
 		t.Fatalf("an orphan seen for the first time is kept: %+v", rep)
 	}
 	// Indexed between passes, as a deploy committing late would be.
-	if _, err := w.db.Blobs().Ref(ctx, types.Blob{
-		Checksums: types.Checksums{SHA256: adopted}, Size: int64(len("adopted")), Created: w.now(),
+	if _, err := w.db.Blobs().Ref(ctx, blob.Blob{
+		Checksums: kernel.Checksums{SHA256: adopted}, Size: int64(len("adopted")), Created: w.now(),
 	}, 1); err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +310,7 @@ func TestUnitOrphans(t *testing.T) {
 func TestUnitLeaseHeldElsewhere(t *testing.T) {
 	w := newWorld(t)
 	now := w.now()
-	if ok, err := w.db.Leases().Acquire(context.Background(), types.Lease{
+	if ok, err := w.db.Leases().Acquire(context.Background(), work.Lease{
 		Name: "storage-gc", Holder: "elsewhere", Acquired: now, Expires: now.Add(time.Hour),
 	}, now); err != nil || !ok {
 		t.Fatal(ok, err)
@@ -323,18 +328,18 @@ type failing struct {
 	calls                        *atomic.Int64
 }
 
-func (f failing) Uploads() store.UploadStore { return failUploads{f.Store.Uploads(), f.stale} }
-func (f failing) Blobs() store.BlobIndex     { return failBlobs{f.Store.Blobs(), f.unreferenced} }
-func (f failing) Leases() store.LeaseStore {
+func (f failing) Uploads() session.UploadStore { return failUploads{f.Store.Uploads(), f.stale} }
+func (f failing) Blobs() port.BlobIndex        { return failBlobs{f.Store.Blobs(), f.unreferenced} }
+func (f failing) Leases() work.LeaseStore {
 	return failLeases{f.Store.Leases(), f.acquire, f.renewals, f.calls}
 }
 
 type failUploads struct {
-	store.UploadStore
+	session.UploadStore
 	err error
 }
 
-func (f failUploads) Stale(ctx context.Context, before time.Time, n int) ([]store.Upload, error) {
+func (f failUploads) Stale(ctx context.Context, before time.Time, n int) ([]session.Upload, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -342,11 +347,11 @@ func (f failUploads) Stale(ctx context.Context, before time.Time, n int) ([]stor
 }
 
 type failBlobs struct {
-	store.BlobIndex
+	port.BlobIndex
 	err error
 }
 
-func (f failBlobs) Unreferenced(ctx context.Context, p store.Page) ([]types.Blob, string, error) {
+func (f failBlobs) Unreferenced(ctx context.Context, p kernel.Page) ([]blob.Blob, string, error) {
 	if f.err != nil {
 		return nil, "", f.err
 	}
@@ -356,13 +361,13 @@ func (f failBlobs) Unreferenced(ctx context.Context, p store.Page) ([]types.Blob
 // failLeases fails Acquire with err, or refuses every Acquire after the
 // first renewals ones, as a lease taken over mid-pass would.
 type failLeases struct {
-	store.LeaseStore
+	work.LeaseStore
 	err      error
 	renewals int
 	calls    *atomic.Int64
 }
 
-func (f failLeases) Acquire(ctx context.Context, l types.Lease, now time.Time) (bool, error) {
+func (f failLeases) Acquire(ctx context.Context, l work.Lease, now time.Time) (bool, error) {
 	if f.err != nil {
 		return false, f.err
 	}

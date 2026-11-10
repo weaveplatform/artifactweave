@@ -9,11 +9,11 @@ import (
 	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/sql/sqlite"
 	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
 	sqlitedrv "github.com/weaveplatform/artifactweave/migration/platform/sql/sqlite"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // keyring seals secret columns in the contract runs, so the sealed paths are
@@ -141,7 +141,7 @@ func TestAccOpenErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	if _, err := s.Blobs().Get(ctx, "x"); err == nil || errors.Is(err, store.ErrNotFound) {
+	if _, err := s.Blobs().Get(ctx, "x"); err == nil || errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("unmigrated database: want a driver error, got %v", err)
 	}
 }

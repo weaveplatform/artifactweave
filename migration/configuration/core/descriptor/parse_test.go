@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 )
 
 func noEnv(string) (string, bool) { return "", false }
@@ -141,7 +141,7 @@ func TestUnitParseJFrogExample(t *testing.T) {
 	); got != "proxy:corp proxy:old-proxy property_set:build layout:custom-layout" {
 		t.Fatalf("configuration documents %s", got)
 	}
-	if !p.Configs[1].Delete || p.Configs[0].Kind != types.ConfigProxy {
+	if !p.Configs[1].Delete || p.Configs[0].Kind != configdoc.ConfigProxy {
 		t.Fatalf("proxy changes %+v", p.Configs[:2])
 	}
 	// Every scalar, null and list element: 4 in docker-local and gone-local,

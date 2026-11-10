@@ -8,12 +8,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // deployWith deploys a file carrying properties, as matrix parameters do.
-func (w *world) deployWith(p string, props types.Properties) {
+func (w *world) deployWith(p string, props model.Properties) {
 	w.t.Helper()
 	if _, err := w.items.Deploy(w.ctx, item.Deploy{
 		Target: item.Target{Repo: w.c, Path: p}, Body: strings.NewReader(p), Properties: props,
@@ -35,7 +35,7 @@ func (w *world) resolve(d format.Download) string {
 type resolveCase struct {
 	name     string
 	path     string
-	matrix   types.Matrix
+	matrix   model.Matrix
 	expected string
 }
 
@@ -161,21 +161,21 @@ func TestUnitResolveMaven(t *testing.T) {
 func TestUnitResolveMatrix(t *testing.T) {
 	w := newWorld(t, nil)
 	dir := "com/acme/app/"
-	w.deployWith(dir+"1.9/app-1.9.jar", types.Properties{"tier": {"gold"}})
-	w.deployWith(dir+"1.10/app-1.10.jar", types.Properties{"tier": {"silver"}})
+	w.deployWith(dir+"1.9/app-1.9.jar", model.Properties{"tier": {"gold"}})
+	w.deployWith(dir+"1.10/app-1.10.jar", model.Properties{"tier": {"silver"}})
 	w.deploy(dir + "1.8/app-1.8.jar")
 	w.deployWith(
 		dir+"1.0-SNAPSHOT/app-1.0-20261017.090000-1.jar",
-		types.Properties{"tier": {"gold"}},
+		model.Properties{"tier": {"gold"}},
 	)
 	w.deployWith(
 		dir+"1.0-SNAPSHOT/app-1.0-20261017.100000-2.jar",
-		types.Properties{"tier": {"silver"}},
+		model.Properties{"tier": {"silver"}},
 	)
-	gold := types.Matrix{Props: types.Properties{"tier": {"gold"}}}
-	bronze := types.Matrix{Props: types.Properties{"tier": {"bronze"}}}
-	mandatory := types.Matrix{
-		Props:     types.Properties{"tier": {"bronze"}},
+	gold := model.Matrix{Props: model.Properties{"tier": {"gold"}}}
+	bronze := model.Matrix{Props: model.Properties{"tier": {"bronze"}}}
+	mandatory := model.Matrix{
+		Props:     model.Properties{"tier": {"bronze"}},
 		Mandatory: map[string]bool{"tier": true},
 	}
 	w.check([]resolveCase{
@@ -260,11 +260,11 @@ func TestUnitResolveGradle(t *testing.T) {
 	dir := "org.acme/lib/"
 	w.deployWith(
 		dir+"1.0-20261017090000/lib-1.0-20261017090000.jar",
-		types.Properties{"tier": {"gold"}},
+		model.Properties{"tier": {"gold"}},
 	)
 	w.deployWith(
 		dir+"1.0-20261017100000/lib-1.0-20261017100000.jar",
-		types.Properties{"tier": {"silver"}},
+		model.Properties{"tier": {"silver"}},
 	)
 	w.deploy(
 		dir+"1.0-20261017100000/lib-1.0-20261017100000.pom",
@@ -281,7 +281,7 @@ func TestUnitResolveGradle(t *testing.T) {
 		},
 		{
 			name: "integration gold", path: dir + "1.0-[INTEGRATION]/lib-1.0-[INTEGRATION].jar",
-			matrix:   types.Matrix{Props: types.Properties{"tier": {"gold"}}},
+			matrix:   model.Matrix{Props: model.Properties{"tier": {"gold"}}},
 			expected: dir + "1.0-20261017090000/lib-1.0-20261017090000.jar",
 		},
 		{

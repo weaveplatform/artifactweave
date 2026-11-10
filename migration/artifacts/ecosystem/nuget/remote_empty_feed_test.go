@@ -15,8 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func nugetEmptyRequest(w *policyWorld) source.Request {
@@ -68,7 +67,7 @@ func TestAccNuGetEmptyFeedCacheRefreshOfflineAndNoStore(t *testing.T) {
 				result.Stream.ETag != "" {
 				t.Fatal("projection context lost", result)
 			}
-			entries, _, err := w.db.RemoteCache().List(t.Context(), q.Repo.Key, "", store.Page{})
+			entries, _, err := w.db.RemoteCache().List(t.Context(), q.Repo.Key, "", kernel.Page{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -81,7 +80,7 @@ func TestAccNuGetEmptyFeedCacheRefreshOfflineAndNoStore(t *testing.T) {
 				return
 			}
 			if len(entries) != 1 || entries[0].ETag != "" ||
-				entries[0].OriginalChecksums != (types.Checksums{}) {
+				entries[0].OriginalChecksums != (kernel.Checksums{}) {
 				t.Fatal("204 validators retained", entries)
 			}
 			calls := len(w.up.Requests())

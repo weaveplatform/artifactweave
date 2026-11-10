@@ -10,9 +10,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccCRANArchiveDeletedAfterEnumeration(t *testing.T) {
@@ -33,7 +34,7 @@ func TestAccCRANArchiveDeletedAfterEnumeration(t *testing.T) {
 	if _, err := w.db.Items().
 		Get(t.Context(), c.Key, false, cranArchivePath); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("deleted archive resurrected: %v", err)
 	}
@@ -47,16 +48,16 @@ type (
 		cancel context.CancelFunc
 	}
 	cranMigrationItems struct {
-		store.ItemStore
+		port.ItemStore
 		owner *cranMigrationFailure
 	}
 )
 
-func (s *cranMigrationFailure) Items() store.ItemStore { return cranMigrationItems{s.Store.Items(), s} }
+func (s *cranMigrationFailure) Items() port.ItemStore { return cranMigrationItems{s.Store.Items(), s} }
 
-func (s cranMigrationItems) Create(ctx context.Context, it types.Item) (types.Item, error) {
+func (s cranMigrationItems) Create(ctx context.Context, it model.Item) (model.Item, error) {
 	if s.owner.fail {
-		return types.Item{}, errors.New("storage unavailable")
+		return model.Item{}, errors.New("storage unavailable")
 	}
 	return s.ItemStore.Create(ctx, it)
 }
@@ -66,8 +67,8 @@ func (s cranMigrationItems) Descendants(
 	key string,
 	cached bool,
 	folder string,
-	page store.Page,
-) ([]types.Item, string, error) {
+	page kernel.Page,
+) ([]model.Item, string, error) {
 	if s.owner.mode == "listing" {
 		return nil, "", errors.New("archive listing unavailable")
 	}
@@ -78,9 +79,9 @@ func (s cranMigrationItems) Descendants(
 	return entries, next, err
 }
 
-func (s cranMigrationItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
+func (s cranMigrationItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
 	if s.owner.mode == "locking" {
-		return types.Item{}, errors.New("archive lock unavailable")
+		return model.Item{}, errors.New("archive lock unavailable")
 	}
 	return s.ItemStore.GetByID(ctx, id)
 }
@@ -90,9 +91,9 @@ func (s cranMigrationItems) Get(
 	key string,
 	cached bool,
 	p string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if s.owner.mode == "destination" && p == cranArchivePath {
-		return types.Item{}, errors.New("archive destination unavailable")
+		return model.Item{}, errors.New("archive destination unavailable")
 	}
 	return s.ItemStore.Get(ctx, key, cached, p)
 }
@@ -106,9 +107,9 @@ func TestAccCRANArchiveMigrationPaginationAndCancellation(t *testing.T) {
 	wantStatus(t, w.do("PUT", "/artifactory/cran-migrate/"+cranLegacyPath, "admin", body), 201)
 	// These unrelated stored notes must survive; the archive after them must
 	// still be found when the listing spans more than a full page.
-	for n := range store.MaxLimit + 1 {
+	for n := range kernel.MaxLimit + 1 {
 		if _, err := w.db.Items().
-			Put(t.Context(), types.Item{RepoKey: c.Key, Name: fmt.Sprintf("src/contrib/Archive/a-notes/%04d", n)}); err != nil {
+			Put(t.Context(), model.Item{RepoKey: c.Key, Name: fmt.Sprintf("src/contrib/Archive/a-notes/%04d", n)}); err != nil {
 			t.Fatal(err)
 		}
 	}

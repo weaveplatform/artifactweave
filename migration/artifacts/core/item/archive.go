@@ -14,11 +14,11 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Limits on exploding an archive. Entry sizes in an archive's headers are
@@ -118,14 +118,14 @@ type explodeFile struct {
 // against d.Declared, and read twice: once to validate every entry name and
 // the limits, so nothing is written for an archive that would be refused,
 // then to store the entries.
-func (s *Service) Explode(ctx context.Context, d Explode) (types.Item, error) {
+func (s *Service) Explode(ctx context.Context, d Explode) (model.Item, error) {
 	declared, err := ParseChecksums(d.Declared)
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	f, size, err := spool(d.Body, declared, clientPolicy(d.Repo))
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	defer func() { _ = f.Close(); _ = os.Remove(f.Name()) }()
 	kind := archive.KindOf(f, d.Path)
@@ -135,11 +135,11 @@ func (s *Service) Explode(ctx context.Context, d Explode) (types.Item, error) {
 	}
 	folders, err := s.validateEntries(ctx, f, size, kind, d, dir)
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	files, err := s.uploadEntries(ctx, f, size, kind, d, dir)
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	// Every entry is inspected before any is written, so an atomic explode
 	// holds its transaction for the writes alone.
@@ -147,7 +147,7 @@ func (s *Service) Explode(ctx context.Context, d Explode) (types.Item, error) {
 		e := d.Deploy
 		e.Path = fl.path
 		if files[i].env, err = s.inspected(ctx, e, digestsOf(fl.info), fl.info.Size); err != nil {
-			return types.Item{}, err
+			return model.Item{}, err
 		}
 	}
 	now := s.now()
@@ -162,7 +162,7 @@ func (s *Service) Explode(ctx context.Context, d Explode) (types.Item, error) {
 			e,
 			digestsOf(fl.info),
 			fl.info.Size,
-			types.Checksums{},
+			kernel.Checksums{},
 			now,
 		)
 		// An entry the format takes without storing, such as Maven's
@@ -201,14 +201,14 @@ func (s *Service) Explode(ctx context.Context, d Explode) (types.Item, error) {
 		}
 	}
 	if err != nil {
-		return types.Item{}, err //nolint:wrapcheck // ours, from the transaction
+		return model.Item{}, err //nolint:wrapcheck // ours, from the transaction
 	}
 	if dir == "" {
-		return types.Item{RepoKey: d.Repo.Key, Folder: true, Created: now, CreatedBy: d.By}, nil
+		return model.Item{RepoKey: d.Repo.Key, Folder: true, Created: now, CreatedBy: d.By}, nil
 	}
 	folder, err := s.Store.Items().Get(ctx, d.Repo.Key, false, dir)
 	if err != nil {
-		return types.Item{}, fmt.Errorf("item: get %s: %w", dir, err)
+		return model.Item{}, fmt.Errorf("item: get %s: %w", dir, err)
 	}
 	return folder, nil
 }
@@ -254,7 +254,7 @@ func (s *Service) validateEntries(
 			return fmt.Errorf("%w: %s is a folder", ErrConflict, target)
 		case err == nil && !d.CanOverwrite:
 			return &OverwriteDeniedError{Repo: d.Repo.Key, Path: target, User: d.By}
-		case err != nil && !errors.Is(err, store.ErrNotFound):
+		case err != nil && !errors.Is(err, kernel.ErrNotFound):
 			return fmt.Errorf("item: get %s: %w", target, err)
 		}
 		return nil
@@ -310,7 +310,7 @@ func (s *Service) uploadEntries(
 
 // spool copies body to a temporary file, refusing more than MaxExplodeBytes,
 // and checks the declared checksums under the client-checksums policy.
-func spool(body io.Reader, declared types.Checksums, verify bool) (*os.File, int64, error) {
+func spool(body io.Reader, declared kernel.Checksums, verify bool) (*os.File, int64, error) {
 	f, err := os.CreateTemp("", "artifactweave-explode-*")
 	if err != nil {
 		return nil, 0, fmt.Errorf("item: spool archive: %w", err)
@@ -344,9 +344,9 @@ func spool(body io.Reader, declared types.Checksums, verify bool) (*os.File, int
 	return f, n, nil
 }
 
-func digestsOf(info blob.Info) types.Checksums {
+func digestsOf(info blob.Info) kernel.Checksums {
 	d := info.Digests
-	return types.Checksums{SHA256: d.SHA256, SHA512: d.SHA512, SHA1: d.SHA1, MD5: d.MD5}
+	return kernel.Checksums{SHA256: d.SHA256, SHA512: d.SHA512, SHA1: d.SHA1, MD5: d.MD5}
 }
 
 // ArchiveEntry finds the entry at entry inside the archive file it and
@@ -354,7 +354,7 @@ func digestsOf(info blob.Info) types.Checksums {
 // archive or has no such entry.
 func (s *Service) ArchiveEntry(
 	ctx context.Context,
-	it types.Item,
+	it model.Item,
 	entry string,
 	serve func(size int64, r io.Reader) error,
 ) error {
@@ -404,7 +404,7 @@ func (s *Service) ArchiveEntry(
 // file's copy buffer.
 func (s *Service) ArchiveFiles(
 	ctx context.Context,
-	files []types.Item,
+	files []model.Item,
 	base string,
 	kind ArchiveKind,
 	sums bool,
@@ -505,10 +505,10 @@ func (a *archiveWriter) close() error {
 func FolderDownload(
 	ctx context.Context,
 	st interface{ Settings() settings.SettingsStore },
-) (types.FolderDownloadSettings, error) {
-	fd := types.FolderDownloadSettings{}
-	err := st.Settings().Get(ctx, types.SettingFolderDownload, &fd)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+) (model.FolderDownloadSettings, error) {
+	fd := model.FolderDownloadSettings{}
+	err := st.Settings().Get(ctx, settings.SettingFolderDownload, &fd)
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		return fd, fmt.Errorf("item: folder download setting: %w", err)
 	}
 	if fd.MaxDownloadSizeMB <= 0 {

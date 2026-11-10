@@ -8,12 +8,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	swiftfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Options configures the Swift protocol. RemoteSources serves remote
@@ -143,7 +143,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 			h.k.Error(w, r, bad(http.StatusBadRequest, "Swift identifier lookup requires one URL"))
 			return
 		}
-		if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+		if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 			return
 		}
 		h.k.Error(w, r, bad(http.StatusNotFound, "Swift package identifier mapping not found"))

@@ -16,7 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var (
@@ -214,10 +213,10 @@ func (m *Mapping) validate() error {
 	if ts.ExpiresIn != nil && *ts.ExpiresIn < 1 {
 		return invalidf("token_spec.expires_in must be at least 1 second")
 	}
-	var sc types.Scope
+	var sc kernel.Scope
 	if str(ts.Scope) != "" {
 		var err error
-		if sc, err = types.ParseScope(*ts.Scope); err != nil {
+		if sc, err = kernel.ParseScope(*ts.Scope); err != nil {
 			return invalidf("token_spec.scope: %v", err)
 		}
 	}
@@ -227,14 +226,14 @@ func (m *Mapping) validate() error {
 	named := str(ts.Username) != "" || str(ts.UsernamePattern) != ""
 	// A resource_pattern only narrows (mappedScope), so it too needs a user,
 	// groups or project roles whose permissions it narrows.
-	if !named && !hasKind(sc, types.ScopeGroups) && !hasKind(sc, types.ScopeRoles) &&
+	if !named && !hasKind(sc, kernel.ScopeGroups) && !hasKind(sc, kernel.ScopeRoles) &&
 		str(ts.GroupsPattern) == "" {
 		return invalidf("token_spec needs username, username_pattern, a groups or project " +
 			"roles scope, or groups_pattern")
 	}
 	m.ProjectKey = nil
 	for _, e := range sc.Entries {
-		if e.Kind == types.ScopeRoles {
+		if e.Kind == kernel.ScopeRoles {
 			// "Only one project key is allowed per mapping" (Manage
 			// Project-Scoped Identity Mappings). Keeping the last project
 			// instead would file the mapping, and the tokens it issues,
@@ -251,7 +250,7 @@ func (m *Mapping) validate() error {
 		// the groups or project roles its scope names give permissions to.
 		// A project roles mapping commonly has no user: the jfrog/platform
 		// provider's documented example sends none.
-		if !named && e.Kind != types.ScopeGroups && e.Kind != types.ScopeRoles {
+		if !named && e.Kind != kernel.ScopeGroups && e.Kind != kernel.ScopeRoles {
 			return invalidf("token_spec.username is required unless the scope names only " +
 				"groups or project roles")
 		}
@@ -264,21 +263,21 @@ func (m *Mapping) validate() error {
 // pattern and groups with a groups pattern do not combine, and every other
 // pair does. A user is the username field or an applied-permissions/user
 // scope.
-func combinable(ts *TokenSpec, sc types.Scope) error {
+func combinable(ts *TokenSpec, sc kernel.Scope) error {
 	userDynamic := str(ts.UsernamePattern) != ""
 	groupsDynamic := str(ts.GroupsPattern) != ""
 	resourceDynamic := str(ts.ResourcePattern) != ""
 	switch {
-	case hasKind(sc, types.ScopeAdmin) &&
+	case hasKind(sc, kernel.ScopeAdmin) &&
 		(len(sc.Entries) > 1 || userDynamic || groupsDynamic || resourceDynamic):
 		return invalidf("token_spec: an admin scope combines with no other scope or pattern")
-	case userDynamic && (str(ts.Username) != "" || hasKind(sc, types.ScopeUser)):
+	case userDynamic && (str(ts.Username) != "" || hasKind(sc, kernel.ScopeUser)):
 		return invalidf(
 			"token_spec: username_pattern combines with neither username nor a user scope",
 		)
-	case groupsDynamic && hasKind(sc, types.ScopeGroups):
+	case groupsDynamic && hasKind(sc, kernel.ScopeGroups):
 		return invalidf("token_spec: groups_pattern does not combine with a groups scope")
-	case resourceDynamic && hasKind(sc, types.ScopeArtifact):
+	case resourceDynamic && hasKind(sc, kernel.ScopeArtifact):
 		// A token's artifact entries allow the union of what they name, so a
 		// claim's entry beside the mapping's own would widen them.
 		return invalidf(
@@ -288,8 +287,8 @@ func combinable(ts *TokenSpec, sc types.Scope) error {
 	return nil
 }
 
-func hasKind(sc types.Scope, kind types.ScopeKind) bool {
-	return slices.ContainsFunc(sc.Entries, func(e types.ScopeEntry) bool { return e.Kind == kind })
+func hasKind(sc kernel.Scope, kind kernel.ScopeKind) bool {
+	return slices.ContainsFunc(sc.Entries, func(e kernel.ScopeEntry) bool { return e.Kind == kind })
 }
 
 // Service manages providers and mappings and exchanges tokens.
@@ -314,7 +313,7 @@ func (s Service) configs() configdoc.ConfigStore { return s.Store.Configs() }
 
 // Providers returns every provider, by name.
 func (s Service) Providers(ctx context.Context) ([]Provider, error) {
-	docs, err := s.configs().List(ctx, types.ConfigOIDC)
+	docs, err := s.configs().List(ctx, configdoc.ConfigOIDC)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: providers: %w", err)
 	}
@@ -331,7 +330,7 @@ func (s Service) Providers(ctx context.Context) ([]Provider, error) {
 
 // Provider returns one provider.
 func (s Service) Provider(ctx context.Context, name string) (Provider, error) {
-	d, err := s.configs().Get(ctx, types.ConfigOIDC, name)
+	d, err := s.configs().Get(ctx, configdoc.ConfigOIDC, name)
 	if errors.Is(err, kernel.ErrNotFound) {
 		return Provider{}, notFoundf("OIDC provider '%s' does not exist", name)
 	}
@@ -350,8 +349,12 @@ func (s Service) putProvider(ctx context.Context, p Provider) error {
 	if err != nil {
 		return fmt.Errorf("oidc: provider: %w", err)
 	}
-	err = s.configs().Put(ctx, types.ConfigDocument{
-		Kind: types.ConfigOIDC, Key: str(p.Name), Enabled: true, Document: doc, Updated: s.now(),
+	err = s.configs().Put(ctx, configdoc.ConfigDocument{
+		Kind:     configdoc.ConfigOIDC,
+		Key:      str(p.Name),
+		Enabled:  true,
+		Document: doc,
+		Updated:  s.now(),
 	})
 	if err != nil {
 		return fmt.Errorf("oidc: provider %s: %w", str(p.Name), err)
@@ -401,11 +404,11 @@ func (s Service) DeleteProvider(ctx context.Context, name string) error {
 	}
 	for _, m := range all {
 		if err := s.configs().
-			Delete(ctx, types.ConfigOIDCMapping, mappingKey(name, str(m.Mapping.Name))); err != nil {
+			Delete(ctx, configdoc.ConfigOIDCMapping, mappingKey(name, str(m.Mapping.Name))); err != nil {
 			return fmt.Errorf("oidc: delete mapping: %w", err)
 		}
 	}
-	if err := s.configs().Delete(ctx, types.ConfigOIDC, name); err != nil {
+	if err := s.configs().Delete(ctx, configdoc.ConfigOIDC, name); err != nil {
 		return fmt.Errorf("oidc: delete provider %s: %w", name, err)
 	}
 	return nil
@@ -415,7 +418,7 @@ func mappingKey(provider, name string) string { return provider + "/" + name }
 
 // stored returns a provider's mappings in creation order.
 func (s Service) stored(ctx context.Context, provider string) ([]stored, error) {
-	docs, err := s.configs().List(ctx, types.ConfigOIDCMapping)
+	docs, err := s.configs().List(ctx, configdoc.ConfigOIDCMapping)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: mappings: %w", err)
 	}
@@ -456,7 +459,7 @@ func (s Service) storedMapping(ctx context.Context, provider, name string) (stor
 	if _, err := s.Provider(ctx, provider); err != nil {
 		return stored{}, err
 	}
-	d, err := s.configs().Get(ctx, types.ConfigOIDCMapping, mappingKey(provider, name))
+	d, err := s.configs().Get(ctx, configdoc.ConfigOIDCMapping, mappingKey(provider, name))
 	if errors.Is(err, kernel.ErrNotFound) {
 		return stored{}, notFoundf(
 			"OIDC provider '%s' has no identity mapping '%s'",
@@ -485,8 +488,8 @@ func (s Service) putMapping(ctx context.Context, provider string, m stored) erro
 	if err != nil {
 		return fmt.Errorf("oidc: mapping: %w", err)
 	}
-	err = s.configs().Put(ctx, types.ConfigDocument{
-		Kind: types.ConfigOIDCMapping, Key: mappingKey(provider, str(m.Mapping.Name)),
+	err = s.configs().Put(ctx, configdoc.ConfigDocument{
+		Kind: configdoc.ConfigOIDCMapping, Key: mappingKey(provider, str(m.Mapping.Name)),
 		Enabled: true, Document: doc, Updated: s.now(),
 	})
 	if err != nil {
@@ -503,7 +506,7 @@ func (s Service) CreateMapping(ctx context.Context, provider string, m Mapping) 
 	if _, err := s.Provider(ctx, provider); err != nil {
 		return Mapping{}, err
 	}
-	_, err := s.configs().Get(ctx, types.ConfigOIDCMapping, mappingKey(provider, str(m.Name)))
+	_, err := s.configs().Get(ctx, configdoc.ConfigOIDCMapping, mappingKey(provider, str(m.Name)))
 	switch {
 	case err == nil:
 		return Mapping{}, invalidf("an identity mapping named '%s' already exists", str(m.Name))
@@ -549,7 +552,7 @@ func (s Service) DeleteMapping(ctx context.Context, provider, name string) error
 		return err
 	}
 	if err := s.configs().
-		Delete(ctx, types.ConfigOIDCMapping, mappingKey(provider, name)); err != nil {
+		Delete(ctx, configdoc.ConfigOIDCMapping, mappingKey(provider, name)); err != nil {
 		return fmt.Errorf("oidc: delete mapping %s: %w", name, err)
 	}
 	return nil

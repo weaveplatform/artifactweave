@@ -12,14 +12,16 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
@@ -283,17 +285,17 @@ func newStatusFixture(
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(ctx, types.User{Name: "user", PasswordHash: cheapHash}); err != nil {
+		Create(ctx, model.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	// A locked account, until securityStatusRows unlocks every user.
-	if err := db.Users().Create(ctx, types.User{
-		Name: "locked", PasswordHash: cheapHash, Status: types.UserLocked,
+	if err := db.Users().Create(ctx, model.User{
+		Name: "locked", PasswordHash: cheapHash, Status: model.UserLocked,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if anonymous {
-		if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+		if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -338,8 +340,8 @@ func newStatusFixture(
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Settings().Put(ctx, types.SettingFolderDownload,
-		types.FolderDownloadSettings{Enabled: true}); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingFolderDownload,
+		model.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	tokens, secrets := seedTokens(t, db)

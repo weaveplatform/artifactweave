@@ -12,9 +12,9 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 type sourceBackend struct {
@@ -40,7 +40,7 @@ func (b *sourceBackend) Read(
 	}
 	data, ok := b.content[q.Resource.Path]
 	if !ok {
-		return source.Result{}, store.ErrNotFound
+		return source.Result{}, kernel.ErrNotFound
 	}
 	base := q.Resource.ExternalURL
 	reader := bytes.NewReader(data)
@@ -103,9 +103,9 @@ func TestAccRemoteComposerMetadataCacheAndIntegrity(t *testing.T) {
 	svc := &source.Service{
 		HTTP:  backend,
 		Cache: backend,
-		Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
-			return types.SourceIdentity{
-				Kind:       types.ExternalHTTP,
+		Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+			return model.SourceIdentity{
+				Kind:       model.ExternalHTTP,
 				Repository: "r1",
 				ID:         "s1",
 				Generation: "g1",
@@ -266,9 +266,9 @@ func TestAccRemoteComposerRevokedAtDelivery(t *testing.T) {
 			svc := &source.Service{
 				HTTP:  b,
 				Cache: b,
-				Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
-					return types.SourceIdentity{
-						Kind:       types.ExternalHTTP,
+				Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+					return model.SourceIdentity{
+						Kind:       model.ExternalHTTP,
 						Repository: "remote",
 						ID:         "source",
 						Generation: "1",
@@ -309,9 +309,9 @@ func TestAccRemoteComposerSourceFailures(t *testing.T) {
 	svc := &source.Service{
 		HTTP:  b,
 		Cache: b,
-		Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
-			return types.SourceIdentity{
-				Kind:       types.ExternalHTTP,
+		Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+			return model.SourceIdentity{
+				Kind:       model.ExternalHTTP,
 				Repository: "r1",
 				ID:         "s1",
 				Generation: "g1",
@@ -384,9 +384,9 @@ func TestAccComposerVirtualSelectsRemoteDistribution(t *testing.T) {
 	svc := &source.Service{
 		HTTP:  b,
 		Cache: b,
-		Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
-			return types.SourceIdentity{
-				Kind:       types.ExternalHTTP,
+		Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+			return model.SourceIdentity{
+				Kind:       model.ExternalHTTP,
 				Repository: "remote",
 				ID:         "source",
 				Generation: "1",

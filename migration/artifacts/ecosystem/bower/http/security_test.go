@@ -10,9 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitBowerRoutesDoNotDiscloseInvalidOrDeniedPackages(t *testing.T) {
@@ -124,13 +125,13 @@ func TestUnitBowerArchiveRequiresEveryFileReadable(t *testing.T) {
 	c := f.repo("bower-private", repo.Local)
 	f.deploy(c, "hello", "1.0.0", "bower.json", `{"name":"hello","version":"1.0.0"}`)
 	f.deploy(c, "hello", "1.0.0", "secret.txt", "private content")
-	if err := f.db.Permissions().Create(t.Context(), types.Permission{
+	if err := f.db.Permissions().Create(t.Context(), model.Permission{
 		Name: "manifest-only",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{
-				Users: map[string]types.Actions{"manifest-reader": types.ActionRead},
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{
+				Users: map[string]api.Actions{"manifest-reader": api.ActionRead},
 			},
-			Targets: map[string]types.Target{
+			Targets: map[string]model.Target{
 				"bower-private": {Include: []string{"hello/1.0.0/bower.json"}},
 			},
 		}},

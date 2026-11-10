@@ -15,9 +15,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccRemoteCacheOfflineIntegrityAndRedirect(t *testing.T) {
@@ -229,7 +229,7 @@ func remoteService(t *testing.T, db *inmem.Store, items *item.Service) *source.S
 	return &source.Service{
 		HTTP:  policy,
 		Cache: policy,
-		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			return items.Store.RemoteCache().Source(ctx, c.Key)
 		},
 	}

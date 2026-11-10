@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // The version tokens a download path may carry.
@@ -88,9 +88,9 @@ type resolution struct {
 // candidate is a file a resolution may name, as the repository's layout
 // reads it.
 type candidate struct {
-	types.Item
+	model.Item
 	co    layout.Coordinates
-	props types.Properties
+	props model.Properties
 }
 
 // matches reports a candidate with want's coordinates that matches the
@@ -283,9 +283,9 @@ func sameModule(want, got layout.Coordinates) bool {
 // one, which is kept so a file without one sorts as it does there.
 func compareLatest(a, b layout.Coordinates) int {
 	if a.FileItegRev == "" && b.FileItegRev == "" {
-		return types.CompareMercury(a.BaseRev, b.BaseRev)
+		return model.CompareMercury(a.BaseRev, b.BaseRev)
 	}
-	return types.CompareMercury(
+	return model.CompareMercury(
 		a.BaseRev+"-"+orNull(a.FileItegRev),
 		b.BaseRev+"-"+orNull(b.FileItegRev),
 	)

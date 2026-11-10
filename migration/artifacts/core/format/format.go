@@ -10,11 +10,12 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Handler is one package type's required hooks. All run inside the
@@ -22,15 +23,15 @@ import (
 type Handler interface {
 	// Deployed runs after a file was stored at it (new or overwritten), by a
 	// deploy, a copy, a move or a restore, once its properties are set.
-	Deployed(ctx context.Context, env Env, c repo.Config, it types.Item) error
+	Deployed(ctx context.Context, env Env, c repo.Config, it model.Item) error
 	// Deleting runs for each file before it is removed from the tree.
-	Deleting(ctx context.Context, env Env, c repo.Config, it types.Item) error
+	Deleting(ctx context.Context, env Env, c repo.Config, it model.Item) error
 	// Deleted runs once after a delete or a move removed items from the tree
 	// and the item service pruned the versions left without files. A format
 	// whose versions or packages depend on more than their own files (a
 	// Docker tag exists while its folder holds a manifest) corrects the
 	// index here.
-	Deleted(ctx context.Context, env Env, c repo.Config, removed []types.Item) error
+	Deleted(ctx context.Context, env Env, c repo.Config, removed []model.Item) error
 }
 
 // Registry returns the format handler of a package type. The application
@@ -88,7 +89,7 @@ type Env struct {
 	// current transaction without calling any hook, so a format's own
 	// output never re-enters it. A format must not derive an item another
 	// format would need to index.
-	Derive func(ctx context.Context, d Derived) (types.Item, error)
+	Derive func(ctx context.Context, d Derived) (model.Item, error)
 	// Underive removes the file at path, which the format derived, without
 	// any hook and past the trash can, releasing its content; nothing at
 	// path is no error. A restore would bring back data the format
@@ -119,7 +120,7 @@ type Env struct {
 	Inspection any
 	// ReindexSource binds a remote rebuild to the source accepted when queued.
 	// The format must recheck it in its publication transaction.
-	ReindexSource *types.SourceIdentity
+	ReindexSource *model.SourceIdentity
 	// CheckReindex revalidates the original caller before publication of queued
 	// remote maintenance. Trusted direct maintenance leaves it nil.
 	CheckReindex func(context.Context) error
@@ -152,7 +153,7 @@ type Derived struct {
 	// Path is repository-relative, without a leading slash.
 	Path       string
 	Body       io.Reader
-	Properties types.Properties
+	Properties model.Properties
 	// By is recorded as the item's creator and modifier.
 	By string
 }
@@ -186,14 +187,14 @@ type Write struct {
 	// Properties are set on the item with the write: a deploy's matrix
 	// parameters, or the properties a copy or move carries over. Admit may
 	// add or change them.
-	Properties types.Properties
+	Properties model.Properties
 	// Size and Checksums describe the content. For OpChecksum, Checksums is
 	// empty and Size is the length of the sidecar's body as the client
 	// declared it, or -1.
 	Size      int64
-	Checksums types.Checksums
+	Checksums kernel.Checksums
 	// From is the source of a copy or move.
-	From types.Item
+	From model.Item
 }
 
 // Inspector is a format that reads deployed content before the write's
@@ -224,7 +225,7 @@ type Admitter interface {
 // other errors abort planning before any items change. Destination admission
 // remains the target format's responsibility.
 type TransferSourceGuard interface {
-	GuardTransferSource(ctx context.Context, env Env, c repo.Config, it types.Item) error
+	GuardTransferSource(ctx context.Context, env Env, c repo.Config, it model.Item) error
 }
 
 // WriteGuard rechecks invariants that depend on concurrent writes inside the
@@ -256,7 +257,7 @@ type FolderAdmitter interface {
 // restore brings back, or a copy or move carries, properties that were
 // set already, so none of those asks.
 type AnnotationAdmitter interface {
-	AdmitAnnotation(ctx context.Context, env Env, c repo.Config, it types.Item, a Annotation) error
+	AdmitAnnotation(ctx context.Context, env Env, c repo.Config, it model.Item, a Annotation) error
 }
 
 // Download is a file a client asks for.
@@ -266,7 +267,7 @@ type Download struct {
 	Cached bool
 	// Matrix holds the request's matrix parameters, which the file served
 	// must match.
-	Matrix types.Matrix
+	Matrix model.Matrix
 	// Readable reports whether the caller may read a file of the
 	// repository; nil reads every file.
 	Readable func(fullPath string) bool
@@ -282,7 +283,7 @@ type Resolver interface {
 // Annotation is a change to an item's properties.
 type Annotation struct {
 	// Set holds the keys set or replaced, with their new values.
-	Set     types.Properties
+	Set     model.Properties
 	Removed []string
 	// At is when the change was made. A hook that writes properties in
 	// turn writes them at At, so they read as part of the same change
@@ -296,7 +297,7 @@ type Annotation struct {
 // or a folder, AQL properties.update, a copy or move carrying properties
 // over, a restore, and a promotion tagging what it promoted.
 type Annotator interface {
-	Annotated(ctx context.Context, env Env, c repo.Config, it types.Item, a Annotation) error
+	Annotated(ctx context.Context, env Env, c repo.Config, it model.Item, a Annotation) error
 }
 
 // Reindexer is a format that can rebuild its index of a repository from
@@ -345,7 +346,7 @@ type WorkRequest struct {
 	By             string `json:"by,omitempty"`
 	SkipProperties bool   `json:"-"`
 	// Source fences a queued remote reindex across edits and delete/recreate.
-	Source *types.SourceIdentity `json:"source,omitempty"`
+	Source *model.SourceIdentity `json:"source,omitempty"`
 	// Credential is an internal reference to the original authenticated caller.
 	// It contains no password, bearer token or cached permissions.
 	Credential json.RawMessage `json:"credential,omitempty"`
@@ -366,7 +367,7 @@ type Worker interface {
 	// transaction. It must be idempotent and read the state it derives from
 	// afresh, since an item can run again and coalesces every request made
 	// before the run began.
-	Work(ctx context.Context, env Env, item types.WorkItem) error
+	Work(ctx context.Context, env Env, item work.WorkItem) error
 	// Owed names the work a download of path from c must see done before
 	// it is read, so a client never reads derived data that lags a
 	// completed write.

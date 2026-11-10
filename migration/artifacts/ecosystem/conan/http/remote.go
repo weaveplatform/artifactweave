@@ -10,11 +10,12 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	conanfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conan"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxRemoteMetadata = 8 << 20
@@ -138,7 +139,7 @@ func (h handler) remoteRevisions(
 		if !conanfmt.Component(rev.Revision) || rev.Time.IsZero() {
 			return nil, source.ErrInvalidResult
 		}
-		if h.k.CanFolder(r, folder, types.ActionRead) {
+		if h.k.CanFolder(r, folder, api.ActionRead) {
 			if result.CheckRead != nil {
 				candidate := ref
 				candidate.Revision = rev.Revision
@@ -216,7 +217,7 @@ func (h handler) validRemoteFiles(
 			return nil, source.ErrInvalidResult
 		}
 		path := root + "/" + name
-		if !h.k.Can(r, path, types.ActionRead) {
+		if !h.k.Can(r, path, api.ActionRead) {
 			return nil, denied(r)
 		}
 		if result.CheckRead != nil {
@@ -236,7 +237,7 @@ func (h handler) remoteFile(w http.ResponseWriter, r *http.Request, f conanfmt.F
 	// A manifest supplies the expected digest of every downloadable Conan
 	// file. Fetching and parsing it through the source boundary prevents a
 	// mutable upstream from publishing bytes that disagree with its revision.
-	checksums := types.Checksums{}
+	checksums := kernel.Checksums{}
 	var archiveEntries map[string]string
 	if f.File != conanfmt.Manifest {
 		manifest := f
@@ -384,7 +385,7 @@ func (h handler) remoteSearch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		folder := strings.Join([]string{ref.User, ref.Name, ref.Version, ref.Channel}, "/")
-		if !h.k.CanFolder(r, folder, types.ActionRead) {
+		if !h.k.CanFolder(r, folder, api.ActionRead) {
 			continue
 		}
 		if result.CheckFolder != nil {
@@ -445,7 +446,7 @@ func (h handler) remotePackageSearch(
 			return
 		}
 		path := folder + "/package/" + id
-		if !h.k.CanFolder(r, path, types.ActionRead) {
+		if !h.k.CanFolder(r, path, api.ActionRead) {
 			continue
 		}
 		if result.CheckFolder != nil {

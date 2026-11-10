@@ -10,19 +10,20 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // RegisterItemRoutes serves the item paths (decision 0002) and the AQL
@@ -101,7 +102,7 @@ func (s ArtifactoryAPI) deployEscapedItem(
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve deploy target", err))
 		return
 	}
-	if !acc.Item(c, req.Path, req.IsFolder, types.ActionWrite) {
+	if !acc.Item(c, req.Path, req.IsFolder, api.ActionWrite) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -121,16 +122,16 @@ func (s ArtifactoryAPI) deployEscapedItem(
 	existing, err := st.Items().Get(ctx, c.Key, false, req.Path)
 	switch {
 	case err == nil && !existing.Folder && !req.IsFolder && !explode &&
-		!s.MayBeIdentical(byChecksum) && !acc.File(c, req.Path, types.ActionDelete):
+		!s.MayBeIdentical(byChecksum) && !acc.File(c, req.Path, api.ActionDelete):
 		httpkit.WriteErr(w, r, itemkit.OverwriteRefusal(ctx, &item.OverwriteDeniedError{
 			Repo: c.Key, Path: req.Path, User: p.Name,
 		}))
 		return
-	case err != nil && !errors.Is(err, store.ErrNotFound):
+	case err != nil && !errors.Is(err, kernel.ErrNotFound):
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "get item", err))
 		return
 	}
-	var it types.Item
+	var it model.Item
 	switch {
 	case req.IsFolder:
 		it, err = svc.MakeFolder(ctx, t, req.Props, p.Name)
@@ -140,7 +141,7 @@ func (s ArtifactoryAPI) deployEscapedItem(
 			Atomic: strings.EqualFold(r.Header.Get("X-Explode-Archive-Atomic"), "true"),
 			// Replacing files needs the right to delete them, as a deploy does;
 			// it is checked at the archive's path, not per entry.
-			CanOverwrite: acc.File(c, req.Path, types.ActionDelete),
+			CanOverwrite: acc.File(c, req.Path, api.ActionDelete),
 		})
 	case byChecksum:
 		d := s.fileDeploy(r, t, req, p, acc)
@@ -217,7 +218,7 @@ func (s ArtifactoryAPI) fileDeploy(
 	acc itemkit.Access,
 ) item.Deploy {
 	d := s.deployRequest(r, t, req, p)
-	d.CanOverwritePath = func(full string) bool { return acc.File(t.Repo, full, types.ActionDelete) }
+	d.CanOverwritePath = func(full string) bool { return acc.File(t.Repo, full, api.ActionDelete) }
 	return d
 }
 
@@ -232,8 +233,8 @@ func (s ArtifactoryAPI) reusable(
 	p kernel.Principal,
 	acc itemkit.Access,
 	token string,
-) func(context.Context, types.Blob) (bool, error) {
-	return func(ctx context.Context, b types.Blob) (bool, error) {
+) func(context.Context, blob.Blob) (bool, error) {
+	return func(ctx context.Context, b blob.Blob) (bool, error) {
 		if token != "" && s.cfg.Multipart != nil {
 			ok, err := s.cfg.Multipart.Finished(ctx, token, p.Name, b.Checksums.SHA256)
 			if err != nil || ok {
@@ -258,9 +259,9 @@ func readsContent(
 ) (bool, error) {
 	// A nil entry is a repository that no longer exists.
 	repos := map[string]*repo.Config{}
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
-		files, next, err := st.Items().FindByChecksum(ctx, types.Checksums{SHA256: sum}, page)
+		files, next, err := st.Items().FindByChecksum(ctx, kernel.Checksums{SHA256: sum}, page)
 		if err != nil {
 			return false, fmt.Errorf("find files by checksum: %w", err)
 		}
@@ -271,13 +272,13 @@ func readsContent(
 				switch {
 				case err == nil:
 					c = &got
-				case !errors.Is(err, store.ErrNotFound):
+				case !errors.Is(err, kernel.ErrNotFound):
 					return false, fmt.Errorf("get repository %s: %w", f.RepoKey, err)
 				}
 				repos[f.RepoKey] = c
 			}
 			if c != nil && !private(*c, f.FullPath()) &&
-				acc.File(*c, f.FullPath(), types.ActionRead) {
+				acc.File(*c, f.FullPath(), api.ActionRead) {
 				return true, nil
 			}
 		}
@@ -360,7 +361,7 @@ func (s ArtifactoryAPI) deleteItem(w http.ResponseWriter, r *http.Request) {
 			fmt.Sprintf("Cannot delete from the virtual repository '%s'", c.Key)))
 		return
 	}
-	if !acc.File(c, req.Path, types.ActionDelete) {
+	if !acc.File(c, req.Path, api.ActionDelete) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -383,7 +384,7 @@ func (s ArtifactoryAPI) deleteItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, sc := range sidecars {
-		if !acc.File(c, sc.From, types.ActionDelete) {
+		if !acc.File(c, sc.From, api.ActionDelete) {
 			httpkit.WriteErr(w, r, httpkit.Denied(p))
 			return
 		}

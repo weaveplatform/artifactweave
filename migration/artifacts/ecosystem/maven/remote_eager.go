@@ -16,12 +16,11 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // MavenCompanionKind is the persistent work-queue kind of a companion
@@ -34,7 +33,7 @@ type mavenJob struct {
 	Repo      string                     `json:"repo"`
 	Path      string                     `json:"path"`
 	Origin    string                     `json:"origin"`
-	Identity  types.SourceIdentity       `json:"identity"`
+	Identity  model.SourceIdentity       `json:"identity"`
 	Revision  string                     `json:"revision"`
 	Principal kernel.CredentialReference `json:"principal"`
 }
@@ -149,7 +148,7 @@ func (e *MavenEager) Queue(ctx context.Context, q source.Request, permit source.
 		now := time.Now().UTC()
 		holder := rand.Text()
 		held, err := e.policy.Store.Leases().
-			Acquire(tx, types.Lease{Name: MavenCompanionKind, Holder: holder, Acquired: now, Expires: now.Add(time.Minute)}, now)
+			Acquire(tx, work.Lease{Name: MavenCompanionKind, Holder: holder, Acquired: now, Expires: now.Add(time.Minute)}, now)
 		if err != nil {
 			return fmt.Errorf("companion admission lease: %w", err)
 		}
@@ -159,7 +158,7 @@ func (e *MavenEager) Queue(ctx context.Context, q source.Request, permit source.
 		defer func() { _ = e.policy.Store.Leases().Release(tx, MavenCompanionKind, holder) }()
 		if _, err = e.policy.Store.WorkQueue().Get(tx, MavenCompanionKind, key); err == nil {
 			return nil
-		} else if !errors.Is(err, store.ErrNotFound) {
+		} else if !errors.Is(err, kernel.ErrNotFound) {
 			return fmt.Errorf("companion lookup: %w", err)
 		}
 		stats, err := e.policy.Store.WorkQueue().Stats(tx)
@@ -175,7 +174,7 @@ func (e *MavenEager) Queue(ctx context.Context, q source.Request, permit source.
 	})
 }
 
-func (e *MavenEager) run(ctx context.Context, it types.WorkItem) error {
+func (e *MavenEager) run(ctx context.Context, it work.WorkItem) error {
 	var job mavenJob
 	if json.Unmarshal(it.Payload, &job) != nil {
 		return errors.Join(work.ErrPermanent, source.ErrInvalidRequest)

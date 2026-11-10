@@ -19,10 +19,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 func TestUnitAdmitProtectsGeneratedMetadataAndRPMIdentity(t *testing.T) {
@@ -59,7 +61,7 @@ func TestUnitAdmitProtectsGeneratedMetadataAndRPMIdentity(t *testing.T) {
 		t.Fatal("blacked-out repository accepted RPM")
 	}
 	pkg, _, _ := metadataFixture(t)
-	w := format.Write{Path: pkg.Path, Checksums: types.Checksums{SHA256: pkg.SHA256}}
+	w := format.Write{Path: pkg.Path, Checksums: kernel.Checksums{SHA256: pkg.SHA256}}
 	if _, err := h.Admit(t.Context(), format.Env{
 		Inspection: inspection{sha: pkg.SHA256, path: pkg.Path, pkg: pkg},
 	}, c, w); err != nil {
@@ -69,11 +71,11 @@ func TestUnitAdmitProtectsGeneratedMetadataAndRPMIdentity(t *testing.T) {
 		format.Write{Path: "README.txt"}); err != nil {
 		t.Fatalf("ordinary side file inspected as RPM: %v", err)
 	}
-	sideFile := types.Item{RepoKey: c.Key, Name: "README.txt"}
+	sideFile := model.Item{RepoKey: c.Key, Name: "README.txt"}
 	if err := h.Deployed(t.Context(), format.Env{}, c, sideFile); err != nil {
 		t.Fatalf("ordinary side file indexed as RPM: %v", err)
 	}
-	if err := h.Deleted(t.Context(), format.Env{}, c, []types.Item{sideFile}); err != nil {
+	if err := h.Deleted(t.Context(), format.Env{}, c, []model.Item{sideFile}); err != nil {
 		t.Fatalf("ordinary side file deletion changed RPM index: %v", err)
 	}
 	if got := h.Classify(c, "repodata/repomd.xml"); got != format.ClassDerived {
@@ -108,7 +110,7 @@ func TestUnitIndexWorkTracksRepositoryAndPublicationFailures(t *testing.T) {
 	}
 	h := Handler{}
 	env := format.Env{Store: st}
-	for _, work := range []types.WorkItem{
+	for _, work := range []work.WorkItem{
 		{Kind: "rpm.retired", Key: local.Key},
 		{Kind: KindIndex, Key: "missing"},
 		{Kind: KindIndex, Key: remote.Key},
@@ -124,7 +126,7 @@ func TestUnitIndexWorkTracksRepositoryAndPublicationFailures(t *testing.T) {
 	if err := h.Work(
 		canceled,
 		env,
-		types.WorkItem{Kind: KindIndex, Key: local.Key},
+		work.WorkItem{Kind: KindIndex, Key: local.Key},
 	); !errors.Is(
 		err,
 		context.Canceled,
@@ -133,16 +135,16 @@ func TestUnitIndexWorkTracksRepositoryAndPublicationFailures(t *testing.T) {
 	}
 
 	pkg, _, _ := metadataFixture(t)
-	if _, err := st.Items().Put(ctx, types.Item{
+	if _, err := st.Items().Put(ctx, model.Item{
 		RepoKey: local.Key, Name: pkg.Path,
-		Actual: types.Checksums{SHA256: pkg.SHA256},
+		Actual: kernel.Checksums{SHA256: pkg.SHA256},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	const stale = "repodata/stale-primary.xml.gz"
-	if _, err := st.Items().Put(ctx, types.Item{
+	if _, err := st.Items().Put(ctx, model.Item{
 		RepoKey: local.Key, Name: stale,
-		Actual: types.Checksums{SHA256: strings.Repeat("b", 64)},
+		Actual: kernel.Checksums{SHA256: strings.Repeat("b", 64)},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -151,19 +153,19 @@ func TestUnitIndexWorkTracksRepositoryAndPublicationFailures(t *testing.T) {
 		Store: st, Now: func() time.Time { return time.Unix(1700000000, 0) },
 		Keys:       &accessapitest.Keys{},
 		Inspection: inspection{sha: pkg.SHA256, path: pkg.Path, pkg: pkg},
-		Derive: func(context.Context, format.Derived) (types.Item, error) {
-			return types.Item{}, failure
+		Derive: func(context.Context, format.Derived) (model.Item, error) {
+			return model.Item{}, failure
 		},
 		Underive: func(context.Context, repo.Config, bool, string) error { return failure },
 	}
-	work := types.WorkItem{Kind: KindIndex, Key: local.Key}
+	work := work.WorkItem{Kind: KindIndex, Key: local.Key}
 	if err := h.Work(ctx, env, work); !errors.Is(err, failure) {
 		t.Fatalf("derived metadata failure: %v", err)
 	}
 	var published []string
-	env.Derive = func(_ context.Context, d format.Derived) (types.Item, error) {
+	env.Derive = func(_ context.Context, d format.Derived) (model.Item, error) {
 		published = append(published, d.Path)
-		return types.Item{}, nil
+		return model.Item{}, nil
 	}
 	if err := h.Work(ctx, env, work); !errors.Is(err, failure) {
 		t.Fatalf("stale metadata removal failure: %v", err)
@@ -198,8 +200,8 @@ func TestUnitIndexWorkSignsMetadataWithEnvKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 	pkg, _, _ := metadataFixture(t)
-	if _, err := st.Items().Put(t.Context(), types.Item{
-		RepoKey: c.Key, Name: pkg.Path, Actual: types.Checksums{SHA256: pkg.SHA256},
+	if _, err := st.Items().Put(t.Context(), model.Item{
+		RepoKey: c.Key, Name: pkg.Path, Actual: kernel.Checksums{SHA256: pkg.SHA256},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -216,13 +218,13 @@ func TestUnitIndexWorkSignsMetadataWithEnvKeys(t *testing.T) {
 			Name: "yum", Type: accessapi.KeypairGPG, PrivateKey: key.Private, PublicKey: key.Public,
 		}}},
 		Inspection: inspection{sha: pkg.SHA256, path: pkg.Path, pkg: pkg},
-		Derive: func(_ context.Context, d format.Derived) (types.Item, error) {
+		Derive: func(_ context.Context, d format.Derived) (model.Item, error) {
 			body, err := io.ReadAll(d.Body)
 			generated[d.Path] = body
-			return types.Item{}, err
+			return model.Item{}, err
 		},
 	}
-	work := types.WorkItem{Kind: KindIndex, Key: c.Key}
+	work := work.WorkItem{Kind: KindIndex, Key: c.Key}
 	if err := (Handler{}).Work(t.Context(), env, work); err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +248,7 @@ func TestUnitIndexWorkSignsMetadataWithEnvKeys(t *testing.T) {
 func TestUnitSigningRejectsWrongKeyType(t *testing.T) {
 	t.Parallel()
 	keys := &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{
-		"rsa": {Name: "rsa", Type: types.KeypairRSA},
+		"rsa": {Name: "rsa", Type: accessapi.KeypairRSA},
 	}}
 	ctx := t.Context()
 	c := repo.Config{PrimaryKeyPairRef: "rsa"}
@@ -283,7 +285,7 @@ func TestUnitIndexAndSigningSurfaceStorageFailures(t *testing.T) {
 		t.Fatalf("canceled item search was lost: %v", err)
 	}
 	keys := &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{"rpm-invalid-gpg": {
-		Name: "rpm-invalid-gpg", Type: types.KeypairGPG, PrivateKey: "invalid key",
+		Name: "rpm-invalid-gpg", Type: accessapi.KeypairGPG, PrivateKey: "invalid key",
 	}}}
 	c.PrimaryKeyPairRef = "rpm-invalid-gpg"
 	if err := signMetadata(ctx, keys, c, map[string][]byte{
@@ -337,14 +339,14 @@ func TestUnitRPMHooksRejectCorruptStoredContentAndStaleInspection(t *testing.T) 
 	env := format.Env{Store: st, Blobs: blobs}
 	c := *repo.Defaults(&repo.Config{Key: "rpm-local", Class: repo.Local, PackageType: repo.RPM})
 	h := Handler{}
-	w := format.Write{Path: path, Checksums: types.Checksums{SHA256: info.Digests.SHA256}}
+	w := format.Write{Path: path, Checksums: kernel.Checksums{SHA256: info.Digests.SHA256}}
 	for _, in := range []any{nil, inspection{sha: "stale", path: path}} {
 		env.Inspection = in
 		if _, err := h.Admit(t.Context(), env, c, w); err == nil {
 			t.Fatalf("corrupt RPM admitted with inspection %T", in)
 		}
 	}
-	it := types.Item{RepoKey: c.Key, Name: path, Actual: w.Checksums}
+	it := model.Item{RepoKey: c.Key, Name: path, Actual: w.Checksums}
 	if err := h.Deployed(t.Context(), env, c, it); err == nil {
 		t.Fatal("corrupt stored RPM entered the package index")
 	}
@@ -357,10 +359,10 @@ func TestUnitRPMHooksRejectCorruptStoredContentAndStaleInspection(t *testing.T) 
 	if err := h.Reindex(t.Context(), env, c); err == nil {
 		t.Fatal("reindex accepted corrupt stored RPM")
 	}
-	if err := h.Work(t.Context(), env, types.WorkItem{Kind: KindIndex, Key: c.Key}); err == nil {
+	if err := h.Work(t.Context(), env, work.WorkItem{Kind: KindIndex, Key: c.Key}); err == nil {
 		t.Fatal("metadata work published a corrupt stored RPM")
 	}
-	if err := setProperties(t.Context(), st, types.Item{ID: 99999}, Package{}); err == nil {
+	if err := setProperties(t.Context(), st, model.Item{ID: 99999}, Package{}); err == nil {
 		t.Fatal("missing item accepted RPM index properties")
 	}
 }

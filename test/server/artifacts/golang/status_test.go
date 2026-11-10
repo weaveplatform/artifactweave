@@ -6,10 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -30,13 +32,13 @@ type statusPart struct {
 
 func grantOverwriter(t *testing.T, db harness.Store, key, under string) {
 	t.Helper()
-	if err := db.Permissions().Create(t.Context(), types.Permission{
+	if err := db.Permissions().Create(t.Context(), model.Permission{
 		Name: "st-overwrite-" + key,
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"overwriter": types.ActionRead | types.ActionWrite,
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{
+				"overwriter": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]types.Target{key: {Include: []string{under + "**"}}},
+			Targets: map[string]model.Target{key: {Include: []string{under + "**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -55,7 +57,7 @@ func newGoStatusWorld(t *testing.T, anonymous bool) goStatusWorld {
 		tokens = cfg.Tokens
 		if anonymous {
 			if err := cfg.Store.Settings().
-				Put(t.Context(), types.SettingAnonymousAccess, true); err != nil {
+				Put(t.Context(), settings.SettingAnonymousAccess, true); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -67,7 +69,7 @@ func newGoStatusWorld(t *testing.T, anonymous bool) goStatusWorld {
 				t.Fatal(err)
 			}
 		}
-		if err := cfg.Store.Users().Create(t.Context(), types.User{
+		if err := cfg.Store.Users().Create(t.Context(), model.User{
 			Name: "overwriter", PasswordHash: cheapHash,
 		}); err != nil {
 			t.Fatal(err)

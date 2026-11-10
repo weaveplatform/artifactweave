@@ -9,7 +9,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // Metadata is a version's document in the package index
@@ -54,7 +54,7 @@ func DecodeMetadata(b []byte) (Metadata, error) {
 }
 
 // metadataOf is the Metadata of t stored as it with props.
-func metadataOf(t *Tarball, it types.Item, props types.Properties) Metadata {
+func metadataOf(t *Tarball, it model.Item, props model.Properties) Metadata {
 	m := Metadata{
 		Manifest:         t.Manifest,
 		Dist:             Dist{Shasum: it.Actual.SHA1, Integrity: integrity(it.Actual.SHA512)},
@@ -67,7 +67,7 @@ func metadataOf(t *Tarball, it types.Item, props types.Properties) Metadata {
 
 // annotate takes the version state npm changes after a publish from the
 // tarball's properties.
-func (m *Metadata) annotate(props types.Properties) {
+func (m *Metadata) annotate(props model.Properties) {
 	m.Tags = nil
 	for _, t := range props[PropDistTag] {
 		if t != "" && !slices.Contains(m.Tags, t) {
@@ -103,7 +103,7 @@ func jsonText(v any) []byte {
 
 // published is when the tarball it was last deployed: its version's time.
 // A move keeps it and a copy is a deploy at its target.
-func published(it types.Item) time.Time {
+func published(it model.Item) time.Time {
 	return it.Modified.UTC().Truncate(time.Microsecond)
 }
 

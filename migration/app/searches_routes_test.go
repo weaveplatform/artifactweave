@@ -6,11 +6,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // seedStatusSearches deploys libs-local's maven/lib/1.0/lib-1.0.jar, a
@@ -29,7 +30,7 @@ func seedStatusSearches(t *testing.T, db *inmem.Store, blobs blob.Store) {
 		Store: db, Blobs: blobs, Formats: ecosystem.For,
 	}).Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: libs, Path: "maven/lib/1.0/lib-1.0.jar"},
-		Body:   strings.NewReader("lib"), Properties: types.Properties{"version": {"1.0"}},
+		Body:   strings.NewReader("lib"), Properties: model.Properties{"version": {"1.0"}},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +114,7 @@ func readsOrMissing(repoKey, path string, named bool) rule {
 		switch {
 		case p.anonymous && (named || !p.anonymousOn):
 			return http.StatusUnauthorized
-		case p.holds(repoKey, path, types.ActionRead):
+		case p.holds(repoKey, path, api.ActionRead):
 			return 0
 		}
 		return http.StatusNotFound
@@ -132,7 +133,7 @@ func versioned(path string) seeder {
 		}
 		if _, err := f.items.Deploy(ctx, item.Deploy{
 			Target: item.Target{Repo: c, Path: strings.ReplaceAll(path, "{p}", p)},
-			Body:   strings.NewReader(p), Properties: types.Properties{"version": {"1.0"}},
+			Body:   strings.NewReader(p), Properties: model.Properties{"version": {"1.0"}},
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -152,7 +153,7 @@ func built(name string) seeder {
 
 // signedInHolds: a signed-in caller holding want at path in repoKey;
 // anonymous is told to authenticate even when it holds them.
-func signedInHolds(repoKey, path string, want types.Actions) rule {
+func signedInHolds(repoKey, path string, want api.Actions) rule {
 	held := holds(repoKey, path, want)
 	return func(p matrixPrincipal) int {
 		if s := signedIn(p); s != 0 {
@@ -167,7 +168,7 @@ func signedInHolds(repoKey, path string, want types.Actions) rule {
 // reads it; build artifacts search needs a named user who reads the run.
 func moreSearchMatrix() []matrixRow {
 	const s = "/artifactory/api/search/"
-	bi := types.BuildInfoRepository
+	bi := api.BuildInfoRepository
 	return []matrixRow{
 		row("GET "+s+"gavc", s+"gavc?a=lib", "", anyone, 200),
 		row(
@@ -188,7 +189,7 @@ func moreSearchMatrix() []matrixRow {
 			"POST "+s+"buildArtifacts",
 			s+"buildArtifacts",
 			`{"buildName":"b-{p}","buildNumber":"1"}`,
-			signedInHolds(bi, "", types.ActionRead),
+			signedInHolds(bi, "", api.ActionRead),
 			200,
 		).seeding(built("b-{p}")),
 	}

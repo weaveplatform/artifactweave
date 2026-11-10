@@ -9,11 +9,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // reindexRemote rebuilds from the actual cached files. Upstream representations
@@ -33,7 +33,7 @@ func reindexRemote(ctx context.Context, env format.Env, c repo.Config) error {
 		return fmt.Errorf("nuget: reindex candidates: %w", err)
 	}
 	inspected := map[int64]*Nuspec{}
-	snapshot := map[int64]types.Item{}
+	snapshot := map[int64]model.Item{}
 	for _, hit := range hits {
 		snapshot[hit.Item.ID] = hit.Item
 		if kindOf(hit.Item.FullPath()) == other {
@@ -49,7 +49,7 @@ func reindexRemote(ctx context.Context, env format.Env, c repo.Config) error {
 		ctx,
 		func(ctx context.Context) error {
 			current, err := env.Store.RemoteCache().Source(ctx, c.Key)
-			if errors.Is(err, store.ErrNotFound) || err == nil && current != source {
+			if errors.Is(err, kernel.ErrNotFound) || err == nil && current != source {
 				return staleReindex()
 			}
 			if err != nil {
@@ -69,7 +69,7 @@ func reindexRemote(ctx context.Context, env format.Env, c repo.Config) error {
 			if !sameReindexItems(snapshot, latest) {
 				return fmt.Errorf(
 					"nuget: cached packages changed during reindex: %w",
-					store.ErrConflict,
+					kernel.ErrConflict,
 				)
 			}
 			groups := map[versionKey][]member{}
@@ -106,7 +106,7 @@ func staleReindex() error {
 	return fmt.Errorf("%w: nuget reindex source changed; schedule a new reindex", work.ErrPermanent)
 }
 
-func sameReindexItems(before map[int64]types.Item, after []aql.Hit) bool {
+func sameReindexItems(before map[int64]model.Item, after []aql.Hit) bool {
 	if len(before) != len(after) {
 		return false
 	}
@@ -123,7 +123,7 @@ func sameReindexItems(before map[int64]types.Item, after []aql.Hit) bool {
 	return true
 }
 
-func inspectReindexPackage(ctx context.Context, env format.Env, it types.Item) (*Nuspec, error) {
+func inspectReindexPackage(ctx context.Context, env format.Env, it model.Item) (*Nuspec, error) {
 	rc, info, err := env.Blobs.Open(ctx, it.Actual.SHA256)
 	if err != nil {
 		return nil, fmt.Errorf("open: %w", err)

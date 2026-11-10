@@ -7,8 +7,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // tagging is a generic format that records the properties it is told of.
@@ -21,7 +21,7 @@ func (f *tagging) Annotated(
 	_ context.Context,
 	_ format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	_ format.Annotation,
 ) error {
 	f.tagged = append(f.tagged, c.Key+":"+it.FullPath())
@@ -38,7 +38,7 @@ func TestUnitPromotionTagsThroughTheFormat(t *testing.T) {
 	f.tagged = nil
 	if _, err := w.svc.Promote(context.Background(), Promotion{
 		Name: "app", Number: "1", Artifacts: true,
-		Properties: types.Properties{"stage": {"qa"}}, FailFast: true, By: "admin",
+		Properties: model.Properties{"stage": {"qa"}}, FailFast: true, By: "admin",
 	}, everyone); err != nil {
 		t.Fatal(err)
 	}

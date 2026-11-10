@@ -11,14 +11,15 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 )
 
 func TestAccMappedMavenDescriptorDownloadAndAliasDenial(t *testing.T) {
@@ -61,7 +62,7 @@ func TestAccMappedMavenDescriptorDownloadAndAliasDenial(t *testing.T) {
 			if _, err := w.rt.Store.Items().
 				Get(t.Context(), w.c.Key, true, "org.acme/app/ivy-2.0.xml"); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("projected invalid POM admitted", err)
 			}
@@ -107,7 +108,7 @@ func TestAccMappedRootRuntimePublicationAndDeliveryFences(t *testing.T) {
 				w := newMavenRemoteWorld(t)
 				const custom = "filename-discovery"
 				if err := w.rt.Store.Configs().
-					Put(t.Context(), types.ConfigDocument{Kind: types.ConfigLayout, Key: custom, Document: json.RawMessage(`{"artifactPathPattern":"[org]/[module]-[baseRev].[ext]"}`)}); err != nil {
+					Put(t.Context(), configdoc.ConfigDocument{Kind: configdoc.ConfigLayout, Key: custom, Document: json.RawMessage(`{"artifactPathPattern":"[org]/[module]-[baseRev].[ext]"}`)}); err != nil {
 					t.Fatal(err)
 				}
 				w.c.RepoLayoutRef, w.c.RemoteRepoLayoutRef = custom, "maven-2-default"
@@ -156,9 +157,9 @@ func TestAccMappedRootRuntimePublicationAndDeliveryFences(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				r := permission.Resources[types.ResourceArtifact]
-				r.Targets[w.c.Key] = types.Target{Include: []string{"org.acme/app-1.0.jar"}}
-				permission.Resources[types.ResourceArtifact] = r
+				r := permission.Resources[accessapi.ResourceArtifact]
+				r.Targets[w.c.Key] = model.Target{Include: []string{"org.acme/app-1.0.jar"}}
+				permission.Resources[accessapi.ResourceArtifact] = r
 				if err = w.rt.Store.Permissions().Update(t.Context(), permission); err != nil {
 					t.Fatal(err)
 				}

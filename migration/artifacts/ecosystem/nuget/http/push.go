@@ -7,10 +7,11 @@ import (
 	"path"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // push answers a push to PackagePublish, PUT /api/nuget/{repoKey}[/] or
@@ -52,7 +53,7 @@ func (h handler) symbols(w http.ResponseWriter, r *http.Request) {
 // It answers 201 with no body, the status 7.x answers; [I] the body is
 // inferred.
 func (h handler) store(w http.ResponseWriter, r *http.Request, folder string, symbols bool) {
-	if !h.k.RequireFolder(w, r, folder, types.ActionWrite) {
+	if !h.k.RequireFolder(w, r, folder, api.ActionWrite) {
 		return
 	}
 	// The first file part is the package and the rest are ignored, as
@@ -86,7 +87,7 @@ func (h handler) store(w http.ResponseWriter, r *http.Request, folder string, sy
 	if symbols {
 		name, what = nugetfmt.SymbolsFileName(n.ID, n.Version), "the symbols of "
 	}
-	_, err = h.k.StoreNew(r, path.Join(folder, name), form.File, nil, types.Checksums{},
+	_, err = h.k.StoreNew(r, path.Join(folder, name), form.File, nil, kernel.Checksums{},
 		func() error {
 			// The canonical path holds the version already. Elsewhere in the
 			// repository, Admit refuses it with the same words.

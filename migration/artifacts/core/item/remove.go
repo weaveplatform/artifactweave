@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // removeFiles is format.Env.Remove: it deletes each file at paths in c with
@@ -27,7 +27,7 @@ func (s *Service) removeFiles(ctx context.Context, c repo.Config, paths []string
 			p = strings.Trim(p, "/")
 			_, err := s.Delete(ctx, Target{Repo: c, Cached: c.Class == repo.Remote, Path: p}, by)
 			switch {
-			case errors.Is(err, store.ErrNotFound):
+			case errors.Is(err, kernel.ErrNotFound):
 				continue
 			case err != nil:
 				return err
@@ -65,10 +65,10 @@ func (s *Service) pruneEmpty(ctx context.Context, c repo.Config, dir string) err
 			c.Key,
 			c.Class == repo.Remote,
 			dir,
-			store.Page{Limit: 1},
+			kernel.Page{Limit: 1},
 		)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			// Pruned already, from a deeper folder's walk.
 			continue
 		case err != nil:
@@ -78,7 +78,7 @@ func (s *Service) pruneEmpty(ctx context.Context, c repo.Config, dir string) err
 		}
 		it, err := items.Get(ctx, c.Key, c.Class == repo.Remote, dir)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			continue
 		case err != nil:
 			return fmt.Errorf("item: get %s: %w", dir, err)

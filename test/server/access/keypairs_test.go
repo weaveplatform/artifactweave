@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -280,8 +280,8 @@ func TestAccKeypairReadByNonAdmin(t *testing.T) {
 	h := statusFixture(t, true, func(c *Config) { db = c.Store })
 	k := testKeys()
 	const passphrase = "passphrase-never-read"
-	if err := db.Keys().CreateKeypair(context.Background(), types.Keypair{
-		Name: "kp-secret", Type: types.KeypairRSA, Alias: "secret",
+	if err := db.Keys().CreateKeypair(context.Background(), api.Keypair{
+		Name: "kp-secret", Type: api.KeypairRSA, Alias: "secret",
 		PrivateKey: k.private, PublicKey: k.public, Passphrase: passphrase,
 	}); err != nil {
 		t.Fatal(err)

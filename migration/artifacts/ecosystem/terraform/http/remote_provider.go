@@ -13,12 +13,12 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	tf "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (h handler) providerMetadata(
@@ -247,7 +247,7 @@ func (h handler) providerBundle(r *http.Request, q providerOp) (providerBundle, 
 		providerCompanionPath(q, true),
 	}
 	for _, path := range b.paths {
-		if !h.k.Can(r, path, types.ActionRead) {
+		if !h.k.Can(r, path, api.ActionRead) {
 			return b, source.ErrDenied
 		}
 	}
@@ -397,7 +397,7 @@ func (h handler) remoteProvider(w http.ResponseWriter, r *http.Request, q provid
 			return
 		}
 	}
-	if !h.k.RequireFolder(w, r, providerFolder(q), types.ActionRead) {
+	if !h.k.RequireFolder(w, r, providerFolder(q), api.ActionRead) {
 		return
 	}
 	if q.isUpstreamMirror {
@@ -519,7 +519,7 @@ func (h handler) providerVersionVisibility(
 		for _, platform := range platforms {
 			q.os, q.arch = platform.OS, platform.Arch
 			path := providerArchivePath(q)
-			if h.k.Can(r, path, types.ActionRead) {
+			if h.k.Can(r, path, api.ActionRead) {
 				readable = append(readable, platform)
 				paths = append(paths, path)
 			}
@@ -529,7 +529,7 @@ func (h handler) providerVersionVisibility(
 	for _, platform := range providerPlatforms {
 		q.os, q.arch = platform.OS, platform.Arch
 		path := providerArchivePath(q)
-		if !h.k.Can(r, path, types.ActionRead) {
+		if !h.k.Can(r, path, api.ActionRead) {
 			continue
 		}
 		*lookups++
@@ -567,7 +567,7 @@ func (h handler) remoteProviderMirror(
 	results := []source.Result{result}
 	for _, platform := range platforms {
 		q.os, q.arch = platform.OS, platform.Arch
-		if !h.k.Can(r, providerArchivePath(q), types.ActionRead) {
+		if !h.k.Can(r, providerArchivePath(q), api.ActionRead) {
 			continue
 		}
 		bundle, err := h.providerBundle(r, q)

@@ -19,8 +19,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Deriver is recorded as the creator and modifier of the metadata the
@@ -173,7 +173,7 @@ func timeStamp(t time.Time) string { return t.UTC().Format("20060102150405") }
 // packageFile is a file the index links to one of a package's versions.
 type packageFile struct {
 	version string
-	item    types.Item
+	item    model.Item
 }
 
 // Versions returns the versions the index holds for package name in c,
@@ -185,9 +185,9 @@ func Versions(
 	st format.Store,
 	c repo.Config,
 	name string,
-) ([]types.PackageVersion, map[int64][]types.Item, error) {
+) ([]model.PackageVersion, map[int64][]model.Item, error) {
 	p, err := st.Packages().Find(ctx, c.Key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil, nil, nil
 	}
 	if err != nil {
@@ -199,7 +199,7 @@ func Versions(
 	if err != nil {
 		return nil, nil, fmt.Errorf("maven: versions of %s: %w", name, err)
 	}
-	files := make(map[int64][]types.Item, len(vs))
+	files := make(map[int64][]model.Item, len(vs))
 	for _, v := range vs {
 		ids, err := st.Packages().Files(ctx, v.ID)
 		if err != nil {
@@ -300,7 +300,7 @@ func writeArtifactLevel(
 	// Mercury order, and versions it holds equal, such as 1.0 and 1.0.0, by
 	// name, so every run lists them alike.
 	order := slices.Sorted(maps.Keys(withPom))
-	slices.SortStableFunc(order, types.CompareMercury)
+	slices.SortStableFunc(order, model.CompareMercury)
 	v := &versioning{Versions: order, LastUpdated: timeStamp(now)}
 	v.Latest = order[len(order)-1]
 	for _, ver := range order {
@@ -323,7 +323,7 @@ func writeSnapshotLevel(
 	files []packageFile,
 	now time.Time,
 ) error {
-	byFolder := map[string][]types.Item{}
+	byFolder := map[string][]model.Item{}
 	withPom := map[string]bool{}
 	for _, f := range files {
 		folder := path.Dir(f.item.FullPath())
@@ -428,7 +428,7 @@ func newer(a, b UniqueBuild) bool {
 func snapshotMetadata(
 	c repo.Config,
 	g, a, folder string,
-	its []types.Item,
+	its []model.Item,
 	now time.Time,
 ) metadata {
 	v := &versioning{LastUpdated: timeStamp(now), Snapshot: &snapshot{}}
@@ -515,19 +515,19 @@ func stored(
 	env format.Env,
 	c repo.Config,
 	p string,
-) (metadata, types.Item, error) {
+) (metadata, model.Item, error) {
 	it, err := env.Store.Items().Get(ctx, c.Key, false, p)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
-		return metadata{}, types.Item{}, nil
+	case errors.Is(err, kernel.ErrNotFound):
+		return metadata{}, model.Item{}, nil
 	case err != nil:
-		return metadata{}, types.Item{}, fmt.Errorf("maven: get %s: %w", p, err)
+		return metadata{}, model.Item{}, fmt.Errorf("maven: get %s: %w", p, err)
 	case it.Folder:
-		return metadata{}, types.Item{}, nil
+		return metadata{}, model.Item{}, nil
 	}
 	body, err := content(ctx, env, it)
 	if err != nil {
-		return metadata{}, types.Item{}, err
+		return metadata{}, model.Item{}, err
 	}
 	var m metadata
 	_ = xml.Unmarshal(body, &m)
@@ -535,7 +535,7 @@ func stored(
 }
 
 // content reads up to maxMetadata bytes of a stored file.
-func content(ctx context.Context, env format.Env, it types.Item) ([]byte, error) {
+func content(ctx context.Context, env format.Env, it model.Item) ([]byte, error) {
 	rc, _, err := env.Blobs.Open(ctx, it.Actual.SHA256)
 	if err != nil {
 		return nil, fmt.Errorf("maven: open %s: %w", it.FullPath(), err)

@@ -7,13 +7,14 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (h handler) migrationDestination(
@@ -21,11 +22,11 @@ func (h handler) migrationDestination(
 	files []migrationFile,
 	status migrationStatus,
 ) (bool, error) {
-	items, err := h.migrationItems(r, status.Destination, types.ActionRead|types.ActionWrite)
+	items, err := h.migrationItems(r, status.Destination, api.ActionRead|api.ActionWrite)
 	if err != nil {
 		return false, err
 	}
-	existing := make(map[string]types.Item)
+	existing := make(map[string]model.Item)
 	for _, it := range items {
 		if !it.Folder {
 			existing[it.FullPath()] = it
@@ -96,7 +97,7 @@ func (h handler) publishMigration(
 		RepoKey: c.Key, PackageType: c.PackageType,
 		Package: id.Kind + "/" + id.RepoID(), Version: status.Revision,
 	}
-	var first types.Item
+	var first model.Item
 	for _, file := range files {
 		info := blob.Info{Size: file.item.Size, Digests: blob.Digests{
 			SHA256: file.item.Actual.SHA256, SHA1: file.item.Actual.SHA1,
@@ -127,7 +128,7 @@ func (h handler) publishMigration(
 		return fmt.Errorf("huggingface: find migrated version: %w", err)
 	}
 	if !ok {
-		return fmt.Errorf("huggingface: migrated version: %w", store.ErrNotFound)
+		return fmt.Errorf("huggingface: migrated version: %w", kernel.ErrNotFound)
 	}
 	slices.Sort(paths)
 	pv.Metadata, _ = json.Marshal(map[string]any{"revision": status.Revision, "files": paths})
@@ -140,8 +141,8 @@ func (h handler) publishMigration(
 			ref,
 			strings.NewReader(status.Revision),
 			nil,
-			types.Checksums{},
-			func(types.Item) error {
+			kernel.Checksums{},
+			func(model.Item) error {
 				return h.migrationRefAvailable(r, ref, status.Revision)
 			},
 		)

@@ -14,15 +14,15 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // world is an in-memory store with tf-local, a Terraform backend
@@ -81,14 +81,14 @@ func (w *world) repo(key string, t repo.PackageType) repo.Config {
 }
 
 // put stores body at p in c through the item service, as ctx's writer.
-func (w *world) put(ctx context.Context, c repo.Config, p string, body []byte) (types.Item, error) {
+func (w *world) put(ctx context.Context, c repo.Config, p string, body []byte) (model.Item, error) {
 	w.now = w.now.Add(time.Second)
 	return w.items.Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: p}, Body: bytes.NewReader(body), By: "alice",
 	})
 }
 
-func (w *world) mustPut(ctx context.Context, c repo.Config, p string, body []byte) types.Item {
+func (w *world) mustPut(ctx context.Context, c repo.Config, p string, body []byte) model.Item {
 	w.t.Helper()
 	it, err := w.put(ctx, c, p, body)
 	if err != nil {
@@ -118,7 +118,7 @@ func TestUnitItemRouteWritesAreRefused(t *testing.T) {
 	src := w.mustPut(w.ctx, w.libs, "a.json", []byte(aState))
 	_, err = w.items.DeployByChecksum(w.ctx, item.Deploy{
 		Target:   item.Target{Repo: w.tf, Path: tfbe.LatestPath("app")},
-		Declared: types.Checksums{SHA256: src.Actual.SHA256},
+		Declared: kernel.Checksums{SHA256: src.Actual.SHA256},
 	})
 	refused(t, "a checksum deploy", err)
 	_, err = w.items.MakeFolder(w.ctx, item.Target{Repo: w.tf, Path: "workspaces/app"}, nil, "x")
@@ -167,11 +167,11 @@ func TestUnitLockPropertiesAreTheAPIs(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, change := range []struct {
-		set    types.Properties
+		set    model.Properties
 		remove []string
 	}{
-		{types.Properties{tfbe.PropLockedBy: {"mallory"}}, nil},
-		{types.Properties{tfbe.PropLockedAt: {"1"}}, nil},
+		{model.Properties{tfbe.PropLockedBy: {"mallory"}}, nil},
+		{model.Properties{tfbe.PropLockedAt: {"1"}}, nil},
 		{nil, []string{tfbe.PropLockedBy}},
 		{nil, []string{tfbe.PropLockedAt}},
 	} {
@@ -186,13 +186,13 @@ func TestUnitLockPropertiesAreTheAPIs(t *testing.T) {
 		w.ctx,
 		w.tf,
 		folder,
-		types.Properties{"team": {"infra"}},
+		model.Properties{"team": {"infra"}},
 		nil,
 	); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.items.Annotate(w.writes, w.tf, folder,
-		types.Properties{tfbe.PropLockedBy: {"alice"}}, nil); err != nil {
+		model.Properties{tfbe.PropLockedBy: {"alice"}}, nil); err != nil {
 		t.Fatal(err)
 	}
 	// A deleted locked workspace comes back locked, even into a folder made
@@ -219,7 +219,7 @@ func TestUnitLockPropertiesAreTheAPIs(t *testing.T) {
 	}
 }
 
-func (w *world) folderProps(ws string) (types.Properties, error) {
+func (w *world) folderProps(ws string) (model.Properties, error) {
 	f, err := w.st.Items().Get(w.ctx, "tf-local", false, tfbe.Folder(ws))
 	if err != nil {
 		return nil, err //nolint:wrapcheck // test helper
@@ -230,7 +230,7 @@ func (w *world) folderProps(ws string) (types.Properties, error) {
 func TestUnitInspectHandsOverWhatTheAPIKnows(t *testing.T) {
 	h := tfbe.Handler{}
 	known := &tfbe.Meta{Serial: 3, Stored: "abc"}
-	write := format.Write{Path: tfbe.LatestPath("app"), Checksums: types.Checksums{SHA256: "abc"}}
+	write := format.Write{Path: tfbe.LatestPath("app"), Checksums: kernel.Checksums{SHA256: "abc"}}
 	ctx := tfbe.Writing(context.Background(), known)
 	got, err := h.Inspect(ctx, format.Env{}, repo.Config{}, write)
 	if m, ok := got.(*tfbe.Meta); err != nil || !ok || *m != *known || m == known {
@@ -333,8 +333,8 @@ func TestUnitDeployedOverABrokenIndex(t *testing.T) {
 	// A cached item, or one that is no state, is not indexed.
 	cached := it
 	cached.Cached = true
-	record := types.Item{ID: it.ID, Name: tfbe.RecordPath("app")}
-	for _, other := range []types.Item{cached, record} {
+	record := model.Item{ID: it.ID, Name: tfbe.RecordPath("app")}
+	for _, other := range []model.Item{cached, record} {
 		if err := w.h.Deployed(w.ctx, w.items.Env(), w.tf, other); err != nil {
 			t.Errorf("Deployed(%s) = %v", other.FullPath(), err)
 		}
@@ -370,7 +370,7 @@ type failingReader struct{ io.ReadSeekCloser }
 func (failingReader) Read([]byte) (int, error) { return 0, errors.New("read fails") }
 
 // version is version ms of workspace ws in tf-local.
-func (w *world) version(ws string, ms int64) types.PackageVersion {
+func (w *world) version(ws string, ms int64) model.PackageVersion {
 	w.t.Helper()
 	p, err := w.st.Packages().Find(w.ctx, "tf-local", ws)
 	if err != nil {
@@ -383,7 +383,7 @@ func (w *world) version(ws string, ms int64) types.PackageVersion {
 	return v
 }
 
-func (w *world) files(v types.PackageVersion) []int64 {
+func (w *world) files(v model.PackageVersion) []int64 {
 	w.t.Helper()
 	ids, err := w.st.Packages().Files(w.ctx, v.ID)
 	if err != nil {
@@ -396,7 +396,7 @@ func (w *world) files(v types.PackageVersion) []int64 {
 func (w *world) reindexMatches() {
 	w.t.Helper()
 	before := w.snapshot()
-	pkgs, _, err := w.st.Packages().List(w.ctx, "tf-local", store.Page{Limit: 10})
+	pkgs, _, err := w.st.Packages().List(w.ctx, "tf-local", kernel.Page{Limit: 10})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -416,7 +416,7 @@ func (w *world) reindexMatches() {
 func (w *world) snapshot() string {
 	w.t.Helper()
 	var b strings.Builder
-	pkgs, _, err := w.st.Packages().List(w.ctx, "tf-local", store.Page{Limit: 10})
+	pkgs, _, err := w.st.Packages().List(w.ctx, "tf-local", kernel.Page{Limit: 10})
 	if err != nil {
 		w.t.Fatal(err)
 	}

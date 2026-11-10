@@ -9,10 +9,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // ResealReport is what Reseal did.
@@ -36,7 +38,7 @@ func (s *Service) Reseal(ctx context.Context) (ResealReport, error) {
 	if s.Keys == nil {
 		return rep, ErrNoKeyring
 	}
-	repos, err := s.store().Repos().List(ctx, store.RepoFilter{Class: repo.Local})
+	repos, err := s.store().Repos().List(ctx, port.RepoFilter{Class: repo.Local})
 	if err != nil {
 		return rep, fmt.Errorf("terraformstate: repositories: %w", err)
 	}
@@ -81,7 +83,7 @@ func (s *Service) reseal(
 	ctx context.Context,
 	c repo.Config,
 	ws string,
-	it types.Item,
+	it model.Item,
 ) (bool, error) {
 	stored, err := tfbe.ReadStored(ctx, s.Items.Blobs, it.Actual.SHA256)
 	if err != nil {
@@ -106,7 +108,7 @@ func (s *Service) reseal(
 	if err != nil {
 		return false, fmt.Errorf("terraformstate: store %s: %w", it.FullPath(), err)
 	}
-	actual := types.Checksums{
+	actual := kernel.Checksums{
 		SHA256: info.Digests.SHA256, SHA512: info.Digests.SHA512,
 		SHA1: info.Digests.SHA1, MD5: info.Digests.MD5,
 	}
@@ -114,7 +116,7 @@ func (s *Service) reseal(
 	err = s.store().Tx(ctx, func(ctx context.Context) error {
 		items := s.store().Items()
 		cur, err := items.Get(ctx, c.Key, false, it.FullPath())
-		if errors.Is(err, store.ErrNotFound) ||
+		if errors.Is(err, kernel.ErrNotFound) ||
 			err == nil && cur.Actual.SHA256 != it.Actual.SHA256 {
 			// Written or deleted since it was read: whatever is there now is
 			// the active version's, or gone.
@@ -123,7 +125,7 @@ func (s *Service) reseal(
 		if err != nil {
 			return fmt.Errorf("terraformstate: get %s: %w", it.FullPath(), err)
 		}
-		if _, err := s.store().Blobs().Ref(ctx, types.Blob{
+		if _, err := s.store().Blobs().Ref(ctx, blob.Blob{
 			Checksums: actual, Size: info.Size, Created: s.now(),
 		}, 1); err != nil {
 			return fmt.Errorf("terraformstate: reference %s: %w", it.FullPath(), err)

@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // ErrRegistryChallenge reports an upstream registry's authentication
@@ -361,10 +361,10 @@ type RegistryPool struct {
 // remote.ErrClosed.
 func (p *RegistryPool) Client(
 	c repo.Config,
-	identity types.SourceIdentity,
+	identity model.SourceIdentity,
 	opts RegistryOptions,
 ) (*Registry, error) {
-	if identity.Kind != types.ExternalHTTP || identity.Repository == "" ||
+	if identity.Kind != model.ExternalHTTP || identity.Repository == "" ||
 		identity.Generation == "" {
 		return nil, remote.ErrConfiguration
 	}
@@ -422,7 +422,7 @@ type RegistryClients struct {
 func (r *RegistryClients) Open(
 	ctx context.Context,
 	c repo.Config,
-	id types.SourceIdentity,
+	id model.SourceIdentity,
 	revision string,
 ) (remote.RegistryClient, error) {
 	creds, err := r.Options(ctx, c)

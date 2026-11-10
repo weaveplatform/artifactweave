@@ -11,7 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const (
@@ -95,7 +95,7 @@ func (h handler) search(w http.ResponseWriter, r *http.Request) {
 	key := pkgroute.RequestFrom(r).Repo.Key
 	answer := searchAnswer{Objects: []searchObject{}}
 	skip := q.from
-	page := store.Page{Limit: searchPage}
+	page := kernel.Page{Limit: searchPage}
 	for {
 		found, next, err := h.k.DB().Packages().List(r.Context(), key, page)
 		if err != nil {

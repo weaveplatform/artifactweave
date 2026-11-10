@@ -10,10 +10,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Serves reports whether t is the package type this format handles,
@@ -70,7 +70,7 @@ func (Handler) Admit(
 // is written, unless the context carries DeferReindex, whose caller rebuilds
 // it once in the same transaction. Folders, refs and Xet records leave the
 // index alone.
-func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder {
 		return nil
 	}
@@ -85,7 +85,7 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 
 // Deleting does nothing: the index is rebuilt once the files are gone, in
 // Deleted.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted rebuilds the repository's index (Reindex) when a delete or a move
 // took at least one snapshot file, so no revision outlives its files.
@@ -93,7 +93,7 @@ func (h Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	for _, it := range removed {
 		if _, _, _, ok := ParseSnapshotPath(it.FullPath()); ok {
@@ -104,7 +104,7 @@ func (h Handler) Deleted(
 }
 
 type snapshotGroup struct {
-	files []types.Item
+	files []model.Item
 }
 
 // Reindex reconstructs the native package/version view from committed
@@ -112,7 +112,7 @@ type snapshotGroup struct {
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	err := env.Store.Tx(ctx, func(ctx context.Context) error {
 		groups := map[string]map[string]*snapshotGroup{}
-		page := store.Page{Limit: store.MaxLimit}
+		page := kernel.Page{Limit: kernel.MaxLimit}
 		cached := pkgindex.Stored(c).Cached
 		for {
 			items, next, err := env.Store.Items().Descendants(ctx, c.Key, cached, "", page)

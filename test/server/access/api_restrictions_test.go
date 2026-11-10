@@ -8,13 +8,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // budgets is the request budget store of the in-memory composite that
@@ -129,7 +130,7 @@ func TestAccAPIProjectQuotaUsesRepositoryOwner(t *testing.T) {
 		}
 		for _, project := range []string{"alpha", "beta"} {
 			if err := c.Store.Projects().
-				Create(t.Context(), types.Project{Key: project}); err != nil {
+				Create(t.Context(), model.Project{Key: project}); err != nil {
 				t.Fatal(err)
 			}
 			if err := c.Store.Repos().
@@ -164,14 +165,14 @@ func TestAccAPIRecoveryRequiresMatchingEscapedRoute(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := w.db.Permissions().
-		Create(ctx, types.Permission{Name: "encoded-api", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{
-					Users: map[string]types.Actions{
-						"deployer": types.ActionRead | types.ActionWrite,
+		Create(ctx, model.Permission{Name: "encoded-api", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{
+					Users: map[string]api.Actions{
+						"deployer": api.ActionRead | api.ActionWrite,
 					},
 				},
-				Targets: map[string]types.Target{"api": {Include: []string{"**"}}},
+				Targets: map[string]model.Target{"api": {Include: []string{"**"}}},
 			},
 		}}); err != nil {
 		t.Fatal(err)
@@ -190,7 +191,7 @@ func TestAccAPIRecoveryRequiresMatchingEscapedRoute(t *testing.T) {
 	if _, err := w.db.Items().
 		Get(ctx, "api", false, "artifactweave/api-restrictions/target"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("restricted upload mutated state: %v", err)
 	}

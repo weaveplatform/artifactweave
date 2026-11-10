@@ -11,10 +11,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Handler keeps the package index derived from immutable source archives.
@@ -94,7 +94,7 @@ func (h Handler) Admit(
 	}
 	old, err := env.Store.Items().Get(ctx, c.Key, w.Cached, w.Path)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return w, nil
 	case err != nil:
 		return w, fmt.Errorf("swift: existing release: %w", err)
@@ -110,7 +110,7 @@ func (h Handler) Admit(
 // index, creating the package and version when they are new. Folders,
 // files at other paths and items outside the tree the index reads (a
 // remote repository's cache, or a local one's own items) change nothing.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || it.Cached != pkgindex.Stored(c).Cached {
 		return nil
 	}
@@ -128,11 +128,11 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 
 // Deleting does nothing: the item service drops a removed archive's
 // version link with it.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted does nothing: a version is one archive, so the item service's
 // pruning of versions left without files is all a delete needs.
-func (Handler) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
+func (Handler) Deleted(context.Context, format.Env, repo.Config, []model.Item) error { return nil }
 
 // Classify classes every path as unique content, as the generic hooks do:
 // a release archive is content only its publisher can supply again.

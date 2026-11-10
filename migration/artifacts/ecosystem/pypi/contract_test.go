@@ -7,8 +7,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // A version is its wheel and sdist at the canonical path, and a zip sdist
@@ -37,7 +37,7 @@ func TestUnitContract(t *testing.T) {
 				Linked: []string{whl, tgz, zipped},
 			}
 		},
-		Properties: []types.Properties{
+		Properties: []model.Properties{
 			{pypi.PropYanked: {"true"}},
 			{pypi.PropYanked: {"use 2.0"}, "formattest.k": {"x"}},
 		},

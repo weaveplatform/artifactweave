@@ -8,9 +8,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccCacheMaintenanceZapRefreshAndStalePolicy(t *testing.T) {
@@ -96,11 +96,11 @@ func TestAccCacheMaintenanceZapRefreshAndStalePolicy(t *testing.T) {
 func TestAccCacheMaintenanceNegativeDeleteDiscoversUpstream(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("new.bin", source.ResourceKindArtifact)
-	if _, err := w.read(q); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.read(q); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal(err)
 	}
 	w.up.Set("/new.bin", fakeupstream.Resource{Body: []byte("newly available")})
-	if _, err := w.read(q); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.read(q); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal("negative not effective", err)
 	}
 	if _, err := w.p.Items.Delete(
@@ -178,7 +178,7 @@ func TestAccCacheMaintenanceFencesBlockedPublication(t *testing.T) {
 				if err != nil || !entry.ValidatedAt.IsZero() {
 					t.Fatal("zap lost usable expired metadata", err)
 				}
-			} else if !errors.Is(err, store.ErrNotFound) {
+			} else if !errors.Is(err, kernel.ErrNotFound) {
 				t.Fatal("invalidated bytes restored", entry, err)
 			}
 		})
@@ -225,7 +225,7 @@ func TestAccCacheMaintenanceRestoreFencesBlockedRefresh(t *testing.T) {
 	restored, err := w.p.Items.Restore(
 		t.Context(),
 		item.Target{Repo: w.c, Cached: true, Path: q.Resource.Path},
-		types.TrashRecord{Item: *original.Item},
+		model.TrashRecord{Item: *original.Item},
 		"admin",
 	)
 	if err != nil {
@@ -242,7 +242,7 @@ func TestAccCacheMaintenanceRestoreFencesBlockedRefresh(t *testing.T) {
 	if _, err = w.db.RemoteCache().
 		Read(t.Context(), entry.Token.Key); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("restore fabricated retrieval state", err)
 	}

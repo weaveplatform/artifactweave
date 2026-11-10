@@ -9,12 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -32,14 +34,14 @@ func buildSearchWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *item
 	if err := w.db.Repos().Create(ctx, *repo.Defaults(&proj)); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Permissions().Create(ctx, types.Permission{
-		Name: "deployer-builds", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceBuild: {
-				Actions: types.Grants{
-					Users: map[string]types.Actions{"deployer": types.ActionRead},
+	if err := w.db.Permissions().Create(ctx, model.Permission{
+		Name: "deployer-builds", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceBuild: {
+				Actions: model.Grants{
+					Users: map[string]api.Actions{"deployer": api.ActionRead},
 				},
-				Targets: map[string]types.Target{
-					types.BuildInfoRepository: {Include: []string{"app/**"}},
+				Targets: map[string]model.Target{
+					api.BuildInfoRepository: {Include: []string{"app/**"}},
 				},
 			},
 		},
@@ -64,7 +66,7 @@ func buildSearchWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *item
 		}
 		return build.FormatStarted(s.Add(time.Duration(n) * time.Second))
 	}
-	runs := map[string]types.Build{}
+	runs := map[string]model.Build{}
 	both := file("a.bin", "artifact a") + "," + file("b-sources.jar", "artifact b")
 	for n, r := range []struct{ key, project, name, number, artifacts string }{
 		{"app1", "", "app", "1", both},
@@ -83,7 +85,7 @@ func buildSearchWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *item
 		}
 		runs[r.key] = p.Run
 	}
-	if _, err := w.db.Builds().AddPromotion(ctx, types.BuildPromotion{
+	if _, err := w.db.Builds().AddPromotion(ctx, model.BuildPromotion{
 		BuildID: runs["app1"].ID, Status: "Released", Created: time.Now(),
 	}); err != nil {
 		t.Fatal(err)
@@ -217,14 +219,14 @@ func TestAccSearchBuildArtifacts(t *testing.T) {
 		http.StatusForbidden)
 	// Anonymous callers are told to authenticate, even with anonymous
 	// access on and read on the run, which the dependency search shows.
-	if err := w.db.Permissions().Create(context.Background(), types.Permission{
-		Name: "anonymous-builds", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceBuild: {
-				Actions: types.Grants{
-					Users: map[string]types.Actions{kernel.AnonymousUser: types.ActionRead},
+	if err := w.db.Permissions().Create(context.Background(), model.Permission{
+		Name: "anonymous-builds", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceBuild: {
+				Actions: model.Grants{
+					Users: map[string]api.Actions{kernel.AnonymousUser: api.ActionRead},
 				},
-				Targets: map[string]types.Target{
-					types.BuildInfoRepository: {Include: []string{"app/**"}},
+				Targets: map[string]model.Target{
+					api.BuildInfoRepository: {Include: []string{"app/**"}},
 				},
 			},
 		},
@@ -281,23 +283,23 @@ type buildSearchFaults struct {
 	fail string
 }
 
-func (f buildSearchFaults) Builds() store.BuildStore {
+func (f buildSearchFaults) Builds() port.BuildStore {
 	return faultyBuildSearch{f.Store.Builds(), f.fail}
 }
 
-func (f buildSearchFaults) Items() store.ItemStore {
+func (f buildSearchFaults) Items() port.ItemStore {
 	return faultyChecksumSearch{f.Store.Items(), f.fail}
 }
 
 type faultyBuildSearch struct {
-	store.BuildStore
+	port.BuildStore
 	fail string
 }
 
 func (f faultyBuildSearch) FindDependencies(
 	ctx context.Context,
-	c types.Checksums,
-) ([]types.BuildFileRef, error) {
+	c kernel.Checksums,
+) ([]model.BuildFileRef, error) {
 	if f.fail == "dependencies" {
 		return nil, errBoom
 	}
@@ -307,8 +309,8 @@ func (f faultyBuildSearch) FindDependencies(
 func (f faultyBuildSearch) Runs(
 	ctx context.Context,
 	project, name string,
-	p store.Page,
-) ([]types.BuildRun, string, error) {
+	p kernel.Page,
+) ([]model.BuildRun, string, error) {
 	if f.fail == "runs" {
 		return nil, "", errBoom
 	}
@@ -316,15 +318,15 @@ func (f faultyBuildSearch) Runs(
 }
 
 type faultyChecksumSearch struct {
-	store.ItemStore
+	port.ItemStore
 	fail string
 }
 
 func (f faultyChecksumSearch) FindByChecksum(
 	ctx context.Context,
-	c types.Checksums,
-	p store.Page,
-) ([]types.Item, string, error) {
+	c kernel.Checksums,
+	p kernel.Page,
+) ([]model.Item, string, error) {
 	if f.fail == "find" {
 		return nil, "", errBoom
 	}

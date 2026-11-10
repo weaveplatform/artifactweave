@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // Metadata is a version's document in the package index
@@ -86,7 +86,7 @@ func DecodeMetadata(b []byte) (Metadata, error) {
 }
 
 // describe is the Metadata of the package n describes, stored as it.
-func describe(n *Nuspec, it types.Item) Metadata {
+func describe(n *Nuspec, it model.Item) Metadata {
 	return Metadata{
 		ID: n.ID, Version: n.Version.Normalized(), OriginalVersion: n.Version.Original,
 		Title: n.Title, Authors: n.Authors, Owners: n.Owners, Description: n.Description,
@@ -115,7 +115,7 @@ func (m Metadata) encode() []byte {
 
 // published is when the file it was last deployed. A move keeps it and a
 // copy is a deploy at its target.
-func published(it types.Item) time.Time {
+func published(it model.Item) time.Time {
 	return it.Modified.UTC().Truncate(time.Microsecond)
 }
 

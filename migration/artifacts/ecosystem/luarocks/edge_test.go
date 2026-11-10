@@ -14,9 +14,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 type testContent struct {
@@ -42,18 +44,18 @@ type testBlobs struct {
 
 type itemLookupStore struct {
 	*inmem.Store
-	item      *types.Item
+	item      *model.Item
 	getErr    error
 	searchErr error
 }
 
-func (s itemLookupStore) Items() store.ItemStore {
+func (s itemLookupStore) Items() port.ItemStore {
 	return itemLookup{s.Store.Items(), s.item, s.getErr, s.searchErr}
 }
 
 type itemLookup struct {
-	store.ItemStore
-	item      *types.Item
+	port.ItemStore
+	item      *model.Item
 	getErr    error
 	searchErr error
 }
@@ -70,9 +72,9 @@ func (s itemLookup) Get(
 	key string,
 	cached bool,
 	path string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if s.getErr != nil {
-		return types.Item{}, s.getErr
+		return model.Item{}, s.getErr
 	}
 	if s.item != nil {
 		return *s.item, nil
@@ -172,9 +174,9 @@ func TestUnitManifestHookBoundaries(t *testing.T) {
 			queued = append(queued, kind+":"+key)
 			return nil
 		},
-		Derive: func(_ context.Context, d format.Derived) (types.Item, error) {
+		Derive: func(_ context.Context, d format.Derived) (model.Item, error) {
 			derived = append(derived, d.Path)
-			return types.Item{Name: d.Path}, nil
+			return model.Item{Name: d.Path}, nil
 		},
 	}
 	if refs := h.Owed(c, false, ManifestPath); len(refs) != 1 || refs[0].Kind != KindManifest {
@@ -221,7 +223,7 @@ func TestUnitManifestHookBoundaries(t *testing.T) {
 		ctx,
 		env,
 		c,
-		types.Item{Name: "hello-1.0-1.rockspec", Folder: true},
+		model.Item{Name: "hello-1.0-1.rockspec", Folder: true},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +231,7 @@ func TestUnitManifestHookBoundaries(t *testing.T) {
 		ctx,
 		env,
 		c,
-		types.Item{Name: "hello-1.0-1.rockspec"},
+		model.Item{Name: "hello-1.0-1.rockspec"},
 	); err != nil ||
 		len(queued) != 2 {
 		t.Fatalf("rockspec deletion queue: %v %v", err, queued)
@@ -238,7 +240,7 @@ func TestUnitManifestHookBoundaries(t *testing.T) {
 		ctx,
 		env,
 		c,
-		types.Item{Name: ManifestPath},
+		model.Item{Name: ManifestPath},
 	); err != nil ||
 		len(queued) != 3 {
 		t.Fatalf("manifest deletion queue: %v %v", err, queued)
@@ -247,30 +249,30 @@ func TestUnitManifestHookBoundaries(t *testing.T) {
 		ctx,
 		env,
 		remote,
-		types.Item{Name: "hello-1.0-1.rockspec"},
+		model.Item{Name: "hello-1.0-1.rockspec"},
 	); err != nil ||
 		len(queued) != 3 {
 		t.Fatalf("remote deletion must not queue: %v %v", err, queued)
 	}
-	if err := h.Deployed(ctx, env, c, types.Item{Name: "folder", Folder: true}); err != nil {
+	if err := h.Deployed(ctx, env, c, model.Item{Name: "folder", Folder: true}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Deployed(ctx, env, c, types.Item{Name: "unrelated.txt"}); err != nil {
+	if err := h.Deployed(ctx, env, c, model.Item{Name: "unrelated.txt"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Deleted(ctx, env, c, []types.Item{{Name: "unrelated.txt"}}); err != nil {
+	if err := h.Deleted(ctx, env, c, []model.Item{{Name: "unrelated.txt"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Work(ctx, env, types.WorkItem{Kind: "unrelated", Key: c.Key}); err != nil {
+	if err := h.Work(ctx, env, work.WorkItem{Kind: "unrelated", Key: c.Key}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Work(ctx, env, types.WorkItem{Kind: KindManifest, Key: "missing"}); err != nil {
+	if err := h.Work(ctx, env, work.WorkItem{Kind: KindManifest, Key: "missing"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Work(ctx, env, types.WorkItem{Kind: KindManifest, Key: remote.Key}); err != nil {
+	if err := h.Work(ctx, env, work.WorkItem{Kind: KindManifest, Key: remote.Key}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Work(ctx, env, types.WorkItem{Kind: KindManifest, Key: c.Key}); err != nil {
+	if err := h.Work(ctx, env, work.WorkItem{Kind: KindManifest, Key: c.Key}); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(
@@ -286,10 +288,10 @@ func TestUnitManifestHookBoundaries(t *testing.T) {
 	) {
 		t.Fatalf("derived manifests: %v", derived)
 	}
-	env.Derive = func(context.Context, format.Derived) (types.Item, error) {
-		return types.Item{}, errors.New("derived item unavailable")
+	env.Derive = func(context.Context, format.Derived) (model.Item, error) {
+		return model.Item{}, errors.New("derived item unavailable")
 	}
-	if err := h.Work(ctx, env, types.WorkItem{Kind: KindManifest, Key: c.Key}); err == nil {
+	if err := h.Work(ctx, env, work.WorkItem{Kind: KindManifest, Key: c.Key}); err == nil {
 		t.Fatal("manifest derivation failure was ignored")
 	}
 }
@@ -308,7 +310,7 @@ func TestUnitAdmissionAndManifestSizeBoundaries(t *testing.T) {
 		{"checksum", c, format.Write{Op: format.OpChecksum, Path: "hello-1.0-1.rockspec"}, format.Env{}, false},
 		{"cached", c, format.Write{Op: format.OpDeploy, Path: "hello-1.0-1.rockspec", Cached: true}, format.Env{}, false},
 		{"invalid filename", c, format.Write{Op: format.OpDeploy, Path: "bad.rockspec"}, format.Env{}, true},
-		{"invalid content", c, format.Write{Op: format.OpDeploy, Path: "hello-1.0-1.rockspec", Checksums: types.Checksums{SHA256: "sha"}}, format.Env{Blobs: testBlobs{body: []byte("bad")}}, true},
+		{"invalid content", c, format.Write{Op: format.OpDeploy, Path: "hello-1.0-1.rockspec", Checksums: kernel.Checksums{SHA256: "sha"}}, format.Env{Blobs: testBlobs{body: []byte("bad")}}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := h.Admit(ctx, tc.env, tc.c, tc.w)
@@ -345,7 +347,7 @@ func TestUnitManifestReadFaultBoundaries(t *testing.T) {
 	ctx := context.Background()
 	c := repo.Config{Key: "rocks", Class: repo.Local, PackageType: repo.LuaRocks}
 	entry := manifestEntry{"hello", "1.0-1", "rockspec"}
-	item := types.Item{Actual: types.Checksums{SHA256: "sha"}}
+	item := model.Item{Actual: kernel.Checksums{SHA256: "sha"}}
 	for _, tc := range []struct {
 		name  string
 		store itemLookupStore
@@ -379,14 +381,14 @@ func TestUnitVersionIDMissingPackageAndVersion(t *testing.T) {
 	c := repo.Config{Key: "rocks", Class: repo.Local, PackageType: repo.LuaRocks}
 	db := inmem.New()
 	id, _ := Parse("hello-1.0-1.rockspec")
-	if _, err := VersionID(ctx, db, c, id); !errors.Is(err, store.ErrNotFound) {
+	if _, err := VersionID(ctx, db, c, id); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("missing package: %v", err)
 	}
 	if _, err := db.Packages().
-		Ensure(ctx, types.Package{RepoKey: c.Key, Name: id.Name, Type: c.PackageType}); err != nil {
+		Ensure(ctx, model.Package{RepoKey: c.Key, Name: id.Name, Type: c.PackageType}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := VersionID(ctx, db, c, id); !errors.Is(err, store.ErrNotFound) {
+	if _, err := VersionID(ctx, db, c, id); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("missing version: %v", err)
 	}
 }
@@ -401,7 +403,7 @@ func TestUnitManifestSearchFaultIsNotPublished(t *testing.T) {
 	}
 	lookup := itemLookupStore{Store: db, searchErr: errors.New("index offline")}
 	env := format.Env{Store: lookup, Leases: lookup.Leases(), WorkQueue: lookup.WorkQueue()}
-	if err := h.Work(ctx, env, types.WorkItem{Kind: KindManifest, Key: c.Key}); err == nil {
+	if err := h.Work(ctx, env, work.WorkItem{Kind: KindManifest, Key: c.Key}); err == nil {
 		t.Fatal("work published a manifest after search failed")
 	}
 	if err := h.Reindex(ctx, env, c); err == nil {

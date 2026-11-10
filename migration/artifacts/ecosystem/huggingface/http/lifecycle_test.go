@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitDeleteRestoreAndReindex(t *testing.T) {
@@ -41,7 +41,7 @@ func TestUnitDeleteRestoreAndReindex(t *testing.T) {
 	if _, e := f.db.Packages().
 		Find(t.Context(), "hf", "models/acme/demo"); !errors.Is(
 		e,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("stale deleted index: %v", e)
 	}

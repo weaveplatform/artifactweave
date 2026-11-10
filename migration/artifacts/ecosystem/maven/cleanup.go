@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // KindSnapshots applies a package's maxUniqueSnapshots, keyed by
@@ -43,7 +43,7 @@ func queueCleanup(
 	env format.Env,
 	c repo.Config,
 	r reader,
-	it types.Item,
+	it model.Item,
 	co Coordinates,
 	indexed bool,
 ) error {

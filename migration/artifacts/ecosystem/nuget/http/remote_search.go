@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Limit autocomplete's package lookups as well as registration traversal. The
@@ -130,7 +130,7 @@ func (s *remoteSession) autocomplete(w http.ResponseWriter) {
 			}
 			continue
 		}
-		if !s.h.k.CanFolder(s.r, nugetfmt.PackageName(value), types.ActionRead) {
+		if !s.h.k.CanFolder(s.r, nugetfmt.PackageName(value), api.ActionRead) {
 			continue
 		}
 		versions, owner, versionErr := s.versions(value)

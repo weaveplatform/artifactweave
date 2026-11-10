@@ -16,11 +16,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // errBroken is a format that breaks the contract.
@@ -73,7 +74,7 @@ type Format struct {
 	// Properties are the property sets the suite applies in turn to a
 	// version's files: a format whose index follows properties names the
 	// ones it reads. Nil means a set the format does not read.
-	Properties []types.Properties
+	Properties []model.Properties
 	// Work lists the kinds of work the format queues on a deploy, keyed by
 	// package. Each committed deploy leaves exactly one item of each per
 	// package; a kind listed in neither Work nor RepoWork must never be
@@ -228,7 +229,7 @@ func everything(vs ...Version) []string {
 }
 
 // defaultProperties are property sets no format reads.
-var defaultProperties = []types.Properties{
+var defaultProperties = []model.Properties{
 	{"formattest.k": {"1"}},
 	{"formattest.k": {"2"}, "formattest.l": {"x"}},
 }
@@ -326,7 +327,7 @@ func (w *world) tick() { w.now = w.now.Add(time.Minute) }
 
 func (w *world) version(p, v string, n int) Version { return w.f.Version(p, v, n) }
 
-func (w *world) deploy(c repo.Config, v Version, props types.Properties) error {
+func (w *world) deploy(c repo.Config, v Version, props model.Properties) error {
 	for _, f := range v.Files {
 		w.tick()
 		if _, err := w.items.Deploy(w.ctx, item.Deploy{
@@ -354,7 +355,7 @@ func (w *world) cache(c repo.Config, v Version) error {
 	return nil
 }
 
-func (w *world) file(c repo.Config, p string) (types.Item, error) {
+func (w *world) file(c repo.Config, p string) (model.Item, error) {
 	it, err := w.st.Items().Get(w.ctx, c.Key, false, p)
 	if err != nil {
 		return it, fmt.Errorf("get %s in %s: %w", p, c.Key, err)
@@ -383,7 +384,7 @@ type snapshot map[string]indexedPackage
 
 func (w *world) snapshot(c repo.Config) (snapshot, error) {
 	out := snapshot{}
-	for page := (store.Page{Limit: store.MaxLimit}); ; {
+	for page := (kernel.Page{Limit: kernel.MaxLimit}); ; {
 		pkgs, next, err := w.st.Packages().List(w.ctx, c.Key, page)
 		if err != nil {
 			return nil, fmt.Errorf("packages of %s: %w", c.Key, err)
@@ -493,7 +494,7 @@ func (w *world) verifyOne(c repo.Config) error {
 
 // wipe removes c's whole index.
 func (w *world) wipe(c repo.Config) error {
-	pkgs, _, err := w.st.Packages().List(w.ctx, c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := w.st.Packages().List(w.ctx, c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		return fmt.Errorf("packages of %s: %w", c.Key, err)
 	}
@@ -560,8 +561,8 @@ func (w *world) work() (map[string]int64, error) {
 func (w *world) drain() error {
 	q := w.st.WorkQueue()
 	for {
-		items, err := q.Lease(w.ctx, store.WorkLease{
-			Holder: "formattest", Limit: store.MaxLimit, Until: w.now.Add(time.Hour), Now: w.now,
+		items, err := q.Lease(w.ctx, work.WorkLease{
+			Holder: "formattest", Limit: kernel.MaxLimit, Until: w.now.Add(time.Hour), Now: w.now,
 		})
 		if err != nil {
 			return fmt.Errorf("lease the queued work: %w", err)
@@ -610,7 +611,7 @@ func (w *world) holds(c repo.Config, want bool, paths ...string) error {
 	for _, p := range paths {
 		it, err := w.st.Items().Get(w.ctx, c.Key, c.Class == repo.Remote, p)
 		switch {
-		case err != nil && !errors.Is(err, store.ErrNotFound):
+		case err != nil && !errors.Is(err, kernel.ErrNotFound):
 			return fmt.Errorf("get %s in %s: %w", p, c.Key, err)
 		case want && (err != nil || it.Folder):
 			return fmt.Errorf("%w: %s lacks the file %s", errBroken, c.Key, p)

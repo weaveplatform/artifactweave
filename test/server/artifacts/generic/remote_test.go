@@ -16,11 +16,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -59,7 +59,7 @@ func TestAccGenericRemoteDownloadLifecycle(t *testing.T) {
 	if _, err := w.rt.Store.Items().
 		Get(t.Context(), "remote", true, "a/file.bin"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("HEAD cached: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestAccGenericRemoteDownloadLifecycle(t *testing.T) {
 	if _, err = w.rt.Store.RemoteCache().
 		Source(t.Context(), "remote"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("source retained %v", err)
 	}
@@ -157,7 +157,7 @@ func TestAccGenericRemoteTransientSidecarsAndFailures(t *testing.T) {
 	)
 	remoteStatus(t, w.request("GET", "/artifactory/remote-cache/file.bin", "reader", ""), 404)
 	if entries, _, err := w.rt.Store.RemoteCache().
-		List(t.Context(), "remote", "", store.Page{}); err != nil ||
+		List(t.Context(), "remote", "", kernel.Page{}); err != nil ||
 		len(entries) != 0 {
 		t.Fatalf("transient entries %v %v", entries, err)
 	}
@@ -233,7 +233,7 @@ func TestAccGenericRemoteAuthorizationAndRevocation(t *testing.T) {
 					t.Fatal(e)
 				}
 				if mutation == "user" {
-					u.Status = types.UserDisabled
+					u.Status = model.UserDisabled
 				} else {
 					u.PasswordHash = []byte("replacement")
 				}
@@ -261,7 +261,7 @@ func TestAccGenericRemoteAuthorizationAndRevocation(t *testing.T) {
 			if _, err = w.rt.Store.Items().
 				Get(t.Context(), "remote", true, "held.bin"); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatalf("revoked candidate published %v", err)
 			}
@@ -487,7 +487,7 @@ func TestAccGenericRemoteRejectsMalformedColdChecksum(t *testing.T) {
 			if _, err := w.rt.Store.Items().
 				Get(t.Context(), "remote", true, "invalid.bin.sha256"); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatalf("sidecar persisted %v", err)
 			}

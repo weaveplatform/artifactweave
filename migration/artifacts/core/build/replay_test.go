@@ -8,15 +8,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/idempotency"
 )
 
-func buildReplayRequest() store.ReplayRequest {
+func buildReplayRequest() idempotency.ReplayRequest {
 	digest := func(s string) string { return fmt.Sprintf("%x", sha256.Sum256([]byte(s))) }
 	now := time.Now()
-	return store.ReplayRequest{
+	return idempotency.ReplayRequest{
 		Scope:       digest("scope"),
 		Key:         digest("key"),
 		Fingerprint: digest("body"),
@@ -54,7 +54,7 @@ func TestUnitAppendOnce(t *testing.T) {
 		ctx,
 		ap,
 		r,
-		func(context.Context) (Access, error) { return only(types.ActionRead), nil },
+		func(context.Context) (Access, error) { return only(api.ActionRead), nil },
 	)
 	if !errors.Is(err, ErrForbidden) {
 		t.Fatalf("replay after permission revocation: %v", err)
@@ -96,7 +96,7 @@ func TestUnitAppendOnceRevalidationRollsBack(t *testing.T) {
 }
 
 func TestUnitAppendOnceFailures(t *testing.T) {
-	for _, fail := range []string{"get", "replace", "byid", "repo:" + types.BuildInfoRepository, "item"} {
+	for _, fail := range []string{"get", "replace", "byid", "repo:" + api.BuildInfoRepository, "item"} {
 		t.Run(fail, func(t *testing.T) {
 			w := newWorld(t)
 			w.publish(doc("app", "1", started0))

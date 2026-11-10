@@ -13,12 +13,14 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // world is a Helm local repository with the item service over it and a
@@ -68,7 +70,7 @@ func (w *world) repo(key string, tune func(*repo.Config)) repo.Config {
 	return c
 }
 
-func (w *world) deploy(p string, body []byte) types.Item {
+func (w *world) deploy(p string, body []byte) model.Item {
 	w.t.Helper()
 	it, err := w.deployTo(w.c, p, body)
 	if err != nil {
@@ -77,7 +79,7 @@ func (w *world) deploy(p string, body []byte) types.Item {
 	return it
 }
 
-func (w *world) deployTo(c repo.Config, p string, body []byte) (types.Item, error) {
+func (w *world) deployTo(c repo.Config, p string, body []byte) (model.Item, error) {
 	w.now = w.now.Add(time.Minute)
 	return w.items.Deploy(w.ctx, item.Deploy{ //nolint:wrapcheck // test helper
 		Target: item.Target{Repo: c, Path: p}, Body: bytes.NewReader(body), By: "tester",
@@ -112,7 +114,7 @@ func (w *world) transfer(
 	return res
 }
 
-func (w *world) props(p string) types.Properties {
+func (w *world) props(p string) model.Properties {
 	w.t.Helper()
 	it, err := w.st.Items().Get(w.ctx, w.c.Key, false, p)
 	if err != nil {
@@ -135,7 +137,7 @@ type entry struct {
 func (w *world) index(c repo.Config) map[string]map[string]entry {
 	w.t.Helper()
 	out := map[string]map[string]entry{}
-	pkgs, _, err := w.st.Packages().List(w.ctx, c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := w.st.Packages().List(w.ctx, c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -197,9 +199,9 @@ func (w *world) described(c repo.Config, name, v, p, description string, files .
 func (w *world) queued(kind string) []string {
 	w.t.Helper()
 	var out []string
-	items, err := w.st.WorkQueue().Lease(w.ctx, store.WorkLease{
+	items, err := w.st.WorkQueue().Lease(w.ctx, work.WorkLease{
 		Holder: "test",
-		Limit:  store.MaxLimit,
+		Limit:  kernel.MaxLimit,
 		Until:  w.now.Add(2 * time.Hour),
 		Now:    w.now.Add(time.Hour),
 	})
@@ -238,7 +240,7 @@ func TestUnitDeployIndexesACharts(t *testing.T) {
 	if diff := cmp.Diff(want, e.Meta.Chart); diff != "" || e.Meta.Digest != it.Actual.SHA256 {
 		t.Fatal(diff, e.Meta.Digest)
 	}
-	if diff := cmp.Diff(types.Properties{
+	if diff := cmp.Diff(model.Properties{
 		helm.PropName: {"web"}, helm.PropVersion: {"1.0.0"}, helm.PropAppVersion: {"2.4"},
 	}, w.props("team/web-1.0.0.tgz")); diff != "" {
 		t.Fatal(diff)
@@ -361,7 +363,7 @@ func TestUnitCopyAndMove(t *testing.T) {
 // indexes it, with its .prov.
 func TestUnitRestore(t *testing.T) {
 	w := newWorld(t)
-	if err := w.st.Settings().Put(w.ctx, types.SettingTrashcan, types.TrashcanSettings{
+	if err := w.st.Settings().Put(w.ctx, settings.SettingTrashcan, model.TrashcanSettings{
 		Enabled: true, RetentionDays: 14,
 	}); err != nil {
 		t.Fatal(err)
@@ -459,10 +461,10 @@ func TestUnitRemoteCache(t *testing.T) {
 	}
 	// A file stored in a local repository's own content is not the cache's.
 	h := helm.Handler{}
-	if err := h.Deployed(w.ctx, format.Env{}, w.c, types.Item{Cached: true}); err != nil {
+	if err := h.Deployed(w.ctx, format.Env{}, w.c, model.Item{Cached: true}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Deleting(w.ctx, format.Env{}, w.c, types.Item{Cached: true}); err != nil {
+	if err := h.Deleting(w.ctx, format.Env{}, w.c, model.Item{Cached: true}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -497,7 +499,7 @@ func TestUnitOwed(t *testing.T) {
 	if err := h.Work(
 		context.Background(),
 		format.Env{},
-		types.WorkItem{Kind: "other", Key: "l"},
+		work.WorkItem{Kind: "other", Key: "l"},
 	); err != nil {
 		t.Fatal(err)
 	}

@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Referrers returns the descriptors of the manifests in o's image whose
@@ -117,7 +117,7 @@ func (s *Service) unreferenced(
 		}
 		kept[d] = true // a list naming a platform twice names it once
 		dir := o.Name + "/" + layout.DigestFolder(hex)
-		if _, err := items.Get(ctx, o.Repo.Key, false, dir); errors.Is(err, store.ErrNotFound) {
+		if _, err := items.Get(ctx, o.Repo.Key, false, dir); errors.Is(err, kernel.ErrNotFound) {
 			continue
 		} else if err != nil {
 			return nil, fmt.Errorf("registry: get %s: %w", dir, err)
@@ -141,7 +141,7 @@ func (s *Service) DeleteMultiArch(ctx context.Context, o Owner, tag string) ([]s
 		dir := o.Name + "/" + tag
 		f, err := s.Store.Items().Get(ctx, o.Repo.Key, false, dir)
 		if err == nil && !f.Folder {
-			err = store.ErrNotFound
+			err = kernel.ErrNotFound
 		}
 		if err != nil {
 			return fmt.Errorf("registry: tag %s: %w", dir, err)
@@ -190,7 +190,7 @@ func (s *Service) stored(ctx context.Context, h aql.Hit) (layout.Manifest, error
 	return m, nil
 }
 
-func first(p types.Properties, key string) string {
+func first(p model.Properties, key string) string {
 	if v := p[key]; len(v) > 0 {
 		return v[0]
 	}

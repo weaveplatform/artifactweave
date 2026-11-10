@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (h handler) account(_ http.ResponseWriter, r *http.Request) (result, error) {
@@ -21,7 +21,7 @@ func (h handler) account(_ http.ResponseWriter, r *http.Request) (result, error)
 func (h handler) organization(_ http.ResponseWriter, r *http.Request) (result, error) {
 	c, err := h.repository(r)
 	if err == nil {
-		err = require(r, c, "", types.ActionRead, true)
+		err = require(r, c, "", api.ActionRead, true)
 	}
 	if err != nil {
 		return result{}, err //nolint:wrapcheck // storage errors retain their typed API status
@@ -58,7 +58,7 @@ func workspaceResource(ws terraformstate.Workspace) map[string]any {
 }
 
 func (h handler) workspace(_ http.ResponseWriter, r *http.Request) (result, error) {
-	_, ws, err := h.resolveWorkspace(r, types.ActionRead)
+	_, ws, err := h.resolveWorkspace(r, api.ActionRead)
 	if err != nil {
 		return result{}, err //nolint:wrapcheck // storage errors retain their typed API status
 	}
@@ -68,7 +68,7 @@ func (h handler) workspace(_ http.ResponseWriter, r *http.Request) (result, erro
 func (h handler) workspaces(_ http.ResponseWriter, r *http.Request) (result, error) {
 	c, err := h.repository(r)
 	if err == nil {
-		err = require(r, c, "", types.ActionRead, true)
+		err = require(r, c, "", api.ActionRead, true)
 	}
 	if err != nil {
 		return result{}, err //nolint:wrapcheck // storage errors retain their typed API status
@@ -84,7 +84,7 @@ func (h handler) workspaces(_ http.ResponseWriter, r *http.Request) (result, err
 	rows := make([]any, 0, len(all))
 	for _, ws := range all {
 		if strings.Contains(ws.Name, r.URL.Query().Get("search[name]")) &&
-			can(r, c, tfbe.Folder(ws.Name), types.ActionRead, true) {
+			can(r, c, tfbe.Folder(ws.Name), api.ActionRead, true) {
 			rows = append(rows, workspaceResource(ws))
 		}
 	}
@@ -115,7 +115,7 @@ func (h handler) createWorkspace(w http.ResponseWriter, r *http.Request) (result
 	if err := tfbe.CheckName(a.Name); err != nil {
 		return result{}, err //nolint:wrapcheck // storage errors retain their typed API status
 	}
-	if err := require(r, c, tfbe.RecordPath(a.Name), types.ActionWrite, false); err != nil {
+	if err := require(r, c, tfbe.RecordPath(a.Name), api.ActionWrite, false); err != nil {
 		return result{}, err //nolint:wrapcheck // storage errors retain their typed API status
 	}
 	ws, err := h.states.CreateWorkspace(r.Context(), c, a.Name, a.Version, caller(r))
@@ -126,7 +126,7 @@ func (h handler) createWorkspace(w http.ResponseWriter, r *http.Request) (result
 }
 
 func (h handler) deleteWorkspace(_ http.ResponseWriter, r *http.Request) (result, error) {
-	c, ws, err := h.resolveWorkspace(r, types.ActionDelete)
+	c, ws, err := h.resolveWorkspace(r, api.ActionDelete)
 	if err == nil {
 		err = h.states.DeleteWorkspace(r.Context(), c, ws.Name, caller(r))
 	}
@@ -136,7 +136,7 @@ func (h handler) deleteWorkspace(_ http.ResponseWriter, r *http.Request) (result
 }
 
 func (h handler) lock(_ http.ResponseWriter, r *http.Request) (result, error) {
-	c, ws, err := h.resolveWorkspace(r, types.ActionRead)
+	c, ws, err := h.resolveWorkspace(r, api.ActionRead)
 	if err == nil {
 		ws, err = h.states.Lock(r.Context(), c, ws.Name, caller(r))
 	}
@@ -144,7 +144,7 @@ func (h handler) lock(_ http.ResponseWriter, r *http.Request) (result, error) {
 }
 
 func (h handler) unlock(_ http.ResponseWriter, r *http.Request) (result, error) {
-	c, ws, err := h.resolveWorkspace(r, types.ActionRead)
+	c, ws, err := h.resolveWorkspace(r, api.ActionRead)
 	if err == nil {
 		ws, err = h.states.Unlock(r.Context(), c, ws.Name, caller(r))
 	}
@@ -152,7 +152,7 @@ func (h handler) unlock(_ http.ResponseWriter, r *http.Request) (result, error) 
 }
 
 func (h handler) forceUnlock(_ http.ResponseWriter, r *http.Request) (result, error) {
-	c, ws, err := h.resolveWorkspace(r, types.ActionDelete)
+	c, ws, err := h.resolveWorkspace(r, api.ActionDelete)
 	if err == nil {
 		ws, err = h.states.ForceUnlock(r.Context(), c, ws.Name)
 	}

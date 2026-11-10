@@ -10,9 +10,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // SearchPage is how many rows one store query reads. Permission filtering
@@ -209,7 +209,7 @@ func (r *SearchRun) RepoScope(repos *string, virtual bool) (scope aql.Node, miss
 		// as AQL resolves it.
 		c, ok := r.Configs[key]
 		if !ok {
-			stored, cached := types.ResolveRepoKey(key)
+			stored, cached := model.ResolveRepoKey(key)
 			c, ok = r.Configs[stored]
 			ok = ok && cached && c.Class == repo.Remote
 		}

@@ -6,8 +6,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Handler is the format of docker, oci and helmoci repositories, which the
@@ -29,7 +29,7 @@ type Handler struct {
 // covers copies, moves and restores that land the manifest after its
 // blobs; another file joins its folder's version once the folder is a tag.
 // A manifest in a digest folder keeps its image a package.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	st := env.Store
 	name, folder, ok := imageFolder(it)
 	switch {
@@ -53,7 +53,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 
 // Deleting runs before a file of an image is removed. The item service
 // drops the file's version link with it; Deleted settles the rest.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted brings the index back in line with the tree after files of
 // images were removed: a tag folder left without a manifest is no longer a
@@ -64,7 +64,7 @@ func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	var a affected
 	for _, it := range removed {
@@ -83,7 +83,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 // the tag to other content under the same path, and every other file,
 // digest-addressed or a layer, as unique.
 func (Handler) Classify(_ repo.Config, p string) format.Class {
-	_, folder, ok := imageFolder(types.Item{Path: path.Dir(p), Name: path.Base(p)})
+	_, folder, ok := imageFolder(model.Item{Path: path.Dir(p), Name: path.Base(p)})
 	if ok && isManifest(path.Base(p)) && !IsDigestFolder(folder) {
 		return format.ClassMetadata
 	}

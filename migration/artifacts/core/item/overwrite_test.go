@@ -10,12 +10,12 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 )
 
 // seeded deploys body at p with props and one download recorded.
-func (w *world) seeded(p, body string, props types.Properties) types.Item {
+func (w *world) seeded(p, body string, props model.Properties) model.Item {
 	w.t.Helper()
 	ctx := context.Background()
 	it, err := w.svc.Deploy(ctx, Deploy{
@@ -24,7 +24,7 @@ func (w *world) seeded(p, body string, props types.Properties) types.Item {
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	if err := w.db.Items().RecordDownload(ctx, it.ID, store.Download{By: "x", At: at}); err != nil {
+	if err := w.db.Items().RecordDownload(ctx, it.ID, port.Download{By: "x", At: at}); err != nil {
 		w.t.Fatal(err)
 	}
 	return it
@@ -47,31 +47,31 @@ func (w *world) downloads(p string) int64 {
 // them. A Maven non-unique snapshot keeps its metadata across builds.
 func TestUnitOverwriteClearsTheFilesMetadata(t *testing.T) {
 	ctx := context.Background()
-	old := types.Properties{"build.name": {"b"}, "npm.deprecated": {"old"}}
+	old := model.Properties{"build.name": {"b"}, "npm.deprecated": {"old"}}
 	for _, c := range []struct {
 		name, path, body string
-		props            types.Properties
-		expected         types.Properties
+		props            model.Properties
+		expected         model.Properties
 		downloads        int64
 	}{
-		{"other content", "a/b.txt", "two", nil, types.Properties{}, 0},
+		{"other content", "a/b.txt", "two", nil, model.Properties{}, 0},
 		{
 			"other content with its own", "a/b.txt", "two",
-			types.Properties{"k": {"v"}},
-			types.Properties{"k": {"v"}},
+			model.Properties{"k": {"v"}},
+			model.Properties{"k": {"v"}},
 			0,
 		},
 		{"same content", "a/b.txt", "one", nil, old, 1},
 		{
 			"same content with its own", "a/b.txt", "one",
-			types.Properties{"k": {"v"}},
-			types.Properties{"k": {"v"}},
+			model.Properties{"k": {"v"}},
+			model.Properties{"k": {"v"}},
 			1,
 		},
 		{"non-unique snapshot", "g/a/1.0-SNAPSHOT/a-1.0-SNAPSHOT.jar", "two", nil, old, 1},
 		{
 			"unique snapshot", "g/a/1.0-SNAPSHOT/a-1.0-20261019.120000-1.jar", "two", nil,
-			types.Properties{},
+			model.Properties{},
 			0,
 		},
 	} {
@@ -105,15 +105,15 @@ func TestUnitOverwriteKeepsWhatTheFormatAdds(t *testing.T) {
 	ctx := context.Background()
 	for _, c := range []struct {
 		body     string
-		expected types.Properties
+		expected model.Properties
 	}{
-		{"one", types.Properties{"k": {"v"}, "plugin": {"true"}}},
-		{"two", types.Properties{"plugin": {"true"}}},
+		{"one", model.Properties{"k": {"v"}, "plugin": {"true"}}},
+		{"two", model.Properties{"plugin": {"true"}}},
 	} {
 		w, r := recording(t)
-		w.seeded("a.pom", "one", types.Properties{"k": {"v"}})
+		w.seeded("a.pom", "one", model.Properties{"k": {"v"}})
 		r.admit = func(fw format.Write) (format.Write, error) {
-			fw.Properties = types.Properties{"plugin": {"true"}}
+			fw.Properties = model.Properties{"plugin": {"true"}}
 			return fw, nil
 		}
 		if _, err := w.svc.Deploy(ctx, Deploy{
@@ -136,20 +136,20 @@ func TestUnitTransferOntoAFileReplacesItsMetadata(t *testing.T) {
 	for _, c := range []struct {
 		name      string
 		move      bool
-		srcProps  types.Properties
-		expected  types.Properties
+		srcProps  model.Properties
+		expected  model.Properties
 		downloads int64
 	}{
-		{"copy", false, types.Properties{"k": {"v"}}, types.Properties{"k": {"v"}}, 0},
-		{"copy of a bare file", false, nil, types.Properties{}, 0},
-		{"move", true, types.Properties{"k": {"v"}}, types.Properties{"k": {"v"}}, 1},
+		{"copy", false, model.Properties{"k": {"v"}}, model.Properties{"k": {"v"}}, 0},
+		{"copy of a bare file", false, nil, model.Properties{}, 0},
+		{"move", true, model.Properties{"k": {"v"}}, model.Properties{"k": {"v"}}, 1},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			w := newWorld(t)
 			w.seeded("src.txt", "new", c.srcProps)
-			w.seeded("dst.txt", "old", types.Properties{"stale": {"yes"}})
+			w.seeded("dst.txt", "old", model.Properties{"stale": {"yes"}})
 			dst, _ := w.get(w.loc, "dst.txt")
-			if err := w.db.Items().RecordDownload(ctx, dst.ID, store.Download{At: at}); err != nil {
+			if err := w.db.Items().RecordDownload(ctx, dst.ID, port.Download{At: at}); err != nil {
 				t.Fatal(err)
 			}
 			res := w.transfer(Transfer{

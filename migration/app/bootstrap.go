@@ -18,8 +18,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
 	"github.com/weaveplatform/artifactweave/migration/configuration/core/descriptor"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // ApplyDescriptor runs `artifactweave config apply`: it applies the
@@ -120,10 +120,10 @@ func applyBootstrap(
 		return nil
 	}
 	var m bootstrapMarker
-	switch err := st.Settings().Get(ctx, types.SettingBootstrapDescriptor, &m); {
+	switch err := st.Settings().Get(ctx, settings.SettingBootstrapDescriptor, &m); {
 	case err == nil:
 		return nil
-	case !errors.Is(err, store.ErrNotFound):
+	case !errors.Is(err, kernel.ErrNotFound):
 		return fmt.Errorf("bootstrap descriptor: %w", err)
 	}
 	doc, err := os.ReadFile(file)
@@ -146,7 +146,7 @@ func applyBootstrap(
 			return err //nolint:wrapcheck // wrapped below
 		}
 		return st.Settings().
-			Put(ctx, types.SettingBootstrapDescriptor, bootstrapMarker{ //nolint:wrapcheck // as above
+			Put(ctx, settings.SettingBootstrapDescriptor, bootstrapMarker{ //nolint:wrapcheck // as above
 				File: file, SHA256: hex.EncodeToString(sum[:]), At: now,
 			})
 	})

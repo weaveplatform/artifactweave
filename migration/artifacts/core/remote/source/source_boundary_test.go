@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitDeliveryIdentityFailureCannotReuseArtifactAuthority(t *testing.T) {
@@ -30,9 +30,9 @@ func TestUnitDeliveryIdentityFailureCannotReuseArtifactAuthority(t *testing.T) {
 				},
 			)
 			svc := source.Service{
-				Resolve: func(ctx context.Context, cfg repo.Config) (types.SourceIdentity, error) {
+				Resolve: func(ctx context.Context, cfg repo.Config) (model.SourceIdentity, error) {
 					if resolveErr != nil {
-						return types.SourceIdentity{}, resolveErr
+						return model.SourceIdentity{}, resolveErr
 					}
 					return identity(ctx, cfg)
 				},
@@ -102,9 +102,9 @@ func TestUnitAdapterCredentialsAndGitRequestsFailBeforeResolution(t *testing.T) 
 func assertRequestRejectedBeforeResolution(t *testing.T, q source.Request) {
 	t.Helper()
 	svc := source.Service{
-		Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
 			t.Fatal("invalid adapter contract reached source resolution")
-			return types.SourceIdentity{}, nil
+			return model.SourceIdentity{}, nil
 		},
 	}
 	result, err := svc.Read(t.Context(), q)

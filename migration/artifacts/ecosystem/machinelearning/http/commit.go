@@ -15,16 +15,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func readCommit(w http.ResponseWriter, r *http.Request) (ml.Manifest, types.Properties, error) {
+func readCommit(w http.ResponseWriter, r *http.Request) (ml.Manifest, model.Properties, error) {
 	media, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || media != "multipart/form-data" || params["boundary"] == "" {
 		return ml.Manifest{}, nil, apierror.New(
@@ -38,7 +38,7 @@ func readCommit(w http.ResponseWriter, r *http.Request) (ml.Manifest, types.Prop
 	)
 	seen := map[string]bool{}
 	var manifest ml.Manifest
-	props := types.Properties{}
+	props := model.Properties{}
 	for {
 		part, err := reader.NextPart()
 		if errors.Is(err, io.EOF) {
@@ -86,7 +86,7 @@ func (h handler) commit(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, badRequest("invalid model transaction"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, id.Prefix(), types.ActionWrite) {
+	if !h.k.RequireFolder(w, r, id.Prefix(), api.ActionWrite) {
 		return
 	}
 	m, props, err := readCommit(w, r)
@@ -134,7 +134,7 @@ func (h handler) publish(
 	id ml.Identity,
 	tx string,
 	m ml.Manifest,
-	props types.Properties,
+	props model.Properties,
 	info blob.Info,
 ) error {
 	ctx := r.Context()
@@ -148,11 +148,11 @@ func (h handler) publish(
 		return fmt.Errorf("machinelearning: publish: %w", err)
 	}
 	for _, file := range m.Files() {
-		if !h.k.Can(r, id.Prefix()+"/"+file.Path, types.ActionWrite) {
+		if !h.k.Can(r, id.Prefix()+"/"+file.Path, api.ActionWrite) {
 			return apierror.New(http.StatusForbidden, "model artifact deployment is not authorized")
 		}
 	}
-	if !h.k.Can(r, id.Manifest(), types.ActionWrite) {
+	if !h.k.Can(r, id.Manifest(), api.ActionWrite) {
 		return apierror.New(http.StatusForbidden, "model publication is not authorized")
 	}
 	existing, err := h.k.DB().Items().Get(ctx, c.Key, false, id.Manifest())
@@ -170,7 +170,7 @@ func (h handler) publish(
 		}
 		return nil
 	}
-	if !errors.Is(err, store.ErrNotFound) {
+	if !errors.Is(err, kernel.ErrNotFound) {
 		return fmt.Errorf("machinelearning: publish: %w", err)
 	}
 	staged, err := ml.Verify(ctx, h.env(), c, id.Staging(tx), m)
@@ -190,7 +190,7 @@ func (h handler) publish(
 			MD5:    it.Actual.MD5,
 		}
 		path := id.Prefix() + "/" + file.Path
-		_, err = h.k.StoreNew(r, path, blobInfo, nil, types.Checksums{}, func() error {
+		_, err = h.k.StoreNew(r, path, blobInfo, nil, kernel.Checksums{}, func() error {
 			old, err := h.k.DB().Items().Get(ctx, c.Key, false, path)
 			if err == nil && old.Actual.SHA256 == it.Actual.SHA256 && old.Size == it.Size {
 				return nil
@@ -209,7 +209,7 @@ func (h handler) publish(
 		id.Manifest(),
 		info,
 		props,
-		types.Checksums{},
+		kernel.Checksums{},
 		func() error { return apierror.New(http.StatusConflict, "model version already exists") },
 	)
 	if err != nil {

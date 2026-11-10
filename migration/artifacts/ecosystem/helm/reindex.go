@@ -12,9 +12,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Reindex rebuilds the repository's Helm index from every chart archive in
@@ -37,7 +37,7 @@ func (Handler) ReindexPath(ctx context.Context, env format.Env, c repo.Config, p
 
 // found is a chart archive a reindex read, with the chart it holds.
 type found struct {
-	it    types.Item
+	it    model.Item
 	chart *Chart
 }
 
@@ -100,7 +100,7 @@ func archivesUnder(
 	st format.Store,
 	c repo.Config,
 	under string,
-) ([]types.Item, error) {
+) ([]model.Item, error) {
 	criteria := aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
@@ -113,7 +113,7 @@ func archivesUnder(
 		dir, name := path.Split(under)
 		dir = strings.TrimSuffix(dir, "/")
 		if dir == "" {
-			dir = types.RootPath
+			dir = kernel.RootPath
 		}
 		// AQL has no escape, so a * or ? in the path widens the match;
 		// within narrows it again.
@@ -130,7 +130,7 @@ func archivesUnder(
 	if err != nil {
 		return nil, fmt.Errorf("helm: charts of %s: %w", c.Key, err)
 	}
-	out := make([]types.Item, 0, len(hits))
+	out := make([]model.Item, 0, len(hits))
 	for _, h := range hits {
 		if p := h.Item.FullPath(); IsChartPath(p) && within(p, under) {
 			out = append(out, h.Item)
@@ -149,7 +149,7 @@ func readOnce(
 	ctx context.Context,
 	env format.Env,
 	read map[string]*Chart,
-	it types.Item,
+	it model.Item,
 ) (*Chart, error) {
 	if ch, ok := read[it.Actual.SHA256]; ok {
 		return ch, nil
@@ -222,7 +222,7 @@ func reindexPart(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	hits []types.Item,
+	hits []model.Item,
 	charts []found,
 ) error {
 	st := env.Store
@@ -312,7 +312,7 @@ func reindexVersion(
 	for _, f := range here {
 		created = earliest(created, deployed(f.it))
 	}
-	p, err := st.Packages().Ensure(ctx, types.Package{
+	p, err := st.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Name: k.name, Type: c.PackageType, Created: created,
 	})
 	if err != nil {
@@ -328,17 +328,17 @@ func stored(
 	st format.Store,
 	c repo.Config,
 	k versionKey,
-) (types.PackageVersion, bool, error) {
+) (model.PackageVersion, bool, error) {
 	p, err := st.Packages().Find(ctx, c.Key, k.name)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
-		return types.PackageVersion{}, false, nil
+	case errors.Is(err, kernel.ErrNotFound):
+		return model.PackageVersion{}, false, nil
 	case err != nil:
-		return types.PackageVersion{}, false, fmt.Errorf("helm: package %s: %w", k.name, err)
+		return model.PackageVersion{}, false, fmt.Errorf("helm: package %s: %w", k.name, err)
 	}
 	pv, err := st.Packages().Version(ctx, p.ID, k.version)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return pv, false, nil
 	case err != nil:
 		return pv, false, fmt.Errorf("helm: version %s of %s: %w", k.version, k.name, err)

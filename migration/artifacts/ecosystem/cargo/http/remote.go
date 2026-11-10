@@ -12,9 +12,10 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cargo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 type upstreamConfig struct {
@@ -143,7 +144,7 @@ func (h handler) serveRemoteBytes(
 			),
 			MediaType: media,
 			ETag:      fmt.Sprintf(`"%x"`, digest),
-			Checksums: types.Checksums{SHA256: hex.EncodeToString(digest[:])},
+			Checksums: kernel.Checksums{SHA256: hex.EncodeToString(digest[:])},
 		},
 	}
 	h.k.ServeResult(w, r, result)
@@ -178,7 +179,7 @@ func downloadURL(base, name, version string) (string, error) {
 }
 
 func (h handler) remoteCrate(w http.ResponseWriter, r *http.Request, name, version, path string) {
-	if !h.k.Require(w, r, path, types.ActionRead) {
+	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
 	configRaw, configResult, err := h.remoteDocument(r, "index/config.json", "")
@@ -227,7 +228,7 @@ func (h handler) remoteCrate(w http.ResponseWriter, r *http.Request, name, versi
 		Method:      http.MethodGet,
 		ExternalURL: url,
 		Variant:     "cargo-crate-v1:" + selected.Checksum,
-		Checksums:   types.Checksums{SHA256: selected.Checksum},
+		Checksums:   kernel.Checksums{SHA256: selected.Checksum},
 	}
 	res.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
 		if size <= 0 || size > cargo.MaxCrate {

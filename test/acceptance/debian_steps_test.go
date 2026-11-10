@@ -21,7 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func (w *world) registerDebian(sc *godog.ScenarioContext) {
@@ -116,7 +116,7 @@ func (w *world) debianUpstream(name, version string) error {
 	packagePath := "pool/main/a/" + name + "/" + name + "_" + version + "_amd64.deb"
 	packages, err := debian.Packages([]debian.IndexedBinary{{
 		Binary: binary, Path: packagePath, Size: int64(len(archive)),
-		Checksums: types.Checksums{
+		Checksums: kernel.Checksums{
 			MD5:    fmt.Sprintf("%x", md5.Sum(archive)),
 			SHA256: fmt.Sprintf("%x", sha256.Sum256(archive)),
 		},
@@ -175,7 +175,7 @@ func (w *world) debianSourceUpstream() error {
 		"alpha_1.0-1.debian.tar.xz",
 	}
 	files := map[string][]byte{}
-	checksums := map[string]types.Checksums{}
+	checksums := map[string]kernel.Checksums{}
 	for _, name := range names {
 		body, err := os.ReadFile(
 			filepath.Join(repoRoot, "migration/artifacts/ecosystem/debian/testdata", name),
@@ -184,7 +184,7 @@ func (w *world) debianSourceUpstream() error {
 			return err
 		}
 		files[name] = body
-		checksums[name] = types.Checksums{
+		checksums[name] = kernel.Checksums{
 			MD5:    fmt.Sprintf("%x", md5.Sum(body)), //nolint:gosec // Debian wire checksum.
 			SHA256: fmt.Sprintf("%x", sha256.Sum256(body)),
 		}

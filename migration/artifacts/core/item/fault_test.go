@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errBoom = errors.New("boom")
@@ -21,10 +22,10 @@ type faulty struct {
 	fail string
 }
 
-func (f faulty) Items() store.ItemStore  { return faultyItems{f.Store.Items(), f.fail} }
-func (f faulty) Blobs() store.BlobIndex  { return faultyBlobs{f.Store.Blobs(), f.fail} }
-func (f faulty) Trash() store.TrashStore { return faultyTrash{f.Store.Trash(), f.fail} }
-func (f faulty) Packages() store.PackageStore {
+func (f faulty) Items() port.ItemStore  { return faultyItems{f.Store.Items(), f.fail} }
+func (f faulty) Blobs() port.BlobIndex  { return faultyBlobs{f.Store.Blobs(), f.fail} }
+func (f faulty) Trash() port.TrashStore { return faultyTrash{f.Store.Trash(), f.fail} }
+func (f faulty) Packages() port.PackageStore {
 	return faultyPackages{f.Store.Packages(), f.fail}
 }
 
@@ -33,18 +34,18 @@ func (f faulty) Tx(ctx context.Context, fn func(context.Context) error) error {
 }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	fail string
 }
 
-func (f faultyItems) Get(ctx context.Context, k string, c bool, p string) (types.Item, error) {
+func (f faultyItems) Get(ctx context.Context, k string, c bool, p string) (model.Item, error) {
 	if f.fail == "get" || (f.fail == "get:"+p) {
-		return types.Item{}, errBoom
+		return model.Item{}, errBoom
 	}
 	return f.ItemStore.Get(ctx, k, c, p)
 }
 
-func (f faultyItems) Put(ctx context.Context, it types.Item) (types.Item, error) {
+func (f faultyItems) Put(ctx context.Context, it model.Item) (model.Item, error) {
 	if f.fail == "put" || (f.fail == "putFolder" && it.Folder) || f.fail == "put:"+it.Name {
 		return it, errBoom
 	}
@@ -54,7 +55,7 @@ func (f faultyItems) Put(ctx context.Context, it types.Item) (types.Item, error)
 func (f faultyItems) PatchProperties(
 	ctx context.Context,
 	id int64,
-	set types.Properties,
+	set model.Properties,
 	rm []string,
 	at time.Time,
 ) error {
@@ -67,7 +68,7 @@ func (f faultyItems) PatchProperties(
 func (f faultyItems) SetProperties(
 	ctx context.Context,
 	id int64,
-	props types.Properties,
+	props model.Properties,
 	at time.Time,
 ) error {
 	if f.fail == "set" {
@@ -76,7 +77,7 @@ func (f faultyItems) SetProperties(
 	return f.ItemStore.SetProperties(ctx, id, props, at)
 }
 
-func (f faultyItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (f faultyItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if f.fail == "properties" {
 		return nil, errBoom
 	}
@@ -84,8 +85,8 @@ func (f faultyItems) Properties(ctx context.Context, id int64) (types.Properties
 }
 
 func (f faultyItems) Descendants(
-	ctx context.Context, k string, c bool, p string, pg store.Page,
-) ([]types.Item, string, error) {
+	ctx context.Context, k string, c bool, p string, pg kernel.Page,
+) ([]model.Item, string, error) {
 	if f.fail == "descendants" {
 		return nil, "", errBoom
 	}
@@ -97,21 +98,21 @@ func (f faultyItems) Delete(
 	k string,
 	c bool,
 	p string,
-) (store.DeleteResult, error) {
+) (port.DeleteResult, error) {
 	if f.fail == "delete" || f.fail == "delete:"+p {
-		return store.DeleteResult{}, errBoom
+		return port.DeleteResult{}, errBoom
 	}
 	return f.ItemStore.Delete(ctx, k, c, p)
 }
 
-func (f faultyItems) Stats(ctx context.Context, id int64) (types.ItemStats, error) {
+func (f faultyItems) Stats(ctx context.Context, id int64) (model.ItemStats, error) {
 	if f.fail == "stats" {
-		return types.ItemStats{}, errBoom
+		return model.ItemStats{}, errBoom
 	}
 	return f.ItemStore.Stats(ctx, id)
 }
 
-func (f faultyItems) PutStats(ctx context.Context, id int64, st types.ItemStats) error {
+func (f faultyItems) PutStats(ctx context.Context, id int64, st model.ItemStats) error {
 	if f.fail == "putStats" {
 		return errBoom
 	}
@@ -123,8 +124,8 @@ func (f faultyItems) Children(
 	k string,
 	c bool,
 	folder string,
-	p store.Page,
-) ([]types.Item, string, error) {
+	p kernel.Page,
+) ([]model.Item, string, error) {
 	if f.fail == "children" {
 		return nil, "", errBoom
 	}
@@ -132,37 +133,37 @@ func (f faultyItems) Children(
 }
 
 type faultyBlobs struct {
-	store.BlobIndex
+	port.BlobIndex
 	fail string
 }
 
-func (f faultyBlobs) Ref(ctx context.Context, b types.Blob, n int64) (types.Blob, error) {
+func (f faultyBlobs) Ref(ctx context.Context, b blob.Blob, n int64) (blob.Blob, error) {
 	if f.fail == "ref" {
 		return b, errBoom
 	}
 	return f.BlobIndex.Ref(ctx, b, n)
 }
 
-func (f faultyBlobs) Unref(ctx context.Context, sha string, n int64) (types.Blob, error) {
+func (f faultyBlobs) Unref(ctx context.Context, sha string, n int64) (blob.Blob, error) {
 	if f.fail == "unref" {
-		return types.Blob{}, errBoom
+		return blob.Blob{}, errBoom
 	}
 	return f.BlobIndex.Unref(ctx, sha, n)
 }
 
-func (f faultyBlobs) Find(ctx context.Context, c types.Checksums) (types.Blob, error) {
+func (f faultyBlobs) Find(ctx context.Context, c kernel.Checksums) (blob.Blob, error) {
 	if f.fail == "find" {
-		return types.Blob{}, errBoom
+		return blob.Blob{}, errBoom
 	}
 	return f.BlobIndex.Find(ctx, c)
 }
 
 type faultyTrash struct {
-	store.TrashStore
+	port.TrashStore
 	fail string
 }
 
-func (f faultyTrash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEntry, error) {
+func (f faultyTrash) Add(ctx context.Context, e model.TrashEntry) (model.TrashEntry, error) {
 	if f.fail == "trash" {
 		return e, errBoom
 	}
@@ -170,13 +171,13 @@ func (f faultyTrash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEn
 }
 
 type faultyPackages struct {
-	store.PackageStore
+	port.PackageStore
 	fail string
 }
 
-func (f faultyPackages) VersionOf(ctx context.Context, id int64) (types.PackageVersion, error) {
+func (f faultyPackages) VersionOf(ctx context.Context, id int64) (model.PackageVersion, error) {
 	if f.fail == "versionOf" {
-		return types.PackageVersion{}, errBoom
+		return model.PackageVersion{}, errBoom
 	}
 	return f.PackageStore.VersionOf(ctx, id)
 }
@@ -224,35 +225,35 @@ func TestUnitStoreFailures(t *testing.T) {
 		fail string
 		run  func(*world) error
 	}{
-		{"begin", func(w *world) error { _, err := w.deploy("n", "x", types.Checksums{}); return err }},
-		{"commit", func(w *world) error { _, err := w.deploy("n", "x", types.Checksums{}); return err }},
-		{"get:n", func(w *world) error { _, err := w.deploy("n", "x", types.Checksums{}); return err }},
-		{"get:a", func(w *world) error { _, err := w.deploy("a/n", "x", types.Checksums{}); return err }},
-		{"putFolder", func(w *world) error { _, err := w.deploy("a/n", "x", types.Checksums{}); return err }},
-		{"put", func(w *world) error { _, err := w.deploy("n", "x", types.Checksums{}); return err }},
-		{"ref", func(w *world) error { _, err := w.deploy("n", "x", types.Checksums{}); return err }},
-		{"unref", func(w *world) error { _, err := w.deploy("seed", "x", types.Checksums{}); return err }},
+		{"begin", func(w *world) error { _, err := w.deploy("n", "x", kernel.Checksums{}); return err }},
+		{"commit", func(w *world) error { _, err := w.deploy("n", "x", kernel.Checksums{}); return err }},
+		{"get:n", func(w *world) error { _, err := w.deploy("n", "x", kernel.Checksums{}); return err }},
+		{"get:a", func(w *world) error { _, err := w.deploy("a/n", "x", kernel.Checksums{}); return err }},
+		{"putFolder", func(w *world) error { _, err := w.deploy("a/n", "x", kernel.Checksums{}); return err }},
+		{"put", func(w *world) error { _, err := w.deploy("n", "x", kernel.Checksums{}); return err }},
+		{"ref", func(w *world) error { _, err := w.deploy("n", "x", kernel.Checksums{}); return err }},
+		{"unref", func(w *world) error { _, err := w.deploy("seed", "x", kernel.Checksums{}); return err }},
 		{"set", func(w *world) error {
 			_, err := w.svc.Deploy(ctx, Deploy{
 				Target: Target{Repo: w.loc, Path: "n"}, Body: strings.NewReader("x"),
-				Properties: types.Properties{"k": {"v"}},
+				Properties: model.Properties{"k": {"v"}},
 			})
 			return err
 		}},
-		{"stats", func(w *world) error { _, err := w.deploy("seed", "x", types.Checksums{}); return err }},
+		{"stats", func(w *world) error { _, err := w.deploy("seed", "x", kernel.Checksums{}); return err }},
 		{"putStats", func(w *world) error {
 			seed, ok := w.get(w.loc, "seed")
 			if !ok {
 				return errors.New("no seed")
 			}
-			if err := w.db.Items().RecordDownload(ctx, seed.ID, store.Download{At: at}); err != nil {
+			if err := w.db.Items().RecordDownload(ctx, seed.ID, port.Download{At: at}); err != nil {
 				return err //nolint:wrapcheck // test setup
 			}
-			_, err := w.deploy("seed", "x", types.Checksums{})
+			_, err := w.deploy("seed", "x", kernel.Checksums{})
 			return err
 		}},
 		{"patch", func(w *world) error {
-			_, err := w.svc.MakeFolder(ctx, Target{Repo: w.loc, Path: "f"}, types.Properties{"k": {"v"}}, "")
+			_, err := w.svc.MakeFolder(ctx, Target{Repo: w.loc, Path: "f"}, model.Properties{"k": {"v"}}, "")
 			return err
 		}},
 		{"get", func(w *world) error {

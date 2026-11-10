@@ -14,15 +14,15 @@ import (
 	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // tfKey is the world's Terraform backend repository, with encryptStates
@@ -223,7 +223,7 @@ func (w *world) stored(c repo.Config, p string) []byte {
 func (w *world) index(c repo.Config) map[string]map[string]string {
 	w.t.Helper()
 	out := map[string]map[string]string{}
-	pkgs, _, err := w.st.Packages().List(w.ctx, c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := w.st.Packages().List(w.ctx, c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -257,7 +257,7 @@ func (w *world) index(c repo.Config) map[string]map[string]string {
 func (w *world) reindexed(c repo.Config) map[string]map[string]string {
 	w.t.Helper()
 	kept := w.index(c)
-	pkgs, _, err := w.st.Packages().List(w.ctx, c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := w.st.Packages().List(w.ctx, c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -285,7 +285,7 @@ func eachStore(t *testing.T, fn func(t *testing.T, w *world)) {
 }
 
 // props are the properties of the item at p in c.
-func (w *world) props(c repo.Config, p string) types.Properties {
+func (w *world) props(c repo.Config, p string) model.Properties {
 	w.t.Helper()
 	it, err := w.st.Items().Get(w.ctx, c.Key, false, p)
 	if err != nil {

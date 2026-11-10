@@ -13,7 +13,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitReadDpkgSourceFixture(t *testing.T) {
@@ -101,7 +102,7 @@ func TestUnitSourceIndexRequiresEveryStoredArchiveDigest(t *testing.T) {
 		"alpha_1.0-1.dsc", "alpha_1.0.orig.tar.gz",
 		"alpha_1.0-1.debian.tar.xz",
 	}
-	items := make([]types.Item, 0, len(names))
+	items := make([]model.Item, 0, len(names))
 	for _, name := range names {
 		body, err := os.ReadFile(filepath.Join("testdata", name))
 		if err != nil {
@@ -109,16 +110,21 @@ func TestUnitSourceIndexRequiresEveryStoredArchiveDigest(t *testing.T) {
 		}
 		sha := sha256.Sum256(body)
 		md5sum := md5.Sum(body) //nolint:gosec // Debian Sources wire checksum.
-		it, err := st.Items().Put(t.Context(), types.Item{
-			RepoKey: "deb-local", Name: folder + name, Size: int64(len(body)),
-			Actual: types.Checksums{SHA256: fmt.Sprintf("%x", sha), MD5: fmt.Sprintf("%x", md5sum)},
+		it, err := st.Items().Put(t.Context(), model.Item{
+			RepoKey: "deb-local",
+			Name:    folder + name,
+			Size:    int64(len(body)),
+			Actual: kernel.Checksums{
+				SHA256: fmt.Sprintf("%x", sha),
+				MD5:    fmt.Sprintf("%x", md5sum),
+			},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		items = append(items, it)
 	}
-	if err := st.Items().SetProperties(t.Context(), items[0].ID, types.Properties{
+	if err := st.Items().SetProperties(t.Context(), items[0].ID, model.Properties{
 		"dsc.distribution": {"stable"}, "dsc.component": {"main"},
 	}, time.Time{}); err != nil {
 		t.Fatal(err)
@@ -156,7 +162,7 @@ func TestUnitSourceIndexRequiresEveryStoredArchiveDigest(t *testing.T) {
 	if err != nil || len(groups) != 0 {
 		t.Fatalf("incomplete source indexed: %v %+v", err, groups)
 	}
-	corrupt := append([]types.Item(nil), items...)
+	corrupt := append([]model.Item(nil), items...)
 	corrupt[2].Actual.SHA256 = strings.Repeat("0", 64)
 	groups, err = collectSourceGroups(t.Context(), env, corrupt)
 	if err != nil || len(groups) != 0 {

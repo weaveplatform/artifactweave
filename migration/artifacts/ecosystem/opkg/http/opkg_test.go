@@ -16,13 +16,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/opkg"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The index and IPK are published OpenWrt 24.10 content, independent of our
@@ -127,7 +126,7 @@ func TestAccOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
 		source.Request{Resource: source.Resource{Path: "../wrong.ipk"}},
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Errorf("invalid IPK path accepted: %v", err)
 	}
@@ -135,7 +134,7 @@ func TestAccOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
 		source.Request{Resource: source.Resource{Path: "../Packages"}},
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Errorf("unsafe index path accepted: %v", err)
 	}
@@ -216,7 +215,7 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 		acc,
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Errorf("cached local feed accepted: %v", err)
 	}
@@ -230,7 +229,7 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 		acc,
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Errorf("missing local feed accepted: %v", err)
 	}
@@ -379,7 +378,7 @@ func TestAccOpkgVirtualLocalPackageRejectsMissingAndDriftedBytes(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := w.db.Items().
-			Put(t.Context(), types.Item{RepoKey: member.Key, Name: path, Actual: types.Checksums{SHA256: info.Digests.SHA256}, Size: int64(len(body))}); err != nil {
+			Put(t.Context(), model.Item{RepoKey: member.Key, Name: path, Actual: kernel.Checksums{SHA256: info.Digests.SHA256}, Size: int64(len(body))}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -430,9 +429,9 @@ func TestAccOpkgVirtualLocalPackageRejectsMissingAndDriftedBytes(t *testing.T) {
 	); err == nil {
 		t.Error("malformed local Packages metadata accepted")
 	}
-	if _, err := w.db.Items().Put(t.Context(), types.Item{
+	if _, err := w.db.Items().Put(t.Context(), model.Item{
 		RepoKey: member.Key, Path: "feed", Name: "Packages",
-		Actual: types.Checksums{SHA256: strings.Repeat("0", 64)}, Size: int64(len(index)),
+		Actual: kernel.Checksums{SHA256: strings.Repeat("0", 64)}, Size: int64(len(index)),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -487,7 +486,7 @@ func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 		return svc.opkgMemberIndex(t.Context(), w.db, remote, false, "feed/Packages", p, acc)
 	}
 	if _, err := svc.opkgMemberIndex(t.Context(), w.db, remote, false,
-		"../Packages", p, acc); !errors.Is(err, store.ErrNotFound) {
+		"../Packages", p, acc); !errors.Is(err, kernel.ErrNotFound) {
 		t.Errorf("unsafe remote index path was accepted: %v", err)
 	}
 	stream := func(body io.Reader, size int64) *sourceBody {
@@ -546,12 +545,12 @@ func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 		)
 	}
 	backendResult = source.Result{
-		Item: &types.Item{
+		Item: &model.Item{
 			RepoKey: remote.Key,
 			Cached:  true,
 			Path:    "feed",
 			Name:    "Packages",
-			Actual:  types.Checksums{SHA256: strings.Repeat("0", 64)},
+			Actual:  kernel.Checksums{SHA256: strings.Repeat("0", 64)},
 		},
 	}
 	if _, err := read(); err == nil {
@@ -656,7 +655,7 @@ func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 	mode := "stream"
 	packageReads := 0
 	used := 0
-	var cached *types.Item
+	var cached *model.Item
 	backend := sourceBackend(
 		func(ctx context.Context, q source.Request, _ source.Permit) (source.Result, error) {
 			switch q.Resource.Path {
@@ -747,13 +746,13 @@ func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 		t.Errorf("revoked upstream authority published success: status=%d used=%d", res.Code, used)
 	}
 	mode = "cached"
-	cached = &types.Item{
+	cached = &model.Item{
 		RepoKey: remote.Key,
 		Cached:  true,
 		Path:    "feed",
 		Name:    filepath.Base(want.Path),
 		Size:    want.Size,
-		Actual:  types.Checksums{SHA256: strings.Repeat("0", 64)},
+		Actual:  kernel.Checksums{SHA256: strings.Repeat("0", 64)},
 	}
 	if res := w.do(http.MethodGet, url, "admin", ""); res.Code == http.StatusOK || used != 1 {
 		t.Errorf("wrong cached SHA published success: status=%d used=%d", res.Code, used)

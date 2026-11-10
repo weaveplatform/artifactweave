@@ -16,15 +16,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/composer"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Options configures the Composer protocol. Blobs opens the stored archives
@@ -97,7 +98,7 @@ func resolveKey(rel string) []pkgroute.Key {
 	if len(keys) == 0 {
 		return nil
 	}
-	key, cached := types.ResolveRepoKey(keys[0].Key)
+	key, cached := model.ResolveRepoKey(keys[0].Key)
 	keys[0].Key, keys[0].CacheOnly = key, cached
 	return keys
 }
@@ -105,7 +106,7 @@ func resolveKey(rel string) []pkgroute.Key {
 type release struct {
 	Name, Version, Path string
 	Document            map[string]any
-	Item                types.Item
+	Item                model.Item
 	RemoteURL, SHA1     string
 	Member              *http.Request
 	revalidate          func(context.Context) error
@@ -113,7 +114,7 @@ type release struct {
 type catalog map[string][]release
 
 func (h handler) root(w http.ResponseWriter, r *http.Request) {
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	if r.URL.RawQuery != "" {
@@ -196,12 +197,12 @@ func (h handler) p2(w http.ResponseWriter, r *http.Request) {
 		h.notFound(w, r)
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
 	releases, err := h.lookup(r, name)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			h.notFound(w, r)
 			return
 		}
@@ -258,11 +259,11 @@ func (h handler) lookup(r *http.Request, name string) ([]release, error) {
 			return nil, err
 		}
 		for _, member := range members {
-			if !h.k.CanFolder(member, name, types.ActionRead) {
+			if !h.k.CanFolder(member, name, api.ActionRead) {
 				continue
 			}
 			found, err := h.lookup(member, name)
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, kernel.ErrNotFound) {
 				continue
 			}
 			if err != nil {
@@ -281,7 +282,7 @@ func (h handler) lookup(r *http.Request, name string) ([]release, error) {
 				return found, nil
 			}
 		}
-		return nil, store.ErrNotFound
+		return nil, kernel.ErrNotFound
 	}
 	return nil, source.ErrUnsupported
 }
@@ -296,7 +297,7 @@ func (h handler) members(r *http.Request) ([]*http.Request, error) {
 		}
 		seen[key] = true
 		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -319,13 +320,13 @@ func (h handler) hosted(r *http.Request) (catalog, error) {
 	cat := catalog{}
 	items, cursor, err := h.k.DB().
 		Items().
-		Descendants(r.Context(), q.Repo.Key, false, "", store.Page{Limit: 500})
+		Descendants(r.Context(), q.Repo.Key, false, "", kernel.Page{Limit: 500})
 	for err == nil {
 		for _, it := range items {
 			if it.Folder || !strings.HasSuffix(it.FullPath(), ".zip") {
 				continue
 			}
-			if !h.k.Can(r, it.FullPath(), types.ActionRead) {
+			if !h.k.Can(r, it.FullPath(), api.ActionRead) {
 				continue
 			}
 			props, e := h.k.DB().Items().Properties(r.Context(), it.ID)
@@ -348,7 +349,7 @@ func (h handler) hosted(r *http.Request) (catalog, error) {
 					"stored Composer archive is invalid",
 				)
 			}
-			if !h.k.CanFolder(r, pkg.Name, types.ActionRead) {
+			if !h.k.CanFolder(r, pkg.Name, api.ActionRead) {
 				continue
 			}
 			doc := pkg.Document()
@@ -370,7 +371,7 @@ func (h handler) hosted(r *http.Request) (catalog, error) {
 		}
 		items, cursor, err = h.k.DB().
 			Items().
-			Descendants(r.Context(), q.Repo.Key, false, "", store.Page{Limit: 500, After: cursor})
+			Descendants(r.Context(), q.Repo.Key, false, "", kernel.Page{Limit: 500, After: cursor})
 	}
 	if err != nil {
 		return nil, fmt.Errorf("list composer items: %w", err)
@@ -401,7 +402,7 @@ func distDocument(r *http.Request, name, version, sha1 string) map[string]any {
 func publicKey(r *http.Request) string {
 	q := pkgroute.RequestFrom(r)
 	if q.CacheOnly {
-		return q.Repo.Key + types.CacheSuffix
+		return q.Repo.Key + model.CacheSuffix
 	}
 	return q.Repo.Key
 }
@@ -416,12 +417,12 @@ func (h handler) dist(w http.ResponseWriter, r *http.Request) {
 		h.notFound(w, r)
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
 	releases, err := h.lookup(r, name)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			h.notFound(w, r)
 			return
 		}
@@ -449,7 +450,7 @@ func (h handler) dist(w http.ResponseWriter, r *http.Request) {
 			h.remoteDist(w, r, rel)
 			return
 		}
-		if !h.k.Can(r, rel.Path, types.ActionRead) {
+		if !h.k.Can(r, rel.Path, api.ActionRead) {
 			h.k.Error(w, r, apierror.New(http.StatusForbidden, "Composer archive read denied"))
 			return
 		}
@@ -488,7 +489,7 @@ func (h handler) reindex(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionManage) {
+	if !h.k.RequireFolder(w, r, "", api.ActionManage) {
 		return
 	}
 	if _, err := h.hosted(r); err != nil {

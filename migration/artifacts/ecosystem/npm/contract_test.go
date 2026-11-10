@@ -8,8 +8,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // A version is its tarball at the canonical path; "beta" is scoped, so the
@@ -35,7 +35,7 @@ func TestUnitContract(t *testing.T) {
 				Linked: []string{canonical},
 			}
 		},
-		Properties: []types.Properties{
+		Properties: []model.Properties{
 			{npm.PropDistTag: {"beta"}},
 			{npm.PropDistTag: {"beta", "next"}, npm.PropDeprecated: {"use 2.0.0"}},
 		},

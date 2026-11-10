@@ -17,10 +17,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // recorder is a format with every optional interface. It records each call
@@ -38,9 +40,9 @@ type recorder struct {
 	admit  func(format.Write) (format.Write, error)
 	writes []format.Write
 
-	deployed    func(ctx context.Context, env format.Env, it types.Item) error
+	deployed    func(ctx context.Context, env format.Env, it model.Item) error
 	inspections []any
-	props       []types.Properties // the item's properties when Deployed ran
+	props       []model.Properties // the item's properties when Deployed ran
 
 	annotateErr error
 	annotations []annotation
@@ -108,12 +110,12 @@ func (r *recorder) Deployed(
 	ctx context.Context,
 	env format.Env,
 	_ repo.Config,
-	it types.Item,
+	it model.Item,
 ) error {
 	r.note(ctx, env, "deployed "+it.FullPath())
 	r.inspections = append(r.inspections, env.Inspection)
 	props, err := env.Store.Items().Properties(ctx, it.ID)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		return err //nolint:wrapcheck // test double
 	}
 	r.props = append(r.props, props)
@@ -127,7 +129,7 @@ func (r *recorder) Deleting(
 	ctx context.Context,
 	env format.Env,
 	_ repo.Config,
-	it types.Item,
+	it model.Item,
 ) error {
 	r.note(ctx, env, "deleting "+it.FullPath())
 	return nil
@@ -137,7 +139,7 @@ func (r *recorder) Deleted(
 	ctx context.Context,
 	env format.Env,
 	_ repo.Config,
-	gone []types.Item,
+	gone []model.Item,
 ) error {
 	r.note(ctx, env, fmt.Sprintf("deleted %d", len(gone)))
 	return nil
@@ -147,7 +149,7 @@ func (r *recorder) Annotated(
 	ctx context.Context,
 	env format.Env,
 	_ repo.Config,
-	it types.Item,
+	it model.Item,
 	a format.Annotation,
 ) error {
 	r.note(ctx, env, "annotated "+it.FullPath())
@@ -170,14 +172,14 @@ func (r *recorder) Reindex(ctx context.Context, env format.Env, c repo.Config) e
 	return nil
 }
 
-func (w *world) props(p string) types.Properties {
+func (w *world) props(p string) model.Properties {
 	w.t.Helper()
 	it, ok := w.get(w.loc, p)
 	if !ok {
 		w.t.Fatalf("%s is missing", p)
 	}
 	props, err := w.db.Items().Properties(context.Background(), it.ID)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		w.t.Fatal(err)
 	}
 	return props
@@ -192,7 +194,7 @@ func TestUnitDeployRunsTheHooks(t *testing.T) {
 	r.inspection = "parsed"
 	_, err := w.svc.Deploy(ctx, Deploy{
 		Target: Target{Repo: w.loc, Path: "/a/b.txt"}, Body: strings.NewReader("body"),
-		Properties: types.Properties{"k": {"v"}}, By: "alice",
+		Properties: model.Properties{"k": {"v"}}, By: "alice",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -218,7 +220,7 @@ func TestUnitDeployRunsTheHooks(t *testing.T) {
 
 	// Without properties nothing is announced.
 	r.reset()
-	if _, err := w.deploy("c.txt", "c", types.Checksums{}); err != nil {
+	if _, err := w.deploy("c.txt", "c", kernel.Checksums{}); err != nil {
 		t.Fatal(err)
 	}
 	if slices.Contains(r.order, "annotated c.txt") {
@@ -231,10 +233,10 @@ func TestUnitAdmitShapesTheDeploy(t *testing.T) {
 	w, r := recording(t)
 	r.admit = func(wr format.Write) (format.Write, error) {
 		wr.Path = "moved/" + path.Base(wr.Path)
-		wr.Properties = types.Properties{"added": {"1"}}
+		wr.Properties = model.Properties{"added": {"1"}}
 		return wr, nil
 	}
-	it, err := w.deploy("a/b.txt", "body", types.Checksums{})
+	it, err := w.deploy("a/b.txt", "body", kernel.Checksums{})
 	if err != nil || it.FullPath() != "moved/b.txt" {
 		t.Fatalf("deploy %+v, %v", it, err)
 	}
@@ -248,7 +250,7 @@ func TestUnitAdmitShapesTheDeploy(t *testing.T) {
 	r.admit = func(wr format.Write) (format.Write, error) {
 		return wr, format.Rejectf(http.StatusConflict, "not here")
 	}
-	_, err = w.deploy("x.txt", "x", types.Checksums{})
+	_, err = w.deploy("x.txt", "x", kernel.Checksums{})
 	var refused *format.RejectionError
 	if !errors.As(err, &refused) || refused.Status != http.StatusConflict ||
 		refused.Error() != "not here" {
@@ -261,7 +263,7 @@ func TestUnitAdmitShapesTheDeploy(t *testing.T) {
 	r.admit = func(wr format.Write) (format.Write, error) { wr.Path = "/"; return wr, nil }
 	if _, err := w.svc.Deploy(ctx, Deploy{
 		Target: Target{Repo: w.loc, Path: "y.txt"}, Body: strings.NewReader("y"),
-	}); !errors.Is(err, types.ErrInvalidItemPath) {
+	}); !errors.Is(err, kernel.ErrInvalidItemPath) {
 		t.Fatalf("admitted to the root: %v", err)
 	}
 }
@@ -269,7 +271,7 @@ func TestUnitAdmitShapesTheDeploy(t *testing.T) {
 func TestUnitInspectFailureStopsTheDeploy(t *testing.T) {
 	w, r := recording(t)
 	r.inspectErr = errBoom
-	if _, err := w.deploy("a.txt", "a", types.Checksums{}); !errors.Is(err, errBoom) {
+	if _, err := w.deploy("a.txt", "a", kernel.Checksums{}); !errors.Is(err, errBoom) {
 		t.Fatalf("deploy: %v", err)
 	}
 	if _, ok := w.get(w.loc, "a.txt"); ok || len(r.order) != 1 {
@@ -396,7 +398,7 @@ func TestUnitRecordSidecarAnswers(t *testing.T) {
 		msg         string
 	}{
 		{
-			"none", sums("x").SHA1, store.ErrNotFound,
+			"none", sums("x").SHA1, kernel.ErrNotFound,
 			"Target file to set checksum on doesn't exist: libs:none",
 		},
 		{
@@ -434,7 +436,7 @@ func TestUnitTransferRunsTheFormats(t *testing.T) {
 	r.inspection = "parsed"
 	if _, err := w.svc.Deploy(ctx, Deploy{
 		Target: Target{Repo: w.loc, Path: "src/a.txt"}, Body: strings.NewReader("a"),
-		Properties: types.Properties{"k": {"v"}},
+		Properties: model.Properties{"k": {"v"}},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -508,7 +510,7 @@ func TestUnitTransferRunsTheFormats(t *testing.T) {
 	}
 
 	r.inspectErr = nil
-	r.deployed = func(context.Context, format.Env, types.Item) error { return errBoom }
+	r.deployed = func(context.Context, format.Env, model.Item) error { return errBoom }
 	if _, err := w.svc.Transfer(ctx, Transfer{
 		From: Target{Repo: w.loc, Path: "src/a.txt"}, To: Target{Repo: w.loc, Path: "e.txt"},
 	}); !errors.Is(err, errBoom) {
@@ -525,21 +527,21 @@ func TestUnitRestoreAndFoldersAnnotate(t *testing.T) {
 	f := w.must("a/f.txt", "content")
 	r.reset()
 	if _, err := w.svc.Restore(ctx, Target{Repo: w.loc, Path: "b/r.txt"},
-		types.TrashRecord{Item: f, Properties: types.Properties{"k": {"v"}}}, "bob"); err != nil {
+		model.TrashRecord{Item: f, Properties: model.Properties{"k": {"v"}}}, "bob"); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(r.order, []string{"deployed b/r.txt", "annotated b/r.txt"}) ||
 		r.inspections[0] != nil {
 		t.Errorf("restore calls %v, inspection %v", r.order, r.inspections)
 	}
-	folder := types.Item{Folder: true, Created: at}
+	folder := model.Item{Folder: true, Created: at}
 	r.reset()
 	if _, err := w.svc.Restore(
 		ctx,
 		Target{Repo: w.loc, Path: "a"},
-		types.TrashRecord{
+		model.TrashRecord{
 			Item:       folder,
-			Properties: types.Properties{"f": {"x"}},
+			Properties: model.Properties{"f": {"x"}},
 		},
 		"bob",
 	); err != nil {
@@ -548,16 +550,16 @@ func TestUnitRestoreAndFoldersAnnotate(t *testing.T) {
 	if _, err := w.svc.Restore(
 		ctx,
 		Target{Repo: w.loc, Path: "new"},
-		types.TrashRecord{
+		model.TrashRecord{
 			Item:       folder,
-			Properties: types.Properties{"g": {"y"}},
+			Properties: model.Properties{"g": {"y"}},
 		},
 		"bob",
 	); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.svc.MakeFolder(ctx, Target{Repo: w.loc, Path: "made"},
-		types.Properties{"h": {"z"}}, "bob"); err != nil {
+		model.Properties{"h": {"z"}}, "bob"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.svc.MakeFolder(ctx, Target{Repo: w.loc, Path: "bare"}, nil, "bob"); err != nil {
@@ -572,9 +574,9 @@ func TestUnitRestoreAndFoldersAnnotate(t *testing.T) {
 	if _, err := w.svc.Restore(
 		ctx,
 		Target{Repo: w.loc, Path: "c/r.txt"},
-		types.TrashRecord{
+		model.TrashRecord{
 			Item:       f,
-			Properties: types.Properties{"k": {"v"}},
+			Properties: model.Properties{"k": {"v"}},
 		},
 		"bob",
 	); !errors.Is(err, errBoom) {
@@ -583,18 +585,18 @@ func TestUnitRestoreAndFoldersAnnotate(t *testing.T) {
 	if _, err := w.svc.Restore(
 		ctx,
 		Target{Repo: w.loc, Path: "a"},
-		types.TrashRecord{
+		model.TrashRecord{
 			Item:       folder,
-			Properties: types.Properties{"f": {"x"}},
+			Properties: model.Properties{"f": {"x"}},
 		},
 		"bob",
 	); !errors.Is(err, errBoom) {
 		t.Fatalf("folder restore: %v", err)
 	}
 	r.annotateErr = nil
-	r.deployed = func(context.Context, format.Env, types.Item) error { return errBoom }
+	r.deployed = func(context.Context, format.Env, model.Item) error { return errBoom }
 	if _, err := w.svc.Restore(ctx, Target{Repo: w.loc, Path: "d/r.txt"},
-		types.TrashRecord{Item: f}, "bob"); !errors.Is(err, errBoom) {
+		model.TrashRecord{Item: f}, "bob"); !errors.Is(err, errBoom) {
 		t.Fatalf("restore: %v", err)
 	}
 }
@@ -604,7 +606,7 @@ func TestUnitAnnotate(t *testing.T) {
 	w, r := recording(t)
 	if _, err := w.svc.Deploy(ctx, Deploy{
 		Target: Target{Repo: w.loc, Path: "p.txt"}, Body: strings.NewReader("p"),
-		Properties: types.Properties{"old": {"1"}},
+		Properties: model.Properties{"old": {"1"}},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -614,7 +616,7 @@ func TestUnitAnnotate(t *testing.T) {
 		ctx,
 		w.loc,
 		it,
-		types.Properties{"k": {"v"}},
+		model.Properties{"k": {"v"}},
 		[]string{"old"},
 	); err != nil {
 		t.Fatal(err)
@@ -634,7 +636,7 @@ func TestUnitAnnotate(t *testing.T) {
 		ctx,
 		w.loc,
 		it,
-		types.Properties{"k": {"w"}},
+		model.Properties{"k": {"w"}},
 		nil,
 	); !errors.Is(
 		err,
@@ -648,7 +650,7 @@ func TestUnitAnnotate(t *testing.T) {
 
 	// A format that follows no properties still gets them changed.
 	w.svc.Formats = nil
-	if err := w.svc.Annotate(ctx, w.loc, it, types.Properties{"k": {"x"}}, nil); err != nil {
+	if err := w.svc.Annotate(ctx, w.loc, it, model.Properties{"k": {"x"}}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if !w.props("p.txt").Has("k", "x") {
@@ -659,7 +661,7 @@ func TestUnitAnnotate(t *testing.T) {
 		ctx,
 		w.loc,
 		it,
-		types.Properties{"k": {"y"}},
+		model.Properties{"k": {"y"}},
 		nil,
 	); !errors.Is(
 		err,
@@ -715,10 +717,10 @@ func TestUnitDeriveWritesWithoutHooks(t *testing.T) {
 	ctx := context.Background()
 	w, r := recording(t)
 	fail := false
-	r.deployed = func(ctx context.Context, env format.Env, it types.Item) error {
+	r.deployed = func(ctx context.Context, env format.Env, it model.Item) error {
 		if _, err := env.Derive(ctx, format.Derived{
 			Repo: w.loc, Path: "a/meta.xml", Body: strings.NewReader("meta " + it.Name),
-			Properties: types.Properties{"derived": {"yes"}}, By: "format",
+			Properties: model.Properties{"derived": {"yes"}}, By: "format",
 		}); err != nil {
 			return err //nolint:wrapcheck // test double
 		}
@@ -727,7 +729,7 @@ func TestUnitDeriveWritesWithoutHooks(t *testing.T) {
 		}
 		return nil
 	}
-	if _, err := w.deploy("a/x.jar", "x", types.Checksums{}); err != nil {
+	if _, err := w.deploy("a/x.jar", "x", kernel.Checksums{}); err != nil {
 		t.Fatal(err)
 	}
 	meta, ok := w.get(w.loc, "a/meta.xml")
@@ -740,7 +742,7 @@ func TestUnitDeriveWritesWithoutHooks(t *testing.T) {
 	}
 
 	fail = true
-	if _, err := w.deploy("a/y.jar", "y", types.Checksums{}); !errors.Is(err, errBoom) {
+	if _, err := w.deploy("a/y.jar", "y", kernel.Checksums{}); !errors.Is(err, errBoom) {
 		t.Fatalf("deploy: %v", err)
 	}
 	if meta, _ := w.get(w.loc, "a/meta.xml"); meta.Actual != sums("meta x.jar") {
@@ -771,9 +773,9 @@ func TestUnitDeriveWritesWithoutHooks(t *testing.T) {
 // failingQueue fails the work queue's enqueue.
 type failingQueue struct{ *inmem.Store }
 
-func (f failingQueue) WorkQueue() store.WorkQueue { return failingWork{f.Store.WorkQueue()} }
+func (f failingQueue) WorkQueue() work.WorkQueue { return failingWork{f.Store.WorkQueue()} }
 
-type failingWork struct{ store.WorkQueue }
+type failingWork struct{ work.WorkQueue }
 
 func (failingWork) Enqueue(context.Context, string, string, []byte, time.Time) error {
 	return errBoom
@@ -792,7 +794,7 @@ func TestUnitEnqueueJoinsTheWrite(t *testing.T) {
 	ctx := context.Background()
 	w, r := recording(t)
 	fail := false
-	r.deployed = func(ctx context.Context, env format.Env, it types.Item) error {
+	r.deployed = func(ctx context.Context, env format.Env, it model.Item) error {
 		if err := env.Enqueue(ctx, "test.kind", it.Name, []byte(`{"a":1}`)); err != nil {
 			return err //nolint:wrapcheck // test double
 		}
@@ -801,20 +803,20 @@ func TestUnitEnqueueJoinsTheWrite(t *testing.T) {
 		}
 		return nil
 	}
-	if _, err := w.deploy("kept", "k", types.Checksums{}); err != nil {
+	if _, err := w.deploy("kept", "k", kernel.Checksums{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.db.WorkQueue().Get(ctx, "test.kind", "kept"); err != nil {
 		t.Fatalf("committed work: %v", err)
 	}
 	fail = true
-	if _, err := w.deploy("dropped", "d", types.Checksums{}); !errors.Is(err, errBoom) {
+	if _, err := w.deploy("dropped", "d", kernel.Checksums{}); !errors.Is(err, errBoom) {
 		t.Fatalf("deploy: %v", err)
 	}
 	if _, err := w.db.WorkQueue().
 		Get(ctx, "test.kind", "dropped"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("rolled-back work: %v", err)
 	}
@@ -822,7 +824,7 @@ func TestUnitEnqueueJoinsTheWrite(t *testing.T) {
 	fail = false
 	q := &queued{}
 	w.svc.Work = q
-	if _, err := w.deploy("woken", "w", types.Checksums{}); err != nil {
+	if _, err := w.deploy("woken", "w", kernel.Checksums{}); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(q.keys, []string{"test.kind/woken"}) {
@@ -830,7 +832,7 @@ func TestUnitEnqueueJoinsTheWrite(t *testing.T) {
 	}
 
 	w.svc.Work, w.svc.Store = nil, failingQueue{w.db}
-	if _, err := w.deploy("refused", "r", types.Checksums{}); !errors.Is(err, errBoom) {
+	if _, err := w.deploy("refused", "r", kernel.Checksums{}); !errors.Is(err, errBoom) {
 		t.Fatalf("enqueue failure: %v", err)
 	}
 }
@@ -839,8 +841,8 @@ func TestUnitEnvironment(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	doc, _ := json.Marshal(map[string]string{"artifactPathPattern": "[module]-[baseRev].[ext]"})
-	if err := w.db.Configs().Put(ctx, types.ConfigDocument{
-		Kind: types.ConfigLayout, Key: "flat", Document: doc,
+	if err := w.db.Configs().Put(ctx, configdoc.ConfigDocument{
+		Kind: configdoc.ConfigLayout, Key: "flat", Document: doc,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -869,9 +871,9 @@ func TestUnitEnvironment(t *testing.T) {
 // bare is a format with the required hooks alone.
 type bare struct{}
 
-func (bare) Deployed(context.Context, format.Env, repo.Config, types.Item) error  { return nil }
-func (bare) Deleting(context.Context, format.Env, repo.Config, types.Item) error  { return nil }
-func (bare) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
+func (bare) Deployed(context.Context, format.Env, repo.Config, model.Item) error  { return nil }
+func (bare) Deleting(context.Context, format.Env, repo.Config, model.Item) error  { return nil }
+func (bare) Deleted(context.Context, format.Env, repo.Config, []model.Item) error { return nil }
 
 func TestUnitOptionalInterfaces(t *testing.T) {
 	ctx := context.Background()
@@ -879,7 +881,7 @@ func TestUnitOptionalInterfaces(t *testing.T) {
 	w.svc.Formats = func(repo.PackageType) format.Handler { return bare{} }
 	if _, err := w.svc.Deploy(ctx, Deploy{
 		Target: Target{Repo: w.loc, Path: "a.txt"}, Body: strings.NewReader("a"),
-		Properties: types.Properties{"k": {"v"}},
+		Properties: model.Properties{"k": {"v"}},
 	}); err != nil {
 		t.Fatalf("a format without optional interfaces: %v", err)
 	}
@@ -889,7 +891,7 @@ func TestUnitOptionalInterfaces(t *testing.T) {
 	r.annotateErr = errBoom
 	if _, err := w.svc.Deploy(ctx, Deploy{
 		Target: Target{Repo: w.loc, Path: "b.txt"}, Body: strings.NewReader("b"),
-		Properties: types.Properties{"k": {"v"}},
+		Properties: model.Properties{"k": {"v"}},
 	}); !errors.Is(err, errBoom) {
 		t.Fatalf("deploy: %v", err)
 	}

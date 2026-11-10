@@ -8,7 +8,6 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type providerClaim struct {
@@ -100,7 +99,7 @@ func (h handler) remoteSignedProvider(w http.ResponseWriter, r *http.Request, c 
 	}
 	ctx := accessapi.WithCaller(r.Context(), principal, d)
 	r = r.WithContext(ctx)
-	if !h.k.Require(w, r, c.Path, types.ActionRead) {
+	if !h.k.Require(w, r, c.Path, accessapi.ActionRead) {
 		return
 	}
 	identity, err := h.o.RemoteSources.Resolve(ctx, pkgroute.RequestFrom(r).Repo)

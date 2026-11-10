@@ -8,9 +8,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Serves reports whether t is a package type of this format.
@@ -69,7 +69,7 @@ func read(ctx context.Context, env format.Env, sha string) (*inspection, error) 
 // inspectionOf is the inspection of the write that stored it when there
 // was one of this content, or else a read of the content, as a restore
 // needs.
-func inspectionOf(ctx context.Context, env format.Env, it types.Item) (*inspection, error) {
+func inspectionOf(ctx context.Context, env format.Env, it model.Item) (*inspection, error) {
 	if in, ok := env.Inspection.(*inspection); ok && in.sha256 == it.Actual.SHA256 {
 		return in, nil
 	}
@@ -82,7 +82,7 @@ func inspectionOf(ctx context.Context, env format.Env, it types.Item) (*inspecti
 // pre-release. A file that was another version's, such as one overwritten
 // with other content, leaves that version first. A file stored anywhere
 // but where the index reads (pkgindex.Stored) is not indexed.
-func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	k := kindOf(it.FullPath())
 	if it.Folder || it.Cached != pkgindex.Stored(c).Cached || k == other {
 		return nil
@@ -132,7 +132,7 @@ func leave(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	key versionKey,
 ) error {
 	pv, linked, err := pkgindex.VersionOf(ctx, env.Store, it.ID)
@@ -160,7 +160,7 @@ func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	stored := pkgindex.Stored(c).Cached
 	seen := map[versionKey]bool{}

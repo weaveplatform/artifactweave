@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	pgdrv "github.com/weaveplatform/artifactweave/migration/platform/sql/postgres"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // Both moves pause before flushing work. Each transaction must lock its
@@ -106,12 +106,12 @@ type enqueuePauseStore struct {
 	pause *enqueuePause
 }
 
-func (s enqueuePauseStore) WorkQueue() store.WorkQueue {
+func (s enqueuePauseStore) WorkQueue() work.WorkQueue {
 	return enqueuePauseQueue{WorkQueue: s.Store.WorkQueue(), pause: s.pause}
 }
 
 type enqueuePauseQueue struct {
-	store.WorkQueue
+	work.WorkQueue
 	pause *enqueuePause
 }
 

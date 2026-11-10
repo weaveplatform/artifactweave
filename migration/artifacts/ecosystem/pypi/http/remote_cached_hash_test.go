@@ -15,11 +15,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitCachedPyPIArtifactChecksEveryAdvertisedHash(t *testing.T) {
@@ -48,7 +49,7 @@ func TestUnitCachedPyPIArtifactChecksEveryAdvertisedHash(t *testing.T) {
 			Protocol(Options{}),
 		),
 	}
-	result := source.Result{Item: &types.Item{Actual: types.Checksums{
+	result := source.Result{Item: &model.Item{Actual: kernel.Checksums{
 		SHA256: info.Digests.SHA256,
 		SHA512: info.Digests.SHA512,
 		SHA1:   info.Digests.SHA1,

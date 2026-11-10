@@ -12,12 +12,14 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // write answers a PUT in the registry. PUT /<name> is npm publish, or a
@@ -57,8 +59,8 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request, name string) {
 	// publish, which needs Deploy, from a packument update, which needs
 	// Annotate, so either lets the body be read. The canonical path is
 	// checked once the body has named the version.
-	if !h.k.CanFolder(r, name, types.ActionAnnotate) &&
-		!h.k.RequireFolder(w, r, name, types.ActionWrite) {
+	if !h.k.CanFolder(r, name, api.ActionAnnotate) &&
+		!h.k.RequireFolder(w, r, name, api.ActionWrite) {
 		return
 	}
 	if r.ContentLength > h.maxPublish {
@@ -119,7 +121,7 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request, name string) {
 type published struct {
 	number   string
 	tags     map[string]string
-	declared types.Checksums
+	declared kernel.Checksums
 }
 
 // version checks the body's shape and its tarball attachment against the
@@ -178,7 +180,7 @@ func (b publishBody) version(name string, enforce bool) (published, error) {
 // latest unless --tag is given, so the npm format gives latest by its own
 // rules instead: a publish without another tag takes it when its version
 // outranks the version that has it (decision 0034).
-func (p published) props(version string) types.Properties {
+func (p published) props(version string) model.Properties {
 	var tags []string
 	for tag, v := range p.tags {
 		if clean, ok := npmfmt.CleanVersion(v); ok && clean == version &&
@@ -190,7 +192,7 @@ func (p published) props(version string) types.Properties {
 		return nil
 	}
 	slices.Sort(tags)
-	return types.Properties{npmfmt.PropDistTag: tags}
+	return model.Properties{npmfmt.PropDistTag: tags}
 }
 
 // checkDist reads the version manifest's dist.shasum, and each hash in
@@ -208,7 +210,7 @@ func (p published) props(version string) types.Properties {
 // in the bad-checksum search as a REST deploy's does; one too malformed to
 // be a checksum of its algorithm is dropped, since a stored original must
 // be one.
-func checkDist(manifest json.RawMessage, d blob.Digests, enforce bool) (types.Checksums, error) {
+func checkDist(manifest json.RawMessage, d blob.Digests, enforce bool) (kernel.Checksums, error) {
 	var doc struct {
 		Dist struct {
 			Shasum    string `json:"shasum"`
@@ -216,17 +218,17 @@ func checkDist(manifest json.RawMessage, d blob.Digests, enforce bool) (types.Ch
 		} `json:"dist"`
 	}
 	if json.Unmarshal(manifest, &doc) != nil {
-		return types.Checksums{}, badRequest(
+		return kernel.Checksums{}, badRequest(
 			"the version's manifest is not an object whose dist is an object")
 	}
-	var declared types.Checksums
+	var declared kernel.Checksums
 	if s := strings.ToLower(doc.Dist.Shasum); s != "" {
 		raw, err := hex.DecodeString(s)
 		switch {
 		case s == d.SHA1:
 			declared.SHA1 = s
 		case enforce:
-			return types.Checksums{}, badRequest(
+			return kernel.Checksums{}, badRequest(
 				fmt.Sprintf(
 					"dist.shasum %s is not the tarball's SHA-1 %s",
 					doc.Dist.Shasum,
@@ -257,7 +259,7 @@ func checkDist(manifest json.RawMessage, d blob.Digests, enforce bool) (types.Ch
 		switch {
 		case err == nil && bytes.Equal(got, want):
 		case enforce:
-			return types.Checksums{}, badRequest(
+			return kernel.Checksums{}, badRequest(
 				fmt.Sprintf("dist.integrity's %s hash does not match the tarball", alg),
 			)
 		case err != nil || len(got) != len(want):

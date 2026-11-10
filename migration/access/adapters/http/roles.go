@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/roles"
 	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Global roles and environments (/access/api/v1/roles, /environments;
@@ -180,8 +180,8 @@ func (s AccessService) CreateGlobalRole(
 		return nil, httpkit.BadRequestf("a body with the role is required")
 	}
 	b := req.Body
-	r := types.Role{
-		Name: b.Name, Type: types.RoleType(b.Type),
+	r := model.Role{
+		Name: b.Name, Type: model.RoleType(b.Type),
 		Description: httpkit.Deref(b.Description), Actions: httpkit.Deref(b.Actions),
 		Environments: httpkit.Deref(b.Environments),
 	}
@@ -207,8 +207,8 @@ func (s AccessService) UpdateGlobalRole(
 		return nil, httpkit.BadRequestf("a body with the role is required")
 	}
 	b := req.Body
-	r := types.Role{
-		Name: b.Name, Type: types.RoleType(b.Type),
+	r := model.Role{
+		Name: b.Name, Type: model.RoleType(b.Type),
 		Description: httpkit.Deref(b.Description), Actions: httpkit.Deref(b.Actions),
 		Environments: httpkit.Deref(b.Environments),
 	}
@@ -235,7 +235,7 @@ func (s AccessService) DeleteGlobalRole(
 }
 
 // globalRoleWire renders a role, with empty lists rather than null.
-func globalRoleWire(r types.Role) accessgen.GlobalRole {
+func globalRoleWire(r model.Role) accessgen.GlobalRole {
 	typ := accessgen.GlobalRoleType(r.Type)
 	out := accessgen.GlobalRole{
 		Name: r.Name, Type: &typ,

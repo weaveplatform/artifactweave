@@ -13,13 +13,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // traceTime is the time format of Artifactory's trace, Joda's
@@ -53,7 +52,7 @@ func (d *Download) stepf(format string, args ...any) {
 func traceRepoPath(c repo.Config, cached bool, p string) string {
 	key := c.Key
 	if cached && c.Class == repo.Remote {
-		key += types.CacheSuffix
+		key += model.CacheSuffix
 	}
 	return key + ":" + p
 }
@@ -138,7 +137,7 @@ func (s *Kit) traceDownload(
 	if err != nil {
 		return s.ItemError(ctx, "resolve repository", err)
 	}
-	if !acc.Folder(c, req.Path, types.ActionRead) {
+	if !acc.Folder(c, req.Path, accessapi.ActionRead) {
 		return httpkit.Denied(p)
 	}
 	kind := string(c.Class)
@@ -194,13 +193,13 @@ func (s *Kit) traceDownload(
 	dl := newDownload(req.Path, req.IsFolder, req.matrix(), s.Items(st).Resolve)
 	dl.trace = t
 	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, map[string]bool{})
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return s.traceContained(ctx, st, method, c, cached, req.Path, p, acc, dl)
 	}
 	if err != nil {
 		return s.ItemError(ctx, "lookup item", err)
 	}
-	if !acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, types.ActionRead) {
+	if !acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, accessapi.ActionRead) {
 		return httpkit.Denied(p)
 	}
 	t.stepf(
@@ -244,7 +243,7 @@ func (s *Kit) traceContained(
 		if err != nil {
 			return ItemNotFound()
 		}
-		if !acc.File(a.Repo, a.Item.FullPath(), types.ActionRead) {
+		if !acc.File(a.Repo, a.Item.FullPath(), accessapi.ActionRead) {
 			return httpkit.Denied(caller)
 		}
 		if a.Item.Folder {
@@ -272,7 +271,7 @@ func (s *Kit) traceContained(
 	f, err := Lookup(ctx, st, c, cached, artifact, acc, dl, map[string]bool{})
 	// A file the caller may not read has no visible checksum either.
 	if err != nil || f.Item.Folder || alg.Of(f.Item.Actual) == "" ||
-		!acc.File(f.Repo, f.Item.FullPath(), types.ActionRead) {
+		!acc.File(f.Repo, f.Item.FullPath(), accessapi.ActionRead) {
 		return ItemNotFound()
 	}
 	dl.stepf(

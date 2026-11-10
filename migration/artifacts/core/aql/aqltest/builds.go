@@ -6,14 +6,15 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // BuildSeed is one build run to store after Seeds, with its promotions,
 // whose BuildID the store's ID for the run replaces.
 type BuildSeed struct {
-	Build      types.Build
-	Promotions []types.BuildPromotion
+	Build      model.Build
+	Promotions []model.BuildPromotion
 }
 
 // sha1Of and md5Of are the checksums Seeds gives item n (1 is the first).
@@ -24,13 +25,13 @@ func sha1Of(n int) string { return strings.Repeat(string(rune('a'+n)), 40) }
 //nolint:gosec // n numbers a seed, far inside rune's range.
 func md5Of(n int) string { return strings.Repeat(string(rune('a'+n)), 32) }
 
-func file(name, typ string, item int) types.BuildFile {
-	return types.BuildFile{
-		Name: name, Type: typ, Checksums: types.Checksums{SHA1: sha1Of(item), MD5: md5Of(item)},
+func file(name, typ string, item int) model.BuildFile {
+	return model.BuildFile{
+		Name: name, Type: typ, Checksums: kernel.Checksums{SHA1: sha1Of(item), MD5: md5Of(item)},
 	}
 }
 
-func dependency(id, typ string, item int, scopes ...string) types.BuildFile {
+func dependency(id, typ string, item int, scopes ...string) model.BuildFile {
 	f := file("", typ, item)
 	f.ID, f.Scopes = id, scopes
 	return f
@@ -47,21 +48,21 @@ func BuildSeeds() []BuildSeed {
 	at := func(minutes int) time.Time { return Base.Add(time.Duration(minutes) * time.Minute) }
 	return []BuildSeed{
 		{
-			Build: types.Build{
+			Build: model.Build{
 				Name: "app", Number: "1", Started: at(10), Created: at(11), CreatedBy: "ci",
-				URL: "https://ci/app/1", Properties: types.Properties{"os": {"linux"}},
-				Modules: []types.BuildModule{{
+				URL: "https://ci/app/1", Properties: model.Properties{"os": {"linux"}},
+				Modules: []model.BuildModule{{
 					ID: "org.acme:app:1.0", Type: "maven",
-					Properties: types.Properties{"java": {"17"}},
-					Artifacts: []types.BuildFile{
+					Properties: model.Properties{"java": {"17"}},
+					Artifacts: []model.BuildFile{
 						file("app-1.0.jar", "jar", 4), file("app-1.0.pom", "pom", 5),
 					},
-					Dependencies: []types.BuildFile{
+					Dependencies: []model.BuildFile{
 						dependency("org.acme:util:2.0", "jar", 6, "compile"),
 					},
 				}},
 			},
-			Promotions: []types.BuildPromotion{
+			Promotions: []model.BuildPromotion{
 				{
 					Created: at(50), CreatedBy: "admin", Status: "staged", Comment: "rc",
 					CIUser: "jenkins", SourceRepo: "libs-local", Repo: "libs-stage",
@@ -73,50 +74,50 @@ func BuildSeeds() []BuildSeed {
 			},
 		},
 		{
-			Build: types.Build{
+			Build: model.Build{
 				Name: "app", Number: "2", Started: at(20), Created: at(21), CreatedBy: "ci",
 				Modified: at(25), ModifiedBy: "admin", URL: "https://ci/app/2",
-				Properties: types.Properties{"os": {"windows"}},
-				Modules: []types.BuildModule{{
+				Properties: model.Properties{"os": {"windows"}},
+				Modules: []model.BuildModule{{
 					ID: "org.acme:app:2.0", Type: "maven",
-					Artifacts: []types.BuildFile{
+					Artifacts: []model.BuildFile{
 						file("app-1.0.jar", "jar", 4), file("naïve.txt", "txt", 14),
 					},
-					Dependencies: []types.BuildFile{
+					Dependencies: []model.BuildFile{
 						dependency("docs:guide:1", "txt", 9, "test", "runtime"),
 						{
 							ID: "gone:lib:1", Type: "jar",
-							Checksums: types.Checksums{SHA1: strings.Repeat("z", 40)},
+							Checksums: kernel.Checksums{SHA1: strings.Repeat("z", 40)},
 						},
 					},
 				}},
 			},
 		},
 		{
-			Build: types.Build{
+			Build: model.Build{
 				ProjectKey: "proj", Name: "tool", Number: "1", Started: at(30), Created: at(31),
 				CreatedBy: "bob",
-				Modules: []types.BuildModule{{
-					ID: "tool", Type: "generic", Properties: types.Properties{"license": {"MIT"}},
-					Artifacts: []types.BuildFile{
+				Modules: []model.BuildModule{{
+					ID: "tool", Type: "generic", Properties: model.Properties{"license": {"MIT"}},
+					Artifacts: []model.BuildFile{
 						file("a_b.txt", "txt", 10), file("axb.txt", "txt", 11),
 						file("naïve.txt", "txt", 14),
 					},
-					Dependencies: []types.BuildFile{dependency("org.acme:app:1.0", "jar", 4)},
+					Dependencies: []model.BuildFile{dependency("org.acme:app:1.0", "jar", 4)},
 				}},
 			},
-			Promotions: []types.BuildPromotion{
+			Promotions: []model.BuildPromotion{
 				{CreatedBy: "bob", Status: "staged", SourceRepo: "tools-dev", Repo: "tools-stage"},
 			},
 		},
 		{
-			Build: types.Build{
+			Build: model.Build{
 				Name: "app", Number: "1", Started: at(40), Created: at(41), CreatedBy: "ci",
 				URL: "https://ci/app/1",
-				Modules: []types.BuildModule{
+				Modules: []model.BuildModule{
 					{
 						ID: "org.acme:app:1.0", Type: "maven",
-						Artifacts: []types.BuildFile{file("app-1.0.jar", "jar", 15)},
+						Artifacts: []model.BuildFile{file("app-1.0.jar", "jar", 15)},
 					},
 					{ID: "empty", Type: "generic"},
 				},

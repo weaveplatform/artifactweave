@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 )
 
 var errBoom = errors.New("boom")
@@ -50,24 +50,24 @@ type faultStore struct {
 	f *faults
 }
 
-func (s faultStore) Uploads() store.UploadStore { return faultUploads{s.Store.Uploads(), s.f} }
-func (s faultStore) Blobs() store.BlobIndex     { return faultIndex{s.Store.Blobs(), s.f} }
+func (s faultStore) Uploads() session.UploadStore { return faultUploads{s.Store.Uploads(), s.f} }
+func (s faultStore) Blobs() port.BlobIndex        { return faultIndex{s.Store.Blobs(), s.f} }
 
 type faultUploads struct {
-	store.UploadStore
+	session.UploadStore
 	f *faults
 }
 
-func (u faultUploads) Put(ctx context.Context, up store.Upload) error {
+func (u faultUploads) Put(ctx context.Context, up session.Upload) error {
 	if err := u.f.hit("put"); err != nil {
 		return err
 	}
 	return u.UploadStore.Put(ctx, up) //nolint:wrapcheck // test double
 }
 
-func (u faultUploads) Get(ctx context.Context, id string) (store.Upload, error) {
+func (u faultUploads) Get(ctx context.Context, id string) (session.Upload, error) {
 	if err := u.f.hit("get"); err != nil {
-		return store.Upload{}, err
+		return session.Upload{}, err
 	}
 	return u.UploadStore.Get(ctx, id) //nolint:wrapcheck // test double
 }
@@ -80,13 +80,13 @@ func (u faultUploads) Delete(ctx context.Context, id string) error {
 }
 
 type faultIndex struct {
-	store.BlobIndex
+	port.BlobIndex
 	f *faults
 }
 
-func (i faultIndex) Ref(ctx context.Context, b types.Blob, n int64) (types.Blob, error) {
+func (i faultIndex) Ref(ctx context.Context, b blob.Blob, n int64) (blob.Blob, error) {
 	if err := i.f.hit("ref"); err != nil {
-		return types.Blob{}, err
+		return blob.Blob{}, err
 	}
 	return i.BlobIndex.Ref(ctx, b, n) //nolint:wrapcheck // test double
 }

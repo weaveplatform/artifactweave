@@ -9,8 +9,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitHandlerAdmissionAndNoContentBranches(t *testing.T) {
@@ -35,7 +36,7 @@ func TestUnitHandlerAdmissionAndNoContentBranches(t *testing.T) {
 	}
 	missing := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	if _, err := h.Inspect(ctx, format.Env{Blobs: blobs}, c,
-		format.Write{Checksums: types.Checksums{SHA256: missing}}); err == nil {
+		format.Write{Checksums: kernel.Checksums{SHA256: missing}}); err == nil {
 		t.Fatal("inspection accepted a missing blob")
 	}
 	good := format.Write{Op: format.OpDeploy, Path: Path("acme", "pkg", "1.0.0")}
@@ -87,17 +88,17 @@ func TestUnitHandlerAdmissionAndNoContentBranches(t *testing.T) {
 	if err := h.GuardWrite(ctx, format.Env{Store: inmem.New()}, c, good); err != nil {
 		t.Fatalf("new version: %v", err)
 	}
-	for _, it := range []types.Item{{Folder: true}, {Cached: true}} {
+	for _, it := range []model.Item{{Folder: true}, {Cached: true}} {
 		if err := h.Deployed(ctx, format.Env{}, c, it); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := metadataOf(ctx, format.Env{Blobs: blobs}, types.Item{
-		Actual: types.Checksums{SHA256: missing},
+	if _, err := metadataOf(ctx, format.Env{Blobs: blobs}, model.Item{
+		Actual: kernel.Checksums{SHA256: missing},
 	}); err == nil {
 		t.Fatal("metadata lookup accepted a missing blob")
 	}
-	if err := setProperties(ctx, inmem.New(), types.Item{ID: 999}, Metadata{}); err == nil {
+	if err := setProperties(ctx, inmem.New(), model.Item{ID: 999}, Metadata{}); err == nil {
 		t.Fatal("missing item's properties were patched")
 	}
 }

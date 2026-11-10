@@ -13,12 +13,13 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	pubfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pub"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -151,7 +152,7 @@ func (h handler) remoteVersions(r *http.Request, name string) ([]release, error)
 	}
 	out := releases[:0]
 	for _, rel := range releases {
-		if !h.k.Can(r, rel.meta.Path, types.ActionRead) {
+		if !h.k.Can(r, rel.meta.Path, api.ActionRead) {
 			continue
 		}
 		if err := result.CheckRead(r.Context(), rel.meta.Path); err != nil {
@@ -208,7 +209,7 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, rel relea
 	resource := source.Resource{
 		Kind: source.ResourceKindArtifact, Path: rel.meta.Path, Method: http.MethodGet,
 		Variant:   "dart-pub-v2-archive-v1",
-		Checksums: types.Checksums{SHA256: rel.meta.SHA256},
+		Checksums: kernel.Checksums{SHA256: rel.meta.SHA256},
 		Validate: func(_ context.Context, body io.ReadSeeker, size int64) error {
 			if size <= 0 || size > pubfmt.MaxArchiveBytes {
 				return source.ErrInvalidResult

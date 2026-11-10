@@ -9,9 +9,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // index makes the chart archive it, which holds ch, a file of the version
@@ -19,7 +19,7 @@ import (
 // the properties that follow from ch. An archive that was a file of another
 // version, because it held another chart before an overwrite, leaves that
 // one first.
-func index(ctx context.Context, env format.Env, c repo.Config, it types.Item, ch *Chart) error {
+func index(ctx context.Context, env format.Env, c repo.Config, it model.Item, ch *Chart) error {
 	st := env.Store
 	if pv, ok, err := pkgindex.VersionOf(ctx, st, it.ID); err != nil {
 		return err //nolint:wrapcheck // pkgindex wraps its own
@@ -37,7 +37,7 @@ func index(ctx context.Context, env format.Env, c repo.Config, it types.Item, ch
 	if err := setProperties(ctx, st, it, ch); err != nil {
 		return err
 	}
-	p, err := st.Packages().Ensure(ctx, types.Package{
+	p, err := st.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Name: ch.Name, Type: c.PackageType, Created: deployed(it),
 	})
 	if err != nil {
@@ -47,7 +47,7 @@ func index(ctx context.Context, env format.Env, c repo.Config, it types.Item, ch
 	var prev *Metadata
 	pv, err := st.Packages().Version(ctx, p.ID, ch.Version)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 	case err != nil:
 		return fmt.Errorf("helm: version %s of %s: %w", ch.Version, ch.Name, err)
 	default:
@@ -69,7 +69,7 @@ func index(ctx context.Context, env format.Env, c repo.Config, it types.Item, ch
 
 // unindex takes the file it, which holds no chart now, out of the version
 // it was a file of, and reports whether it was one.
-func unindex(ctx context.Context, env format.Env, it types.Item) (bool, error) {
+func unindex(ctx context.Context, env format.Env, it model.Item) (bool, error) {
 	pv, ok, err := pkgindex.VersionOf(ctx, env.Store, it.ID)
 	if err != nil || !ok {
 		return false, err //nolint:wrapcheck // pkgindex wraps its own
@@ -79,7 +79,7 @@ func unindex(ctx context.Context, env format.Env, it types.Item) (bool, error) {
 
 // detach makes pv's files those it has but the item with id: gone with
 // its package when that leaves none, as pkgindex.Prune drops one.
-func detach(ctx context.Context, env format.Env, pv types.PackageVersion, id int64) error {
+func detach(ctx context.Context, env format.Env, pv model.PackageVersion, id int64) error {
 	st := env.Store
 	linked, err := st.Packages().Files(ctx, pv.ID)
 	if err != nil {
@@ -101,7 +101,7 @@ func detach(ctx context.Context, env format.Env, pv types.PackageVersion, id int
 }
 
 // drop removes pv, and its package when no version is left.
-func drop(ctx context.Context, st format.Store, pv types.PackageVersion) error {
+func drop(ctx context.Context, st format.Store, pv model.PackageVersion) error {
 	if err := st.Packages().DeleteVersion(ctx, pv.ID); err != nil {
 		return fmt.Errorf("helm: drop version %s: %w", pv.Version, err)
 	}
@@ -119,7 +119,7 @@ func drop(ctx context.Context, st format.Store, pv types.PackageVersion) error {
 }
 
 // previous is pv's Metadata, which names its newest archive.
-func previous(pv types.PackageVersion) (*Metadata, error) {
+func previous(pv model.PackageVersion) (*Metadata, error) {
 	m, err := DecodeMetadata(pv.Metadata)
 	if err != nil {
 		return nil, err
@@ -137,14 +137,14 @@ func previous(pv types.PackageVersion) (*Metadata, error) {
 func settle(
 	ctx context.Context,
 	env format.Env,
-	p types.Package,
+	p model.Package,
 	version string,
 	ids []int64,
 	known map[int64]*Chart,
 	prev *Metadata,
 ) error {
 	st := env.Store
-	items := make([]types.Item, 0, len(ids))
+	items := make([]model.Item, 0, len(ids))
 	for _, id := range ids {
 		it, err := st.Items().GetByID(ctx, id)
 		if err != nil {
@@ -174,7 +174,7 @@ func settle(
 	}
 	pv, err := st.Packages().Version(ctx, p.ID, version)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	case err != nil:
 		return fmt.Errorf("helm: version %s of %s: %w", version, p.Name, err)
@@ -187,7 +187,7 @@ func settle(
 func describe(
 	ctx context.Context,
 	env format.Env,
-	it types.Item,
+	it model.Item,
 	known map[int64]*Chart,
 	prev *Metadata,
 ) (*Chart, error) {
@@ -205,7 +205,7 @@ func describe(
 // describes the version from now on (decision 0039). The links are left to
 // the item service, which drops the deleted file's and prunes a version left
 // with none, so pv keeps its ID, which the item service has read.
-func handOver(ctx context.Context, env format.Env, pv types.PackageVersion, it types.Item) error {
+func handOver(ctx context.Context, env format.Env, pv model.PackageVersion, it model.Item) error {
 	m, err := DecodeMetadata(pv.Metadata)
 	if err != nil {
 		return err
@@ -222,7 +222,7 @@ func handOver(ctx context.Context, env format.Env, pv types.PackageVersion, it t
 	if err != nil {
 		return fmt.Errorf("helm: package %d: %w", pv.PackageID, err)
 	}
-	var rest []types.Item
+	var rest []model.Item
 	for _, id := range linked {
 		if id == it.ID {
 			continue
@@ -256,24 +256,24 @@ func handOver(ctx context.Context, env format.Env, pv types.PackageVersion, it t
 // straight to the store runs no Annotated hook, which the index has none
 // of anyway. They follow from the content, so they are written at the time
 // the content was, it.Updated.
-func setProperties(ctx context.Context, st format.Store, it types.Item, ch *Chart) error {
+func setProperties(ctx context.Context, st format.Store, it model.Item, ch *Chart) error {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("helm: properties of %s: %w", it.FullPath(), err)
 	}
-	want := types.Properties{
-		PropName:    {types.TruncatePropertyValue(ch.Name, types.PropertyValueMax)},
-		PropVersion: {types.TruncatePropertyValue(ch.Version, types.PropertyValueMax)},
+	want := model.Properties{
+		PropName:    {model.TruncatePropertyValue(ch.Name, model.PropertyValueMax)},
+		PropVersion: {model.TruncatePropertyValue(ch.Version, model.PropertyValueMax)},
 	}
 	var remove []string
 	if ch.AppVersion != "" {
 		want[PropAppVersion] = []string{
-			types.TruncatePropertyValue(ch.AppVersion, types.PropertyValueMax),
+			model.TruncatePropertyValue(ch.AppVersion, model.PropertyValueMax),
 		}
 	} else if _, ok := props[PropAppVersion]; ok {
 		remove = append(remove, PropAppVersion)
 	}
-	set := types.Properties{}
+	set := model.Properties{}
 	for _, k := range slices.Sorted(maps.Keys(want)) {
 		if !slices.Equal(props[k], want[k]) {
 			set[k] = want[k]

@@ -7,22 +7,22 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // TestAccPublicKeyFile: the file name is the alias, the pair's type and pub,
 // and the header quotes an alias that is not a plain token (#473).
 func TestAccPublicKeyFile(t *testing.T) {
-	for k, want := range map[types.Keypair]string{
-		{Alias: "alpine", Type: types.KeypairRSA}: "alpine.rsa.pub",
-		{Alias: "debian", Type: types.KeypairGPG}: "debian.gpg.pub",
+	for k, want := range map[api.Keypair]string{
+		{Alias: "alpine", Type: api.KeypairRSA}: "alpine.rsa.pub",
+		{Alias: "debian", Type: api.KeypairGPG}: "debian.gpg.pub",
 	} {
 		if got := publicKeyFile(k); got != want {
 			t.Errorf("publicKeyFile(%+v) = %q, want %q", k, got, want)
@@ -33,8 +33,8 @@ func TestAccPublicKeyFile(t *testing.T) {
 	// need.
 	ctx := asAdmin(context.Background())
 	db := inmem.New()
-	if err := db.Keys().CreateKeypair(ctx, types.Keypair{
-		Name: "kp-spaced", Type: types.KeypairRSA, Alias: "my key",
+	if err := db.Keys().CreateKeypair(ctx, api.Keypair{
+		Name: "kp-spaced", Type: api.KeypairRSA, Alias: "my key",
 		PrivateKey: "private", PublicKey: "public",
 	}); err != nil {
 		t.Fatalf("create: %v", err)
@@ -71,7 +71,7 @@ type vanishingKeys struct {
 	updateErr error
 }
 
-func (v *vanishingKeys) CreateKeypair(context.Context, types.Keypair) error {
+func (v *vanishingKeys) CreateKeypair(context.Context, api.Keypair) error {
 	v.creates++
 	if v.creates == 1 {
 		return kernel.ErrConflict
@@ -79,19 +79,19 @@ func (v *vanishingKeys) CreateKeypair(context.Context, types.Keypair) error {
 	return nil
 }
 
-func (v *vanishingKeys) UpdateKeypair(context.Context, types.Keypair) error {
+func (v *vanishingKeys) UpdateKeypair(context.Context, api.Keypair) error {
 	return v.updateErr
 }
 
 func TestAccPutKeypairRaces(t *testing.T) {
 	ctx := context.Background()
 	gone := &vanishingKeys{updateErr: kernel.ErrNotFound}
-	if err := putKeypair(ctx, gone, types.Keypair{Name: "kp"}); err != nil || gone.creates != 2 {
+	if err := putKeypair(ctx, gone, api.Keypair{Name: "kp"}); err != nil || gone.creates != 2 {
 		t.Fatalf("a pair deleted before its update: %v after %d creates", err, gone.creates)
 	}
 	errDown := errors.New("store down")
 	broken := &vanishingKeys{updateErr: errDown}
-	if err := putKeypair(ctx, broken, types.Keypair{Name: "kp"}); !errors.Is(err, errDown) {
+	if err := putKeypair(ctx, broken, api.Keypair{Name: "kp"}); !errors.Is(err, errDown) {
 		t.Fatalf("a failed update: %v", err)
 	}
 }
@@ -182,8 +182,8 @@ func usedKeypair(t *testing.T) *inmem.Store {
 	t.Helper()
 	ctx := context.Background()
 	db := inmem.New()
-	if err := db.Keys().CreateKeypair(ctx, types.Keypair{
-		Name: "kp-used", Type: types.KeypairRSA, Alias: "used",
+	if err := db.Keys().CreateKeypair(ctx, api.Keypair{
+		Name: "kp-used", Type: api.KeypairRSA, Alias: "used",
 		PrivateKey: "private", PublicKey: "public",
 	}); err != nil {
 		t.Fatal(err)

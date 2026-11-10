@@ -14,12 +14,12 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	bowerfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxRefsBytes = 1 << 20
@@ -132,7 +132,7 @@ func (h handler) remoteVersions(r *http.Request, name string) ([]string, error) 
 	out := make([]string, 0, len(vs))
 	for _, v := range vs {
 		manifest := bowerfmt.ManifestPath(name, v.Version)
-		if !h.k.Can(r, manifest, types.ActionRead) {
+		if !h.k.Can(r, manifest, api.ActionRead) {
 			continue
 		}
 		if result.CheckRead != nil {
@@ -163,7 +163,7 @@ func (h handler) remotePackageNames(r *http.Request, query string) ([]string, er
 		Variant: "bower-packages-v1", ValidateMetadata: validatePackages,
 	}
 	result, err := h.k.Read(r, resource)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil, nil
 	}
 	if err != nil {
@@ -381,6 +381,6 @@ func (h handler) remoteBinary(w http.ResponseWriter, r *http.Request, name, vers
 // absent virtual member, unlike upstream refusal, timeout or integrity failure.
 func missingPackage(err error) bool {
 	var failure *apierror.Error
-	return errors.Is(err, store.ErrNotFound) ||
+	return errors.Is(err, kernel.ErrNotFound) ||
 		errors.As(err, &failure) && failure.Status == http.StatusNotFound
 }

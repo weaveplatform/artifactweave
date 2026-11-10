@@ -3,10 +3,10 @@ package app
 import (
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var modelRoutes = []struct {
@@ -93,9 +93,9 @@ var machineLearningMatrixPart = matrixPart{
 	rows: func() []matrixRow {
 		var rows []matrixRow
 		for _, r := range modelRoutes {
-			action := types.ActionWrite
+			action := api.ActionWrite
 			if r.method == "GET" {
-				action = types.ActionRead
+				action = api.ActionRead
 			}
 			rows = append(
 				rows,

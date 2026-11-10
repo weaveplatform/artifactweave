@@ -40,21 +40,25 @@ import (
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
@@ -102,7 +106,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*RouterConfig)) *it
 	db := inmem.New()
 	cheapSeed(t, db)
 	hash := cheapHash
-	for _, u := range []types.User{
+	for _, u := range []model.User{
 		{Name: "reader", PasswordHash: hash, Groups: []string{authn.ReadersGroup}},
 		{Name: "deployer", PasswordHash: hash},
 		{Name: "user", PasswordHash: hash},
@@ -111,30 +115,32 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*RouterConfig)) *it
 			t.Fatal(err)
 		}
 	}
-	if err := db.Permissions().Create(ctx, types.Permission{
+	if err := db.Permissions().Create(ctx, model.Permission{
 		Name: "deploy-libs",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"deployer": types.ActionRead | types.ActionWrite,
+		Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]accessapi.Actions{
+				"deployer": accessapi.ActionRead | accessapi.ActionWrite,
 			}},
-			Targets: map[string]types.Target{"libs-local": {Include: []string{"**"}}},
+			Targets: map[string]model.Target{"libs-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if anonymous {
-		if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+		if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 			t.Fatal(err)
 		}
 		// The seeded Any Remote grants anonymous nothing (#383), so anonymous
 		// reads remotes through a permission of its own, as JFrog advises.
-		if err := db.Permissions().Create(ctx, types.Permission{
+		if err := db.Permissions().Create(ctx, model.Permission{
 			Name: anonymousRemotes,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					kernel.AnonymousUser: types.ActionRead,
+			Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]accessapi.Actions{
+					kernel.AnonymousUser: accessapi.ActionRead,
 				}},
-				Targets: map[string]types.Target{types.TargetAnyRemote: {Include: []string{"**"}}},
+				Targets: map[string]model.Target{
+					accessapi.TargetAnyRemote: {Include: []string{"**"}},
+				},
 			}},
 		}); err != nil {
 			t.Fatal(err)
@@ -192,7 +198,7 @@ func (w *itemWorld) do(
 	return do(w.t, w.h, method, path, h, body)
 }
 
-func (w *itemWorld) item(key string, cached bool, p string) types.Item {
+func (w *itemWorld) item(key string, cached bool, p string) model.Item {
 	w.t.Helper()
 	it, err := w.db.Items().Get(context.Background(), key, cached, p)
 	if err != nil {
@@ -241,7 +247,7 @@ func newRepoWorld(t *testing.T) *repoWorld {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	reader := types.User{
+	reader := model.User{
 		Name:         "reader",
 		PasswordHash: cheapHash,
 		Groups:       []string{authn.ReadersGroup},
@@ -313,7 +319,7 @@ func newIdentityWorld(t *testing.T) identityWorld {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -369,7 +375,7 @@ func (w identityWorld) bearer(t *testing.T, user string, scope string) map[strin
 	t.Helper()
 	req := token.Request{Username: user, ByAdmin: true}
 	if scope != "" {
-		sc, err := types.ParseScope(scope)
+		sc, err := kernel.ParseScope(scope)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -487,13 +493,13 @@ func seedKeys(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	ctx := context.Background()
 	k := testKeys()
-	if err := db.Keys().CreateKeypair(ctx, types.Keypair{
-		Name: "kp-used", Type: types.KeypairRSA, Alias: "used",
+	if err := db.Keys().CreateKeypair(ctx, accessapi.Keypair{
+		Name: "kp-used", Type: accessapi.KeypairRSA, Alias: "used",
 		PrivateKey: k.private, PublicKey: k.public,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Keys().PutCertificate(ctx, types.Certificate{
+	if err := db.Keys().PutCertificate(ctx, accessapi.Certificate{
 		Alias: "cert-used", PEM: k.bundle,
 	}); err != nil {
 		t.Fatal(err)
@@ -958,29 +964,29 @@ type faultyStore struct {
 	fail map[string]bool
 }
 
-func (f faultyStore) Repos() store.RepoStore {
+func (f faultyStore) Repos() port.RepoStore {
 	return faultyRepos{RepoStore: f.Store.Repos(), fail: f.fail}
 }
 
-func (f faultyStore) Permissions() store.PermissionStore {
+func (f faultyStore) Permissions() port.PermissionStore {
 	if f.fail["permissions"] {
 		return failingPermissionStore{f.Store.Permissions()}
 	}
 	return f.Store.Permissions()
 }
 
-type failingPermissionStore struct{ store.PermissionStore }
+type failingPermissionStore struct{ port.PermissionStore }
 
 func (failingPermissionStore) ForPrincipal(
 	context.Context,
 	string,
 	[]string,
-) ([]types.Permission, error) {
+) ([]model.Permission, error) {
 	return nil, errBoom
 }
 
 type faultyRepos struct {
-	store.RepoStore
+	port.RepoStore
 	fail map[string]bool
 }
 
@@ -991,7 +997,7 @@ func (f faultyRepos) Including(ctx context.Context, key string) ([]string, error
 	return f.RepoStore.Including(ctx, key) //nolint:wrapcheck // test double
 }
 
-func (f faultyRepos) List(ctx context.Context, rf store.RepoFilter) ([]repo.Config, error) {
+func (f faultyRepos) List(ctx context.Context, rf port.RepoFilter) ([]repo.Config, error) {
 	if f.fail["list"] {
 		return nil, errBoom
 	}
@@ -1041,9 +1047,9 @@ func (f sourceBackend) Read(
 	return f(ctx, q, p)
 }
 
-func sourceIdentity(context.Context, repo.Config) (types.SourceIdentity, error) {
-	return types.SourceIdentity{
-		Kind:       types.ExternalHTTP,
+func sourceIdentity(context.Context, repo.Config) (model.SourceIdentity, error) {
+	return model.SourceIdentity{
+		Kind:       model.ExternalHTTP,
 		Repository: "repo-1",
 		ID:         "http-1",
 		Generation: "revision-1",
@@ -1060,7 +1066,7 @@ func (b *sourceBody) Close() error { b.closes.Add(1); return nil }
 // bearerFor issues dev a token with scope.
 func bearerFor(t *testing.T, tokens *token.Service, scope string) map[string]string {
 	t.Helper()
-	sc, err := types.ParseScope(scope)
+	sc, err := kernel.ParseScope(scope)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1079,19 +1085,19 @@ func buildsAQLWorld(t *testing.T, tune ...func(*RouterConfig)) (http.Handler, *t
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	if err := db.Users().Create(ctx, types.User{Name: "dev", PasswordHash: cheapHash}); err != nil {
+	if err := db.Users().Create(ctx, model.User{Name: "dev", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
-	dev := types.Grants{Users: map[string]types.Actions{"dev": types.ActionRead}}
-	if err := db.Permissions().Create(ctx, types.Permission{
-		Name: "dev-app", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
+	dev := model.Grants{Users: map[string]accessapi.Actions{"dev": accessapi.ActionRead}}
+	if err := db.Permissions().Create(ctx, model.Permission{
+		Name: "dev-app", Resources: map[accessapi.ResourceType]model.Resource{
+			accessapi.ResourceArtifact: {
 				Actions: dev,
-				Targets: map[string]types.Target{"libs-local": {Include: []string{"**"}}},
+				Targets: map[string]model.Target{"libs-local": {Include: []string{"**"}}},
 			},
-			types.ResourceBuild: {
+			accessapi.ResourceBuild: {
 				Actions: dev,
-				Targets: map[string]types.Target{
+				Targets: map[string]model.Target{
 					"artifactory-build-info": {Include: []string{"app/**"}},
 				},
 			},
@@ -1115,18 +1121,18 @@ func buildsAQLWorld(t *testing.T, tune ...func(*RouterConfig)) (http.Handler, *t
 		t.Fatal(err)
 	}
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	jar := types.BuildFile{Name: "app.jar", Checksums: types.Checksums{SHA1: sha1Hex("jar")}}
+	jar := model.BuildFile{Name: "app.jar", Checksums: kernel.Checksums{SHA1: sha1Hex("jar")}}
 	for n, run := range [][2]string{{"app", "1"}, {"app", "2"}, {"tool", "1"}} {
-		b, err := db.Builds().Put(ctx, types.Build{
+		b, err := db.Builds().Put(ctx, model.Build{
 			Name: run[0], Number: run[1], Started: base.Add(time.Duration(n) * time.Minute),
 			Created: base.Add(time.Hour), CreatedBy: "ci", URL: "https://ci/" + run[0],
-			Modules: []types.BuildModule{{ID: run[0], Artifacts: []types.BuildFile{jar}}},
+			Modules: []model.BuildModule{{ID: run[0], Artifacts: []model.BuildFile{jar}}},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if n == 0 {
-			if _, err := db.Builds().AddPromotion(ctx, types.BuildPromotion{
+			if _, err := db.Builds().AddPromotion(ctx, model.BuildPromotion{
 				BuildID: b.ID, Created: base.Add(2 * time.Hour), CreatedBy: "admin",
 				Status: "released", Repo: "libs-release", CIUser: "jenkins",
 			}); err != nil {
@@ -1134,7 +1140,7 @@ func buildsAQLWorld(t *testing.T, tune ...func(*RouterConfig)) (http.Handler, *t
 			}
 		}
 	}
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -1179,9 +1185,9 @@ func searchWorld(t *testing.T, anonymous bool, tune ...func(*RouterConfig)) *ite
 	wantStatus(t, w.do("PUT", "/artifactory/server-local/bad.jar", "admin", "bad",
 		"X-Checksum-Md5", md5Hex("other")), http.StatusCreated)
 	hour := time.Now().Add(-time.Hour).UTC()
-	if _, err := w.db.Items().Put(context.Background(), types.Item{
-		RepoKey: "up", Cached: true, Path: types.RootPath, Name: "cached.txt", Size: 1,
-		Actual:  types.Checksums{SHA1: sha1Hex("c"), MD5: md5Hex("c")},
+	if _, err := w.db.Items().Put(context.Background(), model.Item{
+		RepoKey: "up", Cached: true, Path: kernel.RootPath, Name: "cached.txt", Size: 1,
+		Actual:  kernel.Checksums{SHA1: sha1Hex("c"), MD5: md5Hex("c")},
 		Created: hour, Modified: hour, Updated: hour,
 	}); err != nil {
 		t.Fatal(err)
@@ -1220,8 +1226,8 @@ func restrictionsOver(t *testing.T, st *inmem.Store) accessapi.Restrictions {
 // setTrashcan turns the trash can on or off, with Artifactory's retention.
 func setTrashcan(t *testing.T, db *inmem.Store, on bool) {
 	t.Helper()
-	if err := db.Settings().Put(context.Background(), types.SettingTrashcan,
-		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
+	if err := db.Settings().Put(context.Background(), settings.SettingTrashcan,
+		model.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -1239,7 +1245,7 @@ func seedOverwriteStatus(t *testing.T, db *inmem.Store, items *item.Service) {
 	t.Helper()
 	ctx := context.Background()
 	name, _, _ := strings.Cut(overwriter, ":")
-	if err := db.Users().Create(ctx, types.User{Name: name, PasswordHash: cheapHash}); err != nil {
+	if err := db.Users().Create(ctx, model.User{Name: name, PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	grantOverwriter(t, db, "libs-local", "overwrite/")
@@ -1488,13 +1494,13 @@ func (w *itemWorld) put(p, body string) {
 func grantOverwriter(t *testing.T, db *inmem.Store, key, under string) {
 	t.Helper()
 	name, _, _ := strings.Cut(overwriter, ":")
-	if err := db.Permissions().Create(context.Background(), types.Permission{
+	if err := db.Permissions().Create(context.Background(), model.Permission{
 		Name: "st-overwrite-" + key,
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				name: types.ActionRead | types.ActionWrite,
+		Resources: map[accessapi.ResourceType]model.Resource{accessapi.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]accessapi.Actions{
+				name: accessapi.ActionRead | accessapi.ActionWrite,
 			}},
-			Targets: map[string]types.Target{key: {Include: []string{under + "**"}}},
+			Targets: map[string]model.Target{key: {Include: []string{under + "**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -1534,23 +1540,23 @@ type buildSearchFaults struct {
 	fail string
 }
 
-func (f buildSearchFaults) Builds() store.BuildStore {
+func (f buildSearchFaults) Builds() port.BuildStore {
 	return faultyBuildSearch{f.Store.Builds(), f.fail}
 }
 
-func (f buildSearchFaults) Items() store.ItemStore {
+func (f buildSearchFaults) Items() port.ItemStore {
 	return faultyChecksumSearch{f.Store.Items(), f.fail}
 }
 
 type faultyBuildSearch struct {
-	store.BuildStore
+	port.BuildStore
 	fail string
 }
 
 func (f faultyBuildSearch) FindDependencies(
 	ctx context.Context,
-	c types.Checksums,
-) ([]types.BuildFileRef, error) {
+	c kernel.Checksums,
+) ([]model.BuildFileRef, error) {
 	if f.fail == "dependencies" {
 		return nil, errBoom
 	}
@@ -1560,8 +1566,8 @@ func (f faultyBuildSearch) FindDependencies(
 func (f faultyBuildSearch) Runs(
 	ctx context.Context,
 	project, name string,
-	p store.Page,
-) ([]types.BuildRun, string, error) {
+	p kernel.Page,
+) ([]model.BuildRun, string, error) {
 	if f.fail == "runs" {
 		return nil, "", errBoom
 	}
@@ -1569,15 +1575,15 @@ func (f faultyBuildSearch) Runs(
 }
 
 type faultyChecksumSearch struct {
-	store.ItemStore
+	port.ItemStore
 	fail string
 }
 
 func (f faultyChecksumSearch) FindByChecksum(
 	ctx context.Context,
-	c types.Checksums,
-	p store.Page,
-) ([]types.Item, string, error) {
+	c kernel.Checksums,
+	p kernel.Page,
+) ([]model.Item, string, error) {
 	if f.fail == "find" {
 		return nil, "", errBoom
 	}

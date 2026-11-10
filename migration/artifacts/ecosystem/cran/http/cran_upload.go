@@ -9,13 +9,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cran"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The native POST API identifies a CRAN package by its archive contents. A
@@ -90,7 +90,7 @@ func (s CranAPI) uploadCran(
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("repository is not a CRAN repository"))
 		return
 	}
-	if !acc.Folder(c, feed, types.ActionWrite) {
+	if !acc.Folder(c, feed, api.ActionWrite) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -118,7 +118,7 @@ func (s CranAPI) uploadCran(
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("invalid CRAN package archive"))
 		return
 	}
-	if !acc.File(c, pkg.Path, types.ActionWrite) {
+	if !acc.File(c, pkg.Path, api.ActionWrite) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -130,7 +130,7 @@ func (s CranAPI) uploadCran(
 	it, err := svc.Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: pkg.Path}, Body: tmp,
 		Declared: pkgroute.DeclaredChecksums(r.Header), By: p.Name,
-		CanOverwritePath:   func(full string) bool { return acc.File(c, full, types.ActionDelete) },
+		CanOverwritePath:   func(full string) bool { return acc.File(c, full, api.ActionDelete) },
 		OverwriteIdentical: s.MayBeIdentical(false),
 	})
 	if errors.Is(err, cran.ErrPackage) {

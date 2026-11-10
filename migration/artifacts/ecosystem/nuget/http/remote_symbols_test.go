@@ -11,7 +11,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const remotePDBKey = "030201000504070608090A0B0C0D0E0FFFFFFFFF"
@@ -125,7 +125,7 @@ func TestAccRemoteSymbolBadContentNeverPublishes(t *testing.T) {
 			if _, err := f.db.Items().
 				Get(t.Context(), c.Key, true, ".symbols/"+path); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("invalid symbol published", err)
 			}

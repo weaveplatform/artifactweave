@@ -14,14 +14,15 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // APIVersionHeader is the header every registry response carries. Docker
@@ -65,13 +66,13 @@ type Options struct {
 	// ServeBlob answers a GET of a blob's item in a repository with the
 	// server's download, which applies the download redirect policy
 	// (decision 0029) and counts the download. Nil streams it from Blobs.
-	ServeBlob func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item)
+	ServeBlob func(w http.ResponseWriter, r *http.Request, c repo.Config, it model.Item)
 	// RedirectManifest answers a GET of a manifest's item, whose media type
 	// is mediaType, with the server's download redirect when the policy says
 	// so (decision 0029), and reports whether it wrote a response. Nil
 	// streams every manifest.
 	RedirectManifest func(
-		w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item, mediaType string,
+		w http.ResponseWriter, r *http.Request, c repo.Config, it model.Item, mediaType string,
 	) bool
 	// Now supplies the time to upload sessions; nil means time.Now.
 	Now func() time.Time
@@ -110,8 +111,8 @@ type Registry struct {
 	// blob store.
 	blobs            blob.Store
 	uploads          *registry.Service
-	serveBlob        func(http.ResponseWriter, *http.Request, repo.Config, types.Item)
-	redirectManifest func(http.ResponseWriter, *http.Request, repo.Config, types.Item, string) bool
+	serveBlob        func(http.ResponseWriter, *http.Request, repo.Config, model.Item)
+	redirectManifest func(http.ResponseWriter, *http.Request, repo.Config, model.Item, string) bool
 }
 
 type endpointKey struct {
@@ -347,10 +348,10 @@ func (g *Registry) lookup(ctx context.Context, key string) (repo.Config, bool, e
 // false for a missing repository and for one of another package type.
 func Lookup(ctx context.Context, st format.Store, key string) (repo.Config, bool, error) {
 	c, err := st.Repos().Get(ctx, key)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		// The exact key failed; a case-insensitive match needs the list.
 		var all []repo.Config
-		if all, err = st.Repos().List(ctx, store.RepoFilter{}); err == nil {
+		if all, err = st.Repos().List(ctx, port.RepoFilter{}); err == nil {
 			i := slices.IndexFunc(
 				all,
 				func(c repo.Config) bool { return strings.EqualFold(c.Key, key) },
@@ -394,7 +395,7 @@ func (g *Registry) blackedOut(w http.ResponseWriter, r *http.Request, q Request)
 // excluded answers a pulled item the repository's include and exclude
 // patterns reject as a missing one, 404 under code, with Artifactory's
 // message.
-func excluded(w http.ResponseWriter, q Request, it types.Item, code string) bool {
+func excluded(w http.ResponseWriter, q Request, it model.Item, code string) bool {
 	var refused *format.RejectionError
 	if errors.As(generic.CheckDownload(q.Repo, it.FullPath(), false), &refused) {
 		Write(w, Errorf(http.StatusNotFound, code, "%s", refused.Message))

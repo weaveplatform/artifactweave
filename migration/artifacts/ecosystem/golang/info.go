@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // MaxInfo is the largest .info a Go deploy may carry: 64 KiB, far above
@@ -66,7 +66,7 @@ func infoTime(body []byte) (t time.Time, ok bool) {
 
 // storedTime reads the Time of the .info stored as it. Without a blob
 // store to read, as in a hook run on a store alone, it reads none.
-func storedTime(ctx context.Context, blobs format.Blobs, it types.Item) (time.Time, bool, error) {
+func storedTime(ctx context.Context, blobs format.Blobs, it model.Item) (time.Time, bool, error) {
 	if blobs == nil {
 		return time.Time{}, false, nil
 	}
@@ -102,7 +102,7 @@ func metadataOf(t time.Time, ok bool) []byte {
 
 // ListTime is the time @v/list gives version v: its stored .info's Time,
 // or else when its first file was stored, which a synthesised .info gives.
-func ListTime(v types.PackageVersion) time.Time {
+func ListTime(v model.PackageVersion) time.Time {
 	var m versionMeta
 	if json.Unmarshal(v.Metadata, &m) == nil {
 		if t, err := time.Parse(time.RFC3339, m.Time); err == nil {

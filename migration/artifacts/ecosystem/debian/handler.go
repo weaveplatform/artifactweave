@@ -12,9 +12,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // KindIndex is the work kind that rebuilds a local or federated
@@ -193,7 +193,7 @@ func (Handler) Admit(
 // trusting their paths. A source package file (a .dsc, .diff.gz or
 // .tar.* archive) only queues the rebuild, which lists the source once
 // all its parts are stored. Folders and other files change nothing.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder {
 		return nil
 	}
@@ -221,7 +221,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 // metadata rebuild when a local or federated repository's own binary or
 // source package file is about to be deleted, so the rebuild is asked for
 // exactly when the delete commits.
-func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if snapshotPath(it.FullPath()) && ctx.Value(snapshotDeleteKey{}) != true {
 		return format.Rejectf(http.StatusConflict, "Delete the complete Debian snapshot folder")
 	}
@@ -239,7 +239,7 @@ func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	seen := map[string]bool{}
 	for _, it := range removed {
@@ -301,7 +301,7 @@ func reindex(ctx context.Context, env format.Env, c repo.Config, writeProps bool
 	if err != nil {
 		return err
 	}
-	by := map[string]map[string][]types.Item{}
+	by := map[string]map[string][]model.Item{}
 	for _, it := range items {
 		if !isBinary(it.FullPath()) {
 			continue
@@ -316,7 +316,7 @@ func reindex(ctx context.Context, env format.Env, c repo.Config, writeProps bool
 			}
 		}
 		if by[b.Name] == nil {
-			by[b.Name] = map[string][]types.Item{}
+			by[b.Name] = map[string][]model.Item{}
 		}
 		by[b.Name][b.Version] = append(by[b.Name][b.Version], it)
 	}
@@ -413,7 +413,7 @@ func readStoredSource(ctx context.Context, blobs format.Blobs, sha string) (Sour
 	return source, nil
 }
 
-func sourceFor(ctx context.Context, env format.Env, it types.Item) (Source, error) {
+func sourceFor(ctx context.Context, env format.Env, it model.Item) (Source, error) {
 	if in, ok := env.Inspection.(sourceInspection); ok &&
 		in.sha == it.Actual.SHA256 && in.path == it.FullPath() {
 		return in.source, nil
@@ -421,7 +421,7 @@ func sourceFor(ctx context.Context, env format.Env, it types.Item) (Source, erro
 	return readStoredSource(ctx, env.Blobs, it.Actual.SHA256)
 }
 
-func sourceCoordinates(props types.Properties, source Source, cached bool) error {
+func sourceCoordinates(props model.Properties, source Source, cached bool) error {
 	dists, components := props["dsc.distribution"], props["dsc.component"]
 	if len(dists)+len(components) == 0 && cached {
 		return nil
@@ -439,7 +439,7 @@ func sourceCoordinates(props types.Properties, source Source, cached bool) error
 	return nil
 }
 
-func packageFor(ctx context.Context, env format.Env, it types.Item) (Binary, error) {
+func packageFor(ctx context.Context, env format.Env, it model.Item) (Binary, error) {
 	if in, ok := env.Inspection.(inspection); ok &&
 		in.sha == it.Actual.SHA256 && in.path == it.FullPath() {
 		return in.binary, nil
@@ -447,7 +447,7 @@ func packageFor(ctx context.Context, env format.Env, it types.Item) (Binary, err
 	return readStored(ctx, env.Blobs, it.Actual.SHA256)
 }
 
-func coordinates(props types.Properties, b Binary) error {
+func coordinates(props model.Properties, b Binary) error {
 	distributions, components, arches := props[PropDistribution], props[PropComponent], props[PropArchitecture]
 	if len(distributions)+len(components)+len(arches) == 0 {
 		return nil // stored without Debian coordinates; not indexed by apt
@@ -478,13 +478,13 @@ func coordinates(props types.Properties, b Binary) error {
 	return nil
 }
 
-func setProperties(ctx context.Context, st format.Store, it types.Item, b Binary) error {
+func setProperties(ctx context.Context, st format.Store, it model.Item, b Binary) error {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("debian: item properties: %w", err)
 	}
-	want := types.Properties{PropName: {b.Name}, PropVersion: {b.Version}}
-	set := types.Properties{}
+	want := model.Properties{PropName: {b.Name}, PropVersion: {b.Version}}
+	set := model.Properties{}
 	for key, value := range want {
 		if !slices.Equal(props[key], value) {
 			set[key] = value
@@ -501,7 +501,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, versi
 	if err != nil {
 		return err
 	}
-	var selected []types.Item
+	var selected []model.Item
 	for _, it := range items {
 		if !isBinary(it.FullPath()) {
 			continue
@@ -518,7 +518,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, versi
 		return nil // the item service prunes the last version on delete
 	}
 	v := indexedVersion(version, selected)
-	p, err := env.Store.Packages().Ensure(ctx, types.Package{
+	p, err := env.Store.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Type: c.PackageType, Name: name, Created: v.Created,
 	})
 	if err != nil {
@@ -528,7 +528,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, versi
 	return err //nolint:wrapcheck
 }
 
-func indexedVersion(version string, items []types.Item) pkgindex.IndexedVersion {
+func indexedVersion(version string, items []model.Item) pkgindex.IndexedVersion {
 	v := pkgindex.IndexedVersion{Version: version}
 	for _, it := range items {
 		if v.Created.IsZero() || it.Created.Before(v.Created) {
@@ -540,7 +540,7 @@ func indexedVersion(version string, items []types.Item) pkgindex.IndexedVersion 
 	return v
 }
 
-func files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, error) {
+func files(ctx context.Context, st format.Store, c repo.Config) ([]model.Item, error) {
 	hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
@@ -548,7 +548,7 @@ func files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, e
 	if err != nil {
 		return nil, fmt.Errorf("debian: repository files: %w", err)
 	}
-	out := make([]types.Item, 0, len(hits))
+	out := make([]model.Item, 0, len(hits))
 	for _, hit := range hits {
 		out = append(out, hit.Item)
 	}

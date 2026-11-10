@@ -21,9 +21,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type registryFixture struct {
@@ -491,8 +491,8 @@ func TestAccRegistryHTTPSRealmCredentialOptInAndRedirect(t *testing.T) {
 func TestAccRegistryPoolAndNaming(t *testing.T) {
 	f := newRegistryFixture(t, "")
 	var pool RegistryPool
-	identity := types.SourceIdentity{
-		Kind:       types.ExternalHTTP,
+	identity := model.SourceIdentity{
+		Kind:       model.ExternalHTTP,
 		Repository: "incarnation",
 		Generation: "one",
 	}
@@ -575,8 +575,8 @@ func TestUnitRegistryClientsOpenReturnsUntypedNil(t *testing.T) {
 		},
 	}
 	c := repo.Config{Key: "docker-remote", Class: repo.Remote, PackageType: repo.Docker}
-	identity := types.SourceIdentity{
-		Kind:       types.ExternalHTTP,
+	identity := model.SourceIdentity{
+		Kind:       model.ExternalHTTP,
 		Repository: "incarnation",
 		Generation: "one",
 	}
@@ -726,10 +726,10 @@ func TestAccRegistryInvalidConfigurationAndRequests(t *testing.T) {
 		t.Fatal("oversized project image")
 	}
 	var pool RegistryPool
-	if _, err := pool.Client(f.config, types.SourceIdentity{}, f.options); err == nil {
+	if _, err := pool.Client(f.config, model.SourceIdentity{}, f.options); err == nil {
 		t.Fatal("source identity absent")
 	}
-	identity := types.SourceIdentity{Kind: types.ExternalHTTP, Repository: "one", Generation: "one"}
+	identity := model.SourceIdentity{Kind: model.ExternalHTTP, Repository: "one", Generation: "one"}
 	bad := f.config
 	bad.PackageType = "npm"
 	if _, err := pool.Client(bad, identity, f.options); err == nil {
@@ -761,9 +761,9 @@ func TestAccRegistryProjectAndRepositoryIsolation(t *testing.T) {
 		}
 		client, err := pool.Client(
 			config,
-			types.SourceIdentity{
-				Kind:       types.ExternalHTTP,
-				Repository: types.RepositoryIncarnation(key),
+			model.SourceIdentity{
+				Kind:       model.ExternalHTTP,
+				Repository: model.RepositoryIncarnation(key),
 				Generation: "one",
 			},
 			options,

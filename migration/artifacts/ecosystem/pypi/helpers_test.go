@@ -16,10 +16,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // entry is an archive entry: a folder when its name ends in "/".
@@ -149,7 +149,7 @@ func (w *world) repo(key string, class repo.Class) repo.Config {
 	return c
 }
 
-func (w *world) deploy(p string, body []byte, props types.Properties) types.Item {
+func (w *world) deploy(p string, body []byte, props model.Properties) model.Item {
 	w.t.Helper()
 	it, err := w.tryDeploy(w.c, p, body, props)
 	if err != nil {
@@ -162,8 +162,8 @@ func (w *world) tryDeploy(
 	c repo.Config,
 	p string,
 	body []byte,
-	props types.Properties,
-) (types.Item, error) {
+	props model.Properties,
+) (model.Item, error) {
 	w.now = w.now.Add(time.Minute)
 	return w.items.Deploy(w.ctx, item.Deploy{ //nolint:wrapcheck // test helper
 		Target: item.Target{Repo: c, Path: p}, Body: bytes.NewReader(body),
@@ -171,7 +171,7 @@ func (w *world) tryDeploy(
 	})
 }
 
-func (w *world) item(p string) types.Item {
+func (w *world) item(p string) model.Item {
 	w.t.Helper()
 	it, err := w.st.Items().Get(w.ctx, w.c.Key, false, p)
 	if err != nil {
@@ -180,7 +180,7 @@ func (w *world) item(p string) types.Item {
 	return it
 }
 
-func (w *world) annotate(p string, set types.Properties, remove ...string) {
+func (w *world) annotate(p string, set model.Properties, remove ...string) {
 	w.t.Helper()
 	w.now = w.now.Add(time.Minute)
 	if err := w.items.Annotate(w.ctx, w.c, w.item(p), set, remove); err != nil {
@@ -188,7 +188,7 @@ func (w *world) annotate(p string, set types.Properties, remove ...string) {
 	}
 }
 
-func (w *world) props(p string) types.Properties {
+func (w *world) props(p string) model.Properties {
 	w.t.Helper()
 	props, err := w.st.Items().Properties(w.ctx, w.item(p).ID)
 	if err != nil {
@@ -222,7 +222,7 @@ func (w *world) transfer(from, to string, move bool) {
 func (w *world) index() map[string]map[string]pypi.Metadata {
 	w.t.Helper()
 	out := map[string]map[string]pypi.Metadata{}
-	pkgs, _, err := w.st.Packages().List(w.ctx, w.c.Key, store.Page{Limit: store.MaxLimit})
+	pkgs, _, err := w.st.Packages().List(w.ctx, w.c.Key, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -254,5 +254,5 @@ func paths(m pypi.Metadata) []string {
 
 // annotation is a change to pypi.yanked.
 func annotation() format.Annotation {
-	return format.Annotation{Set: types.Properties{pypi.PropYanked: {"true"}}}
+	return format.Annotation{Set: model.Properties{pypi.PropYanked: {"true"}}}
 }

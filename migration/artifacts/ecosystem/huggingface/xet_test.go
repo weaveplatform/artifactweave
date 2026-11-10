@@ -6,8 +6,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	api "github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitXetPrivateLayoutBoundaries(t *testing.T) {
@@ -28,7 +28,7 @@ func TestUnitXetPrivateLayoutBoundaries(t *testing.T) {
 		if _, err := h.Resolve(t.Context(), api.Env{}, c, api.Download{Path: path}); err == nil {
 			t.Fatal("raw private read accepted")
 		}
-		item := types.Item{
+		item := model.Item{
 			Path: strings.TrimSuffix(path, "/"+strings.Repeat("a", 64)),
 			Name: strings.Repeat("a", 64),
 		}
@@ -55,7 +55,7 @@ func TestUnitXetPrivateLayoutBoundaries(t *testing.T) {
 		t.Context(),
 		api.Env{},
 		c,
-		types.Item{Name: "config.json"},
+		model.Item{Name: "config.json"},
 	); e != nil {
 		t.Fatal("ordinary transfer refused")
 	}

@@ -14,10 +14,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 func sum(s string) string {
@@ -106,7 +107,7 @@ func findBlob(t *testing.T, db item.Store) {
 		"claimed": sum("claimed"), "absent": sum("absent"),
 	} {
 		if _, err := layout.FindBlob(ctx, db.Items(), "docker-local", "a_b.c", hex); !errors.Is(
-			err, store.ErrNotFound,
+			err, kernel.ErrNotFound,
 		) {
 			t.Errorf("%s: %v", name, err)
 		}
@@ -123,7 +124,7 @@ func findBlob(t *testing.T, db item.Store) {
 	}
 }
 
-type failingSearch struct{ store.ItemStore }
+type failingSearch struct{ port.ItemStore }
 
 func (failingSearch) Search(context.Context, *aql.Query, aql.Options) ([]aql.Hit, error) {
 	return nil, errors.New("boom")
@@ -131,7 +132,7 @@ func (failingSearch) Search(context.Context, *aql.Query, aql.Options) ([]aql.Hit
 
 func TestUnitFindBlobFails(t *testing.T) {
 	_, err := layout.FindBlob(context.Background(), failingSearch{}, "r", "app", sum("x"))
-	if err == nil || errors.Is(err, store.ErrNotFound) || !strings.Contains(err.Error(), "boom") {
+	if err == nil || errors.Is(err, kernel.ErrNotFound) || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("err = %v", err)
 	}
 }

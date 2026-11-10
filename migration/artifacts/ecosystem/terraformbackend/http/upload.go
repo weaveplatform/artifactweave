@@ -19,8 +19,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -44,8 +42,8 @@ type claims struct {
 	Expires int64  `json:"exp"`
 	// Keep a token's original ceiling: looking up only its user's current
 	// permissions would silently turn a scoped capability into a full grant.
-	Scope    *string             `json:"scope,omitempty"`
-	Identity types.TokenIdentity `json:"identity,omitempty"`
+	Scope    *string              `json:"scope,omitempty"`
+	Identity kernel.TokenIdentity `json:"identity,omitempty"`
 }
 
 func (h handler) uploadURL(
@@ -153,9 +151,9 @@ func (h handler) authorizeUpload(r *http.Request, c repo.Config, name string, cl
 		return fmt.Errorf("terraformbackend: restricted upload: %w", err)
 	}
 
-	var scope *types.Scope
+	var scope *kernel.Scope
 	if cl.Scope != nil {
-		parsed, err := types.ParseScope(*cl.Scope)
+		parsed, err := kernel.ParseScope(*cl.Scope)
 		if err != nil {
 			return forbidden
 		}
@@ -166,7 +164,7 @@ func (h handler) authorizeUpload(r *http.Request, c repo.Config, name string, cl
 	// is not a member, as accessapi.SubjectOf does for bearer requests.
 	if scope != nil {
 		for _, entry := range scope.Entries {
-			if entry.Kind == types.ScopeGroups {
+			if entry.Kind == kernel.ScopeGroups {
 				subject.Groups = append(subject.Groups, entry.Names...)
 			}
 		}
@@ -176,10 +174,10 @@ func (h handler) authorizeUpload(r *http.Request, c repo.Config, name string, cl
 		return fmt.Errorf("terraformbackend: upload permissions: %w", err)
 	}
 	if !access.Allows(
-		types.ResourceArtifact,
+		accessapi.ResourceArtifact,
 		accessapi.Repo{Key: c.Key, Class: string(c.Class)},
 		tfbe.LatestPath(name),
-		types.ActionWrite,
+		accessapi.ActionWrite,
 	) {
 		return forbidden
 	}
@@ -198,19 +196,19 @@ func scopeText(p kernel.Principal) *string {
 // synthetic identity never becomes a same-named stored account; a transient
 // one uses the current auto-join groups only while no stored account exists.
 func (h handler) uploadUser(r *http.Request, cl claims) (accessapi.UserInfo, error) {
-	if cl.Identity == types.IdentitySynthetic {
+	if cl.Identity == kernel.IdentitySynthetic {
 		return accessapi.UserInfo{Name: cl.Subject}, nil
 	}
 	ctx := r.Context()
 	u, err := h.o.Identity.User(ctx, cl.Subject)
-	if errors.Is(err, store.ErrNotFound) && cl.Identity == types.IdentityTransient {
+	if errors.Is(err, kernel.ErrNotFound) && cl.Identity == kernel.IdentityTransient {
 		groups, err := h.o.Identity.AutoJoinGroups(ctx)
 		if err != nil {
 			return u, fmt.Errorf("terraformbackend: upload auto-join groups: %w", err)
 		}
 		return accessapi.UserInfo{Name: cl.Subject, Groups: groups}, nil
 	}
-	if errors.Is(err, store.ErrNotFound) || err == nil && !u.Enabled() {
+	if errors.Is(err, kernel.ErrNotFound) || err == nil && !u.Enabled() {
 		return u, forbidden
 	}
 	if err != nil {
@@ -222,18 +220,18 @@ func (h handler) uploadUser(r *http.Request, cl claims) (accessapi.UserInfo, err
 func (h handler) capabilityIdentity(
 	r *http.Request,
 	p kernel.Principal,
-) (types.TokenIdentity, error) {
-	if p.Identity != types.IdentityTransient {
+) (kernel.TokenIdentity, error) {
+	if p.Identity != kernel.IdentityTransient {
 		return p.Identity, nil
 	}
 	_, err := h.o.Identity.User(r.Context(), p.Name)
-	if errors.Is(err, store.ErrNotFound) {
-		return types.IdentityTransient, nil
+	if errors.Is(err, kernel.ErrNotFound) {
+		return kernel.IdentityTransient, nil
 	}
 	if err != nil {
 		return "", fmt.Errorf("terraformbackend: capability identity: %w", err)
 	}
 	// A capability issued for a stored account stops when that account is
 	// deleted. It must not silently become a transient-user capability.
-	return types.IdentityStored, nil
+	return kernel.IdentityStored, nil
 }

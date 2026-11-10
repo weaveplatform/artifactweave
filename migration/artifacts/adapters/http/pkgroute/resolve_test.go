@@ -13,11 +13,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // encodedFormat is a test protocol shaped like Terraform's registry
@@ -298,16 +299,16 @@ func TestAccResolveFailures(t *testing.T) {
 	}
 }
 
-type unlistableRepos struct{ store.RepoStore }
+type unlistableRepos struct{ port.RepoStore }
 
-func (unlistableRepos) List(context.Context, store.RepoFilter) ([]repo.Config, error) {
+func (unlistableRepos) List(context.Context, port.RepoFilter) ([]repo.Config, error) {
 	return nil, errors.New("repos down")
 }
 
 // unlistable finds repositories by their exact key, and fails to list them.
 type unlistable struct{ pkgroute.Store }
 
-func (s unlistable) Repos() store.RepoStore { return unlistableRepos{s.Store.Repos()} }
+func (s unlistable) Repos() port.RepoStore { return unlistableRepos{s.Store.Repos()} }
 
 func TestUnitSplitKey(t *testing.T) {
 	for _, c := range []struct {
@@ -450,12 +451,12 @@ func TestAccChallenge(t *testing.T) {
 	}
 	f.deploy(t, "forced", "a.txt", "forced")
 	f.deploy(t, local, "open.txt", "open")
-	everyone := map[string]types.Actions{"anonymous": types.ActionRead, "reader": types.ActionRead}
-	if err := f.db.Permissions().Create(ctx, types.Permission{
+	everyone := map[string]api.Actions{"anonymous": api.ActionRead, "reader": api.ActionRead}
+	if err := f.db.Permissions().Create(ctx, model.Permission{
 		Name: "anyone-reads",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: everyone},
-			Targets: map[string]types.Target{
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: everyone},
+			Targets: map[string]model.Target{
 				"forced": {Include: []string{"**"}}, local: {Include: []string{"**"}},
 			},
 		}},

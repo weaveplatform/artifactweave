@@ -13,8 +13,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type manifestReader struct{ *bytes.Reader }
@@ -82,7 +83,7 @@ func TestUnitBowerAdmissionUsesStoredManifestIdentity(t *testing.T) {
 	w := format.Write{
 		Op:        format.OpDeploy,
 		Path:      path,
-		Checksums: types.Checksums{SHA256: strings.Repeat("a", 64)},
+		Checksums: kernel.Checksums{SHA256: strings.Repeat("a", 64)},
 	}
 	for _, tc := range []struct {
 		name     string
@@ -153,12 +154,12 @@ func TestUnitBowerInspectionAndIndexingRejectCorruptStoredManifest(t *testing.T)
 	w := format.Write{
 		Op:        format.OpDeploy,
 		Path:      path,
-		Checksums: types.Checksums{SHA256: strings.Repeat("a", 64)},
+		Checksums: kernel.Checksums{SHA256: strings.Repeat("a", 64)},
 	}
 	if _, err := h.Inspect(t.Context(), format.Env{Blobs: bad}, c, w); err == nil {
 		t.Fatal("inspection accepted a stored manifest for another package")
 	}
-	it := types.Item{RepoKey: c.Key, Path: "hello/1.0.0", Name: "bower.json", Actual: w.Checksums}
+	it := model.Item{RepoKey: c.Key, Path: "hello/1.0.0", Name: "bower.json", Actual: w.Checksums}
 	if err := h.Deployed(t.Context(), format.Env{Blobs: bad}, c, it); err == nil {
 		t.Fatal("deployment indexed a stored manifest for another package")
 	}
@@ -210,7 +211,7 @@ func TestUnitBowerInspectionRejectsInterruptedBlobRead(t *testing.T) {
 	w := format.Write{
 		Op:        format.OpDeploy,
 		Path:      ManifestPath("hello", "1.0.0"),
-		Checksums: types.Checksums{SHA256: "sha"},
+		Checksums: kernel.Checksums{SHA256: "sha"},
 	}
 	if _, err := (Handler{}).Inspect(
 		t.Context(),
@@ -230,9 +231,9 @@ func TestUnitBowerReindexSortsStoredVersionsAndRequiresValidRepository(t *testin
 		t.Fatal(err)
 	}
 	for _, version := range []string{"2.0.0", "1.0.0"} {
-		it := types.Item{
+		it := model.Item{
 			RepoKey: c.Key, Path: "hello/" + version, Name: "bower.json",
-			Actual: types.Checksums{SHA256: version},
+			Actual: kernel.Checksums{SHA256: version},
 		}
 		if _, err := db.Items().Put(t.Context(), it); err != nil {
 			t.Fatal(err)
@@ -298,9 +299,9 @@ func TestUnitBowerReindexStopsWhenCanceledAfterManifestRead(t *testing.T) {
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Items().Put(t.Context(), types.Item{
+	if _, err := db.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Path: "hello/1.0.0", Name: "bower.json",
-		Actual: types.Checksums{SHA256: "1.0.0"},
+		Actual: kernel.Checksums{SHA256: "1.0.0"},
 	}); err != nil {
 		t.Fatal(err)
 	}

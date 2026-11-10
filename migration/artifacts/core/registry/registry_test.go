@@ -15,13 +15,14 @@ import (
 	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var start = time.Date(2026, 10, 16, 9, 0, 0, 0, time.UTC)
@@ -139,7 +140,7 @@ func (w *world) owner(name string) registry.Owner {
 }
 
 // deploy stores a file in c at path, last written at.
-func (w *world) deploy(c repo.Config, path, body string, at time.Time) types.Item {
+func (w *world) deploy(c repo.Config, path, body string, at time.Time) model.Item {
 	w.t.Helper()
 	items := &item.Service{
 		Store: w.db, Blobs: w.blobs, Now: func() time.Time { return at }, Formats: ecosystem.For,
@@ -153,7 +154,7 @@ func (w *world) deploy(c repo.Config, path, body string, at time.Time) types.Ite
 	return it
 }
 
-func (w *world) item(c repo.Config, path string) (types.Item, error) {
+func (w *world) item(c repo.Config, path string) (model.Item, error) {
 	return w.db.Items().Get(context.Background(), c.Key, false, path)
 }
 
@@ -211,7 +212,7 @@ func TestAccChunkedUploadSurvivesARestart(t *testing.T) {
 		if _, err := again.Status(ctx, o, id); !errors.Is(err, registry.ErrUnknown) {
 			t.Fatalf("a finished session lingers: %v", err)
 		}
-		if _, err := w.db.Uploads().Get(ctx, id); !errors.Is(err, store.ErrNotFound) {
+		if _, err := w.db.Uploads().Get(ctx, id); !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatalf("row: %v", err)
 		}
 	})
@@ -241,7 +242,7 @@ func TestAccSessionsBelongToTheirOwner(t *testing.T) {
 			}
 		}
 		// A row another backend owns, and one whose state does not decode.
-		for name, row := range map[string]store.Upload{
+		for name, row := range map[string]session.Upload{
 			"backend": {
 				ID: strings.Repeat("a", 32), Backend: "s3:hot", RepoKey: "docker-local",
 				Started: start, Updated: start,
@@ -290,7 +291,7 @@ func TestAccFinishVerifiesTheDigest(t *testing.T) {
 			t.Fatalf("a mismatched session lingers: %v", err)
 		}
 		if _, err := w.item(w.docker, "app/_uploads/sha256__"+sum("other")); !errors.Is(
-			err, store.ErrNotFound,
+			err, kernel.ErrNotFound,
 		) {
 			t.Fatalf("stored anyway: %v", err)
 		}
@@ -352,7 +353,7 @@ func TestAccASessionEndsWithItsBlobUpload(t *testing.T) {
 		) {
 			t.Fatalf("append: %v", err)
 		}
-		if _, err := w.db.Uploads().Get(ctx, id); !errors.Is(err, store.ErrNotFound) {
+		if _, err := w.db.Uploads().Get(ctx, id); !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatalf("row kept: %v", err)
 		}
 	})
@@ -372,7 +373,7 @@ func TestAccMonolithicUpload(t *testing.T) {
 			t.Fatalf("mismatch: %v", err)
 		}
 		if _, err := w.item(w.docker, "app/_uploads/sha256__"+sum("partial")); !errors.Is(
-			err, store.ErrNotFound,
+			err, kernel.ErrNotFound,
 		) {
 			t.Fatalf("stored anyway: %v", err)
 		}
@@ -432,7 +433,7 @@ func TestAccReap(t *testing.T) {
 		if err := w.svc.Reap(ctx, row); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := w.db.Uploads().Get(ctx, id); !errors.Is(err, store.ErrNotFound) {
+		if _, err := w.db.Uploads().Get(ctx, id); !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatalf("row kept: %v", err)
 		}
 		if _, err := w.blobs.ResumeUpload(ctx, blobID); !errors.Is(err, blob.ErrUploadUnknown) {
@@ -443,7 +444,7 @@ func TestAccReap(t *testing.T) {
 		if err := w.svc.Reap(ctx, row); err != nil {
 			t.Fatal(err)
 		}
-		junk := store.Upload{
+		junk := session.Upload{
 			ID: strings.Repeat("c", 32), Backend: registry.Backend, State: []byte("?"),
 			Started: start, Updated: start,
 		}
@@ -453,7 +454,7 @@ func TestAccReap(t *testing.T) {
 		if err := w.svc.Reap(ctx, junk); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := w.db.Uploads().Get(ctx, junk.ID); !errors.Is(err, store.ErrNotFound) {
+		if _, err := w.db.Uploads().Get(ctx, junk.ID); !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatalf("junk kept: %v", err)
 		}
 	})
@@ -489,7 +490,7 @@ func TestAccExpireUploads(t *testing.T) {
 			t.Fatalf("expired %d: %v", n, err)
 		}
 		for _, p := range gone {
-			if _, err := w.item(w.docker, p); !errors.Is(err, store.ErrNotFound) {
+			if _, err := w.item(w.docker, p); !errors.Is(err, kernel.ErrNotFound) {
 				t.Errorf("%s kept: %v", p, err)
 			}
 		}
@@ -499,7 +500,7 @@ func TestAccExpireUploads(t *testing.T) {
 			}
 		}
 		// Expired uploads bypass the trash can and release their content.
-		if entries, _, err := w.db.Trash().List(ctx, "", "", store.Page{}); err != nil ||
+		if entries, _, err := w.db.Trash().List(ctx, "", "", kernel.Page{}); err != nil ||
 			len(entries) != 0 {
 			t.Fatalf("trash %v %v", entries, err)
 		}

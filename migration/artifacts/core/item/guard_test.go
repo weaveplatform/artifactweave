@@ -9,7 +9,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 type guardedRecorder struct {
@@ -33,7 +33,7 @@ func TestUnitWriteGuardRunsInsideDeployTransaction(t *testing.T) {
 	w.svc.Formats = func(repo.PackageType) format.Handler {
 		return guardedRecorder{r, func(format.Write) error { return refusal }}
 	}
-	_, err := w.deploy("blocked.txt", "body", types.Checksums{})
+	_, err := w.deploy("blocked.txt", "body", kernel.Checksums{})
 	if !errors.Is(err, refusal) || !r.calls["guard blocked.txt"] {
 		t.Fatalf("error %v, calls %v", err, r.calls)
 	}
@@ -47,7 +47,7 @@ func TestUnitTransferWriteGuardPreservesReportsAndSources(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			w, r := recording(t)
 			for _, p := range []string{"src/a.txt", "src/b.txt"} {
-				if _, err := w.deploy(p, p, types.Checksums{}); err != nil {
+				if _, err := w.deploy(p, p, kernel.Checksums{}); err != nil {
 					t.Fatal(err)
 				}
 			}

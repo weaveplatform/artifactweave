@@ -22,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	cargoserver "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cargo/http"
@@ -29,7 +30,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type fixture struct {
@@ -75,7 +75,7 @@ func newFixture(
 			}
 			return err
 		},
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 			rc, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				t.Fatal(err)
@@ -341,12 +341,12 @@ func TestAccStoredIndexIntegrityAndPermissions(t *testing.T) {
 	original := props["cargo.index"][0]
 	for _, tc := range []struct {
 		name   string
-		set    types.Properties
+		set    model.Properties
 		remove []string
 	}{
 		{"missing", nil, []string{"cargo.index"}},
-		{"malformed", types.Properties{"cargo.index": {"bad JSON"}}, nil},
-		{"wrong checksum", types.Properties{"cargo.index": {strings.Replace(original, it.Actual.SHA256, strings.Repeat("a", 64), 1)}}, nil},
+		{"malformed", model.Properties{"cargo.index": {"bad JSON"}}, nil},
+		{"wrong checksum", model.Properties{"cargo.index": {strings.Replace(original, it.Actual.SHA256, strings.Repeat("a", 64), 1)}}, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := f.db.Items().
@@ -373,7 +373,7 @@ func TestAccStoredIndexIntegrityAndPermissions(t *testing.T) {
 				t.Fatalf("corrupt yank: %d %s", got.Code, got.Body.String())
 			}
 			if err := f.db.Items().
-				PatchProperties(t.Context(), it.ID, types.Properties{"cargo.index": {original}}, nil, it.Updated); err != nil {
+				PatchProperties(t.Context(), it.ID, model.Properties{"cargo.index": {original}}, nil, it.Updated); err != nil {
 				t.Fatal(err)
 			}
 		})

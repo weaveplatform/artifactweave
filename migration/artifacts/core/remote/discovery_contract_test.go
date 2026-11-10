@@ -15,7 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 )
 
 func TestAccMappedCustomIvyRetainsTypeClassifierAndRevision(t *testing.T) {
@@ -39,7 +39,7 @@ func TestAccMappedCustomIvyRetainsTypeClassifierAndRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err = w.db.Configs().
-		Put(t.Context(), types.ConfigDocument{Kind: types.ConfigLayout, Key: def.Name, Document: data}); err != nil {
+		Put(t.Context(), configdoc.ConfigDocument{Kind: configdoc.ConfigLayout, Key: def.Name, Document: data}); err != nil {
 		t.Fatal(err)
 	}
 	q.Repo.RepoLayoutRef = def.Name

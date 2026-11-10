@@ -14,15 +14,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type rpmFailedReader struct{}
@@ -235,12 +235,12 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 	}
 	if _, err := svc.rpmMemberBytes(t.Context(), w.db,
 		repo.Config{Key: "rpm-other", Class: repo.Virtual, PackageType: repo.RPM},
-		"repodata/repomd.xml", p, acc); !errors.Is(err, store.ErrNotFound) {
+		"repodata/repomd.xml", p, acc); !errors.Is(err, kernel.ErrNotFound) {
 		t.Errorf("virtual member bytes returned %v", err)
 	}
 	if _, err := svc.rpmMemberBytes(t.Context(), w.db,
 		repo.Config{Key: "rpm-local", Class: repo.Local, PackageType: repo.RPM},
-		"repodata/repomd.xml", p, acc); !errors.Is(err, store.ErrNotFound) {
+		"repodata/repomd.xml", p, acc); !errors.Is(err, kernel.ErrNotFound) {
 		t.Errorf("missing local member metadata returned %v", err)
 	}
 	if _, err := svc.rpmBlob(t.Context(), strings.Repeat("0", 64)); err == nil {
@@ -250,9 +250,9 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 
 func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 	w := newItemWorld(t)
-	for _, pair := range []types.Keypair{
-		{Name: "rpm-rsa", Type: types.KeypairRSA},
-		{Name: "rpm-invalid-gpg", Type: types.KeypairGPG, PrivateKey: "invalid key"},
+	for _, pair := range []api.Keypair{
+		{Name: "rpm-rsa", Type: api.KeypairRSA},
+		{Name: "rpm-invalid-gpg", Type: api.KeypairGPG, PrivateKey: "invalid key"},
 	} {
 		if err := w.db.Keys().CreateKeypair(t.Context(), pair); err != nil {
 			t.Fatal(err)
@@ -265,7 +265,7 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 		expected error
 	}{
 		{"", nil},
-		{"rpm-absent", store.ErrNotFound},
+		{"rpm-absent", kernel.ErrNotFound},
 		{"rpm-rsa", errRPMVirtualKey},
 		{"rpm-invalid-gpg", nil},
 	} {
@@ -395,9 +395,9 @@ func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 	if got := failedBody.closes.Load(); got != 1 {
 		t.Errorf("failed metadata response body closed %d times, want once", got)
 	}
-	backendResult = &source.Result{Item: &types.Item{
+	backendResult = &source.Result{Item: &model.Item{
 		RepoKey: remote.Key, Cached: true, Path: "repodata", Name: "repomd.xml",
-		Actual: types.Checksums{SHA256: strings.Repeat("0", 64)},
+		Actual: kernel.Checksums{SHA256: strings.Repeat("0", 64)},
 	}}
 	if _, err := svc.rpmMemberBytes(
 		t.Context(),
@@ -486,7 +486,7 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 	remote := *repo.Defaults(&repo.Config{
 		Key: "rpm-remote", Class: repo.Remote, PackageType: repo.RPM, URL: "https://up.example",
 	})
-	var cached *types.Item
+	var cached *model.Item
 	sources := &source.Service{
 		Resolve: sourceIdentity,
 		HTTP: sourceBackend(
@@ -527,9 +527,9 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 	if res := serve(svc, strings.Repeat("0", 64)); res.Code != http.StatusBadGateway {
 		t.Errorf("valid RPM with wrong index SHA returned %d", res.Code)
 	}
-	cached = &types.Item{
+	cached = &model.Item{
 		RepoKey: remote.Key, Cached: true, Path: "pool", Name: filepath.Base(path),
-		Actual: types.Checksums{SHA256: strings.Repeat("0", 64)},
+		Actual: kernel.Checksums{SHA256: strings.Repeat("0", 64)},
 	}
 	if res := serve(svc, correctSHA); res.Code != http.StatusBadGateway {
 		t.Errorf("cached RPM with wrong index SHA returned %d", res.Code)
@@ -567,9 +567,9 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := w.db.Items().Put(t.Context(), types.Item{
+		if _, err := w.db.Items().Put(t.Context(), model.Item{
 			RepoKey: member.Key, Name: path,
-			Actual: types.Checksums{SHA256: info.Digests.SHA256},
+			Actual: kernel.Checksums{SHA256: info.Digests.SHA256},
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -591,7 +591,7 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 		acc,
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Errorf("manifest with missing primary returned %v", err)
 	}

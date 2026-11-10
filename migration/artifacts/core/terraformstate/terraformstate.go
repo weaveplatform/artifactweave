@@ -8,10 +8,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Errors the API maps onto statuses. The three that wrap store.ErrNotFound
@@ -20,12 +20,12 @@ var (
 	// ErrNoRepository is a key that names no local terraformbackend
 	// repository: no organisation.
 	ErrNoRepository = fmt.Errorf("terraformstate: no local terraform backend repository: %w",
-		store.ErrNotFound)
+		kernel.ErrNotFound)
 	// ErrNoWorkspace is a workspace that does not exist.
-	ErrNoWorkspace = fmt.Errorf("terraformstate: no such workspace: %w", store.ErrNotFound)
+	ErrNoWorkspace = fmt.Errorf("terraformstate: no such workspace: %w", kernel.ErrNotFound)
 	// ErrNoState is a state version that is not stored, or a workspace
 	// without a current state.
-	ErrNoState = fmt.Errorf("terraformstate: no such state version: %w", store.ErrNotFound)
+	ErrNoState = fmt.Errorf("terraformstate: no such state version: %w", kernel.ErrNotFound)
 	// ErrInvalidName is a workspace name that cannot name a folder (422).
 	ErrInvalidName = terraformbackend.ErrInvalidName
 	// ErrTaken is a workspace create for a name that exists (422).
@@ -110,7 +110,7 @@ func (s *Service) at(t time.Time) *item.Service {
 func (s *Service) Repository(ctx context.Context, key string) (repo.Config, error) {
 	c, err := s.store().Repos().Get(ctx, key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return repo.Config{}, fmt.Errorf("%w: %s", ErrNoRepository, key)
 	case err != nil:
 		return repo.Config{}, fmt.Errorf("terraformstate: get repository %s: %w", key, err)
@@ -161,10 +161,10 @@ func (s *Service) ResolveState(ctx context.Context, id string) (repo.Config, Sta
 	return c, st, err
 }
 
-func (s *Service) fileAt(ctx context.Context, c repo.Config, p string) (*types.Item, error) {
+func (s *Service) fileAt(ctx context.Context, c repo.Config, p string) (*model.Item, error) {
 	it, err := s.store().Items().Get(ctx, c.Key, false, p)
 	switch {
-	case errors.Is(err, store.ErrNotFound) || err == nil && it.Folder:
+	case errors.Is(err, kernel.ErrNotFound) || err == nil && it.Folder:
 		return nil, nil //nolint:nilnil // nothing there is no failure
 	case err != nil:
 		return nil, fmt.Errorf("terraformstate: get %s: %w", p, err)

@@ -8,8 +8,8 @@ import (
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 var indexes = map[string]string{
@@ -51,7 +51,7 @@ func Marketplace(
 		return nil, fmt.Errorf("%w: %s", ErrMarketplace, name)
 	}
 	plugins := make([]map[string]any, 0)
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		pkgs, next, err := st.Packages().List(ctx, repoKey, page)
 		if err != nil {
@@ -62,7 +62,7 @@ func Marketplace(
 			if err != nil {
 				return nil, fmt.Errorf("agentplugins: versions of %s: %w", p.Name, err)
 			}
-			types.SortVersions(types.ComparatorFor(p.Type), versions)
+			model.SortVersions(model.ComparatorFor(p.Type), versions)
 			for _, v := range slices.Backward(versions) {
 				var meta Metadata
 				if err := json.Unmarshal(v.Metadata, &meta); err != nil {

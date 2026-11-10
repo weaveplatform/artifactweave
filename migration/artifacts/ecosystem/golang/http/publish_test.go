@@ -13,18 +13,19 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	golanghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -56,16 +57,16 @@ func newPubFixture(t *testing.T) *pubFixture {
 			t.Fatal(err)
 		}
 	}
-	for user, a := range map[string]types.Actions{
-		"reader":     types.ActionRead,
-		"deployer":   types.ActionRead | types.ActionWrite,
-		"maintainer": types.ActionRead | types.ActionWrite | types.ActionDelete,
+	for user, a := range map[string]api.Actions{
+		"reader":     api.ActionRead,
+		"deployer":   api.ActionRead | api.ActionWrite,
+		"maintainer": api.ActionRead | api.ActionWrite | api.ActionDelete,
 	} {
-		if err := db.Permissions().Create(ctx, types.Permission{
+		if err := db.Permissions().Create(ctx, model.Permission{
 			Name: user,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{user: a}},
-				Targets: map[string]types.Target{goLocal: {Include: []string{"**"}}},
+			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{user: a}},
+				Targets: map[string]model.Target{goLocal: {Include: []string{"**"}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)
@@ -101,7 +102,7 @@ func newPubFixture(t *testing.T) *pubFixture {
 			}
 			return err
 		},
-		Created: func(w http.ResponseWriter, _ *http.Request, it types.Item) {
+		Created: func(w http.ResponseWriter, _ *http.Request, it model.Item) {
 			w.WriteHeader(http.StatusCreated)
 			_, _ = io.WriteString(w, it.FullPath())
 		},
@@ -124,7 +125,7 @@ func (f *pubFixture) put(path, user, body string, headers ...string) *httptest.R
 	return rec
 }
 
-func (f *pubFixture) item(t *testing.T, path string) types.Item {
+func (f *pubFixture) item(t *testing.T, path string) model.Item {
 	t.Helper()
 	it, err := f.db.Items().Get(context.Background(), goLocal, false, path)
 	if err != nil {
@@ -294,7 +295,7 @@ func TestAccPublishRefusals(t *testing.T) {
 		}
 	}
 	if _, err := f.db.Items().Get(context.Background(), goLocal, false,
-		"example.com/m/@v/v1.0.0.zip"); !errors.Is(err, store.ErrNotFound) {
+		"example.com/m/@v/v1.0.0.zip"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("a refused deploy stored the file: %v", err)
 	}
 }

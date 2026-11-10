@@ -14,12 +14,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // chartConfig is a chart's config as Helm pushes it: its Chart.yaml as
@@ -69,7 +69,7 @@ func newCharts(t *testing.T) *charts {
 	}}
 }
 
-func (x *charts) deploy(path, body string) types.Item {
+func (x *charts) deploy(path, body string) model.Item {
 	x.t.Helper()
 	it, err := x.items.Deploy(context.Background(), item.Deploy{
 		Target: item.Target{Repo: x.c, Path: path}, Body: strings.NewReader(body),
@@ -82,19 +82,19 @@ func (x *charts) deploy(path, body string) types.Item {
 
 // version returns the index's record of the image's tag; ok is false when
 // the tag is no version.
-func (x *charts) version(name, tag string) (types.PackageVersion, bool) {
+func (x *charts) version(name, tag string) (model.PackageVersion, bool) {
 	x.t.Helper()
 	ctx := context.Background()
 	p, err := x.db.Packages().Find(ctx, x.c.Key, name)
-	if errors.Is(err, store.ErrNotFound) {
-		return types.PackageVersion{}, false
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.PackageVersion{}, false
 	}
 	if err != nil {
 		x.t.Fatal(err)
 	}
 	v, err := x.db.Packages().Version(ctx, p.ID, tag)
-	if errors.Is(err, store.ErrNotFound) {
-		return types.PackageVersion{}, false
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.PackageVersion{}, false
 	}
 	if err != nil {
 		x.t.Fatal(err)

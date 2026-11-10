@@ -6,7 +6,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // limited sets maxUniqueSnapshots.
@@ -162,7 +162,7 @@ func TestUnitCleanupOwesNothing(t *testing.T) {
 	if err := w.st.Repos().Update(w.ctx, gen); err != nil {
 		t.Fatal(err)
 	}
-	for _, it := range []types.WorkItem{
+	for _, it := range []work.WorkItem{
 		{Kind: nuget.KindSnapshots, Key: "missing/foo"},
 		{Kind: nuget.KindSnapshots, Key: "nokey"},
 		{Kind: nuget.KindSnapshots, Key: "generic-local/foo"},

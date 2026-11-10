@@ -10,12 +10,12 @@ import (
 	"strings"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func badRequestf(format string, a ...any) error {
@@ -28,7 +28,7 @@ func badRequestf(format string, a ...any) error {
 // list). jfrog-support-bundle is singular, as JFrog's reserved names list
 // and 7.x's own logs in its Jira (RTFACT-22258, RTFACT-21053) spell it; the
 // delete page's example key JFrog-Support-Bundles is the odd one out.
-var protected = []string{"auto-trashcan", "jfrog-support-bundle", types.BuildInfoRepository}
+var protected = []string{"auto-trashcan", "jfrog-support-bundle", accessapi.BuildInfoRepository}
 
 // Protected reports whether key names a repository that may not be deleted:
 // a blank key, or one of the protected keys in any case (auto-trashcan,
@@ -120,7 +120,7 @@ func CheckKeypairs(ctx context.Context, keys accessapi.Keys, c repo.Config) erro
 		}
 		k, err := keys.Keypair(ctx, ref)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			return badRequestf("Key pair '%s' does not exist", ref)
 		case err != nil:
 			return fmt.Errorf("repos: key pair %s: %w", ref, err)
@@ -161,16 +161,16 @@ func CheckEnvironments(ctx context.Context, projects accessapi.Projects, c *repo
 		return nil
 	}
 	if len(c.Environments) == 0 {
-		c.Environments = []string{types.EnvironmentDev}
+		c.Environments = []string{model.EnvironmentDev}
 	}
-	known := slices.Clone(types.BuiltinEnvironments)
+	known := slices.Clone(model.BuiltinEnvironments)
 	global, err := projects.Environments(ctx, "")
 	if err != nil {
 		return fmt.Errorf("repos: global environments: %w", err)
 	}
 	known = append(known, global...)
 	scoped, err := projects.Environments(ctx, c.ProjectKey)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		return fmt.Errorf("repos: environments of project %s: %w", c.ProjectKey, err)
 	}
 	for _, name := range scoped {
@@ -298,7 +298,7 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 // trash can as it was.
 func Remove(ctx context.Context, st Store, key, by string) (int64, bool, error) {
 	c, err := st.Repos().Get(ctx, key)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return 0, false, nil
 	}
 	if err != nil {
@@ -339,7 +339,7 @@ func Remove(ctx context.Context, st Store, key, by string) (int64, bool, error) 
 			}
 		}
 		for {
-			pkgs, _, err := st.Packages().List(ctx, key, store.Page{Limit: 100})
+			pkgs, _, err := st.Packages().List(ctx, key, kernel.Page{Limit: 100})
 			if err != nil {
 				return fmt.Errorf("list packages: %w", err)
 			}

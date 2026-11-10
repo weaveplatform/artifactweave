@@ -8,11 +8,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // errBoom is the error the permission index fails with.
@@ -41,30 +44,30 @@ type permFaultStore struct {
 	f *permFault
 }
 
-func (s permFaultStore) Permissions() store.PermissionStore {
+func (s permFaultStore) Permissions() port.PermissionStore {
 	return permFaultPerms{s.Store.Permissions(), s.f}
 }
 
 type permFaultPerms struct {
-	store.PermissionStore
+	port.PermissionStore
 	f *permFault
 }
 
-func (p permFaultPerms) Create(ctx context.Context, perm types.Permission) error {
+func (p permFaultPerms) Create(ctx context.Context, perm model.Permission) error {
 	if err := p.f.hit("create"); err != nil {
 		return err
 	}
 	return p.PermissionStore.Create(ctx, perm) //nolint:wrapcheck // test double
 }
 
-func (p permFaultPerms) Get(ctx context.Context, name string) (types.Permission, error) {
+func (p permFaultPerms) Get(ctx context.Context, name string) (model.Permission, error) {
 	if err := p.f.hit("get"); err != nil {
-		return types.Permission{}, err
+		return model.Permission{}, err
 	}
 	return p.PermissionStore.Get(ctx, name) //nolint:wrapcheck // test double
 }
 
-func (p permFaultPerms) Update(ctx context.Context, perm types.Permission) error {
+func (p permFaultPerms) Update(ctx context.Context, perm model.Permission) error {
 	if err := p.f.hit("update"); err != nil {
 		return err
 	}
@@ -80,8 +83,8 @@ func (p permFaultPerms) Delete(ctx context.Context, name string) error {
 
 func (p permFaultPerms) List(
 	ctx context.Context,
-	pg store.Page,
-) ([]types.Permission, string, error) {
+	pg kernel.Page,
+) ([]model.Permission, string, error) {
 	if err := p.f.hit("list"); err != nil {
 		return nil, "", err
 	}
@@ -92,7 +95,7 @@ func (p permFaultPerms) ForPrincipal(
 	ctx context.Context,
 	user string,
 	groups []string,
-) ([]types.Permission, error) {
+) ([]model.Permission, error) {
 	if err := p.f.hit("forprincipal"); err != nil {
 		return nil, err
 	}
@@ -108,10 +111,10 @@ func newPermFaultWorld(t *testing.T) (http.Handler, *permFault) {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Users().Create(ctx, types.User{Name: "mgr", PasswordHash: cheapHash}); err != nil {
+	if err := db.Users().Create(ctx, model.User{Name: "mgr", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	for _, key := range []string{"perm-local", "perm-other"} {
@@ -120,14 +123,14 @@ func newPermFaultWorld(t *testing.T) (http.Handler, *permFault) {
 			t.Fatal(err)
 		}
 	}
-	for _, p := range []types.Permission{
-		{Name: "p", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"mgr": types.ActionRead | types.ActionManage}},
-			Targets: map[string]types.Target{"perm-local": {}},
+	for _, p := range []model.Permission{
+		{Name: "p", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"mgr": api.ActionRead | api.ActionManage}},
+			Targets: map[string]model.Target{"perm-local": {}},
 		}}},
 		{Name: "empty"},
-		{Name: "split", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Targets: map[string]types.Target{
+		{Name: "split", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Targets: map[string]model.Target{
 				"perm-local": {Include: []string{"a/**"}},
 				"perm-other": {Include: []string{"b/**"}},
 			},

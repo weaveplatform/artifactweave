@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 )
 
 // addRepo creates another repository in the world.
@@ -24,9 +26,9 @@ func (w *world) addRepo(c repo.Config) repo.Config {
 	return c
 }
 
-func (w *world) must(p, body string) types.Item {
+func (w *world) must(p, body string) model.Item {
 	w.t.Helper()
-	it, err := w.deploy(p, body, types.Checksums{})
+	it, err := w.deploy(p, body, kernel.Checksums{})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -35,16 +37,16 @@ func (w *world) must(p, body string) types.Item {
 
 // sameHistory reports whether a copied or moved file kept its source's
 // creation, modification and update times and users.
-func sameHistory(got, src types.Item) bool {
+func sameHistory(got, src model.Item) bool {
 	return got.Created.Equal(src.Created) && got.CreatedBy == src.CreatedBy &&
 		got.Modified.Equal(src.Modified) && got.ModifiedBy == src.ModifiedBy &&
 		got.Updated.Equal(src.Updated)
 }
 
-func (w *world) get(c repo.Config, p string) (types.Item, bool) {
+func (w *world) get(c repo.Config, p string) (model.Item, bool) {
 	w.t.Helper()
 	it, err := w.db.Items().Get(context.Background(), c.Key, false, p)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return it, false
 	}
 	if err != nil {
@@ -72,7 +74,7 @@ func TestUnitCopyFile(t *testing.T) {
 	src := w.must("a/x.txt", "content")
 	w.svc.Now = func() time.Time { return at }
 	if err := w.db.Items().
-		SetProperties(ctx, src.ID, types.Properties{"k": {"v"}}, time.Now()); err != nil {
+		SetProperties(ctx, src.ID, model.Properties{"k": {"v"}}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	res := w.transfer(Transfer{
@@ -125,7 +127,7 @@ func TestUnitCopyAndMoveFolder(t *testing.T) {
 	w.must("d/sub/2.txt", "two")
 	folder, _ := w.get(w.loc, "d/sub")
 	if err := w.db.Items().
-		SetProperties(ctx, folder.ID, types.Properties{"f": {"1"}}, time.Now()); err != nil {
+		SetProperties(ctx, folder.ID, model.Properties{"f": {"1"}}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	// A missing target folder takes the source's place.
@@ -151,7 +153,7 @@ func TestUnitCopyAndMoveFolder(t *testing.T) {
 		t.Fatal("copy into an existing folder")
 	}
 	if err := w.db.Items().
-		RecordDownload(ctx, one.ID, store.Download{By: "x", At: at}); err != nil {
+		RecordDownload(ctx, one.ID, port.Download{By: "x", At: at}); err != nil {
 		t.Fatal(err)
 	}
 	before := w.refs(one.Actual.SHA256)
@@ -342,8 +344,8 @@ func TestUnitTransferLayouts(t *testing.T) {
 	doc, _ := json.Marshal(map[string]string{
 		"artifactPathPattern": "[orgPath]/[module]-[baseRev].[ext]",
 	})
-	if err := w.db.Configs().Put(ctx, types.ConfigDocument{
-		Kind: types.ConfigLayout, Key: "flat", Document: doc,
+	if err := w.db.Configs().Put(ctx, configdoc.ConfigDocument{
+		Kind: configdoc.ConfigLayout, Key: "flat", Document: doc,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -532,11 +534,11 @@ func TestUnitTransferStoreFailures(t *testing.T) {
 		one := w.must("d/1.txt", "one")
 		w.must("e/1.txt", "old")
 		if err := w.db.Items().
-			SetProperties(ctx, one.ID, types.Properties{"k": {"v"}}, time.Now()); err != nil {
+			SetProperties(ctx, one.ID, model.Properties{"k": {"v"}}, time.Now()); err != nil {
 			t.Fatal(err)
 		}
 		if err := w.db.Items().
-			RecordDownload(ctx, one.ID, store.Download{By: "x", At: at}); err != nil {
+			RecordDownload(ctx, one.ID, port.Download{By: "x", At: at}); err != nil {
 			t.Fatal(err)
 		}
 		w.svc.Store = faulty{w.db, fail}

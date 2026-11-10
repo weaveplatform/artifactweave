@@ -13,9 +13,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // The repositories API's route suites in test/server/artifacts cover the
@@ -101,7 +104,7 @@ func TestUnitMergeKeepsCaseRespeltClassAndType(t *testing.T) {
 	}
 	// The build-info repository keeps its type respelt too.
 	buildInfo := repo.Config{
-		Key: types.BuildInfoRepository, Class: repo.Local, PackageType: repo.BuildInfo,
+		Key: accessapi.BuildInfoRepository, Class: repo.Local, PackageType: repo.BuildInfo,
 	}
 	if got, err := update(t, buildInfo, `{"packageType": "BuildInfo"}`); err != nil ||
 		got.PackageType != repo.BuildInfo {
@@ -113,7 +116,7 @@ func TestUnitMergeKeepsCaseRespeltClassAndType(t *testing.T) {
 // type; no other repository may have it (#472).
 func TestUnitMergeUpdatesTheBuildInfoRepository(t *testing.T) {
 	buildInfo := repo.Config{
-		Key: types.BuildInfoRepository, Class: repo.Local, PackageType: repo.BuildInfo,
+		Key: accessapi.BuildInfoRepository, Class: repo.Local, PackageType: repo.BuildInfo,
 	}
 	got, err := update(t, buildInfo, `{"description": "builds", "packageType": "buildinfo"}`)
 	if err != nil || got.Description != "builds" || got.PackageType != repo.BuildInfo {
@@ -170,7 +173,7 @@ func TestUnitMergeKeepsCreationOnlyFields(t *testing.T) {
 func TestUnitProtectedKeys(t *testing.T) {
 	for key, want := range map[string]bool{
 		"auto-trashcan": true, "Auto-Trashcan": true, "jfrog-support-bundle": true,
-		"JFrog-Support-Bundle": true, types.BuildInfoRepository: true, " ": true,
+		"JFrog-Support-Bundle": true, accessapi.BuildInfoRepository: true, " ": true,
 		"jfrog-support-bundles": false, "libs-local": false,
 	} {
 		if got := Protected(key); got != want {
@@ -187,23 +190,23 @@ type faulty struct {
 	fail string
 }
 
-func (f faulty) Items() store.ItemStore       { return faultyItems{f.Store.Items(), f.fail} }
-func (f faulty) Blobs() store.BlobIndex       { return faultyBlobs{f.Store.Blobs(), f.fail} }
-func (f faulty) Packages() store.PackageStore { return faultyPackages{f.Store.Packages(), f.fail} }
-func (f faulty) Repos() store.RepoStore       { return faultyRepos{f.Store.Repos(), f.fail} }
-func (f faulty) Trash() store.TrashStore      { return faultyTrash{f.Store.Trash(), f.fail} }
-func (f faulty) Settings() store.SettingsStore {
+func (f faulty) Items() port.ItemStore       { return faultyItems{f.Store.Items(), f.fail} }
+func (f faulty) Blobs() port.BlobIndex       { return faultyBlobs{f.Store.Blobs(), f.fail} }
+func (f faulty) Packages() port.PackageStore { return faultyPackages{f.Store.Packages(), f.fail} }
+func (f faulty) Repos() port.RepoStore       { return faultyRepos{f.Store.Repos(), f.fail} }
+func (f faulty) Trash() port.TrashStore      { return faultyTrash{f.Store.Trash(), f.fail} }
+func (f faulty) Settings() settings.SettingsStore {
 	return faultySettings{f.Store.Settings(), f.fail}
 }
 
 type faultyTrash struct {
-	store.TrashStore
+	port.TrashStore
 	fail string
 }
 
 // Add fails on the second entry, so the first is in the trash can when
 // the delete rolls back.
-func (f faultyTrash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEntry, error) {
+func (f faultyTrash) Add(ctx context.Context, e model.TrashEntry) (model.TrashEntry, error) {
 	if f.fail == "trash" && e.Record.Item.Name == "g.txt" {
 		return e, errBoom
 	}
@@ -211,7 +214,7 @@ func (f faultyTrash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEn
 }
 
 type faultySettings struct {
-	store.SettingsStore
+	settings.SettingsStore
 	fail string
 }
 
@@ -223,7 +226,7 @@ func (f faultySettings) Get(ctx context.Context, key string, into any) error {
 }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	fail string
 }
 
@@ -232,9 +235,9 @@ func (f faultyItems) Delete(
 	repoKey string,
 	cached bool,
 	path string,
-) (store.DeleteResult, error) {
+) (port.DeleteResult, error) {
 	if f.fail == "items" {
-		return store.DeleteResult{}, errBoom
+		return port.DeleteResult{}, errBoom
 	}
 	return f.ItemStore.Delete(ctx, repoKey, cached, path) //nolint:wrapcheck // test double
 }
@@ -247,27 +250,27 @@ func (f faultyItems) DeleteRoot(ctx context.Context, repoKey string, cached bool
 }
 
 type faultyBlobs struct {
-	store.BlobIndex
+	port.BlobIndex
 	fail string
 }
 
-func (f faultyBlobs) Unref(ctx context.Context, sha string, n int64) (types.Blob, error) {
+func (f faultyBlobs) Unref(ctx context.Context, sha string, n int64) (blob.Blob, error) {
 	if f.fail == "unref" {
-		return types.Blob{}, errBoom
+		return blob.Blob{}, errBoom
 	}
 	return f.BlobIndex.Unref(ctx, sha, n) //nolint:wrapcheck // test double
 }
 
 type faultyPackages struct {
-	store.PackageStore
+	port.PackageStore
 	fail string
 }
 
 func (f faultyPackages) List(
 	ctx context.Context,
 	repoKey string,
-	p store.Page,
-) ([]types.Package, string, error) {
+	p kernel.Page,
+) ([]model.Package, string, error) {
 	if f.fail == "list packages" {
 		return nil, "", errBoom
 	}
@@ -282,7 +285,7 @@ func (f faultyPackages) Delete(ctx context.Context, id int64) error {
 }
 
 type faultyRepos struct {
-	store.RepoStore
+	port.RepoStore
 	fail string
 }
 
@@ -316,16 +319,16 @@ func world(t *testing.T) *inmem.Store {
 	}
 	sha := strings.Repeat("ab", 32)
 	if _, err := db.Blobs().
-		Ref(ctx, types.Blob{Checksums: types.Checksums{SHA256: sha}, Size: 3}, 1); err != nil {
+		Ref(ctx, blob.Blob{Checksums: kernel.Checksums{SHA256: sha}, Size: 3}, 1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Items().Put(ctx, types.Item{
-		RepoKey: "libs", Name: "f.txt", Size: 3, Actual: types.Checksums{SHA256: sha},
+	if _, err := db.Items().Put(ctx, model.Item{
+		RepoKey: "libs", Name: "f.txt", Size: 3, Actual: kernel.Checksums{SHA256: sha},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Packages().
-		Ensure(ctx, types.Package{RepoKey: "libs", Type: repo.Generic, Name: "p"}); err != nil {
+		Ensure(ctx, model.Package{RepoKey: "libs", Type: repo.Generic, Name: "p"}); err != nil {
 		t.Fatal(err)
 	}
 	return db
@@ -334,12 +337,12 @@ func world(t *testing.T) *inmem.Store {
 func TestUnitRemove(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
-	root, err := db.Items().EnsureRoot(ctx, types.Item{RepoKey: "libs"})
+	root, err := db.Items().EnsureRoot(ctx, model.Item{RepoKey: "libs"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Items().
-		PatchProperties(ctx, root.ID, types.Properties{"k": {"v"}}, nil, time.Now()); err != nil {
+		PatchProperties(ctx, root.ID, model.Properties{"k": {"v"}}, nil, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	files, found, err := Remove(ctx, db, "libs", "admin")
@@ -347,7 +350,7 @@ func TestUnitRemove(t *testing.T) {
 		t.Fatalf("Remove = %d, %v, %v", files, found, err)
 	}
 	// A repository created again under the key starts with a bare root.
-	if _, err := db.Items().Root(ctx, "libs", false); !errors.Is(err, store.ErrNotFound) {
+	if _, err := db.Items().Root(ctx, "libs", false); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("the root outlived its repository: %v", err)
 	}
 	if v, _ := db.Repos().
@@ -454,7 +457,7 @@ func TestUnitVirtualEmptiedByRemoveStillUpdates(t *testing.T) {
 	if err != nil || updated.Description != "empty now" || len(updated.Repositories) != 0 {
 		t.Fatalf("update of an emptied virtual: %+v, %v", updated, err)
 	}
-	known, _ := db.Repos().List(ctx, store.RepoFilter{})
+	known, _ := db.Repos().List(ctx, port.RepoFilter{})
 	if err := CheckMembers(updated, known); err != nil {
 		t.Fatal(err)
 	}
@@ -480,11 +483,11 @@ func TestUnitRemoveFailures(t *testing.T) {
 		sha := strings.Repeat("ab", 32)
 		// A second file with the same content, which "trash" fails on.
 		if _, err := db.Blobs().
-			Ref(ctx, types.Blob{Checksums: types.Checksums{SHA256: sha}, Size: 3}, 1); err != nil {
+			Ref(ctx, blob.Blob{Checksums: kernel.Checksums{SHA256: sha}, Size: 3}, 1); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := db.Items().Put(ctx, types.Item{
-			RepoKey: "libs", Name: "g.txt", Size: 3, Actual: types.Checksums{SHA256: sha},
+		if _, err := db.Items().Put(ctx, model.Item{
+			RepoKey: "libs", Name: "g.txt", Size: 3, Actual: kernel.Checksums{SHA256: sha},
 		}); err != nil {
 			t.Fatal(err)
 		}

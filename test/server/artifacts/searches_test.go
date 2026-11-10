@@ -14,8 +14,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -41,9 +42,9 @@ func searchWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorld
 	wantStatus(t, w.do("PUT", "/artifactory/server-local/bad.jar", "admin", "bad",
 		"X-Checksum-Md5", md5Hex("other")), http.StatusCreated)
 	hour := time.Now().Add(-time.Hour).UTC()
-	if _, err := w.db.Items().Put(context.Background(), types.Item{
-		RepoKey: "up", Cached: true, Path: types.RootPath, Name: "cached.txt", Size: 1,
-		Actual:  types.Checksums{SHA1: sha1Hex("c"), MD5: md5Hex("c")},
+	if _, err := w.db.Items().Put(context.Background(), model.Item{
+		RepoKey: "up", Cached: true, Path: kernel.RootPath, Name: "cached.txt", Size: 1,
+		Actual:  kernel.Checksums{SHA1: sha1Hex("c"), MD5: md5Hex("c")},
 		Created: hour, Modified: hour, Updated: hour,
 	}); err != nil {
 		t.Fatal(err)
@@ -112,8 +113,8 @@ func TestAccSearchArtifact(t *testing.T) {
 		*repo.Defaults(&repo.Config{Key: "tools-cache", Class: repo.Local})); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.db.Items().Put(context.Background(), types.Item{
-		RepoKey: "tools-cache", Path: types.RootPath, Name: "lib-tool.jar",
+	if _, err := w.db.Items().Put(context.Background(), model.Item{
+		RepoKey: "tools-cache", Path: kernel.RootPath, Name: "lib-tool.jar",
 		Created: time.Now(), Modified: time.Now(),
 	}); err != nil {
 		t.Fatal(err)
@@ -503,8 +504,8 @@ func TestAccSearchPages(t *testing.T) {
 	w := searchWorld(t, false)
 	ctx := context.Background()
 	for n := range searchPage {
-		if _, err := w.db.Items().Put(ctx, types.Item{
-			RepoKey: "other-local", Path: types.RootPath, Name: fmt.Sprintf("page-%04d.bin", n),
+		if _, err := w.db.Items().Put(ctx, model.Item{
+			RepoKey: "other-local", Path: kernel.RootPath, Name: fmt.Sprintf("page-%04d.bin", n),
 			Created: time.Now(), Modified: time.Now(),
 		}); err != nil {
 			t.Fatal(err)
@@ -548,9 +549,9 @@ func TestAccSearchStoreErrors(t *testing.T) {
 // failingSearchStore fails every item search.
 type failingSearchStore struct{ harness.Store }
 
-func (s failingSearchStore) Items() store.ItemStore { return failingItems{s.Store.Items()} }
+func (s failingSearchStore) Items() port.ItemStore { return failingItems{s.Store.Items()} }
 
-type failingItems struct{ store.ItemStore }
+type failingItems struct{ port.ItemStore }
 
 func (failingItems) Search(context.Context, *aql.Query, aql.Options) ([]aql.Hit, error) {
 	return nil, errBoom

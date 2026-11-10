@@ -11,10 +11,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	ansiblefmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/ansible"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccGalaxyRouteStatusAndLifecycle(t *testing.T) {
@@ -78,7 +80,7 @@ func TestAccGalaxyRouteStatusAndLifecycle(t *testing.T) {
 	if _, err := f.items.Restore(
 		t.Context(),
 		item.Target{Repo: f.repo, Path: p},
-		types.TrashRecord{Item: it, Properties: props},
+		model.TrashRecord{Item: it, Properties: props},
 		"admin",
 	); err != nil {
 		t.Fatal(err)
@@ -132,12 +134,12 @@ func TestAccGalaxyVirtualOrderedReadableMembers(t *testing.T) {
 	if err := f.db.Repos().Create(t.Context(), virtual); err != nil {
 		t.Fatal(err)
 	}
-	permission := types.Permission{
+	permission := model.Permission{
 		Name: "reader",
-		Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}},
-				Targets: map[string]types.Target{
+		Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]model.Target{
 					"virtual": {Include: []string{"**"}},
 					"second":  {Include: []string{"**"}},
 				},
@@ -225,12 +227,12 @@ func TestAccGalaxyPaginationAndPathPermissions(t *testing.T) {
 	if !strings.Contains(w.Body.String(), "1.3.0") {
 		t.Fatalf("next page: %s", w.Body)
 	}
-	permission := types.Permission{
+	permission := model.Permission{
 		Name: "one-version",
-		Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}},
-				Targets: map[string]types.Target{
+		Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]model.Target{
 					f.repo.Key: {Include: []string{"collections/weave/sample/1.2.3/**"}},
 				},
 			},

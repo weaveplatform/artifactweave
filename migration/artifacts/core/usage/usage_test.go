@@ -10,11 +10,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitSummarize(t *testing.T) {
@@ -143,10 +144,10 @@ func TestUnitSummarizeReadsTheWholeTrash(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	// More entries than one page of the trash listing holds.
-	n := store.MaxLimit + 1
+	n := kernel.MaxLimit + 1
 	for i := range n {
-		if _, err := db.Trash().Add(ctx, types.TrashEntry{Record: types.TrashRecord{
-			Item: types.Item{RepoKey: "bulk", Path: ".", Name: fmt.Sprintf("f%04d", i), Size: 1},
+		if _, err := db.Trash().Add(ctx, model.TrashEntry{Record: model.TrashRecord{
+			Item: model.Item{RepoKey: "bulk", Path: ".", Name: fmt.Sprintf("f%04d", i), Size: 1},
 		}}); err != nil {
 			t.Fatal(err)
 		}
@@ -168,19 +169,19 @@ type failing struct {
 	op string
 }
 
-func (f failing) Blobs() store.BlobIndex  { return failBlobs{f.Store.Blobs(), f.op} }
-func (f failing) Items() store.ItemStore  { return failItems{f.Store.Items(), f.op} }
-func (f failing) Repos() store.RepoStore  { return failRepos{f.Store.Repos(), f.op} }
-func (f failing) Trash() store.TrashStore { return failTrash{f.Store.Trash(), f.op} }
+func (f failing) Blobs() port.BlobIndex  { return failBlobs{f.Store.Blobs(), f.op} }
+func (f failing) Items() port.ItemStore  { return failItems{f.Store.Items(), f.op} }
+func (f failing) Repos() port.RepoStore  { return failRepos{f.Store.Repos(), f.op} }
+func (f failing) Trash() port.TrashStore { return failTrash{f.Store.Trash(), f.op} }
 
 type failTrash struct {
-	store.TrashStore
+	port.TrashStore
 	op string
 }
 
 func (f failTrash) List(
-	ctx context.Context, repoKey, prefix string, p store.Page,
-) ([]types.TrashEntry, string, error) {
+	ctx context.Context, repoKey, prefix string, p kernel.Page,
+) ([]model.TrashEntry, string, error) {
 	if f.op == "trash" {
 		return nil, "", errBoom
 	}
@@ -188,7 +189,7 @@ func (f failTrash) List(
 }
 
 type failBlobs struct {
-	store.BlobIndex
+	port.BlobIndex
 	op string
 }
 
@@ -200,11 +201,11 @@ func (f failBlobs) Totals(ctx context.Context) (int64, int64, error) {
 }
 
 type failItems struct {
-	store.ItemStore
+	port.ItemStore
 	op string
 }
 
-func (f failItems) Usage(ctx context.Context) ([]store.RepoUsage, error) {
+func (f failItems) Usage(ctx context.Context) ([]port.RepoUsage, error) {
 	if f.op == "usage" {
 		return nil, errBoom
 	}
@@ -212,11 +213,11 @@ func (f failItems) Usage(ctx context.Context) ([]store.RepoUsage, error) {
 }
 
 type failRepos struct {
-	store.RepoStore
+	port.RepoStore
 	op string
 }
 
-func (f failRepos) List(ctx context.Context, filter store.RepoFilter) ([]repo.Config, error) {
+func (f failRepos) List(ctx context.Context, filter port.RepoFilter) ([]repo.Config, error) {
 	if f.op == "list" {
 		return nil, errBoom
 	}

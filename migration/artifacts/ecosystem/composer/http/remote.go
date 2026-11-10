@@ -11,12 +11,12 @@ import (
 	"regexp"
 	"strings"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/composer"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -228,7 +228,7 @@ func (h handler) remoteP2(r *http.Request, name string) ([]release, error) {
 		}
 		result, e := h.k.Read(r, resource)
 		var api *apierror.Error
-		if errors.Is(e, store.ErrNotFound) ||
+		if errors.Is(e, kernel.ErrNotFound) ||
 			errors.As(e, &api) && api.Status == http.StatusNotFound {
 			continue
 		}
@@ -246,7 +246,7 @@ func (h handler) remoteP2(r *http.Request, name string) ([]release, error) {
 		for i := range releases {
 			rel := &releases[i]
 			rel.Path = name + "/" + rel.Version + ".zip"
-			if !h.k.Can(r, rel.Path, types.ActionRead) {
+			if !h.k.Can(r, rel.Path, accessapi.ActionRead) {
 				continue
 			}
 			if result.CheckRead != nil {
@@ -280,7 +280,7 @@ func (h handler) remoteDist(w http.ResponseWriter, r *http.Request, rel release)
 		ExternalURL: rel.RemoteURL,
 		Method:      http.MethodGet,
 		Variant:     "composer-zip-v1",
-		Checksums:   types.Checksums{SHA1: rel.SHA1},
+		Checksums:   kernel.Checksums{SHA1: rel.SHA1},
 		Validate: func(ctx context.Context, body io.ReadSeeker, size int64) error {
 			pkg, err := composer.ParseArchive(ctx, body, size, rel.Version)
 			if err != nil || pkg.Name != rel.Name {

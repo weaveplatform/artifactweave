@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -16,7 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // reindexRecorder is the format of the P8 package types in these tests:
@@ -115,17 +116,17 @@ func reindexWorld(
 		cfg.Work = q
 	})
 	ctx := context.Background()
-	targets := map[string]types.Target{}
+	targets := map[string]model.Target{}
 	for _, c := range p8Repos {
 		if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
 		}
-		targets[c.Key] = types.Target{Include: []string{"**"}}
+		targets[c.Key] = model.Target{Include: []string{"**"}}
 	}
-	if err := w.db.Permissions().Create(ctx, types.Permission{
+	if err := w.db.Permissions().Create(ctx, model.Permission{
 		Name: "manage-p8",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"deployer": types.ActionManage}},
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}},
 			Targets: targets,
 		}},
 	}); err != nil {

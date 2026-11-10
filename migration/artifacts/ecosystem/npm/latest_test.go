@@ -7,9 +7,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // latestOf is the version of name whose Metadata carries latest, failing
@@ -36,9 +36,9 @@ func canonical(version string) string { return npm.CanonicalPath("left-pad", ver
 // dist-tags tags, as jf npm publish --tag deploys it.
 func (w *world) deployVersion(version string, tags ...string) {
 	w.t.Helper()
-	var props types.Properties
+	var props model.Properties
 	if len(tags) > 0 {
-		props = types.Properties{npm.PropDistTag: tags}
+		props = model.Properties{npm.PropDistTag: tags}
 	}
 	w.deploy(canonical(version), pkg("left-pad", version, ""), props)
 }
@@ -79,7 +79,7 @@ func TestUnitLatestRules(t *testing.T) {
 		},
 		// npm dist-tag add 0.9.5 latest, or the properties API.
 		{"latest set by property moves it", func() {
-			w.annotate(canonical("0.9.5"), types.Properties{npm.PropDistTag: {"latest"}})
+			w.annotate(canonical("0.9.5"), model.Properties{npm.PropDistTag: {"latest"}})
 		}, "0.9.5"},
 		// A pin lasts until the next untagged version that outranks it.
 		{"a redeploy leaves a pin", func() { w.deployVersion("1.0.0") }, "0.9.5"},
@@ -94,10 +94,10 @@ func TestUnitLatestRules(t *testing.T) {
 		// npm dist-tag rm latest: the version that outranks the others
 		// takes it back.
 		{"latest taken off returns", func() {
-			w.annotate(canonical("2.0.0"), types.Properties{npm.PropDistTag: {"next"}})
+			w.annotate(canonical("2.0.0"), model.Properties{npm.PropDistTag: {"next"}})
 		}, "2.0.0"},
 		{"latest taken off a lower pin goes to the highest", func() {
-			w.annotate(canonical("0.9.0"), types.Properties{npm.PropDistTag: {"latest"}})
+			w.annotate(canonical("0.9.0"), model.Properties{npm.PropDistTag: {"latest"}})
 			w.annotate(canonical("0.9.0"), nil, npm.PropDistTag)
 		}, "2.0.0"},
 		// An overwrite with another version's content drops the version.
@@ -130,7 +130,7 @@ func TestUnitReindexSettlesLatest(t *testing.T) {
 	w := newWorld(t)
 	w.deployVersion("1.0.0")
 	w.deployVersion("2.0.0")
-	w.annotate(canonical("1.0.0"), types.Properties{npm.PropDistTag: {"latest"}})
+	w.annotate(canonical("1.0.0"), model.Properties{npm.PropDistTag: {"latest"}})
 	if err := w.items.Reindex(w.ctx, w.c); err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +278,7 @@ func TestUnitLatestByPublish(t *testing.T) {
 			func() { w.remove(canonical("3.0.0-beta.1")) }, "2.0.0",
 		},
 		{"latest taken off returns to the last deployed", func() {
-			w.annotate(canonical("1.0.0"), types.Properties{npm.PropDistTag: {"latest"}})
+			w.annotate(canonical("1.0.0"), model.Properties{npm.PropDistTag: {"latest"}})
 			w.annotate(canonical("1.0.0"), nil, npm.PropDistTag)
 		}, "2.0.0"},
 	}

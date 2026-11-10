@@ -13,9 +13,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // entry is how a file is indexed: under a project's version, as a record
@@ -37,7 +37,7 @@ type entry struct {
 //     file's Requires-Python, as 7.x's project page query reads it
 //     (RTFACT-29892). [I] That 7.x reads it for such a file is inferred
 //     (#216).
-func entryOf(it types.Item, d *Dist, props types.Properties) (entry, bool) {
+func entryOf(it model.Item, d *Dist, props model.Properties) (entry, bool) {
 	e := entry{file: File{
 		Path: it.FullPath(), Name: path.Base(it.FullPath()),
 		SHA256: it.Actual.SHA256, MD5: it.Actual.MD5, Size: it.Size, Uploaded: uploaded(it),
@@ -62,7 +62,7 @@ func entryOf(it types.Item, d *Dist, props types.Properties) (entry, bool) {
 }
 
 // first is the first value of the property key, or "".
-func first(props types.Properties, key string) string {
+func first(props model.Properties, key string) string {
 	if v := props[key]; len(v) > 0 {
 		return v[0]
 	}
@@ -71,7 +71,7 @@ func first(props types.Properties, key string) string {
 
 // yankedBy reads a file's yanked state and reason from pypi.yanked
 // (PropYanked).
-func yankedBy(props types.Properties) (bool, string) {
+func yankedBy(props model.Properties) (bool, string) {
 	v, ok := props[PropYanked]
 	if !ok {
 		return false, ""
@@ -99,14 +99,14 @@ func yankedBy(props types.Properties) (bool, string) {
 func setProperties(
 	ctx context.Context,
 	st format.Store,
-	it types.Item,
+	it model.Item,
 	d *Dist,
-) (types.Properties, error) {
+) (model.Properties, error) {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return nil, err //nolint:wrapcheck // the caller names the item
 	}
-	want := types.Properties{
+	want := model.Properties{
 		PropName:           {d.Name},
 		PropVersion:        {d.Version},
 		PropNormalizedName: {Normalize(d.Name)},
@@ -121,7 +121,7 @@ func setProperties(
 			remove = append(remove, k)
 		}
 	}
-	set := types.Properties{}
+	set := model.Properties{}
 	for k, v := range want {
 		if !slices.Equal(props[k], v) {
 			set[k] = v
@@ -134,7 +134,7 @@ func setProperties(
 		return nil, err //nolint:wrapcheck // the caller names the item
 	}
 	// A store may give an item without properties none at all.
-	out := types.Properties{}
+	out := model.Properties{}
 	maps.Copy(out, props)
 	for _, k := range remove {
 		delete(out, k)
@@ -148,7 +148,7 @@ func setProperties(
 // it compares with what the store holds. The name and version are valid
 // by now, and need neither.
 func propertyValue(s string) string {
-	return types.TruncatePropertyValue(strings.ReplaceAll(s, "\x00", ""), types.PropertyValueMax)
+	return model.TruncatePropertyValue(strings.ReplaceAll(s, "\x00", ""), model.PropertyValueMax)
 }
 
 // place indexes the file it as e says, or leaves it out of the index when
@@ -157,7 +157,7 @@ func place(
 	ctx context.Context,
 	st format.Store,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	e entry,
 	ok bool,
 ) error {
@@ -180,7 +180,7 @@ func place(
 	if !ok {
 		return nil
 	}
-	p, err := st.Packages().Ensure(ctx, types.Package{
+	p, err := st.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Name: e.project, Type: c.PackageType, Created: e.file.Uploaded,
 	})
 	if err != nil {
@@ -191,12 +191,12 @@ func place(
 
 // attach makes e's record, of the item with id, a file of e's version of
 // p.
-func attach(ctx context.Context, st format.Store, p types.Package, e entry, id int64) error {
+func attach(ctx context.Context, st format.Store, p model.Package, e entry, id int64) error {
 	var m Metadata
 	var files []int64
 	pv, err := st.Packages().Version(ctx, p.ID, e.version)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 	case err != nil:
 		return fmt.Errorf("pypi: version %s of %s: %w", e.version, p.Name, err)
 	default:
@@ -224,9 +224,9 @@ func attach(ctx context.Context, st format.Store, p types.Package, e entry, id i
 func detach(
 	ctx context.Context,
 	st format.Store,
-	p types.Package,
-	pv types.PackageVersion,
-	it types.Item,
+	p model.Package,
+	pv model.PackageVersion,
+	it model.Item,
 	keep bool,
 ) error {
 	m, err := DecodeMetadata(pv.Metadata)
@@ -354,7 +354,7 @@ func readOnce(
 	ctx context.Context,
 	env format.Env,
 	read map[string]*Dist,
-	it types.Item,
+	it model.Item,
 ) (*Dist, error) {
 	name := path.Base(it.FullPath())
 	if !IsDistribution(name) {

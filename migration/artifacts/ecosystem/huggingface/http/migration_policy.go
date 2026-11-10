@@ -10,7 +10,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Grants.AccessChange compares each permission's entire target union for
@@ -108,14 +107,14 @@ func (h handler) migrationAccess(
 	status migrationStatus,
 	ref string,
 ) error {
-	if !h.k.CanFolder(r, status.Source, types.ActionRead) ||
-		!h.k.CanFolder(r, status.Destination, types.ActionRead|types.ActionWrite) ||
-		ref != "" && !h.k.Can(r, ref, types.ActionRead|types.ActionWrite) {
+	if !h.k.CanFolder(r, status.Source, accessapi.ActionRead) ||
+		!h.k.CanFolder(r, status.Destination, accessapi.ActionRead|accessapi.ActionWrite) ||
+		ref != "" && !h.k.Can(r, ref, accessapi.ActionRead|accessapi.ActionWrite) {
 		return migrationAccessDenied()
 	}
 	for _, file := range files {
-		if !h.k.Can(r, file.item.FullPath(), types.ActionRead) ||
-			!h.k.Can(r, file.path, types.ActionRead|types.ActionWrite) {
+		if !h.k.Can(r, file.item.FullPath(), accessapi.ActionRead) ||
+			!h.k.Can(r, file.path, accessapi.ActionRead|accessapi.ActionWrite) {
 			return migrationAccessDenied()
 		}
 	}

@@ -10,9 +10,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // keeper keeps a signature beside every file ending .bin, as Helm keeps a
@@ -132,7 +132,7 @@ func TestUnitRestoreSidecarPermit(t *testing.T) {
 	w := keeping(t)
 	w.remove(t, w.libs, "a/x.bin")
 	_, err := w.trash.Restore(ctx, "libs", "a/x.bin", trash.Destination{Repo: w.libs}, "bob",
-		func(it types.Item) bool { return !strings.HasSuffix(it.FullPath(), ".sig") })
+		func(it model.Item) bool { return !strings.HasSuffix(it.FullPath(), ".sig") })
 	if !errors.Is(err, trash.ErrNotPermitted) || w.exists(w.libs, "a/x.bin") {
 		t.Fatalf("a refused sidecar: %v", err)
 	}

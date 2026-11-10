@@ -7,10 +7,12 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	goformat "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // publisher answers the deploys jf go-publish sends: one PUT per file of a
@@ -37,16 +39,16 @@ func (p publisher) publish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	declared := pkgroute.DeclaredChecksums(r.Header)
-	var it types.Item
+	var it model.Item
 	if f.Ext == goformat.ExtInfo {
 		// Checked before the body is read, so a refused caller's never is.
-		if !k.Require(w, r, f.Path(), types.ActionWrite) {
+		if !k.Require(w, r, f.Path(), api.ActionWrite) {
 			return
 		}
 		it, err = p.storeInfo(r, f, path.Props, declared)
 	} else {
 		it, err = k.StoreOnce(r, f.Path(), r.Body, path.Props, declared,
-			func(types.Item) error { return goformat.Republished(f) })
+			func(model.Item) error { return goformat.Republished(f) })
 	}
 	if err != nil {
 		k.Error(w, r, err)
@@ -77,17 +79,17 @@ func file(r *http.Request, p pkgroute.Path) (goformat.File, error) {
 func (p publisher) storeInfo(
 	r *http.Request,
 	f goformat.File,
-	props types.Properties,
-	declared types.Checksums,
-) (types.Item, error) {
+	props model.Properties,
+	declared kernel.Checksums,
+) (model.Item, error) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, goformat.MaxInfo+1))
 	if err != nil {
-		return types.Item{}, apierror.New(http.StatusBadRequest,
+		return model.Item{}, apierror.New(http.StatusBadRequest,
 			fmt.Sprintf("Reading the .info of version %s of module %s failed: %v.",
 				f.Version, f.Module, err))
 	}
 	if err := goformat.CheckInfo(f, body); err != nil {
-		return types.Item{}, apierror.New(http.StatusBadRequest, err.Error())
+		return model.Item{}, apierror.New(http.StatusBadRequest, err.Error())
 	}
 	return p.k.Store( //nolint:wrapcheck // the kit's answer, given as it is
 		r, f.Path(), bytes.NewReader(body), props, declared)

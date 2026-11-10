@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitParseBuildDomains(t *testing.T) {
@@ -115,7 +116,7 @@ func TestUnitCheckRestrictedBuilds(t *testing.T) {
 
 func TestUnitBuildResponse(t *testing.T) {
 	at := time.Date(2026, 1, 2, 3, 4, 5, 678_901_000, time.UTC)
-	run := types.Build{
+	run := model.Build{
 		ID: 1, ProjectKey: "proj", Name: "app", Number: "7", Started: at, Created: at,
 		CreatedBy: "ci",
 	}
@@ -132,7 +133,7 @@ func TestUnitBuildResponse(t *testing.T) {
 		t.Fatalf("got  %s\nwant %s", b, want)
 	}
 	q = mustParse(t, `build.promotions.find().offset(1).limit(5)`)
-	promo := &types.BuildPromotion{ID: 2, BuildID: 1, Status: "staged", Comment: "rc"}
+	promo := &model.BuildPromotion{ID: 2, BuildID: 1, Status: "staged", Comment: "rc"}
 	b, err = json.Marshal(q.BuildResponse([]BuildHit{{Build: run, Promotion: promo}}))
 	if err != nil {
 		t.Fatal(err)
@@ -205,10 +206,10 @@ func TestUnitCompileJoins(t *testing.T) {
 func TestUnitJoinedEdges(t *testing.T) {
 	// A Joined nested in an $or by hand evaluates on its own and restores
 	// the outer combination.
-	it := types.Item{ID: 1, Name: "a", Actual: types.Checksums{SHA1: "s"}}
+	it := model.Item{ID: 1, Name: "a", Actual: kernel.Checksums{SHA1: "s"}}
 	c := &Corpus{Items: []Hit{{Item: it}}}
-	c.Builds = []types.Build{{ID: 1, Name: "b", Modules: []types.BuildModule{{
-		Artifacts: []types.BuildFile{{Name: "f", Checksums: types.Checksums{SHA1: "s"}}},
+	c.Builds = []model.Build{{ID: 1, Name: "b", Modules: []model.BuildModule{{
+		Artifacts: []model.BuildFile{{Name: "f", Checksums: kernel.Checksums{SHA1: "s"}}},
 	}}}}
 	inner := &Joined{Criteria: And{&PathCriterion{
 		Path: "artifact.module.build", Field: "name", Op: OpEq, Text: "b", rel: relBuild,
@@ -224,7 +225,7 @@ func TestUnitJoinedEdges(t *testing.T) {
 	}
 	// A promotion of a run the corpus lacks is skipped, as the SQL join
 	// skips it, and reaches no build either.
-	c.Promotions = []types.BuildPromotion{{ID: 1, BuildID: 9, Status: "s"}}
+	c.Promotions = []model.BuildPromotion{{ID: 1, BuildID: 9, Status: "s"}}
 	promotions := mustParse(t, `build.promotions.find()`)
 	if got := SelectBuilds(promotions, Options{}, c); len(got) != 0 {
 		t.Fatalf("orphan promotion %v", got)

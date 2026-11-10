@@ -7,11 +7,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/identity"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errBoom = errors.New("boom")
@@ -33,21 +33,21 @@ type faultyUsers struct {
 	f *faulty
 }
 
-func (u faultyUsers) Get(ctx context.Context, name string) (types.User, error) {
+func (u faultyUsers) Get(ctx context.Context, name string) (model.User, error) {
 	if u.f.failing("users.get") {
-		return types.User{}, errBoom
+		return model.User{}, errBoom
 	}
 	return u.UserStore.Get(ctx, name) //nolint:wrapcheck // test double
 }
 
-func (u faultyUsers) List(ctx context.Context, p kernel.Page) ([]types.User, string, error) {
+func (u faultyUsers) List(ctx context.Context, p kernel.Page) ([]model.User, string, error) {
 	if u.f.failing("users.list") {
 		return nil, "", errBoom
 	}
 	return u.UserStore.List(ctx, p) //nolint:wrapcheck // test double
 }
 
-func (u faultyUsers) Update(ctx context.Context, x types.User) error {
+func (u faultyUsers) Update(ctx context.Context, x model.User) error {
 	if u.f.failing("users.update") {
 		return errBoom
 	}
@@ -66,9 +66,9 @@ type faultyGroups struct {
 	f *faulty
 }
 
-func (g faultyGroups) Get(ctx context.Context, name string) (types.Group, error) {
+func (g faultyGroups) Get(ctx context.Context, name string) (model.Group, error) {
 	if g.f.failing("groups.get") {
-		return types.Group{}, errBoom
+		return model.Group{}, errBoom
 	}
 	return g.GroupStore.Get(ctx, name) //nolint:wrapcheck // test double
 }
@@ -89,7 +89,7 @@ func (t faultyTokens) List(
 	ctx context.Context,
 	f port.TokenFilter,
 	p kernel.Page,
-) ([]types.Token, string, error) {
+) ([]model.Token, string, error) {
 	if t.f.failing("tokens.list") {
 		return nil, "", errBoom
 	}
@@ -132,7 +132,7 @@ func TestUnitStoreFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := db.Tokens().
-		Create(ctx, types.Token{ID: "t", Subject: "jfac@svc/users/eve"}); err != nil {
+		Create(ctx, model.Token{ID: "t", Subject: "jfac@svc/users/eve"}); err != nil {
 		t.Fatal(err)
 	}
 	boss := newUser("boss")
@@ -149,11 +149,11 @@ func TestUnitStoreFailures(t *testing.T) {
 		},
 		"tokens.list":   func() error { return s.DeleteUser(ctx, "eve") },
 		"tokens.delete": func() error { return s.DeleteUser(ctx, "eve") },
-		"groups.get":    func() error { _, err := s.PutGroup(ctx, types.Group{Name: "g"}, nil); return err },
+		"groups.get":    func() error { _, err := s.PutGroup(ctx, model.Group{Name: "g"}, nil); return err },
 		"users.update":  func() error { _, err := s.ExpirePasswords(ctx, []string{"eve"}); return err },
-		"users.unlock":  func() error { return s.SetLockPolicy(ctx, types.UserLockPolicy{}) },
+		"users.unlock":  func() error { return s.SetLockPolicy(ctx, model.UserLockPolicy{}) },
 		"settings.put": func() error {
-			_, err := s.SetExpirationPolicy(ctx, types.PasswordExpirationPolicy{MaxAgeDays: 1})
+			_, err := s.SetExpirationPolicy(ctx, model.PasswordExpirationPolicy{MaxAgeDays: 1})
 			return err
 		},
 	} {
@@ -167,8 +167,8 @@ func TestUnitStoreFailures(t *testing.T) {
 		t.Errorf("expire with a failing read: %v", err)
 	}
 	// The encrypted password's revocation fails the password change.
-	if err := db.Tokens().Create(ctx, types.Token{
-		ID: "ep", Subject: "jfac@svc/users/eve", Purpose: types.TokenPurposeEncryptedPassword,
+	if err := db.Tokens().Create(ctx, model.Token{
+		ID: "ep", Subject: "jfac@svc/users/eve", Purpose: model.TokenPurposeEncryptedPassword,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -218,16 +218,16 @@ func TestUnitAccessLockPolicyStoreFailures(t *testing.T) {
 	f := &faulty{Store: db}
 	s := &identity.Service{Store: f, Hash: cheap}
 	for _, key := range []string{
-		types.SettingUserLockPolicy,
-		types.SettingPasswordExpirationPolicy,
-		types.SettingAccessLockSettings,
+		settings.SettingUserLockPolicy,
+		settings.SettingPasswordExpirationPolicy,
+		settings.SettingAccessLockSettings,
 	} {
 		f.fail = "settings.get:" + key
 		if _, err := s.AccessLockPolicy(ctx); !errors.Is(err, errBoom) {
 			t.Errorf("read with %s failing: %v", key, err)
 		}
 	}
-	for _, key := range []string{types.SettingUserLockPolicy, types.SettingPasswordExpirationPolicy} {
+	for _, key := range []string{settings.SettingUserLockPolicy, settings.SettingPasswordExpirationPolicy} {
 		f.fail = "settings.get:" + key
 		if _, err := s.SetAccessLockPolicy(
 			ctx,

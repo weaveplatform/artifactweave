@@ -22,6 +22,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
@@ -29,9 +31,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type fixture struct {
@@ -89,7 +90,7 @@ func newFixtureWithProtocol(
 			}
 			return err
 		},
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 			rc, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				t.Fatal(err)
@@ -440,7 +441,7 @@ func TestAccManifestFollowsDeleteRestoreCopyAndReindex(t *testing.T) {
 	ctx := context.Background()
 	filename := "hello-1.0-1.rockspec"
 	if err := f.db.Settings().
-		Put(ctx, types.SettingTrashcan, types.TrashcanSettings{Enabled: true, RetentionDays: 14}); err != nil {
+		Put(ctx, settings.SettingTrashcan, model.TrashcanSettings{Enabled: true, RetentionDays: 14}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.items.Deploy(
@@ -694,18 +695,18 @@ type packageFaultStore struct {
 	find, version, list bool
 }
 
-func (s packageFaultStore) Packages() store.PackageStore {
+func (s packageFaultStore) Packages() port.PackageStore {
 	return packageFaults{s.Store.Packages(), s.find, s.version, s.list}
 }
 
 type packageFaults struct {
-	store.PackageStore
+	port.PackageStore
 	find, version, list bool
 }
 
-func (s packageFaults) Find(ctx context.Context, key, name string) (types.Package, error) {
+func (s packageFaults) Find(ctx context.Context, key, name string) (model.Package, error) {
 	if s.find {
-		return types.Package{}, errors.New("injected package find failure")
+		return model.Package{}, errors.New("injected package find failure")
 	}
 	return s.PackageStore.Find(ctx, key, name)
 }
@@ -714,9 +715,9 @@ func (s packageFaults) Version(
 	ctx context.Context,
 	id int64,
 	version string,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	if s.version {
-		return types.PackageVersion{}, errors.New("injected version lookup failure")
+		return model.PackageVersion{}, errors.New("injected version lookup failure")
 	}
 	return s.PackageStore.Version(ctx, id, version)
 }
@@ -724,8 +725,8 @@ func (s packageFaults) Version(
 func (s packageFaults) List(
 	ctx context.Context,
 	key string,
-	page store.Page,
-) ([]types.Package, string, error) {
+	page kernel.Page,
+) ([]model.Package, string, error) {
 	if s.list {
 		return nil, "", errors.New("injected package list failure")
 	}

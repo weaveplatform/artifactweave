@@ -24,19 +24,21 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
@@ -156,7 +158,8 @@ func newItemWorld(t *testing.T, anonymous bool) *itemWorld {
 	db := inmem.New()
 	cheapSeed(t, db)
 	if anonymous {
-		if err := db.Settings().Put(t.Context(), types.SettingAnonymousAccess, true); err != nil {
+		if err := db.Settings().
+			Put(t.Context(), settings.SettingAnonymousAccess, true); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -217,19 +220,19 @@ func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *accesst
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(ctx, types.User{Name: "dev", PasswordHash: support.CheapHash}); err != nil {
+		Create(ctx, model.User{Name: "dev", PasswordHash: support.CheapHash}); err != nil {
 		t.Fatal(err)
 	}
-	dev := types.Grants{Users: map[string]types.Actions{"dev": types.ActionRead}}
-	if err := db.Permissions().Create(ctx, types.Permission{
-		Name: "dev-app", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
+	dev := model.Grants{Users: map[string]accessapi.Actions{"dev": accessapi.ActionRead}}
+	if err := db.Permissions().Create(ctx, model.Permission{
+		Name: "dev-app", Resources: map[accessapi.ResourceType]model.Resource{
+			accessapi.ResourceArtifact: {
 				Actions: dev,
-				Targets: map[string]types.Target{"libs-local": {Include: []string{"**"}}},
+				Targets: map[string]model.Target{"libs-local": {Include: []string{"**"}}},
 			},
-			types.ResourceBuild: {
+			accessapi.ResourceBuild: {
 				Actions: dev,
-				Targets: map[string]types.Target{
+				Targets: map[string]model.Target{
 					"artifactory-build-info": {Include: []string{"app/**"}},
 				},
 			},
@@ -253,18 +256,18 @@ func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *accesst
 		t.Fatal(err)
 	}
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	jar := types.BuildFile{Name: "app.jar", Checksums: types.Checksums{SHA1: sha1Hex("jar")}}
+	jar := model.BuildFile{Name: "app.jar", Checksums: kernel.Checksums{SHA1: sha1Hex("jar")}}
 	for n, run := range [][2]string{{"app", "1"}, {"app", "2"}, {"tool", "1"}} {
-		b, err := db.Builds().Put(ctx, types.Build{
+		b, err := db.Builds().Put(ctx, model.Build{
 			Name: run[0], Number: run[1], Started: base.Add(time.Duration(n) * time.Minute),
 			Created: base.Add(time.Hour), CreatedBy: "ci", URL: "https://ci/" + run[0],
-			Modules: []types.BuildModule{{ID: run[0], Artifacts: []types.BuildFile{jar}}},
+			Modules: []model.BuildModule{{ID: run[0], Artifacts: []model.BuildFile{jar}}},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if n == 0 {
-			if _, err := db.Builds().AddPromotion(ctx, types.BuildPromotion{
+			if _, err := db.Builds().AddPromotion(ctx, model.BuildPromotion{
 				BuildID: b.ID, Created: base.Add(2 * time.Hour), CreatedBy: "admin",
 				Status: "released", Repo: "libs-release", CIUser: "jenkins",
 			}); err != nil {
@@ -298,12 +301,12 @@ type faultyStore struct {
 	fail map[string]bool
 }
 
-func (f faultyStore) Repos() store.RepoStore {
+func (f faultyStore) Repos() port.RepoStore {
 	return faultyRepos{RepoStore: f.Store.Repos(), fail: f.fail}
 }
 
 type faultyRepos struct {
-	store.RepoStore
+	port.RepoStore
 	fail map[string]bool
 }
 
@@ -321,20 +324,20 @@ type buildSearchFaults struct {
 	fail string
 }
 
-func (f buildSearchFaults) Items() store.ItemStore {
+func (f buildSearchFaults) Items() port.ItemStore {
 	return faultyChecksumSearch{f.Store.Items(), f.fail}
 }
 
 type faultyChecksumSearch struct {
-	store.ItemStore
+	port.ItemStore
 	fail string
 }
 
 func (f faultyChecksumSearch) FindByChecksum(
 	ctx context.Context,
-	c types.Checksums,
-	p store.Page,
-) ([]types.Item, string, error) {
+	c kernel.Checksums,
+	p kernel.Page,
+) ([]model.Item, string, error) {
 	if f.fail == "find" {
 		return nil, "", errBoom
 	}

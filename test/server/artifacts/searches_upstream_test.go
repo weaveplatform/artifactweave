@@ -11,18 +11,19 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type upstreamSearchWorld struct {
@@ -72,7 +73,7 @@ func searchUpstreamWorld(t *testing.T) *upstreamSearchWorld {
 		t.Cleanup(pool.Close)
 		backend := &maven.MavenBackend{Policy: policy}
 		u.svc = &source.Service{
-			Resolve: func(ctx context.Context, r repo.Config) (types.SourceIdentity, error) {
+			Resolve: func(ctx context.Context, r repo.Config) (model.SourceIdentity, error) {
 				return c.Store.RemoteCache().Source(ctx, r.Key)
 			},
 			Revalidate: func(ctx context.Context, q source.Request, permit source.Permit) error {
@@ -95,7 +96,7 @@ func searchUpstreamWorld(t *testing.T) *upstreamSearchWorld {
 				} else if q.Resource.PermissionFolder {
 					full, allows = q.Resource.PermissionPath, decider.AllowsFolder
 				}
-				if !allows(types.ResourceArtifact, target(q.Repo), full, types.ActionRead) {
+				if !allows(api.ResourceArtifact, target(q.Repo), full, api.ActionRead) {
 					return source.ErrDenied
 				}
 				return generic.CheckDownload(
@@ -208,7 +209,7 @@ func TestAccSearchUpstreamMavenColdWarmAndAliases(t *testing.T) {
 	if _, err := u.db.Items().
 		Get(t.Context(), "up", true, "org/acme/lib/2.0/lib-2.0.jar"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("version discovery fetched a binary", err)
 	}
@@ -277,8 +278,8 @@ func TestAccSearchUpstreamFailureClassification(t *testing.T) {
 		hard   bool
 		status int
 	}{
-		{"missing", store.ErrNotFound, true, 200},
-		{"offline miss", store.ErrNotFound, false, 200},
+		{"missing", kernel.ErrNotFound, true, 200},
+		{"offline miss", kernel.ErrNotFound, false, 200},
 		{"connect soft", &source.HTTPError{Status: 502, Kind: source.FailureKindConnectivity}, false, 200},
 		{"connect hard", &source.HTTPError{Status: 502, Kind: source.FailureKindConnectivity}, true, 502},
 		{"timeout soft", &source.HTTPError{Status: 504, Kind: source.FailureKindTimeout}, false, 200},
@@ -317,11 +318,11 @@ func TestAccSearchUpstreamFailureClassification(t *testing.T) {
 func TestAccSearchUpstreamVisibilityAndRevocation(t *testing.T) {
 	u := searchUpstreamWorld(t)
 	u.metadata("org/acme/lib", searchMetadata)
-	grant := types.Permission{
+	grant := model.Permission{
 		Name: "search-user",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
-			Targets: map[string]types.Target{"up": {Include: []string{"org/acme/lib/2.0/*.jar"}}},
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]model.Target{"up": {Include: []string{"org/acme/lib/2.0/*.jar"}}},
 		}},
 	}
 	if err := u.db.Permissions().Create(t.Context(), grant); err != nil {
@@ -447,7 +448,7 @@ func TestAccSearchUpstreamMalformedMetadataNeverAdmitted(t *testing.T) {
 				)
 				wantStatus(t, res, 502)
 				entries, _, err := u.db.RemoteCache().
-					List(t.Context(), "up", "org/acme/lib", store.Page{Limit: 100})
+					List(t.Context(), "up", "org/acme/lib", kernel.Page{Limit: 100})
 				if err != nil {
 					t.Fatal(err)
 				}

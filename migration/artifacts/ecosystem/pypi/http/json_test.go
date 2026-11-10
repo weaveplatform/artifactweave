@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func jsonDocument(t *testing.T, f *fixture, suffix, user string) map[string]any {
@@ -82,9 +82,9 @@ func TestAccJSONLatest(t *testing.T) {
 		t.Run(strings.Join(c.versions, "-"), func(t *testing.T) {
 			f := newFixture(t, pypifmt.Settings{})
 			for _, version := range c.versions {
-				var props types.Properties
+				var props model.Properties
 				if c.yanked == "all" || c.yanked == version {
-					props = types.Properties{pypifmt.PropYanked: {"broken"}}
+					props = model.Properties{pypifmt.PropYanked: {"broken"}}
 				}
 				f.deploy(
 					t,
@@ -195,7 +195,7 @@ func TestAccJSONEgg(t *testing.T) {
 		"pypi-local",
 		"legacy-1.0-py3.9.egg",
 		[]byte("property-indexed egg"),
-		types.Properties{pypifmt.PropName: {"legacy"}, pypifmt.PropVersion: {"1.0"}},
+		model.Properties{pypifmt.PropName: {"legacy"}, pypifmt.PropVersion: {"1.0"}},
 	)
 	doc := jsonDocument(t, f, "legacy/json", "reader")
 	file := doc["urls"].([]any)[0].(map[string]any)

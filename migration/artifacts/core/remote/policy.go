@@ -17,14 +17,14 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Store is the persistence that the policy, Smart Remote and the ecosystem
@@ -92,8 +92,8 @@ type Policy struct {
 }
 
 type fillResult struct {
-	key         types.RemoteCacheKey
-	entry       types.RemoteCacheEntry
+	key         model.RemoteCacheKey
+	entry       model.RemoteCacheEntry
 	isTransient bool
 	failure     error
 }
@@ -146,7 +146,7 @@ func (p *Policy) Read(
 		enabled(q.Repo.Offline) {
 		return p.cachedOnly(ctx, q)
 	}
-	if p.kind(q) == types.RemoteDerived {
+	if p.kind(q) == model.RemoteDerived {
 		return p.cachedOnly(ctx, q)
 	}
 	if p.Options == nil || (p.Pool == nil && p.Fetch == nil) || len(p.Key) == 0 {
@@ -166,12 +166,12 @@ func (p *Policy) Read(
 		entry, readErr := p.ReadEntry(ctx, key, permit)
 		if readErr == nil {
 			if p.negativeFresh(q, entry) {
-				return source.Result{}, store.ErrNotFound
+				return source.Result{}, kernel.ErrNotFound
 			}
 			if p.fresh(q, entry) {
 				return p.resultFor(ctx, q, entry)
 			}
-		} else if !errors.Is(readErr, store.ErrNotFound) {
+		} else if !errors.Is(readErr, kernel.ErrNotFound) {
 			return source.Result{}, readErr
 		}
 	}
@@ -237,12 +237,12 @@ func MetadataContext(ctx context.Context, q source.Request) (context.Context, co
 }
 
 func (p *Policy) cachedOnly(ctx context.Context, q source.Request) (source.Result, error) {
-	if p.kind(q) == types.RemoteMetadata {
+	if p.kind(q) == model.RemoteMetadata {
 		// Cache-only reads deliberately do not resolve credentials or DNS. Retained
 		// raw metadata is separate from locally generated package indexes.
 		variant := p.CacheKey(q, "").Variant
-		var newest types.RemoteCacheEntry
-		page := store.Page{Limit: 128}
+		var newest model.RemoteCacheEntry
+		page := kernel.Page{Limit: 128}
 		for {
 			entries, next, err := p.Store.RemoteCache().List(ctx, q.Repo.Key, q.Resource.Path, page)
 			if err != nil {
@@ -266,7 +266,7 @@ func (p *Policy) cachedOnly(ctx context.Context, q source.Request) (source.Resul
 	if err != nil {
 		return source.Result{}, fmt.Errorf("read remote cache: %w", err)
 	}
-	if q.Resource.Checksums != (types.Checksums{}) {
+	if q.Resource.Checksums != (kernel.Checksums{}) {
 		want, parseErr := item.ParseChecksums(q.Resource.Checksums)
 		if parseErr != nil {
 			return source.Result{}, PolicyError(parseErr)
@@ -299,7 +299,7 @@ func (p *Policy) cachedOnly(ctx context.Context, q source.Request) (source.Resul
 // key, so each term's encoding must stay as it is, and a new opt-in term is
 // added only when its option is set, which leaves every existing key unchanged.
 // It reads neither the store nor the network.
-func (p *Policy) CacheKey(q source.Request, revision string) types.RemoteCacheKey {
+func (p *Policy) CacheKey(q source.Request, revision string) model.RemoteCacheKey {
 	query := ""
 	if enabled(q.Repo.PropagateQueryParams) {
 		query = q.Resource.Query
@@ -316,7 +316,7 @@ func (p *Policy) CacheKey(q source.Request, revision string) types.RemoteCacheKe
 		externalURL = ""
 	}
 	if q.Resource.UpstreamPath != "" || externalURL != "" ||
-		q.Resource.Checksums != (types.Checksums{}) || q.Resource.ExpectedContentType != "" {
+		q.Resource.Checksums != (kernel.Checksums{}) || q.Resource.ExpectedContentType != "" {
 		identity = append(identity, q.Resource.UpstreamPath, externalURL,
 			q.Resource.Checksums, q.Resource.ExpectedContentType)
 	}
@@ -338,7 +338,7 @@ func (p *Policy) CacheKey(q source.Request, revision string) types.RemoteCacheKe
 	b, _ := json.Marshal(identity)
 	mac := hmac.New(sha256.New, p.Key)
 	_, _ = mac.Write(b)
-	return types.RemoteCacheKey{
+	return model.RemoteCacheKey{
 		RepoKey:          q.Repo.Key,
 		Path:             q.Resource.Path,
 		Variant:          hex.EncodeToString(mac.Sum(nil)),
@@ -350,18 +350,18 @@ func (p *Policy) CacheKey(q source.Request, revision string) types.RemoteCacheKe
 // source identity share a single upstream exchange: the hex SHA-256 of both,
 // so that callers with different credentials never share a response. Smart
 // Remote keys its discovery flights the same way.
-func (p *Policy) FlightKey(key types.RemoteCacheKey, identity types.SourceIdentity) string {
+func (p *Policy) FlightKey(key model.RemoteCacheKey, identity model.SourceIdentity) string {
 	b, _ := json.Marshal([]any{key, identity})
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
 }
 
-func (p *Policy) kind(q source.Request) types.RemoteKind {
+func (p *Policy) kind(q source.Request) model.RemoteKind {
 	if q.Resource.Kind != source.ResourceKindArtifact {
-		return types.RemoteMetadata
+		return model.RemoteMetadata
 	}
 	if q.Resource.Mutable {
-		return types.RemoteMutable
+		return model.RemoteMutable
 	}
 	var h format.Handler = generic.Handler{}
 	if p.Items != nil && p.Items.Formats != nil {
@@ -369,11 +369,11 @@ func (p *Policy) kind(q source.Request) types.RemoteKind {
 	}
 	switch format.ClassOf(h, q.Repo, q.Resource.Path) {
 	case format.ClassDerived:
-		return types.RemoteDerived
+		return model.RemoteDerived
 	case format.ClassMetadata:
-		return types.RemoteMetadata
+		return model.RemoteMetadata
 	default:
-		return types.RemoteUnique
+		return model.RemoteUnique
 	}
 }
 
@@ -384,22 +384,22 @@ func (p *Policy) kind(q source.Request) types.RemoteKind {
 // wrapped.
 func (p *Policy) ReadEntry(
 	ctx context.Context,
-	key types.RemoteCacheKey,
+	key model.RemoteCacheKey,
 	permit source.Permit,
-) (types.RemoteCacheEntry, error) {
+) (model.RemoteCacheEntry, error) {
 	e, err := p.Store.RemoteCache().Read(ctx, key)
 	if err != nil {
 		// A stored item can have been replaced by another representation at
 		// the same path. A miss must discard its former checksum and clock.
-		return types.RemoteCacheEntry{}, fmt.Errorf("read remote retrieval state: %w", err)
+		return model.RemoteCacheEntry{}, fmt.Errorf("read remote retrieval state: %w", err)
 	}
 	if e.Token.Source != permit.Identity {
-		return types.RemoteCacheEntry{}, store.ErrNotFound
+		return model.RemoteCacheEntry{}, kernel.ErrNotFound
 	}
 	return e, nil
 }
 
-func (p *Policy) fresh(q source.Request, e types.RemoteCacheEntry) bool {
+func (p *Policy) fresh(q source.Request, e model.RemoteCacheEntry) bool {
 	if e.Blob.Checksums.SHA256 == "" || !e.NegativeUntil.IsZero() {
 		return false
 	}
@@ -409,10 +409,10 @@ func (p *Policy) fresh(q source.Request, e types.RemoteCacheEntry) bool {
 	}
 	return parseCacheRules(
 		e.CacheControl,
-	).fresh(e.Kind != types.RemoteUnique, e.ValidatedAt, p.now(), ttl)
+	).fresh(e.Kind != model.RemoteUnique, e.ValidatedAt, p.now(), ttl)
 }
 
-func (p *Policy) negativeFresh(q source.Request, e types.RemoteCacheEntry) bool {
+func (p *Policy) negativeFresh(q source.Request, e model.RemoteCacheEntry) bool {
 	return (q.Repo.MissedRetrievalCachePeriodSecs == nil || *q.Repo.MissedRetrievalCachePeriodSecs > 0) &&
 		e.NegativeUntil.After(p.now())
 }
@@ -420,7 +420,7 @@ func (p *Policy) negativeFresh(q source.Request, e types.RemoteCacheEntry) bool 
 func (p *Policy) resultFor(
 	ctx context.Context,
 	q source.Request,
-	e types.RemoteCacheEntry,
+	e model.RemoteCacheEntry,
 ) (source.Result, error) {
 	if q.Resource.Method == http.MethodHead && e.ItemID == 0 && e.Blob.Checksums.SHA256 != "" {
 		modified, _ := http.ParseTime(e.LastModified)
@@ -443,19 +443,19 @@ func (p *Policy) resultFor(
 	return p.result(ctx, e)
 }
 
-func (p *Policy) result(ctx context.Context, e types.RemoteCacheEntry) (source.Result, error) {
+func (p *Policy) result(ctx context.Context, e model.RemoteCacheEntry) (source.Result, error) {
 	if e.ItemID > 0 {
 		it, err := p.Store.Items().GetByID(ctx, e.ItemID)
 		if err != nil {
 			return source.Result{}, fmt.Errorf("read cached artifact: %w", err)
 		}
 		if it.Actual.SHA256 != e.Blob.Checksums.SHA256 {
-			return source.Result{}, store.ErrNotFound
+			return source.Result{}, kernel.ErrNotFound
 		}
 		return source.Result{Item: &it, Used: p.used(e.Token)}, nil
 	}
 	if e.Blob.Checksums.SHA256 == "" {
-		return source.Result{}, store.ErrNotFound
+		return source.Result{}, kernel.ErrNotFound
 	}
 	body, info, err := p.Blobs.Open(ctx, e.Blob.Checksums.SHA256)
 	if err != nil {
@@ -476,10 +476,10 @@ func (p *Policy) result(ctx context.Context, e types.RemoteCacheEntry) (source.R
 	}, nil
 }
 
-func (p *Policy) used(token types.RemoteCacheToken) func(context.Context) error {
+func (p *Policy) used(token model.RemoteCacheToken) func(context.Context) error {
 	return func(ctx context.Context) error {
 		err := p.Store.RemoteCache().Touch(ctx, token, p.now())
-		if errors.Is(err, store.ErrConflict) || errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrConflict) || errors.Is(err, kernel.ErrNotFound) {
 			return nil
 		}
 		if err != nil {
@@ -497,7 +497,7 @@ func (p *Policy) used(token types.RemoteCacheToken) func(context.Context) error 
 // 304; the caller's own validators never reach the upstream. Format rules
 // build their extra exchanges, such as Maven's checksum sidecars, from it
 // so that they go out as the policy's own requests do.
-func TransportRequest(q source.Request, e types.RemoteCacheEntry) Request {
+func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 	path := q.Resource.EscapedPath
 	if path == "" {
 		path = (&url.URL{Path: q.Resource.Path}).EscapedPath()
@@ -563,9 +563,9 @@ func PolicyError(err error) error {
 		return source.ErrDenied
 	case errors.Is(err, source.ErrSuperseded):
 		return source.ErrSuperseded
-	case errors.Is(err, store.ErrNotFound):
-		return store.ErrNotFound
-	case errors.Is(err, store.ErrConflict):
+	case errors.Is(err, kernel.ErrNotFound):
+		return kernel.ErrNotFound
+	case errors.Is(err, kernel.ErrConflict):
 		return source.ErrSuperseded
 	case errors.Is(err, context.Canceled):
 		return context.Canceled

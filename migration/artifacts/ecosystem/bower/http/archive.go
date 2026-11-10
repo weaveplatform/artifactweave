@@ -11,11 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	bowerfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -25,10 +26,10 @@ const (
 
 func (h handler) localBinary(w http.ResponseWriter, r *http.Request, name, version string) {
 	folder := name + "/" + version
-	var items []types.Item
+	var items []model.Item
 	var total int64
 	hasManifest := false
-	for page := (store.Page{Limit: store.MaxLimit}); ; {
+	for page := (kernel.Page{Limit: kernel.MaxLimit}); ; {
 		batch, next, err := h.k.DB().
 			Items().
 			Descendants(r.Context(), pkgroute.RequestFrom(r).Repo.Key, false, folder, page)
@@ -42,7 +43,7 @@ func (h handler) localBinary(w http.ResponseWriter, r *http.Request, name, versi
 			}
 			_, _, _, ok := bowerfmt.ParsePath(it.FullPath())
 			if !ok || !strings.HasPrefix(it.FullPath(), folder+"/") ||
-				!h.k.Can(r, it.FullPath(), types.ActionRead) {
+				!h.k.Can(r, it.FullPath(), api.ActionRead) {
 				h.k.Error(
 					w,
 					r,

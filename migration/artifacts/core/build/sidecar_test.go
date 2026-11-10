@@ -6,11 +6,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // keeper keeps a signature beside every file ending .bin, as Helm keeps a
@@ -37,8 +38,8 @@ func sidecarWorld(t *testing.T) *world {
 }
 
 // deny refuses want on the sidecar at path in repository key.
-func deny(key, path string, want types.Actions) perms {
-	return perms{item: func(c repo.Config, p string, w types.Actions) bool {
+func deny(key, path string, want api.Actions) perms {
+	return perms{item: func(c repo.Config, p string, w api.Actions) bool {
 		return c.Key != key || p != path || !w.Has(want)
 	}}
 }
@@ -57,20 +58,20 @@ func TestUnitPromoteSidecars(t *testing.T) {
 		expected string
 	}{
 		{
-			"no read", deny("libs-local", "app/a.bin.sig", types.ActionRead), true, nil,
+			"no read", deny("libs-local", "app/a.bin.sig", api.ActionRead), true, nil,
 			"ERROR Cannot copy libs-local:app/a.bin: no permission to copy its sidecar app/a.bin.sig",
 		},
 		{
-			"no delete for a move", deny("libs-local", "app/a.bin.sig", types.ActionDelete), false, nil,
+			"no delete for a move", deny("libs-local", "app/a.bin.sig", api.ActionDelete), false, nil,
 			"ERROR Cannot move libs-local:app/a.bin: no permission to move its sidecar app/a.bin.sig",
 		},
 		{
-			"no deploy", deny("release-local", "app/a.bin.sig", types.ActionWrite), false, nil,
+			"no deploy", deny("release-local", "app/a.bin.sig", api.ActionWrite), false, nil,
 			"ERROR Cannot move libs-local:app/a.bin: no permission to deploy its sidecar to " +
 				"release-local:app/a.bin.sig",
 		},
 		{
-			"no delete to replace", deny("release-local", "app/a.bin.sig", types.ActionDelete), false,
+			"no delete to replace", deny("release-local", "app/a.bin.sig", api.ActionDelete), false,
 			func(w *world) { w.put("release-local", false, "app/a.bin.sig", "other", nil) },
 			"User doesn't have permissions to override 'release-local:app/a.bin.sig'",
 		},
@@ -117,7 +118,7 @@ func TestUnitDeleteArtifactsSidecars(t *testing.T) {
 	if _, err := w.svc.Delete(
 		ctx,
 		del,
-		deny("libs-local", "app/a.bin.sig", types.ActionDelete),
+		deny("libs-local", "app/a.bin.sig", api.ActionDelete),
 	); !errors.Is(
 		err,
 		ErrForbidden,
@@ -141,10 +142,10 @@ type failingGets struct {
 	key, path string
 }
 
-func (f failingGets) Items() store.ItemStore { return failingItems{f.Store.Items(), f.key, f.path} }
+func (f failingGets) Items() port.ItemStore { return failingItems{f.Store.Items(), f.key, f.path} }
 
 type failingItems struct {
-	store.ItemStore
+	port.ItemStore
 	key, path string
 }
 
@@ -154,9 +155,9 @@ func (f failingItems) Get(
 	key string,
 	cached bool,
 	p string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if key == f.key && p == f.path {
-		return types.Item{}, errBoom
+		return model.Item{}, errBoom
 	}
 	return f.ItemStore.Get(ctx, key, cached, p)
 }
@@ -169,7 +170,7 @@ func TestUnitSidecarFaults(t *testing.T) {
 	promote := func(w *world) error {
 		_, err := w.svc.Promote(ctx, Promotion{
 			Name: "app", Number: "1", TargetRepo: "release-local", Artifacts: true, By: "x",
-		}, deny("release-local", "app/a.bin.sig", types.ActionDelete))
+		}, deny("release-local", "app/a.bin.sig", api.ActionDelete))
 		return err
 	}
 	w := sidecarWorld(t)

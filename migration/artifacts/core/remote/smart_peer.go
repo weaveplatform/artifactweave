@@ -5,8 +5,9 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // SmartPeer identifies only the configured peer. Parsing it does not negotiate
@@ -48,12 +49,12 @@ func ParseSmartPeer(c repo.Config) (SmartPeer, error) {
 		return SmartPeer{}, source.ErrInvalidRequest
 	}
 	path := strings.Trim(u.Path, "/")
-	if _, _, _, err = types.SplitItemPath(path); err != nil {
+	if _, _, _, err = kernel.SplitItemPath(path); err != nil {
 		return SmartPeer{}, source.ErrInvalidRequest
 	}
 	parts := smartRepositoryParts(c, strings.Split(path, "/"))
 	key := parts[len(parts)-1]
-	if strings.ContainsAny(key, ":;\\") || strings.HasSuffix(key, types.CacheSuffix) {
+	if strings.ContainsAny(key, ":;\\") || strings.HasSuffix(key, model.CacheSuffix) {
 		return SmartPeer{}, source.ErrInvalidRequest
 	}
 	base := parts[:len(parts)-1]
@@ -76,7 +77,7 @@ func (p SmartPeer) StorageURL(path string, query url.Values) (string, error) {
 		return "", source.ErrInvalidRequest
 	}
 	if path != "" {
-		if _, _, _, err := types.SplitItemPath(
+		if _, _, _, err := kernel.SplitItemPath(
 			path,
 		); err != nil ||
 			path != strings.Trim(path, "/") {

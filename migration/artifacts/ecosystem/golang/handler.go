@@ -13,10 +13,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Serves reports whether t is the Go module type.
@@ -37,7 +37,7 @@ type Handler struct {
 
 // Deployed indexes a version file: it settles the file's version from the
 // tree.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	f, ok := fileOf(it)
 	if !ok {
 		return nil
@@ -47,7 +47,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 
 // Deleting runs before a file is removed. The item service drops the
 // file's version link with it, and Deleted settles the rest.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted settles each version a delete or a move took files from. A
 // version that keeps a file may now date from a later one. A version left
@@ -57,7 +57,7 @@ func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	type version struct {
 		module, version string
@@ -105,7 +105,7 @@ func (h Handler) Admit(
 	}
 	old, err := env.Store.Items().Get(ctx, c.Key, w.Cached, w.Path)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return w, nil
 	case err != nil:
 		return w, fmt.Errorf("golang: get %s: %w", w.Path, err)
@@ -190,7 +190,7 @@ func (Handler) Classify(_ repo.Config, p string) format.Class {
 
 // fileOf reads the version file an item is; ok is false for a folder and
 // for a file whose path fails the path checks.
-func fileOf(it types.Item) (File, bool) {
+func fileOf(it model.Item) (File, bool) {
 	if it.Folder {
 		return File{}, false
 	}
@@ -220,7 +220,7 @@ func syncVersion(
 		p := File{Module: m, Version: v, Ext: ext}.Path()
 		it, err := st.Items().Get(ctx, c.Key, cached, p)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			continue
 		case err != nil:
 			return fmt.Errorf("golang: get %s: %w", p, err)
@@ -240,7 +240,7 @@ func syncVersion(
 	if len(files) == 0 {
 		return nil
 	}
-	p, err := st.Packages().Ensure(ctx, types.Package{
+	p, err := st.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Name: m, Type: c.PackageType, Created: created,
 	})
 	if err != nil {

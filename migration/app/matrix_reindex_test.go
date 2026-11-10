@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 )
 
 // reindexMatrixPart is the P8 reindex operations' share of the matrix:
@@ -18,7 +18,7 @@ var reindexMatrixPart = matrixPart{
 			helm      = "/artifactory/api/helm/"
 			terraform = "/artifactory/api/terraform/"
 		)
-		manages := func(key string) rule { return holds(key, "", types.ActionManage) }
+		manages := func(key string) rule { return holds(key, "", api.ActionManage) }
 		return []matrixRow{
 			row(reindexPyPI, pypi+"reindex-pypi/reindex", "", manages("reindex-pypi"), 200),
 			row(reindexPyPI, pypi+"reindex-pypi/reindex?async=true", "",

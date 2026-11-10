@@ -6,20 +6,20 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // Handler implements format.Handler for generic content.
 type Handler struct{}
 
 // Deployed does nothing: a generic file belongs to no package.
-func (Handler) Deployed(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deployed(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleting does nothing.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted does nothing.
-func (Handler) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
+func (Handler) Deleted(context.Context, format.Env, repo.Config, []model.Item) error { return nil }
 
 // Admit refuses writes to a blacked-out repository and to paths its
 // include and exclude patterns reject, as Artifactory does for every

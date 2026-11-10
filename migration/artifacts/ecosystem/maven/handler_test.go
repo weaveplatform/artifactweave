@@ -16,11 +16,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The Maven group's four local types have the Maven format; p2 and the
@@ -111,9 +112,9 @@ func newWorld(t *testing.T, tune func(*repo.Config)) *world {
 	return w
 }
 
-func (w *world) deploy(paths ...string) []types.Item {
+func (w *world) deploy(paths ...string) []model.Item {
 	w.t.Helper()
-	out := make([]types.Item, 0, len(paths))
+	out := make([]model.Item, 0, len(paths))
 	for _, p := range paths {
 		it, err := w.items.Deploy(w.ctx, item.Deploy{
 			Target: item.Target{Repo: w.c, Path: p}, Body: strings.NewReader(bodyOf(p)),
@@ -160,7 +161,7 @@ func (w *world) delete(p string) {
 func (w *world) versions(pkg string) []indexed {
 	w.t.Helper()
 	p, err := w.db.Packages().Find(w.ctx, w.c.Key, pkg)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -231,7 +232,7 @@ func TestUnitIndex(t *testing.T) {
 	if diff := cmp.Diff(want, w.versions("com.acme:app")); diff != "" {
 		t.Fatalf("(-want +got):\n%s", diff)
 	}
-	pkgs, _, err := w.db.Packages().List(w.ctx, w.c.Key, store.Page{Limit: 10})
+	pkgs, _, err := w.db.Packages().List(w.ctx, w.c.Key, kernel.Page{Limit: 10})
 	if err != nil || len(pkgs) != 1 || pkgs[0].Type != repo.Maven {
 		t.Fatalf("packages %+v %v", pkgs, err)
 	}
@@ -273,7 +274,7 @@ func TestUnitHookLayouts(t *testing.T) {
 	db := inmem.New()
 	h := maven.Handler{}
 	c := repo.Config{Key: "maven-local", Class: repo.Local, PackageType: repo.Maven}
-	it, err := db.Items().Put(ctx, types.Item{
+	it, err := db.Items().Put(ctx, model.Item{
 		RepoKey: c.Key, Name: "com/acme/app/1.0/app-1.0.jar", Created: time.Now(),
 	})
 	if err != nil {
@@ -286,7 +287,7 @@ func TestUnitHookLayouts(t *testing.T) {
 	if _, err := db.Packages().Find(ctx, c.Key, "com.acme:app"); err != nil {
 		t.Fatalf("indexed under no layout: %v", err)
 	}
-	for _, it := range []types.Item{{Folder: true, Name: "com"}, {Name: "readme.txt"}} {
+	for _, it := range []model.Item{{Folder: true, Name: "com"}, {Name: "readme.txt"}} {
 		if err := h.Deployed(ctx, env, c, it); err != nil {
 			t.Fatal(err)
 		}
@@ -294,21 +295,21 @@ func TestUnitHookLayouts(t *testing.T) {
 	broken := format.Env{Store: db, Layouts: layouts{fail: true}}
 	for name, err := range map[string]error{
 		"deployed": h.Deployed(ctx, broken, c, it),
-		"deleted":  h.Deleted(ctx, broken, c, []types.Item{it}),
+		"deleted":  h.Deleted(ctx, broken, c, []model.Item{it}),
 		"reindex":  h.Reindex(ctx, broken, c),
 	} {
 		if !errors.Is(err, errLayout) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
-	if err := h.Deleted(ctx, env, c, []types.Item{{Folder: true, Name: "com"}}); err != nil {
+	if err := h.Deleted(ctx, env, c, []model.Item{{Folder: true, Name: "com"}}); err != nil {
 		t.Fatal(err)
 	}
 	undefined := c
 	undefined.RepoLayoutRef = "no-such-layout"
 	if err := errors.Join(
 		h.Deployed(ctx, env, undefined, it),
-		h.Deleted(ctx, env, undefined, []types.Item{it}),
+		h.Deleted(ctx, env, undefined, []model.Item{it}),
 		h.Reindex(ctx, env, undefined),
 	); err != nil {
 		t.Fatal(err)
@@ -316,7 +317,7 @@ func TestUnitHookLayouts(t *testing.T) {
 	if _, err := db.Packages().
 		Find(ctx, c.Key, "com.acme:app"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("a reindex under an undefined layout kept the index: %v", err)
 	}
@@ -331,16 +332,16 @@ type faulty struct {
 	fail map[string]bool
 }
 
-func (f faulty) Packages() store.PackageStore { return faultyPackages{f.Store.Packages(), f.fail} }
-func (f faulty) Items() store.ItemStore       { return faultyItems{f.Store.Items(), f.fail} }
+func (f faulty) Packages() port.PackageStore { return faultyPackages{f.Store.Packages(), f.fail} }
+func (f faulty) Items() port.ItemStore       { return faultyItems{f.Store.Items(), f.fail} }
 
 type faultyPackages struct {
-	store.PackageStore
+	port.PackageStore
 	fail map[string]bool
 }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	fail map[string]bool
 }
 
@@ -353,17 +354,17 @@ func (i faultyItems) Search(ctx context.Context, q *aql.Query, o aql.Options) ([
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Ensure(ctx context.Context, v types.Package) (types.Package, error) {
+func (p faultyPackages) Ensure(ctx context.Context, v model.Package) (model.Package, error) {
 	if p.fail["Ensure"] {
-		return types.Package{}, errIndex
+		return model.Package{}, errIndex
 	}
 	return p.PackageStore.Ensure(ctx, v)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Find(ctx context.Context, key, name string) (types.Package, error) {
+func (p faultyPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
 	if p.fail["Find"] {
-		return types.Package{}, errIndex
+		return model.Package{}, errIndex
 	}
 	return p.PackageStore.Find(ctx, key, name)
 }
@@ -373,15 +374,15 @@ func (p faultyPackages) Version(
 	ctx context.Context,
 	id int64,
 	v string,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	if p.fail["Version"] {
-		return types.PackageVersion{}, errIndex
+		return model.PackageVersion{}, errIndex
 	}
 	return p.PackageStore.Version(ctx, id, v)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (p faultyPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if p.fail["Versions"] {
 		return nil, errIndex
 	}
@@ -406,8 +407,8 @@ func (p faultyPackages) Delete(ctx context.Context, id int64) error {
 
 //nolint:wrapcheck // test double
 func (p faultyPackages) List(
-	ctx context.Context, key string, pg store.Page,
-) ([]types.Package, string, error) {
+	ctx context.Context, key string, pg kernel.Page,
+) ([]model.Package, string, error) {
 	if p.fail["List"] {
 		return nil, "", errIndex
 	}
@@ -425,8 +426,8 @@ func TestUnitIndexFailures(t *testing.T) {
 	// gone removes the jar from the tree without the hooks, leaving 1.0
 	// indexed with nothing behind it; with 1.1 also gone, the package has no
 	// version the tree backs.
-	gone := func(w *world, also ...string) []types.Item {
-		var out []types.Item
+	gone := func(w *world, also ...string) []model.Item {
+		var out []model.Item
 		for _, p := range append([]string{jar}, also...) {
 			it, err := w.db.Items().Get(w.ctx, w.c.Key, false, p)
 			if err != nil {
@@ -504,7 +505,7 @@ func TestUnitDeletedUnindexed(t *testing.T) {
 	w.deploy("com/acme/app/1.1/app-1.1.jar")
 	h := maven.Handler{}
 	env := format.Env{Store: w.db, Layouts: layouts{}, Enqueue: noWork}
-	removed := []types.Item{
+	removed := []model.Item{
 		{RepoKey: w.c.Key, Path: "com/acme/app/1.0", Name: "app-1.0.jar"},
 		{RepoKey: w.c.Key, Path: "com/acme/other/1.0", Name: "other-1.0.jar"},
 	}

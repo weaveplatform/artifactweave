@@ -7,7 +7,7 @@ import (
 	"path"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // versionMeta is a version's metadata in the package index (decision
@@ -29,7 +29,7 @@ func metadataOf(
 	ctx context.Context,
 	env format.Env,
 	prev []byte,
-	its []types.Item,
+	its []model.Item,
 ) ([]byte, error) {
 	it, ok := versionPOM(its)
 	if !ok {
@@ -60,8 +60,8 @@ func metadataOf(
 
 // versionPOM is the POM a version's metadata comes from: its only one, or,
 // among a snapshot's unique builds, the highest build's.
-func versionPOM(its []types.Item) (types.Item, bool) {
-	var best types.Item
+func versionPOM(its []model.Item) (model.Item, bool) {
+	var best model.Item
 	bestBuild, found := 0, false
 	for _, it := range its {
 		p := it.FullPath()

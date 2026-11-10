@@ -11,11 +11,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // SmartStatus serves GET
@@ -34,11 +34,11 @@ func (s ArtifactoryAPI) SmartStatus(w http.ResponseWriter, r *http.Request) {
 	query, err := url.ParseQuery(r.URL.RawQuery)
 	path := query.Get("path")
 	key := chi.URLParam(r, "repoKey")
-	_, _, _, pathErr := types.SplitItemPath(path)
+	_, _, _, pathErr := kernel.SplitItemPath(path)
 	if err != nil || len(query) != 1 || len(query["path"]) != 1 || pathErr != nil ||
 		path != strings.Trim(path, "/") ||
 		strings.ContainsAny(path, "*?\r\n") ||
-		strings.HasSuffix(key, types.CacheSuffix) {
+		strings.HasSuffix(key, model.CacheSuffix) {
 		apierror.Write(
 			w,
 			apierror.ProfileArtifactory,
@@ -57,9 +57,9 @@ func (s ArtifactoryAPI) SmartStatus(w http.ResponseWriter, r *http.Request) {
 	status, err := s.cfg.RemoteStatus(ctx, key, path)
 	if err != nil {
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			err = apierror.New(http.StatusNotFound, "remote repository does not exist")
-		case errors.Is(err, store.ErrInvalid), errors.Is(err, source.ErrInvalidRequest):
+		case errors.Is(err, kernel.ErrInvalid), errors.Is(err, source.ErrInvalidRequest):
 			err = httpkit.BadRequestf("one canonical remote repository path is required")
 		default:
 			err = s.InternalError(ctx, "remote status", err)

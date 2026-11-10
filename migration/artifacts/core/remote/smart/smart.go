@@ -17,9 +17,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type (
@@ -264,7 +263,7 @@ func smartMetadataTarget(peer remote.SmartPeer, target string) bool {
 	if !ok || path == "" {
 		return false
 	}
-	_, _, _, err = types.SplitItemPath(path)
+	_, _, _, err = kernel.SplitItemPath(path)
 	return err == nil
 }
 
@@ -300,7 +299,7 @@ func (s *Smart) prepareUpload(
 		return smartError("operation", err)
 	}
 	if !present {
-		return store.ErrNotFound
+		return kernel.ErrNotFound
 	}
 	u.SmartProperties = &props
 	return nil

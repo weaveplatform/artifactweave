@@ -14,18 +14,18 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -169,14 +169,14 @@ func (v storageView) downloadURI(ctx context.Context, p string) string {
 // whether or not it has a record.
 func (v storageView) target(ctx context.Context) (itemkit.Found, error) {
 	if v.path == "" {
-		root := types.Item{RepoKey: v.repo.Key, Cached: v.isCached, Folder: true}
+		root := model.Item{RepoKey: v.repo.Key, Cached: v.isCached, Folder: true}
 		if v.repo.Class != repo.Virtual {
 			rec, err := v.st.Items().
 				Root(ctx, v.repo.Key, v.isCached || v.repo.Class == repo.Remote)
 			switch {
 			case err == nil:
 				root.ID, root.PropertiesModified = rec.ID, rec.PropertiesModified
-			case !errors.Is(err, store.ErrNotFound):
+			case !errors.Is(err, kernel.ErrNotFound):
 				return itemkit.Found{}, fmt.Errorf("repository root: %w", err)
 			}
 		}
@@ -200,18 +200,18 @@ func (v storageView) trees(
 	seen[c.Key] = true
 	if c.Class != repo.Virtual {
 		cached := c.Class == repo.Remote || (c.Key == v.repo.Key && v.isCached)
-		return []itemkit.Found{{Repo: c, Item: types.Item{RepoKey: c.Key, Cached: cached}}}, nil
+		return []itemkit.Found{{Repo: c, Item: model.Item{RepoKey: c.Key, Cached: cached}}}, nil
 	}
 	var out []itemkit.Found
 	for _, key := range c.Repositories {
 		m, err := v.st.Repos().Get(ctx, key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
 			return nil, fmt.Errorf("member %s of %s: %w", key, c.Key, err)
 		}
-		if !v.acc.Folder(m, v.path, types.ActionRead) {
+		if !v.acc.Folder(m, v.path, api.ActionRead) {
 			continue
 		}
 		sub, err := v.trees(ctx, m, seen)
@@ -226,19 +226,19 @@ func (v storageView) trees(
 // below lists what lies under folder in every tree the view reads, direct
 // children or (deep) every descendant. A name that several members hold is
 // reported once, from the first member, as a download would resolve it.
-func (v storageView) below(ctx context.Context, folder string, deep bool) ([]types.Item, error) {
+func (v storageView) below(ctx context.Context, folder string, deep bool) ([]model.Item, error) {
 	trees, err := v.trees(ctx, v.repo, map[string]bool{})
 	if err != nil {
 		return nil, err
 	}
 	seen := map[string]bool{}
-	var out []types.Item
+	var out []model.Item
 	for _, t := range trees {
 		list := v.st.Items().Children
 		if deep {
 			list = v.st.Items().Descendants
 		}
-		page := store.Page{Limit: store.MaxLimit}
+		page := kernel.Page{Limit: kernel.MaxLimit}
 		for {
 			batch, next, err := list(ctx, t.Repo.Key, t.Item.Cached, folder, page)
 			if err != nil {
@@ -248,7 +248,7 @@ func (v storageView) below(ctx context.Context, folder string, deep bool) ([]typ
 				// What the caller may not see is left out; a folder shows
 				// when something below it is readable.
 				if !seen[it.FullPath()] &&
-					v.acc.Item(t.Repo, it.FullPath(), it.Folder, types.ActionRead) {
+					v.acc.Item(t.Repo, it.FullPath(), it.Folder, api.ActionRead) {
 					seen[it.FullPath()] = true
 					out = append(out, it)
 				}
@@ -278,13 +278,13 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 	}
 	// A folder check first, as for a download; the exact right once the
 	// item is found.
-	if !v.acc.Folder(v.repo, v.path, types.ActionRead) {
+	if !v.acc.Folder(v.repo, v.path, api.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	switch {
 	case mode == "list" && p.Anonymous,
-		mode == "lastModified" && !v.acc.Folder(v.repo, v.path, types.ActionWrite),
+		mode == "lastModified" && !v.acc.Folder(v.repo, v.path, api.ActionWrite),
 		mode == "permissions" && !p.Admin:
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
@@ -304,7 +304,7 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "storage item", err))
 		return
 	}
-	if !v.acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, types.ActionRead) {
+	if !v.acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, api.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -477,12 +477,12 @@ func parseListing(q url.Values) (listing, error) {
 // listed, which for the trash can is not the item's own.
 type listed struct {
 	path string
-	item types.Item
+	item model.Item
 }
 
 // render is the FileList body of folder, whose own item is self, over the
 // items below it.
-func (l listing) render(uri, folder string, self types.Item, items []listed) map[string]any {
+func (l listing) render(uri, folder string, self model.Item, items []listed) map[string]any {
 	base := segments(folder)
 	files := make([]map[string]any, 0, len(items)+1)
 	if l.shouldIncludeRootPath {
@@ -513,7 +513,7 @@ func (l listing) render(uri, folder string, self types.Item, items []listed) map
 // string. mdTimestamps, when asked for, is left out for an item without
 // properties, as 6.20's FileListElement creates the map only when it adds a
 // time to it.
-func listEntry(it types.Item, uri string, mdTimestamps bool) map[string]any {
+func listEntry(it model.Item, uri string, mdTimestamps bool) map[string]any {
 	entry := map[string]any{"uri": uri, "folder": it.Folder, "size": int64(-1)}
 	putTime(entry, "lastModified", it.Modified)
 	if !it.Folder {
@@ -620,12 +620,12 @@ func (v storageView) lastModified(ctx context.Context, f itemkit.Found) (string,
 // letters: grants whose target names the item's repository and whose include
 // and exclude patterns admit its path.
 func (v storageView) permissions(ctx context.Context, f itemkit.Found) (string, any, error) {
-	targets := []string{f.Repo.Key, types.TargetAny}
+	targets := []string{f.Repo.Key, api.TargetAny}
 	switch f.Repo.Class {
 	case repo.Local, repo.Federated:
-		targets = append(targets, types.TargetAnyLocal)
+		targets = append(targets, api.TargetAnyLocal)
 	case repo.Remote:
-		targets = append(targets, types.TargetAnyRemote)
+		targets = append(targets, api.TargetAnyRemote)
 	}
 	users, groups, err := v.s.cfg.Access.Grants.ItemGrants(
 		ctx,
@@ -636,7 +636,7 @@ func (v storageView) permissions(ctx context.Context, f itemkit.Found) (string, 
 	if err != nil {
 		return "", nil, err //nolint:wrapcheck // ItemGrants names the target it was reading
 	}
-	letters := func(m map[string]types.Actions) map[string][]string {
+	letters := func(m map[string]api.Actions) map[string][]string {
 		out := map[string][]string{}
 		for name, a := range m {
 			if l := a.Letters(); len(l) > 0 {
@@ -658,7 +658,7 @@ func (v storageView) permissions(ctx context.Context, f itemkit.Found) (string, 
 // sent only to PATCH /api/metadata, is merged into the item's download
 // statistics (mergeStats); noProps leaves the properties alone.
 type propertyEdit struct {
-	set                  types.Properties
+	set                  model.Properties
 	remove               []string
 	stats                map[string]json.RawMessage
 	shouldSkipProperties bool
@@ -728,7 +728,7 @@ func (s ArtifactoryAPI) editProperties(
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	if !v.acc.File(v.repo, v.path, types.ActionAnnotate) {
+	if !v.acc.File(v.repo, v.path, api.ActionAnnotate) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -746,7 +746,7 @@ func (s ArtifactoryAPI) editProperties(
 			w,
 			r,
 			httpkit.BadRequestf("properties of remote repository '%s' are set on its cache, '%s'",
-				v.key, v.repo.Key+types.CacheSuffix),
+				v.key, v.repo.Key+model.CacheSuffix),
 		)
 		return
 	}
@@ -763,7 +763,7 @@ func (s ArtifactoryAPI) editProperties(
 	cached := v.isCached || v.repo.Class == repo.Remote
 	items := s.Items(v.st)
 	err = v.st.Tx(ctx, func(ctx context.Context) error {
-		apply := func(it types.Item) error {
+		apply := func(it model.Item) error {
 			return items.Annotate(ctx, v.repo, it, edit.set, edit.remove)
 		}
 		target, ok, err := s.editTarget(ctx, v, cached, len(edit.set) > 0, p.Name)
@@ -786,7 +786,7 @@ func (s ArtifactoryAPI) editProperties(
 		if !recursive || !target.Folder {
 			return nil
 		}
-		page := store.Page{Limit: store.MaxLimit}
+		page := kernel.Page{Limit: kernel.MaxLimit}
 		for {
 			batch, next, err := v.st.Items().
 				Descendants(ctx, v.repo.Key, cached, target.FullPath(), page)
@@ -820,7 +820,7 @@ func (s ArtifactoryAPI) editTarget(
 	v storageView,
 	cached, create bool,
 	by string,
-) (types.Item, bool, error) {
+) (model.Item, bool, error) {
 	if v.path != "" {
 		it, err := v.st.Items().Get(ctx, v.repo.Key, cached, v.path)
 		return it, err == nil, err //nolint:wrapcheck // mapped by ItemError
@@ -830,8 +830,8 @@ func (s ArtifactoryAPI) editTarget(
 		return it, err == nil, err //nolint:wrapcheck // the item service wraps its own
 	}
 	it, err := v.st.Items().Root(ctx, v.repo.Key, cached)
-	if errors.Is(err, store.ErrNotFound) {
-		return types.RootItem(v.repo.Key, cached), false, nil
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.RootItem(v.repo.Key, cached), false, nil
 	}
 	return it, err == nil, err //nolint:wrapcheck // mapped by ItemError
 }
@@ -839,15 +839,15 @@ func (s ArtifactoryAPI) editTarget(
 // parseProperties parses the properties API's "k=v1,v2;k2=v3": ";" or "|"
 // between properties, "," between values, and a backslash escaping any of
 // them or "=" inside a value. A key repeated adds values.
-func parseProperties(s string) (types.Properties, error) {
-	props := types.Properties{}
+func parseProperties(s string) (model.Properties, error) {
+	props := model.Properties{}
 	for _, p := range splitUnescaped(s, ";|") {
 		if p == "" {
 			continue
 		}
 		kv := splitUnescaped(p, "=")
 		key := unescapeBackslashes(kv[0])
-		if err := types.ValidatePropertyKey(key); err != nil {
+		if err := model.ValidatePropertyKey(key); err != nil {
 			return nil, httpkit.BadRequestf("%v", err)
 		}
 		if len(kv) < 2 {
@@ -905,17 +905,17 @@ func parseMetadataPatch(r *http.Request) (propertyEdit, error) {
 		return propertyEdit{}, httpkit.BadRequestf("props or stats fields required")
 	}
 	// "props":{} changes nothing, so it walks nothing either.
-	edit := propertyEdit{set: types.Properties{}, shouldSkipProperties: len(body.Props) == 0}
+	edit := propertyEdit{set: model.Properties{}, shouldSkipProperties: len(body.Props) == 0}
 	if body.Stats != nil {
 		// Checked against a zero record now, so a bad field answers 400
 		// before the transaction starts.
-		if err := mergeStats(&types.ItemStats{}, body.Stats); err != nil {
+		if err := mergeStats(&model.ItemStats{}, body.Stats); err != nil {
 			return propertyEdit{}, err
 		}
 		edit.stats = body.Stats
 	}
 	for key, raw := range body.Props {
-		if err := types.ValidatePropertyKey(key); err != nil {
+		if err := model.ValidatePropertyKey(key); err != nil {
 			return propertyEdit{}, httpkit.BadRequestf("%v", err)
 		}
 		var one string

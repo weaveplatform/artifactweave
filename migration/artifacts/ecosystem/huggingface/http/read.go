@@ -17,13 +17,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxInfo = 8 << 20
@@ -107,7 +108,7 @@ func (h handler) selectRepo(
 	if c.Class == repo.Virtual {
 		for _, key := range c.Repositories {
 			member, err := h.k.DB().Repos().Get(r.Context(), key)
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, kernel.ErrNotFound) {
 				continue
 			}
 			if err != nil {
@@ -122,7 +123,7 @@ func (h handler) selectRepo(
 				return selected{}, fmt.Errorf("huggingface: member request: %w", err)
 			}
 			chosen, err := h.selectRepo(mr, id, rev, seen)
-			if errors.Is(err, store.ErrNotFound) || isNotFound(err) {
+			if errors.Is(err, kernel.ErrNotFound) || isNotFound(err) {
 				continue
 			}
 			if err != nil {
@@ -132,7 +133,7 @@ func (h handler) selectRepo(
 		}
 		return selected{}, missing()
 	}
-	if !h.k.CanFolder(r, id.Prefix(), types.ActionRead) {
+	if !h.k.CanFolder(r, id.Prefix(), api.ActionRead) {
 		return selected{}, missing()
 	}
 	if c.Class == repo.Remote {
@@ -167,9 +168,9 @@ func (h handler) localInfo(r *http.Request, id format.Identity, rev string) (sel
 				return selected{}, source.ErrInvalidResult
 			}
 			rev = string(data)
-		case errors.Is(getErr, store.ErrNotFound) && rev == "main":
+		case errors.Is(getErr, kernel.ErrNotFound) && rev == "main":
 			// An older snapshot can predate ref records.
-		case errors.Is(getErr, store.ErrNotFound):
+		case errors.Is(getErr, kernel.ErrNotFound):
 			return selected{}, missing()
 		case getErr == nil:
 			return selected{}, source.ErrInvalidResult
@@ -192,7 +193,7 @@ func (h handler) localInfo(r *http.Request, id format.Identity, rev string) (sel
 	files := make([]sibling, 0)
 	for _, it := range all {
 		_, at, file, ok := format.ParseSnapshotPath(it.FullPath())
-		if !ok || at != rev || !h.k.Can(r, it.FullPath(), types.ActionRead) {
+		if !ok || at != rev || !h.k.Can(r, it.FullPath(), api.ActionRead) {
 			continue
 		}
 		s := sibling{Filename: file, Size: it.Size}
@@ -243,13 +244,13 @@ func (h handler) snapshotItems(
 	r *http.Request,
 	id format.Identity,
 	rev string,
-) ([]types.Item, error) {
+) ([]model.Item, error) {
 	prefix := id.Prefix() + "/snapshots"
 	if rev != "" {
 		prefix += "/" + rev
 	}
-	page := store.Page{Limit: store.MaxLimit}
-	var all []types.Item
+	page := kernel.Page{Limit: kernel.MaxLimit}
+	var all []model.Item
 	for {
 		items, next, err := h.k.DB().
 			Items().
@@ -317,7 +318,7 @@ func (h handler) remoteInfo(r *http.Request, id format.Identity, rev string) (se
 	filtered := make([]sibling, 0, len(info.Siblings))
 	for _, file := range info.Siblings {
 		path, ok := format.SnapshotPath(id, info.SHA, file.Filename)
-		if !ok || !h.k.Can(r, path, types.ActionRead) {
+		if !ok || !h.k.Can(r, path, api.ActionRead) {
 			continue
 		}
 		if result.CheckRead != nil && result.CheckRead(r.Context(), path) != nil {

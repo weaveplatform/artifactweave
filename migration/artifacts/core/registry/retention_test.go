@@ -11,11 +11,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func ptr(n int) *int { return &n }
@@ -25,7 +25,7 @@ func ptr(n int) *int { return &n }
 func (w *world) folders(c repo.Config, name string) []string {
 	w.t.Helper()
 	children, _, err := w.db.Items().Children(context.Background(), c.Key, false, name,
-		store.Page{Limit: 1000})
+		kernel.Page{Limit: 1000})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func (w *world) folders(c repo.Config, name string) []string {
 // trashed reports whether anything at path of c is in the trash can.
 func (w *world) trashed(c repo.Config, path string) bool {
 	w.t.Helper()
-	entries, _, err := w.db.Trash().List(context.Background(), c.Key, path, store.Page{Limit: 10})
+	entries, _, err := w.db.Trash().List(context.Background(), c.Key, path, kernel.Page{Limit: 10})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -249,7 +249,7 @@ func TestAccRemoveTag(t *testing.T) {
 		if _, err := items.Deploy(ctx, item.Deploy{
 			Target:     item.Target{Repo: w.docker, Path: kept},
 			Body:       strings.NewReader(old),
-			Properties: types.Properties{layout.ManifestProperty: {"multi"}},
+			Properties: model.Properties{layout.ManifestProperty: {"multi"}},
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -260,7 +260,7 @@ func TestAccRemoveTag(t *testing.T) {
 
 		for _, tag := range []string{"nope", "notes", layout.DigestFolder(sum(p2))} {
 			err := w.svc.RemoveTag(ctx, o, tag, registry.Removal{})
-			if !errors.Is(err, store.ErrNotFound) {
+			if !errors.Is(err, kernel.ErrNotFound) {
 				t.Errorf("%s: %v", tag, err)
 			}
 		}
@@ -317,7 +317,7 @@ func (w *world) treeOf(c repo.Config, dir string) map[string]string {
 	return out
 }
 
-func (w *world) propertiesOf(c repo.Config, path string) types.Properties {
+func (w *world) propertiesOf(c repo.Config, path string) model.Properties {
 	w.t.Helper()
 	it, err := w.item(c, path)
 	if err != nil {

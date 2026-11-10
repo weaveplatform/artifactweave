@@ -12,12 +12,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	apmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Protocol returns the APM v1 registry protocol for the router kit, under
@@ -76,13 +77,13 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	if !h.k.RequireFolder(w, r, owner+"/"+name, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, owner+"/"+name, api.ActionRead) {
 		return
 	}
 	p, err := h.k.DB().
 		Packages().
 		Find(r.Context(), pkgroute.RequestFrom(r).Repo.Key, owner+"/"+name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		h.k.Error(w, r, apierror.New(http.StatusNotFound, "package not found"))
 		return
 	}
@@ -101,7 +102,7 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request) {
 	}{Package: p.Name, Versions: []version{}}
 	for _, pv := range all {
 		path := apmfmt.Path(owner, name, pv.Version)
-		if !h.k.Can(r, path, types.ActionRead) {
+		if !h.k.Can(r, path, api.ActionRead) {
 			continue
 		}
 		var meta apmfmt.Metadata
@@ -158,7 +159,7 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := apmfmt.Path(owner, name, version)
-	if !h.k.Require(w, r, path, types.ActionWrite) {
+	if !h.k.Require(w, r, path, api.ActionWrite) {
 		return
 	}
 	info, err := h.k.Upload(r, http.MaxBytesReader(w, r.Body, apmfmt.MaxArchiveBytes))
@@ -208,7 +209,7 @@ func (h handler) search(w http.ResponseWriter, r *http.Request) {
 		Limit   int               `json:"limit"`
 		Offset  int               `json:"offset"`
 	}{Results: []apmfmt.Metadata{}, Limit: limit, Offset: offset}
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	key := pkgroute.RequestFrom(r).Repo.Key
 	for {
 		pkgs, next, err := h.k.DB().Packages().List(r.Context(), key, page)
@@ -241,7 +242,7 @@ func (h handler) search(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) searchPackage(
-	r *http.Request, p types.Package, q, kind, tag string,
+	r *http.Request, p model.Package, q, kind, tag string,
 ) (apmfmt.Metadata, bool, error) {
 	all, err := h.k.DB().Packages().Versions(r.Context(), p.ID)
 	if err != nil {
@@ -260,7 +261,7 @@ func (h handler) searchPackage(
 				err,
 			)
 		}
-		if !h.k.Can(r, meta.Path, types.ActionRead) {
+		if !h.k.Can(r, meta.Path, api.ActionRead) {
 			continue
 		}
 		if q != "" && !strings.Contains(strings.ToLower(meta.Name+" "+meta.Description), q) {

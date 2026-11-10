@@ -8,8 +8,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // SmartStatus is an artifactweave diagnostic, not an Artifactory storage wire
@@ -41,9 +41,9 @@ type SmartRepresentationStatus struct {
 // operation, "refresh" or "statistics", its work-queue state and the
 // attempts made so far.
 type SmartWorkStatus struct {
-	Operation string          `json:"operation"`
-	State     types.WorkState `json:"state"`
-	Attempts  int             `json:"attempts"`
+	Operation string         `json:"operation"`
+	State     work.WorkState `json:"state"`
+	Attempts  int            `json:"attempts"`
 }
 
 // Status reads one exact path under a source lifetime lock. Options resolves
@@ -73,7 +73,7 @@ func (s *Smart) Status(ctx context.Context, key, path string) (SmartStatus, erro
 			return smartError("operation", err)
 		}
 		entries, next, err := s.policy.Store.RemoteCache().
-			Exact(tx, key, path, store.Page{Limit: 16})
+			Exact(tx, key, path, kernel.Page{Limit: 16})
 		if err != nil {
 			return smartError("operation", err)
 		}
@@ -90,7 +90,7 @@ func (s *Smart) Status(ctx context.Context, key, path string) (SmartStatus, erro
 				continue
 			}
 			it, e := s.policy.Store.Items().GetByID(tx, entry.ItemID)
-			if errors.Is(e, store.ErrNotFound) {
+			if errors.Is(e, kernel.ErrNotFound) {
 				continue
 			}
 			if e != nil {
@@ -114,7 +114,7 @@ func (s *Smart) Status(ctx context.Context, key, path string) (SmartStatus, erro
 			for _, statistics := range []bool{false, true} {
 				job, e := s.policy.Store.WorkQueue().
 					Get(tx, kind, smartWorkKey(entry.Token.Key, identity, statistics))
-				if errors.Is(e, store.ErrNotFound) {
+				if errors.Is(e, kernel.ErrNotFound) {
 					continue
 				}
 				if e != nil {

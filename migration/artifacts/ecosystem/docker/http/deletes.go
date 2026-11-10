@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // deleteManifest serves DELETE .../manifests/<tag or digest> (end-9): by
@@ -17,11 +17,11 @@ import (
 // under another algorithm name no manifest the registry stores, and answer
 // 404 MANIFEST_UNKNOWN as an absent one does (decision 0031).
 func (g *Registry) deleteManifest(w http.ResponseWriter, r *http.Request, q Request) {
-	if err := q.Require(r, q.Name+"/", types.ActionDelete); err != nil {
+	if err := q.Require(r, q.Name+"/", api.ActionDelete); err != nil {
 		Write(w, err)
 		return
 	}
-	err := store.ErrNotFound
+	err := kernel.ErrNotFound
 	o := owner(r, q)
 	switch {
 	case strings.Contains(q.Reference, ":"):
@@ -32,7 +32,7 @@ func (g *Registry) deleteManifest(w http.ResponseWriter, r *http.Request, q Requ
 		err = g.uploads.DeleteTag(r.Context(), o, q.Reference)
 	}
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		Write(w, manifestUnknown(q))
 	case err != nil:
 		g.writeErr(w, r, err)

@@ -10,12 +10,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // okBody is the body of a packument update and of each unpublish step. npm
@@ -61,7 +62,7 @@ func (h handler) update(w http.ResponseWriter, r *http.Request, name string, b p
 			h.k.Error(w, r, err)
 			return
 		}
-		if !h.k.Require(w, r, it.FullPath(), types.ActionAnnotate) {
+		if !h.k.Require(w, r, it.FullPath(), api.ActionAnnotate) {
 			return
 		}
 		changes = append(changes, annotation{it: it, key: npmfmt.PropDeprecated, values: []string{
@@ -78,7 +79,7 @@ func (h handler) update(w http.ResponseWriter, r *http.Request, name string, b p
 // annotation sets the property key of it to values, or removes it when
 // they are all empty.
 type annotation struct {
-	it     types.Item
+	it     model.Item
 	key    string
 	values []string
 }
@@ -91,7 +92,7 @@ func (h handler) annotate(r *http.Request, changes []annotation) error {
 	err := h.k.DB().Tx(r.Context(), func(ctx context.Context) error {
 		r := r.WithContext(ctx)
 		for _, c := range changes {
-			set, remove := types.Properties{c.key: c.values}, []string(nil)
+			set, remove := model.Properties{c.key: c.values}, []string(nil)
 			if !slices.ContainsFunc(c.values, func(v string) bool { return v != "" }) {
 				set, remove = nil, []string{c.key}
 			}
@@ -132,7 +133,7 @@ func bodyVersions(b publishBody) (versions map[string]json.RawMessage, sent bool
 // settles latest itself. <rev> is compared with nothing: every packument's
 // _rev is 1-0, as 7.x answers it, so it cannot show a stale view (#290).
 func (h handler) unpublishVersions(w http.ResponseWriter, r *http.Request, name string) {
-	if !h.k.RequireFolder(w, r, name, types.ActionDelete) {
+	if !h.k.RequireFolder(w, r, name, api.ActionDelete) {
 		return
 	}
 	if r.ContentLength > h.maxPublish {
@@ -210,7 +211,7 @@ func (h handler) unpublish(w http.ResponseWriter, r *http.Request) {
 // package's folder and files off its canonical paths is unknown (#216);
 // only the versions' tarballs go.
 func (h handler) unpublishPackage(w http.ResponseWriter, r *http.Request, name string) {
-	if !h.k.RequireFolder(w, r, name, types.ActionDelete) {
+	if !h.k.RequireFolder(w, r, name, api.ActionDelete) {
 		return
 	}
 	versions, found := h.indexedOr404(w, r, name)
@@ -228,7 +229,7 @@ func (h handler) unpublishPackage(w http.ResponseWriter, r *http.Request, name s
 // transaction, once the caller is known to hold Delete on each.
 func (h handler) remove(w http.ResponseWriter, r *http.Request, paths []string) {
 	for _, p := range paths {
-		if !h.k.Require(w, r, p, types.ActionDelete) {
+		if !h.k.Require(w, r, p, api.ActionDelete) {
 			return
 		}
 	}
@@ -251,11 +252,11 @@ func (h handler) remove(w http.ResponseWriter, r *http.Request, paths []string) 
 // indexed is every version of the package called name in the request's
 // repository, whatever the caller may read; ok is false when there is
 // none.
-func (h handler) indexed(r *http.Request, name string) ([]types.PackageVersion, bool, error) {
+func (h handler) indexed(r *http.Request, name string) ([]model.PackageVersion, bool, error) {
 	ctx := r.Context()
 	st := h.k.DB()
 	found, err := st.Packages().Find(ctx, pkgroute.RequestFrom(r).Repo.Key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil, false, nil
 	}
 	if err != nil {
@@ -270,7 +271,7 @@ func (h handler) indexed(r *http.Request, name string) ([]types.PackageVersion, 
 
 // tarball is the file at the canonical path of name at version, the one
 // file the index links the version to.
-func (h handler) tarball(r *http.Request, name, version string) (types.Item, error) {
+func (h handler) tarball(r *http.Request, name, version string) (model.Item, error) {
 	p := npmfmt.CanonicalPath(name, version)
 	it, err := h.k.DB().Items().Get(r.Context(), pkgroute.RequestFrom(r).Repo.Key, false, p)
 	if err != nil {

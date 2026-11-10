@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccTrashListingAndRestore(t *testing.T) {
@@ -95,13 +95,13 @@ func TestAccTrashListingAndRestore(t *testing.T) {
 func TestAccTrashListingFiltered(t *testing.T) {
 	w := newItemWorld(t, true)
 	ctx := context.Background()
-	grant := func(name, user, repoKey string, a types.Actions, include, exclude []string) {
+	grant := func(name, user, repoKey string, a api.Actions, include, exclude []string) {
 		t.Helper()
-		if err := w.db.Permissions().Create(ctx, types.Permission{
+		if err := w.db.Permissions().Create(ctx, model.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{user: a}},
-				Targets: map[string]types.Target{
+			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{user: a}},
+				Targets: map[string]model.Target{
 					repoKey: {Include: include, Exclude: exclude},
 				},
 			}},
@@ -145,11 +145,11 @@ func TestAccTrashListingFiltered(t *testing.T) {
 	// Without deploy or manage anywhere the trash can is refused; read is
 	// not enough.
 	refused("user", "", "/libs-local")
-	grant("read-all", "user", types.TargetAnyLocal, types.ActionRead, []string{"**"}, nil)
+	grant("read-all", "user", api.TargetAnyLocal, api.ActionRead, []string{"**"}, nil)
 	refused("user", "", "/libs-local/a/one.txt")
 
 	// Deploy on a/ in libs-local, but not a/secret/.
-	grant("deploy-a", "user", "libs-local", types.ActionWrite,
+	grant("deploy-a", "user", "libs-local", api.ActionWrite,
 		[]string{"a/**"}, []string{"a/secret/**"})
 	list("user", "", "/libs-local")
 	list("user", "/libs-local", "/a")
@@ -167,14 +167,14 @@ func TestAccTrashListingFiltered(t *testing.T) {
 	wantStatus(t, w.do("GET", tc+"/libs-local/a/absent", "user", ""), http.StatusNotFound)
 
 	// Manage without deploy is enough too.
-	grant("manage-other", "user", "other-local", types.ActionManage, []string{"**"}, nil)
+	grant("manage-other", "user", "other-local", api.ActionManage, []string{"**"}, nil)
 	list("user", "", "/libs-local", "/other-local")
 	list("user", "/other-local", "/o.txt")
 
 	// A pattern naming a path below s.txt lets the folder check through,
 	// but the trashed file needs the exact right, and its repository shows
 	// only for an item the caller sees.
-	grant("below-s", "user", "server-local", types.ActionWrite, []string{"s.txt/x"}, nil)
+	grant("below-s", "user", "server-local", api.ActionWrite, []string{"s.txt/x"}, nil)
 	refused("user", "/server-local/s.txt")
 	wantStatus(t, w.do("GET", tc+"/server-local", "user", ""), http.StatusNotFound)
 	list("user", "", "/libs-local", "/other-local")
@@ -185,7 +185,7 @@ func TestAccTrashListingFiltered(t *testing.T) {
 	list("admin", "", "/libs-local", "/other-local", "/server-local")
 
 	// Anonymous is told to sign in, even holding deploy.
-	grant("anon-deploy", kernel.AnonymousUser, "libs-local", types.ActionWrite, []string{"**"}, nil)
+	grant("anon-deploy", kernel.AnonymousUser, "libs-local", api.ActionWrite, []string{"**"}, nil)
 	for _, p := range []string{"", "/libs-local", "/libs-local/b/three.txt"} {
 		wantStatus(t, w.do("GET", tc+p, "", ""), http.StatusUnauthorized)
 	}
@@ -222,13 +222,13 @@ func TestAccTrashListingReadFailure(t *testing.T) {
 func TestAccTrashRestoreNeedsOrigin(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
-	grant := func(name, repoKey string, a types.Actions, include, exclude []string) {
+	grant := func(name, repoKey string, a api.Actions, include, exclude []string) {
 		t.Helper()
-		if err := w.db.Permissions().Create(ctx, types.Permission{
+		if err := w.db.Permissions().Create(ctx, model.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"user": a}},
-				Targets: map[string]types.Target{
+			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{"user": a}},
+				Targets: map[string]model.Target{
 					repoKey: {Include: include, Exclude: exclude},
 				},
 			}},
@@ -245,7 +245,7 @@ func TestAccTrashRestoreNeedsOrigin(t *testing.T) {
 	}
 	trashed := func() int {
 		t.Helper()
-		entries, _, err := w.db.Trash().List(ctx, "libs-local", "", store.Page{})
+		entries, _, err := w.db.Trash().List(ctx, "libs-local", "", kernel.Page{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -255,7 +255,7 @@ func TestAccTrashRestoreNeedsOrigin(t *testing.T) {
 		t.Helper()
 		return w.do("POST", "/artifactory/api/trash/restore/"+from+"?to=other-local", "user", "")
 	}
-	grant("restore-dest", "other-local", types.ActionManage, []string{"**"}, nil)
+	grant("restore-dest", "other-local", api.ActionManage, []string{"**"}, nil)
 
 	// Manage on the destination alone: refused, and nothing moves.
 	wantStatus(t, restore("libs-local/a"), http.StatusBadRequest)
@@ -269,7 +269,7 @@ func TestAccTrashRestoreNeedsOrigin(t *testing.T) {
 
 	// Delete on a/ but not a/secret/: a/ as a whole is refused, with
 	// nothing restored, while the permitted file alone is restored.
-	grant("restore-a", "libs-local", types.ActionDelete,
+	grant("restore-a", "libs-local", api.ActionDelete,
 		[]string{"a/**"}, []string{"a/secret/**"})
 	rec := restore("libs-local/a")
 	wantStatus(t, rec, http.StatusBadRequest)
@@ -286,7 +286,7 @@ func TestAccTrashRestoreNeedsOrigin(t *testing.T) {
 	wantStatus(t, restore("libs-local/b"), http.StatusBadRequest)
 
 	// Manage without delete on the origin is enough too.
-	grant("restore-secret", "libs-local", types.ActionManage, []string{"a/secret/**"}, nil)
+	grant("restore-secret", "libs-local", api.ActionManage, []string{"a/secret/**"}, nil)
 	wantStatus(t, restore("libs-local/a/secret"), http.StatusAccepted)
 	wantStatus(t, w.do("GET", "/artifactory/other-local/a/secret/two.txt", "admin", ""),
 		http.StatusOK)
@@ -295,7 +295,7 @@ func TestAccTrashRestoreNeedsOrigin(t *testing.T) {
 	if err := w.db.Repos().Delete(ctx, "libs-local"); err != nil {
 		t.Fatal(err)
 	}
-	grant("restore-any", "ANY LOCAL", types.ActionDelete|types.ActionManage, []string{"**"}, nil)
+	grant("restore-any", "ANY LOCAL", api.ActionDelete|api.ActionManage, []string{"**"}, nil)
 	wantStatus(t, restore("libs-local/b"), http.StatusBadRequest)
 	wantStatus(t, w.do("POST", "/artifactory/api/trash/restore/libs-local/b?to=other-local",
 		"admin", ""), http.StatusAccepted)
@@ -313,11 +313,11 @@ func TestAccTrashOriginReadFailure(t *testing.T) {
 	wantStatus(t, w.do("PUT", "/artifactory/libs-local/f.txt", "admin", "f"), http.StatusCreated)
 	wantStatus(t, w.do("DELETE", "/artifactory/libs-local/f.txt", "admin", ""),
 		http.StatusNoContent)
-	if err := w.db.Permissions().Create(context.Background(), types.Permission{
+	if err := w.db.Permissions().Create(context.Background(), model.Permission{
 		Name: "restore-dest",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionManage}},
-			Targets: map[string]types.Target{"other-local": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionManage}},
+			Targets: map[string]model.Target{"other-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -390,13 +390,13 @@ func TestAccRepositoryDeleteKeepsItsContent(t *testing.T) {
 	}
 	// user manages, deletes and deploys in both repositories, so only the
 	// deleted repository being gone keeps it out.
-	if err := w.db.Permissions().Create(ctx, types.Permission{
+	if err := w.db.Permissions().Create(ctx, model.Permission{
 		Name: "user-all",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"user": types.ActionWrite | types.ActionDelete | types.ActionManage,
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{
+				"user": api.ActionWrite | api.ActionDelete | api.ActionManage,
 			}},
-			Targets: map[string]types.Target{
+			Targets: map[string]model.Target{
 				"libs-local": {Include: []string{"**"}}, "other-local": {Include: []string{"**"}},
 			},
 		}},

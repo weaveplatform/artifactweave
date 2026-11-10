@@ -7,11 +7,13 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -35,7 +37,7 @@ func NewWorld(t *testing.T) *World {
 	db := inmem.New()
 	support.Seed(t, db)
 	for _, name := range []string{"deployer", "user"} {
-		if err := db.Users().Create(t.Context(), types.User{
+		if err := db.Users().Create(t.Context(), model.User{
 			Name: name, PasswordHash: support.CheapHash,
 		}); err != nil {
 			t.Fatal(err)
@@ -92,8 +94,8 @@ func WantStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
 // and fails t when the setting cannot be stored.
 func SetTrashcan(t *testing.T, db *inmem.Store, on bool) {
 	t.Helper()
-	if err := db.Settings().Put(t.Context(), types.SettingTrashcan,
-		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
+	if err := db.Settings().Put(t.Context(), settings.SettingTrashcan,
+		model.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
 		t.Fatal(err)
 	}
 }

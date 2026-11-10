@@ -18,14 +18,16 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -205,7 +207,7 @@ func TestAccCatalogLifecycle(t *testing.T) {
 			t.Context(),
 			f.c,
 			it,
-			types.Properties{key: {"forged"}},
+			model.Properties{key: {"forged"}},
 			nil,
 		); err == nil {
 			t.Fatalf("accepted forged %s", key)
@@ -215,7 +217,7 @@ func TestAccCatalogLifecycle(t *testing.T) {
 		t.Context(),
 		f.c,
 		it,
-		types.Properties{"box_provider": {"docker"}},
+		model.Properties{"box_provider": {"docker"}},
 		nil,
 	); err != nil {
 		t.Fatal(err)
@@ -227,7 +229,7 @@ func TestAccCatalogLifecycle(t *testing.T) {
 		t.Context(),
 		f.c,
 		it,
-		types.Properties{
+		model.Properties{
 			"box_provider": {"virtualbox"},
 			"box_name":     {"renamed"},
 			"box_version":  {"2.0.0"},
@@ -249,7 +251,7 @@ func TestAccCatalogLifecycle(t *testing.T) {
 		t.Context(),
 		f.c,
 		it,
-		types.Properties{"box_name": {"renamed"}},
+		model.Properties{"box_name": {"renamed"}},
 		nil,
 	); err != nil {
 		t.Fatal(err)
@@ -307,7 +309,7 @@ func TestAccCatalogLifecycle(t *testing.T) {
 	if _, err := f.items.Restore(
 		t.Context(),
 		item.Target{Repo: f.c, Path: "restored.box"},
-		types.TrashRecord{Item: moved, Properties: props},
+		model.TrashRecord{Item: moved, Properties: props},
 		"admin",
 	); err != nil {
 		t.Fatal(err)
@@ -319,12 +321,12 @@ func TestAccCatalogStatusAndPermissions(t *testing.T) {
 	f := newFixture(t, repo.Local)
 	f.publish("visible/a.box", "widget", "1.0", "virtualbox")
 	f.publish("hidden/a.box", "widget", "2.0", "docker")
-	permission := types.Permission{
+	permission := model.Permission{
 		Name: "reader",
-		Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}},
-				Targets: map[string]types.Target{"boxes": {Include: []string{"visible/**"}}},
+		Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]model.Target{"boxes": {Include: []string{"visible/**"}}},
 			},
 		},
 	}
@@ -395,27 +397,27 @@ func (f *faultStore) Tx(ctx context.Context, fn func(context.Context) error) err
 	return f.Store.Tx(ctx, fn)
 }
 
-func (f *faultStore) Packages() store.PackageStore { return faultPackages{f.Store.Packages(), f.stage} }
-func (f *faultStore) Items() store.ItemStore       { return faultItems{f.Store.Items(), f.stage} }
+func (f *faultStore) Packages() port.PackageStore { return faultPackages{f.Store.Packages(), f.stage} }
+func (f *faultStore) Items() port.ItemStore       { return faultItems{f.Store.Items(), f.stage} }
 
 type faultPackages struct {
-	store.PackageStore
+	port.PackageStore
 	stage string
 }
 
-func (f faultPackages) Find(ctx context.Context, key, name string) (types.Package, error) {
+func (f faultPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
 	if f.stage == "find" {
-		return types.Package{}, errFault
+		return model.Package{}, errFault
 	}
 	return f.PackageStore.Find(ctx, key, name)
 }
 
-func (f faultPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (f faultPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if f.stage == "versions" {
 		return nil, errFault
 	}
 	if f.stage == "manyversions" {
-		return make([]types.PackageVersion, 10001), nil
+		return make([]model.PackageVersion, 10001), nil
 	}
 	return f.PackageStore.Versions(ctx, id)
 }
@@ -431,21 +433,21 @@ func (f faultPackages) Files(ctx context.Context, id int64) ([]int64, error) {
 }
 
 type faultItems struct {
-	store.ItemStore
+	port.ItemStore
 	stage string
 }
 
-func (f faultItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
+func (f faultItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
 	if f.stage == "item" {
-		return types.Item{}, errFault
+		return model.Item{}, errFault
 	}
 	if f.stage == "missingitem" {
-		return types.Item{}, store.ErrNotFound
+		return model.Item{}, kernel.ErrNotFound
 	}
 	return f.ItemStore.GetByID(ctx, id)
 }
 
-func (f faultItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (f faultItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if f.stage == "properties" {
 		return nil, errFault
 	}

@@ -19,16 +19,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	formatapi "github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -51,7 +51,7 @@ type preuploadRequest struct {
 
 func (h handler) targetRequest(r *http.Request, id format.Identity) (*http.Request, error) {
 	c := pkgroute.RequestFrom(r).Repo
-	if !h.k.CanFolder(r, id.Prefix(), types.ActionWrite) {
+	if !h.k.CanFolder(r, id.Prefix(), api.ActionWrite) {
 		return nil, apierror.New(http.StatusForbidden, "model deployment is not authorized")
 	}
 	if c.Class == repo.Remote {
@@ -71,7 +71,7 @@ func (h handler) targetRequest(r *http.Request, id format.Identity) (*http.Reque
 	}
 	member, err := h.k.DB().Repos().Get(r.Context(), c.DefaultDeploymentRepo)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			return nil, apierror.New(http.StatusNotFound, "model deployment target not found")
 		}
 		return nil, fmt.Errorf("huggingface: deployment member: %w", err)
@@ -84,7 +84,7 @@ func (h handler) targetRequest(r *http.Request, id format.Identity) (*http.Reque
 	if err != nil {
 		return nil, fmt.Errorf("huggingface: member request: %w", err)
 	}
-	if !h.k.CanFolder(mr, id.Prefix(), types.ActionWrite) {
+	if !h.k.CanFolder(mr, id.Prefix(), api.ActionWrite) {
 		return nil, apierror.New(http.StatusForbidden, "model deployment target is not authorized")
 	}
 	return mr, nil
@@ -118,7 +118,7 @@ func (h handler) preupload(w http.ResponseWriter, r *http.Request) {
 		path, valid := format.SnapshotPath(id, pathRev, f.Path)
 		decoded, err := base64.StdEncoding.DecodeString(f.Sample)
 		if !valid || seen[f.Path] || f.Size < 0 || f.Size > 10<<30 || err != nil ||
-			len(decoded) > 512 || !h.k.Can(target, path, types.ActionWrite) {
+			len(decoded) > 512 || !h.k.Can(target, path, api.ActionWrite) {
 			h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid preupload file"))
 			return
 		}
@@ -192,7 +192,7 @@ func (h handler) commit(w http.ResponseWriter, r *http.Request) {
 	refPath := ""
 	if !format.Revision(rev) {
 		refPath, _ = format.RefPath(id, rev)
-		if !h.k.Can(target, refPath, types.ActionWrite) {
+		if !h.k.Can(target, refPath, api.ActionWrite) {
 			h.k.Error(w, r, apierror.New(http.StatusForbidden, "model revision is not writable"))
 			return
 		}
@@ -247,9 +247,9 @@ func (h handler) publishCommit(
 		if refPath != "" && parent != "" && !commitChanges(parentFiles, ops) {
 			for _, op := range ops {
 				path, _ := format.SnapshotPath(id, parent, op.name)
-				action := types.ActionWrite
+				action := api.ActionWrite
 				if op.shouldDeleteFile || op.shouldDeleteFolder {
-					action = types.ActionDelete
+					action = api.ActionDelete
 				}
 				if !h.k.Can(target, path, action) {
 					return apierror.New(http.StatusForbidden, "model operation is not authorized")
@@ -268,7 +268,7 @@ func (h handler) publishCommit(
 		for _, it := range parentFiles {
 			name := strings.TrimPrefix(it.FullPath(), id.Prefix()+"/snapshots/"+parent+"/")
 			if commitReplaces(name, ops) {
-				if !h.k.Can(target, it.FullPath(), types.ActionDelete) {
+				if !h.k.Can(target, it.FullPath(), api.ActionDelete) {
 					return apierror.New(http.StatusForbidden, "parent model file is not deletable")
 				}
 				continue
@@ -282,7 +282,7 @@ func (h handler) publishCommit(
 				continue
 			}
 			path, _ := format.SnapshotPath(id, storedRev, op.name)
-			if !h.k.Can(target, path, types.ActionWrite) {
+			if !h.k.Can(target, path, api.ActionWrite) {
 				return apierror.New(http.StatusForbidden, "model file is not writable")
 			}
 			if err := h.storeCommitFile(target, path, op); err != nil {
@@ -295,7 +295,7 @@ func (h handler) publishCommit(
 		}
 		if refPath != "" {
 			if _, err := h.k.Store(target, refPath, bytes.NewReader([]byte(storedRev)), nil,
-				types.Checksums{}); err != nil {
+				kernel.Checksums{}); err != nil {
 				return fmt.Errorf("huggingface: move revision ref: %w", err)
 			}
 		}
@@ -311,11 +311,11 @@ func (h handler) carryParentFile(
 	target *http.Request,
 	id format.Identity,
 	revision, name string,
-	parent types.Item,
+	parent model.Item,
 ) error {
 	ctx := target.Context()
 	path, _ := format.SnapshotPath(id, revision, name)
-	if !h.k.Can(target, path, types.ActionWrite) {
+	if !h.k.Can(target, path, api.ActionWrite) {
 		return apierror.New(http.StatusForbidden, "inherited model file is not writable")
 	}
 	existing, err := h.k.DB().Items().Get(ctx,
@@ -326,7 +326,7 @@ func (h handler) carryParentFile(
 		return nil
 	case err == nil:
 		return apierror.New(http.StatusConflict, "immutable model revision differs")
-	case !errors.Is(err, store.ErrNotFound):
+	case !errors.Is(err, kernel.ErrNotFound):
 		return fmt.Errorf("huggingface: check inherited file: %w", err)
 	}
 	info, err := h.k.Blobs().Stat(ctx, parent.Actual.SHA256)
@@ -336,7 +336,7 @@ func (h handler) carryParentFile(
 	info.Digests.SHA1 = parent.Actual.SHA1
 	info.Digests.SHA512 = parent.Actual.SHA512
 	info.Digests.MD5 = parent.Actual.MD5
-	_, err = h.k.StoreNew(target, path, info, nil, types.Checksums{}, func() error {
+	_, err = h.k.StoreNew(target, path, info, nil, kernel.Checksums{}, func() error {
 		stored, getErr := h.k.DB().Items().Get(ctx,
 			pkgroute.RequestFrom(target).Repo.Key, false, path)
 		if getErr == nil && stored.Actual.SHA256 == parent.Actual.SHA256 &&
@@ -358,13 +358,13 @@ func (h handler) commitParent(target *http.Request, refPath string) (string, err
 	ctx := target.Context()
 	marker, err := h.k.DB().Items().Get(ctx, pkgroute.RequestFrom(target).Repo.Key,
 		false, refPath)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return "", nil
 	}
 	if err != nil {
 		return "", fmt.Errorf("huggingface: read parent ref: %w", err)
 	}
-	if marker.Folder || !h.k.Can(target, refPath, types.ActionRead) {
+	if marker.Folder || !h.k.Can(target, refPath, api.ActionRead) {
 		return "", apierror.New(http.StatusForbidden, "parent model revision is not readable")
 	}
 	reader, _, err := h.k.Blobs().Open(ctx, marker.Actual.SHA256)
@@ -383,15 +383,15 @@ func (h handler) commitParentFiles(
 	target *http.Request,
 	id format.Identity,
 	parent string,
-) ([]types.Item, error) {
+) ([]model.Item, error) {
 	if parent == "" {
 		return nil, nil
 	}
 	ctx := target.Context()
 	repoKey := pkgroute.RequestFrom(target).Repo.Key
 	prefix := id.Prefix() + "/snapshots/" + parent
-	page := store.Page{Limit: store.MaxLimit}
-	files := make([]types.Item, 0)
+	page := kernel.Page{Limit: kernel.MaxLimit}
+	files := make([]model.Item, 0)
 	for {
 		items, next, err := h.k.DB().Items().Descendants(ctx, repoKey, false, prefix, page)
 		if err != nil {
@@ -405,7 +405,7 @@ func (h handler) commitParentFiles(
 			if !valid || candidateID.Prefix() != id.Prefix() || candidate != parent {
 				return nil, apierror.New(http.StatusConflict, "invalid parent model snapshot")
 			}
-			if !h.k.Can(target, it.FullPath(), types.ActionRead) {
+			if !h.k.Can(target, it.FullPath(), api.ActionRead) {
 				return nil, apierror.New(http.StatusForbidden, "parent model file is not readable")
 			}
 			files = append(files, it)
@@ -421,7 +421,7 @@ func (h handler) commitParentFiles(
 	}
 }
 
-func commitChanges(parent []types.Item, ops []commitOp) bool {
+func commitChanges(parent []model.Item, ops []commitOp) bool {
 	seen := make(map[string]bool, len(ops))
 	changed := false
 	for _, it := range parent {
@@ -475,7 +475,7 @@ func (h handler) storeCommitFile(target *http.Request, path string, op commitOp)
 	if op.oid == "" {
 		digest := commitDigest(op)
 		_, err := h.k.StoreOnce(target, path, bytes.NewReader(op.data), nil,
-			types.Checksums{}, func(existing types.Item) error {
+			kernel.Checksums{}, func(existing model.Item) error {
 				if existing.Actual.SHA256 == digest && existing.Size == int64(len(op.data)) {
 					return nil
 				}
@@ -493,7 +493,7 @@ func (h handler) storeCommitFile(target *http.Request, path string, op commitOp)
 		return nil
 	case getErr == nil:
 		return apierror.New(http.StatusConflict, "immutable model revision differs")
-	case !errors.Is(getErr, store.ErrNotFound):
+	case !errors.Is(getErr, kernel.ErrNotFound):
 		return fmt.Errorf("huggingface: check existing lfs file: %w", getErr)
 	}
 	info, err := h.k.Blobs().Stat(ctx, op.oid)
@@ -504,7 +504,7 @@ func (h handler) storeCommitFile(target *http.Request, path string, op commitOp)
 		return err
 	}
 	_, err = h.k.StoreNew(target, path, info, nil,
-		types.Checksums{SHA256: op.oid}, func() error {
+		kernel.Checksums{SHA256: op.oid}, func() error {
 			it, getErr := h.k.DB().Items().Get(ctx,
 				pkgroute.RequestFrom(target).Repo.Key, false, path)
 			if getErr == nil && it.Actual.SHA256 == op.oid {

@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // skipsExisting reports whether Poetry's publish --skip-existing takes rec
@@ -155,7 +155,7 @@ func TestAccOverwriteRefusalAnonymous(t *testing.T) {
 		c.Protocols = append(c.Protocols, pkgtestProtocol())
 	})
 	grant(t, w, "anonymous-deploys", kernel.AnonymousUser, "libs-local",
-		types.ActionRead|types.ActionWrite)
+		api.ActionRead|api.ActionWrite)
 	w.put("/artifactory/libs-local/taken.txt", "taken")
 	want := refusedOverwrite("libs-local", "taken.txt", kernel.AnonymousUser)
 	for _, path := range []string{
@@ -189,7 +189,7 @@ func TestAccOverwriteRefusalProtocols(t *testing.T) {
 	})); err != nil {
 		t.Fatal(err)
 	}
-	grant(t, w, "deploy-go", "deployer", "go-local", types.ActionRead|types.ActionWrite)
+	grant(t, w, "deploy-go", "deployer", "go-local", api.ActionRead|api.ActionWrite)
 	w.put("/artifactory/libs-local/taken.txt", "taken")
 	const info = "/artifactory/api/go/go-local/example.com/m/@v/v1.0.0.info"
 	wantStatus(t, w.do(http.MethodPut, info, "admin", `{"Version":"v1.0.0"}`), http.StatusCreated)
@@ -222,7 +222,7 @@ func TestAccOverwriteRefusalTransfer(t *testing.T) {
 	// deployer may move out of other-local, which takes Delete there, and
 	// deploy to libs-local, but not delete there.
 	grant(t, w, "move-other", "deployer", "other-local",
-		types.ActionRead|types.ActionWrite|types.ActionDelete)
+		api.ActionRead|api.ActionWrite|api.ActionDelete)
 	w.put("/artifactory/libs-local/taken.txt", "taken")
 	w.put("/artifactory/other-local/m.txt", "moved")
 	for _, path := range []string{

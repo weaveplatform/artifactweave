@@ -9,12 +9,13 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccAuthenticatePrincipal(t *testing.T) {
@@ -47,7 +48,7 @@ func TestAccAuthenticatePrincipal(t *testing.T) {
 	if got != nil {
 		t.Fatalf("a public route without credentials got principal %+v", got)
 	}
-	if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)
 	}
 	serve(nil)
@@ -63,7 +64,7 @@ func TestAccAuthenticateAttachesDecider(t *testing.T) {
 	ctx := t.Context()
 	db := inmem.New()
 	cheapSeed(t, db)
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -122,7 +123,7 @@ func TestAccAuthenticateAttachesDecider(t *testing.T) {
 	check("bearer", ping, map[string]string{"Authorization": "Bearer " + issued.AccessToken}, true)
 	check("public route without credentials", ping, nil, false)
 	check("unauthenticated route", skipped, basic("admin", "pw"), false)
-	if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)
 	}
 	check("anonymous on", ping, nil, true)
@@ -133,8 +134,8 @@ func TestAccAuthenticateAttachesDecider(t *testing.T) {
 
 type brokenUsers struct{ port.UserStore }
 
-func (brokenUsers) Get(context.Context, string) (types.User, error) {
-	return types.User{}, errors.New("database down")
+func (brokenUsers) Get(context.Context, string) (model.User, error) {
+	return model.User{}, errors.New("database down")
 }
 
 type brokenSettings struct{ settings.SettingsStore }

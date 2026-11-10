@@ -16,12 +16,13 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const dir = "example.com/m/@v/v1.0.0"
@@ -83,15 +84,15 @@ func (w *world) must(err error) {
 func (w *world) version(
 	c repo.Config,
 	m, v string,
-) (pv types.PackageVersion, files []string, ok bool) {
+) (pv model.PackageVersion, files []string, ok bool) {
 	w.t.Helper()
 	p, err := w.st.Packages().Find(w.ctx, c.Key, m)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return pv, nil, false
 	}
 	w.must(err)
 	pv, err = w.st.Packages().Version(w.ctx, p.ID, v)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return pv, nil, false
 	}
 	w.must(err)
@@ -347,9 +348,9 @@ func TestUnitInfoTimeUnreadable(t *testing.T) {
 	if err := st.Repos().Create(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	info := types.Item{
+	info := model.Item{
 		RepoKey: c.Key, Path: "example.com/m/@v", Name: "v1.0.0.info", Depth: 4,
-		Actual: types.Checksums{SHA256: strings.Repeat("0", 64)},
+		Actual: kernel.Checksums{SHA256: strings.Repeat("0", 64)},
 	}
 	if _, err := st.Items().Put(ctx, info); err != nil {
 		t.Fatal(err)
@@ -411,7 +412,7 @@ func TestUnitClassify(t *testing.T) {
 func TestUnitStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	c := repo.Config{Key: "go-local", Class: repo.Local, PackageType: repo.Go}
-	file := types.Item{RepoKey: c.Key, Name: dir + ".zip"}
+	file := model.Item{RepoKey: c.Key, Name: dir + ".zip"}
 	for _, f := range []struct {
 		fail string
 		run  func(h golang.Handler, env format.Env) error
@@ -420,7 +421,7 @@ func TestUnitStoreFailures(t *testing.T) {
 			return h.Deployed(ctx, env, c, file)
 		}},
 		{"Get", func(h golang.Handler, env format.Env) error {
-			return h.Deleted(ctx, env, c, []types.Item{file, {Path: "example.com", Name: "m", Folder: true}})
+			return h.Deleted(ctx, env, c, []model.Item{file, {Path: "example.com", Name: "m", Folder: true}})
 		}},
 		{"Ensure", func(h golang.Handler, env format.Env) error {
 			return h.Deployed(ctx, env, c, file)
@@ -451,14 +452,14 @@ type faulty struct {
 	fail map[string]bool
 }
 
-func (f faulty) Items() store.ItemStore { return faultyItems{f.Store.Items(), f.fail} }
+func (f faulty) Items() port.ItemStore { return faultyItems{f.Store.Items(), f.fail} }
 
-func (f faulty) Packages() store.PackageStore {
+func (f faulty) Packages() port.PackageStore {
 	return faultyPackages{f.Store.Packages(), f.fail}
 }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	fail map[string]bool
 }
 
@@ -468,9 +469,9 @@ func (f faultyItems) Get(
 	key string,
 	cached bool,
 	p string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if f.fail["Get"] {
-		return types.Item{}, errStore
+		return model.Item{}, errStore
 	}
 	return f.ItemStore.Get(ctx, key, cached, p)
 }
@@ -484,14 +485,14 @@ func (f faultyItems) Search(ctx context.Context, q *aql.Query, o aql.Options) ([
 }
 
 type faultyPackages struct {
-	store.PackageStore
+	port.PackageStore
 	fail map[string]bool
 }
 
 //nolint:wrapcheck // test double
-func (f faultyPackages) Ensure(ctx context.Context, p types.Package) (types.Package, error) {
+func (f faultyPackages) Ensure(ctx context.Context, p model.Package) (model.Package, error) {
 	if f.fail["Ensure"] {
-		return types.Package{}, errStore
+		return model.Package{}, errStore
 	}
 	return f.PackageStore.Ensure(ctx, p)
 }

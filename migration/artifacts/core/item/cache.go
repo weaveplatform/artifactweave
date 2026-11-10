@@ -14,9 +14,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Remote ingestion errors are source failures, never negative cache entries.
@@ -33,20 +34,20 @@ var (
 type CacheUpload struct {
 	// SmartProperties is a complete validated peer snapshot. Merge it inside
 	// the publication transaction so a concurrent local annotation wins.
-	SmartProperties        *types.Properties
+	SmartProperties        *model.Properties
 	SmartPropertiesStarted time.Time
 	// Expected comes from authoritative protocol metadata, not optional remote
 	// headers. It is enforced even when their checksum policy says ignore.
-	Expected types.Checksums
+	Expected kernel.Checksums
 	// Validate inspects complete bytes outside SQL, before either publication
 	// or transient delivery. It must not retain or close its reader.
 	Validate   func(context.Context, io.ReadSeeker, int64) error
-	Token      types.RemoteCacheToken
+	Token      model.RemoteCacheToken
 	Repo       repo.Config
 	Body       io.Reader
-	Kind       types.RemoteKind
-	Declared   types.Checksums
-	Properties types.Properties
+	Kind       model.RemoteKind
+	Declared   kernel.Checksums
+	Properties model.Properties
 	// PublishMetadata keeps protocol metadata in its native item/index layout
 	// while retaining metadata expiry and zap behavior. Ordinary raw upstream
 	// metadata deliberately stays outside the derived package tree.
@@ -74,9 +75,9 @@ type CacheUpload struct {
 // CacheResult is either committed content or an owned transient reader. Close
 // Body after a no-store response; closing removes its temporary file.
 type CacheResult struct {
-	Declared types.Checksums
-	Entry    types.RemoteCacheEntry
-	Item     types.Item
+	Declared kernel.Checksums
+	Entry    model.RemoteCacheEntry
+	Item     model.Item
 	Info     blob.Info
 	Body     io.ReadSeekCloser
 }
@@ -96,7 +97,7 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 	if err != nil {
 		return out, err
 	}
-	if u.MaxBytes == 0 && u.Kind == types.RemoteMetadata {
+	if u.MaxBytes == 0 && u.Kind == model.RemoteMetadata {
 		u.MaxBytes = 64 << 20
 	}
 	d.Body = body
@@ -121,13 +122,13 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 		return out, err
 	}
 	actual := digestsOf(info)
-	var envInspection func(context.Context) (types.Item, error)
-	if u.Kind != types.RemoteMetadata || u.PublishMetadata {
+	var envInspection func(context.Context) (model.Item, error)
+	if u.Kind != model.RemoteMetadata || u.PublishMetadata {
 		env, err := s.inspected(ctx, d, actual, info.Size)
 		if err != nil {
 			return out, err
 		}
-		envInspection = func(ctx context.Context) (types.Item, error) {
+		envInspection = func(ctx context.Context) (model.Item, error) {
 			return s.putFile(ctx, env, d, actual, info.Size, d.Declared, s.now())
 		}
 	}
@@ -141,10 +142,10 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 			}
 		}
 		now := s.now()
-		e := types.RemoteCacheEntry{
+		e := model.RemoteCacheEntry{
 			OriginalChecksums: d.Declared,
 			Kind:              u.Kind,
-			Blob:              types.Blob{Checksums: actual, Size: info.Size, Created: now},
+			Blob:              blob.Blob{Checksums: actual, Size: info.Size, Created: now},
 			ETag:              u.ETag,
 			LastModified:      u.LastModified,
 			ContentType:       u.ContentType,
@@ -154,7 +155,7 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 			ValidatedAt:       now,
 			LastUsed:          now,
 		}
-		if u.Kind == types.RemoteMetadata {
+		if u.Kind == model.RemoteMetadata {
 			e.MetadataBaseURL = u.RemoteURL
 		}
 		if envInspection != nil {
@@ -189,21 +190,21 @@ func (s *Service) cacheItem(
 	ctx context.Context,
 	u CacheUpload,
 	d *Deploy,
-	e *types.RemoteCacheEntry,
-	inspect func(context.Context) (types.Item, error),
-) (types.Item, error) {
+	e *model.RemoteCacheEntry,
+	inspect func(context.Context) (model.Item, error),
+) (model.Item, error) {
 	if u.SmartProperties != nil {
 		d.shouldReplaceProperties = true
 		var err error
 		d.Properties, e.Smart, err = s.initialRemoteProperties(ctx, u)
 		if err != nil {
-			return types.Item{}, err
+			return model.Item{}, err
 		}
 	}
 
 	it, err := inspect(ctx)
 	if err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	it.RemoteURL = u.RemoteURL
 	if modified, parseErr := http.ParseTime(u.LastModified); parseErr == nil {
@@ -211,13 +212,13 @@ func (s *Service) cacheItem(
 	}
 	it, err = s.Store.Items().Put(ctx, it)
 	if err != nil {
-		return types.Item{}, fmt.Errorf("cache origin: %w", err)
+		return model.Item{}, fmt.Errorf("cache origin: %w", err)
 	}
 	e.ItemID = it.ID
 	if e.Smart == nil {
 		old, readErr := s.Store.RemoteCache().Read(ctx, u.Token.Key)
-		if readErr != nil && !errors.Is(readErr, store.ErrNotFound) {
-			return types.Item{}, fmt.Errorf("cache smart state: %w", readErr)
+		if readErr != nil && !errors.Is(readErr, kernel.ErrNotFound) {
+			return model.Item{}, fmt.Errorf("cache smart state: %w", readErr)
 		}
 		if readErr == nil && old.Token.Source == u.Token.Source && old.ItemID == it.ID &&
 			old.Blob.Checksums.SHA256 == e.Blob.Checksums.SHA256 {
@@ -265,7 +266,7 @@ func (s *Service) checkRawCacheBlob(ctx context.Context, sha string) error {
 
 func (u CacheUpload) validate() error {
 	if len(u.ExpectedContentTypes) > 0 {
-		if u.Kind != types.RemoteMetadata || u.ExpectedContentType != "" || u.Validate == nil ||
+		if u.Kind != model.RemoteMetadata || u.ExpectedContentType != "" || u.Validate == nil ||
 			len(u.ExpectedContentTypes) > 16 {
 			return ErrRemoteMIME
 		}
@@ -281,19 +282,19 @@ func (u CacheUpload) validate() error {
 		}
 	}
 
-	if err := store.ValidateRemoteKey(u.Token.Key); err != nil {
+	if err := port.ValidateRemoteKey(u.Token.Key); err != nil {
 		return fmt.Errorf("cache: %w", err)
 	}
 	if u.Repo.Class != repo.Remote || u.Repo.Key != u.Token.Key.RepoKey || u.Body == nil ||
 		u.Length < -1 ||
 		u.MaxBytes < 0 {
-		return fmt.Errorf("cache target: %w", store.ErrInvalid)
+		return fmt.Errorf("cache target: %w", kernel.ErrInvalid)
 	}
-	if err := store.ValidateRemoteEntry(types.RemoteCacheEntry{Kind: u.Kind}); err != nil {
+	if err := port.ValidateRemoteEntry(model.RemoteCacheEntry{Kind: u.Kind}); err != nil {
 		return fmt.Errorf("cache: %w", err)
 	}
-	if u.Kind == "" || u.Kind == types.RemoteDerived {
-		return fmt.Errorf("cache upstream kind: %w", store.ErrInvalid)
+	if u.Kind == "" || u.Kind == model.RemoteDerived {
+		return fmt.Errorf("cache upstream kind: %w", kernel.ErrInvalid)
 	}
 	return nil
 }
@@ -304,16 +305,16 @@ func remoteDeploy(u CacheUpload) (Deploy, error) {
 	switch c.RemoteRepoChecksumPolicyType {
 	case "", repo.GenerateIfAbsent, repo.Fail:
 		c.ChecksumPolicyType = repo.ClientChecksums
-		if c.RemoteRepoChecksumPolicyType == repo.Fail && declared == (types.Checksums{}) {
+		if c.RemoteRepoChecksumPolicyType == repo.Fail && declared == (kernel.Checksums{}) {
 			return Deploy{}, ErrRemoteChecksumRequired
 		}
 	case repo.IgnoreAndGenerate:
 		c.ChecksumPolicyType = repo.ServerGeneratedChecksums
-		declared = types.Checksums{}
+		declared = kernel.Checksums{}
 	case repo.PassThru:
 		c.ChecksumPolicyType = repo.ServerGeneratedChecksums
 	default:
-		return Deploy{}, fmt.Errorf("remote checksum policy: %w", store.ErrInvalid)
+		return Deploy{}, fmt.Errorf("remote checksum policy: %w", kernel.ErrInvalid)
 	}
 	parsed, err := ParseChecksums(declared)
 	if err != nil {
@@ -321,7 +322,7 @@ func remoteDeploy(u CacheUpload) (Deploy, error) {
 	}
 	return Deploy{
 		Target: Target{Repo: c, Cached: true, Path: u.Token.Key.Path}, Declared: parsed,
-		Properties: u.Properties, By: u.By, Trusted: parsed == (types.Checksums{}),
+		Properties: u.Properties, By: u.By, Trusted: parsed == (kernel.Checksums{}),
 	}, nil
 }
 
@@ -350,7 +351,7 @@ func remoteExpectedMIME(u CacheUpload, body *bufio.Reader) error {
 	if u.ExpectedContentType != "" {
 		var err error
 		expected, _, err = mime.ParseMediaType(u.ExpectedContentType)
-		if u.Kind != types.RemoteMetadata || err != nil || !strings.Contains(expected, "/") ||
+		if u.Kind != model.RemoteMetadata || err != nil || !strings.Contains(expected, "/") ||
 			strings.Contains(expected, "*") {
 			return ErrRemoteMIME
 		}
@@ -407,7 +408,7 @@ func remoteExpectedMIME(u CacheUpload, body *bufio.Reader) error {
 // this nonstandard label; metadata and generic uploads keep their MIME rules.
 func compressedTarMIME(u CacheUpload, got, expected, sniff string) bool {
 	label := got == "application/x-compressed-tar" || got == "application/x-compressed" ||
-		(got == "binary/octet-stream" && u.Kind != types.RemoteMetadata && u.Validate != nil)
+		(got == "binary/octet-stream" && u.Kind != model.RemoteMetadata && u.Validate != nil)
 	return label && sameArchiveMIME(expected, "application/gzip") &&
 		sameArchiveMIME(sniff, "application/gzip")
 }
@@ -492,7 +493,7 @@ func (s *Service) cacheTransient(
 	return out, nil
 }
 
-func verifyExpected(expected types.Checksums, actual blob.Digests) error {
+func verifyExpected(expected kernel.Checksums, actual blob.Digests) error {
 	parsed, err := ParseChecksums(expected)
 	if err != nil {
 		return err

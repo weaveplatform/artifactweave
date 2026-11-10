@@ -8,10 +8,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Properties the format keeps on an indexed tarball. Name, version,
@@ -85,7 +85,7 @@ func (h Handler) Inspect(
 // version of a file that no longer is one, such as a tarball overwritten
 // with another version's content. A tarball stored anywhere but where the
 // index reads (pkgindex.Stored) is not indexed.
-func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Cached != pkgindex.Stored(c).Cached {
 		return nil
 	}
@@ -109,7 +109,7 @@ func (h Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	stored := pkgindex.Stored(c).Cached
 	seen := map[string]bool{}
@@ -121,7 +121,7 @@ func (h Handler) Deleted(
 		seen[name] = true
 		p, err := env.Store.Packages().Find(ctx, c.Key, name)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			continue
 		case err != nil:
 			return fmt.Errorf("npm: package %s: %w", name, err)
@@ -136,7 +136,7 @@ func (h Handler) Deleted(
 // inspectionOf is the inspection of the write that stored it when there
 // was one of this content, or else a read of the content, as a restore
 // needs.
-func inspectionOf(ctx context.Context, env format.Env, it types.Item) (*inspection, error) {
+func inspectionOf(ctx context.Context, env format.Env, it model.Item) (*inspection, error) {
 	if !candidate(it.FullPath()) {
 		return &inspection{}, nil
 	}
@@ -163,7 +163,7 @@ func (h Handler) Annotated(
 	ctx context.Context,
 	env format.Env,
 	_ repo.Config,
-	it types.Item,
+	it model.Item,
 	a format.Annotation,
 ) error {
 	if it.Folder || !followed(a) {

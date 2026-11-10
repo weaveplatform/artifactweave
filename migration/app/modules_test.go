@@ -10,8 +10,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/app/config"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 )
 
 // buildModules over a store whose every call panics, because its embedded
@@ -47,7 +47,7 @@ func TestAccRuntimeTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if types.ValidateInstanceID(id.InstanceID) != nil || rt.Tokens.Issuer() == "" {
+	if instance.ValidateInstanceID(id.InstanceID) != nil || rt.Tokens.Issuer() == "" {
 		t.Fatalf("identity %q, issuer %q", id.InstanceID, rt.Tokens.Issuer())
 	}
 	issued, err := rt.Tokens.Issue(ctx, token.Request{Username: "admin"})
@@ -78,29 +78,29 @@ func TestAccRuntimeTokens(t *testing.T) {
 // instanceOf replaces a store's instance identity store.
 type instanceOf struct {
 	*inmem.Store
-	inst store.InstanceStore
+	inst instance.InstanceStore
 }
 
-func (s instanceOf) Instance() store.InstanceStore { return s.inst }
+func (s instanceOf) Instance() instance.InstanceStore { return s.inst }
 
 type fakeInstance struct {
 	getErr, initErr error
 }
 
-func (f fakeInstance) Init(context.Context, types.InstanceIdentity) error { return f.initErr }
+func (f fakeInstance) Init(context.Context, instance.InstanceIdentity) error { return f.initErr }
 
-func (f fakeInstance) Get(context.Context) (types.InstanceIdentity, error) {
-	return types.InstanceIdentity{}, f.getErr
+func (f fakeInstance) Get(context.Context) (instance.InstanceIdentity, error) {
+	return instance.InstanceIdentity{}, f.getErr
 }
 
-func (f fakeInstance) Update(context.Context, types.InstanceIdentity) error { return nil }
+func (f fakeInstance) Update(context.Context, instance.InstanceIdentity) error { return nil }
 
 func TestAccOpenTokensWithoutIdentity(t *testing.T) {
 	ctx := context.Background()
 	// The identity cannot be read back: the token service refuses to start.
 	if _, err := openTokens(
 		ctx,
-		instanceOf{inmem.New(), fakeInstance{getErr: store.ErrNotFound}},
+		instanceOf{inmem.New(), fakeInstance{getErr: kernel.ErrNotFound}},
 		tokenKeyBits,
 	); err == nil {
 		t.Fatal("tokens without an identity")

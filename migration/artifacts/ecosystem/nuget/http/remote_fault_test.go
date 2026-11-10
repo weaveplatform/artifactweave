@@ -19,7 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccRemoteV3MetadataAdmissionAndRecovery(t *testing.T) {
@@ -35,7 +35,7 @@ func TestAccRemoteV3MetadataAdmissionAndRecovery(t *testing.T) {
 			)
 			wantStatus(t, f.do("GET", remoteV3+"index.json", "reader"), 502)
 			entries, _, err := f.db.RemoteCache().
-				List(t.Context(), "nuget-remote", "", store.Page{Limit: 100})
+				List(t.Context(), "nuget-remote", "", kernel.Page{Limit: 100})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -130,7 +130,7 @@ func TestAccRemoteV3TamperAndIdentityNeverPublish(t *testing.T) {
 				)
 				_, err := f.db.Items().
 					Get(t.Context(), "nuget-remote", true, "acme.mixed/1.0.0/acme.mixed.1.0.0.nupkg")
-				if !errors.Is(err, store.ErrNotFound) {
+				if !errors.Is(err, kernel.ErrNotFound) {
 					t.Fatalf("bad package published: %v", err)
 				}
 			})
@@ -442,7 +442,7 @@ func TestAccRemoteV3MinimalFeedNoStoreRangeAndNuspec(t *testing.T) {
 		t.Fatal("nuspec range applied to archive")
 	}
 	entries, _, err := f.db.RemoteCache().
-		List(t.Context(), "nuget-remote", "", store.Page{Limit: 100})
+		List(t.Context(), "nuget-remote", "", kernel.Page{Limit: 100})
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("no-store persisted metadata: %v %d", err, len(entries))
 	}

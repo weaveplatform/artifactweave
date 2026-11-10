@@ -12,8 +12,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	nixfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nix"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 func TestAccNixRawRoutesCannotBypassNativeValidation(t *testing.T) {
@@ -61,7 +61,7 @@ func TestAccNixRawRoutesCannotBypassNativeValidation(t *testing.T) {
 			if _, err = w.rt.Store.Items().
 				Get(t.Context(), "remote", true, info.URL); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatalf("corrupt archive cached: %v", err)
 			}
@@ -99,7 +99,7 @@ func TestAccNixRawRoutesCannotBypassNativeValidation(t *testing.T) {
 			}
 			// Transient metadata has no cache entry to invalidate and must be
 			// fetched anew on the next request.
-			if !cache && !errors.Is(err, store.ErrNotFound) {
+			if !cache && !errors.Is(err, kernel.ErrNotFound) {
 				t.Fatalf("transient metadata was cached: %v", err)
 			}
 			refreshed := info
@@ -115,7 +115,7 @@ func TestAccNixRawRoutesCannotBypassNativeValidation(t *testing.T) {
 			if cache && err != nil {
 				t.Fatal(err)
 			}
-			if !cache && !errors.Is(err, store.ErrNotFound) {
+			if !cache && !errors.Is(err, kernel.ErrNotFound) {
 				t.Fatalf("transient archive retained: %v", err)
 			}
 		})

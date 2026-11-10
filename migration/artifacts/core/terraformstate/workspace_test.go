@@ -12,7 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitWorkspacesRoundTrip(t *testing.T) {
@@ -57,7 +57,7 @@ func TestUnitWorkspacesRoundTrip(t *testing.T) {
 		}
 
 		for _, missing := range []string{"none", "a/b", ""} {
-			if _, err := w.svc.Workspace(w.ctx, w.c, missing); !errors.Is(err, store.ErrNotFound) {
+			if _, err := w.svc.Workspace(w.ctx, w.c, missing); !errors.Is(err, kernel.ErrNotFound) {
 				t.Errorf("Workspace(%q) = %v", missing, err)
 			}
 		}
@@ -337,7 +337,7 @@ func TestUnitUnreadableRecord(t *testing.T) {
 		w.c,
 		"app",
 	); err == nil ||
-		errors.Is(err, store.ErrNotFound) {
+		errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("a workspace with an unreadable record = %v", err)
 	}
 	it.Actual.SHA256 = "0000000000000000000000000000000000000000000000000000000000000000"

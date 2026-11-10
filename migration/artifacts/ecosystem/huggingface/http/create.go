@@ -9,12 +9,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type createRepoRequest struct {
@@ -91,7 +91,7 @@ func (h handler) createBranch(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	if !h.k.Can(target, refPath, types.ActionWrite) {
+	if !h.k.Can(target, refPath, api.ActionWrite) {
 		h.k.Error(w, r, apierror.New(http.StatusForbidden, "model branch is not writable"))
 		return
 	}
@@ -115,7 +115,7 @@ func (h handler) createBranch(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		h.k.Error(w, r, fmt.Errorf("huggingface: read branch: %w", err))
 		return
@@ -125,7 +125,7 @@ func (h handler) createBranch(w http.ResponseWriter, r *http.Request) {
 		refPath,
 		bytes.NewReader([]byte(parent.info.SHA)),
 		nil,
-		types.Checksums{},
+		kernel.Checksums{},
 	); err != nil {
 		h.k.Error(w, r, fmt.Errorf("huggingface: create branch: %w", err))
 		return

@@ -10,9 +10,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Freshener brings derived work up to date before a reader reads what it
@@ -54,7 +53,7 @@ func (s *Service) RegisterWork(q *work.Queue) error {
 				continue
 			}
 			owners[kind] = reflect.TypeOf(h)
-			run := func(ctx context.Context, it types.WorkItem) error {
+			run := func(ctx context.Context, it work.WorkItem) error {
 				return w.Work(ctx, s.env(), it) //nolint:wrapcheck // the format's own error
 			}
 			var err error
@@ -75,7 +74,7 @@ func (s *Service) RegisterWork(q *work.Queue) error {
 // one, through the format of the repository's package type. A repository
 // that is gone, or whose format keeps no index, owes nothing: no run could
 // do the work, so failing would only retry it until the queue parked it.
-func (s *Service) reindexWork(ctx context.Context, it types.WorkItem) error {
+func (s *Service) reindexWork(ctx context.Context, it work.WorkItem) error {
 	var req format.WorkRequest
 	if len(it.Payload) != 0 {
 		if err := json.Unmarshal(it.Payload, &req); err != nil {
@@ -88,7 +87,7 @@ func (s *Service) reindexWork(ctx context.Context, it types.WorkItem) error {
 	}
 	c, err := s.Store.Repos().Get(ctx, key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	case err != nil:
 		return fmt.Errorf("item: reindex %s: %w", key, err)

@@ -7,18 +7,21 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type testSource struct {
 	meta, archive []byte
 	mode          string
-	cached        *types.Item
+	cached        *model.Item
 	rechecks      int
 }
 
@@ -137,7 +140,7 @@ func TestAccNixRemoteRequiresValidatedAuthority(t *testing.T) {
 			}
 			src := &testSource{meta: f.meta, archive: f.data, mode: tc.mode, cached: &it}
 			if tc.mode == "missing blob" {
-				src.cached = &types.Item{Actual: types.Checksums{SHA256: "missing"}}
+				src.cached = &model.Item{Actual: kernel.Checksums{SHA256: "missing"}}
 			}
 			if tc.mode == "malformed" {
 				src.meta = []byte("invalid")
@@ -191,7 +194,7 @@ func TestAccNixHostedAuthorityAndSigningFailures(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "wrong key type":
-				pair.Type = types.KeypairRSA
+				pair.Type = api.KeypairRSA
 			case "broken private key":
 				pair.PrivateKey = "broken"
 			case "bad alias":
@@ -295,19 +298,19 @@ func TestAccNixExactPathPermissionsAndRevocation(t *testing.T) {
 			if err := f.db.Repos().Create(t.Context(), v); err != nil {
 				t.Fatal(err)
 			}
-			targets := map[string]types.Target{"local": {}, "virtual": {}}
+			targets := map[string]model.Target{"local": {}, "virtual": {}}
 			if mode == "metadata-only" {
-				targets["local"] = types.Target{Include: []string{infoPath}}
+				targets["local"] = model.Target{Include: []string{infoPath}}
 			}
 			if mode == "virtual-only" {
 				delete(targets, "local")
 			}
-			p := types.Permission{
+			p := model.Permission{
 				Name: "read",
-				Resources: map[types.ResourceType]types.Resource{
-					types.ResourceArtifact: {
-						Actions: types.Grants{
-							Users: map[string]types.Actions{"reader": types.ActionRead},
+				Resources: map[api.ResourceType]model.Resource{
+					api.ResourceArtifact: {
+						Actions: model.Grants{
+							Users: map[string]api.Actions{"reader": api.ActionRead},
 						},
 						Targets: targets,
 					},
@@ -341,18 +344,18 @@ func TestAccNixExactPathPermissionsAndRevocation(t *testing.T) {
 
 type failStore struct {
 	serverStore
-	repos store.RepoStore
-	items store.ItemStore
+	repos port.RepoStore
+	items port.ItemStore
 }
 
-func (s failStore) Repos() store.RepoStore {
+func (s failStore) Repos() port.RepoStore {
 	if s.repos != nil {
 		return s.repos
 	}
 	return s.serverStore.Repos()
 }
 
-func (s failStore) Items() store.ItemStore {
+func (s failStore) Items() port.ItemStore {
 	if s.items != nil {
 		return s.items
 	}
@@ -360,7 +363,7 @@ func (s failStore) Items() store.ItemStore {
 }
 
 type failRepos struct {
-	store.RepoStore
+	port.RepoStore
 	key string
 }
 
@@ -371,15 +374,15 @@ func (s failRepos) Get(ctx context.Context, key string) (repo.Config, error) {
 	return s.RepoStore.Get(ctx, key)
 }
 
-type failItems struct{ store.ItemStore }
+type failItems struct{ port.ItemStore }
 
 func (failItems) Descendants(
 	context.Context,
 	string,
 	bool,
 	string,
-	store.Page,
-) ([]types.Item, string, error) {
+	kernel.Page,
+) ([]model.Item, string, error) {
 	return nil, "", io.ErrUnexpectedEOF
 }
 

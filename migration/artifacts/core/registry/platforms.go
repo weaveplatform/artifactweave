@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // PlatformTag is a descriptive tag a list push adds for one of its
@@ -139,7 +139,7 @@ func (s *Service) folderList(
 ) (layout.Manifest, bool, error) {
 	items := s.Store.Items()
 	list, err := items.Get(ctx, o.Repo.Key, false, o.Name+"/"+folder+"/"+layout.ListManifestFile)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return layout.Manifest{}, false, nil
 	}
 	if err != nil {

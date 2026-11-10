@@ -14,8 +14,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // CalculateMetadata does calculateMetadata's work on folder in c, a local
@@ -43,7 +44,7 @@ func CalculateMetadata(
 	switch {
 	case !recursive:
 		criteria = append(criteria, &aql.FieldCriterion{
-			Field: aql.FieldPath, Op: aql.OpEq, Text: cmp.Or(folder, types.RootPath),
+			Field: aql.FieldPath, Op: aql.OpEq, Text: cmp.Or(folder, kernel.RootPath),
 		})
 	case folder != "":
 		criteria = append(criteria, under([]string{folder + "/"}))
@@ -110,7 +111,7 @@ func GeneratePOM(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	jar types.Item,
+	jar model.Item,
 ) (string, []byte, error) {
 	r, err := readerOf(ctx, env, c)
 	if err != nil {
@@ -161,7 +162,7 @@ func pomPath(l *layout.Layout, full string) (string, error) {
 // none or is no archive. A shaded jar carries its dependencies' POMs too,
 // so the one for the jar's own coordinates is taken, where 6.20's
 // getPomFileAsStringFromJar takes the first it meets.
-func embeddedPOM(ctx context.Context, env format.Env, jar types.Item, g, a string) ([]byte, error) {
+func embeddedPOM(ctx context.Context, env format.Env, jar model.Item, g, a string) ([]byte, error) {
 	rc, info, err := env.Blobs.Open(ctx, jar.Actual.SHA256)
 	if err != nil {
 		return nil, fmt.Errorf("maven: open %s: %w", jar.FullPath(), err)

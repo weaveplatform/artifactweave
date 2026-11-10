@@ -11,10 +11,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // accounts is the npm fixture with login and logout served by a real
@@ -41,18 +43,18 @@ func newAccounts(t *testing.T, settings map[string]any, expiry time.Duration) *a
 		}
 	}
 	hash := accesstest.HashPassword(t, "pw")
-	for _, u := range []types.User{
+	for _, u := range []model.User{
 		{Name: "ann", PasswordHash: hash},
-		{Name: "locked", PasswordHash: hash, Status: types.UserLocked},
+		{Name: "locked", PasswordHash: hash, Status: model.UserLocked},
 		{Name: "expired", PasswordHash: hash, PasswordExpired: true},
 		{Name: "external", PasswordHash: hash, InternalPasswordDisabled: true},
-		{Name: "off", PasswordHash: hash, Status: types.UserDisabled},
+		{Name: "off", PasswordHash: hash, Status: model.UserDisabled},
 	} {
 		if err := f.db.Users().Create(ctx, u); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := f.db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := f.db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -108,7 +110,7 @@ func TestAccLogin(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !rec2.Revocable || rec2.Description != "npm login" ||
-			rec2.Scope.String() != types.UserScope().String() ||
+			rec2.Scope.String() != kernel.UserScope().String() ||
 			rec2.ExpiresAt.Sub(rec2.IssuedAt) != c.expected {
 			t.Errorf("expiry %s: token %+v", c.expiry, rec2)
 		}
@@ -126,7 +128,7 @@ func TestAccLoginNames(t *testing.T) {
 	ctx := context.Background()
 	hash := accesstest.HashPassword(t, "pw")
 	if err := f.db.Users().
-		Create(ctx, types.User{Name: "a@b.example", PasswordHash: hash}); err != nil {
+		Create(ctx, model.User{Name: "a@b.example", PasswordHash: hash}); err != nil {
 		t.Fatal(err)
 	}
 	body := `{"name":"a@b.example","password":"pw"}`
@@ -172,7 +174,7 @@ func TestAccLoginRefusals(t *testing.T) {
 	} {
 		wantError(t, f.login(c.name, c.password), c.expected, c.msg)
 	}
-	issued, _, err := f.db.Tokens().List(context.Background(), store.TokenFilter{}, store.Page{})
+	issued, _, err := f.db.Tokens().List(context.Background(), port.TokenFilter{}, kernel.Page{})
 	if err != nil || len(issued) != 0 {
 		t.Errorf("refused logins issued tokens: %v, %v", issued, err)
 	}
@@ -181,7 +183,7 @@ func TestAccLoginRefusals(t *testing.T) {
 // While basic authentication is switched off no password logs in, as no
 // Basic login does.
 func TestAccLoginBasicAuthDisabled(t *testing.T) {
-	f := newAccounts(t, map[string]any{types.SettingBasicAuthEnabled: false}, 0)
+	f := newAccounts(t, map[string]any{settings.SettingBasicAuthEnabled: false}, 0)
 	wantError(t, f.login("ann", "pw"), http.StatusUnauthorized, "Basic authentication")
 }
 
@@ -190,8 +192,8 @@ func TestAccLoginBasicAuthDisabled(t *testing.T) {
 // Failed logins count toward the user lock as Basic ones do.
 func TestAccLoginCountsFailures(t *testing.T) {
 	f := newAccounts(t, map[string]any{
-		types.SettingUserLockPolicy:     types.UserLockPolicy{Enabled: true, LoginAttempts: 2},
-		types.SettingAccessLockSettings: types.AccessLockSettings{},
+		settings.SettingUserLockPolicy:     model.UserLockPolicy{Enabled: true, LoginAttempts: 2},
+		settings.SettingAccessLockSettings: model.AccessLockSettings{},
 	}, 0)
 	for range 2 {
 		wantError(t, f.login("ann", "wrong"), http.StatusUnauthorized, "Bad credentials")
@@ -213,7 +215,7 @@ func TestAccLoginCountsFailures(t *testing.T) {
 // suspension lasts even the right password is refused.
 func TestAccLoginSuspension(t *testing.T) {
 	f := newAccounts(t, map[string]any{
-		types.SettingAccessLockSettings: types.AccessLockSettings{
+		settings.SettingAccessLockSettings: model.AccessLockSettings{
 			ClientLoginSuspensionEnabled: true, MaxLoginDelayIncorrectAttempts: 1,
 			BaseLoginDelayMillis: 60_000, MaxLoginDelayMillis: 60_000,
 		},
@@ -234,9 +236,9 @@ func TestAccLoginWithToken(t *testing.T) {
 	f := newAccounts(t, nil, 0)
 	ctx := context.Background()
 	hour := time.Hour
-	issue := func(user, scope string, id types.TokenIdentity) accessapi.IssuedToken {
+	issue := func(user, scope string, id kernel.TokenIdentity) accessapi.IssuedToken {
 		t.Helper()
-		s, err := types.ParseScope(scope)
+		s, err := kernel.ParseScope(scope)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -248,7 +250,7 @@ func TestAccLoginWithToken(t *testing.T) {
 		}
 		return issued
 	}
-	whole := issue("ann", "applied-permissions/user", types.IdentityStored)
+	whole := issue("ann", "applied-permissions/user", kernel.IdentityStored)
 	tokenOf(t, f.login("ann", whole.AccessToken))
 	encrypted, err := f.kit.API().Tokens.EncryptedPassword(ctx, "ann")
 	if err != nil {
@@ -262,9 +264,9 @@ func TestAccLoginWithToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, raw := range map[string]string{
-		"narrowed":  issue("ann", "applied-permissions/groups:readers", types.IdentityStored).AccessToken,
+		"narrowed":  issue("ann", "applied-permissions/groups:readers", kernel.IdentityStored).AccessToken,
 		"registry":  registryToken.AccessToken,
-		"transient": issue("ghost", "applied-permissions/user", types.IdentityTransient).AccessToken,
+		"transient": issue("ghost", "applied-permissions/user", kernel.IdentityTransient).AccessToken,
 		"other":     whole.AccessToken,
 	} {
 		user := "ann"

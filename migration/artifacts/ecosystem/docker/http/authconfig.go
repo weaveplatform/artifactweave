@@ -12,7 +12,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // authEntry is a docker config.json entry: base64 of user:secret, and the
@@ -56,7 +55,7 @@ func (g *Registry) writeAuth(w http.ResponseWriter, r *http.Request, s apierror.
 		switch {
 		case err == nil:
 			email = u.Email
-		case !errors.Is(err, store.ErrNotFound):
+		case !errors.Is(err, kernel.ErrNotFound):
 			// A user an OIDC token names need not be stored; any other
 			// failure is the store's.
 			if g.fault != nil {

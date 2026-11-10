@@ -8,12 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/identity"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var cheap = authn.HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
@@ -42,8 +43,8 @@ func wantInvalid(t *testing.T, what string, err error) {
 	}
 }
 
-func newUser(name string, groups ...string) types.User {
-	return types.User{
+func newUser(name string, groups ...string) model.User {
+	return model.User{
 		Name:             name,
 		Email:            name + "@example.com",
 		ProfileUpdatable: true,
@@ -60,7 +61,7 @@ func TestUnitPutUser(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	_, err := s.PutGroup(ctx, types.Group{Name: "joiners", AutoJoin: true}, nil)
+	_, err := s.PutGroup(ctx, model.Group{Name: "joiners", AutoJoin: true}, nil)
 	must(err)
 
 	created, err := s.PutUser(ctx, newUser("ann", authn.ReadersGroup), "Ann-pass1")
@@ -70,7 +71,7 @@ func TestUnitPutUser(t *testing.T) {
 	ann, err := s.User(ctx, "ann")
 	must(err)
 	if !slices.Equal(ann.Groups, []string{"joiners", authn.ReadersGroup}) ||
-		ann.Status != types.UserEnabled || ann.Realm != types.RealmInternal ||
+		ann.Status != model.UserEnabled || ann.Realm != model.RealmInternal ||
 		!ann.PasswordChanged.Equal(clock) || len(ann.PasswordHash) == 0 {
 		t.Fatalf("created user: %+v", ann)
 	}
@@ -96,7 +97,7 @@ func TestUnitPutUser(t *testing.T) {
 	}
 
 	for what, put := range map[string]func() error{
-		"no email":      func() error { _, err := s.PutUser(ctx, types.User{Name: "x"}, "pw"); return err },
+		"no email":      func() error { _, err := s.PutUser(ctx, model.User{Name: "x"}, "pw"); return err },
 		"no password":   func() error { _, err := s.PutUser(ctx, newUser("x"), ""); return err },
 		"bad name":      func() error { _, err := s.PutUser(ctx, newUser("a/b"), "pw"); return err },
 		"unknown group": func() error { _, err := s.PutUser(ctx, newUser("x", "nope"), "pw"); return err },
@@ -172,7 +173,7 @@ func TestUnitLastAdminAndDeletion(t *testing.T) {
 	}
 
 	// Deleting a user revokes its tokens and nobody else's.
-	for _, tok := range []types.Token{
+	for _, tok := range []model.Token{
 		{ID: "t1", Subject: "jfac@svc/users/boss"},
 		{ID: "t2", Subject: "jfac@svc/users/admin"},
 	} {
@@ -205,14 +206,14 @@ func TestUnitGroups(t *testing.T) {
 		t.Fatal(err)
 	}
 	members := []string{"cat", "cat"}
-	created, err := s.PutGroup(ctx, types.Group{Name: "devs", Description: "d"}, &members)
+	created, err := s.PutGroup(ctx, model.Group{Name: "devs", Description: "d"}, &members)
 	if err != nil || !created {
 		t.Fatalf("create: %v %v", created, err)
 	}
 	// A replacement without members keeps them.
 	created, err = s.PutGroup(
 		ctx,
-		types.Group{Name: "devs", Description: "e", AdminPrivileges: true},
+		model.Group{Name: "devs", Description: "e", AdminPrivileges: true},
 		nil,
 	)
 	if err != nil || created {
@@ -240,9 +241,9 @@ func TestUnitGroups(t *testing.T) {
 		"unknown member",
 		s.PatchGroup(ctx, "devs", identity.GroupPatch{Members: &ghost}),
 	)
-	_, err = s.PutGroup(ctx, types.Group{Name: "devs"}, &ghost)
+	_, err = s.PutGroup(ctx, model.Group{Name: "devs"}, &ghost)
 	wantInvalid(t, "unknown member on put", err)
-	_, err = s.PutGroup(ctx, types.Group{Name: ""}, nil)
+	_, err = s.PutGroup(ctx, model.Group{Name: ""}, nil)
 	wantInvalid(t, "no name", err)
 	if err := s.PatchGroup(
 		ctx,
@@ -266,7 +267,7 @@ func TestUnitGroups(t *testing.T) {
 		t.Fatalf("groups: %v %v", groups, err)
 	}
 	anything, err := db.Permissions().Get(ctx, authn.AnythingPermission)
-	if err != nil || len(anything.Resources[types.ResourceArtifact].Actions.Groups) != 0 {
+	if err != nil || len(anything.Resources[api.ResourceArtifact].Actions.Groups) != 0 {
 		t.Fatalf("Anything after deleting readers: %+v %v", anything, err)
 	}
 	if err := s.DeleteGroup(ctx, "devs"); !errors.Is(err, kernel.ErrNotFound) {
@@ -325,7 +326,7 @@ func TestUnitPolicies(t *testing.T) {
 	if err != nil || lock.Enabled || lock.LoginAttempts != authn.DefaultLoginAttempts {
 		t.Fatalf("default lock policy: %+v %v", lock, err)
 	}
-	if err := s.SetLockPolicy(ctx, types.UserLockPolicy{Enabled: true}); err != nil {
+	if err := s.SetLockPolicy(ctx, model.UserLockPolicy{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	if lock, _ := s.LockPolicy(
@@ -337,13 +338,13 @@ func TestUnitPolicies(t *testing.T) {
 	wantInvalid(
 		t,
 		"a negative limit",
-		s.SetLockPolicy(ctx, types.UserLockPolicy{LoginAttempts: -1}),
+		s.SetLockPolicy(ctx, model.UserLockPolicy{LoginAttempts: -1}),
 	)
 	// Disabling the policy unlocks everyone.
 	if _, err := db.Users().RecordFailedLogin(ctx, authn.AdminUser, 1); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetLockPolicy(ctx, types.UserLockPolicy{}); err != nil {
+	if err := s.SetLockPolicy(ctx, model.UserLockPolicy{}); err != nil {
 		t.Fatal(err)
 	}
 	if locked, _ := s.Locked(ctx); len(locked) != 0 {
@@ -357,12 +358,12 @@ func TestUnitPolicies(t *testing.T) {
 	}
 	stored, err := s.SetExpirationPolicy(
 		ctx,
-		types.PasswordExpirationPolicy{Enabled: true, MaxAgeDays: 30},
+		model.PasswordExpirationPolicy{Enabled: true, MaxAgeDays: 30},
 	)
 	if err != nil || stored.MaxAgeDays != 30 {
 		t.Fatalf("set: %+v %v", stored, err)
 	}
-	_, err = s.SetExpirationPolicy(ctx, types.PasswordExpirationPolicy{})
+	_, err = s.SetExpirationPolicy(ctx, model.PasswordExpirationPolicy{})
 	wantInvalid(t, "a zero age", err)
 }
 
@@ -374,13 +375,13 @@ func TestUnitAccessLockPolicy(t *testing.T) {
 	s, db := newService(t)
 	got, err := s.AccessLockPolicy(ctx)
 	if err != nil ||
-		got != (identity.AccessLockPolicy{AccessLockSettings: types.DefaultAccessLockSettings()}) {
+		got != (identity.AccessLockPolicy{AccessLockSettings: model.DefaultAccessLockSettings()}) {
 		t.Fatalf("defaults: %+v %v", got, err)
 	}
 	want := identity.AccessLockPolicy{
 		Attempts:           3,
 		PasswordExpiryDays: 30,
-		AccessLockSettings: types.AccessLockSettings{
+		AccessLockSettings: model.AccessLockSettings{
 			SecondsToUnlock:        60,
 			AdminPasswordExpirable: true,
 		},
@@ -414,7 +415,7 @@ func TestUnitAccessLockPolicy(t *testing.T) {
 	for name, p := range map[string]identity.AccessLockPolicy{
 		"negative attempts": {Attempts: -1},
 		"too many attempts": {Attempts: 101},
-		"negative unlock":   {AccessLockSettings: types.AccessLockSettings{SecondsToUnlock: -1}},
+		"negative unlock":   {AccessLockSettings: model.AccessLockSettings{SecondsToUnlock: -1}},
 		"negative expiry":   {PasswordExpiryDays: -1},
 	} {
 		_, err := s.SetAccessLockPolicy(ctx, p)
@@ -434,8 +435,8 @@ func TestUnitEncryptedPasswordFollowsThePassword(t *testing.T) {
 	}
 	encrypted := func(id, sub string) {
 		t.Helper()
-		if err := db.Tokens().Create(ctx, types.Token{
-			ID: id, Subject: sub, Purpose: types.TokenPurposeEncryptedPassword, Secret: id,
+		if err := db.Tokens().Create(ctx, model.Token{
+			ID: id, Subject: sub, Purpose: model.TokenPurposeEncryptedPassword, Secret: id,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -448,7 +449,7 @@ func TestUnitEncryptedPasswordFollowsThePassword(t *testing.T) {
 	encrypted("ep-bad", "nonsense")
 	encrypted("ep-erin", "jfac@svc/users/erin")
 	if err := db.Tokens().
-		Create(ctx, types.Token{ID: "t-dan", Subject: "jfac@svc/users/dan"}); err != nil {
+		Create(ctx, model.Token{ID: "t-dan", Subject: "jfac@svc/users/dan"}); err != nil {
 		t.Fatal(err)
 	}
 	exists := func(id string) bool {
@@ -537,7 +538,7 @@ func TestUnitChangePassword(t *testing.T) {
 	// With the lock policy on, wrong old passwords lock the user, and a
 	// locked user changes nothing.
 	if err := s.SetLockPolicy(
-		ctx, types.UserLockPolicy{Enabled: true, LoginAttempts: 2},
+		ctx, model.UserLockPolicy{Enabled: true, LoginAttempts: 2},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -602,7 +603,7 @@ type racingUsers struct {
 	r *racing
 }
 
-func (u racingUsers) Get(ctx context.Context, name string) (types.User, error) {
+func (u racingUsers) Get(ctx context.Context, name string) (model.User, error) {
 	got, err := u.UserStore.Get(ctx, name)
 	if f := u.r.after; f != nil {
 		u.r.after = nil

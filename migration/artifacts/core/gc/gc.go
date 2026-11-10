@@ -9,12 +9,12 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -70,7 +70,7 @@ type Options struct {
 	// session's Backend: a JFrog CLI multipart session holds staged parts
 	// on local disk as well as a blob upload. Sessions of a backend with no
 	// reaper are blob store uploads.
-	Reapers map[string]func(context.Context, store.Upload) error
+	Reapers map[string]func(context.Context, session.Upload) error
 	// Expirers remove finished uploads nothing took in time: the registry's
 	// <image>/_uploads files, which a manifest push links from (decision
 	// 0031). Each removes what was last written before the cutoff it is
@@ -103,7 +103,7 @@ type Collector struct {
 	trash        *trash.Service
 	grace        time.Duration
 	uploadExpiry time.Duration
-	reapers      map[string]func(context.Context, store.Upload) error
+	reapers      map[string]func(context.Context, session.Upload) error
 	expirers     []func(context.Context, time.Time) (int, error)
 	tokens       accessapi.Tokens
 	now          func() time.Time
@@ -169,7 +169,7 @@ func (c *Collector) Run(ctx context.Context) (Report, error) {
 // renew takes or extends the lease and reports whether it is held.
 func (c *Collector) renew(ctx context.Context) (bool, error) {
 	now := c.now()
-	held, err := c.store.Leases().Acquire(ctx, types.Lease{
+	held, err := c.store.Leases().Acquire(ctx, work.Lease{
 		Name: leaseName, Holder: c.holder, Task: "garbage collection",
 		Acquired: now, Expires: now.Add(leaseTTL),
 	}, now)
@@ -186,7 +186,7 @@ func (c *Collector) expireTokens(ctx context.Context, rep *Report) error {
 	if c.tokens == nil {
 		return nil
 	}
-	n, err := c.tokens.DeleteExpired(ctx, c.now().Add(-types.DefaultRefreshGrace))
+	n, err := c.tokens.DeleteExpired(ctx, c.now().Add(-model.DefaultRefreshGrace))
 	rep.TokensExpired += n
 	if err != nil {
 		return fmt.Errorf("gc: expired tokens: %w", err)
@@ -232,7 +232,7 @@ func (c *Collector) reapUploads(ctx context.Context, rep *Report) error {
 				_ = up.Abort(ctx)
 			}
 			err := c.store.Uploads().Delete(ctx, u.ID)
-			if err != nil && !errors.Is(err, store.ErrNotFound) {
+			if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 				return fmt.Errorf("gc: drop upload %s: %w", u.ID, err)
 			}
 			reaped++
@@ -247,7 +247,7 @@ func (c *Collector) reapUploads(ctx context.Context, rep *Report) error {
 // finishDeleting removes the blobs a crashed pass marked deleting and never
 // finished. Until then a deploy of the same content is refused.
 func (c *Collector) finishDeleting(ctx context.Context, rep *Report) error {
-	page := store.Page{Limit: batch}
+	page := kernel.Page{Limit: batch}
 	for {
 		rows, next, err := c.store.Blobs().Deleting(ctx, page)
 		if err != nil {
@@ -271,7 +271,7 @@ func (c *Collector) finishDeleting(ctx context.Context, rep *Report) error {
 // grace period.
 func (c *Collector) collectIndexed(ctx context.Context, rep *Report) error {
 	cutoff := c.now().Add(-c.grace)
-	page := store.Page{Limit: batch}
+	page := kernel.Page{Limit: batch}
 	for {
 		rows, next, err := c.store.Blobs().Unreferenced(ctx, page)
 		if err != nil {
@@ -305,10 +305,10 @@ var errLeaseLost = errors.New("gc: lease was taken over")
 // referenced again since it was listed refuses (it is kept), then remove
 // deletes the content and leaves the tombstone. It reports whether it
 // removed the blob.
-func (c *Collector) destroy(ctx context.Context, b types.Blob, rep *Report) (bool, error) {
+func (c *Collector) destroy(ctx context.Context, b blob.Blob, rep *Report) (bool, error) {
 	_, err := c.store.Blobs().MarkDeleting(ctx, b, c.now())
 	switch {
-	case errors.Is(err, store.ErrConflict):
+	case errors.Is(err, kernel.ErrConflict):
 		rep.Kept++
 		return false, nil
 	case err != nil:
@@ -320,13 +320,13 @@ func (c *Collector) destroy(ctx context.Context, b types.Blob, rep *Report) (boo
 // remove deletes a deleting blob's content and turns its row into a
 // tombstone. The row is unreferenced and refuses new references, so nothing
 // can come to need the content while it goes.
-func (c *Collector) remove(ctx context.Context, b types.Blob) error {
+func (c *Collector) remove(ctx context.Context, b blob.Blob) error {
 	sha := b.Checksums.SHA256
 	if err := c.blobs.Delete(ctx, sha); err != nil && !errors.Is(err, blob.ErrNotFound) {
 		return fmt.Errorf("gc: delete content %s: %w", sha, err)
 	}
 	err := c.store.Blobs().FinishDelete(ctx, sha, c.now())
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		return fmt.Errorf("gc: finish deleting %s: %w", sha, err)
 	}
 	return nil
@@ -339,12 +339,12 @@ func (c *Collector) remove(ctx context.Context, b types.Blob) error {
 func (c *Collector) indexed(ctx context.Context, sha string) (bool, error) {
 	b, err := c.store.Blobs().Get(ctx, sha)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return false, nil
 	case err != nil:
 		return false, fmt.Errorf("gc: blob %s: %w", sha, err)
 	}
-	return b.State != types.BlobDeleted, nil
+	return b.State != blob.BlobDeleted, nil
 }
 
 // collectOrphans deletes content the index does not serve once it has stayed
@@ -393,8 +393,8 @@ func (c *Collector) collectOrphans(ctx context.Context, rep *Report) error {
 		if indexed {
 			continue
 		}
-		removed, err := c.destroy(ctx, types.Blob{
-			Checksums: types.Checksums{SHA256: sha}, Size: info.Size, Created: now,
+		removed, err := c.destroy(ctx, blob.Blob{
+			Checksums: kernel.Checksums{SHA256: sha}, Size: info.Size, Created: now,
 		}, rep)
 		if err != nil {
 			return err

@@ -25,9 +25,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // repairEvery is how often a mirror's repair loop runs a pass; a variable
@@ -168,7 +168,7 @@ func OpenRuntime(
 	// which brings the references its collection would have to trust.
 	collector, err := gc.New(st, hot.store, gc.Options{
 		Grace: settings.GCGrace,
-		Reapers: map[string]func(context.Context, store.Upload) error{
+		Reapers: map[string]func(context.Context, session.Upload) error{
 			multipart.Backend: parts.Reap,
 			registry.Backend:  uploads.Reap,
 		},

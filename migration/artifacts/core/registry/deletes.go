@@ -6,7 +6,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // DeleteTag removes the tag folder of o's image with everything in it, as
@@ -29,7 +29,7 @@ func (s *Service) DeleteManifest(ctx context.Context, o Owner, hex string) error
 		return err //nolint:wrapcheck // the layout names itself
 	}
 	if len(folders) == 0 {
-		return fmt.Errorf("registry: manifest %s in %s: %w", hex, o.Name, store.ErrNotFound)
+		return fmt.Errorf("registry: manifest %s in %s: %w", hex, o.Name, kernel.ErrNotFound)
 	}
 	return s.deleteFolders(ctx, o, folders)
 }

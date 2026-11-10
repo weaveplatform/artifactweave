@@ -14,10 +14,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Serves reports whether t is the Terraform registry's package type. The
@@ -94,7 +94,7 @@ func (Handler) Inspect(
 // Deployed settles the version of a file the repository's terraformType
 // indexes, from the tree: a deploy may make the file its version's, or
 // take that place from another path.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || it.Cached != pkgindex.Stored(c).Cached {
 		return nil
 	}
@@ -117,7 +117,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 
 // Deleting runs before a file is removed. The item service drops the
 // file's version link with it, and Deleted settles the rest.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted settles each version a delete or a move took files from: another
 // path may now hold a place the removed file held, and a version left with
@@ -126,7 +126,7 @@ func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	stored := pkgindex.Stored(c).Cached
 	modules := map[string]Module{}
@@ -206,7 +206,7 @@ func syncModule(ctx context.Context, st format.Store, c repo.Config, m Module) e
 		m.V = v
 		it, err := st.Items().Get(ctx, c.Key, cached, m.Path())
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			continue
 		case err != nil:
 			return fmt.Errorf("terraform: get %s: %w", m.Path(), err)
@@ -229,7 +229,7 @@ func index(
 	name string,
 	v pkgindex.IndexedVersion,
 ) error {
-	p, err := st.Packages().Ensure(ctx, types.Package{
+	p, err := st.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Name: name, Type: c.PackageType, Created: v.Created,
 	})
 	if err != nil {
@@ -252,14 +252,14 @@ func modulesWanted(
 	if err != nil {
 		return nil, err
 	}
-	holders := map[string]map[string]types.Item{}
+	holders := map[string]map[string]model.Item{}
 	for _, it := range items {
 		m, ok := ParseModule(it.FullPath())
 		if !ok {
 			continue
 		}
 		if holders[m.Package()] == nil {
-			holders[m.Package()] = map[string]types.Item{}
+			holders[m.Package()] = map[string]model.Item{}
 		}
 		if cur, ok := holders[m.Package()][m.Version]; !ok || it.FullPath() < cur.FullPath() {
 			holders[m.Package()][m.Version] = it
@@ -283,7 +283,7 @@ func modulesWanted(
 // place in the version.
 type held struct {
 	f  ProviderPackageFile
-	it types.Item
+	it model.Item
 }
 
 // syncRelease makes version v of the Terraform provider package name what
@@ -329,14 +329,14 @@ func knownFromIndex(
 	known map[string]string,
 ) error {
 	p, err := st.Packages().Find(ctx, c.Key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
 		return fmt.Errorf("terraform: package %s: %w", name, err)
 	}
 	pv, err := st.Packages().Version(ctx, p.ID, v)
-	if errors.Is(err, store.ErrNotFound) || err == nil && len(pv.Metadata) == 0 {
+	if errors.Is(err, kernel.ErrNotFound) || err == nil && len(pv.Metadata) == 0 {
 		return nil
 	}
 	if err != nil {
@@ -389,7 +389,7 @@ func releasesWanted(
 // holders sorts the files of Terraform provider packages among items into
 // their packages and versions, by the place each holds, keeping the path
 // that sorts first where two claim one place.
-func holders(items []types.Item) map[string]map[string]map[string]held {
+func holders(items []model.Item) map[string]map[string]map[string]held {
 	out := map[string]map[string]map[string]held{}
 	for _, it := range items {
 		f, ok := ParseProviderPackageFile(it.FullPath())
@@ -457,7 +457,7 @@ func search(
 	st format.Store,
 	c repo.Config,
 	more ...aql.Node,
-) ([]types.Item, error) {
+) ([]model.Item, error) {
 	criteria := aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
@@ -467,7 +467,7 @@ func search(
 	if err != nil {
 		return nil, fmt.Errorf("terraform: files of %s: %w", c.Key, err)
 	}
-	out := make([]types.Item, 0, len(hits))
+	out := make([]model.Item, 0, len(hits))
 	for _, h := range hits {
 		out = append(out, h.Item)
 	}

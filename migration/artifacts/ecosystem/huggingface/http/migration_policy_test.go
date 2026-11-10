@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -23,8 +24,6 @@ import (
 	huggingfacehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // migrationPolicyWorld is a local repository holding one legacy model
@@ -105,14 +104,14 @@ func TestAccLegacyMigrationRefusesPermissionScanPastTheLimit(t *testing.T) {
 	w := newMigrationPolicyWorld(t)
 	for n := range 1024 {
 		if err := w.f.db.Permissions().
-			Create(t.Context(), types.Permission{Name: fmt.Sprintf("%04d", n)}); err != nil {
+			Create(t.Context(), model.Permission{Name: fmt.Sprintf("%04d", n)}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if out := w.migrate(t, w.access.Grants, true); out.Code != http.StatusOK {
 		t.Fatalf("migration within the scan limit: %d %s", out.Code, out.Body)
 	}
-	if err := w.f.db.Permissions().Create(t.Context(), types.Permission{Name: "1024"}); err != nil {
+	if err := w.f.db.Permissions().Create(t.Context(), model.Permission{Name: "1024"}); err != nil {
 		t.Fatal(err)
 	}
 	expectRefusal(
@@ -167,7 +166,7 @@ func TestAccLegacyMigrationNamesTheFirstChangingPermission(t *testing.T) {
 		t.Fatalf("scan asked %+v, want once for hf, local, %+v and 1024", asked, pairs)
 	}
 	published, _, err := w.f.db.Items().
-		Descendants(t.Context(), "hf", false, "models--acme--demo", store.Page{})
+		Descendants(t.Context(), "hf", false, "models--acme--demo", kernel.Page{})
 	if err != nil || len(published) != 0 {
 		t.Fatalf("refused migration published %v: %v", published, err)
 	}

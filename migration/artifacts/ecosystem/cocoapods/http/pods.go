@@ -15,14 +15,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Options configures Protocol. RemoteSources is the source service that
@@ -91,7 +91,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		h.remoteRead(w, r, path)
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
@@ -220,7 +220,7 @@ func specFor(base, key string, a podfmt.Archive) ([]byte, error) {
 func (h handler) localPackages(r *http.Request) (map[string]map[string]version, error) {
 	out := map[string]map[string]version{}
 	key := pkgroute.RequestFrom(r).Repo.Key
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		packages, next, err := h.k.DB().Packages().List(r.Context(), key, page)
 		if err != nil {
@@ -235,7 +235,7 @@ func (h handler) localPackages(r *http.Request) (map[string]map[string]version, 
 				return nil, fmt.Errorf("cocoapods: list versions: %w", err)
 			}
 			for _, v := range versions {
-				if !h.k.Can(r, podfmt.Path(p.Name, v.Version), types.ActionRead) {
+				if !h.k.Can(r, podfmt.Path(p.Name, v.Version), api.ActionRead) {
 					continue
 				}
 				var a podfmt.Archive

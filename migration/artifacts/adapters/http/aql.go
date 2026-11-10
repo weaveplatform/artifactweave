@@ -17,11 +17,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // AQLLimits bounds POST /api/search/aql (decision 0012).
@@ -233,10 +233,10 @@ func nesting(
 	if err != nil {
 		return n, err
 	}
-	n.ItemVisible = func(it types.Item) bool {
+	n.ItemVisible = func(it model.Item) bool {
 		return len(readableRows(acc, configs, []aql.Hit{{Item: it}}, 0)) == 1
 	}
-	n.RunVisible = func(b types.Build) bool { return readsRun(acc, b) }
+	n.RunVisible = func(b model.Build) bool { return readsRun(acc, b) }
 	return n, nil
 }
 
@@ -310,7 +310,7 @@ func readableRows(
 	a itemkit.Access,
 	configs map[string]repo.Config,
 	hits []aql.Hit,
-	want types.Actions,
+	want accessapi.Actions,
 ) []aql.Hit {
 	patterns := map[string]repo.RepoPatterns{}
 	out := hits[:0]
@@ -325,7 +325,8 @@ func readableRows(
 			patterns[c.Key] = pat
 		}
 		full := h.Item.FullPath()
-		if pat.Accepts(full, h.Item.Folder) && a.Item(c, full, h.Item.Folder, types.ActionRead) &&
+		if pat.Accepts(full, h.Item.Folder) &&
+			a.Item(c, full, h.Item.Folder, accessapi.ActionRead) &&
 			(want == 0 || a.File(c, full, want)) {
 			out = append(out, h)
 		}

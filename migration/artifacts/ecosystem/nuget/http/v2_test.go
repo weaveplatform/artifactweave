@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 )
 
 const (
@@ -444,7 +444,7 @@ func TestAccV2DownloadCountsAndImmediateDelete(t *testing.T) {
 		}
 		for i := 0; i < n; i++ {
 			if err := f.db.Items().
-				RecordDownload(context.Background(), it.ID, store.Download{By: "reader", At: f.now()}); err != nil {
+				RecordDownload(context.Background(), it.ID, port.Download{By: "reader", At: f.now()}); err != nil {
 				t.Fatal(err)
 			}
 		}

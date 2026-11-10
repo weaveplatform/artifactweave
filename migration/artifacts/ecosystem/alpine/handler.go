@@ -10,9 +10,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // KindIndex is the work kind that regenerates a local or federated
@@ -113,7 +113,7 @@ func (Handler) Admit(
 // every package in the repository whose .PKGINFO gives that name and
 // version, so Deployed reads them all rather than trusting their paths.
 // Folders and other files change nothing.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || !strings.HasSuffix(it.FullPath(), ".apk") {
 		return nil
 	}
@@ -133,7 +133,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 // Deleting queues the index rebuild when a local or federated repository's
 // own package is about to be deleted, so the rebuild is asked for exactly
 // when the delete commits.
-func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || !strings.HasSuffix(it.FullPath(), ".apk") {
 		return nil
 	}
@@ -148,7 +148,7 @@ func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	seen := map[string]bool{}
 	for _, it := range removed {
@@ -216,7 +216,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	if err != nil {
 		return err
 	}
-	by := map[string]map[string][]types.Item{}
+	by := map[string]map[string][]model.Item{}
 	for _, it := range items {
 		if !strings.HasSuffix(it.FullPath(), ".apk") {
 			continue
@@ -229,7 +229,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 			return err
 		}
 		if by[pkg.Name] == nil {
-			by[pkg.Name] = map[string][]types.Item{}
+			by[pkg.Name] = map[string][]model.Item{}
 		}
 		by[pkg.Name][pkg.Version] = append(by[pkg.Name][pkg.Version], it)
 	}
@@ -257,7 +257,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	return queue(ctx, env, c, pkgindex.Stored(c).Cached)
 }
 
-func packageFor(ctx context.Context, env format.Env, it types.Item) (Package, error) {
+func packageFor(ctx context.Context, env format.Env, it model.Item) (Package, error) {
 	if in, ok := env.Inspection.(inspection); ok &&
 		in.sha == it.Actual.SHA256 && in.path == it.FullPath() {
 		return in.packageInfo, nil
@@ -281,17 +281,17 @@ func readStored(ctx context.Context, blobs format.Blobs, sha, path string) (Pack
 	return pkg, nil
 }
 
-func setProperties(ctx context.Context, st format.Store, it types.Item, pkg Package) error {
+func setProperties(ctx context.Context, st format.Store, it model.Item, pkg Package) error {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("alpine: properties: %w", err)
 	}
-	want := types.Properties{
+	want := model.Properties{
 		PropName: {pkg.Name}, PropVersion: {pkg.Version},
 		PropBranch: {pkg.Branch}, PropComponent: {pkg.Component},
 		PropArchitecture: {pkg.Architecture},
 	}
-	set := types.Properties{}
+	set := model.Properties{}
 	for key, values := range want {
 		if !slices.Equal(props[key], values) {
 			set[key] = values
@@ -308,7 +308,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, versi
 	if err != nil {
 		return err
 	}
-	var selected []types.Item
+	var selected []model.Item
 	for _, it := range items {
 		if !strings.HasSuffix(it.FullPath(), ".apk") {
 			continue
@@ -325,7 +325,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, versi
 		return nil // the item service prunes the last version on delete
 	}
 	v := indexedVersion(version, selected)
-	p, err := env.Store.Packages().Ensure(ctx, types.Package{
+	p, err := env.Store.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Type: c.PackageType, Name: name, Created: v.Created,
 	})
 	if err != nil {
@@ -335,7 +335,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, versi
 	return err //nolint:wrapcheck
 }
 
-func indexedVersion(version string, items []types.Item) pkgindex.IndexedVersion {
+func indexedVersion(version string, items []model.Item) pkgindex.IndexedVersion {
 	v := pkgindex.IndexedVersion{Version: version}
 	for _, it := range items {
 		if v.Created.IsZero() || it.Created.Before(v.Created) {
@@ -347,7 +347,7 @@ func indexedVersion(version string, items []types.Item) pkgindex.IndexedVersion 
 	return v
 }
 
-func files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, error) {
+func files(ctx context.Context, st format.Store, c repo.Config) ([]model.Item, error) {
 	hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
@@ -355,7 +355,7 @@ func files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, e
 	if err != nil {
 		return nil, fmt.Errorf("alpine: files of %s: %w", c.Key, err)
 	}
-	out := make([]types.Item, 0, len(hits))
+	out := make([]model.Item, 0, len(hits))
 	for _, hit := range hits {
 		out = append(out, hit.Item)
 	}

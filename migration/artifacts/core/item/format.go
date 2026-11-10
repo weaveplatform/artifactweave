@@ -9,11 +9,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // ErrNoReindex reports a package type whose format keeps no index to
@@ -99,25 +99,25 @@ func (s *Service) enqueue(ctx context.Context, kind, key string, payload []byte)
 
 // derive writes a format's derived item: its content into the blob store,
 // then the item in ctx's transaction (or one of its own), with no hook.
-func (s *Service) derive(ctx context.Context, d format.Derived) (types.Item, error) {
+func (s *Service) derive(ctx context.Context, d format.Derived) (model.Item, error) {
 	u, err := s.Blobs.BeginUpload(ctx)
 	if err != nil {
-		return types.Item{}, fmt.Errorf("item: begin upload: %w", err)
+		return model.Item{}, fmt.Errorf("item: begin upload: %w", err)
 	}
 	if _, err := u.Append(ctx, d.Body); err != nil {
 		_ = u.Abort(context.WithoutCancel(ctx))
-		return types.Item{}, fmt.Errorf("item: upload: %w", err)
+		return model.Item{}, fmt.Errorf("item: upload: %w", err)
 	}
 	info, err := u.Commit(ctx, blob.Digests{})
 	if err != nil {
 		_ = u.Abort(context.WithoutCancel(ctx))
-		return types.Item{}, fmt.Errorf("item: commit upload: %w", err)
+		return model.Item{}, fmt.Errorf("item: commit upload: %w", err)
 	}
 	dep := Deploy{
 		Target:     Target{Repo: d.Repo, Cached: d.Cached, Path: d.Path},
 		Properties: d.Properties, By: d.By, Trusted: true,
 	}
-	var out types.Item
+	var out model.Item
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
 		var err error
 		out, err = s.writeFile(ctx, dep, fileWrite{
@@ -126,7 +126,7 @@ func (s *Service) derive(ctx context.Context, d format.Derived) (types.Item, err
 		return err
 	})
 	if err != nil {
-		return types.Item{}, err //nolint:wrapcheck // the transaction returns ours
+		return model.Item{}, err //nolint:wrapcheck // the transaction returns ours
 	}
 	return out, nil
 }
@@ -138,7 +138,7 @@ func (s *Service) underive(ctx context.Context, c repo.Config, cached bool, p st
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
 		it, err := s.Store.Items().Get(ctx, c.Key, cached, full)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			return nil
 		case err != nil:
 			return fmt.Errorf("item: get %s: %w", full, err)
@@ -201,7 +201,7 @@ func admit(
 	out.Path = strings.Trim(out.Path, "/")
 	if out.Path == "" {
 		return w, fmt.Errorf("%w: the format admitted %s to the repository root",
-			types.ErrInvalidItemPath, w.Path)
+			kernel.ErrInvalidItemPath, w.Path)
 	}
 	return out, nil
 }
@@ -227,7 +227,7 @@ func (s *Service) annotated(
 	h format.Handler,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	a format.Annotation,
 ) error {
 	an, ok := h.(format.Annotator)
@@ -246,8 +246,8 @@ func (s *Service) annotated(
 func (s *Service) Annotate(
 	ctx context.Context,
 	c repo.Config,
-	it types.Item,
-	set types.Properties,
+	it model.Item,
+	set model.Properties,
 	remove []string,
 ) error {
 	return s.annotate(ctx, c, it, set, remove, true)
@@ -259,8 +259,8 @@ func (s *Service) Annotate(
 func (s *Service) annotate(
 	ctx context.Context,
 	c repo.Config,
-	it types.Item,
-	set types.Properties,
+	it model.Item,
+	set model.Properties,
 	remove []string,
 	admit bool,
 ) error {

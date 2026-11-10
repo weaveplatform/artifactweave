@@ -7,12 +7,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 	"github.com/weaveplatform/artifactweave/test/server/support/registryfixture"
 )
@@ -39,45 +43,45 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 			}
 		}
 		for _, name := range []string{"nobody", "writer", "member", "charter", "gadmin", "resmgr", "gresmgr"} {
-			user := types.User{Name: name, PasswordHash: cheapHash}
+			user := model.User{Name: name, PasswordHash: cheapHash}
 			if name == "resmgr" {
 				user.Roles.ResourcesManager = true
 			}
 			must(cfg.Store.Users().Create(ctx, user))
 		}
-		must(cfg.Store.Groups().Create(ctx, types.Group{
+		must(cfg.Store.Groups().Create(ctx, model.Group{
 			Name: "team", Members: []string{"member"},
 		}))
-		must(cfg.Store.Groups().Create(ctx, types.Group{
+		must(cfg.Store.Groups().Create(ctx, model.Group{
 			Name: "ops", Members: []string{"gadmin"}, AdminPrivileges: true,
 		}))
-		must(cfg.Store.Groups().Create(ctx, types.Group{
+		must(cfg.Store.Groups().Create(ctx, model.Group{
 			Name: "res-managers", Members: []string{"gresmgr"},
-			Roles: types.RoleFlags{ResourcesManager: true},
+			Roles: model.RoleFlags{ResourcesManager: true},
 		}))
 		for _, c := range matrixRegistryRepos() {
 			must(cfg.Store.Repos().Create(ctx, *repo.Defaults(&c)))
 		}
 		for _, grant := range []struct {
 			name, under string
-			users       map[string]types.Actions
-			groups      map[string]types.Actions
+			users       map[string]api.Actions
+			groups      map[string]api.Actions
 		}{
-			{"reader", "**", map[string]types.Actions{"reader": types.ActionRead}, nil},
-			{"writer", "work/**", map[string]types.Actions{"writer": rwd}, nil},
-			{"team", "**", nil, map[string]types.Actions{"team": rawd}},
+			{"reader", "**", map[string]api.Actions{"reader": api.ActionRead}, nil},
+			{"writer", "work/**", map[string]api.Actions{"writer": rwd}, nil},
+			{"team", "**", nil, map[string]api.Actions{"team": rawd}},
 		} {
-			must(cfg.Store.Permissions().Create(ctx, types.Permission{
+			must(cfg.Store.Permissions().Create(ctx, model.Permission{
 				Name: "matrix-docker-" + grant.name,
-				Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-					Actions: types.Grants{Users: grant.users, Groups: grant.groups},
-					Targets: map[string]types.Target{dockerA: {Include: []string{grant.under}}},
+				Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+					Actions: model.Grants{Users: grant.users, Groups: grant.groups},
+					Targets: map[string]model.Target{dockerA: {Include: []string{grant.under}}},
 				}},
 			}))
 		}
 		seedMatrixRegistry(t, f)
 		seedMatrixManifests(t, f)
-		must(cfg.Store.Instance().Init(ctx, types.InstanceIdentity{
+		must(cfg.Store.Instance().Init(ctx, instance.InstanceIdentity{
 			InstanceID:      "jfrt@01234567-89ab-4cde-8f01-23456789abcd",
 			ProtocolVersion: 1,
 		}))
@@ -128,7 +132,7 @@ func seedDockerMatrixTokens(
 			secrets[p.name] = issued.AccessToken
 			continue
 		}
-		scope, err := types.ParseScope(p.scope)
+		scope, err := kernel.ParseScope(p.scope)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -171,7 +175,7 @@ func (f *matrixFixture) deploy(t *testing.T, key, path string, body []byte) repo
 func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int, string) {
 	t.Helper()
 	if err := f.db.Settings().
-		Put(t.Context(), types.SettingAnonymousAccess, p.anonymousOn); err != nil {
+		Put(t.Context(), settings.SettingAnonymousAccess, p.anonymousOn); err != nil {
 		t.Fatal(err)
 	}
 	headers := map[string]string{}

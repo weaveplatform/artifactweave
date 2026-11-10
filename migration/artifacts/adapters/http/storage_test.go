@@ -11,7 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // The permissions view renders what Grants answers in the legacy letters,
@@ -32,16 +32,16 @@ func TestUnitStoragePermissionsRenderGrants(t *testing.T) {
 		}
 		asked = targets
 		users := map[string]accessapi.Actions{
-			"dev":  types.ActionRead | types.ActionWrite,
+			"dev":  accessapi.ActionRead | accessapi.ActionWrite,
 			"none": 0,
 		}
-		return users, map[string]accessapi.Actions{"readers": types.ActionRead}, nil
+		return users, map[string]accessapi.Actions{"readers": accessapi.ActionRead}, nil
 	}}
 	v := storageView{
 		s:   newArtifactoryAPI(Config{Access: accessapi.API{Grants: grants}}),
 		key: "libs",
 	}
-	item := types.Item{RepoKey: "libs", Path: "dir", Name: "a.txt"}
+	item := model.Item{RepoKey: "libs", Path: "dir", Name: "a.txt"}
 	want := map[string]any{
 		"uri": "/artifactory/api/storage/libs/dir/a.txt",
 		"principals": map[string]any{
@@ -50,10 +50,10 @@ func TestUnitStoragePermissionsRenderGrants(t *testing.T) {
 		},
 	}
 	for class, targets := range map[repo.Class][]string{
-		repo.Local:     {"libs", types.TargetAny, types.TargetAnyLocal},
-		repo.Federated: {"libs", types.TargetAny, types.TargetAnyLocal},
-		repo.Remote:    {"libs", types.TargetAny, types.TargetAnyRemote},
-		repo.Virtual:   {"libs", types.TargetAny},
+		repo.Local:     {"libs", accessapi.TargetAny, accessapi.TargetAnyLocal},
+		repo.Federated: {"libs", accessapi.TargetAny, accessapi.TargetAnyLocal},
+		repo.Remote:    {"libs", accessapi.TargetAny, accessapi.TargetAnyRemote},
+		repo.Virtual:   {"libs", accessapi.TargetAny},
 	} {
 		f := itemkit.Found{Repo: repo.Config{Key: "libs", Class: class}, Item: item}
 		media, body, err := v.permissions(t.Context(), f)
@@ -77,7 +77,7 @@ func TestUnitStoragePermissionsRenderGrants(t *testing.T) {
 }
 
 func TestUnitParseProperties(t *testing.T) {
-	for in, want := range map[string]types.Properties{
+	for in, want := range map[string]model.Properties{
 		`a=1`:          {"a": {"1"}},
 		`a=1,2|b=`:     {"a": {"1", "2"}, "b": {""}},
 		`a=x=y;a=z`:    {"a": {"x=y", "z"}},

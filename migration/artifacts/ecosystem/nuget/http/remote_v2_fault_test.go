@@ -14,7 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccRemoteV2XMLAdmissionNeverPublishes(t *testing.T) {
@@ -143,7 +143,7 @@ func TestAccRemoteV2XMLAdmissionNeverPublishes(t *testing.T) {
 				502,
 			)
 			entries, _, err := f.db.RemoteCache().
-				List(t.Context(), "nuget-remote", "", store.Page{Limit: 100})
+				List(t.Context(), "nuget-remote", "", kernel.Page{Limit: 100})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -353,7 +353,7 @@ func TestAccRemoteV2NoStorePinsAndArchiveAdmission(t *testing.T) {
 			if _, err := f.db.Items().
 				Get(t.Context(), c.Key, true, "acme.mixed/1.0.0/acme.mixed.1.0.0.nupkg"); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("invalid no-store package persisted", err)
 			}
@@ -397,7 +397,7 @@ func TestAccRemoteV2UpstreamNoStoreFeedIsNeverReused(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "2.0.0") {
 		t.Fatal("no-store feed reused")
 	}
-	entries, _, err := f.db.RemoteCache().List(t.Context(), "nuget-remote", "", store.Page{})
+	entries, _, err := f.db.RemoteCache().List(t.Context(), "nuget-remote", "", kernel.Page{})
 	if err != nil {
 		t.Fatal(err)
 	}

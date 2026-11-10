@@ -14,7 +14,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/idtoken"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // The RFC 8693 identifiers of the exchange.
@@ -180,7 +180,7 @@ func (s Service) issue(
 	if err != nil {
 		return Exchanged{}, err
 	}
-	sc, err := mappedScope(ts, claims, identity != types.IdentitySynthetic)
+	sc, err := mappedScope(ts, claims, identity != kernel.IdentitySynthetic)
 	if err != nil {
 		return Exchanged{}, err
 	}
@@ -210,11 +210,15 @@ func (s Service) issue(
 // checking that the user exists (a transient user); a mapping without a user
 // name gets a synthetic subject named after the provider and the mapping, so
 // that its token acts through the groups of its scope alone.
-func mappedUser(p Provider, m Mapping, claims map[string]any) (string, types.TokenIdentity, error) {
+func mappedUser(
+	p Provider,
+	m Mapping,
+	claims map[string]any,
+) (string, kernel.TokenIdentity, error) {
 	ts := m.TokenSpec
 	switch {
 	case str(ts.Username) != "":
-		return *ts.Username, types.IdentityTransient, nil
+		return *ts.Username, kernel.IdentityTransient, nil
 	case str(ts.UsernamePattern) != "":
 		names, err := applyPattern(*ts.UsernamePattern, claims)
 		if err != nil {
@@ -230,9 +234,9 @@ func mappedUser(p Provider, m Mapping, claims map[string]any) (string, types.Tok
 		if !printable(names[0]) {
 			return "", "", invalidf("username_pattern yields the user name %q", names[0])
 		}
-		return names[0], types.IdentityTransient, nil
+		return names[0], kernel.IdentityTransient, nil
 	default:
-		return "oidc-" + str(p.Name) + "-" + str(m.Name), types.IdentitySynthetic, nil
+		return "oidc-" + str(p.Name) + "-" + str(m.Name), kernel.IdentitySynthetic, nil
 	}
 }
 
@@ -256,48 +260,48 @@ func printable(s string) bool {
 // the token also acts through the auto-join groups ("Transient Users in OIDC
 // Token Exchange"). A project roles scope takes no user scope (JA-19609),
 // and an admin scope needs none.
-func mappedScope(ts *TokenSpec, claims map[string]any, named bool) (types.Scope, error) {
-	var sc types.Scope
+func mappedScope(ts *TokenSpec, claims map[string]any, named bool) (kernel.Scope, error) {
+	var sc kernel.Scope
 	if str(ts.Scope) != "" {
-		parsed, err := types.ParseScope(*ts.Scope)
+		parsed, err := kernel.ParseScope(*ts.Scope)
 		if err != nil {
-			return types.Scope{}, invalidf("token_spec.scope: %v", err)
+			return kernel.Scope{}, invalidf("token_spec.scope: %v", err)
 		}
 		sc = parsed
 	}
 	if str(ts.GroupsPattern) != "" {
 		groups, err := applyPattern(*ts.GroupsPattern, claims)
 		if err != nil {
-			return types.Scope{}, err
+			return kernel.Scope{}, err
 		}
 		groups = slices.DeleteFunc(groups, func(g string) bool { return g == "" })
 		if len(groups) == 0 {
-			return types.Scope{}, fmt.Errorf("%w: groups_pattern yields no group", ErrNoMatch)
+			return kernel.Scope{}, fmt.Errorf("%w: groups_pattern yields no group", ErrNoMatch)
 		}
 		for _, g := range groups {
 			// The scope grammar has no escape for a quote in a group name.
 			if !printable(g) || strings.Contains(g, `"`) {
-				return types.Scope{}, invalidf("groups_pattern yields the group name %q", g)
+				return kernel.Scope{}, invalidf("groups_pattern yields the group name %q", g)
 			}
 		}
-		sc.Entries = append(sc.Entries, types.ScopeEntry{Kind: types.ScopeGroups, Names: groups})
+		sc.Entries = append(sc.Entries, kernel.ScopeEntry{Kind: kernel.ScopeGroups, Names: groups})
 	}
 	if str(ts.ResourcePattern) != "" {
 		values, err := applyPattern(*ts.ResourcePattern, claims)
 		if err != nil {
-			return types.Scope{}, err
+			return kernel.Scope{}, err
 		}
 		for _, v := range values {
 			e, err := resourceEntry(v)
 			if err != nil {
-				return types.Scope{}, err
+				return kernel.Scope{}, err
 			}
 			sc.Entries = append(sc.Entries, e)
 		}
 	}
-	if named && !hasKind(sc, types.ScopeUser) && !hasKind(sc, types.ScopeAdmin) &&
-		!hasKind(sc, types.ScopeRoles) {
-		sc.Entries = append(sc.Entries, types.ScopeEntry{Kind: types.ScopeUser})
+	if named && !hasKind(sc, kernel.ScopeUser) && !hasKind(sc, kernel.ScopeAdmin) &&
+		!hasKind(sc, kernel.ScopeRoles) {
+		sc.Entries = append(sc.Entries, kernel.ScopeEntry{Kind: kernel.ScopeUser})
 	}
 	return sc, issuable(sc)
 }
@@ -309,17 +313,17 @@ func mappedScope(ts *TokenSpec, claims map[string]any, named bool) (types.Scope,
 // exactly, never by a wildcard. Such an entry only narrows: artifact entries
 // intersect the subject's permissions (decision 0006), so the token never
 // reaches a repository its user or groups could not.
-func resourceEntry(v string) (types.ScopeEntry, error) {
-	e := types.ScopeEntry{
-		Kind:    types.ScopeArtifact,
+func resourceEntry(v string) (kernel.ScopeEntry, error) {
+	e := kernel.ScopeEntry{
+		Kind:    kernel.ScopeArtifact,
 		Target:  v,
 		Path:    "**",
-		Actions: types.ScopeRead,
+		Actions: kernel.ScopeRead,
 	}
 	if strings.Contains(v, ":") {
-		sc, err := types.ParseScope(v)
-		if err != nil || len(sc.Entries) != 1 || sc.Entries[0].Kind != types.ScopeArtifact {
-			return types.ScopeEntry{}, invalidf(
+		sc, err := kernel.ParseScope(v)
+		if err != nil || len(sc.Entries) != 1 || sc.Entries[0].Kind != kernel.ScopeArtifact {
+			return kernel.ScopeEntry{}, invalidf(
 				"resource_pattern yields %q, which is not one artifact scope", v,
 			)
 		}
@@ -327,7 +331,7 @@ func resourceEntry(v string) (types.ScopeEntry, error) {
 	}
 	if e.Target == "" || !printable(e.Target) ||
 		strings.ContainsFunc(e.Target, unicode.IsSpace) || strings.ContainsAny(e.Target, `*?/\:"`) {
-		return types.ScopeEntry{}, invalidf(
+		return kernel.ScopeEntry{}, invalidf(
 			"resource_pattern yields %q, which does not name one repository", v,
 		)
 	}
@@ -337,8 +341,8 @@ func resourceEntry(v string) (types.ScopeEntry, error) {
 // issuable checks that sc reads back as itself. A token's scope is signed
 // and stored as text, so a value a claim supplied must not change how that
 // text parses, and the text must stay within the scope length limit.
-func issuable(sc types.Scope) error {
-	back, err := types.ParseScope(sc.String())
+func issuable(sc kernel.Scope) error {
+	back, err := kernel.ParseScope(sc.String())
 	if err != nil || !reflect.DeepEqual(back, sc) {
 		return invalidf("the claims give a scope that cannot be issued: %q", sc.String())
 	}

@@ -14,9 +14,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccGoPrivateCredentialsAndRepositoryIsolation(t *testing.T) {
@@ -57,7 +57,7 @@ func TestAccGoPrivateCredentialsAndRepositoryIsolation(t *testing.T) {
 	}
 	q.Repo, q.CacheOnly, q.Resource = repo.Masked(other), true, source.Resource{Path: path}
 	before := up.Count("", "")
-	if _, err = src.Read(t.Context(), q); !errors.Is(err, store.ErrNotFound) {
+	if _, err = src.Read(t.Context(), q); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal("cross-repository cache hit", err)
 	}
 	if up.Count("", "") != before {
@@ -79,7 +79,7 @@ func TestAccGoPrivateCredentialsAndRepositoryIsolation(t *testing.T) {
 	if _, err = w.db.Items().
 		Get(t.Context(), other.Key, true, goModule+"/@v/v1.0.0.mod"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("denied private artifact published", err)
 	}
@@ -110,7 +110,7 @@ func TestAccGoSourceDenialAndInterruptedBodies(t *testing.T) {
 	if _, err := w.db.Items().
 		Get(t.Context(), q.Repo.Key, true, goModule+"/@v/v1.0.0.mod"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("partial body published", err)
 	}
@@ -131,7 +131,7 @@ func TestAccGoSourcePreservesConsumerIntentAndFences(t *testing.T) {
 		}
 		return nil
 	}
-	q.Project, q.Visited = "consumer", []types.RepositoryIncarnation{"previous-hop"}
+	q.Project, q.Visited = "consumer", []model.RepositoryIncarnation{"previous-hop"}
 	path := goEscapedModule + "/@v/v1.0.0.mod"
 	body := []byte("module " + goModule + "\n")
 	w.up.Set("/"+path, fakeupstream.Resource{Body: body})
@@ -252,7 +252,7 @@ func TestAccGoSourceMissingVersusUpstreamFailure(t *testing.T) {
 				w.up.Set("/"+path, fakeupstream.Resource{Status: status})
 				_, err := src.Read(t.Context(), q)
 				missing := status == 404 || status == 410
-				if err == nil || errors.Is(err, store.ErrNotFound) != missing {
+				if err == nil || errors.Is(err, kernel.ErrNotFound) != missing {
 					t.Fatalf("status %d must preserve absence versus failure: %v", status, err)
 				}
 				if !missing {
@@ -266,7 +266,7 @@ func TestAccGoSourceMissingVersusUpstreamFailure(t *testing.T) {
 				w.up.Set("/"+path, fakeupstream.Resource{Body: body})
 				if persist {
 					before := w.up.Count("", "")
-					if _, err = src.Read(t.Context(), q); !errors.Is(err, store.ErrNotFound) {
+					if _, err = src.Read(t.Context(), q); !errors.Is(err, kernel.ErrNotFound) {
 						t.Fatal("negative cache bypass", err)
 					}
 					if w.up.Count("", "") != before {
@@ -285,7 +285,7 @@ func TestAccGoGoneOptInDoesNotChangeGenericErrors(t *testing.T) {
 	w.up.Set("/gone.bin", fakeupstream.Resource{Status: http.StatusGone})
 	q := w.request("gone.bin", source.ResourceKindArtifact)
 	_, err := w.p.Read(t.Context(), q, w.permit)
-	if err == nil || errors.Is(err, store.ErrNotFound) {
+	if err == nil || errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal("generic 410 became a protocol absence", err)
 	}
 }

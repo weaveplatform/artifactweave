@@ -17,8 +17,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Mirrors is what the storage endpoints need from the runtime's blob
@@ -56,7 +54,7 @@ func (s ArtifactoryAPI) GetStorageSummaryInfo(
 	if err != nil {
 		return nil, s.InternalError(ctx, "storage summary access", err)
 	}
-	if !a.Decider.System("info/storage", types.ScopeRead) {
+	if !a.Decider.System("info/storage", kernel.ScopeRead) {
 		return nil, kernel.ErrForbidden
 	}
 	sum, err := usage.Summarize(ctx, st, s.cfg.BlobLocation)
@@ -140,10 +138,10 @@ func mirrorSummaries(mirrors []MirrorStatus) wire.StorageSummaryMirrors {
 
 // replicaTallies keys a member's replica counts by state, with all four
 // states present.
-func replicaTallies(counts []store.ReplicaCount) map[string]wire.ReplicaTally {
+func replicaTallies(counts []mirror.ReplicaCount) map[string]wire.ReplicaTally {
 	reps := map[string]wire.ReplicaTally{}
-	for _, st := range []types.ReplicaState{
-		types.ReplicaPresent, types.ReplicaPending, types.ReplicaDeleting, types.ReplicaFailed,
+	for _, st := range []mirror.ReplicaState{
+		mirror.ReplicaPresent, mirror.ReplicaPending, mirror.ReplicaDeleting, mirror.ReplicaFailed,
 	} {
 		reps[string(st)] = wire.ReplicaTally{Size: humanBytes(0)}
 	}

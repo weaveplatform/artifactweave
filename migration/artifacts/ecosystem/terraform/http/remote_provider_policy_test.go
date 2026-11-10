@@ -14,12 +14,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (f *remoteProviderFixture) configure(update func(*repo.Config)) {
@@ -213,12 +214,12 @@ func TestAccRemoteProviderCurrentDisclosureAndSource(t *testing.T) {
 	}
 	f.svc.Revalidate = original
 	permission, _ := f.db.Permissions().Get(t.Context(), "remote-read")
-	resource := permission.Resources[types.ResourceArtifact]
-	resource.Targets["remote"] = types.Target{
+	resource := permission.Resources[api.ResourceArtifact]
+	resource.Targets["remote"] = model.Target{
 		Include: []string{"hashicorp/null/**"},
 		Exclude: []string{"**/*_arm64.zip"},
 	}
-	permission.Resources[types.ResourceArtifact] = resource
+	permission.Resources[api.ResourceArtifact] = resource
 	if err := f.db.Permissions().Update(t.Context(), permission); err != nil {
 		t.Fatal(err)
 	}
@@ -280,10 +281,10 @@ func TestAccRemoteProviderPartialBundleStaysPrivate(t *testing.T) {
 
 func TestAccRemoteProviderSignedCredentialRevocation(t *testing.T) {
 	f := newProviderFixture(t)
-	token := types.Token{
+	token := model.Token{
 		ID:        "provider-parent",
 		Subject:   "jfac@test/users/reader",
-		Scope:     types.UserScope(),
+		Scope:     kernel.UserScope(),
 		ExpiresAt: f.now.Add(time.Hour),
 	}
 	if err := f.db.Tokens().Create(t.Context(), token); err != nil {

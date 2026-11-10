@@ -15,7 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // pluginPOM is what the plugin metadata reads from a POM: its own elements,
@@ -102,7 +102,7 @@ func writePluginMetadata(
 	}
 	// Of a plugin's versions, the highest names it, where Artifactory takes
 	// whichever POM its search returns first.
-	poms := map[string]types.Item{}
+	poms := map[string]model.Item{}
 	for _, h := range hits {
 		p := h.Item.FullPath()
 		if h.Item.Cached || !IsPom(p) || path.Dir(path.Dir(path.Dir(p))) != dir {
@@ -110,7 +110,7 @@ func writePluginMetadata(
 		}
 		artifact := path.Base(path.Dir(path.Dir(p)))
 		cur, seen := poms[artifact]
-		if !seen || types.CompareMercury(versionFolder(p), versionFolder(cur.FullPath())) > 0 {
+		if !seen || model.CompareMercury(versionFolder(p), versionFolder(cur.FullPath())) > 0 {
 			poms[artifact] = h.Item
 		}
 	}
@@ -148,7 +148,7 @@ func versionFolder(p string) string { return path.Base(path.Dir(p)) }
 
 // pluginOf reads a plugin's entry from its POM; ok is false for a POM that
 // does not parse, which names no plugin.
-func pluginOf(ctx context.Context, env format.Env, it types.Item) (plugin, bool, error) {
+func pluginOf(ctx context.Context, env format.Env, it model.Item) (plugin, bool, error) {
 	body, err := content(ctx, env, it)
 	if err != nil {
 		return plugin{}, false, err

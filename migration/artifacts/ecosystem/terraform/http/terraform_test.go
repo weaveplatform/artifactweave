@@ -12,17 +12,20 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // serverStore is the one store the router kit serves and the access API is
@@ -75,20 +78,20 @@ func newFixture(t *testing.T) *fixture {
 			t.Fatal(err)
 		}
 	}
-	for _, u := range []types.User{{Name: "admin", Admin: true}, {Name: "reader"}} {
+	for _, u := range []model.User{{Name: "admin", Admin: true}, {Name: "reader"}} {
 		if err := db.Users().Create(t.Context(), u); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if err := db.Permissions().
-		Create(t.Context(), types.Permission{Name: "read", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{
-				Users: map[string]types.Actions{
-					"reader":    types.ActionRead,
-					"anonymous": types.ActionRead,
+		Create(t.Context(), model.Permission{Name: "read", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{
+				Users: map[string]api.Actions{
+					"reader":    api.ActionRead,
+					"anonymous": api.ActionRead,
 				},
 			},
-			Targets: map[string]types.Target{"mods": {Include: []string{"ns/name/aws/1.0.0.zip"}}},
+			Targets: map[string]model.Target{"mods": {Include: []string{"ns/name/aws/1.0.0.zip"}}},
 		}}}); err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +132,7 @@ func (f *fixture) router(keys *crypt.Keyring) http.Handler {
 		pkgroute.Options{
 			Store: f.read,
 			Items: func() *item.Service { return f.items },
-			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 				w.Header().Set("X-Checksum-Sha256", it.Actual.SHA256)
 				if r.Method != "HEAD" {
 					_, _ = w.Write([]byte(it.FullPath()))
@@ -252,7 +255,7 @@ func TestAccSignedDownloads(t *testing.T) {
 			if strings.HasPrefix(scenario, "anonymous") {
 				user = "anonymous"
 				if err := f.db.Settings().
-					Put(t.Context(), types.SettingAnonymousAccess, true); err != nil {
+					Put(t.Context(), settings.SettingAnonymousAccess, true); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -299,7 +302,7 @@ func TestAccSignedDownloads(t *testing.T) {
 			case "restricted-user":
 				now := time.Now()
 				if _, err := f.db.APIRestrictions().
-					Put(t.Context(), store.APIRestriction{User: user, Actor: "admin", Reason: "Stop downloads", Changed: now, Until: now.Add(time.Hour)}); err != nil {
+					Put(t.Context(), port.APIRestriction{User: user, Actor: "admin", Reason: "Stop downloads", Changed: now, Until: now.Add(time.Hour)}); err != nil {
 					t.Fatal(err)
 				}
 				status = 403
@@ -308,7 +311,7 @@ func TestAccSignedDownloads(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				u.Status = types.UserDisabled
+				u.Status = model.UserDisabled
 				if err = f.db.Users().Update(t.Context(), u); err != nil {
 					t.Fatal(err)
 				}
@@ -333,7 +336,7 @@ func TestAccSignedDownloads(t *testing.T) {
 				status = 403
 			case "anonymous-off":
 				if err := f.db.Settings().
-					Put(t.Context(), types.SettingAnonymousAccess, false); err != nil {
+					Put(t.Context(), settings.SettingAnonymousAccess, false); err != nil {
 					t.Fatal(err)
 				}
 				status = 403

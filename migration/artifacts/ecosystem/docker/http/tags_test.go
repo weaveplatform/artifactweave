@@ -11,10 +11,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // pushTags uploads imageConfig and layer to the image name of docker-local
@@ -230,11 +230,11 @@ func TestAccListingPermissions(t *testing.T) {
 	w.pushTags("team/app", "layer", "v1")
 	w.pushTags("other", "other", "v1")
 	w.deploy("oci-local", "tools/v1/manifest.json", image("x"))
-	if err := w.db.Permissions().Create(context.Background(), types.Permission{
+	if err := w.db.Permissions().Create(context.Background(), model.Permission{
 		Name: "team",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}},
-			Targets: map[string]types.Target{"docker-local": {Include: []string{"team/**"}}},
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+			Targets: map[string]model.Target{"docker-local": {Include: []string{"team/**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -291,7 +291,7 @@ func TestAccDeleteManifests(t *testing.T) {
 	}
 	for _, folder := range []string{"app/v2", "app/" + d} {
 		if _, err := w.db.Items().Get(context.Background(), "docker-local", false,
-			folder); !errors.Is(err, store.ErrNotFound) {
+			folder); !errors.Is(err, kernel.ErrNotFound) {
 			t.Errorf("%s: %v", folder, err)
 		}
 	}
@@ -330,14 +330,14 @@ func TestAccDeleteUnknownManifests(t *testing.T) {
 func TestAccDeletePermissions(t *testing.T) {
 	w := newBlobWorld(t)
 	w.pushTags("app", "layer", "v1", "v2")
-	if err := w.db.Permissions().Create(context.Background(), types.Permission{
+	if err := w.db.Permissions().Create(context.Background(), model.Permission{
 		Name: "docker",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"reader": types.ActionRead | types.ActionWrite,
-				"owner":  types.ActionRead | types.ActionDelete,
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{
+				"reader": api.ActionRead | api.ActionWrite,
+				"owner":  api.ActionRead | api.ActionDelete,
 			}},
-			Targets: map[string]types.Target{"docker-local": {Include: []string{"**"}}},
+			Targets: map[string]model.Target{"docker-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -412,18 +412,18 @@ func TestAccListingsWithoutBlobs(t *testing.T) {
 func TestAccCatalogNeedsTheCatalogGrant(t *testing.T) {
 	w := newBlobWorld(t)
 	w.pushTags("team/app", "layer", "v1")
-	catalog := types.RegistryGrant{Type: scopeRegistry, Name: "catalog", Actions: []string{"*"}}
+	catalog := kernel.RegistryGrant{Type: scopeRegistry, Name: "catalog", Actions: []string{"*"}}
 	for name, c := range map[string]struct {
-		grants   []types.RegistryGrant
+		grants   []kernel.RegistryGrant
 		expected int
 	}{
 		"not granted": {nil, http.StatusUnauthorized},
-		"granted":     {[]types.RegistryGrant{catalog}, http.StatusOK},
+		"granted":     {[]kernel.RegistryGrant{catalog}, http.StatusOK},
 	} {
 		for _, target := range []string{"/v2/_catalog", "/v2/docker-local/_catalog"} {
 			req := httptest.NewRequest(http.MethodGet, target, nil)
 			req = req.WithContext(kernel.WithPrincipal(req.Context(),
-				kernel.Principal{Registry: &types.RegistryAccess{Grants: c.grants}}))
+				kernel.Principal{Registry: &kernel.RegistryAccess{Grants: c.grants}}))
 			rec := httptest.NewRecorder()
 			w.h.ServeHTTP(rec, req)
 			if rec.Code != c.expected {

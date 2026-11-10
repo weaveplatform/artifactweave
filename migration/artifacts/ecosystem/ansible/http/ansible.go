@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/mod/semver"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -26,8 +27,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxPageBytes = 2 << 20
@@ -82,7 +81,7 @@ func (h handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 
 func isMissing(err error) bool {
 	var e *apierror.Error
-	return errors.Is(err, store.ErrNotFound) ||
+	return errors.Is(err, kernel.ErrNotFound) ||
 		errors.As(err, &e) && e.Status == http.StatusNotFound
 }
 
@@ -134,7 +133,7 @@ func (h handler) checkIdentity(w http.ResponseWriter, r *http.Request, ns, name 
 		h.fail(w, r, apierror.New(http.StatusBadRequest, "invalid collection identity"))
 		return false
 	}
-	return h.k.RequireFolder(w, r, "collections/"+ns+"/"+name, types.ActionRead)
+	return h.k.RequireFolder(w, r, "collections/"+ns+"/"+name, api.ActionRead)
 }
 
 type release struct {
@@ -161,7 +160,7 @@ func (c catalog) finish(ctx context.Context) error {
 func (h handler) localVersions(r *http.Request, ns, name string) ([]release, error) {
 	key := pkgroute.RequestFrom(r).Repo.Key
 	p, err := h.k.DB().Packages().Find(r.Context(), key, ns+"."+name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil, nil
 	}
 	if err != nil {
@@ -173,7 +172,7 @@ func (h handler) localVersions(r *http.Request, ns, name string) ([]release, err
 	}
 	out := make([]release, 0, len(versions))
 	for _, v := range versions {
-		if !h.k.Can(r, ansiblefmt.Path(ns, name, v.Version), types.ActionRead) {
+		if !h.k.Can(r, ansiblefmt.Path(ns, name, v.Version), api.ActionRead) {
 			continue
 		}
 		var m ansiblefmt.Metadata
@@ -182,7 +181,7 @@ func (h handler) localVersions(r *http.Request, ns, name string) ([]release, err
 			return nil, fmt.Errorf("ansible: corrupt package metadata: %w", ansiblefmt.ErrArchive)
 		}
 		it, err := h.k.Item(r, ansiblefmt.Path(ns, name, v.Version))
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -204,7 +203,7 @@ func (h handler) memberRequests(r *http.Request) ([]*http.Request, error) {
 	out := make([]*http.Request, 0, len(q.Repo.Repositories))
 	for _, key := range q.Repo.Repositories {
 		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -227,7 +226,7 @@ func (h handler) releases(r *http.Request, ns, name string) (catalog, error) {
 	byVersion := map[string]bool{}
 	var out catalog
 	for _, member := range members {
-		if !h.k.CanFolder(member, "collections/"+ns+"/"+name, types.ActionRead) {
+		if !h.k.CanFolder(member, "collections/"+ns+"/"+name, api.ActionRead) {
 			continue
 		}
 		var releases []release
@@ -247,7 +246,7 @@ func (h handler) releases(r *http.Request, ns, name string) (catalog, error) {
 		}
 		for _, rel := range releases {
 			if !byVersion[rel.Meta.Version] && h.k.Can(r,
-				ansiblefmt.Path(ns, name, rel.Meta.Version), types.ActionRead) {
+				ansiblefmt.Path(ns, name, rel.Meta.Version), api.ActionRead) {
 				out.items = append(out.items, rel)
 				byVersion[rel.Meta.Version] = true
 			}
@@ -430,7 +429,7 @@ func (h handler) artifact(w http.ResponseWriter, r *http.Request, file string) {
 		return
 	}
 	path := ansiblefmt.Path(ns, name, version)
-	if !h.k.Require(w, r, path, types.ActionRead) {
+	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
 	rel, err := h.find(r, ns, name, version)
@@ -463,7 +462,7 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 2*ansiblefmt.MaxArchiveBytes+maxPageBytes)
-	if !h.k.RequireFolder(w, r, "collections", types.ActionWrite) {
+	if !h.k.RequireFolder(w, r, "collections", api.ActionWrite) {
 		return
 	}
 	f, err := h.k.ReadFormLimited(r, "file", ansiblefmt.MaxArchiveBytes)
@@ -493,7 +492,7 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request) {
 		path,
 		f.File,
 		nil,
-		types.Checksums{SHA256: meta.SHA256},
+		kernel.Checksums{SHA256: meta.SHA256},
 		func() error {
 			return apierror.New(http.StatusConflict, "collection version already exists")
 		},
@@ -517,14 +516,14 @@ func (h handler) importTask(w http.ResponseWriter, r *http.Request, task string)
 		return
 	}
 	items, _, err := h.k.DB().Items().FindByChecksum(r.Context(),
-		types.Checksums{SHA256: task}, store.Page{Limit: store.MaxLimit})
+		kernel.Checksums{SHA256: task}, kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		h.fail(w, r, err)
 		return
 	}
 	for _, it := range items {
 		if it.RepoKey == pkgroute.RequestFrom(r).Repo.Key && !it.Cached &&
-			h.k.Can(r, it.FullPath(), types.ActionRead) {
+			h.k.Can(r, it.FullPath(), api.ActionRead) {
 			if _, _, _, ok := ansiblefmt.ParsePath(it.FullPath()); ok {
 				writeJSON(w, r, http.StatusOK, map[string]any{
 					"state": "completed", "finished_at": it.Updated.UTC().Format(time.RFC3339Nano),
@@ -730,7 +729,7 @@ func (h handler) remoteVersions(r *http.Request, ns, name string) (catalog, erro
 				return catalog{}, source.ErrInvalidResult
 			}
 			seenVersion[v.Version] = true
-			if !h.k.Can(r, ansiblefmt.Path(ns, name, v.Version), types.ActionRead) {
+			if !h.k.Can(r, ansiblefmt.Path(ns, name, v.Version), api.ActionRead) {
 				continue
 			}
 			if err := result.CheckRead(
@@ -782,7 +781,7 @@ func (h handler) remoteArtifact(w http.ResponseWriter, r *http.Request, rel rele
 	resource := source.Resource{
 		Kind: source.ResourceKindArtifact, Path: ansiblefmt.Path(m.Namespace, m.Name, m.Version),
 		Method: r.Method, ExternalURL: info.DownloadURL,
-		Checksums: types.Checksums{SHA256: m.SHA256}, Variant: "ansible-collection-archive-v1",
+		Checksums: kernel.Checksums{SHA256: m.SHA256}, Variant: "ansible-collection-archive-v1",
 		Validate: func(_ context.Context, reader io.ReadSeeker, size int64) error {
 			got, err := ansiblefmt.ReadArchive(reader, size)
 			if err != nil || got.Namespace != m.Namespace || got.Name != m.Name ||

@@ -10,13 +10,17 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // faultyStore fails the repository operations named in fail with errBoom.
@@ -27,24 +31,24 @@ type faultyStore struct {
 
 var errBoom = errors.New("boom")
 
-func (f faultyStore) Repos() store.RepoStore {
+func (f faultyStore) Repos() port.RepoStore {
 	return faultyRepos{RepoStore: f.Store.Repos(), fail: f.fail}
 }
 
-func (f faultyStore) Permissions() store.PermissionStore {
+func (f faultyStore) Permissions() port.PermissionStore {
 	if f.fail["permissions"] {
 		return failingPermissionStore{f.Store.Permissions()}
 	}
 	return f.Store.Permissions()
 }
 
-type failingPermissionStore struct{ store.PermissionStore }
+type failingPermissionStore struct{ port.PermissionStore }
 
 func (failingPermissionStore) ForPrincipal(
 	context.Context,
 	string,
 	[]string,
-) ([]types.Permission, error) {
+) ([]model.Permission, error) {
 	return nil, errBoom
 }
 
@@ -56,11 +60,11 @@ func (f faultyRepos) Including(ctx context.Context, key string) ([]string, error
 }
 
 type faultyRepos struct {
-	store.RepoStore
+	port.RepoStore
 	fail map[string]bool
 }
 
-func (f faultyRepos) List(ctx context.Context, rf store.RepoFilter) ([]repo.Config, error) {
+func (f faultyRepos) List(ctx context.Context, rf port.RepoFilter) ([]repo.Config, error) {
 	if f.fail["list"] {
 		return nil, errBoom
 	}
@@ -602,18 +606,18 @@ func TestAccUpdateKeepsTheKey(t *testing.T) {
 	if c := w.stored("libs-local"); c.Description != "" {
 		t.Errorf("a refused batch changed libs-local: %q", c.Description)
 	}
-	rec = w.do("POST", "/artifactory/api/repositories/"+types.BuildInfoRepository, "admin",
+	rec = w.do("POST", "/artifactory/api/repositories/"+api.BuildInfoRepository, "admin",
 		`{"description":"builds","xrayIndex":true}`)
 	if rec.Code != 200 {
 		t.Fatalf("build-info update %d %s", rec.Code, rec.Body)
 	}
-	if c := w.stored(types.BuildInfoRepository); c.PackageType != repo.BuildInfo ||
+	if c := w.stored(api.BuildInfoRepository); c.PackageType != repo.BuildInfo ||
 		c.Description != "builds" || !*c.XrayIndex {
 		t.Errorf("build-info %+v", c)
 	}
 	rec = w.do("POST", "/artifactory/api/v2/repositories/batch", "admin",
 		`[{"key":"artifactory-build-info","packageType":"buildinfo","notes":"n"}]`)
-	if rec.Code != 200 || w.stored(types.BuildInfoRepository).Notes != "n" {
+	if rec.Code != 200 || w.stored(api.BuildInfoRepository).Notes != "n" {
 		t.Errorf("build-info batch update %d %s", rec.Code, rec.Body)
 	}
 }
@@ -729,7 +733,7 @@ func TestAccBatchCreateAndUpdate(t *testing.T) {
 		`[{"key":"ok","rclass":"local"},{"key":"bad","rclass":"remote"}]`); rec.Code != 400 {
 		t.Fatalf("bad batch %d", rec.Code)
 	}
-	if _, err := w.db.Repos().Get(context.Background(), "ok"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.db.Repos().Get(context.Background(), "ok"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("a rejected batch created a repository: %v", err)
 	}
 	for name, body := range map[string]string{
@@ -836,17 +840,17 @@ func seedContent(t *testing.T, db *inmem.Store, key string, cached bool) {
 	ctx := context.Background()
 	sha := strings.Repeat("ab", 32)
 	if _, err := db.Blobs().
-		Ref(ctx, types.Blob{Checksums: types.Checksums{SHA256: sha}, Size: 3}, 1); err != nil {
+		Ref(ctx, blob.Blob{Checksums: kernel.Checksums{SHA256: sha}, Size: 3}, 1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Items().Put(ctx, types.Item{
+	if _, err := db.Items().Put(ctx, model.Item{
 		RepoKey: key, Cached: cached, Name: "f.txt", Size: 3,
-		Actual: types.Checksums{SHA256: sha},
+		Actual: kernel.Checksums{SHA256: sha},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Packages().
-		Ensure(ctx, types.Package{RepoKey: key, Type: repo.Generic, Name: "p"}); err != nil {
+		Ensure(ctx, model.Package{RepoKey: key, Type: repo.Generic, Name: "p"}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -889,10 +893,10 @@ func TestAccDeleteRepository(t *testing.T) {
 	if err != nil || newClient == oldClient {
 		t.Fatalf("deleted repository reused its client: %v", err)
 	}
-	if _, err := w.db.Items().Get(ctx, "up", true, "f.txt"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.db.Items().Get(ctx, "up", true, "f.txt"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("the cache survived: %v", err)
 	}
-	if pkgs, _, _ := w.db.Packages().List(ctx, "up", store.Page{}); len(pkgs) != 0 {
+	if pkgs, _, _ := w.db.Packages().List(ctx, "up", kernel.Page{}); len(pkgs) != 0 {
 		t.Fatalf("packages survived: %v", pkgs)
 	}
 	// The cache's reference is released; lib still references the blob.
@@ -941,7 +945,7 @@ func TestAccDeleteRepository(t *testing.T) {
 		code int
 		msg  string
 	}{
-		{types.BuildInfoRepository, 403, buildInfoBlocked},
+		{api.BuildInfoRepository, 403, buildInfoBlocked},
 		{"Artifactory-Build-Info", 403, buildInfoBlocked},
 		{"auto-trashcan", 400, msgProtected},
 		{"JFrog-Support-Bundle", 400, msgProtected},

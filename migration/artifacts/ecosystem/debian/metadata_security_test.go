@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitReleaseRejectsUntrustedChecksumsAndArmor(t *testing.T) {
@@ -140,7 +140,7 @@ func TestUnitPackageIndexRejectsForgedServerDigests(t *testing.T) {
 			Control: []byte("Package: alpha\nVersion: 1.0\nArchitecture: amd64\n"),
 		},
 		Path: "pool/alpha.deb", Size: 4,
-		Checksums: types.Checksums{SHA256: strings.Repeat("a", 64), MD5: strings.Repeat("b", 32)},
+		Checksums: kernel.Checksums{SHA256: strings.Repeat("a", 64), MD5: strings.Repeat("b", 32)},
 	}
 	for _, tc := range []struct {
 		name   string
@@ -243,7 +243,7 @@ func TestUnitPackagesSortsMultipleNamesVersionsAndFiles(t *testing.T) {
 			},
 			Path: path,
 			Size: 4,
-			Checksums: types.Checksums{
+			Checksums: kernel.Checksums{
 				SHA256: strings.Repeat("a", 64),
 				MD5:    strings.Repeat("b", 32),
 			},

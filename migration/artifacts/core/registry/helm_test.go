@@ -14,7 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // The chart in testdata/helm as helm 4.3 pushed it: acme 1.2.3+build.4,
@@ -267,7 +267,7 @@ func TestAccTagRetentionOfOneLeavesTheTwin(t *testing.T) {
 func (w *world) present(c repo.Config, path string) bool {
 	w.t.Helper()
 	_, err := w.item(c, path)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		w.t.Fatal(err)
 	}
 	return err == nil

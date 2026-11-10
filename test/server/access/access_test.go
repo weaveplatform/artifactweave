@@ -7,14 +7,17 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 )
 
 // accessWorld is a router over a store where dev (group devs) may read and
@@ -25,12 +28,12 @@ func accessWorld(t *testing.T) (http.Handler, *token.Service) {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	for _, g := range []types.Group{{Name: "devs"}, {Name: "admins", AdminPrivileges: true}} {
+	for _, g := range []model.Group{{Name: "devs"}, {Name: "admins", AdminPrivileges: true}} {
 		if err := db.Groups().Create(ctx, g); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, u := range []types.User{
+	for _, u := range []model.User{
 		{Name: "dev", PasswordHash: cheapHash, Groups: []string{"devs"}},
 		{Name: "ann", PasswordHash: cheapHash, Groups: []string{"admins"}},
 	} {
@@ -38,13 +41,13 @@ func accessWorld(t *testing.T) (http.Handler, *token.Service) {
 			t.Fatal(err)
 		}
 	}
-	if err := db.Permissions().Create(ctx, types.Permission{
-		Name: "dev-com", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Groups: map[string]types.Actions{
-					"devs": types.ActionRead | types.ActionWrite | types.ActionAnnotate,
+	if err := db.Permissions().Create(ctx, model.Permission{
+		Name: "dev-com", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Groups: map[string]api.Actions{
+					"devs": api.ActionRead | api.ActionWrite | api.ActionAnnotate,
 				}},
-				Targets: map[string]types.Target{"libs-local": {Include: []string{"com/**"}}},
+				Targets: map[string]model.Target{"libs-local": {Include: []string{"com/**"}}},
 			},
 		},
 	}); err != nil {
@@ -71,7 +74,7 @@ func accessWorld(t *testing.T) (http.Handler, *token.Service) {
 			}
 		}
 	}
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -174,7 +177,7 @@ func TestAccPathLevelPermissions(t *testing.T) {
 func TestAccScopedTokenIsolation(t *testing.T) {
 	ctx := context.Background()
 	h, tokens := accessWorld(t)
-	sc, err := types.ParseScope("artifact:libs-local:r")
+	sc, err := kernel.ParseScope("artifact:libs-local:r")
 	if err != nil {
 		t.Fatal(err)
 	}

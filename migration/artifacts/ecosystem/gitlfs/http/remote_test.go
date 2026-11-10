@@ -23,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -30,7 +31,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type remoteFixture struct {
@@ -221,7 +221,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	svc := &source.Service{
 		HTTP:  policy,
 		Cache: policy,
-		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			return db.RemoteCache().Source(ctx, c.Key)
 		},
 	}
@@ -235,7 +235,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		pkgroute.Options{
 			Store: db,
 			Items: func() *item.Service { return items },
-			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+			ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 				body, _, e := blobs.Open(r.Context(), it.Actual.SHA256)
 				if e != nil {
 					t.Error(e)

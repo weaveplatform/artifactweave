@@ -9,8 +9,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitHandlerRejectsInvalidBundlesAndPolicies(t *testing.T) {
@@ -51,13 +52,13 @@ func TestUnitHandlerRejectsInvalidBundlesAndPolicies(t *testing.T) {
 			t.Fatalf("non-publish write: %v", err)
 		}
 	}
-	if err := h.Deployed(ctx, format.Env{}, c, types.Item{Folder: true}); err != nil {
+	if err := h.Deployed(ctx, format.Env{}, c, model.Item{Folder: true}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Deployed(ctx, format.Env{}, c, types.Item{Cached: true}); err != nil {
+	if err := h.Deployed(ctx, format.Env{}, c, model.Item{Cached: true}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Deployed(ctx, format.Env{}, c, types.Item{Name: "misc.zip"}); err != nil {
+	if err := h.Deployed(ctx, format.Env{}, c, model.Item{Name: "misc.zip"}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -76,7 +77,7 @@ func TestUnitHandlerMissingBlobAndReindexFault(t *testing.T) {
 		ctx,
 		env,
 		c,
-		format.Write{Path: Path("reader", "1.0.0"), Checksums: types.Checksums{SHA256: sha}},
+		format.Write{Path: Path("reader", "1.0.0"), Checksums: kernel.Checksums{SHA256: sha}},
 	); err == nil {
 		t.Fatal("missing blob accepted")
 	}
@@ -89,10 +90,10 @@ func TestUnitHandlerMissingBlobAndReindexFault(t *testing.T) {
 		err != nil {
 		t.Fatalf("non-ZIP: %v %v", got, err)
 	}
-	it := types.Item{
+	it := model.Item{
 		RepoKey: c.Key,
 		Name:    Path("reader", "1.0.0"),
-		Actual:  types.Checksums{SHA256: sha},
+		Actual:  kernel.Checksums{SHA256: sha},
 	}
 	it, err = env.Store.Items().Put(ctx, it)
 	if err != nil {

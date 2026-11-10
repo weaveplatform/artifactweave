@@ -13,10 +13,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // KindIndex is the work kind that regenerates a local or federated
@@ -114,7 +115,7 @@ func (Handler) Admit(
 // Reindex does; with calculateYumMetadata on, a local or federated
 // repository then queues its repodata rebuild. Folders and other files
 // change nothing.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || !strings.HasSuffix(it.FullPath(), ".rpm") {
 		return nil
 	}
@@ -130,7 +131,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 
 // Deleting does nothing: Deleted rebuilds the package index, and queues
 // the repodata rebuild, once per delete, after the packages are gone.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted rebuilds the repository's package index from its remaining
 // packages when a delete or move removed at least one package and, with
@@ -140,7 +141,7 @@ func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	for _, it := range removed {
 		if strings.HasSuffix(it.FullPath(), ".rpm") {
@@ -191,7 +192,7 @@ func reindex(ctx context.Context, env format.Env, c repo.Config, queue bool) err
 		return err
 	}
 	wanted := map[string]map[string]*pkgindex.IndexedVersion{}
-	created := map[string]types.Item{}
+	created := map[string]model.Item{}
 	for _, it := range items {
 		if !strings.HasSuffix(it.FullPath(), ".rpm") {
 			continue
@@ -262,13 +263,13 @@ func reindex(ctx context.Context, env format.Env, c repo.Config, queue bool) err
 // gets empty repodata, and generated files no longer produced are removed.
 // More than 100,000 packages fail the run. It reads the repository afresh,
 // so a repeated run gives the same result.
-func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) error {
+func (Handler) Work(ctx context.Context, env format.Env, work work.WorkItem) error {
 	if work.Kind != KindIndex {
 		return nil
 	}
 	c, err := env.Store.Repos().Get(ctx, work.Key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	case err != nil:
 		return fmt.Errorf("rpm: repository: %w", err)
@@ -393,7 +394,7 @@ func signMetadata(
 	if err != nil {
 		return fmt.Errorf("rpm: metadata signing key: %w", err)
 	}
-	if pair.Type != types.KeypairGPG {
+	if pair.Type != accessapi.KeypairGPG {
 		return fmt.Errorf("%w: rpm metadata signing requires gpg", errInvalidPackage)
 	}
 	manifest := files["repodata/repomd.xml"]
@@ -406,7 +407,7 @@ func signMetadata(
 	return nil
 }
 
-func packageFor(ctx context.Context, env format.Env, it types.Item) (Package, error) {
+func packageFor(ctx context.Context, env format.Env, it model.Item) (Package, error) {
 	if in, ok := env.Inspection.(inspection); ok &&
 		in.sha == it.Actual.SHA256 && in.path == it.FullPath() {
 		return in.pkg, nil
@@ -430,16 +431,16 @@ func readStored(ctx context.Context, blobs format.Blobs, sha, p string) (Package
 	return pkg, nil
 }
 
-func setProperties(ctx context.Context, st format.Store, it types.Item, pkg Package) error {
+func setProperties(ctx context.Context, st format.Store, it model.Item, pkg Package) error {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("rpm: item properties: %w", err)
 	}
-	want := types.Properties{
+	want := model.Properties{
 		PropName: {pkg.Name}, PropVersion: {pkg.Version},
 		PropRelease: {pkg.Release}, PropArch: {pkg.Architecture},
 	}
-	set := types.Properties{}
+	set := model.Properties{}
 	for key, values := range want {
 		if !slices.Equal(props[key], values) {
 			set[key] = values
@@ -451,7 +452,7 @@ func setProperties(ctx context.Context, st format.Store, it types.Item, pkg Pack
 	return st.Items().PatchProperties(ctx, it.ID, set, nil, it.Updated) //nolint:wrapcheck
 }
 
-func files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, error) {
+func files(ctx context.Context, st format.Store, c repo.Config) ([]model.Item, error) {
 	hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
@@ -459,7 +460,7 @@ func files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, e
 	if err != nil {
 		return nil, fmt.Errorf("rpm: files of %s: %w", c.Key, err)
 	}
-	out := make([]types.Item, 0, len(hits))
+	out := make([]model.Item, 0, len(hits))
 	for _, hit := range hits {
 		out = append(out, hit.Item)
 	}

@@ -15,10 +15,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // onceFormat stores what PUT /once/* carries through StoreOnce, refusing
@@ -38,7 +39,7 @@ func onceFormat() pkgroute.Protocol {
 					return
 				}
 				it, err := k.StoreOnce(r, p.String(), r.Body, p.Props,
-					pkgroute.DeclaredChecksums(r.Header), func(stored types.Item) error {
+					pkgroute.DeclaredChecksums(r.Header), func(stored model.Item) error {
 						return apierror.New(
 							http.StatusConflict,
 							"other content at "+stored.FullPath(),
@@ -72,7 +73,7 @@ func onceOptions(f *kitFixture, st pkgroute.Store) pkgroute.Options {
 			}
 			return err
 		},
-		Created: func(w http.ResponseWriter, _ *http.Request, it types.Item) {
+		Created: func(w http.ResponseWriter, _ *http.Request, it model.Item) {
 			w.WriteHeader(http.StatusCreated)
 			_, _ = io.WriteString(w, "created "+it.FullPath())
 		},
@@ -157,7 +158,7 @@ func TestAccStoreOnce(t *testing.T) {
 	if _, err := f.db.Items().
 		Get(ctx, local, false, "m/v2.zip"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("a refused first store left a file: %v", err)
 	}
@@ -210,12 +211,12 @@ func TestAccCreatedWithoutBody(t *testing.T) {
 // failingPatch fails writing properties.
 type failingPatch struct{ item.Store }
 
-func (s failingPatch) Items() store.ItemStore { return failingPatchItems{s.Store.Items()} }
+func (s failingPatch) Items() port.ItemStore { return failingPatchItems{s.Store.Items()} }
 
-type failingPatchItems struct{ store.ItemStore }
+type failingPatchItems struct{ port.ItemStore }
 
 func (failingPatchItems) PatchProperties(
-	context.Context, int64, types.Properties, []string, time.Time,
+	context.Context, int64, model.Properties, []string, time.Time,
 ) error {
 	return errors.New("properties down")
 }

@@ -15,10 +15,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errFixture = errors.New("controlled model storage failure")
@@ -185,20 +185,20 @@ func newFormatFixture(t *testing.T) *formatFixture {
 	}
 }
 
-func (f *formatFixture) put(path string, data []byte) types.Item {
+func (f *formatFixture) put(path string, data []byte) model.Item {
 	f.t.Helper()
 	sum := sha256.Sum256(data)
 	sha := hex.EncodeToString(sum[:])
 	f.blobs.data[sha] = data
 	it, err := f.db.Items().
-		Put(f.ctx, types.Item{RepoKey: f.c.Key, Name: path, Size: int64(len(data)), Actual: types.Checksums{SHA256: sha}, Created: f.now, CreatedBy: "owner"})
+		Put(f.ctx, model.Item{RepoKey: f.c.Key, Name: path, Size: int64(len(data)), Actual: kernel.Checksums{SHA256: sha}, Created: f.now, CreatedBy: "owner"})
 	if err != nil {
 		f.t.Fatal(err)
 	}
 	return it
 }
 
-func (f *formatFixture) publish(id ml.Identity) (ml.Manifest, types.Item, types.Item) {
+func (f *formatFixture) publish(id ml.Identity) (ml.Manifest, model.Item, model.Item) {
 	f.t.Helper()
 	it := f.put(id.Prefix()+"/files/weights.bin", []byte("model"))
 	m := modelManifest()
@@ -231,7 +231,7 @@ func TestUnitStoredManifestIdentityAndContentVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.blobs.statError = false
-	for _, change := range []func(*types.Item){func(it *types.Item) { it.Folder = true }, func(it *types.Item) { it.Size++ }, func(it *types.Item) { it.Actual.SHA256 = strings.Repeat("a", 64) }} {
+	for _, change := range []func(*model.Item){func(it *model.Item) { it.Folder = true }, func(it *model.Item) { it.Size++ }, func(it *model.Item) { it.Actual.SHA256 = strings.Repeat("a", 64) }} {
 		bad := it
 		change(&bad)
 		if _, err = f.db.Items().Put(f.ctx, bad); err != nil {
@@ -247,7 +247,7 @@ func TestUnitStoredManifestIdentityAndContentVerification(t *testing.T) {
 	if _, err = ml.Verify(f.ctx, f.env, f.c, id.Prefix(), m); !ml.Missing(err) {
 		t.Fatalf("missing file: %v", err)
 	}
-	for _, change := range []func(*types.Item){func(it *types.Item) { it.Folder = true }, func(it *types.Item) { it.Size = ml.MaxManifestSize + 1 }} {
+	for _, change := range []func(*model.Item){func(it *model.Item) { it.Folder = true }, func(it *model.Item) { it.Size = ml.MaxManifestSize + 1 }} {
 		bad := manifest
 		change(&bad)
 		if _, err = f.db.Items().Put(f.ctx, bad); err != nil {
@@ -273,7 +273,7 @@ func TestUnitStoredManifestIdentityAndContentVerification(t *testing.T) {
 		ml.Identity{Name: "missing", Version: "1"},
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal(err)
 	}

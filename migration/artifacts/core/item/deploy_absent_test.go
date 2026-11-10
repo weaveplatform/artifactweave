@@ -8,8 +8,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // A PostgreSQL READ COMMITTED transaction can observe a missing destination,
@@ -22,12 +23,12 @@ type deployRaceStore struct {
 	creates     int
 }
 
-func (s *deployRaceStore) Items() store.ItemStore {
+func (s *deployRaceStore) Items() port.ItemStore {
 	return deployRaceItems{ItemStore: s.Store.Items(), race: s}
 }
 
 type deployRaceItems struct {
-	store.ItemStore
+	port.ItemStore
 	race *deployRaceStore
 }
 
@@ -36,15 +37,15 @@ func (s deployRaceItems) Get(
 	key string,
 	cached bool,
 	path string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if path == s.race.destination && !s.race.missed {
 		s.race.missed = true
-		return types.Item{}, store.ErrNotFound
+		return model.Item{}, kernel.ErrNotFound
 	}
 	return s.ItemStore.Get(ctx, key, cached, path)
 }
 
-func (s deployRaceItems) Create(ctx context.Context, it types.Item) (types.Item, error) {
+func (s deployRaceItems) Create(ctx context.Context, it model.Item) (model.Item, error) {
 	if it.FullPath() == s.race.destination {
 		s.race.creates++
 	}
@@ -57,7 +58,7 @@ func TestUnitDeployIfAbsentRejectsRacingInsertWithoutPublication(t *testing.T) {
 	competing := w.seeded(
 		destination,
 		"competing writer",
-		types.Properties{"owner": {"competing writer"}},
+		model.Properties{"owner": {"competing writer"}},
 	)
 	retained := w.must("retained.bin", "losing writer")
 	competing, _ = w.get(w.loc, destination)
@@ -69,7 +70,7 @@ func TestUnitDeployIfAbsentRejectsRacingInsertWithoutPublication(t *testing.T) {
 	_, err := w.svc.Deploy(t.Context(), Deploy{
 		Target: Target{Repo: w.loc, Path: destination},
 		Body:   strings.NewReader("losing writer"), By: "loser", IfAbsent: true,
-		Properties: types.Properties{"owner": {"loser"}},
+		Properties: model.Properties{"owner": {"loser"}},
 	})
 	if !errors.Is(err, ErrExists) {
 		t.Fatalf("racing create returned %v, want ErrExists", err)

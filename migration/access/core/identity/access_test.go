@@ -8,8 +8,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/identity"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitCreateOnly(t *testing.T) {
@@ -17,14 +17,14 @@ func TestUnitCreateOnly(t *testing.T) {
 	s, db := newService(t)
 	if err := s.CreateGroup(
 		ctx,
-		types.Group{Name: "devs", AutoJoin: true},
+		model.Group{Name: "devs", AutoJoin: true},
 		[]string{"admin", "admin"},
 	); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.CreateGroup(
 		ctx,
-		types.Group{Name: "devs"},
+		model.Group{Name: "devs"},
 		nil,
 	); !errors.Is(
 		err,
@@ -34,7 +34,7 @@ func TestUnitCreateOnly(t *testing.T) {
 	}
 	if err := s.CreateGroup(
 		ctx,
-		types.Group{Name: "x"},
+		model.Group{Name: "x"},
 		[]string{"nobody"},
 	); !errors.Is(
 		err,
@@ -42,20 +42,20 @@ func TestUnitCreateOnly(t *testing.T) {
 	) {
 		t.Fatalf("a group with an unknown member: %v", err)
 	}
-	wantInvalid(t, "a group without a name", s.CreateGroup(ctx, types.Group{}, nil))
+	wantInvalid(t, "a group without a name", s.CreateGroup(ctx, model.Group{}, nil))
 
 	if err := s.CreateUser(ctx, newUser("ann"), "Ann-pass1"); err != nil {
 		t.Fatal(err)
 	}
 	u, err := db.Users().Get(ctx, "ann")
-	if err != nil || u.Realm != types.RealmInternal || u.Status != types.UserEnabled ||
+	if err != nil || u.Realm != model.RealmInternal || u.Status != model.UserEnabled ||
 		!slices.Equal(u.Groups, []string{"devs", "readers"}) || len(u.PasswordHash) == 0 {
 		t.Fatalf("created %+v %v", u, err)
 	}
 	if err := s.CreateUser(ctx, newUser("ann"), "Ann-pass1"); !errors.Is(err, identity.ErrExists) {
 		t.Fatalf("a taken user name: %v", err)
 	}
-	wantInvalid(t, "a user without an email", s.CreateUser(ctx, types.User{Name: "bo"}, "pw"))
+	wantInvalid(t, "a user without an email", s.CreateUser(ctx, model.User{Name: "bo"}, "pw"))
 	wantInvalid(t, "a user without a password", s.CreateUser(ctx, newUser("bo"), ""))
 	wantInvalid(t, "a user without a name", s.CreateUser(ctx, newUser(""), "pw"))
 	wantInvalid(
@@ -74,7 +74,7 @@ func TestUnitMemberships(t *testing.T) {
 	ctx := context.Background()
 	s, _ := newService(t)
 	for _, g := range []string{"a", "b"} {
-		if err := s.CreateGroup(ctx, types.Group{Name: g}, nil); err != nil {
+		if err := s.CreateGroup(ctx, model.Group{Name: g}, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -120,7 +120,7 @@ func TestUnitPasswordPolicyRules(t *testing.T) {
 	ctx := context.Background()
 	s, db := newService(t)
 	p, err := s.PasswordPolicy(ctx)
-	if err != nil || p != types.DefaultPasswordPolicy() {
+	if err != nil || p != model.DefaultPasswordPolicy() {
 		t.Fatalf("an unset policy is the default: %+v %v", p, err)
 	}
 	// The default: four characters, not the old password, not the username.
@@ -137,8 +137,8 @@ func TestUnitPasswordPolicyRules(t *testing.T) {
 		t.Fatalf("an update resending the password: %v", err)
 	}
 	wantInvalid(t, "a change to the same password", s.SetPassword(ctx, "admin", "abcd"))
-	wantInvalid(t, "a negative rule", s.SetPasswordPolicy(ctx, types.PasswordPolicy{Digit: -1}))
-	if err := s.SetPasswordPolicy(ctx, types.PasswordPolicy{
+	wantInvalid(t, "a negative rule", s.SetPasswordPolicy(ctx, model.PasswordPolicy{Digit: -1}))
+	if err := s.SetPasswordPolicy(ctx, model.PasswordPolicy{
 		Length: 6, Uppercase: 1, Lowercase: 1, Digit: 1, SpecialChar: 1, NotMatchOld: true,
 	}); err != nil {
 		t.Fatal(err)
@@ -230,10 +230,10 @@ func TestUnitBulkExpiryRevokesEncryptedPasswords(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, n := range []string{"admin", "sso"} {
-		if err := db.Tokens().Create(ctx, types.Token{
+		if err := db.Tokens().Create(ctx, model.Token{
 			ID:      "ep-" + n,
 			Subject: "jfac@svc/users/" + n,
-			Purpose: types.TokenPurposeEncryptedPassword,
+			Purpose: model.TokenPurposeEncryptedPassword,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -273,7 +273,7 @@ func TestUnitAccessStoreFailures(t *testing.T) {
 		"users.list":      func() error { return s.ExpireAllPasswords(ctx) },
 		"users.update":    func() error { return s.UnexpireAllPasswords(ctx) },
 		"groups.autojoin": func() error { return s.CreateUser(ctx, newUser("x"), "pw") },
-		"settings.put":    func() error { return s.SetPasswordPolicy(ctx, types.PasswordPolicy{}) },
+		"settings.put":    func() error { return s.SetPasswordPolicy(ctx, model.PasswordPolicy{}) },
 		"groups.get": func() error {
 			_, err := s.UpdateGroupMembers(ctx, "readers", nil, nil)
 			return err

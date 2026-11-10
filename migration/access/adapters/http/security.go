@@ -13,13 +13,13 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/identity"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The legacy security API (/api/security/users, groups, locks, policies and
@@ -134,7 +134,7 @@ func (s SecurityAPI) GetUserDetails(
 	if err != nil {
 		return nil, s.identityErr(ctx, "get user", userNotFound(req.UserName), err)
 	}
-	doc, err := convert[artgen.GetUserDetails200JSONResponse](types.UserToLegacy(u))
+	doc, err := convert[artgen.GetUserDetails200JSONResponse](model.UserToLegacy(u))
 	if err != nil {
 		return nil, s.internalError(ctx, "render user", err)
 	}
@@ -176,7 +176,7 @@ func (s SecurityAPI) CreateOrReplaceUser(
 	}
 	// Server-owned fields are ignored on write.
 	w.Name, w.Status, w.LastLoggedIn, w.Realm, w.MFAStatus = req.UserName, "", "", "", ""
-	u, err := types.UserFromLegacy(w)
+	u, err := model.UserFromLegacy(w)
 	if err != nil {
 		return nil, httpkit.BadRequestf("%v", err)
 	}
@@ -267,7 +267,7 @@ func (s SecurityAPI) GetGroupDetails(
 	if err != nil {
 		return nil, s.identityErr(ctx, "get group", groupNotFound(req.GroupName), err)
 	}
-	w := types.GroupToLegacy(g)
+	w := model.GroupToLegacy(g)
 	if req.Params.IncludeUsers == nil || !*req.Params.IncludeUsers {
 		w.UserNames = nil
 	}
@@ -316,7 +316,7 @@ func (s SecurityAPI) CreateOrReplaceGroup(
 		return nil, httpkit.BadRequestf("%v", err)
 	}
 	w.Name, w.Realm, w.RealmAttributes = req.GroupName, "", ""
-	if _, err := s.identity(st).PutGroup(ctx, types.GroupFromLegacy(w), b.UserNames); err != nil {
+	if _, err := s.identity(st).PutGroup(ctx, model.GroupFromLegacy(w), b.UserNames); err != nil {
 		return nil, s.identityErr(ctx, "put group", "", err)
 	}
 	return artgen.CreateOrReplaceGroup201Response{}, nil
@@ -467,7 +467,7 @@ func (s SecurityAPI) ConfigureUserLockPolicy(
 	if req.Body == nil {
 		return nil, httpkit.BadRequestf("a user lock policy is required")
 	}
-	p := types.UserLockPolicy{
+	p := model.UserLockPolicy{
 		Enabled:       req.Body.Enabled != nil && *req.Body.Enabled,
 		LoginAttempts: authn.DefaultLoginAttempts,
 	}
@@ -499,7 +499,7 @@ func (s SecurityAPI) GetPasswordExpirationPolicy(
 	return artgen.GetPasswordExpirationPolicy200JSONResponse(expirationDoc(p)), nil
 }
 
-func expirationDoc(p types.PasswordExpirationPolicy) artgen.PasswordExpirationPolicy {
+func expirationDoc(p model.PasswordExpirationPolicy) artgen.PasswordExpirationPolicy {
 	return artgen.PasswordExpirationPolicy{
 		Enabled: &p.Enabled, PasswordMaxAge: &p.MaxAgeDays, NotifyByEmail: &p.NotifyByEmail,
 	}
@@ -518,7 +518,7 @@ func (s SecurityAPI) SetPasswordExpirationPolicy(
 	if req.Body == nil {
 		return nil, httpkit.BadRequestf("a password expiration policy is required")
 	}
-	p := types.PasswordExpirationPolicy{
+	p := model.PasswordExpirationPolicy{
 		MaxAgeDays:    authn.DefaultPasswordMaxAgeDays,
 		NotifyByEmail: true,
 	}

@@ -4,13 +4,13 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 const maxXetMetadataEntries = 128
 
 type xetCacheKey struct {
-	Source       types.SourceIdentity
+	Source       model.SourceIdentity
 	Path, SHA256 string
 	Size, ItemID int64
 }

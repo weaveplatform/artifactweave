@@ -9,11 +9,11 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/identity"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/permission"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // accessState is what the access partials share: their dependencies and
@@ -109,7 +109,7 @@ func (s accessState) permissionError(ctx context.Context, op string, err error) 
 		return err
 	case errors.Is(err, permission.ErrInvalid):
 		return httpkit.BadRequestf("%s", after(err, permission.ErrInvalid))
-	case errors.Is(err, types.ErrLossyProjection):
+	case errors.Is(err, model.ErrLossyProjection):
 		return httpkit.BadRequestf("%s; read it through /access/api/v2/permissions", err)
 	case errors.Is(err, permission.ErrNotFound):
 		return apierror.New(http.StatusNotFound, after(err, permission.ErrNotFound))

@@ -15,13 +15,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	puppetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/puppet"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -207,7 +208,7 @@ func (h handler) remotePage(r *http.Request, name string, offset int) ([]release
 	}
 	out := releases[:0]
 	for _, rel := range releases {
-		if !h.k.Can(r, rel.meta.Path, types.ActionRead) ||
+		if !h.k.Can(r, rel.meta.Path, api.ActionRead) ||
 			generic.CheckDownload(pkgroute.RequestFrom(r).Repo, rel.meta.Path, false) != nil {
 			continue
 		}
@@ -262,7 +263,7 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, rel relea
 	resource := source.Resource{
 		Kind: source.ResourceKindArtifact, Path: rel.meta.Path, Method: http.MethodGet,
 		Variant:   "puppet-forge-v3-archive-v1",
-		Checksums: types.Checksums{SHA256: rel.meta.SHA256},
+		Checksums: kernel.Checksums{SHA256: rel.meta.SHA256},
 		Validate: func(_ context.Context, body io.ReadSeeker, size int64) error {
 			if size != rel.meta.Size || size <= 0 || size > puppetfmt.MaxArchiveBytes {
 				return source.ErrInvalidResult

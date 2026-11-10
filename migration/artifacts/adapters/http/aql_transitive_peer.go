@@ -14,10 +14,10 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type peerAQLRow struct {
@@ -153,7 +153,7 @@ func (r peerAQLRow) hit(peer, key string) (aql.Hit, error) {
 		strings.ContainsAny(r.Name, "/\\") {
 		return aql.Hit{}, source.ErrInvalidResult
 	}
-	it := types.Item{
+	it := model.Item{
 		RepoKey:    key,
 		Path:       r.Path,
 		Name:       r.Name,
@@ -164,11 +164,11 @@ func (r peerAQLRow) hit(peer, key string) (aql.Hit, error) {
 		Modified:   r.Modified,
 		ModifiedBy: r.ModifiedBy,
 		Updated:    r.Updated,
-		Actual:     types.Checksums{SHA1: r.ActualSHA1, MD5: r.ActualMD5, SHA256: r.SHA256},
-		Original:   types.Checksums{SHA1: r.OriginalSHA1, MD5: r.OriginalMD5},
+		Actual:     kernel.Checksums{SHA1: r.ActualSHA1, MD5: r.ActualMD5, SHA256: r.SHA256},
+		Original:   kernel.Checksums{SHA1: r.OriginalSHA1, MD5: r.OriginalMD5},
 	}
 	if !it.IsRoot() {
-		parent, name, depth, err := types.SplitItemPath(it.FullPath())
+		parent, name, depth, err := kernel.SplitItemPath(it.FullPath())
 		if err != nil || parent != it.Path || name != it.Name {
 			return aql.Hit{}, source.ErrInvalidResult
 		}
@@ -190,9 +190,9 @@ func (r peerAQLRow) hit(peer, key string) (aql.Hit, error) {
 	if len(r.Properties) > 4096 {
 		return aql.Hit{}, source.ErrInvalidResult
 	}
-	properties := make(types.Properties)
+	properties := make(model.Properties)
 	for _, property := range r.Properties {
-		if types.ValidatePropertyKey(property.Key) != nil || len(property.Value) > 16384 {
+		if model.ValidatePropertyKey(property.Key) != nil || len(property.Value) > 16384 {
 			return aql.Hit{}, source.ErrInvalidResult
 		}
 		properties.Set(property.Key, append(properties[property.Key], property.Value)...)

@@ -8,16 +8,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const remoteBase = "/artifactory/api/luarocks/rocks/"
@@ -46,13 +48,13 @@ func newRemoteFixture(t *testing.T, tune ...func(*pkgroute.Options, *item.Servic
 			if err = items.Store.Repos().Update(t.Context(), c); err != nil {
 				t.Fatal(err)
 			}
-			if err = db.Permissions().Create(t.Context(), types.Permission{
+			if err = db.Permissions().Create(t.Context(), model.Permission{
 				Name: "visible-only",
-				Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-					Actions: types.Grants{
-						Users: map[string]types.Actions{"partial": types.ActionRead},
+				Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+					Actions: model.Grants{
+						Users: map[string]api.Actions{"partial": api.ActionRead},
 					},
-					Targets: map[string]types.Target{"rocks": {Include: []string{"visible-*"}}},
+					Targets: map[string]model.Target{"rocks": {Include: []string{"visible-*"}}},
 				}},
 			}); err != nil {
 				t.Fatal(err)
@@ -74,7 +76,7 @@ func newRemoteFixture(t *testing.T, tune ...func(*pkgroute.Options, *item.Servic
 			t.Cleanup(pool.Close)
 			svc := &source.Service{
 				HTTP: policy, Cache: policy,
-				Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+				Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 					return items.Store.RemoteCache().Source(ctx, c.Key)
 				},
 			}

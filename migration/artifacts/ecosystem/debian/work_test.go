@@ -19,8 +19,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 func TestUnitWorkPublishesReleaseAndAllArchitectureIndexes(t *testing.T) {
@@ -38,14 +40,14 @@ func TestUnitWorkPublishesReleaseAndAllArchitectureIndexes(t *testing.T) {
 	h := sha256.Sum256(body)
 	m := md5.Sum(body) //nolint:gosec // Debian Packages wire checksum.
 	const path = "pool/main/h/hello/hello_1.0-1_all.deb"
-	it, err := st.Items().Put(t.Context(), types.Item{
+	it, err := st.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Name: path, Size: int64(len(body)),
-		Actual: types.Checksums{SHA256: fmt.Sprintf("%x", h), MD5: fmt.Sprintf("%x", m)},
+		Actual: kernel.Checksums{SHA256: fmt.Sprintf("%x", h), MD5: fmt.Sprintf("%x", m)},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.Items().SetProperties(t.Context(), it.ID, types.Properties{
+	if err := st.Items().SetProperties(t.Context(), it.ID, model.Properties{
 		PropDistribution: {"stable"}, PropComponent: {"main"}, PropArchitecture: {"all"},
 	}, time.Time{}); err != nil {
 		t.Fatal(err)
@@ -57,13 +59,13 @@ func TestUnitWorkPublishesReleaseAndAllArchitectureIndexes(t *testing.T) {
 		Inspection: inspection{
 			sha: it.Actual.SHA256, path: path, binary: b,
 		},
-		Derive: func(_ context.Context, d format.Derived) (types.Item, error) {
+		Derive: func(_ context.Context, d format.Derived) (model.Item, error) {
 			body, err := io.ReadAll(d.Body)
 			if err != nil {
-				return types.Item{}, err
+				return model.Item{}, err
 			}
 			generated[d.Path] = body
-			return types.Item{}, nil
+			return model.Item{}, nil
 		},
 		Underive: func(_ context.Context, _ repo.Config, _ bool, path string) error {
 			t.Errorf("unexpected removal: %s", path)
@@ -79,7 +81,7 @@ func TestUnitWorkPublishesReleaseAndAllArchitectureIndexes(t *testing.T) {
 	if err := (Handler{}).Work(
 		t.Context(),
 		env,
-		types.WorkItem{Kind: KindIndex, Key: c.Key},
+		work.WorkItem{Kind: KindIndex, Key: c.Key},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +110,7 @@ func TestUnitWorkPublishesReleaseAndAllArchitectureIndexes(t *testing.T) {
 	) {
 		t.Fatal("Release does not enumerate generated index")
 	}
-	if err := (Handler{}).Work(t.Context(), env, types.WorkItem{
+	if err := (Handler{}).Work(t.Context(), env, work.WorkItem{
 		Kind: KindReindexNoProps, Key: c.Key,
 	}); err != nil {
 		t.Fatal(err)
@@ -145,14 +147,14 @@ func TestUnitWorkSignsReleaseWithEnvKeys(t *testing.T) {
 	h := sha256.Sum256(body)
 	m := md5.Sum(body) //nolint:gosec // Debian Packages wire checksum.
 	const path = "pool/main/h/hello/hello_1.0-1_amd64.deb"
-	it, err := st.Items().Put(t.Context(), types.Item{
+	it, err := st.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Name: path, Size: int64(len(body)),
-		Actual: types.Checksums{SHA256: fmt.Sprintf("%x", h), MD5: fmt.Sprintf("%x", m)},
+		Actual: kernel.Checksums{SHA256: fmt.Sprintf("%x", h), MD5: fmt.Sprintf("%x", m)},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.Items().SetProperties(t.Context(), it.ID, types.Properties{
+	if err := st.Items().SetProperties(t.Context(), it.ID, model.Properties{
 		PropDistribution: {"stable"}, PropComponent: {"main"}, PropArchitecture: {"amd64"},
 	}, time.Time{}); err != nil {
 		t.Fatal(err)
@@ -170,13 +172,13 @@ func TestUnitWorkSignsReleaseWithEnvKeys(t *testing.T) {
 			Name: "apt", Type: accessapi.KeypairGPG, PrivateKey: key.Private,
 		}}},
 		Inspection: inspection{sha: it.Actual.SHA256, path: path, binary: b},
-		Derive: func(_ context.Context, d format.Derived) (types.Item, error) {
+		Derive: func(_ context.Context, d format.Derived) (model.Item, error) {
 			body, err := io.ReadAll(d.Body)
 			generated[d.Path] = body
-			return types.Item{}, err
+			return model.Item{}, err
 		},
 	}
-	work := types.WorkItem{Kind: KindIndex, Key: c.Key}
+	work := work.WorkItem{Kind: KindIndex, Key: c.Key}
 	if err := (Handler{}).Work(t.Context(), env, work); err != nil {
 		t.Fatal(err)
 	}

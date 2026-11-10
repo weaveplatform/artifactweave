@@ -9,7 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // enforcing is a repository with both Enforce Layout fields set as given.
@@ -191,7 +191,7 @@ func TestUnitAdmit(t *testing.T) {
 	}
 	// Content the store cannot open is a failure, not a refusal.
 	_, err = h.Admit(w.ctx, env, c, format.Write{
-		Op: format.OpDeploy, Path: "x.tgz", Checksums: types.Checksums{SHA256: "missing"},
+		Op: format.OpDeploy, Path: "x.tgz", Checksums: kernel.Checksums{SHA256: "missing"},
 	})
 	if err == nil || errors.As(err, &r) {
 		t.Fatal(err)

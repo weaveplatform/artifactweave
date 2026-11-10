@@ -13,21 +13,21 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	huggingfacehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/http"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-type migrationTokenVerifier struct{ token types.Token }
+type migrationTokenVerifier struct{ token model.Token }
 
-func (v migrationTokenVerifier) Verify(context.Context, string) (types.Token, error) {
+func (v migrationTokenVerifier) Verify(context.Context, string) (model.Token, error) {
 	return v.token, nil
 }
 
@@ -57,7 +57,7 @@ func migrationScopeFixture(t *testing.T) (*fixture, *migrationReadCounter, http.
 		Create(t.Context(), *repo.Defaults(&repo.Config{Key: "hf", Class: repo.Local, PackageType: repo.HuggingFaceML})); err != nil {
 		t.Fatal(err)
 	}
-	if err = db.Users().Create(t.Context(), types.User{Name: "admin", Admin: true}); err != nil {
+	if err = db.Users().Create(t.Context(), model.User{Name: "admin", Admin: true}); err != nil {
 		t.Fatal(err)
 	}
 	f := &fixture{t: t, db: db, items: items}
@@ -79,12 +79,12 @@ func migrationWithScope(
 	dry bool,
 ) *httptest.ResponseRecorder {
 	t.Helper()
-	parsed, err := types.ParseScope(scope)
+	parsed, err := kernel.ParseScope(scope)
 	if err != nil {
 		t.Fatal(err)
 	}
 	kit := accesstest.Over(t, f.db, accesstest.WithTokenVerifier(migrationTokenVerifier{
-		token: types.Token{ID: "scoped", Subject: "jfac@fixture/users/admin", Scope: parsed},
+		token: model.Token{ID: "scoped", Subject: "jfac@fixture/users/admin", Scope: parsed},
 	}))
 	principal, err := kit.API().Authenticator.Token(t.Context(), "scoped", "")
 	if err != nil {
@@ -138,7 +138,7 @@ func TestAccLegacyMigrationHonorsAdministratorTokenScopes(t *testing.T) {
 						}
 					}
 					before, _, err := f.db.Items().
-						Descendants(t.Context(), "hf", false, "models--acme--demo", store.Page{})
+						Descendants(t.Context(), "hf", false, "models--acme--demo", kernel.Page{})
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -163,7 +163,7 @@ func TestAccLegacyMigrationHonorsAdministratorTokenScopes(t *testing.T) {
 							t.Fatalf("denied migration opened %d blobs", blobs.opens.Load())
 						}
 						after, _, err := f.db.Items().
-							Descendants(t.Context(), "hf", false, "models--acme--demo", store.Page{})
+							Descendants(t.Context(), "hf", false, "models--acme--demo", kernel.Page{})
 						if err != nil || !slices.Equal(before, after) {
 							t.Fatalf("denied migration changed destination: %v", err)
 						}

@@ -11,7 +11,7 @@ import (
 
 	"github.com/ulikunitz/xz"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // ArtifactChecksums reads the checksums declared for a standard P2 artifact
@@ -21,25 +21,25 @@ func ArtifactChecksums(
 	metadataName string,
 	body []byte,
 	artifactPath string,
-) (types.Checksums, error) {
+) (kernel.Checksums, error) {
 	if !strings.HasPrefix(path.Base(metadataName), "artifacts.") ||
 		Validate(metadataName, bytes.NewReader(body), int64(len(body))) != nil {
-		return types.Checksums{}, ErrInvalid
+		return kernel.Checksums{}, ErrInvalid
 	}
 	xmlBody, err := metadataXML(metadataName, body)
 	if err != nil {
-		return types.Checksums{}, err
+		return kernel.Checksums{}, err
 	}
 	dec := xml.NewDecoder(bytes.NewReader(xmlBody))
 	var found, matching bool
-	var checksums types.Checksums
+	var checksums kernel.Checksums
 	for {
 		token, err := dec.Token()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			return types.Checksums{}, ErrInvalid
+			return kernel.Checksums{}, ErrInvalid
 		}
 		switch el := token.(type) {
 		case xml.StartElement:
@@ -67,7 +67,7 @@ func ArtifactChecksums(
 				matching = candidate == artifactPath
 				if matching {
 					if found {
-						return types.Checksums{}, ErrInvalid
+						return kernel.Checksums{}, ErrInvalid
 					}
 					found = true
 				}
@@ -95,10 +95,10 @@ func ArtifactChecksums(
 		}
 	}
 	if !found {
-		return types.Checksums{}, ErrInvalid
+		return kernel.Checksums{}, ErrInvalid
 	}
 	if !validDigest(checksums.SHA256, 64) || !validDigest(checksums.SHA512, 128) {
-		return types.Checksums{}, ErrInvalid
+		return kernel.Checksums{}, ErrInvalid
 	}
 	return checksums, nil
 }

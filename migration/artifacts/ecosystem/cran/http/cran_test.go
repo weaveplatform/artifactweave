@@ -13,7 +13,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 func TestUnitCRANSourceValidatesPublishedBytes(t *testing.T) {
@@ -85,7 +84,7 @@ func TestUnitCRANSourceValidatesPublishedBytes(t *testing.T) {
 			source.Request{Resource: source.Resource{Path: p}},
 		); !errors.Is(
 			err,
-			store.ErrNotFound,
+			kernel.ErrNotFound,
 		) {
 			t.Errorf("unsafe or unsupported path %q admitted: %v", p, err)
 		}
@@ -131,7 +130,7 @@ func TestUnitCRANVirtualRejectsCyclesAndWrongMembers(t *testing.T) {
 	}
 	if _, err := svc.cranMemberIndex(t.Context(), w.db,
 		repo.Config{Key: "cran-local", Class: repo.Local}, true,
-		"src/contrib/PACKAGES", p, acc); !errors.Is(err, store.ErrNotFound) {
+		"src/contrib/PACKAGES", p, acc); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("local cache alias accepted: %v", err)
 	}
 }

@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // pkg is a package as one caller sees it: the versions whose tarballs it
@@ -130,7 +130,7 @@ func (h handler) manifest(w http.ResponseWriter, r *http.Request, name, spec str
 // exists, as the item routes refuse a path; one that may but finds no
 // version it can read gets 404.
 func (h handler) load(w http.ResponseWriter, r *http.Request, name string) (pkg, bool) {
-	if !h.k.RequireFolder(w, r, name, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return pkg{}, false
 	}
 	p, ok, err := h.readable(r, name)
@@ -153,7 +153,7 @@ func (h handler) readable(r *http.Request, name string) (pkg, bool, error) {
 	st := h.k.DB()
 	key := pkgroute.RequestFrom(r).Repo.Key
 	found, err := st.Packages().Find(ctx, key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return pkg{}, false, nil
 	}
 	if err != nil {
@@ -165,7 +165,7 @@ func (h handler) readable(r *http.Request, name string) (pkg, bool, error) {
 	}
 	p := pkg{repoKey: key, name: name, created: found.Created, rules: h.format}
 	for _, v := range all {
-		if !h.k.Can(r, npmfmt.CanonicalPath(name, v.Version), types.ActionRead) {
+		if !h.k.Can(r, npmfmt.CanonicalPath(name, v.Version), api.ActionRead) {
 			continue
 		}
 		m, err := npmfmt.DecodeMetadata(v.Metadata)

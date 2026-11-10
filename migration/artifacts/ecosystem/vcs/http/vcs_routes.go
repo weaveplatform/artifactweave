@@ -17,7 +17,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // VCSAPI is the VCS ecosystem's partial strict server: the branch, tag and
@@ -73,7 +72,7 @@ func (s VCSAPI) vcsRepository(
 	if err != nil {
 		return vcsAccess{}, err
 	}
-	if !acc.Folder(c, owner+"/"+name, types.ActionRead) {
+	if !acc.Folder(c, owner+"/"+name, accessapi.ActionRead) {
 		return vcsAccess{}, fmt.Errorf(
 			"vcs repository read denied: %w",
 			pkgroute.SourceError(source.ErrDenied, p.Anonymous),
@@ -174,7 +173,7 @@ func (s VCSAPI) vcsRefs(
 		if ref.Branch {
 			kind = "heads"
 		}
-		if a.access.File(a.repo, owner+"/"+name+"/refs/"+kind+"/"+ref.Name, types.ActionRead) {
+		if a.access.File(a.repo, owner+"/"+name+"/refs/"+kind+"/"+ref.Name, accessapi.ActionRead) {
 			filtered = append(filtered, ref)
 		}
 	}

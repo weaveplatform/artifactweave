@@ -13,12 +13,12 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/xet"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -88,14 +88,14 @@ func (h handler) xetUploadXorb(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, map[string]bool{"was_inserted": true})
 }
 
-func (h handler) storeXet(r *http.Request, path string, data []byte) (types.Item, error) {
+func (h handler) storeXet(r *http.Request, path string, data []byte) (model.Item, error) {
 	r = r.WithContext(format.XetWrite(r.Context()))
 	if existing, err := h.k.DB().
 		Items().
 		Get(r.Context(), pkgroute.RequestFrom(r).Repo.Key, false, path); err == nil {
 		old, e := h.readXet(r, path, xet.MaxEncodedXorb)
 		if e != nil {
-			return types.Item{}, e
+			return model.Item{}, e
 		}
 		equal := bytes.Equal(old, data)
 		if strings.Contains(path, "/.xet/xorbs/") {
@@ -111,22 +111,22 @@ func (h handler) storeXet(r *http.Request, path string, data []byte) (types.Item
 				a.Size == b.Size
 		}
 		if !equal {
-			return types.Item{}, apierror.New(http.StatusConflict, "immutable Xet record differs")
+			return model.Item{}, apierror.New(http.StatusConflict, "immutable Xet record differs")
 		}
 		return existing, nil
 	} else if !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
-		return types.Item{}, fmt.Errorf("huggingface: lookup Xet record: %w", err)
+		return model.Item{}, fmt.Errorf("huggingface: lookup Xet record: %w", err)
 	}
 	it, err := h.k.StoreOnce(
 		r,
 		path,
 		bytes.NewReader(data),
 		nil,
-		types.Checksums{},
-		func(existing types.Item) error {
+		kernel.Checksums{},
+		func(existing model.Item) error {
 			old, err := h.readXet(r, path, int64(len(data))+1)
 			if err != nil || !bytes.Equal(old, data) {
 				return apierror.New(http.StatusConflict, "immutable Xet record differs")
@@ -135,7 +135,7 @@ func (h handler) storeXet(r *http.Request, path string, data []byte) (types.Item
 		},
 	)
 	if err != nil {
-		return types.Item{}, fmt.Errorf("huggingface: publish Xet record: %w", err)
+		return model.Item{}, fmt.Errorf("huggingface: publish Xet record: %w", err)
 	}
 	return it, nil
 }
@@ -206,7 +206,7 @@ func (h handler) xetXorbExists(w http.ResponseWriter, r *http.Request) {
 		Items().
 		Get(target.Context(), pkgroute.RequestFrom(target).Repo.Key, false, xetPath(claimIdentity(c), "xorbs", hash))
 
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		h.k.Error(w, r, missing())
 		return
 	}
@@ -275,15 +275,15 @@ func (h handler) xetUploadShard(w http.ResponseWriter, r *http.Request) {
 						existing.Actual.SHA256 != record.SHA256 {
 						return xetInvalid()
 					}
-				case !errors.Is(e, store.ErrNotFound):
+				case !errors.Is(e, kernel.ErrNotFound):
 					return fmt.Errorf("huggingface: lookup reconstructed Xet file: %w", e)
 				default:
 					_, err := h.k.StoreNew(
 						target,
 						xetPath(id, "sha256", record.SHA256),
 						infos[i],
-						types.Properties{xetHashProperty: {record.Hash}},
-						types.Checksums{SHA256: record.SHA256},
+						model.Properties{xetHashProperty: {record.Hash}},
+						kernel.Checksums{SHA256: record.SHA256},
 						func() error {
 							existing, e := h.k.DB().
 								Items().

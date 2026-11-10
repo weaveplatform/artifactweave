@@ -20,7 +20,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -229,9 +228,9 @@ func (h handler) restoreXetClaim(r *http.Request, c xetClaim, write bool) (*http
 	}
 	r = r.WithContext(accessapi.WithCaller(r.Context(), p, d))
 	id, _ := format.ParseIdentity(c.Kind, c.Owner, c.Name)
-	action := types.ActionRead
+	action := accessapi.ActionRead
 	if write {
-		action = types.ActionWrite
+		action = accessapi.ActionWrite
 	}
 	if !h.k.CanFolder(r, id.Prefix(), action) {
 		return nil, forbidden

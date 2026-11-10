@@ -14,18 +14,21 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // trashcan turns the trash can on or off.
 func trashcan(t *testing.T, db Store, on bool) {
 	t.Helper()
-	if err := db.Settings().Put(context.Background(), types.SettingTrashcan,
-		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
+	if err := db.Settings().Put(context.Background(), settings.SettingTrashcan,
+		model.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -91,7 +94,7 @@ func (l *lifecycle) repo(t *testing.T, key string) repo.Config {
 }
 
 // deploy stores body at p in key and returns its sha256.
-func (l *lifecycle) deploy(t *testing.T, key, p, body string, props types.Properties) string {
+func (l *lifecycle) deploy(t *testing.T, key, p, body string, props model.Properties) string {
 	t.Helper()
 	it, err := l.items.Deploy(context.Background(), item.Deploy{
 		Target: item.Target{Repo: l.repo(t, key), Path: p}, Body: strings.NewReader(body),
@@ -140,16 +143,16 @@ func (l *lifecycle) stored(t *testing.T, sha string) bool {
 func TestUnitRemoveKeepsContentInTheTrashCan(t *testing.T) {
 	ctx := context.Background()
 	l := newLifecycle(t)
-	one := l.deploy(t, "libs", "a/one.txt", "one", types.Properties{"k": {"v"}})
+	one := l.deploy(t, "libs", "a/one.txt", "one", model.Properties{"k": {"v"}})
 	l.deploy(t, "libs", "a/two.txt", "one", nil)
 	three := l.deploy(t, "libs", "b/three.txt", "three", nil)
 	l.deploy(t, "other", "one.txt", "one", nil)
-	root, err := l.db.Items().EnsureRoot(ctx, types.Item{RepoKey: "libs"})
+	root, err := l.db.Items().EnsureRoot(ctx, model.Item{RepoKey: "libs"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := l.db.Items().
-		PatchProperties(ctx, root.ID, types.Properties{"team": {"x"}}, nil, l.clock); err != nil {
+		PatchProperties(ctx, root.ID, model.Properties{"team": {"x"}}, nil, l.clock); err != nil {
 		t.Fatal(err)
 	}
 
@@ -158,7 +161,7 @@ func TestUnitRemoveKeepsContentInTheTrashCan(t *testing.T) {
 		t.Fatalf("Remove = %d, %v, %v", files, found, err)
 	}
 	if left, _, _ := l.db.Items().
-		Descendants(ctx, "libs", false, "", store.Page{}); len(left) != 0 {
+		Descendants(ctx, "libs", false, "", kernel.Page{}); len(left) != 0 {
 		t.Fatalf("content left behind: %v", left)
 	}
 	if n, m := refs(t, l.db, one), refs(t, l.db, three); n != 3 || m != 1 {
@@ -210,7 +213,7 @@ func TestUnitRemoveKeepsContentInTheTrashCan(t *testing.T) {
 func TestUnitRemoveThenRestore(t *testing.T) {
 	ctx := context.Background()
 	l := newLifecycle(t)
-	one := l.deploy(t, "libs", "a/one.txt", "one", types.Properties{"k": {"v"}})
+	one := l.deploy(t, "libs", "a/one.txt", "one", model.Properties{"k": {"v"}})
 	three := l.deploy(t, "libs", "b/three.txt", "three", nil)
 	if _, _, err := Remove(ctx, l.db, "libs", "admin"); err != nil {
 		t.Fatal(err)
@@ -290,11 +293,11 @@ func TestUnitRemoveReleasesARemoteCache(t *testing.T) {
 	}
 	sha := strings.Repeat("cd", 32)
 	if _, err := db.Blobs().
-		Ref(ctx, types.Blob{Checksums: types.Checksums{SHA256: sha}, Size: 1}, 1); err != nil {
+		Ref(ctx, blob.Blob{Checksums: kernel.Checksums{SHA256: sha}, Size: 1}, 1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Items().Put(ctx, types.Item{
-		RepoKey: "up", Cached: true, Name: "c.txt", Size: 1, Actual: types.Checksums{SHA256: sha},
+	if _, err := db.Items().Put(ctx, model.Item{
+		RepoKey: "up", Cached: true, Name: "c.txt", Size: 1, Actual: kernel.Checksums{SHA256: sha},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -330,21 +333,21 @@ func TestUnitRemoveLargeRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := db.Items().
-		Put(ctx, types.Item{RepoKey: "big", Name: "bulk", Folder: true}); err != nil {
+		Put(ctx, model.Item{RepoKey: "big", Name: "bulk", Folder: true}); err != nil {
 		t.Fatal(err)
 	}
-	const n = 2*store.MaxLimit + 1
+	const n = 2*kernel.MaxLimit + 1
 	shas := make([]string, n)
 	for i := range n {
 		shas[i] = fmt.Sprintf("%064x", i+1)
 		if _, err := db.Blobs().Ref(
-			ctx, types.Blob{Checksums: types.Checksums{SHA256: shas[i]}, Size: 1}, 1,
+			ctx, blob.Blob{Checksums: kernel.Checksums{SHA256: shas[i]}, Size: 1}, 1,
 		); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := db.Items().Put(ctx, types.Item{
+		if _, err := db.Items().Put(ctx, model.Item{
 			RepoKey: "big", Path: "bulk", Name: fmt.Sprintf("f%05d", i), Size: 1,
-			Actual: types.Checksums{SHA256: shas[i]},
+			Actual: kernel.Checksums{SHA256: shas[i]},
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -379,10 +382,10 @@ type racing struct {
 	race func(ctx context.Context)
 }
 
-func (r racing) Items() store.ItemStore { return racingItems{r.Store.Items(), r.race} }
+func (r racing) Items() port.ItemStore { return racingItems{r.Store.Items(), r.race} }
 
 type racingItems struct {
-	store.ItemStore
+	port.ItemStore
 	race func(ctx context.Context)
 }
 
@@ -391,7 +394,7 @@ func (r racingItems) Delete(
 	repoKey string,
 	cached bool,
 	path string,
-) (store.DeleteResult, error) {
+) (port.DeleteResult, error) {
 	r.race(ctx)
 	return r.ItemStore.Delete(ctx, repoKey, cached, path) //nolint:wrapcheck // test double
 }
@@ -407,11 +410,11 @@ func TestUnitRemoveWhileTheContentChanges(t *testing.T) {
 	late := strings.Repeat("ef", 32)
 	added := racing{db, func(ctx context.Context) {
 		if _, err := db.Blobs().
-			Ref(ctx, types.Blob{Checksums: types.Checksums{SHA256: late}, Size: 1}, 1); err != nil {
+			Ref(ctx, blob.Blob{Checksums: kernel.Checksums{SHA256: late}, Size: 1}, 1); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := db.Items().Put(ctx, types.Item{
-			RepoKey: "libs", Name: "late.txt", Size: 1, Actual: types.Checksums{SHA256: late},
+		if _, err := db.Items().Put(ctx, model.Item{
+			RepoKey: "libs", Name: "late.txt", Size: 1, Actual: kernel.Checksums{SHA256: late},
 		}); err != nil {
 			t.Fatal(err)
 		}

@@ -10,8 +10,9 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // gatedBlobs holds every Open while armed, reporting it on opened, until
@@ -52,8 +53,8 @@ func TestAccFolderDownloadLimit(t *testing.T) {
 				cfg.FolderDownloadMaxConcurrent = c.limit
 			})
 			w.put("/artifactory/libs-local/d/a.txt", "a")
-			if err := w.db.Settings().Put(context.Background(), types.SettingFolderDownload,
-				types.FolderDownloadSettings{Enabled: true}); err != nil {
+			if err := w.db.Settings().Put(context.Background(), settings.SettingFolderDownload,
+				model.FolderDownloadSettings{Enabled: true}); err != nil {
 				t.Fatal(err)
 			}
 			const archive = "/artifactory/api/archive/download/libs-local/d?archiveType=zip"

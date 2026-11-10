@@ -11,12 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 )
 
 const virtualBase = "/artifactory/api/luarocks/combined/"
@@ -39,11 +40,11 @@ func newVirtualFixture(
 	if err := f.db.Repos().Create(t.Context(), virtual); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.db.Permissions().Create(t.Context(), types.Permission{
+	if err := f.db.Permissions().Create(t.Context(), model.Permission{
 		Name: "partial-virtual",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"partial": types.ActionRead}},
-			Targets: map[string]types.Target{
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
+			Targets: map[string]model.Target{
 				"combined": {Include: []string{"**"}},
 				"local":    {Include: []string{"local-*"}},
 			},
@@ -59,12 +60,12 @@ type virtualFaultStore struct {
 	failKey *string
 }
 
-func (s virtualFaultStore) Repos() store.RepoStore {
+func (s virtualFaultStore) Repos() port.RepoStore {
 	return virtualFaultRepos{RepoStore: s.Store.Repos(), failKey: s.failKey}
 }
 
 type virtualFaultRepos struct {
-	store.RepoStore
+	port.RepoStore
 	failKey *string
 }
 
@@ -294,13 +295,13 @@ func TestAccVirtualReadRejectsQueriesAndConcealsDeniedMembers(t *testing.T) {
 
 func TestAccVirtualDeploymentRequiresValidLocalTargetAndBothGrants(t *testing.T) {
 	f := newVirtualFixture(t)
-	if err := f.db.Permissions().Create(t.Context(), types.Permission{
+	if err := f.db.Permissions().Create(t.Context(), model.Permission{
 		Name: "virtual-publisher",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"publisher": types.ActionRead | types.ActionWrite,
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{
+				"publisher": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]types.Target{"combined": {Include: []string{"**"}}},
+			Targets: map[string]model.Target{"combined": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

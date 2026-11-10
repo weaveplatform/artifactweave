@@ -8,10 +8,10 @@ import (
 	"net/url"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The historical receiver has no idempotency key. Claim before sending and
@@ -25,14 +25,14 @@ func (s *Smart) statistics(
 	peer remote.SmartPeer,
 	job smartJob,
 ) error {
-	var snapshot types.RemoteSmartState
+	var snapshot model.RemoteSmartState
 	var count int64
 	err := s.update(
 		ctx,
 		q,
 		permit,
 		job,
-		func(_ context.Context, entry *types.RemoteCacheEntry) error {
+		func(_ context.Context, entry *model.RemoteCacheEntry) error {
 			state := entry.Smart
 			count = state.Downloads - state.Claimed
 			if count < 0 {
@@ -77,7 +77,7 @@ func (s *Smart) statistics(
 		q,
 		permit,
 		job,
-		func(_ context.Context, entry *types.RemoteCacheEntry) error {
+		func(_ context.Context, entry *model.RemoteCacheEntry) error {
 			entry.Smart.Uncertain -= count
 			return nil
 		},
@@ -87,7 +87,7 @@ func (s *Smart) statistics(
 func statisticsURL(p remote.SmartPeer) string {
 	key := p.Repository
 	if p.Class == repo.Remote {
-		key += types.CacheSuffix
+		key += model.CacheSuffix
 	}
 	return p.BaseURL + "/api/storage/statistics/" + url.PathEscape(key)
 }

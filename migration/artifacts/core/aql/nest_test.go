@@ -9,7 +9,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql/aqltest"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // rows renders a response's results compactly.
@@ -63,9 +63,9 @@ func nestBuilds(t *testing.T, src string, opt aql.Nesting) (string, error) {
 // the cache's jar of the rerun of app/1, naïve.txt of app/2 and tool/1.
 func TestUnitNest(t *testing.T) {
 	f32, f40 := strings.Repeat("f", 32), strings.Repeat("f", 40)
-	hide2 := aql.Nesting{RunVisible: func(b types.Build) bool { return b.ID != 2 }}
+	hide2 := aql.Nesting{RunVisible: func(b model.Build) bool { return b.ID != 2 }}
 	hideNaive := aql.Nesting{
-		ItemVisible: func(it types.Item) bool { return it.Name != "naïve.txt" },
+		ItemVisible: func(it model.Item) bool { return it.Name != "naïve.txt" },
 	}
 	for _, c := range []struct {
 		name, query string
@@ -339,7 +339,7 @@ func TestUnitNest(t *testing.T) {
 			// or statistics: the jars are hidden, the pom is not.
 			"a hidden item's properties and statistics", `builds.find({"name":"app","number":"1"})` +
 				`.include("number","module.artifact.item.property.*","module.artifact.item.stat")`,
-			aql.Nesting{ItemVisible: func(it types.Item) bool { return it.Name != "app-1.0.jar" }},
+			aql.Nesting{ItemVisible: func(it model.Item) bool { return it.Name != "app-1.0.jar" }},
 			`[{"build.number":"1","modules":[{"artifacts":[{"items":[{` +
 				`"properties":[{"key":"build.name","value":"app"}],` +
 				`"stats":[{"downloads":0,"remote_downloads":0}]}]}]}]},{"build.number":"1"}]`,
@@ -393,7 +393,7 @@ type failingSource struct{}
 
 var errLoad = errors.New("load failed")
 
-func (failingSource) RunsWithFile(context.Context, bool, string) ([]types.Build, error) {
+func (failingSource) RunsWithFile(context.Context, bool, string) ([]model.Build, error) {
 	return nil, errLoad
 }
 
@@ -404,11 +404,11 @@ func (failingSource) ItemsWithSHA1(context.Context, string) ([]aql.Hit, error) {
 func (failingSource) Run(
 	context.Context,
 	int64,
-) (types.Build, error) {
-	return types.Build{}, errLoad
+) (model.Build, error) {
+	return model.Build{}, errLoad
 }
 
-func (failingSource) RunPromotions(context.Context, int64) ([]types.BuildPromotion, error) {
+func (failingSource) RunPromotions(context.Context, int64) ([]model.BuildPromotion, error) {
 	return nil, errLoad
 }
 

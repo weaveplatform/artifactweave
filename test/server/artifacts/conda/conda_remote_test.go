@@ -16,8 +16,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -80,7 +80,7 @@ func TestAccCondaShardRemoteCacheRefreshAndOffline(t *testing.T) {
 		t.Fatal("shard was not reused from cache")
 	}
 	entries, _, err := w.rt.Store.RemoteCache().
-		List(t.Context(), "remote", "noarch/"+shard, store.Page{Limit: 100})
+		List(t.Context(), "remote", "noarch/"+shard, kernel.Page{Limit: 100})
 	if err != nil || len(entries) != 1 || entries[0].Blob.Checksums.SHA256 == "" {
 		t.Fatalf("validated shard not cached: %+v %v", entries, err)
 	}
@@ -185,7 +185,7 @@ func TestAccCondaInvalidShardNeverPublishesCacheOrFallsBack(t *testing.T) {
 				t.Fatal("invalid shard returned success")
 			}
 			entries, _, err := w.rt.Store.RemoteCache().
-				List(t.Context(), "remote", "noarch/"+shard, store.Page{Limit: 100})
+				List(t.Context(), "remote", "noarch/"+shard, kernel.Page{Limit: 100})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -246,7 +246,7 @@ func TestAccCondaShardFetchRechecksPermissionAndRepositoryRevision(t *testing.T)
 				t.Fatal("request did not stop")
 			}
 			entries, _, err := w.rt.Store.RemoteCache().
-				List(t.Context(), "remote", "noarch/"+shard, store.Page{Limit: 100})
+				List(t.Context(), "remote", "noarch/"+shard, kernel.Page{Limit: 100})
 			if err != nil {
 				t.Fatal(err)
 			}

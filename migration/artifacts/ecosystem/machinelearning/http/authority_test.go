@@ -5,19 +5,20 @@ import (
 	"strings"
 	"testing"
 
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func (f *fixture) grant(name string, actions types.Actions, include, exclude []string) {
+func (f *fixture) grant(name string, actions accessapi.Actions, include, exclude []string) {
 	f.t.Helper()
-	p := types.Permission{
+	p := model.Permission{
 		Name: name,
-		Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{name: actions}},
-				Targets: map[string]types.Target{"ml": {Include: include, Exclude: exclude}},
+		Resources: map[accessapi.ResourceType]model.Resource{
+			accessapi.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]accessapi.Actions{name: actions}},
+				Targets: map[string]model.Target{"ml": {Include: include, Exclude: exclude}},
 			},
 		},
 	}
@@ -49,7 +50,7 @@ func TestAccModelArtifactPermissionsAndOwnership(t *testing.T) {
 	for _, file := range []struct{ key, path string }{{"filesUploadPath", "model.pkl"}, {"dependenciesUploadPath", "requirements.txt"}, {"codeUploadPath", "code.zip"}} {
 		f.status(201, "PUT", "/artifactory/ml/"+tx[file.key]+"/"+file.path, data, "", "")
 	}
-	f.grant("other", types.ActionRead|types.ActionWrite, []string{"**"}, nil)
+	f.grant("other", accessapi.ActionRead|accessapi.ActionWrite, []string{"**"}, nil)
 	body, media := multipartBody(t, m)
 	f.status(403, "PUT", api+"entity-manifest/model/1/"+tx["transactionId"], body, media, "other")
 	f.status(403, "PUT", "/artifactory/ml/"+tx["filesUploadPath"]+"/model.pkl", data, "", "other")
@@ -65,11 +66,16 @@ func TestAccModelArtifactPermissionsAndOwnership(t *testing.T) {
 	if got.Code.DownloadURL == "" || got.Dependencies[0].DownloadURL == "" {
 		t.Fatal("missing code/dependency URL")
 	}
-	f.grant("manifest-only", types.ActionRead, []string{"models/model/1/model-manifest.json"}, nil)
+	f.grant(
+		"manifest-only",
+		accessapi.ActionRead,
+		[]string{"models/model/1/model-manifest.json"},
+		nil,
+	)
 	f.status(403, "GET", api+"entity-manifest/model/1", nil, "", "manifest-only")
 	f.grant(
 		"no-code",
-		types.ActionRead,
+		accessapi.ActionRead,
 		[]string{"models/model/1/**"},
 		[]string{"models/model/1/code/**"},
 	)
@@ -83,7 +89,7 @@ func TestAccModelCommitRechecksEveryDestination(t *testing.T) {
 	for _, exclude := range []string{"models/model/1/files/**", "models/model/1/model-manifest.json"} {
 		t.Run(exclude, func(t *testing.T) {
 			f := newFixture(t, repo.Local)
-			f.grant("writer", types.ActionWrite, []string{"models/model/**"}, []string{exclude})
+			f.grant("writer", accessapi.ActionWrite, []string{"models/model/**"}, []string{exclude})
 			response := f.status(200, "POST", api+"model/start-transaction/1", nil, "", "writer")
 			var tx map[string]string
 			if err := json.Unmarshal(response, &tx); err != nil {

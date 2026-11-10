@@ -7,20 +7,21 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	hexfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/hex"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitHexLocalAndVirtualSignedRegistry(t *testing.T) {
 	w := newItemWorld(t, false)
 	keys := testKeys()
-	if err := w.db.Keys().CreateKeypair(t.Context(), types.Keypair{
-		Name: "hex-signing", Type: types.KeypairRSA,
+	if err := w.db.Keys().CreateKeypair(t.Context(), api.Keypair{
+		Name: "hex-signing", Type: api.KeypairRSA,
 		PrivateKey: keys.private, PublicKey: keys.public,
 	}); err != nil {
 		t.Fatal(err)
@@ -147,7 +148,7 @@ func TestUnitHexLocalAndVirtualSignedRegistry(t *testing.T) {
 		t.Fatal(err)
 	}
 	packages, _, err := w.db.Packages().
-		List(t.Context(), "hex-local", store.Page{Limit: store.MaxLimit})
+		List(t.Context(), "hex-local", kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil || len(packages) != 1 || packages[0].Name != "decimal" {
 		t.Fatalf("reindexed packages: %+v %v", packages, err)
 	}
@@ -163,7 +164,7 @@ func TestUnitHexLocalAndVirtualSignedRegistry(t *testing.T) {
 		t.Fatalf("deploy Ecto %d: %s", put.Code, put.Body)
 	}
 	// A legacy non-package object in the store must not become registry data.
-	if _, err := w.db.Items().Put(t.Context(), types.Item{
+	if _, err := w.db.Items().Put(t.Context(), model.Item{
 		RepoKey: "hex-local", Name: "notes.txt",
 	}); err != nil {
 		t.Fatal(err)
@@ -221,8 +222,8 @@ func TestUnitHexLocalAndVirtualSignedRegistry(t *testing.T) {
 func TestUnitHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) {
 	w := newItemWorld(t, false)
 	keys := testKeys()
-	if err := w.db.Keys().CreateKeypair(t.Context(), types.Keypair{
-		Name: "hex-signing", Type: types.KeypairRSA,
+	if err := w.db.Keys().CreateKeypair(t.Context(), api.Keypair{
+		Name: "hex-signing", Type: api.KeypairRSA,
 		PrivateKey: keys.private, PublicKey: keys.public,
 	}); err != nil {
 		t.Fatal(err)
@@ -262,9 +263,9 @@ func TestUnitHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) 
 			t.Fatal(err)
 		}
 	}
-	if _, err := w.db.Items().Put(t.Context(), types.Item{
+	if _, err := w.db.Items().Put(t.Context(), model.Item{
 		RepoKey: "hex-broken-local", Name: "tarballs/decimal-2.0.0.tar",
-		Actual: types.Checksums{SHA256: strings.Repeat("a", 64)},
+		Actual: kernel.Checksums{SHA256: strings.Repeat("a", 64)},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -280,9 +281,9 @@ func TestUnitHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.db.Items().Put(t.Context(), types.Item{
+	if _, err := w.db.Items().Put(t.Context(), model.Item{
 		RepoKey: "hex-mismatch-local", Name: "tarballs/other-2.0.0.tar",
-		Actual: types.Checksums{SHA256: info.Digests.SHA256},
+		Actual: kernel.Checksums{SHA256: info.Digests.SHA256},
 	}); err != nil {
 		t.Fatal(err)
 	}

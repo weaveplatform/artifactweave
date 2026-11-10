@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 )
 
 // Compare orders tags and image names as the specification orders tags,
@@ -74,7 +74,7 @@ func inImage(repoKey, name string) []aql.Node {
 // holds no manifest at all, which the registry answers NAME_UNKNOWN.
 func Tags(
 	ctx context.Context,
-	items store.ItemStore,
+	items port.ItemStore,
 	repoKey, name string,
 ) ([]string, bool, error) {
 	hits, err := items.Search(ctx, manifestFiles(inImage(repoKey, name)...), aql.Options{})
@@ -100,7 +100,7 @@ func Tags(
 // folder alike, in the specification's order.
 func ManifestFolders(
 	ctx context.Context,
-	items store.ItemStore,
+	items port.ItemStore,
 	repoKey, name, hex string,
 ) ([]string, error) {
 	q := manifestFiles(append(inImage(repoKey, name),
@@ -130,7 +130,7 @@ type Image struct {
 // holding at least one manifest in a tag or digest folder of its own
 // (decision 0031), ordered by repository and then as tags are ordered.
 // Whether a name is valid is the caller's to judge.
-func Images(ctx context.Context, items store.ItemStore, keys []string) ([]Image, error) {
+func Images(ctx context.Context, items port.ItemStore, keys []string) ([]Image, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}

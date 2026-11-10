@@ -7,8 +7,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // maxChecksumBody is the longest checksum upload Artifactory reads
@@ -117,7 +117,7 @@ func admitPOM(c repo.Config, r reader, inspected any, w format.Write) (format.Wr
 	if p.isPlugin() {
 		props := maps.Clone(w.Properties)
 		if props == nil {
-			props = types.Properties{}
+			props = model.Properties{}
 		}
 		props[PluginProperty] = []string{"true"}
 		w.Properties = props

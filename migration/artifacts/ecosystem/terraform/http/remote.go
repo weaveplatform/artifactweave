@@ -19,7 +19,6 @@ import (
 	tf "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (h handler) moduleMetadata(
@@ -207,7 +206,7 @@ func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operatio
 		return
 	}
 	path := location.cachePath(q.module)
-	if !h.k.Require(w, r, path, types.ActionRead) {
+	if !h.k.Require(w, r, path, accessapi.ActionRead) {
 		return
 	}
 	resource := moduleArtifactResource(r, q.module, location)
@@ -289,7 +288,7 @@ func (h handler) remoteModuleVersions(
 			return
 		}
 		path := location.cachePath(m)
-		if !h.k.Can(r, path, types.ActionRead) {
+		if !h.k.Can(r, path, accessapi.ActionRead) {
 			continue
 		}
 		paths = append(paths, path)
@@ -400,7 +399,7 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 	}
 	ctx := accessapi.WithCaller(r.Context(), principal, d)
 	r = r.WithContext(ctx)
-	if !h.k.Require(w, r, c.Path, types.ActionRead) {
+	if !h.k.Require(w, r, c.Path, accessapi.ActionRead) {
 		return
 	}
 	slash := strings.LastIndexByte(c.Path, '/')

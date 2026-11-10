@@ -15,13 +15,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	tf "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const remoteProviderBase = prefix + "remote/v1/providers/hashicorp/null/"
@@ -43,9 +44,9 @@ func newProviderFixture(t *testing.T) *remoteProviderFixture {
 		t.Fatal(err)
 	}
 	permission, _ := f.db.Permissions().Get(t.Context(), "remote-read")
-	resource := permission.Resources[types.ResourceArtifact]
-	resource.Targets["remote"] = types.Target{Include: []string{"hashicorp/null/**"}}
-	permission.Resources[types.ResourceArtifact] = resource
+	resource := permission.Resources[api.ResourceArtifact]
+	resource.Targets["remote"] = model.Target{Include: []string{"hashicorp/null/**"}}
+	permission.Resources[api.ResourceArtifact] = resource
 	if err := f.db.Permissions().Update(t.Context(), permission); err != nil {
 		t.Fatal(err)
 	}
@@ -364,11 +365,11 @@ func TestAccRemoteProviderUpstreamMirror(t *testing.T) {
 				t.Fatal(err)
 			}
 			permission, _ := f.db.Permissions().Get(t.Context(), "remote-read")
-			resource := permission.Resources[types.ResourceArtifact]
-			resource.Targets["remote"] = types.Target{
+			resource := permission.Resources[api.ResourceArtifact]
+			resource.Targets["remote"] = model.Target{
 				Include: []string{"provider-mirrors/registry.terraform.io/hashicorp/null/**"},
 			}
-			permission.Resources[types.ResourceArtifact] = resource
+			permission.Resources[api.ResourceArtifact] = resource
 			if err := f.db.Permissions().Update(t.Context(), permission); err != nil {
 				t.Fatal(err)
 			}
@@ -442,11 +443,11 @@ func configureProviderMirrorFaultFixture(t *testing.T, f *remoteProviderFixture)
 	if err != nil {
 		t.Fatal(err)
 	}
-	resource := permission.Resources[types.ResourceArtifact]
-	resource.Targets["remote"] = types.Target{
+	resource := permission.Resources[api.ResourceArtifact]
+	resource.Targets["remote"] = model.Target{
 		Include: []string{"provider-mirrors/registry.terraform.io/hashicorp/null/**"},
 	}
-	permission.Resources[types.ResourceArtifact] = resource
+	permission.Resources[api.ResourceArtifact] = resource
 	if err := f.db.Permissions().Update(t.Context(), permission); err != nil {
 		t.Fatal(err)
 	}
@@ -619,12 +620,12 @@ func TestAccRemoteProviderMirrorIndexBoundsAndPlatformPermissions(t *testing.T) 
 		if err != nil {
 			t.Fatal(err)
 		}
-		resource := permission.Resources[types.ResourceArtifact]
-		resource.Targets["remote"] = types.Target{Include: []string{
+		resource := permission.Resources[api.ResourceArtifact]
+		resource.Targets["remote"] = model.Target{Include: []string{
 			"provider-mirrors/registry.terraform.io/hashicorp/null/index.json",
 			"provider-mirrors/registry.terraform.io/hashicorp/null/1.0.0.json",
 		}}
-		permission.Resources[types.ResourceArtifact] = resource
+		permission.Resources[api.ResourceArtifact] = resource
 		if err := f.db.Permissions().Update(t.Context(), permission); err != nil {
 			t.Fatal(err)
 		}
@@ -788,11 +789,11 @@ func TestAccRemoteProviderVisibilityRequiresReadablePlatform(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		resource := permission.Resources[types.ResourceArtifact]
-		resource.Targets["remote"] = types.Target{Include: []string{
+		resource := permission.Resources[api.ResourceArtifact]
+		resource.Targets["remote"] = model.Target{Include: []string{
 			"hashicorp/null/1.0.0/terraform-provider-null_1.0.0_windows_amd64.zip",
 		}}
-		permission.Resources[types.ResourceArtifact] = resource
+		permission.Resources[api.ResourceArtifact] = resource
 		if err := f.db.Permissions().Update(t.Context(), permission); err != nil {
 			t.Fatal(err)
 		}

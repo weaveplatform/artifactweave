@@ -9,7 +9,7 @@ import (
 	"net/http"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func (s *remoteSession) signatureDocument(version string) (remoteDoc, error) {
@@ -66,7 +66,7 @@ func (s *remoteSession) certificate(w http.ResponseWriter, version, hash string)
 			PermissionFolder: true,
 			Method:           http.MethodGet,
 			ExternalURL:      stringField(cert, "contentUrl"),
-			Checksums:        types.Checksums{SHA256: hash},
+			Checksums:        kernel.Checksums{SHA256: hash},
 			Variant:          "nuget-certificate-v1",
 			Validate: func(_ context.Context, r io.ReadSeeker, size int64) error {
 				if size > 1<<20 {

@@ -3,8 +3,8 @@ package nuget_test
 import (
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Normalisation follows the cases NuGet's and JFrog's documentation give:
@@ -95,8 +95,8 @@ func TestUnitVersionKey(t *testing.T) {
 	if nuget.VersionKey(a) != "1.0.0-beta" || nuget.VersionKey(b) != nuget.VersionKey(a) {
 		t.Fatalf("%q %q", nuget.VersionKey(a), nuget.VersionKey(b))
 	}
-	if types.CompareNuGet(nuget.VersionKey(a), a.Normalized()) != 0 ||
-		types.CompareNuGet("1.0.0-rc.10", "1.0.0-rc.2") <= 0 {
+	if model.CompareNuGet(nuget.VersionKey(a), a.Normalized()) != 0 ||
+		model.CompareNuGet("1.0.0-rc.10", "1.0.0-rc.2") <= 0 {
 		t.Fatal("the key orders apart from the version")
 	}
 	if nuget.PackageName("Newtonsoft.Json") != "newtonsoft.json" {

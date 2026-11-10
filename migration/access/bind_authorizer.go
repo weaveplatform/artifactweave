@@ -9,7 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 var _ accessapi.Authorizer = authorizer{}
@@ -40,7 +40,7 @@ func (b authorizer) Authorize(
 // itself (the item kit's AccessFor), with its error texts.
 func (b authorizer) For(ctx context.Context, p kernel.Principal) (accessapi.Decider, error) {
 	var on bool
-	err := b.st.Settings().Get(ctx, types.SettingAnonymousAccess, &on)
+	err := b.st.Settings().Get(ctx, settings.SettingAnonymousAccess, &on)
 	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		return nil, fmt.Errorf("anonymous access setting: %w", err)
 	}

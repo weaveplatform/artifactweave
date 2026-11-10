@@ -8,9 +8,9 @@ import (
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccOpkgVirtualFeedSignsOnlyWithConfiguredGPGKey(t *testing.T) {
@@ -19,8 +19,8 @@ func TestAccOpkgVirtualFeedSignsOnlyWithConfiguredGPGKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Keys().CreateKeypair(t.Context(), types.Keypair{
-		Name: "opkg-gpg", Type: types.KeypairGPG,
+	if err := w.db.Keys().CreateKeypair(t.Context(), api.Keypair{
+		Name: "opkg-gpg", Type: api.KeypairGPG,
 		PrivateKey: key.Private, PublicKey: key.Public,
 	}); err != nil {
 		t.Fatal(err)

@@ -6,12 +6,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	tf "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type handler struct {
@@ -71,7 +72,7 @@ func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	if !h.k.RequireFolder(w, r, q.module.Package(), types.ActionRead) {
+	if !h.k.RequireFolder(w, r, q.module.Package(), api.ActionRead) {
 		return
 	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
@@ -86,7 +87,7 @@ func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 	if q.isList {
 		versions := make([]map[string]string, 0, len(vs))
 		for _, v := range vs {
-			if h.k.Can(r, v.item.FullPath(), types.ActionRead) {
+			if h.k.Can(r, v.item.FullPath(), api.ActionRead) {
 				versions = append(versions, map[string]string{"version": v.version})
 			}
 		}
@@ -101,7 +102,7 @@ func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 		if v.version != q.module.Version {
 			continue
 		}
-		if !h.k.Require(w, r, v.item.FullPath(), types.ActionRead) {
+		if !h.k.Require(w, r, v.item.FullPath(), api.ActionRead) {
 			return
 		}
 		u, err := h.downloadURL(r, v.item)
@@ -119,13 +120,13 @@ func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 
 type version struct {
 	version string
-	item    types.Item
+	item    model.Item
 }
 
 func (h handler) versions(r *http.Request, name string) ([]version, error) {
 	db, ctx := h.k.DB(), r.Context()
 	p, err := db.Packages().Find(ctx, pkgroute.RequestFrom(r).Repo.Key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil, missing()
 	}
 	if err != nil {
@@ -143,7 +144,7 @@ func (h handler) versions(r *http.Request, name string) ([]version, error) {
 		}
 		for _, id := range ids {
 			it, err := db.Items().GetByID(ctx, id)
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, kernel.ErrNotFound) {
 				continue
 			}
 			if err != nil {

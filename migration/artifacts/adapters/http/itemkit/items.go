@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/reindexauth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/alpine"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
@@ -28,8 +29,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // ItemRequest is a parsed item URL.
@@ -39,13 +38,13 @@ type ItemRequest struct {
 	IsFolder bool
 	// Props are the matrix parameters; mandatory holds the keys sent as
 	// "key+=value", which a download requires the item to carry.
-	Props     types.Properties
+	Props     model.Properties
 	Mandatory map[string]bool
 }
 
 // matrix returns the request's matrix parameters as a download matches them.
-func (r ItemRequest) matrix() types.Matrix {
-	return types.Matrix{Props: r.Props, Mandatory: r.Mandatory}
+func (r ItemRequest) matrix() model.Matrix {
+	return model.Matrix{Props: r.Props, Mandatory: r.Mandatory}
 }
 
 // ParseItemPath splits /artifactory/{repoKey}/{path} into the key, the path
@@ -68,7 +67,7 @@ func ParseEscapedItemPath(escaped string) (ItemRequest, error) {
 		req.Path = strings.Join(parsed.Segments[1:], "/")
 	}
 	if req.Path != "" {
-		if _, _, _, err := types.SplitItemPath(req.Path); err != nil {
+		if _, _, _, err := kernel.SplitItemPath(req.Path); err != nil {
 			return req, httpkit.BadRequestf("malformed path %q", req.Path)
 		}
 	}
@@ -95,12 +94,12 @@ func (s *Kit) ItemCaller(
 // ResolveRepo returns the repository a key names and whether the key is a
 // remote repository's cache alias.
 func ResolveRepo(ctx context.Context, st Store, key string) (repo.Config, bool, error) {
-	stored, cached := types.ResolveRepoKey(key)
+	stored, cached := model.ResolveRepoKey(key)
 	c, err := st.Repos().Get(ctx, stored)
 	if err == nil && (!cached || c.Class == repo.Remote) {
 		return c, cached, nil
 	}
-	if err == nil || errors.Is(err, store.ErrNotFound) {
+	if err == nil || errors.Is(err, kernel.ErrNotFound) {
 		return c, cached, NotFoundRepo(key)
 	}
 	return c, cached, fmt.Errorf("get repository %s: %w", key, err)
@@ -120,7 +119,7 @@ func (s *Kit) ItemError(ctx context.Context, op string, err error) error {
 		return apierror.New(refused.Status, refused.Message)
 	case errors.As(err, &overwrite):
 		return OverwriteRefusal(ctx, overwrite)
-	case errors.As(err, &sidecar) && errors.Is(err, store.ErrNotFound):
+	case errors.As(err, &sidecar) && errors.Is(err, kernel.ErrNotFound):
 		return apierror.New(http.StatusNotFound, sidecar.Message)
 	case errors.As(err, &sidecar):
 		return apierror.New(http.StatusConflict, sidecar.Message)
@@ -138,13 +137,13 @@ func (s *Kit) ItemError(ctx context.Context, op string, err error) error {
 		return apierror.New(http.StatusServiceUnavailable, err.Error())
 	case errors.Is(err, item.ErrBadArchive):
 		return apierror.New(http.StatusBadRequest, err.Error())
-	case errors.Is(err, types.ErrInvalidItemPath):
+	case errors.Is(err, kernel.ErrInvalidItemPath):
 		return apierror.New(http.StatusBadRequest, err.Error())
-	case errors.Is(err, types.ErrPropertyKeyTooLong):
+	case errors.Is(err, model.ErrPropertyKeyTooLong):
 		// The routes refuse long keys themselves; this answers for any
 		// write that reaches a store with one.
-		return apierror.New(http.StatusBadRequest, types.ErrPropertyKeyTooLong.Error())
-	case errors.Is(err, store.ErrNotFound):
+		return apierror.New(http.StatusBadRequest, model.ErrPropertyKeyTooLong.Error())
+	case errors.Is(err, kernel.ErrNotFound):
 		return ItemNotFound()
 	}
 	return s.InternalError(ctx, op, err)
@@ -239,7 +238,7 @@ func (s *Kit) MayBeIdentical(byChecksum bool) bool {
 // item info, its uri is the item's download URL, the same as downloadUri
 // (the deployartifact page's example), and a folder's path and uri end in
 // "/" (6.20's SuccessfulDeploymentResponseHelper).
-func ItemCreated(ctx context.Context, it types.Item) map[string]any {
+func ItemCreated(ctx context.Context, it model.Item) map[string]any {
 	uri := baseurl.From(ctx) + "/artifactory/" + it.ReportedRepoKey() + "/" +
 		httpkit.EscapePath(it.FullPath())
 	body := map[string]any{
@@ -271,7 +270,7 @@ func withSlash(p string) string {
 
 // ChecksumsJSON is the file info's checksum object, which in Artifactory names
 // sha1, md5 and sha256 only; SHA-512 reaches clients as a ".sha512" file.
-func ChecksumsJSON(c types.Checksums) map[string]string {
+func ChecksumsJSON(c kernel.Checksums) map[string]string {
 	out := map[string]string{}
 	for k, v := range map[string]string{"sha1": c.SHA1, "md5": c.MD5, "sha256": c.SHA256} {
 		if v != "" {
@@ -284,7 +283,7 @@ func ChecksumsJSON(c types.Checksums) map[string]string {
 // Found is an item a download resolved, with the repository it lives in.
 type Found struct {
 	Repo repo.Config
-	Item types.Item
+	Item model.Item
 	Used func(context.Context) error
 }
 
@@ -299,7 +298,7 @@ type resolver func(ctx context.Context, c repo.Config, d format.Download) (strin
 type Download struct {
 	path     string
 	isFolder bool
-	matrix   types.Matrix
+	matrix   model.Matrix
 	resolve  resolver
 	// trace records the steps of a ?trace request (traceItem); nil for a
 	// download.
@@ -312,7 +311,7 @@ type Download struct {
 // checksum sidecar as the file it describes. folder is whether the request
 // ended in a slash; m are its matrix parameters, which a resolution filters
 // by as the download filters what it serves.
-func newDownload(p string, folder bool, m types.Matrix, resolve resolver) *Download {
+func newDownload(p string, folder bool, m model.Matrix, resolve resolver) *Download {
 	if archive, _, ok := strings.Cut(p, "!/"); ok {
 		p, folder = archive, false
 	} else if artifact, _, ok := item.Sidecar(p); ok {
@@ -339,7 +338,7 @@ func Lookup(
 	seen map[string]bool,
 ) (Found, error) {
 	if seen[c.Key] {
-		return Found{}, store.ErrNotFound
+		return Found{}, kernel.ErrNotFound
 	}
 	seen[c.Key] = true
 	if dl != nil {
@@ -358,7 +357,7 @@ func Lookup(
 				Cached: cached,
 				Matrix: dl.matrix,
 				Readable: func(fullPath string) bool {
-					return acc.File(c, fullPath, types.ActionRead)
+					return acc.File(c, fullPath, accessapi.ActionRead)
 				},
 			}); err != nil {
 				return Found{}, err
@@ -369,7 +368,7 @@ func Lookup(
 		}
 		it, err := st.Items().Get(ctx, c.Key, cached, p)
 		if err != nil {
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, kernel.ErrNotFound) {
 				dl.stepf("Unable to find resource in %s", traceRepoPath(c, cached, p))
 			}
 			return Found{}, err //nolint:wrapcheck // ErrNotFound is the answer
@@ -378,13 +377,13 @@ func Lookup(
 	}
 	for _, key := range c.Repositories {
 		m, err := st.Repos().Get(ctx, key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
 			return Found{}, fmt.Errorf("member %s of %s: %w", key, c.Key, err)
 		}
-		if !acc.Folder(m, p, types.ActionRead) {
+		if !acc.Folder(m, p, accessapi.ActionRead) {
 			continue
 		}
 		dl.stepf("Searching for the resource within %s", m.Key)
@@ -393,11 +392,11 @@ func Lookup(
 		// lacks the item, as Artifactory's search goes on past every member
 		// that does not serve it (VirtualRepoDownloadStrategy.processStandard).
 		var refused *format.RejectionError
-		if err == nil || (!errors.Is(err, store.ErrNotFound) && !errors.As(err, &refused)) {
+		if err == nil || (!errors.Is(err, kernel.ErrNotFound) && !errors.As(err, &refused)) {
 			return f, err
 		}
 	}
-	return Found{}, store.ErrNotFound
+	return Found{}, kernel.ErrNotFound
 }
 
 // GetItem answers GET and HEAD on an item path: file content, a checksum
@@ -441,7 +440,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 	// repository or an excluded path before it checks permissions; this
 	// answers a caller who may not read the path without telling it how
 	// the repository is configured (DV-057).
-	if !acc.Folder(c, req.Path, types.ActionRead) {
+	if !acc.Folder(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -467,13 +466,13 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 			r,
 			st,
 			c,
-			Found{Repo: c, Item: types.Item{RepoKey: c.Key, Cached: cached, Folder: true}},
+			Found{Repo: c, Item: model.Item{RepoKey: c.Key, Cached: cached, Folder: true}},
 			acc,
 		)
 		return
 	}
 	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, map[string]bool{})
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		// "<archive>!/<entry>" names an entry inside an archive file; a path
 		// that exists as an item is served as one first.
 		if archive, entry, ok := strings.Cut(req.Path, "!/"); ok {
@@ -482,7 +481,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 				httpkit.WriteErr(w, r, ItemNotFound())
 				return
 			}
-			if !acc.File(a.Repo, a.Item.FullPath(), types.ActionRead) {
+			if !acc.File(a.Repo, a.Item.FullPath(), accessapi.ActionRead) {
 				httpkit.WriteErr(w, r, httpkit.Denied(p))
 				return
 			}
@@ -496,7 +495,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "lookup item", err))
 		return
 	}
-	if !acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, types.ActionRead) {
+	if !acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -518,7 +517,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 func matchesMatrix(
 	ctx context.Context,
 	st Store,
-	it types.Item,
+	it model.Item,
 	req ItemRequest,
 ) (bool, error) {
 	if len(req.Props) == 0 {
@@ -554,7 +553,7 @@ func (s *Kit) getSidecar(
 	f, err := Lookup(r.Context(), st, c, cached, artifact, acc, dl, map[string]bool{})
 	// A file the caller may not read has no visible checksum either.
 	if err != nil || f.Item.Folder ||
-		!acc.File(f.Repo, f.Item.FullPath(), types.ActionRead) {
+		!acc.File(f.Repo, f.Item.FullPath(), accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
@@ -687,8 +686,8 @@ func (s *Kit) listFolder(
 ) {
 	ctx := r.Context()
 	folder := f.Item.FullPath()
-	var children []types.Item
-	page := store.Page{Limit: store.MaxLimit}
+	var children []model.Item
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		batch, next, err := st.Items().Children(ctx, f.Repo.Key, f.Item.Cached, folder, page)
 		if err != nil {
@@ -716,7 +715,7 @@ func (s *Kit) listFolder(
 		// Artifactory's browsing leaves them out
 		// (TreeBrowsingCriteriaBuilder.applyRepoIncludeExclude,
 		// RepositoryBrowsingServiceImpl.virtualRepoAccepts).
-		if !acc.Item(f.Repo, c.FullPath(), c.Folder, types.ActionRead) ||
+		if !acc.Item(f.Repo, c.FullPath(), c.Folder, accessapi.ActionRead) ||
 			!acceptedByAll(patterns, c.FullPath(), c.Folder) {
 			continue
 		}
@@ -778,7 +777,7 @@ func SplitRepoPath(escaped string) (key, p string, folder bool, err error) {
 		return "", "", false, httpkit.BadRequestf("a repository key is required")
 	}
 	if p != "" {
-		if _, _, _, err := types.SplitItemPath(p); err != nil {
+		if _, _, _, err := kernel.SplitItemPath(p); err != nil {
 			return "", "", false, httpkit.BadRequestf("malformed path %q", p)
 		}
 	}

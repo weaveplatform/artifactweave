@@ -12,11 +12,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	swiftfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type release struct {
@@ -48,12 +49,12 @@ func (h handler) localRead(w http.ResponseWriter, r *http.Request, q request) {
 	}
 	p := q.packageID
 	path := p.ArchivePath()
-	if !h.k.Require(w, r, path, types.ActionRead) {
+	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
 	f, err := h.k.Item(r, path)
 	switch {
-	case errors.Is(err, store.ErrNotFound), err == nil && f.Item.Folder:
+	case errors.Is(err, kernel.ErrNotFound), err == nil && f.Item.Folder:
 		h.k.Error(w, r, bad(http.StatusNotFound, "Swift release not found"))
 		return
 	case err != nil:
@@ -75,12 +76,12 @@ func (h handler) localRead(w http.ResponseWriter, r *http.Request, q request) {
 
 func (h handler) localReleases(w http.ResponseWriter, r *http.Request, p swiftfmt.Package) {
 	folder := p.Scope + "/" + p.Name
-	if !h.k.RequireFolder(w, r, folder, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, folder, api.ActionRead) {
 		return
 	}
 	c := pkgroute.RequestFrom(r).Repo
 	pkg, err := h.k.DB().Packages().Find(r.Context(), c.Key, p.ID())
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		h.k.Error(w, r, bad(http.StatusNotFound, "Swift package not found"))
 		return
 	}
@@ -96,11 +97,11 @@ func (h handler) localReleases(w http.ResponseWriter, r *http.Request, p swiftfm
 	out := releases{Releases: map[string]release{}}
 	for _, v := range versions {
 		p.Version = v.Version
-		if !swiftfmt.ValidVersion(v.Version) || !h.k.Can(r, p.ArchivePath(), types.ActionRead) {
+		if !swiftfmt.ValidVersion(v.Version) || !h.k.Can(r, p.ArchivePath(), api.ActionRead) {
 			continue
 		}
 		it, err := h.k.DB().Items().Get(r.Context(), c.Key, false, p.ArchivePath())
-		if errors.Is(err, store.ErrNotFound) || err == nil && it.Folder {
+		if errors.Is(err, kernel.ErrNotFound) || err == nil && it.Folder {
 			continue
 		}
 		if err != nil {
@@ -120,7 +121,7 @@ func (h handler) localReleaseInfo(
 	w http.ResponseWriter,
 	r *http.Request,
 	p swiftfmt.Package,
-	it types.Item,
+	it model.Item,
 ) {
 	metadata := map[string]any{}
 	props, err := h.k.DB().Items().Properties(r.Context(), it.ID)
@@ -149,7 +150,7 @@ func (h handler) localManifest(
 	w http.ResponseWriter,
 	r *http.Request,
 	p swiftfmt.Package,
-	it types.Item,
+	it model.Item,
 ) {
 	wanted := "Package.swift"
 	if values, ok := r.URL.Query()["swift-version"]; ok && len(values) == 1 {
@@ -230,7 +231,7 @@ func validToolsVersion(s string) bool {
 	return true
 }
 
-func archiveHeaders(w http.ResponseWriter, p swiftfmt.Package, it types.Item) {
+func archiveHeaders(w http.ResponseWriter, p swiftfmt.Package, it model.Item) {
 	w.Header().Set("Content-Version", "1")
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().

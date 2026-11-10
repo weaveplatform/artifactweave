@@ -17,11 +17,15 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
@@ -30,8 +34,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 const (
@@ -100,23 +103,23 @@ func newFixtureOn(
 			t.Fatal(err)
 		}
 	}
-	permit := func(name, user, include string, actions types.Actions) {
+	permit := func(name, user, include string, actions api.Actions) {
 		t.Helper()
-		target := types.Target{Include: []string{include}}
-		if err := db.Permissions().Create(ctx, types.Permission{
+		target := model.Target{Include: []string{include}}
+		if err := db.Permissions().Create(ctx, model.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{user: actions}},
-				Targets: map[string]types.Target{"nuget-local": target, "nuget-forced": target},
+			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{user: actions}},
+				Targets: map[string]model.Target{"nuget-local": target, "nuget-forced": target},
 			}},
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	read, write, del := types.ActionRead, types.ActionWrite, types.ActionDelete
+	read, write, del := api.ActionRead, api.ActionWrite, api.ActionDelete
 	permit("reader", "reader", "**", read)
 	permit("partial", "partial", "Acme.Mixed.1.*", read)
-	permit("writer", "writer", "**", read|write|del|types.ActionAnnotate)
+	permit("writer", "writer", "**", read|write|del|api.ActionAnnotate)
 	permit("deployer", "deployer", "**", read|write)
 	permit("teamwriter", "teamwriter", "team/**", read|write)
 	permit("pkgdeleter-read", "pkgdeleter", "**", read)
@@ -135,7 +138,7 @@ func newFixtureOn(
 		Store: backend,
 		Items: func() *item.Service { return f.items },
 		// The item routes' download, reduced to the content.
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 			rc, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				t.Errorf("open %s: %v", it.FullPath(), err)
@@ -198,7 +201,7 @@ func (f *fixture) now() time.Time {
 
 // deploy stores body at path in nuget-local through the item service, so
 // the NuGet format checks and indexes it.
-func (f *fixture) deploy(path string, body []byte) types.Item {
+func (f *fixture) deploy(path string, body []byte) model.Item {
 	f.t.Helper()
 	ctx := context.Background()
 	c, err := f.db.Repos().Get(ctx, "nuget-local")
@@ -329,18 +332,18 @@ type failingStore struct {
 	failing string
 }
 
-func (s failingStore) Leases() store.LeaseStore {
+func (s failingStore) Leases() work.LeaseStore {
 	return failingLeases{LeaseStore: s.Store.Leases(), failing: s.failing}
 }
 
 type failingLeases struct {
-	store.LeaseStore
+	work.LeaseStore
 	failing string
 }
 
 func (l failingLeases) Acquire(
 	ctx context.Context,
-	lease types.Lease,
+	lease work.Lease,
 	now time.Time,
 ) (bool, error) {
 	if l.failing == "lease" {
@@ -349,12 +352,12 @@ func (l failingLeases) Acquire(
 	return l.LeaseStore.Acquire(ctx, lease, now) //nolint:wrapcheck // a test's pass-through
 }
 
-func (s failingStore) Items() store.ItemStore {
+func (s failingStore) Items() port.ItemStore {
 	return failingItems{ItemStore: s.Store.Items(), failing: s.failing}
 }
 
 type failingItems struct {
-	store.ItemStore
+	port.ItemStore
 	failing string
 }
 
@@ -363,39 +366,39 @@ func (i failingItems) Get(
 	repoKey string,
 	cached bool,
 	path string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if i.failing == "item" {
-		return types.Item{}, errBroken
+		return model.Item{}, errBroken
 	}
 	return i.ItemStore.Get(ctx, repoKey, cached, path) //nolint:wrapcheck // a test's pass-through
 }
 
-func (i failingItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
+func (i failingItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
 	if i.failing == "byid" {
-		return types.Item{}, errBroken
+		return model.Item{}, errBroken
 	}
 	return i.ItemStore.GetByID(ctx, id) //nolint:wrapcheck // a test's pass-through
 }
 
-func (i failingItems) Stats(ctx context.Context, id int64) (types.ItemStats, error) {
+func (i failingItems) Stats(ctx context.Context, id int64) (model.ItemStats, error) {
 	if i.failing == "stats" {
-		return types.ItemStats{}, errBroken
+		return model.ItemStats{}, errBroken
 	}
 	return i.ItemStore.Stats(ctx, id) //nolint:wrapcheck // a test's pass-through
 }
 
-func (s failingStore) Packages() store.PackageStore {
+func (s failingStore) Packages() port.PackageStore {
 	return failingPackages{PackageStore: s.Store.Packages(), failing: s.failing}
 }
 
 type failingPackages struct {
-	store.PackageStore
+	port.PackageStore
 	failing string
 }
 
-func (p failingPackages) Find(ctx context.Context, key, name string) (types.Package, error) {
+func (p failingPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
 	if p.failing == "find" {
-		return types.Package{}, errBroken
+		return model.Package{}, errBroken
 	}
 	return p.PackageStore.Find(ctx, key, name) //nolint:wrapcheck // a test's pass-through
 }
@@ -403,15 +406,15 @@ func (p failingPackages) Find(ctx context.Context, key, name string) (types.Pack
 func (p failingPackages) List(
 	ctx context.Context,
 	key string,
-	page store.Page,
-) ([]types.Package, string, error) {
+	page kernel.Page,
+) ([]model.Package, string, error) {
 	if p.failing == "list" {
 		return nil, "", errBroken
 	}
 	return p.PackageStore.List(ctx, key, page) //nolint:wrapcheck // a test's pass-through
 }
 
-func (p failingPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (p failingPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	vs, err := p.PackageStore.Versions(ctx, id)
 	switch p.failing {
 	case "versions":
@@ -435,11 +438,11 @@ func (p failingPackages) Version(
 	ctx context.Context,
 	id int64,
 	version string,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	v, err := p.PackageStore.Version(ctx, id, version)
 	switch p.failing {
 	case "version":
-		return types.PackageVersion{}, errBroken
+		return model.PackageVersion{}, errBroken
 	case "metadata":
 		v.Metadata = []byte("{")
 	}

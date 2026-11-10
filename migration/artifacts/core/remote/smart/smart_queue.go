@@ -17,17 +17,16 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type smartJob struct {
-	Key          types.RemoteCacheKey       `json:"key"`
-	Identity     types.SourceIdentity       `json:"identity"`
+	Key          model.RemoteCacheKey       `json:"key"`
+	Identity     model.SourceIdentity       `json:"identity"`
 	Epoch        int64                      `json:"epoch"`
 	ItemID       int64                      `json:"item_id"`
 	SHA256       string                     `json:"sha256"`
@@ -42,7 +41,7 @@ func (s *Smart) enqueue(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
-	key types.RemoteCacheKey,
+	key model.RemoteCacheKey,
 	statistics bool,
 ) (string, error) {
 	principal, ok := kernel.FromContext(ctx)
@@ -60,10 +59,10 @@ func (s *Smart) enqueue(
 		}
 		if !statistics {
 			previous, e := s.policy.Store.WorkQueue().Get(tx, s.kind, jobKey)
-			if e != nil && !errors.Is(e, store.ErrNotFound) {
+			if e != nil && !errors.Is(e, kernel.ErrNotFound) {
 				return smartError("work status", e)
 			}
-			if e == nil && previous.State == types.WorkParked {
+			if e == nil && previous.State == work.WorkParked {
 				var old smartJob
 				if json.Unmarshal(previous.Payload, &old) != nil ||
 					old.Epoch == entry.Token.Epoch && old.ItemID == entry.ItemID &&
@@ -89,7 +88,7 @@ func (s *Smart) enqueue(
 		}
 		if statistics {
 			if entry.Smart == nil {
-				entry.Smart = &types.RemoteSmartState{}
+				entry.Smart = &model.RemoteSmartState{}
 			}
 			if entry.Smart.Downloads == math.MaxInt64 {
 				return source.ErrUnavailable
@@ -116,14 +115,14 @@ func (s *Smart) enqueue(
 func (s *Smart) admit(ctx context.Context, key string) error {
 	holder, now := rand.Text(), policyNow(s.policy)
 	held, err := s.policy.Store.Leases().
-		Acquire(ctx, types.Lease{Name: s.kind, Holder: holder, Acquired: now, Expires: now.Add(time.Minute)}, now)
+		Acquire(ctx, work.Lease{Name: s.kind, Holder: holder, Acquired: now, Expires: now.Add(time.Minute)}, now)
 	if err != nil || !held {
 		return source.ErrUnavailable
 	}
 	defer func() { _ = s.policy.Store.Leases().Release(ctx, s.kind, holder) }()
 	if _, err = s.policy.Store.WorkQueue().Get(ctx, s.kind, key); err == nil {
 		return nil
-	} else if !errors.Is(err, store.ErrNotFound) {
+	} else if !errors.Is(err, kernel.ErrNotFound) {
 		return fmt.Errorf("smart remote work lookup: %w", err)
 	}
 	stats, err := s.policy.Store.WorkQueue().Stats(ctx)
@@ -142,20 +141,20 @@ func (s *Smart) currentEntry(
 	ctx context.Context,
 	q source.Request,
 	permit source.Permit,
-	key types.RemoteCacheKey,
-) (types.RemoteCacheEntry, error) {
+	key model.RemoteCacheKey,
+) (model.RemoteCacheEntry, error) {
 	if err := s.policy.Check(ctx, q, permit, key.SettingsRevision); err != nil {
 		//nolint:wrapcheck // preserves upstream error identity
-		return types.RemoteCacheEntry{}, err
+		return model.RemoteCacheEntry{}, err
 	}
 	// Begin takes the source lifetime lock before reading mutable state. The
 	// outer transaction keeps concurrent statistics and property merges serial.
 	if _, err := s.policy.Store.RemoteCache().Begin(ctx, key); err != nil {
-		return types.RemoteCacheEntry{}, fmt.Errorf("smart remote state lock: %w", err)
+		return model.RemoteCacheEntry{}, fmt.Errorf("smart remote state lock: %w", err)
 	}
 	entry, err := s.policy.ReadEntry(ctx, key, permit)
 	if err != nil || entry.ItemID == 0 {
-		return types.RemoteCacheEntry{}, source.ErrSuperseded
+		return model.RemoteCacheEntry{}, source.ErrSuperseded
 	}
 	return entry, nil
 }
@@ -222,7 +221,7 @@ func (s *Smart) restore(
 
 func smartRegistryGrant(
 	registryPath func(string) (image, operation, reference string, err error),
-	access *types.RegistryAccess,
+	access *kernel.RegistryAccess,
 	key, path string,
 ) bool {
 	if registryPath == nil {
@@ -237,13 +236,13 @@ func smartRegistryGrant(
 	} else if !strings.EqualFold(access.Realm, key) {
 		return false
 	}
-	return slices.ContainsFunc(access.Grants, func(grant types.RegistryGrant) bool {
+	return slices.ContainsFunc(access.Grants, func(grant kernel.RegistryGrant) bool {
 		return grant.Type == "repository" && strings.EqualFold(grant.Name, name) &&
 			(slices.Contains(grant.Actions, "pull") || slices.Contains(grant.Actions, "*"))
 	})
 }
 
-func (s *Smart) run(ctx context.Context, workItem types.WorkItem) error {
+func (s *Smart) run(ctx context.Context, workItem work.WorkItem) error {
 	var job smartJob
 	if json.Unmarshal(workItem.Payload, &job) != nil || job.Key.Path == "" || job.ItemID <= 0 {
 		return errors.Join(work.ErrPermanent, source.ErrInvalidRequest)
@@ -296,7 +295,7 @@ func (s *Smart) update(
 	q source.Request,
 	permit source.Permit,
 	job smartJob,
-	change func(context.Context, *types.RemoteCacheEntry) error,
+	change func(context.Context, *model.RemoteCacheEntry) error,
 ) error {
 	err := s.policy.Store.Tx(ctx, func(tx context.Context) error {
 		entry, err := s.currentEntry(tx, q, permit, job.Key)
@@ -308,7 +307,7 @@ func (s *Smart) update(
 			return source.ErrSuperseded
 		}
 		if entry.Smart == nil {
-			entry.Smart = &types.RemoteSmartState{}
+			entry.Smart = &model.RemoteSmartState{}
 		}
 		if err = change(tx, &entry); err != nil {
 			return smartError("operation", err)
@@ -329,7 +328,7 @@ func (s *Smart) refresh(
 ) error {
 	started := policyNow(s.policy)
 	properties := smartProperties(q.Repo) && smartPropertyPath(s.registryPath, q)
-	var incoming types.Properties
+	var incoming model.Properties
 	var present bool
 	var err error
 	if properties {
@@ -345,7 +344,7 @@ func (s *Smart) refresh(
 		q,
 		permit,
 		job,
-		func(tx context.Context, entry *types.RemoteCacheEntry) error {
+		func(tx context.Context, entry *model.RemoteCacheEntry) error {
 			// A later observation from another HTTP representation won publication.
 			// Never replace it with this older in-flight response.
 			if properties && entry.Smart.PropertiesAt.After(started) ||
@@ -392,10 +391,10 @@ func (s *Smart) refresh(
 	)
 }
 
-func smartWorkKey(key types.RemoteCacheKey, source types.SourceIdentity, statistics bool) string {
+func smartWorkKey(key model.RemoteCacheKey, source model.SourceIdentity, statistics bool) string {
 	identity, _ := json.Marshal(struct {
-		Key        types.RemoteCacheKey `json:"key"`
-		Source     types.SourceIdentity `json:"source"`
+		Key        model.RemoteCacheKey `json:"key"`
+		Source     model.SourceIdentity `json:"source"`
 		Statistics bool                 `json:"statistics"`
 	}{key, source, statistics})
 	digest := sha256.Sum256(identity)

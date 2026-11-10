@@ -10,7 +10,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccRemoteBrowsingOptInAndCacheOnlyStorage(t *testing.T) {
@@ -90,7 +90,7 @@ func TestAccRemoteBrowsingOptInAndCacheOnlyStorage(t *testing.T) {
 	if _, err = w.db.Items().
 		Get(t.Context(), "up", true, "a&b.bin"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("synthetic item", err)
 	}

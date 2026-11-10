@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func xetStagePath(id format.Identity, subject, sha string) string {
@@ -32,16 +31,16 @@ func (h handler) authorizeXetCommit(r *http.Request, path, sha string) error {
 	if err == nil && string(raw) == sha {
 		return nil
 	}
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		return err
 	}
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	readable := false
 	key := pkgroute.RequestFrom(r).Repo.Key
 	for {
 		items, next, err := h.k.DB().
 			Items().
-			FindByChecksum(r.Context(), types.Checksums{SHA256: sha}, page)
+			FindByChecksum(r.Context(), kernel.Checksums{SHA256: sha}, page)
 		if err != nil {
 			return fmt.Errorf("huggingface: authorize Xet content reuse: %w", err)
 		}
@@ -51,7 +50,7 @@ func (h handler) authorizeXetCommit(r *http.Request, path, sha string) error {
 			}
 			existing, _, _, valid := format.ParseSnapshotPath(it.FullPath())
 			if valid && it.RepoKey == key && existing == id &&
-				h.k.Can(r, it.FullPath(), types.ActionRead) {
+				h.k.Can(r, it.FullPath(), api.ActionRead) {
 				readable = true
 			}
 		}

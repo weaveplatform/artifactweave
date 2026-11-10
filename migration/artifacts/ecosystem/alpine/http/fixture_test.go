@@ -26,12 +26,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/alpine"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The x86_64 index of branch v3.20's main component, and the package of
@@ -141,7 +141,7 @@ func (w *itemWorld) repos(cs ...repo.Config) []repo.Config {
 }
 
 // put stores body as the file at path in the repository key, blob and item.
-func (w *itemWorld) put(key, path string, body []byte) types.Item {
+func (w *itemWorld) put(key, path string, body []byte) model.Item {
 	w.t.Helper()
 	return w.world.Put(w.t, repo.Config{Key: key}, false, path, body)
 }
@@ -149,7 +149,7 @@ func (w *itemWorld) put(key, path string, body []byte) types.Item {
 // folder stores a folder at path in the repository key.
 func (w *itemWorld) folder(key, path string) {
 	w.t.Helper()
-	if _, err := w.db.Items().Put(w.t.Context(), types.Item{
+	if _, err := w.db.Items().Put(w.t.Context(), model.Item{
 		RepoKey: key, Name: path, Folder: true, CreatedBy: kittest.Admin.Name,
 	}); err != nil {
 		w.t.Fatal(err)
@@ -160,9 +160,9 @@ func (w *itemWorld) folder(key, path string) {
 // store does not hold.
 func (w *itemWorld) lost(key, path string) {
 	w.t.Helper()
-	if _, err := w.db.Items().Put(w.t.Context(), types.Item{
+	if _, err := w.db.Items().Put(w.t.Context(), model.Item{
 		RepoKey: key, Name: path, Size: 1, CreatedBy: kittest.Admin.Name,
-		Actual: types.Checksums{SHA256: absentSHA256},
+		Actual: kernel.Checksums{SHA256: absentSHA256},
 	}); err != nil {
 		w.t.Fatal(err)
 	}
@@ -236,9 +236,9 @@ func (f sourceBackend) Read(
 
 // sourceIdentity resolves every remote repository to one fixed HTTP source
 // identity, as rpmhttp's fixture of the same name does.
-func sourceIdentity(context.Context, repo.Config) (types.SourceIdentity, error) {
-	return types.SourceIdentity{
-		Kind:       types.ExternalHTTP,
+func sourceIdentity(context.Context, repo.Config) (model.SourceIdentity, error) {
+	return model.SourceIdentity{
+		Kind:       model.ExternalHTTP,
 		Repository: "repo-1",
 		ID:         "http-1",
 		Generation: "revision-1",
@@ -279,12 +279,12 @@ type faultyRepos struct {
 	fail string
 }
 
-func (s faultyRepos) Repos() store.RepoStore {
+func (s faultyRepos) Repos() port.RepoStore {
 	return failingRepoGet{RepoStore: s.Store.Repos(), fail: s.fail}
 }
 
 type failingRepoGet struct {
-	store.RepoStore
+	port.RepoStore
 	fail string
 }
 

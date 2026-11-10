@@ -9,7 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func mustParse(t *testing.T, src string) *Query {
@@ -286,7 +287,7 @@ type badNode struct{}
 func (badNode) node() {}
 
 func TestUnitMatchEdges(t *testing.T) {
-	it := Hit{Item: types.Item{Name: "a", Size: 3}}
+	it := Hit{Item: model.Item{Name: "a", Size: 3}}
 	if (&Query{Criteria: badNode{}}).Match(it, time.Now()) {
 		t.Fatal("an unknown node matched")
 	}
@@ -338,14 +339,14 @@ func TestUnitFieldsAndRestrictions(t *testing.T) {
 
 func TestUnitResponse(t *testing.T) {
 	at := time.Date(2026, 1, 2, 3, 4, 5, 678e6, time.FixedZone("X", 3600))
-	file := types.Item{
+	file := model.Item{
 		RepoKey: "r", Cached: true, Path: "a", Name: "f.jar", Size: 5, Depth: 2,
-		Actual:  types.Checksums{SHA1: "s1", MD5: "m5", SHA256: "s256"},
+		Actual:  kernel.Checksums{SHA1: "s1", MD5: "m5", SHA256: "s256"},
 		Created: at, CreatedBy: "u", Modified: at,
 	}
-	folder := types.Item{RepoKey: "r", Path: ".", Name: "a", Folder: true}
+	folder := model.Item{RepoKey: "r", Path: ".", Name: "a", Folder: true}
 	hits := []Hit{
-		{Item: file, Properties: types.Properties{"b": {"2", "1"}, "a": {"x"}}},
+		{Item: file, Properties: model.Properties{"b": {"2", "1"}, "a": {"x"}}},
 		{Item: folder},
 	}
 	// Offset and limit beside a property include are refused by Parse, so
@@ -556,7 +557,7 @@ func TestUnitCompileSecondaryDomains(t *testing.T) {
 }
 
 func TestUnitMatchStatEdges(t *testing.T) {
-	st := &types.ItemStats{DownloadCount: 1}
+	st := &model.ItemStats{DownloadCount: 1}
 	for src, want := range map[string]bool{
 		`{"stat.downloaded":{"$eq":null}}`:          true,
 		`{"stat.downloaded":{"$ne":null}}`:          false,
@@ -577,9 +578,9 @@ func TestUnitMatchStatEdges(t *testing.T) {
 func TestUnitResponseSecondaryDomains(t *testing.T) {
 	at := time.Date(2026, 1, 2, 3, 4, 5, 678e6, time.UTC)
 	hit := Hit{
-		Item:         types.Item{RepoKey: "r", Path: "a", Name: "f"},
-		Properties:   types.Properties{"b": {"1"}, "a": {"x"}, "c": {"y"}},
-		Stats:        &types.ItemStats{DownloadCount: 2, LastDownloaded: at, RemoteOrigin: "o"},
+		Item:         model.Item{RepoKey: "r", Path: "a", Name: "f"},
+		Properties:   model.Properties{"b": {"1"}, "a": {"x"}, "c": {"y"}},
+		Stats:        &model.ItemStats{DownloadCount: 2, LastDownloaded: at, RemoteOrigin: "o"},
 		VirtualRepos: []string{"v1", "v2"},
 	}
 	for query, want := range map[string]string{
@@ -811,7 +812,7 @@ func TestUnitParseActionErrors(t *testing.T) {
 		`properties.update({"$or":["a"]}).keys("a").newValue("v")`:             ErrSyntax,
 		`properties.update({"$not":[]}).keys("a").newValue("v")`:               ErrSyntax,
 		`properties.update({"item.size":"big"}).keys("a").newValue("v")`:       ErrSyntax,
-		`properties.update().keys("` + strings.Repeat("k", types.PropertyKeyMax+1) +
+		`properties.update().keys("` + strings.Repeat("k", model.PropertyKeyMax+1) +
 			`").newValue("v")`: ErrInvalid,
 	} {
 		if _, err := Parse(src); !errors.Is(err, want) {

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 )
 
 const healthInstanceID = "jfrt@5d0c9a3e-1b2f-4c6d-8e7f-0a1b2c3d4e5f"
@@ -13,7 +13,7 @@ const healthInstanceID = "jfrt@5d0c9a3e-1b2f-4c6d-8e7f-0a1b2c3d4e5f"
 // A service built only to reach the store probes it and remembers nothing.
 func TestAccProbeWithoutMemory(t *testing.T) {
 	db := inmem.New()
-	if err := db.Instance().Init(context.Background(), types.InstanceIdentity{
+	if err := db.Instance().Init(context.Background(), instance.InstanceIdentity{
 		InstanceID: healthInstanceID, ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)

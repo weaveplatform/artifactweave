@@ -6,9 +6,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type remoteVersion struct {
@@ -75,7 +75,7 @@ func (s *remoteSession) registrations(hv hive, id string) ([]remoteVersion, erro
 			out = append(out, remoteVersion{key: key, entry: entry, result: pageResult})
 		}
 	}
-	slices.SortFunc(out, func(a, b remoteVersion) int { return types.CompareNuGet(a.key, b.key) })
+	slices.SortFunc(out, func(a, b remoteVersion) int { return model.CompareNuGet(a.key, b.key) })
 	return out, nil
 }
 
@@ -140,7 +140,7 @@ func (s *remoteSession) registration(
 			continue
 		}
 		if leafKey != "" && v.key != leafKey ||
-			lo != "" && (types.CompareNuGet(v.key, lo) < 0 || types.CompareNuGet(v.key, hi) > 0) {
+			lo != "" && (model.CompareNuGet(v.key, lo) < 0 || model.CompareNuGet(v.key, hi) > 0) {
 			continue
 		}
 		if s.allowed(id, v.key, v.result) {

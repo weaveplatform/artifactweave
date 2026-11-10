@@ -13,13 +13,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/xet"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (h handler) xetRecordBySHA(
@@ -93,11 +93,11 @@ func (h handler) xetPublishedFile(
 			continue
 		}
 		path, _ := format.SnapshotPath(id, chosen.info.SHA, s.Filename)
-		if !h.k.Can(chosen.request, path, types.ActionRead) {
+		if !h.k.Can(chosen.request, path, api.ActionRead) {
 			continue
 		}
 		candidate, e := h.xetFileRecord(r.Context(), chosen, id, s)
-		if errors.Is(e, store.ErrNotFound) || errors.Is(e, errXetTransient) {
+		if errors.Is(e, kernel.ErrNotFound) || errors.Is(e, errXetTransient) {
 			continue
 		}
 		if e != nil {
@@ -359,7 +359,7 @@ func (h handler) xetResolveHeaders(
 		return nil
 	}
 	record, err := h.xetFileRecord(r.Context(), chosen, id, s)
-	if errors.Is(err, store.ErrNotFound) || errors.Is(err, errXetTransient) {
+	if errors.Is(err, kernel.ErrNotFound) || errors.Is(err, errXetTransient) {
 		return nil
 	}
 	if err != nil {

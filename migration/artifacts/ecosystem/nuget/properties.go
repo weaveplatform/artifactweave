@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // The nuget.* properties the format sets on each indexed .nupkg from its
@@ -56,11 +56,11 @@ var propertyKeys = []string{
 // as it. An element n lacks, or leaves empty, gives no property, and each
 // value is cut as the store would cut it (types.PropertyValueMax), so a
 // comparison with what the store holds sees no change where there is none.
-func properties(n *Nuspec, it types.Item) types.Properties {
-	out := types.Properties{}
+func properties(n *Nuspec, it model.Item) model.Properties {
+	out := model.Properties{}
 	one := func(k, v string) {
 		if v != "" {
-			out[k] = []string{types.TruncatePropertyValue(v, types.PropertyValueMax)}
+			out[k] = []string{model.TruncatePropertyValue(v, model.PropertyValueMax)}
 		}
 	}
 	one(PropID, n.ID)
@@ -86,8 +86,8 @@ func properties(n *Nuspec, it types.Item) types.Properties {
 	var deps []string
 	for _, g := range n.DependencyGroups {
 		for _, d := range g.Dependencies {
-			deps = append(deps, types.TruncatePropertyValue(
-				d.ID+":"+d.Range+":"+g.TargetFramework, types.PropertyValueMax))
+			deps = append(deps, model.TruncatePropertyValue(
+				d.ID+":"+d.Range+":"+g.TargetFramework, model.PropertyValueMax))
 		}
 	}
 	slices.Sort(deps)
@@ -102,7 +102,7 @@ func properties(n *Nuspec, it types.Item) types.Properties {
 func setProperties(
 	ctx context.Context,
 	st format.Store,
-	it types.Item,
+	it model.Item,
 	n *Nuspec,
 	at time.Time,
 ) error {
@@ -121,13 +121,13 @@ func setProperties(
 func patchProperties(
 	ctx context.Context,
 	st format.Store,
-	it types.Item,
-	props types.Properties,
+	it model.Item,
+	props model.Properties,
 	n *Nuspec,
 	at time.Time,
 ) error {
 	want := properties(n, it)
-	set := types.Properties{}
+	set := model.Properties{}
 	var remove []string
 	for _, k := range propertyKeys {
 		v, ok := want[k]

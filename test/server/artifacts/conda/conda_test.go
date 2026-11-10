@@ -14,16 +14,19 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type condaUnreadableBlob struct {
@@ -55,9 +58,9 @@ func TestUnitCondaIndexReadFailureNeverServesMetadata(t *testing.T) {
 			if q.Resource.Path != "noarch/repodata.json" {
 				return source.Result{}, source.ErrInvalidRequest
 			}
-			return source.Result{Item: &types.Item{
+			return source.Result{Item: &model.Item{
 				RepoKey: q.Repo.Key, Path: "noarch", Name: "repodata.json", Cached: true,
-				Size: int64(len(raw)), Actual: types.Checksums{SHA256: sha},
+				Size: int64(len(raw)), Actual: kernel.Checksums{SHA256: sha},
 			}}, nil
 		},
 	)}
@@ -73,9 +76,9 @@ func TestUnitCondaIndexReadFailureNeverServesMetadata(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := w.db.Items().Put(t.Context(), types.Item{
+	if _, err := w.db.Items().Put(t.Context(), model.Item{
 		RepoKey: "conda-unreadable-local", Path: "noarch", Name: "repodata.json",
-		Size: int64(len(raw)), Actual: types.Checksums{SHA256: sha},
+		Size: int64(len(raw)), Actual: kernel.Checksums{SHA256: sha},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -145,11 +148,11 @@ func TestUnitCondaChannelRejectsUnsafeRequestsAndVirtualCycles(t *testing.T) {
 		wantStatus(t, w.do(http.MethodGet, tc.path, "admin", ""), tc.expected)
 	}
 	wantStatus(t, w.do(http.MethodGet, base+"repodata.json", "user", ""), http.StatusForbidden)
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+	if err := w.db.Permissions().Create(t.Context(), model.Permission{
 		Name: "conda-virtual-only",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
-			Targets: map[string]types.Target{"conda-empty-virtual": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]model.Target{"conda-empty-virtual": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -274,9 +277,9 @@ func TestUnitCondaLocalIndexRejectsCorruptionAndIncompatibleMember(t *testing.T)
 		w.do(http.MethodPut, "/artifactory/other-local/bad-conda-index", "admin", bad),
 		http.StatusCreated,
 	)
-	_, err := w.db.Items().Put(t.Context(), types.Item{
+	_, err := w.db.Items().Put(t.Context(), model.Item{
 		RepoKey: "conda-broken", Path: "noarch", Name: "repodata.json", Size: int64(len(bad)),
-		Actual: types.Checksums{SHA256: fmt.Sprintf("%x", sha256.Sum256([]byte(bad)))},
+		Actual: kernel.Checksums{SHA256: fmt.Sprintf("%x", sha256.Sum256([]byte(bad)))},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -289,9 +292,9 @@ func TestUnitCondaLocalIndexRejectsCorruptionAndIncompatibleMember(t *testing.T)
 	); got.Code == http.StatusOK {
 		t.Fatal("corrupt stored channel metadata was served")
 	}
-	if _, err := w.db.Items().Put(t.Context(), types.Item{
+	if _, err := w.db.Items().Put(t.Context(), model.Item{
 		RepoKey: "conda-missing-blob", Name: "noarch/repodata.json", Size: 1,
-		Actual: types.Checksums{SHA256: fmt.Sprintf("%064x", 0)},
+		Actual: kernel.Checksums{SHA256: fmt.Sprintf("%064x", 0)},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -304,7 +307,7 @@ func TestUnitCondaLocalIndexRejectsCorruptionAndIncompatibleMember(t *testing.T)
 		t.Fatal("missing index blob was silently replaced with an empty channel")
 	}
 	if _, err := w.db.Items().
-		Put(t.Context(), types.Item{RepoKey: "conda-folder-index", Name: "noarch/repodata.json", Folder: true}); err != nil {
+		Put(t.Context(), model.Item{RepoKey: "conda-folder-index", Name: "noarch/repodata.json", Folder: true}); err != nil {
 		t.Fatal(err)
 	}
 	wantStatus(
@@ -356,12 +359,12 @@ func TestUnitCondaRemoteIndexAndArchiveTrustBoundary(t *testing.T) {
 					if mode == "missing-cached-index" {
 						sha = fmt.Sprintf("%064x", 0)
 					}
-					return source.Result{Item: &types.Item{
+					return source.Result{Item: &model.Item{
 						RepoKey: "conda-remote",
 						Path:    "noarch",
 						Name:    "repodata.json",
 						Cached:  true,
-						Actual:  types.Checksums{SHA256: sha},
+						Actual:  kernel.Checksums{SHA256: sha},
 					}}, nil
 				}
 				if mode == "broken-stream" {
@@ -626,7 +629,7 @@ func TestUnitCondaLocalAndVirtualNativeChannel(t *testing.T) {
 	if err := q.EnsureFresh(t.Context(), condafmt.KindIndex, "conda-local"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.db.Items().Put(t.Context(), types.Item{
+	if _, err := w.db.Items().Put(t.Context(), model.Item{
 		RepoKey: "conda-folder-member", Name: "noarch/repodata.json", Folder: true,
 	}); err != nil {
 		t.Fatal(err)
@@ -644,11 +647,11 @@ func TestUnitCondaLocalAndVirtualNativeChannel(t *testing.T) {
 	if !bytes.Equal(fallbackArchive.Body.Bytes(), body) {
 		t.Fatal("virtual fallback changed package bytes")
 	}
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+	if err := w.db.Permissions().Create(t.Context(), model.Permission{
 		Name: "conda-index-only",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
-			Targets: map[string]types.Target{
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]model.Target{
 				"conda-local":   {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}},
 				"conda-virtual": {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}},
 			},
@@ -749,7 +752,7 @@ func TestAccCondaShardsLocalFederatedVirtualLifecycleAndPermissions(t *testing.T
 		Resolve: sourceIdentity,
 		HTTP: sourceBackend(
 			func(context.Context, source.Request, source.Permit) (source.Result, error) {
-				return source.Result{}, store.ErrNotFound
+				return source.Result{}, kernel.ErrNotFound
 			},
 		),
 	}
@@ -799,7 +802,7 @@ func TestAccCondaShardsLocalFederatedVirtualLifecycleAndPermissions(t *testing.T
 		)
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), types.Permission{Name: "shard-view", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}}, Targets: map[string]types.Target{"shard-local": {Include: []string{"**"}}, "shard-virtual": {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}}}}}); err != nil {
+		Create(t.Context(), model.Permission{Name: "shard-view", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}}, Targets: map[string]model.Target{"shard-local": {Include: []string{"**"}}, "shard-virtual": {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	hidden := w.do(
@@ -883,11 +886,11 @@ func TestAccCondaShardsGenericPathsCannotDiscloseUnfilteredMetadata(t *testing.T
 	sources := &source.Service{Resolve: sourceIdentity, HTTP: sourceBackend(
 		func(context.Context, source.Request, source.Permit) (source.Result, error) {
 			upstreamReads++
-			return source.Result{}, store.ErrNotFound
+			return source.Result{}, kernel.ErrNotFound
 		},
 	)}
 	w := newCondaShardWorld(t, true, sources)
-	targets := map[string]types.Target{}
+	targets := map[string]model.Target{}
 	for _, c := range []repo.Config{
 		{Key: "raw-shard-local", Class: repo.Local, PackageType: repo.Conda},
 		{Key: "raw-shard-fed", Class: repo.Federated, PackageType: repo.Conda},
@@ -897,12 +900,12 @@ func TestAccCondaShardsGenericPathsCannotDiscloseUnfilteredMetadata(t *testing.T
 		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
 		}
-		targets[c.Key] = types.Target{Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}
+		targets[c.Key] = model.Target{Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}
 	}
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
-		Name: "raw-shards-metadata-only", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
+	if err := w.db.Permissions().Create(t.Context(), model.Permission{
+		Name: "raw-shards-metadata-only", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
 				Targets: targets,
 			},
 		},
@@ -949,8 +952,8 @@ func TestAccCondaShardsGenericPathsCannotDiscloseUnfilteredMetadata(t *testing.T
 	if upstreamReads != 0 {
 		t.Fatalf("generic raw requests fetched %d upstream documents", upstreamReads)
 	}
-	if err := w.db.Settings().Put(t.Context(), types.SettingFolderDownload,
-		types.FolderDownloadSettings{Enabled: true}); err != nil {
+	if err := w.db.Settings().Put(t.Context(), settings.SettingFolderDownload,
+		model.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	for _, key := range []string{"raw-shard-local", "raw-shard-fed"} {
@@ -991,15 +994,15 @@ func TestAccCondaShardsCannotEscapeThroughTransfersOrChecksumReuse(t *testing.T)
 			if err := w.db.Repos().Create(t.Context(), c); err != nil {
 				t.Fatal(err)
 			}
-			if err := w.db.Permissions().Create(t.Context(), types.Permission{
-				Name: "shard-transfer", Resources: map[types.ResourceType]types.Resource{
-					types.ResourceArtifact: {
-						Actions: types.Grants{
-							Users: map[string]types.Actions{
-								"user": types.ActionRead | types.ActionWrite | types.ActionDelete,
+			if err := w.db.Permissions().Create(t.Context(), model.Permission{
+				Name: "shard-transfer", Resources: map[api.ResourceType]model.Resource{
+					api.ResourceArtifact: {
+						Actions: model.Grants{
+							Users: map[string]api.Actions{
+								"user": api.ActionRead | api.ActionWrite | api.ActionDelete,
 							},
 						},
-						Targets: map[string]types.Target{
+						Targets: map[string]model.Target{
 							c.Key: {
 								Include: []string{"**"},
 								Exclude: []string{"**/*.tar.bz2"},
@@ -1104,20 +1107,20 @@ func TestAccCondaShardTrashRestorePreservesNativeBoundary(t *testing.T) {
 			}
 			for _, grant := range []struct {
 				name, key string
-				actions   types.Actions
+				actions   api.Actions
 				exclude   []string
 			}{
-				{"restore-source-manage", c.Key, types.ActionManage | types.ActionDelete, nil},
-				{"restore-source-metadata", c.Key, types.ActionRead, []string{"**/*.tar.bz2"}},
-				{"restore-generic", "other-local", types.ActionManage | types.ActionRead, nil},
+				{"restore-source-manage", c.Key, api.ActionManage | api.ActionDelete, nil},
+				{"restore-source-metadata", c.Key, api.ActionRead, []string{"**/*.tar.bz2"}},
+				{"restore-generic", "other-local", api.ActionManage | api.ActionRead, nil},
 			} {
-				if err := w.db.Permissions().Create(t.Context(), types.Permission{
+				if err := w.db.Permissions().Create(t.Context(), model.Permission{
 					Name: grant.name,
-					Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-						Actions: types.Grants{
-							Users: map[string]types.Actions{"user": grant.actions},
+					Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+						Actions: model.Grants{
+							Users: map[string]api.Actions{"user": grant.actions},
 						},
-						Targets: map[string]types.Target{
+						Targets: map[string]model.Target{
 							grant.key: {Include: []string{"**"}, Exclude: grant.exclude},
 						},
 					}},
@@ -1164,7 +1167,7 @@ func TestAccCondaShardTrashRestorePreservesNativeBoundary(t *testing.T) {
 			wantStatus(t, w.do("DELETE", "/artifactory/"+c.Key+"/"+from, "user", ""), 204)
 			trashed := func() int {
 				t.Helper()
-				entries, _, err := w.db.Trash().List(t.Context(), c.Key, "", store.Page{})
+				entries, _, err := w.db.Trash().List(t.Context(), c.Key, "", kernel.Page{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1262,7 +1265,7 @@ func TestAccCondaRemoteShardsValidateBeforeCacheAndDelivery(t *testing.T) {
 							data = classic[filename]
 						}
 						if isIndex && mode == "index-absent" {
-							return source.Result{}, store.ErrNotFound
+							return source.Result{}, kernel.ErrNotFound
 						}
 						if isIndex && mode == "index-error" {
 							return source.Result{}, source.ErrUnavailable
@@ -1270,7 +1273,7 @@ func TestAccCondaRemoteShardsValidateBeforeCacheAndDelivery(t *testing.T) {
 						if !isIndex && filename != "repodata.json" {
 							shardReads++
 							if mode == "missing-shard" {
-								return source.Result{}, store.ErrNotFound
+								return source.Result{}, kernel.ErrNotFound
 							}
 						}
 						if isIndex && mode == "bad-index" || !isIndex && mode == "bad-shard" {

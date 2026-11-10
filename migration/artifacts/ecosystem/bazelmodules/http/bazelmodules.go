@@ -18,15 +18,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	fmtbazel "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const metadataLimit = 4 << 20
@@ -129,7 +129,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, missing())
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
@@ -214,7 +214,7 @@ func routePath(q requestPath) string {
 }
 
 func (h handler) localComplete(r *http.Request, q requestPath) bool {
-	if !h.k.Can(r, modulePath(q), types.ActionRead) {
+	if !h.k.Can(r, modulePath(q), api.ActionRead) {
 		return false
 	}
 	_, ok := h.localArchive(r, q)
@@ -226,12 +226,12 @@ func (h handler) localComplete(r *http.Request, q requestPath) bool {
 }
 
 func (h handler) localArchive(r *http.Request, q requestPath) (string, bool) {
-	if !h.k.CanFolder(r, moduleFolder(q), types.ActionRead) {
+	if !h.k.CanFolder(r, moduleFolder(q), api.ActionRead) {
 		return "", false
 	}
 	items, _, err := h.k.DB().
 		Items().
-		Children(r.Context(), pkgroute.RequestFrom(r).Repo.Key, false, moduleFolder(q), store.Page{Limit: store.MaxLimit})
+		Children(r.Context(), pkgroute.RequestFrom(r).Repo.Key, false, moduleFolder(q), kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		return "", false
 	}
@@ -240,7 +240,7 @@ func (h handler) localArchive(r *http.Request, q requestPath) (string, bool) {
 		if it.Folder {
 			continue
 		}
-		if !h.k.Can(r, it.FullPath(), types.ActionRead) {
+		if !h.k.Can(r, it.FullPath(), api.ActionRead) {
 			continue
 		}
 		f, ok := fmtbazel.ParseFile(it.FullPath())
@@ -255,13 +255,13 @@ func (h handler) localArchive(r *http.Request, q requestPath) (string, bool) {
 }
 
 func (h handler) localMetadata(w http.ResponseWriter, r *http.Request, q requestPath) {
-	if !h.k.RequireFolder(w, r, "modules/"+q.name, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "modules/"+q.name, api.ActionRead) {
 		return
 	}
 	items, _, err := h.k.DB().
 		Items().
-		Children(r.Context(), pkgroute.RequestFrom(r).Repo.Key, false, "modules/"+q.name, store.Page{Limit: store.MaxLimit})
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		Children(r.Context(), pkgroute.RequestFrom(r).Repo.Key, false, "modules/"+q.name, kernel.Page{Limit: kernel.MaxLimit})
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		h.k.Error(w, r, err)
 		return
 	}
@@ -291,7 +291,7 @@ func (h handler) localSource(w http.ResponseWriter, r *http.Request, q requestPa
 	}
 	file, _ := h.localArchive(r, q)
 	p := moduleFolder(q) + "/" + file
-	if !h.k.Require(w, r, p, types.ActionRead) {
+	if !h.k.Require(w, r, p, api.ActionRead) {
 		return
 	}
 	f, err := h.k.Item(r, p)
@@ -481,7 +481,7 @@ func (h handler) remotePatch(w http.ResponseWriter, r *http.Request, q requestPa
 	}
 	p := moduleFolder(q) + "/patches/" + q.file
 	resource := pkgroute.Resource(r, p, p)
-	resource.Checksums = types.Checksums{SHA256: hex.EncodeToString(digest)}
+	resource.Checksums = kernel.Checksums{SHA256: hex.EncodeToString(digest)}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
 		h.k.Error(w, r, err)
@@ -520,7 +520,7 @@ func (h handler) remoteMetadata(w http.ResponseWriter, r *http.Request, q reques
 	metadata, _ := parseMetadata(data)
 	allowed := []string{}
 	for _, v := range metadata.Versions {
-		if h.k.Can(r, "modules/"+q.name+"/"+v+"/MODULE.bazel", types.ActionRead) {
+		if h.k.Can(r, "modules/"+q.name+"/"+v+"/MODULE.bazel", api.ActionRead) {
 			allowed = append(allowed, v)
 		}
 	}
@@ -602,7 +602,7 @@ func (h handler) remoteSource(w http.ResponseWriter, r *http.Request, q requestP
 		h.k.Error(w, r, err)
 		return
 	}
-	if !h.k.Can(r, modulePath(q), types.ActionRead) {
+	if !h.k.Can(r, modulePath(q), api.ActionRead) {
 		h.k.Error(w, r, apierror.New(403, "module read denied"))
 		return
 	}
@@ -639,7 +639,7 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, q request
 		h.k.Error(w, r, err)
 		return
 	}
-	if q.file != doc.archiveFile() || !h.k.Can(r, modulePath(q), types.ActionRead) {
+	if q.file != doc.archiveFile() || !h.k.Can(r, modulePath(q), api.ActionRead) {
 		h.k.Error(w, r, missing())
 		return
 	}
@@ -649,7 +649,7 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, q request
 		ExternalURL: doc.URL,
 		Method:      r.Method,
 		Variant:     "bazelmodules-archive-v1",
-		Checksums:   types.Checksums{SHA256: doc.sha256()},
+		Checksums:   kernel.Checksums{SHA256: doc.sha256()},
 		CheckURL:    sourceURLGuard(pkgroute.RequestFrom(r).Repo, doc.URL),
 	}
 	result, err := h.k.Read(r, resource)
@@ -721,7 +721,7 @@ func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
 		}
 		seen[key] = true
 		c, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -750,7 +750,7 @@ func (h handler) virtualRead(
 		writeJSON(w, r, []byte("{}"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, "modules/"+q.name, types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "modules/"+q.name, api.ActionRead) {
 		return
 	}
 	members, err := h.virtualMembers(r)
@@ -765,7 +765,7 @@ func (h handler) virtualRead(
 	// Select a single member for every representation of a version. A member
 	// that has MODULE.bazel but lacks a valid source cannot shadow a later one.
 	for _, mr := range members {
-		if !h.k.Can(mr, modulePath(q), types.ActionRead) {
+		if !h.k.Can(mr, modulePath(q), api.ActionRead) {
 			continue
 		}
 		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
@@ -803,7 +803,7 @@ func (h handler) virtualMetadata(
 	yanked := map[string]string{}
 	deprecated := ""
 	for _, mr := range members {
-		if !h.k.CanFolder(mr, "modules/"+q.name, types.ActionRead) {
+		if !h.k.CanFolder(mr, "modules/"+q.name, api.ActionRead) {
 			continue
 		}
 		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
@@ -825,7 +825,7 @@ func (h handler) virtualMetadata(
 				return
 			}
 			for _, v := range metadata.Versions {
-				if h.k.Can(mr, "modules/"+q.name+"/"+v+"/MODULE.bazel", types.ActionRead) &&
+				if h.k.Can(mr, "modules/"+q.name+"/"+v+"/MODULE.bazel", api.ActionRead) &&
 					!all[v] {
 					all[v] = true
 					if reason, ok := metadata.YankedVersions[v]; ok {
@@ -839,8 +839,8 @@ func (h handler) virtualMetadata(
 		} else {
 			items, _, e := h.k.DB().
 				Items().
-				Children(ctx, pkgroute.RequestFrom(mr).Repo.Key, false, "modules/"+q.name, store.Page{Limit: store.MaxLimit})
-			if e != nil && !errors.Is(e, store.ErrNotFound) {
+				Children(ctx, pkgroute.RequestFrom(mr).Repo.Key, false, "modules/"+q.name, kernel.Page{Limit: kernel.MaxLimit})
+			if e != nil && !errors.Is(e, kernel.ErrNotFound) {
 				h.k.Error(w, r, e)
 				return
 			}
@@ -868,7 +868,7 @@ func (h handler) virtualMetadata(
 }
 
 func isMissing(err error) bool {
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return true
 	}
 	var api *apierror.Error

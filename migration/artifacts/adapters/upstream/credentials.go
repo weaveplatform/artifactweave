@@ -28,7 +28,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // ResolverOptions is trusted application configuration, never upstream metadata.
@@ -216,13 +215,13 @@ func configurationError(err error) error {
 	return remote.ErrConfiguration
 }
 
-func (r *Resolver) certificate(ctx context.Context, alias string) (types.Certificate, error) {
+func (r *Resolver) certificate(ctx context.Context, alias string) (accessapi.Certificate, error) {
 	if alias == "" {
-		return types.Certificate{}, nil
+		return accessapi.Certificate{}, nil
 	}
 	cert, err := r.options.Certificates.Certificate(ctx, alias)
 	if err != nil {
-		return types.Certificate{}, configurationError(err)
+		return accessapi.Certificate{}, configurationError(err)
 	}
 	return cert, nil
 }
@@ -230,19 +229,19 @@ func (r *Resolver) certificate(ctx context.Context, alias string) (types.Certifi
 func (r *Resolver) proxy(
 	ctx context.Context,
 	c repo.Config,
-) (*url.URL, types.ConfigDocument, error) {
+) (*url.URL, configdoc.ConfigDocument, error) {
 	if enabled(c.DisableProxy) {
-		return nil, types.ConfigDocument{}, nil
+		return nil, configdoc.ConfigDocument{}, nil
 	}
-	var doc types.ConfigDocument
+	var doc configdoc.ConfigDocument
 	if c.Proxy != "" {
 		var err error
-		doc, err = r.store.Configs().Get(ctx, types.ConfigProxy, c.Proxy)
+		doc, err = r.store.Configs().Get(ctx, configdoc.ConfigProxy, c.Proxy)
 		if err != nil {
 			return nil, doc, configurationError(err)
 		}
 	} else {
-		docs, err := r.store.Configs().List(ctx, types.ConfigProxy)
+		docs, err := r.store.Configs().List(ctx, configdoc.ConfigProxy)
 		if err != nil {
 			return nil, doc, configurationError(err)
 		}

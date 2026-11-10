@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 func TestUnitRemotePropertyOwnership(t *testing.T) {
@@ -13,7 +13,7 @@ func TestUnitRemotePropertyOwnership(t *testing.T) {
 	initial, state := MergeRemoteProperties(
 		nil,
 		nil,
-		types.Properties{"up": {"one"}, "remove": {"gone"}, "edit": {"before"}},
+		model.Properties{"up": {"one"}, "remove": {"gone"}, "edit": {"before"}},
 		now,
 	)
 	initial["edit"] = []string{"local"}
@@ -22,7 +22,7 @@ func TestUnitRemotePropertyOwnership(t *testing.T) {
 	merged, next := MergeRemoteProperties(
 		initial,
 		state,
-		types.Properties{
+		model.Properties{
 			"up":       {"two"},
 			"edit":     {"remote"},
 			"existing": {"remote"},
@@ -30,17 +30,17 @@ func TestUnitRemotePropertyOwnership(t *testing.T) {
 		},
 		now.Add(time.Second),
 	)
-	want := types.Properties{"edit": {"local"}, "existing": {"local"}, "new": {"added"}}
+	want := model.Properties{"edit": {"local"}, "existing": {"local"}, "new": {"added"}}
 	if !reflect.DeepEqual(merged, want) || !next.LocalProperties["up"] ||
 		!next.LocalProperties["edit"] ||
 		!next.LocalProperties["existing"] {
 		t.Fatal(merged, next)
 	}
-	if !reflect.DeepEqual(next.OwnedProperties, types.Properties{"new": {"added"}}) ||
+	if !reflect.DeepEqual(next.OwnedProperties, model.Properties{"new": {"added"}}) ||
 		state.LocalProperties["up"] {
 		t.Fatal("snapshot mutated or ownership lost", state, next)
 	}
-	merged, next = MergeRemoteProperties(merged, next, types.Properties{}, now.Add(2*time.Second))
+	merged, next = MergeRemoteProperties(merged, next, model.Properties{}, now.Add(2*time.Second))
 	if _, ok := merged["new"]; ok || len(next.OwnedProperties) != 0 {
 		t.Fatal("upstream deletion retained owned value", merged, next)
 	}

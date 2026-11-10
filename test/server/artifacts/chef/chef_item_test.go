@@ -7,14 +7,17 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
-func chefCachedDocument(t *testing.T, w *itemWorld, key string) types.Item {
+func chefCachedDocument(t *testing.T, w *itemWorld, key string) model.Item {
 	t.Helper()
 	up, err := w.blobs.BeginUpload(t.Context())
 	if err != nil {
@@ -38,12 +41,12 @@ func chefCachedDocument(t *testing.T, w *itemWorld, key string) types.Item {
 			path, name = "api/v1", "cookbooks"
 		}
 		if _, err = w.db.Items().
-			Put(t.Context(), types.Item{RepoKey: key, Path: path, Name: name, Folder: true}); err != nil {
+			Put(t.Context(), model.Item{RepoKey: key, Path: path, Name: name, Folder: true}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	it, err := w.db.Items().
-		Put(t.Context(), types.Item{RepoKey: key, Path: "api/v1/cookbooks", Name: "private", Size: info.Size, Actual: types.Checksums{SHA256: info.Digests.SHA256}})
+		Put(t.Context(), model.Item{RepoKey: key, Path: "api/v1/cookbooks", Name: "private", Size: info.Size, Actual: kernel.Checksums{SHA256: info.Digests.SHA256}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,16 +55,16 @@ func chefCachedDocument(t *testing.T, w *itemWorld, key string) types.Item {
 
 func chefMetadataPermission(t *testing.T, w *itemWorld, keys ...string) {
 	t.Helper()
-	targets := map[string]types.Target{}
+	targets := map[string]model.Target{}
 	for _, key := range keys {
-		targets[key] = types.Target{Include: []string{"**"}, Exclude: []string{"**/*.tar.gz"}}
+		targets[key] = model.Target{Include: []string{"**"}, Exclude: []string{"**/*.tar.gz"}}
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), types.Permission{Name: "chef-metadata", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{
-					Users: map[string]types.Actions{
-						"user": types.ActionRead | types.ActionWrite | types.ActionDelete | types.ActionManage,
+		Create(t.Context(), model.Permission{Name: "chef-metadata", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {
+				Actions: model.Grants{
+					Users: map[string]api.Actions{
+						"user": api.ActionRead | api.ActionWrite | api.ActionDelete | api.ActionManage,
 					},
 				},
 				Targets: targets,
@@ -78,7 +81,7 @@ func TestAccChefCachedMetadataHasNoGenericDownloadBypass(t *testing.T) {
 		HTTP: sourceBackend(
 			func(context.Context, source.Request, source.Permit) (source.Result, error) {
 				reads++
-				return source.Result{}, store.ErrNotFound
+				return source.Result{}, kernel.ErrNotFound
 			},
 		),
 	}
@@ -112,7 +115,7 @@ func TestAccChefCachedMetadataHasNoGenericDownloadBypass(t *testing.T) {
 		t.Fatalf("raw metadata request fetched upstream: %d", reads)
 	}
 	if err := w.db.Settings().
-		Put(t.Context(), types.SettingFolderDownload, types.FolderDownloadSettings{Enabled: true}); err != nil {
+		Put(t.Context(), settings.SettingFolderDownload, model.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	got := w.do(

@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // timeFormat is how results render times: ISO 8601 with milliseconds, as
@@ -316,7 +316,7 @@ func (rr *relRow) parts() []relArray {
 
 // writeStats renders the statistic fields of st as one object, the shape
 // jfrog-client-go reads ("stats":[{...}]).
-func writeStats(b *bytes.Buffer, st *types.ItemStats, fields []StatField) {
+func writeStats(b *bytes.Buffer, st *model.ItemStats, fields []StatField) {
 	b.WriteByte('{')
 	first := true
 	put := func(key StatField, v any) {

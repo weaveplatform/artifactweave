@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 type transferRaceStore struct {
@@ -28,7 +28,7 @@ func TestUnitTransferIfAbsentRacingDestination(t *testing.T) {
 	w := newWorld(t)
 	source := w.must("source.txt", "source")
 	otherWriter := *w.svc
-	var competing types.Item
+	var competing model.Item
 	w.svc.Store = &transferRaceStore{Store: w.db, before: func() {
 		var err error
 		competing, err = otherWriter.Deploy(t.Context(), Deploy{
@@ -44,7 +44,7 @@ func TestUnitTransferIfAbsentRacingDestination(t *testing.T) {
 		To:   Target{Repo: w.loc, Path: "destination.txt"},
 		Move: true, IfAbsent: true, By: "migrator",
 	})
-	if !errors.Is(err, store.ErrConflict) {
+	if !errors.Is(err, kernel.ErrConflict) {
 		t.Fatalf("racing destination: %v", err)
 	}
 	got, ok := w.get(w.loc, source.FullPath())

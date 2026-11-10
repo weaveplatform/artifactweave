@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // State returns the repository's upstream availability state as the
@@ -22,7 +22,7 @@ func (p *Policy) State(
 	ctx context.Context,
 	q source.Request,
 	revision string,
-) (types.RemoteSourceState, error) {
+) (model.RemoteSourceState, error) {
 	state, err := p.Store.RemoteCache().State(ctx, q.Repo.Key)
 	if err != nil {
 		return state, fmt.Errorf("read remote availability: %w", err)
@@ -45,7 +45,7 @@ func (p *Policy) State(
 // policy's clock: a 429 *source.HTTPError carrying the rest of a Retry-After
 // pause, or a 502 connectivity failure while the upstream is assumed
 // offline. It returns nil when the exchange may go ahead.
-func (p *Policy) Cooldown(state types.RemoteSourceState) error {
+func (p *Policy) Cooldown(state model.RemoteSourceState) error {
 	now := p.now()
 	if state.RetryAfterUntil.After(now) {
 		return &source.HTTPError{
@@ -65,7 +65,7 @@ func (p *Policy) changeState(
 	q source.Request,
 	permit source.Permit,
 	revision string,
-	change func(*types.RemoteSourceState),
+	change func(*model.RemoteSourceState),
 ) error {
 	// Recording the outcome is bounded local bookkeeping, even when the
 	// upstream consumed its deadline. It never initiates another network call.
@@ -77,7 +77,7 @@ func (p *Policy) changeState(
 			return err
 		}
 		if state.Source != permit.Identity {
-			return store.ErrConflict
+			return kernel.ErrConflict
 		}
 		change(&state)
 		return p.Store.RemoteCache().PutState(tx, q.Repo.Key, state)
@@ -113,7 +113,7 @@ func (p *Policy) RecordFailure(
 	if q.Repo.AssumedOfflinePeriodSecs != nil {
 		seconds = *q.Repo.AssumedOfflinePeriodSecs
 	}
-	return p.changeState(ctx, q, permit, revision, func(s *types.RemoteSourceState) {
+	return p.changeState(ctx, q, permit, revision, func(s *model.RemoteSourceState) {
 		if seconds <= 0 {
 			s.ConnectionFailures = 0
 			s.OfflineUntil = time.Time{}
@@ -139,7 +139,7 @@ func (p *Policy) RecordResponse(
 	revision string,
 	res *http.Response,
 ) error {
-	return p.changeState(ctx, q, permit, revision, func(s *types.RemoteSourceState) {
+	return p.changeState(ctx, q, permit, revision, func(s *model.RemoteSourceState) {
 		// Any HTTP response proves connectivity; authentication and application
 		// failures keep their status and never become a connection outage.
 		s.ConnectionFailures = 0

@@ -13,8 +13,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // reindexFaults fails one store call a JFrog operation makes: "settings"
@@ -25,23 +25,23 @@ type reindexFaults struct {
 	fail string
 }
 
-func (s reindexFaults) Settings() store.SettingsStore {
+func (s reindexFaults) Settings() settings.SettingsStore {
 	if s.fail == "settings" {
 		return settingsDown{s.Store.Settings()}
 	}
 	return s.Store.Settings()
 }
 
-func (s reindexFaults) WorkQueue() store.WorkQueue {
+func (s reindexFaults) WorkQueue() work.WorkQueue {
 	return queueDown{s.Store.WorkQueue(), s.fail}
 }
 
-type settingsDown struct{ store.SettingsStore }
+type settingsDown struct{ settings.SettingsStore }
 
 func (settingsDown) Get(context.Context, string, any) error { return errBoom }
 
 type queueDown struct {
-	store.WorkQueue
+	work.WorkQueue
 	fail string
 }
 
@@ -57,9 +57,9 @@ func (q queueDown) Enqueue(
 	return q.WorkQueue.Enqueue(ctx, kind, key, payload, now) //nolint:wrapcheck // test double
 }
 
-func (q queueDown) Get(ctx context.Context, kind, key string) (types.WorkItem, error) {
+func (q queueDown) Get(ctx context.Context, kind, key string) (work.WorkItem, error) {
 	if q.fail == "get" {
-		return types.WorkItem{}, errBoom
+		return work.WorkItem{}, errBoom
 	}
 	return q.WorkQueue.Get(ctx, kind, key) //nolint:wrapcheck // test double
 }
@@ -149,13 +149,13 @@ func park(t *testing.T, st *inmem.Store, kind, key string) {
 	if err := q.Enqueue(ctx, kind, key, nil, now); err != nil {
 		t.Fatal(err)
 	}
-	it, took, err := q.LeaseKey(ctx, kind, key, store.WorkLease{
+	it, took, err := q.LeaseKey(ctx, kind, key, work.WorkLease{
 		Holder: "test", Until: now.Add(time.Minute), Now: now,
 	})
 	if err != nil || !took {
 		t.Fatalf("lease %v %v", took, err)
 	}
-	if err := q.Fail(ctx, kind, key, it.Generation, store.WorkFailure{
+	if err := q.Fail(ctx, kind, key, it.Generation, work.WorkFailure{
 		Error: "spent", Park: true, RetryAt: now, Now: now,
 	}); err != nil {
 		t.Fatal(err)

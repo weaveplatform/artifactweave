@@ -11,14 +11,14 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -57,9 +57,9 @@ type migrationStatus struct {
 }
 
 type migrationFile struct {
-	item  types.Item
+	item  model.Item
 	path  string
-	props types.Properties
+	props model.Properties
 }
 
 func (m migrationRequest) paths() (format.Identity, string, string, bool) {
@@ -168,13 +168,13 @@ func (h handler) migrateLegacy(w http.ResponseWriter, r *http.Request) {
 func (h handler) migrationItems(
 	r *http.Request,
 	prefix string,
-	actions types.Actions,
-) ([]types.Item, error) {
+	actions api.Actions,
+) ([]model.Item, error) {
 	if !h.k.CanFolder(r, prefix, actions) {
 		return nil, migrationAccessDenied()
 	}
-	var result []types.Item
-	page := store.Page{Limit: maxMigrationItems}
+	var result []model.Item
+	page := kernel.Page{Limit: maxMigrationItems}
 	for {
 		items, next, err := h.k.DB().Items().Descendants(r.Context(),
 			pkgroute.RequestFrom(r).Repo.Key, false, prefix, page)
@@ -209,7 +209,7 @@ func (h handler) legacyFiles(
 	request migrationRequest,
 	status *migrationStatus,
 ) ([]migrationFile, error) {
-	items, err := h.migrationItems(r, status.Source, types.ActionRead)
+	items, err := h.migrationItems(r, status.Source, api.ActionRead)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +248,7 @@ func (h handler) legacyFiles(
 				"legacy source already contains migration provenance",
 			)
 		}
-		if !h.k.Can(r, status.Destination+"/"+name, types.ActionRead|types.ActionWrite) {
+		if !h.k.Can(r, status.Destination+"/"+name, api.ActionRead|api.ActionWrite) {
 			return nil, migrationAccessDenied()
 		}
 		if !format.FilePath(name) || strings.HasPrefix(name, ".jfrog") ||
@@ -276,7 +276,7 @@ func (h handler) legacyFiles(
 	return files, nil
 }
 
-func (h handler) verifyLegacyFile(ctx context.Context, it types.Item) error {
+func (h handler) verifyLegacyFile(ctx context.Context, it model.Item) error {
 	reader, info, err := h.k.Blobs().Open(ctx, it.Actual.SHA256)
 	if err != nil {
 		return fmt.Errorf("huggingface: open legacy content: %w", err)

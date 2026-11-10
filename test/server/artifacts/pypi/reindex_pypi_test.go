@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // PyPI's reindex runs the PyPI format (#537): it rebuilds a repository's
@@ -28,7 +28,7 @@ func TestAccPypiReindexRebuilds(t *testing.T) {
 	// else.
 	indexed := func() bool {
 		t.Helper()
-		pkgs, _, err := w.db.Packages().List(ctx, "pypi-local", store.Page{Limit: store.MaxLimit})
+		pkgs, _, err := w.db.Packages().List(ctx, "pypi-local", kernel.Page{Limit: kernel.MaxLimit})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -18,13 +18,13 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/fault"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // snapshotJob is the snapshot the tests here take: tag first of the stable
@@ -43,27 +43,27 @@ type itemFaults struct {
 	fails func(call, key, path string) bool
 }
 
-func (s itemFaults) Items() store.ItemStore {
+func (s itemFaults) Items() port.ItemStore {
 	return faultingItems{ItemStore: s.Store.Items(), fails: s.fails}
 }
 
 type faultingItems struct {
-	store.ItemStore
+	port.ItemStore
 	fails func(call, key, path string) bool
 }
 
 func (i faultingItems) Get(
 	ctx context.Context, key string, cached bool, path string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if i.fails("Get", key, path) {
-		return types.Item{}, errFault
+		return model.Item{}, errFault
 	}
 	return i.ItemStore.Get(ctx, key, cached, path)
 }
 
-func (i faultingItems) Put(ctx context.Context, it types.Item) (types.Item, error) {
+func (i faultingItems) Put(ctx context.Context, it model.Item) (model.Item, error) {
 	if i.fails("Put", it.RepoKey, it.FullPath()) {
-		return types.Item{}, errFault
+		return model.Item{}, errFault
 	}
 	return i.ItemStore.Put(ctx, it)
 }
@@ -75,7 +75,7 @@ func (i faultingItems) failsByID(ctx context.Context, call string, id int64) boo
 	return err == nil && i.fails(call, it.RepoKey, it.FullPath())
 }
 
-func (i faultingItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (i faultingItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if i.failsByID(ctx, "Properties", id) {
 		return nil, errFault
 	}
@@ -83,7 +83,7 @@ func (i faultingItems) Properties(ctx context.Context, id int64) (types.Properti
 }
 
 func (i faultingItems) SetProperties(
-	ctx context.Context, id int64, props types.Properties, at time.Time,
+	ctx context.Context, id int64, props model.Properties, at time.Time,
 ) error {
 	if i.failsByID(ctx, "SetProperties", id) {
 		return errFault
@@ -183,7 +183,7 @@ func TestUnitDebianSnapshotRequestNeedsAStoreAndACaller(t *testing.T) {
 		})
 	}
 	_, err := w.db.Items().Get(t.Context(), snapshotJob.Target, false, snapshotMarker)
-	if !errors.Is(err, store.ErrNotFound) {
+	if !errors.Is(err, kernel.ErrNotFound) {
 		t.Errorf("a refused snapshot claimed its tag: %v", err)
 	}
 }
@@ -193,7 +193,7 @@ func TestUnitDebianSnapshotRequestNeedsAStoreAndACaller(t *testing.T) {
 // the queue cannot take, or whose queued run is refused, is a server fault
 // rather than a snapshot reported as created.
 func TestUnitDebianSnapshotThroughTheQueue(t *testing.T) {
-	long := strings.Repeat("t", store.MaxWorkKey)
+	long := strings.Repeat("t", work.MaxWorkKey)
 	for _, tc := range []struct {
 		name    string
 		target  string
@@ -383,7 +383,7 @@ func TestUnitDebianSnapshotCopiesTheSourceMetadata(t *testing.T) {
 	}
 	for _, name := range []string{"dists/stable/InRelease", "dists/stable/Release.gpg"} {
 		if _, err := w.db.Items().Get(t.Context(), snapshotJob.Target, false,
-			snapshotMarker+"/"+name); !errors.Is(err, store.ErrNotFound) {
+			snapshotMarker+"/"+name); !errors.Is(err, kernel.ErrNotFound) {
 			t.Errorf("snapshot holds %s the source never published: %v", name, err)
 		}
 	}
@@ -496,7 +496,7 @@ func TestUnitDebianSnapshotCreationFailsClosed(t *testing.T) {
 			// leaves the claim for a retry to resume, but never the source
 			// property that serves the tag.
 			marker, err := w.db.Items().Get(t.Context(), snapshotJob.Target, false, snapshotMarker)
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, kernel.ErrNotFound) {
 				return
 			}
 			if err != nil {
@@ -533,7 +533,7 @@ func TestUnitDebianSnapshotRechecksARemoteSourcesPackages(t *testing.T) {
 		t.Errorf("snapshot returned %v, want the source's refusal", err)
 	}
 	if _, err := w.db.Items().Get(t.Context(), snapshotJob.Target, false,
-		snapshotMarker+"/"+debRelease); !errors.Is(err, store.ErrNotFound) {
+		snapshotMarker+"/"+debRelease); !errors.Is(err, kernel.ErrNotFound) {
 		t.Errorf("refused snapshot copied its Release: %v", err)
 	}
 }

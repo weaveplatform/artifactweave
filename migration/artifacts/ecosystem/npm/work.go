@@ -10,8 +10,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // KindConvert is the npm format's work from the persistent work queue
@@ -38,13 +39,13 @@ func (Handler) Owed(repo.Config, bool, string) []format.WorkRef { return nil }
 // of a kind the format no longer runs, which an earlier build may have left
 // in the queue: running it as a conversion would move files nobody asked
 // about.
-func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) error {
+func (Handler) Work(ctx context.Context, env format.Env, it work.WorkItem) error {
 	if it.Kind != KindConvert {
 		return nil
 	}
 	c, err := env.Store.Repos().Get(ctx, it.Key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	case err != nil:
 		return fmt.Errorf("npm: repository %s: %w", it.Key, err)
@@ -104,7 +105,7 @@ func convertOne(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	by string,
 ) (string, error) {
 	if _, indexed, err := versionOf(ctx, env.Store, it.ID); err != nil || indexed {
@@ -119,7 +120,7 @@ func convertOne(
 	switch {
 	case err == nil && !there.Folder && there.Actual.SHA256 == it.Actual.SHA256:
 		return "", nil
-	case err != nil && !errors.Is(err, store.ErrNotFound):
+	case err != nil && !errors.Is(err, kernel.ErrNotFound):
 		return "", fmt.Errorf("npm: get %s: %w", to, err)
 	}
 	problem, err := env.Move(ctx, c, from, to, by)

@@ -10,8 +10,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitAdmissionPreservesCurrentLayoutAndRepositoryPolicy(t *testing.T) {
@@ -67,15 +68,15 @@ func TestUnitLifecycleIgnoresNonSnapshotAndFencesReindex(t *testing.T) {
 	h := Handler{}
 	c := *repo.Defaults(&repo.Config{Key: "hf", Class: repo.Local, PackageType: repo.HuggingFaceML})
 	env := format.Env{Store: inmem.New()}
-	for _, it := range []types.Item{{Folder: true}, {Name: "refs/main"}, {Name: "legacy"}} {
+	for _, it := range []model.Item{{Folder: true}, {Name: "refs/main"}, {Name: "legacy"}} {
 		if err := h.Deployed(t.Context(), env, c, it); err != nil {
 			t.Fatalf("non-snapshot deploy: %v", err)
 		}
 	}
-	if err := h.Deleted(t.Context(), env, c, []types.Item{{Name: "legacy"}}); err != nil {
+	if err := h.Deleted(t.Context(), env, c, []model.Item{{Name: "legacy"}}); err != nil {
 		t.Fatalf("non-snapshot delete: %v", err)
 	}
-	if err := h.Deleting(t.Context(), env, c, types.Item{}); err != nil {
+	if err := h.Deleting(t.Context(), env, c, model.Item{}); err != nil {
 		t.Fatalf("pre-delete hook: %v", err)
 	}
 	stop := errors.New("source changed during reindex")
@@ -87,18 +88,18 @@ func TestUnitLifecycleIgnoresNonSnapshotAndFencesReindex(t *testing.T) {
 
 type reindexStore struct {
 	format.Store
-	items    store.ItemStore
-	packages store.PackageStore
+	items    port.ItemStore
+	packages port.PackageStore
 }
 
-func (s reindexStore) Items() store.ItemStore {
+func (s reindexStore) Items() port.ItemStore {
 	if s.items != nil {
 		return s.items
 	}
 	return s.Store.Items()
 }
 
-func (s reindexStore) Packages() store.PackageStore {
+func (s reindexStore) Packages() port.PackageStore {
 	if s.packages != nil {
 		return s.packages
 	}
@@ -106,7 +107,7 @@ func (s reindexStore) Packages() store.PackageStore {
 }
 
 type failingSnapshotList struct {
-	store.ItemStore
+	port.ItemStore
 	err error
 }
 
@@ -115,21 +116,21 @@ func (s failingSnapshotList) Descendants(
 	string,
 	bool,
 	string,
-	store.Page,
-) ([]types.Item, string, error) {
+	kernel.Page,
+) ([]model.Item, string, error) {
 	return nil, "", s.err
 }
 
 type failingPackageList struct {
-	store.PackageStore
+	port.PackageStore
 	err error
 }
 
 func (s failingPackageList) List(
 	context.Context,
 	string,
-	store.Page,
-) ([]types.Package, string, error) {
+	kernel.Page,
+) ([]model.Package, string, error) {
 	return nil, "", s.err
 }
 
@@ -160,8 +161,8 @@ func TestUnitReindexReportsStorageFailures(t *testing.T) {
 }
 
 type pagedSnapshots struct {
-	store.ItemStore
-	first, second []types.Item
+	port.ItemStore
+	first, second []model.Item
 }
 
 func (s pagedSnapshots) Descendants(
@@ -169,8 +170,8 @@ func (s pagedSnapshots) Descendants(
 	_ string,
 	_ bool,
 	_ string,
-	p store.Page,
-) ([]types.Item, string, error) {
+	p kernel.Page,
+) ([]model.Item, string, error) {
 	if p.After == "" {
 		return s.first, "next", nil
 	}
@@ -181,9 +182,9 @@ func TestUnitReindexIncludesEverySnapshotPage(t *testing.T) {
 	base := inmem.New()
 	c := *repo.Defaults(&repo.Config{Key: "hf", Class: repo.Local, PackageType: repo.HuggingFaceML})
 	revision := "0123456789012345678901234567890123456789"
-	files := make([]types.Item, 0, 2)
+	files := make([]model.Item, 0, 2)
 	for i, name := range []string{"config.json", "weights.bin"} {
-		it, err := base.Items().Put(t.Context(), types.Item{
+		it, err := base.Items().Put(t.Context(), model.Item{
 			RepoKey: c.Key,
 			Name:    fmt.Sprintf("models--acme--demo/snapshots/%s/%s", revision, name),
 			Created: time.Unix(int64(i+1), 0),

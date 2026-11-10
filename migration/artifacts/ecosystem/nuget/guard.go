@@ -10,7 +10,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 var errWriteLock = errors.New("nuget: transaction lock is unexpectedly leased")
@@ -38,7 +38,7 @@ func (Handler) GuardWrite(
 	// row/unique-index locks until commit or rollback, even after deletion.
 	// An already-expired timestamp ensures no wall-clock expiry or node clock
 	// skew can change exclusivity, and no lease survives a successful write.
-	took, err := env.Leases.Acquire(ctx, types.Lease{
+	took, err := env.Leases.Acquire(ctx, work.Lease{
 		Name: name, Holder: holder, Task: "nuget write", Acquired: now,
 		Expires: time.Unix(1, 0),
 	}, now)

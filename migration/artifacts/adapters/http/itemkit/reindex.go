@@ -16,8 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // ReindexOp is how 7.x serves one package type's reindex operation.
@@ -202,14 +200,14 @@ func (s *Kit) ReindexAs(
 	if path != "" {
 		kind, workKey = format.KindReindexPath, c.Key+"/"+path
 		// [I] 7.x's answer to an overlong path is unknown (#216).
-		if len(workKey) > store.MaxWorkKey {
+		if len(workKey) > work.MaxWorkKey {
 			return "", httpkit.BadRequestf("The path '%s' is too long to reindex", path)
 		}
 		// Decision 0039: a mistyped partial-reindex path must not claim
 		// that useful work was scheduled. This status is inferred (#216).
 		if t == repo.Helm {
 			if _, err := st.Items().Get(ctx, c.Key, false, path); err != nil {
-				if errors.Is(err, store.ErrNotFound) {
+				if errors.Is(err, kernel.ErrNotFound) {
 					return "", apierror.New(http.StatusNotFound, "Could not find resource")
 				}
 				return "", fmt.Errorf("helm: reindex path %s: %w", path, err)
@@ -263,7 +261,7 @@ func (s *Kit) OperationRepo(
 		if err != nil {
 			return nil, c, "", s.InternalError(ctx, "operation rights", err)
 		}
-		if !acc.File(c, "", types.ActionManage) {
+		if !acc.File(c, "", accessapi.ActionManage) {
 			return nil, c, "", httpkit.Denied(p)
 		}
 	}
@@ -360,7 +358,7 @@ func (s *Kit) queueRemoteReindex(
 				return err
 			}
 			if latest.Class != repo.Remote || latest.Key != c.Key {
-				return s.ItemError(ctx, "reindex repository changed", store.ErrConflict)
+				return s.ItemError(ctx, "reindex repository changed", kernel.ErrConflict)
 			}
 			reference, _ := json.Marshal(current.CredentialReference())
 			if err = s.queueRequest(

@@ -30,6 +30,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
@@ -74,7 +75,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // RouterStore is the metadata store NewRouter hands to the handlers,
@@ -266,14 +266,14 @@ func newRegistry(cfg RouterConfig, kit *itemkit.Kit) *dockerhttp.Registry {
 		Formats: ecosystem.For,
 		// A layer downloads as any file does: redirected to a signed URL
 		// when the repository says so (decision 0029), and counted.
-		ServeBlob: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {
+		ServeBlob: func(w http.ResponseWriter, r *http.Request, c repo.Config, it model.Item) {
 			p, _ := kernel.FromContext(r.Context())
 			kit.ServeFile(w, r, cfg.Store, itemkit.Found{Repo: c, Item: it}, p)
 		},
 		// A manifest at or above the minimum size redirects too, as on 7.x
 		// (RTFACT-29705), carrying its media type to the object store.
 		RedirectManifest: func(
-			w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item, mediaType string,
+			w http.ResponseWriter, r *http.Request, c repo.Config, it model.Item, mediaType string,
 		) bool {
 			return kit.RedirectManifest(
 				w,

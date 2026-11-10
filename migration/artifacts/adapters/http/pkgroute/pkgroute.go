@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -23,8 +24,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Store is what the kit resolves repositories and reads items in, and what
@@ -56,7 +55,7 @@ type Options struct {
 	// ServeItem answers GET or HEAD of a file in c with the item routes'
 	// download, which applies the download redirect policy (decision 0029),
 	// sets the checksum headers and counts the download.
-	ServeItem func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item)
+	ServeItem func(w http.ResponseWriter, r *http.Request, c repo.Config, it model.Item)
 	// DeployItem delegates a PUT with its escaped repository-relative path,
 	// including matrix parameters and any trailing slash.
 	DeployItem func(http.ResponseWriter, *http.Request, repo.Config, string)
@@ -65,7 +64,7 @@ type Options struct {
 	ItemError func(ctx context.Context, op string, err error) error
 	// Created answers 201 to a deploy that stored it, with the item routes'
 	// deploy body. Nil answers 201 with no body.
-	Created func(w http.ResponseWriter, r *http.Request, it types.Item)
+	Created func(w http.ResponseWriter, r *http.Request, it model.Item)
 	// Fault records an unexpected error for the access log; nil drops it.
 	Fault func(*http.Request, error)
 }
@@ -246,7 +245,7 @@ type Source interface {
 // a virtual repository, one of its members.
 type Found struct {
 	Repo repo.Config
-	Item types.Item
+	Item model.Item
 }
 
 // Local reads a local or federated repository's own items.
@@ -430,7 +429,7 @@ func (k *Kit) resolve(next http.Handler) http.Handler {
 		}
 		c, key, err := k.lookup(r.Context(), keys)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			k.Error(w, r, apierror.New(http.StatusNotFound,
 				fmt.Sprintf("Repository '%s' does not exist", keys[0].Key)))
 			return
@@ -492,12 +491,12 @@ func (k *Kit) lookup(ctx context.Context, keys []Key) (repo.Config, Key, error) 
 		switch {
 		case err == nil:
 			return c, key, nil
-		case !errors.Is(err, store.ErrNotFound):
+		case !errors.Is(err, kernel.ErrNotFound):
 			return repo.Config{}, key, fmt.Errorf("get repository %s: %w", key.Key, err)
 		case k.p.Resolve == nil:
 			continue
 		case !listed:
-			if all, err = repos.List(ctx, store.RepoFilter{}); err != nil {
+			if all, err = repos.List(ctx, port.RepoFilter{}); err != nil {
 				return repo.Config{}, key, fmt.Errorf("list repositories: %w", err)
 			}
 			listed = true
@@ -508,7 +507,7 @@ func (k *Kit) lookup(ctx context.Context, keys []Key) (repo.Config, Key, error) 
 			return all[i], key, nil
 		}
 	}
-	return repo.Config{}, Key{}, fmt.Errorf("%s: %w", k.p.Name, store.ErrNotFound)
+	return repo.Config{}, Key{}, fmt.Errorf("%s: %w", k.p.Name, kernel.ErrNotFound)
 }
 
 // anonymous reports whether r carries no credentials: the anonymous
@@ -551,16 +550,16 @@ func (k *Kit) Error(w http.ResponseWriter, r *http.Request, err error) {
 // the caller may read. A request without a principal holds nothing, and so
 // does one whose permissions were never evaluated: the server's middleware
 // evaluates them for every request.
-func (k *Kit) Can(r *http.Request, path string, want types.Actions) bool {
+func (k *Kit) Can(r *http.Request, path string, want accessapi.Actions) bool {
 	return can(r, RequestFrom(r).Repo, path, want)
 }
 
-func can(r *http.Request, c repo.Config, path string, want types.Actions) bool {
+func can(r *http.Request, c repo.Config, path string, want accessapi.Actions) bool {
 	d, ok := accessapi.DeciderFrom(r.Context())
 	if !ok {
 		return false
 	}
-	return d.Allows(types.ResourceArtifact, accessapi.Repo{
+	return d.Allows(accessapi.ResourceArtifact, accessapi.Repo{
 		Key: c.Key, Class: string(c.Class),
 	}, path, want)
 }
@@ -572,7 +571,7 @@ func (k *Kit) Require(
 	w http.ResponseWriter,
 	r *http.Request,
 	path string,
-	want types.Actions,
+	want accessapi.Actions,
 ) bool {
 	if k.Can(r, path, want) {
 		return true
@@ -590,7 +589,7 @@ func (k *Kit) RequireFolder(
 	w http.ResponseWriter,
 	r *http.Request,
 	path string,
-	want types.Actions,
+	want accessapi.Actions,
 ) bool {
 	if k.CanFolder(r, path, want) {
 		return true
@@ -602,13 +601,13 @@ func (k *Kit) RequireFolder(
 // CanFolder is Can for a folder, which a caller may act on when it may act
 // on a path below it, for a handler that accepts more than one right
 // before it knows which the request needs.
-func (k *Kit) CanFolder(r *http.Request, path string, want types.Actions) bool {
+func (k *Kit) CanFolder(r *http.Request, path string, want accessapi.Actions) bool {
 	d, ok := accessapi.DeciderFrom(r.Context())
 	if !ok {
 		return false
 	}
 	c := RequestFrom(r).Repo
-	return d.AllowsFolder(types.ResourceArtifact, accessapi.Repo{
+	return d.AllowsFolder(accessapi.ResourceArtifact, accessapi.Repo{
 		Key: c.Key, Class: string(c.Class),
 	}, path, want)
 }
@@ -620,12 +619,12 @@ func (k *Kit) CanFolder(r *http.Request, path string, want types.Actions) bool {
 // transaction of DB's, it joins that transaction.
 func (k *Kit) Annotate(
 	r *http.Request,
-	it types.Item,
-	set types.Properties,
+	it model.Item,
+	set model.Properties,
 	remove []string,
 ) error {
 	c := RequestFrom(r).Repo
-	if !can(r, c, it.FullPath(), types.ActionAnnotate) {
+	if !can(r, c, it.FullPath(), accessapi.ActionAnnotate) {
 		return refusal(r)
 	}
 	if err := k.o.Items().Annotate(r.Context(), c, it, set, remove); err != nil {
@@ -642,12 +641,12 @@ func (k *Kit) Annotate(
 func (k *Kit) Delete(r *http.Request, path string) error {
 	ctx := r.Context()
 	c := RequestFrom(r).Repo
-	if !can(r, c, path, types.ActionDelete) {
+	if !can(r, c, path, accessapi.ActionDelete) {
 		return refusal(r)
 	}
 	it, err := k.o.Store.Items().Get(ctx, c.Key, false, path)
 	switch {
-	case errors.Is(err, store.ErrNotFound) || err == nil && it.Folder:
+	case errors.Is(err, kernel.ErrNotFound) || err == nil && it.Folder:
 		return apierror.New(http.StatusNotFound, "Could not find resource")
 	case err != nil:
 		return fmt.Errorf("get item %s/%s: %w", c.Key, path, err)
@@ -667,16 +666,16 @@ func (k *Kit) DeleteTree(r *http.Request, path string) error {
 	if c.Class != repo.Local && c.Class != repo.Federated {
 		return apierror.New(http.StatusMethodNotAllowed, "repository does not accept deletes")
 	}
-	if !k.CanFolder(r, path, types.ActionDelete) {
+	if !k.CanFolder(r, path, accessapi.ActionDelete) {
 		return refusal(r)
 	}
-	for page := (store.Page{Limit: 1000}); ; {
+	for page := (kernel.Page{Limit: 1000}); ; {
 		items, next, err := k.o.Store.Items().Descendants(ctx, c.Key, false, path, page)
 		if err != nil {
 			return fmt.Errorf("list revision for delete: %w", err)
 		}
 		for _, it := range items {
-			if !can(r, c, it.FullPath(), types.ActionDelete) {
+			if !can(r, c, it.FullPath(), accessapi.ActionDelete) {
 				return refusal(r)
 			}
 		}
@@ -733,7 +732,7 @@ func (k *Kit) ResolveItem(r *http.Request, path string) (Found, error) {
 // refused before the item is looked up, so a refusal says nothing about
 // whether it exists; a missing file, or a folder, answers 404.
 func (k *Kit) ServeItem(w http.ResponseWriter, r *http.Request, path string) {
-	if !k.Require(w, r, path, types.ActionRead) {
+	if !k.Require(w, r, path, accessapi.ActionRead) {
 		return
 	}
 	if _, ok := RequestFrom(r).Source.(ReadSource); ok {
@@ -747,7 +746,7 @@ func (k *Kit) ServeItem(w http.ResponseWriter, r *http.Request, path string) {
 	}
 	f, err := k.Item(r, path)
 	switch {
-	case errors.Is(err, store.ErrNotFound) || err == nil && f.Item.Folder:
+	case errors.Is(err, kernel.ErrNotFound) || err == nil && f.Item.Folder:
 		k.Error(w, r, apierror.New(http.StatusNotFound, "Could not find resource"))
 	case err != nil:
 		k.Error(w, r, err)
@@ -760,7 +759,7 @@ func (k *Kit) ServeItem(w http.ResponseWriter, r *http.Request, path string) {
 // downloads use the verified item so a concurrent overwrite cannot replace
 // the bytes between checking the signed digest and opening the blob.
 func (k *Kit) ServeFound(w http.ResponseWriter, r *http.Request, f Found) {
-	if !can(r, f.Repo, f.Item.FullPath(), types.ActionRead) {
+	if !can(r, f.Repo, f.Item.FullPath(), accessapi.ActionRead) {
 		k.Error(w, r, refusal(r))
 		return
 	}
@@ -778,38 +777,38 @@ func (k *Kit) Store(
 	r *http.Request,
 	path string,
 	body io.Reader,
-	props types.Properties,
-	declared types.Checksums,
-) (types.Item, error) {
+	props model.Properties,
+	declared kernel.Checksums,
+) (model.Item, error) {
 	ctx := r.Context()
 	c := RequestFrom(r).Repo
 	if c.Class == repo.Remote {
-		return types.Item{}, apierror.New(
+		return model.Item{}, apierror.New(
 			http.StatusMethodNotAllowed,
 			fmt.Sprintf("Cannot deploy to the remote repository '%s'", c.Key),
 		)
 	}
-	if !can(r, c, path, types.ActionWrite) {
-		return types.Item{}, refusal(r)
+	if !can(r, c, path, accessapi.ActionWrite) {
+		return model.Item{}, refusal(r)
 	}
 	p, _ := kernel.FromContext(ctx)
 	existing, err := k.o.Store.Items().Get(ctx, c.Key, false, path)
 	switch {
-	case err == nil && !existing.Folder && !can(r, c, path, types.ActionDelete):
+	case err == nil && !existing.Folder && !can(r, c, path, accessapi.ActionDelete):
 		// Overwriting replaces content, which needs the right to delete it.
 		// The item routes word the refusal, as clients match its text.
-		return types.Item{}, k.o.ItemError(ctx, "deploy", &item.OverwriteDeniedError{
+		return model.Item{}, k.o.ItemError(ctx, "deploy", &item.OverwriteDeniedError{
 			Repo: c.Key, Path: path, User: p.Name,
 		})
-	case err != nil && !errors.Is(err, store.ErrNotFound):
-		return types.Item{}, fmt.Errorf("get item %s/%s: %w", c.Key, path, err)
+	case err != nil && !errors.Is(err, kernel.ErrNotFound):
+		return model.Item{}, fmt.Errorf("get item %s/%s: %w", c.Key, path, err)
 	}
 	it, err := k.o.Items().Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: path}, Body: body, Declared: declared,
 		Properties: props, By: p.Name,
 	})
 	if err != nil {
-		return types.Item{}, k.o.ItemError(ctx, "deploy", err)
+		return model.Item{}, k.o.ItemError(ctx, "deploy", err)
 	}
 	return it, nil
 }
@@ -826,20 +825,20 @@ func (k *Kit) StoreOnce(
 	r *http.Request,
 	path string,
 	body io.Reader,
-	props types.Properties,
-	declared types.Checksums,
-	differs func(stored types.Item) error,
-) (types.Item, error) {
+	props model.Properties,
+	declared kernel.Checksums,
+	differs func(stored model.Item) error,
+) (model.Item, error) {
 	ctx := r.Context()
 	c := RequestFrom(r).Repo
 	if c.Class == repo.Remote {
-		return types.Item{}, apierror.New(
+		return model.Item{}, apierror.New(
 			http.StatusMethodNotAllowed,
 			fmt.Sprintf("Cannot deploy to the remote repository '%s'", c.Key),
 		)
 	}
-	if !can(r, c, path, types.ActionWrite) {
-		return types.Item{}, refusal(r)
+	if !can(r, c, path, accessapi.ActionWrite) {
+		return model.Item{}, refusal(r)
 	}
 	p, _ := kernel.FromContext(ctx)
 	d := item.Deploy{
@@ -849,25 +848,25 @@ func (k *Kit) StoreOnce(
 	svc := k.o.Items()
 	info, err := svc.Upload(ctx, d)
 	if err != nil {
-		return types.Item{}, k.o.ItemError(ctx, "deploy", err)
+		return model.Item{}, k.o.ItemError(ctx, "deploy", err)
 	}
 	stored, err := k.o.Store.Items().Get(ctx, c.Key, false, path)
 	switch {
-	case errors.Is(err, store.ErrNotFound) || err == nil && stored.Folder:
+	case errors.Is(err, kernel.ErrNotFound) || err == nil && stored.Folder:
 		// The item service refuses a file over a folder, as on any deploy.
 		it, err := svc.DeployCommitted(ctx, d, info)
 		if err != nil {
-			return types.Item{}, k.o.ItemError(ctx, "deploy", err)
+			return model.Item{}, k.o.ItemError(ctx, "deploy", err)
 		}
 		return it, nil
 	case err != nil:
-		return types.Item{}, fmt.Errorf("get item %s/%s: %w", c.Key, path, err)
+		return model.Item{}, fmt.Errorf("get item %s/%s: %w", c.Key, path, err)
 	case stored.Actual.SHA256 != info.Digests.SHA256:
-		return types.Item{}, k.o.ItemError(ctx, "deploy", differs(stored))
+		return model.Item{}, k.o.ItemError(ctx, "deploy", differs(stored))
 	}
 	if len(props) > 0 {
 		if err := svc.Annotate(ctx, c, stored, props, nil); err != nil {
-			return types.Item{}, k.o.ItemError(ctx, "deploy", err)
+			return model.Item{}, k.o.ItemError(ctx, "deploy", err)
 		}
 	}
 	return stored, nil
@@ -921,20 +920,20 @@ func (k *Kit) StoreNew(
 	r *http.Request,
 	path string,
 	info blob.Info,
-	props types.Properties,
-	declared types.Checksums,
+	props model.Properties,
+	declared kernel.Checksums,
 	exists func() error,
-) (types.Item, error) {
+) (model.Item, error) {
 	ctx := r.Context()
 	c := RequestFrom(r).Repo
 	if c.Class == repo.Remote {
-		return types.Item{}, apierror.New(
+		return model.Item{}, apierror.New(
 			http.StatusMethodNotAllowed,
 			fmt.Sprintf("Cannot deploy to the remote repository '%s'", c.Key),
 		)
 	}
-	if !can(r, c, path, types.ActionWrite) {
-		return types.Item{}, refusal(r)
+	if !can(r, c, path, accessapi.ActionWrite) {
+		return model.Item{}, refusal(r)
 	}
 	p, _ := kernel.FromContext(ctx)
 	it, err := k.o.Items().DeployCommitted(ctx, item.Deploy{
@@ -943,9 +942,9 @@ func (k *Kit) StoreNew(
 	}, info)
 	switch {
 	case errors.Is(err, item.ErrExists):
-		return types.Item{}, exists()
+		return model.Item{}, exists()
 	case err != nil:
-		return types.Item{}, k.o.ItemError(ctx, "deploy", err)
+		return model.Item{}, k.o.ItemError(ctx, "deploy", err)
 	}
 	return it, nil
 }
@@ -958,12 +957,12 @@ func (k *Kit) Deploy(
 	w http.ResponseWriter,
 	r *http.Request,
 	path string,
-	props types.Properties,
-) (types.Item, bool) {
+	props model.Properties,
+) (model.Item, bool) {
 	it, err := k.Store(r, path, r.Body, props, DeclaredChecksums(r.Header))
 	if err != nil {
 		k.Error(w, r, err)
-		return types.Item{}, false
+		return model.Item{}, false
 	}
 	k.Created(w, r, it)
 	return it, true
@@ -973,7 +972,7 @@ func (k *Kit) Deploy(
 // -Sha256 and -Md5 headers, which jf go-publish reads (research 26 section
 // 3.1), and the item routes' deploy body when the server gives one
 // (Options.Created).
-func (k *Kit) Created(w http.ResponseWriter, r *http.Request, it types.Item) {
+func (k *Kit) Created(w http.ResponseWriter, r *http.Request, it model.Item) {
 	SetChecksums(w.Header(), it.Actual)
 	if k.o.Created != nil {
 		k.o.Created(w, r, it)

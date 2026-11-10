@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Restore recreates a trashed item at t.Path with its recorded content,
@@ -28,10 +28,10 @@ import (
 func (s *Service) Restore(
 	ctx context.Context,
 	t Target,
-	rec types.TrashRecord,
+	rec model.TrashRecord,
 	by string,
-) (types.Item, error) {
-	var restored types.Item
+) (model.Item, error) {
+	var restored model.Item
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
 		if _, err := s.invalidateCache(ctx, t); err != nil {
 			return err
@@ -46,32 +46,32 @@ func (s *Service) Restore(
 func (s *Service) restoreRecord(
 	ctx context.Context,
 	t Target,
-	rec types.TrashRecord,
+	rec model.TrashRecord,
 	by string,
-) (types.Item, error) {
+) (model.Item, error) {
 	full := strings.Trim(t.Path, "/")
 	if full == "" {
-		return types.Item{}, fmt.Errorf("%w: restore needs a path", types.ErrInvalidItemPath)
+		return model.Item{}, fmt.Errorf("%w: restore needs a path", kernel.ErrInvalidItemPath)
 	}
 	now := s.now()
 	rec.Properties = restoredProperties(rec, now)
 	if err := s.ensureFolders(ctx, t, path.Dir(full), by, now); err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	items := s.Store.Items()
 	old, err := items.Get(ctx, t.Repo.Key, t.Cached, full)
 	exists := err == nil
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
-		return types.Item{}, fmt.Errorf("item: get %s: %w", full, err)
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
+		return model.Item{}, fmt.Errorf("item: get %s: %w", full, err)
 	}
 	if exists && old.Folder != rec.Item.Folder {
-		return types.Item{}, fmt.Errorf("%w: %s is in the way", ErrConflict, full)
+		return model.Item{}, fmt.Errorf("%w: %s is in the way", ErrConflict, full)
 	}
 	if exists && old.Folder {
 		// A folder recreated since the delete keeps its content and its own
 		// properties; the recorded ones, and the restore's own, are added.
 		if err := s.annotate(ctx, t.Repo, old, rec.Properties, nil, false); err != nil {
-			return types.Item{}, err
+			return model.Item{}, err
 		}
 		return old, nil
 	}
@@ -79,25 +79,25 @@ func (s *Service) restoreRecord(
 	it.ID, it.RepoKey, it.Cached, it.Path, it.Name = 0, t.Repo.Key, t.Cached, "", full
 	stored, err := items.Put(ctx, it)
 	if err != nil {
-		return types.Item{}, fmt.Errorf("item: put %s: %w", full, err)
+		return model.Item{}, fmt.Errorf("item: put %s: %w", full, err)
 	}
 	if exists && old.Actual.SHA256 != "" {
 		if _, err := s.Store.Blobs().Unref(ctx, old.Actual.SHA256, 1); err != nil {
-			return types.Item{}, fmt.Errorf("item: release replaced blob: %w", err)
+			return model.Item{}, fmt.Errorf("item: release replaced blob: %w", err)
 		}
 	}
 	if err := items.SetProperties(ctx, stored.ID, rec.Properties, now); err != nil {
-		return types.Item{}, fmt.Errorf("item: properties of %s: %w", full, err)
+		return model.Item{}, fmt.Errorf("item: properties of %s: %w", full, err)
 	}
 	hooks, env := s.format(t.Repo.PackageType), s.env()
 	if !stored.Folder {
 		if err := hooks.Deployed(ctx, env, t.Repo, stored); err != nil {
-			return types.Item{}, err //nolint:wrapcheck // the format's own error
+			return model.Item{}, err //nolint:wrapcheck // the format's own error
 		}
 	}
 	if err := s.annotated(ctx, hooks, env, t.Repo, stored,
 		format.Annotation{Set: rec.Properties, At: now}); err != nil {
-		return types.Item{}, err
+		return model.Item{}, err
 	}
 	return stored, nil
 }
@@ -113,8 +113,8 @@ const (
 
 // restoredProperties is rec's properties with the restore's own two. It is
 // a copy: rec's map belongs to the trash entry the caller holds.
-func restoredProperties(rec types.TrashRecord, at time.Time) types.Properties {
-	props := make(types.Properties, len(rec.Properties)+2)
+func restoredProperties(rec model.TrashRecord, at time.Time) model.Properties {
+	props := make(model.Properties, len(rec.Properties)+2)
 	maps.Copy(props, rec.Properties)
 	// A restored item deleted and restored again keeps one restore time, the
 	// latest, rather than gathering one value per restore.

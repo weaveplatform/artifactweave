@@ -3,7 +3,7 @@ package app
 import (
 	"net/http"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 )
 
 // These are the 17 generated VCS REST operations served by the remote-only
@@ -94,7 +94,7 @@ func vcsMatrixRows() []matrixRow {
 			"GET "+prefix+c.route,
 			prefix+c.path,
 			"",
-			holds("vcs-remote", c.permission, types.ActionRead),
+			holds("vcs-remote", c.permission, api.ActionRead),
 			http.StatusNotImplemented,
 		))
 	}

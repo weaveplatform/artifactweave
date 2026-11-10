@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 )
 
 // minSize reads the minimum redirect size the store holds.
@@ -81,7 +81,7 @@ func TestUnitDownloadRedirectMinSizeStoreErrors(t *testing.T) {
 	}
 	put := func(doc string) {
 		t.Helper()
-		if err := db.Configs().Put(ctx, types.ConfigDocument{
+		if err := db.Configs().Put(ctx, configdoc.ConfigDocument{
 			Kind: downloadRedirectKind, Key: downloadRedirectKey, Document: []byte(doc),
 		}); err != nil {
 			t.Fatal(err)

@@ -8,8 +8,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // guard is a format that refuses every folder create and every change to
@@ -28,7 +29,7 @@ func (*guard) AdmitAnnotation(
 	_ context.Context,
 	_ format.Env,
 	_ repo.Config,
-	_ types.Item,
+	_ model.Item,
 	a format.Annotation,
 ) error {
 	if _, ok := a.Set["guarded"]; ok {
@@ -41,7 +42,7 @@ func TestUnitFormatAdmitsFoldersAndPropertyChanges(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	g := &guard{}
-	it, err := w.deploy("a/b.txt", "b", types.Checksums{})
+	it, err := w.deploy("a/b.txt", "b", kernel.Checksums{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +70,7 @@ func TestUnitFormatAdmitsFoldersAndPropertyChanges(t *testing.T) {
 		ctx,
 		w.loc,
 		it,
-		types.Properties{"guarded": {"1"}},
+		model.Properties{"guarded": {"1"}},
 		nil,
 	); !errors.As(
 		err,
@@ -77,14 +78,14 @@ func TestUnitFormatAdmitsFoldersAndPropertyChanges(t *testing.T) {
 	) {
 		t.Fatalf("a refused property change = %v", err)
 	}
-	if err := w.svc.Annotate(ctx, w.loc, it, types.Properties{"free": {"1"}}, nil); err != nil {
+	if err := w.svc.Annotate(ctx, w.loc, it, model.Properties{"free": {"1"}}, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	// A restore into a folder made since brings its properties back
 	// without asking: they were set already.
 	w.svc.Formats = nil
-	if err := w.db.Items().PatchProperties(ctx, folder.ID, types.Properties{"guarded": {"1"}},
+	if err := w.db.Items().PatchProperties(ctx, folder.ID, model.Properties{"guarded": {"1"}},
 		nil, at); err != nil {
 		t.Fatal(err)
 	}

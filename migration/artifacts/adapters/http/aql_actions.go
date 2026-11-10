@@ -10,9 +10,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // aqlAction carries out items.delete or properties.update on the rows the
@@ -31,9 +30,9 @@ func (s ArtifactoryAPI) aqlAction(
 	configs map[string]repo.Config,
 	hits []aql.Hit,
 ) ([]aql.Hit, error) {
-	want := types.ActionDelete
+	want := accessapi.ActionDelete
 	if q.Action == aql.UpdateProperties {
-		want = types.ActionAnnotate
+		want = accessapi.ActionAnnotate
 	}
 	if !p.Admin {
 		d, _ := accessapi.DeciderFrom(ctx)
@@ -67,7 +66,7 @@ func (s ArtifactoryAPI) aqlAction(
 			t,
 			p.Name,
 		); err != nil &&
-			!errors.Is(err, store.ErrNotFound) {
+			!errors.Is(err, kernel.ErrNotFound) {
 			return nil, fmt.Errorf("delete %s/%s: %w", t.Repo.Key, t.Path, err)
 		}
 	}
@@ -80,7 +79,7 @@ func (s ArtifactoryAPI) aqlAction(
 // repository root's record holds the repository's own properties, which
 // properties.update may change; items.delete passes it over, because
 // deleting the root would empty the whole repository, not remove one row.
-func actsOn(c repo.Config, it types.Item, a aql.Action) bool {
+func actsOn(c repo.Config, it model.Item, a aql.Action) bool {
 	return c.Class != repo.Virtual && (c.Class != repo.Remote || it.Cached) &&
 		(a == aql.UpdateProperties || !it.IsRoot())
 }
@@ -99,7 +98,7 @@ func updateProperties(
 	hits []aql.Hit,
 ) error {
 	for n, h := range hits {
-		set := types.Properties{}
+		set := model.Properties{}
 		for _, k := range q.Keys {
 			if _, ok := h.Properties[k]; ok {
 				set[k] = []string{q.NewValue}

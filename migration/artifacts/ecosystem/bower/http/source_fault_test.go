@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type bowerSourceRead func(context.Context, source.Request, source.Permit) (source.Result, error)
@@ -77,7 +77,7 @@ func TestUnitBowerAdapterFailsClosedOnInterruptedMetadataStreams(t *testing.T) {
 					f.mount(&source.Service{
 						HTTP:  backend,
 						Cache: backend,
-						Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+						Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 							return f.db.RemoteCache().Source(ctx, c.Key)
 						},
 					})
@@ -109,7 +109,7 @@ func TestUnitBowerSourceBackendErrorDoesNotExposeMetadata(t *testing.T) {
 	)
 	f.mount(&source.Service{
 		HTTP: backend, Cache: backend,
-		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			return f.db.RemoteCache().Source(ctx, c.Key)
 		},
 	})
@@ -139,7 +139,7 @@ func TestUnitBowerVirtualDoesNotHideMemberSourceFailure(t *testing.T) {
 	)
 	f.mount(&source.Service{
 		HTTP: backend, Cache: backend,
-		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			return f.db.RemoteCache().Source(ctx, c.Key)
 		},
 	})
@@ -218,7 +218,7 @@ func TestUnitBowerGitMetadataAdmissionChecksDeclaredSizes(t *testing.T) {
 			)
 			f.mount(&source.Service{
 				HTTP: backend, Cache: backend,
-				Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+				Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 					return f.db.RemoteCache().Source(ctx, c.Key)
 				},
 			})

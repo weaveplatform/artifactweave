@@ -9,9 +9,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -28,7 +28,7 @@ func (h handler) asset(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badAsset())
 		return
 	}
-	if !h.k.Can(r, cachePath, types.ActionRead) {
+	if !h.k.Can(r, cachePath, api.ActionRead) {
 		h.k.Error(w, r, notFound())
 		return
 	}

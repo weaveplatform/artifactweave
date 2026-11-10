@@ -12,11 +12,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/migration/platform/tx"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -41,12 +41,12 @@ var ErrNotPermitted = errors.New("trash: restoring an item is not permitted")
 func Settings(
 	ctx context.Context,
 	st interface{ Settings() settings.SettingsStore },
-) (types.TrashcanSettings, error) {
-	t := types.TrashcanSettings{Enabled: true, RetentionDays: DefaultRetentionDays}
-	err := st.Settings().Get(ctx, types.SettingTrashcan, &t)
+) (model.TrashcanSettings, error) {
+	t := model.TrashcanSettings{Enabled: true, RetentionDays: DefaultRetentionDays}
+	err := st.Settings().Get(ctx, settings.SettingTrashcan, &t)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
-		return types.TrashcanSettings{Enabled: true, RetentionDays: DefaultRetentionDays}, nil
+	case errors.Is(err, kernel.ErrNotFound):
+		return model.TrashcanSettings{Enabled: true, RetentionDays: DefaultRetentionDays}, nil
 	case err != nil:
 		return t, fmt.Errorf("trash: settings: %w", err)
 	}
@@ -92,9 +92,9 @@ func (s *Service) batch() int { return cmp.Or(s.Batch, DefaultBatch) }
 
 // Entries returns every entry trashed from repoKey at or below prefix ("" for
 // the whole repository; a repoKey of "" for the whole trash can).
-func (s *Service) Entries(ctx context.Context, repoKey, prefix string) ([]types.TrashEntry, error) {
-	var out []types.TrashEntry
-	page := store.Page{Limit: store.MaxLimit}
+func (s *Service) Entries(ctx context.Context, repoKey, prefix string) ([]model.TrashEntry, error) {
+	var out []model.TrashEntry
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		batch, next, err := s.Store.Trash().List(ctx, repoKey, strings.Trim(prefix, "/"), page)
 		if err != nil {
@@ -121,7 +121,7 @@ func (s *Service) Entries(ctx context.Context, repoKey, prefix string) ([]types.
 func (s *Service) Keep(ctx context.Context, c repo.Config, by string) (map[string]int64, error) {
 	held := map[string]int64{}
 	now := s.now()
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		batch, next, err := s.Store.Items().Descendants(ctx, c.Key, false, "", page)
 		if err != nil {
@@ -132,8 +132,8 @@ func (s *Service) Keep(ctx context.Context, c repo.Config, by string) (map[strin
 			if err != nil {
 				return nil, fmt.Errorf("trash: properties of %s/%s: %w", c.Key, it.FullPath(), err)
 			}
-			if _, err := s.Store.Trash().Add(ctx, types.TrashEntry{
-				Record: types.TrashRecord{
+			if _, err := s.Store.Trash().Add(ctx, model.TrashEntry{
+				Record: model.TrashRecord{
 					Item: it, Properties: props, PackageType: string(c.PackageType),
 				},
 				DeletedAt: now, DeletedBy: by,
@@ -155,8 +155,8 @@ func (s *Service) Keep(ctx context.Context, c repo.Config, by string) (map[strin
 
 // Newest keeps, for each original path, the most recently trashed entry,
 // ordered so folders come before what they contain.
-func Newest(entries []types.TrashEntry) []types.TrashEntry {
-	newest := map[string]types.TrashEntry{}
+func Newest(entries []model.TrashEntry) []model.TrashEntry {
+	newest := map[string]model.TrashEntry{}
 	for _, e := range entries {
 		k := e.Record.Item.RepoKey + "/" + e.Record.Item.FullPath()
 		cur, ok := newest[k]
@@ -165,11 +165,11 @@ func Newest(entries []types.TrashEntry) []types.TrashEntry {
 			newest[k] = e
 		}
 	}
-	out := make([]types.TrashEntry, 0, len(newest))
+	out := make([]model.TrashEntry, 0, len(newest))
 	for _, e := range newest {
 		out = append(out, e)
 	}
-	slices.SortFunc(out, func(a, b types.TrashEntry) int {
+	slices.SortFunc(out, func(a, b model.TrashEntry) int {
 		return cmp.Or(
 			cmp.Compare(depth(a.Record.Item.FullPath()), depth(b.Record.Item.FullPath())),
 			strings.Compare(a.Record.Item.FullPath(), b.Record.Item.FullPath()),
@@ -204,7 +204,7 @@ func (s *Service) Restore(
 	repoKey, from string,
 	dst Destination,
 	by string,
-	permit func(types.Item) bool,
+	permit func(model.Item) bool,
 ) (int, error) {
 	from = strings.Trim(from, "/")
 	entries, err := s.Entries(ctx, repoKey, from)
@@ -251,7 +251,7 @@ func (s *Service) Restore(
 
 // restoration is a trash entry a restore brings back, and where to.
 type restoration struct {
-	entry types.TrashEntry
+	entry model.TrashEntry
 	path  string
 }
 
@@ -267,7 +267,7 @@ func (s *Service) withSidecars(
 	ctx context.Context,
 	from string,
 	dst Destination,
-	selected []types.TrashEntry,
+	selected []model.TrashEntry,
 ) ([]restoration, error) {
 	have := make(map[string]bool, len(selected))
 	for _, e := range selected {
@@ -330,7 +330,7 @@ func (s *Service) Clean(ctx context.Context, repoKey, prefix string) (int, error
 func (s *Service) Empty(ctx context.Context) (int, error) {
 	total := 0
 	for {
-		entries, _, err := s.Store.Trash().List(ctx, "", "", store.Page{Limit: s.batch()})
+		entries, _, err := s.Store.Trash().List(ctx, "", "", kernel.Page{Limit: s.batch()})
 		if err != nil {
 			return total, fmt.Errorf("trash: list: %w", err)
 		}
@@ -374,7 +374,7 @@ func (s *Service) PurgeExpired(ctx context.Context) (int, error) {
 // purge drops entries and releases the blob references their files held,
 // one transaction per batch. An entry already gone was purged concurrently;
 // its reference was released by whoever removed it, so it is skipped here.
-func (s *Service) purge(ctx context.Context, entries []types.TrashEntry) (int, error) {
+func (s *Service) purge(ctx context.Context, entries []model.TrashEntry) (int, error) {
 	purged := 0
 	for chunk := range slices.Chunk(entries, s.batch()) {
 		n := 0
@@ -382,7 +382,7 @@ func (s *Service) purge(ctx context.Context, entries []types.TrashEntry) (int, e
 			n = 0
 			for _, e := range chunk {
 				err := s.Store.Trash().Delete(ctx, e.ID)
-				if errors.Is(err, store.ErrNotFound) {
+				if errors.Is(err, kernel.ErrNotFound) {
 					continue
 				}
 				if err != nil {
@@ -394,7 +394,7 @@ func (s *Service) purge(ctx context.Context, entries []types.TrashEntry) (int, e
 					continue
 				}
 				_, err = s.Store.Blobs().Unref(ctx, it.Actual.SHA256, 1)
-				if err != nil && !errors.Is(err, store.ErrNotFound) {
+				if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 					return fmt.Errorf("trash: release blob %s: %w", it.Actual.SHA256, err)
 				}
 			}
@@ -421,7 +421,7 @@ type Child struct {
 func (s *Service) Children(
 	ctx context.Context,
 	dir string,
-	sees func(types.Item) bool,
+	sees func(model.Item) bool,
 ) ([]Child, error) {
 	nodes, err := s.Below(ctx, dir, false, sees)
 	if err != nil {
@@ -443,7 +443,7 @@ type Node struct {
 	// Entry is the newest entry trashed at Path. It is nil for a folder that
 	// only holds what was trashed below it, such as a repository's folder at
 	// the root, or the parent of a file deleted on its own.
-	Entry *types.TrashEntry
+	Entry *model.TrashEntry
 }
 
 // Below lists the trash can's tree under dir ("" for its root): the direct
@@ -456,7 +456,7 @@ func (s *Service) Below(
 	ctx context.Context,
 	dir string,
 	deep bool,
-	sees func(types.Item) bool,
+	sees func(model.Item) bool,
 ) ([]Node, error) {
 	dir = strings.Trim(dir, "/")
 	repoKey, prefix, _ := strings.Cut(dir, "/")
@@ -464,7 +464,7 @@ func (s *Service) Below(
 	if err != nil {
 		return nil, err
 	}
-	visible := make([]types.TrashEntry, 0, len(entries))
+	visible := make([]model.TrashEntry, 0, len(entries))
 	for _, e := range entries {
 		if sees == nil || sees(e.Record.Item) {
 			visible = append(visible, e)
@@ -515,13 +515,13 @@ func (s *Service) Below(
 }
 
 // Find returns the newest entry trashed from repoKey at exactly fullPath.
-func (s *Service) Find(ctx context.Context, repoKey, fullPath string) (types.TrashEntry, error) {
+func (s *Service) Find(ctx context.Context, repoKey, fullPath string) (model.TrashEntry, error) {
 	entries, err := s.Store.Trash().Find(ctx, repoKey, strings.Trim(fullPath, "/"))
 	if err != nil {
-		return types.TrashEntry{}, fmt.Errorf("trash: find %s/%s: %w", repoKey, fullPath, err)
+		return model.TrashEntry{}, fmt.Errorf("trash: find %s/%s: %w", repoKey, fullPath, err)
 	}
 	if len(entries) == 0 {
-		return types.TrashEntry{}, store.ErrNotFound
+		return model.TrashEntry{}, kernel.ErrNotFound
 	}
 	return entries[0], nil
 }

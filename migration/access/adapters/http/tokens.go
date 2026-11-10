@@ -12,6 +12,7 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
@@ -19,7 +20,7 @@ import (
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // The Access token API (#79) and Artifactory's legacy token endpoints, over
@@ -124,7 +125,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 		if m.isLegacy {
 			raw = legacyScope(raw)
 		}
-		if req.Scope, err = types.ParseScope(raw); err != nil {
+		if req.Scope, err = kernel.ParseScope(raw); err != nil {
 			return token.Issued{}, httpkit.BadRequestf("%v", err)
 		}
 		if !p.Admin && !onlyUserScope(req.Scope) {
@@ -144,10 +145,10 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	case m.isLegacy:
 		// The legacy route has its own default, so the year-long
 		// token.default_expiry of the Access route does not reach it.
-		d := types.LegacyTokenExpiry
+		d := model.LegacyTokenExpiry
 		req.ExpiresIn = &d
 	}
-	if !p.Admin && p.Identity != types.IdentityStored {
+	if !p.Admin && p.Identity != kernel.IdentityStored {
 		if err := t.asTransientCaller(ctx, p, &req); err != nil {
 			return token.Issued{}, err
 		}
@@ -253,15 +254,15 @@ var errNeverExpires = apierror.New(
 // access-tokens page, "Support Authentication for Non-existing Users").
 // Only an administrator's token is marked: anyone else mints for
 // themselves alone.
-func (t tokenAPI) identityOf(ctx context.Context, username string) (types.TokenIdentity, error) {
+func (t tokenAPI) identityOf(ctx context.Context, username string) (kernel.TokenIdentity, error) {
 	_, err := t.deps.Store.Users().Get(ctx, username)
 	switch {
 	case errors.Is(err, kernel.ErrNotFound):
-		return types.IdentityTransient, nil
+		return kernel.IdentityTransient, nil
 	case err != nil:
 		return "", t.internalError(ctx, "token user", err)
 	}
-	return types.IdentityStored, nil
+	return kernel.IdentityStored, nil
 }
 
 // asTransientCaller shapes the token a transient user, from an OIDC exchange
@@ -319,9 +320,9 @@ func narrowedToken(p kernel.Principal) bool { return p.TokenID != "" && !identit
 
 // identityScope reports whether a scope acts as its user or as an
 // administrator, rather than narrowing to groups or resources.
-func identityScope(s types.Scope) bool {
+func identityScope(s kernel.Scope) bool {
 	for _, e := range s.Entries {
-		if e.Kind == types.ScopeUser || e.Kind == types.ScopeAdmin {
+		if e.Kind == kernel.ScopeUser || e.Kind == kernel.ScopeAdmin {
 			return true
 		}
 	}
@@ -329,8 +330,8 @@ func identityScope(s types.Scope) bool {
 }
 
 // onlyUserScope is the one scope a non-administrator may request.
-func onlyUserScope(s types.Scope) bool {
-	return len(s.Entries) == 1 && s.Entries[0].Kind == types.ScopeUser
+func onlyUserScope(s kernel.Scope) bool {
+	return len(s.Entries) == 1 && s.Entries[0].Kind == kernel.ScopeUser
 }
 
 // legacyScope translates the legacy token scope forms to Access ones:
@@ -364,7 +365,7 @@ func legacyScope(s string) string {
 // administrator, their own otherwise. Expired tokens are omitted, and so are
 // non-revocable ones, which Artifactory keeps no record of (see #79); a
 // refreshable token is revocable, and so listed.
-func (t tokenAPI) visible(ctx context.Context) ([]types.Token, *token.Service, error) {
+func (t tokenAPI) visible(ctx context.Context) ([]model.Token, *token.Service, error) {
 	svc, err := t.service()
 	if err != nil {
 		return nil, nil, err
@@ -378,7 +379,7 @@ func (t tokenAPI) visible(ctx context.Context) ([]types.Token, *token.Service, e
 		filter.Subject = subjectOf(svc, p.Name)
 	}
 	now := time.Now()
-	var out []types.Token
+	var out []model.Token
 	page := kernel.Page{Limit: 500}
 	for {
 		recs, next, err := t.deps.Store.Tokens().List(ctx, filter, page)
@@ -400,30 +401,30 @@ func (t tokenAPI) visible(ctx context.Context) ([]types.Token, *token.Service, e
 // own resolves a token id the caller may act on: me is the caller's own
 // token; another user's token is 403 unless the caller is an administrator;
 // a missing or expired one is 404.
-func (t tokenAPI) own(ctx context.Context, id string) (types.Token, *token.Service, error) {
+func (t tokenAPI) own(ctx context.Context, id string) (model.Token, *token.Service, error) {
 	svc, err := t.service()
 	if err != nil {
-		return types.Token{}, nil, err
+		return model.Token{}, nil, err
 	}
 	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
-		return types.Token{}, nil, fmt.Errorf("tokens: %w", err)
+		return model.Token{}, nil, fmt.Errorf("tokens: %w", err)
 	}
 	if id == "me" {
 		id = p.TokenID
 	}
 	if id == "" {
-		return types.Token{}, nil, tokenNotFound()
+		return model.Token{}, nil, tokenNotFound()
 	}
 	rec, err := t.deps.Store.Tokens().Get(ctx, id)
 	if errors.Is(err, kernel.ErrNotFound) || (err == nil && rec.Expired(time.Now())) {
-		return types.Token{}, nil, tokenNotFound()
+		return model.Token{}, nil, tokenNotFound()
 	}
 	if err != nil {
-		return types.Token{}, nil, t.internalError(ctx, "get token", err)
+		return model.Token{}, nil, t.internalError(ctx, "get token", err)
 	}
 	if rec.Subject != subjectOf(svc, p.Name) && !p.Admin {
-		return types.Token{}, nil, apierror.New(http.StatusForbidden,
+		return model.Token{}, nil, apierror.New(http.StatusForbidden,
 			"Only an administrator can manage other users' tokens")
 	}
 	return rec, svc, nil
@@ -514,9 +515,12 @@ func (s AccessService) GetTokens(
 // space-separated scopes. JFrog documents the filter (7.133.3) only as
 // returning "token results for a specific scope, such as group"; matching
 // either form exactly is the literal reading, recorded as [I] on #216.
-func hasScope(sc types.Scope, want string) bool {
+func hasScope(sc kernel.Scope, want string) bool {
 	return sc.String() == want ||
-		slices.ContainsFunc(sc.Entries, func(e types.ScopeEntry) bool { return e.String() == want })
+		slices.ContainsFunc(
+			sc.Entries,
+			func(e kernel.ScopeEntry) bool { return e.String() == want },
+		)
 }
 
 // GetTokenById returns one token's metadata. A non-revocable token is still
@@ -607,8 +611,8 @@ func (s AccessService) GetTokenDefaultExpiry(
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	secs := int64(types.DefaultTokenExpiry / time.Second)
-	if err := st.Settings().Get(ctx, types.SettingDefaultTokenExpiry, &secs); err != nil &&
+	secs := int64(model.DefaultTokenExpiry / time.Second)
+	if err := st.Settings().Get(ctx, settings.SettingDefaultTokenExpiry, &secs); err != nil &&
 		!errors.Is(err, kernel.ErrNotFound) {
 		return nil, t.internalError(ctx, "default token expiry", err)
 	}
@@ -633,14 +637,14 @@ func (s AccessService) SetTokenDefaultExpiry(
 	if req.Body == nil || req.Body.DefaultTokenExpiration < 0 {
 		return nil, httpkit.BadRequestf("default_token_expiration must be zero or more seconds")
 	}
-	if err := st.Settings().Put(ctx, types.SettingDefaultTokenExpiry,
+	if err := st.Settings().Put(ctx, settings.SettingDefaultTokenExpiry,
 		int64(req.Body.DefaultTokenExpiration)); err != nil {
 		return nil, t.internalError(ctx, "default token expiry", err)
 	}
 	return accessgen.SetTokenDefaultExpiry200Response{}, nil
 }
 
-func tokenDetails(svc *token.Service, r types.Token) accessgen.TokenDetails {
+func tokenDetails(svc *token.Service, r model.Token) accessgen.TokenDetails {
 	d := accessgen.TokenDetails{
 		TokenId: r.ID, Subject: r.Subject, Issuer: svc.Issuer(), Scope: r.Scope.String(),
 		IssuedAt: int(r.IssuedAt.Unix()), Refreshable: r.Refreshable,

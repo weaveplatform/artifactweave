@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const (
@@ -42,7 +42,7 @@ func (f filter) shows(m nugetfmt.Metadata) bool {
 // absent or unreadable one is 1.0.0, as Microsoft defines it.
 func semVer2(level string) bool {
 	v, ok := nugetfmt.NormalizeVersion(level)
-	return ok && types.CompareNuGet(v, "2.0.0") >= 0
+	return ok && model.CompareNuGet(v, "2.0.0") >= 0
 }
 
 // match is what a search matches a package's newest visible version
@@ -113,7 +113,7 @@ func (h handler) eachPackage(
 	each func(p pkg) error,
 ) error {
 	key := pkgroute.RequestFrom(r).Repo.Key
-	at := store.Page{Limit: listPage}
+	at := kernel.Page{Limit: listPage}
 	for {
 		found, next, err := h.k.DB().Packages().List(r.Context(), key, at)
 		if err != nil {

@@ -9,12 +9,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cran"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // MoveCranArchives migrates the legacy package/version source archive layout.
@@ -45,7 +45,7 @@ func (s CranAPI) MoveCranArchives(
 		moved, err = s.moveCranArchives(ctx, st, c, by)
 		return err
 	})
-	if errors.Is(err, store.ErrConflict) {
+	if errors.Is(err, kernel.ErrConflict) {
 		return nil, apierror.New(
 			http.StatusConflict,
 			"CRAN archive migration conflicts with existing or changed content; no archives were moved",
@@ -64,7 +64,7 @@ func (s CranAPI) moveCranArchives(
 	by string,
 ) (int, error) {
 	svc := s.Items(st)
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	moved := 0
 	for {
 		entries, next, err := st.Items().Descendants(ctx, c.Key, false, "src/contrib/Archive", page)
@@ -99,24 +99,24 @@ func moveCranArchive(
 	ctx context.Context,
 	svc *item.Service,
 	c repo.Config,
-	entry types.Item,
+	entry model.Item,
 	target, by string,
 ) (int, error) {
 	// GetByID holds the SQL row lock until the enclosing transaction ends.
 	// A competing migration may have moved it while this request waited.
 	current, err := svc.Store.Items().GetByID(ctx, entry.ID)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return 0, nil
 	}
 	if err != nil {
 		return 0, fmt.Errorf("cran: lock archive: %w", err)
 	}
 	if current.FullPath() != entry.FullPath() || current.Folder {
-		return 0, fmt.Errorf("cran: archive changed during migration: %w", store.ErrConflict)
+		return 0, fmt.Errorf("cran: archive changed during migration: %w", kernel.ErrConflict)
 	}
 	if _, err := svc.Store.Items().Get(ctx, c.Key, false, target); err == nil {
-		return 0, store.ErrConflict
-	} else if !errors.Is(err, store.ErrNotFound) {
+		return 0, kernel.ErrConflict
+	} else if !errors.Is(err, kernel.ErrNotFound) {
 		return 0, fmt.Errorf("cran: archive destination: %w", err)
 	}
 	result, err := svc.Transfer(ctx, item.Transfer{

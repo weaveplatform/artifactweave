@@ -12,8 +12,9 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // The manifest media types the registry stores (decision 0031).
@@ -271,8 +272,8 @@ func (m Manifest) ConfigType() string {
 // is answered from (DV-036), the image's docker.os and docker.architecture,
 // and a docker.label.<label> for each of its labels. A label whose name no
 // property key may carry is left out.
-func Properties(m Manifest, name, folder string, c Config) types.Properties {
-	p := types.Properties{}
+func Properties(m Manifest, name, folder string, c Config) model.Properties {
+	p := model.Properties{}
 	p.Set(ManifestProperty, folder)
 	p.Set(ManifestDigestProperty, "sha256:"+m.Digest)
 	p.Set(ManifestTypeProperty, m.MediaType)
@@ -294,7 +295,7 @@ func Properties(m Manifest, name, folder string, c Config) types.Properties {
 	}
 	for k, v := range c.Labels {
 		key := LabelPropertyPrefix + k
-		if types.ValidatePropertyKey(key) == nil {
+		if model.ValidatePropertyKey(key) == nil {
 			p.Set(key, v)
 		}
 	}
@@ -403,9 +404,9 @@ func IsDigestFolder(folder string) bool { return strings.HasPrefix(folder, diges
 // there is none.
 func FindManifest(
 	ctx context.Context,
-	items store.ItemStore,
+	items port.ItemStore,
 	repoKey, name, hex string,
-) (types.Item, error) {
+) (model.Item, error) {
 	q := aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{{Key: repoKey}}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
@@ -421,11 +422,11 @@ func FindManifest(
 	}, Limit: 1, HasLimit: true}
 	hits, err := items.Search(ctx, &q, aql.Options{})
 	if err != nil {
-		return types.Item{}, fmt.Errorf("docker: find manifest %s in %s: %w", hex, name, err)
+		return model.Item{}, fmt.Errorf("docker: find manifest %s in %s: %w", hex, name, err)
 	}
 	if len(hits) == 0 {
-		return types.Item{}, fmt.Errorf("docker: manifest %s in %s: %w",
-			hex, name, store.ErrNotFound)
+		return model.Item{}, fmt.Errorf("docker: manifest %s in %s: %w",
+			hex, name, kernel.ErrNotFound)
 	}
 	return hits[0].Item, nil
 }

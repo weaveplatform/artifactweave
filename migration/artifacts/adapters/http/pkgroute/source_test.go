@@ -13,14 +13,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type remoteBackend func(context.Context, source.Request, source.Permit) (source.Result, error)
@@ -45,9 +47,9 @@ func TestAccRemoteAdapterExplicitGateAndRead(t *testing.T) {
 	var result source.Result
 	var fail error
 	svc := &source.Service{
-		Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
-			return types.SourceIdentity{
-				Kind:       types.ExternalHTTP,
+		Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+			return model.SourceIdentity{
+				Kind:       model.ExternalHTTP,
 				Repository: "repo",
 				ID:         "source",
 				Generation: "1",
@@ -71,7 +73,7 @@ func TestAccRemoteAdapterExplicitGateAndRead(t *testing.T) {
 		},
 	)
 	if err := f.db.Permissions().
-		Create(t.Context(), types.Permission{Name: "read-remote", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}}, Targets: map[string]types.Target{"gen-remote": {Include: []string{"**"}}}}}}); err != nil {
+		Create(t.Context(), model.Permission{Name: "read-remote", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]model.Target{"gen-remote": {Include: []string{"**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	b := &remoteBody{Reader: strings.NewReader("remote bytes")}
@@ -86,7 +88,7 @@ func TestAccRemoteAdapterExplicitGateAndRead(t *testing.T) {
 	if res.Code != 200 || res.Body.String() != "remote bytes" || b.closes.Load() != 1 {
 		t.Fatalf("%d %s closed%d", res.Code, res.Body, b.closes.Load())
 	}
-	result = source.Result{Item: &types.Item{RepoKey: "gen-remote", Name: "a b", Cached: true}}
+	result = source.Result{Item: &model.Item{RepoKey: "gen-remote", Name: "a b", Cached: true}}
 	res = f.do(http.MethodGet, base+"gen-remote/files/a%20b", "reader", "")
 	if res.Code != 200 || res.Body.String() != "served a b" {
 		t.Fatal(res.Code, res.Body)
@@ -174,7 +176,7 @@ func TestAccSourceErrorEnvelopes(t *testing.T) {
 		{source.ErrSuperseded, false, 503},
 		{context.Canceled, false, 502},
 		{context.DeadlineExceeded, false, 504},
-		{store.ErrNotFound, false, 404},
+		{kernel.ErrNotFound, false, 404},
 		{errors.New("fault"), false, 500},
 		{format.Rejectf(404, "excluded"), false, 404},
 		{&source.HTTPError{Status: 429, RetryAfter: 1500 * time.Millisecond}, false, 429},
@@ -223,7 +225,7 @@ func TestAccServeTransientRepresentation(t *testing.T) {
 					MediaType:    "application/test",
 					ETag:         `"exact"`,
 					Modified:     time.Unix(1000, 0),
-					Checksums:    types.Checksums{SHA256: "sha256"},
+					Checksums:    kernel.Checksums{SHA256: "sha256"},
 					ContentRange: "bytes 0-3/8",
 				},
 			}
@@ -261,11 +263,11 @@ func TestAccRemoteNativeWritesRemainRefused(t *testing.T) {
 			var err error
 			switch chi.URLParam(r, "operation") {
 			case "store":
-				_, err = k.Store(r, "a", r.Body, nil, types.Checksums{})
+				_, err = k.Store(r, "a", r.Body, nil, kernel.Checksums{})
 			case "once":
-				_, err = k.StoreOnce(r, "a", r.Body, nil, types.Checksums{}, nil)
+				_, err = k.StoreOnce(r, "a", r.Body, nil, kernel.Checksums{}, nil)
 			case "new":
-				_, err = k.StoreNew(r, "a", blob.Info{}, nil, types.Checksums{}, nil)
+				_, err = k.StoreNew(r, "a", blob.Info{}, nil, kernel.Checksums{}, nil)
 			case "upload":
 				_, err = k.Upload(r, r.Body)
 			}

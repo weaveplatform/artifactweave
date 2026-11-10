@@ -12,10 +12,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // KindIndex is the work kind that rebuilds a local or federated
@@ -112,7 +113,7 @@ func (Handler) Admit(
 // version's files are every package in the repository with that name and
 // version, in any feed or folder, so Deployed reads them all rather than
 // trusting their paths. Folders and other files change nothing.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || !IsPackage(it.FullPath()) {
 		return nil
 	}
@@ -132,7 +133,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 // Deleting queues the index rebuild when a local or federated repository's
 // own package is about to be deleted, so the rebuild is asked for exactly
 // when the delete commits. Folders and other files change nothing.
-func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || !IsPackage(it.FullPath()) {
 		return nil
 	}
@@ -147,7 +148,7 @@ func (Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	removed []types.Item,
+	removed []model.Item,
 ) error {
 	seen := map[string]bool{}
 	for _, it := range removed {
@@ -214,7 +215,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	if err != nil {
 		return err
 	}
-	by := map[string]map[string][]types.Item{}
+	by := map[string]map[string][]model.Item{}
 	for _, it := range items {
 		if !IsPackage(it.FullPath()) {
 			continue
@@ -229,7 +230,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 			}
 		}
 		if by[pkg.Name] == nil {
-			by[pkg.Name] = map[string][]types.Item{}
+			by[pkg.Name] = map[string][]model.Item{}
 		}
 		by[pkg.Name][pkg.Version] = append(by[pkg.Name][pkg.Version], it)
 	}
@@ -266,13 +267,13 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 // It ignores other kinds, a repository that no longer exists and one that
 // is not a local or federated CRAN repository, and fails on the first
 // package it cannot read.
-func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) error {
+func (Handler) Work(ctx context.Context, env format.Env, work work.WorkItem) error {
 	if work.Kind != KindIndex {
 		return nil
 	}
 	c, err := env.Store.Repos().Get(ctx, work.Key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	case err != nil:
 		return fmt.Errorf("cran: repository: %w", err)
@@ -329,7 +330,7 @@ func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) er
 	return nil
 }
 
-func packageFor(ctx context.Context, env format.Env, it types.Item) (Package, error) {
+func packageFor(ctx context.Context, env format.Env, it model.Item) (Package, error) {
 	if in, ok := env.Inspection.(inspection); ok && in.sha == it.Actual.SHA256 &&
 		in.path == it.FullPath() {
 		return in.pkg, nil
@@ -353,13 +354,13 @@ func readStored(ctx context.Context, blobs format.Blobs, sha, p string) (Package
 	return pkg, nil
 }
 
-func setProperties(ctx context.Context, st format.Store, it types.Item, pkg Package) error {
+func setProperties(ctx context.Context, st format.Store, it model.Item, pkg Package) error {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("cran: item properties: %w", err)
 	}
-	want := types.Properties{PropName: {pkg.Name}, PropVersion: {pkg.Version}, PropFeed: {pkg.Feed}}
-	set := types.Properties{}
+	want := model.Properties{PropName: {pkg.Name}, PropVersion: {pkg.Version}, PropFeed: {pkg.Feed}}
+	set := model.Properties{}
 	for key, values := range want {
 		if !slices.Equal(props[key], values) {
 			set[key] = values
@@ -376,7 +377,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, versi
 	if err != nil {
 		return err
 	}
-	var selected []types.Item
+	var selected []model.Item
 	for _, it := range items {
 		if !IsPackage(it.FullPath()) {
 			continue
@@ -393,7 +394,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, versi
 		return nil
 	}
 	v := indexedVersion(version, selected)
-	p, err := env.Store.Packages().Ensure(ctx, types.Package{
+	p, err := env.Store.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Type: c.PackageType, Name: name, Created: v.Created,
 	})
 	if err != nil {
@@ -403,7 +404,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, versi
 	return err //nolint:wrapcheck
 }
 
-func indexedVersion(version string, items []types.Item) pkgindex.IndexedVersion {
+func indexedVersion(version string, items []model.Item) pkgindex.IndexedVersion {
 	v := pkgindex.IndexedVersion{Version: version}
 	for _, it := range items {
 		if v.Created.IsZero() || it.Created.Before(v.Created) {
@@ -415,7 +416,7 @@ func indexedVersion(version string, items []types.Item) pkgindex.IndexedVersion 
 	return v
 }
 
-func files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, error) {
+func files(ctx context.Context, st format.Store, c repo.Config) ([]model.Item, error) {
 	hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
@@ -423,7 +424,7 @@ func files(ctx context.Context, st format.Store, c repo.Config) ([]types.Item, e
 	if err != nil {
 		return nil, fmt.Errorf("cran: files of %s: %w", c.Key, err)
 	}
-	out := make([]types.Item, 0, len(hits))
+	out := make([]model.Item, 0, len(hits))
 	for _, hit := range hits {
 		out = append(out, hit.Item)
 	}

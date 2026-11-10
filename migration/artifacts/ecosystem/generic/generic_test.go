@@ -8,7 +8,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 func config(patch func(*repo.Config)) repo.Config {
@@ -72,7 +72,7 @@ func TestUnitAdmit(t *testing.T) {
 			w := format.Write{
 				Op:         format.OpDeploy,
 				Path:       tc.path,
-				Properties: types.Properties{"k": {"v"}},
+				Properties: model.Properties{"k": {"v"}},
 			}
 			got, err := Handler{}.Admit(ctx, format.Env{}, config(tc.patch), w)
 			var refused *format.RejectionError
@@ -92,9 +92,9 @@ func TestUnitAdmit(t *testing.T) {
 func TestUnitHooksDoNothing(t *testing.T) {
 	ctx := context.Background()
 	h := Handler{}
-	if h.Deployed(ctx, format.Env{}, repo.Config{}, types.Item{}) != nil ||
-		h.Deleting(ctx, format.Env{}, repo.Config{}, types.Item{}) != nil ||
-		h.Deleted(ctx, format.Env{}, repo.Config{}, []types.Item{{Name: "c"}}) != nil {
+	if h.Deployed(ctx, format.Env{}, repo.Config{}, model.Item{}) != nil ||
+		h.Deleting(ctx, format.Env{}, repo.Config{}, model.Item{}) != nil ||
+		h.Deleted(ctx, format.Env{}, repo.Config{}, []model.Item{{Name: "c"}}) != nil {
 		t.Fatal("a generic hook failed")
 	}
 	if got := format.ClassOf(h, repo.Config{}, "a/b"); got != format.ClassUnique {

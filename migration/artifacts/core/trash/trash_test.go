@@ -12,11 +12,14 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 type world struct {
@@ -54,8 +57,8 @@ func (w *world) deploy(
 	t *testing.T,
 	c repo.Config,
 	p, body string,
-	props types.Properties,
-) types.Item {
+	props model.Properties,
+) model.Item {
 	t.Helper()
 	it, err := w.items.Deploy(context.Background(), item.Deploy{
 		Target: item.Target{Repo: c, Path: p}, Body: strings.NewReader(body), Properties: props,
@@ -98,15 +101,15 @@ func TestUnitSettings(t *testing.T) {
 	if err != nil || !got.Enabled || got.RetentionDays != trash.DefaultRetentionDays {
 		t.Fatalf("unset = %+v, %v", got, err)
 	}
-	if err := db.Settings().Put(ctx, types.SettingTrashcan,
-		types.TrashcanSettings{Enabled: false, RetentionDays: 3}); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingTrashcan,
+		model.TrashcanSettings{Enabled: false, RetentionDays: 3}); err != nil {
 		t.Fatal(err)
 	}
 	if got, err = trash.Settings(ctx, db); err != nil || got.Enabled || got.RetentionDays != 3 {
 		t.Fatalf("stored = %+v, %v", got, err)
 	}
 	if err := db.Settings().
-		Put(ctx, types.SettingTrashcan, map[string]bool{"enabled": true}); err != nil {
+		Put(ctx, settings.SettingTrashcan, map[string]bool{"enabled": true}); err != nil {
 		t.Fatal(err)
 	}
 	if got, err = trash.Settings(
@@ -116,7 +119,7 @@ func TestUnitSettings(t *testing.T) {
 		got.RetentionDays != trash.DefaultRetentionDays {
 		t.Fatalf("no retention stored = %+v, %v", got, err)
 	}
-	if err := db.Settings().Put(ctx, types.SettingTrashcan, "not an object"); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingTrashcan, "not an object"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := trash.Settings(ctx, db); err == nil {
@@ -127,7 +130,7 @@ func TestUnitSettings(t *testing.T) {
 func TestUnitRestoreToOriginal(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
-	f := w.deploy(t, w.libs, "a/b/f.txt", "content", types.Properties{"k": {"v"}})
+	f := w.deploy(t, w.libs, "a/b/f.txt", "content", model.Properties{"k": {"v"}})
 	w.deploy(t, w.libs, "a/g.txt", "other content", nil)
 	w.remove(t, w.libs, "a")
 	if w.exists(w.libs, "a/b/f.txt") || w.refs(t, f.Actual.SHA256) != 1 {
@@ -245,7 +248,7 @@ func TestUnitRestorePermit(t *testing.T) {
 	w.remove(t, w.libs, "a")
 	var asked []string
 	_, err := w.trash.Restore(ctx, "libs", "a", trash.Destination{Repo: w.other}, "bob",
-		func(it types.Item) bool {
+		func(it model.Item) bool {
 			asked = append(asked, it.RepoKey+"/"+it.FullPath())
 			return it.FullPath() != "a/secret.txt"
 		})
@@ -263,13 +266,13 @@ func TestUnitRestorePermit(t *testing.T) {
 		t.Fatalf("a refused restore keeps every entry: %v", left)
 	}
 	n, err := w.trash.Restore(ctx, "libs", "a/1.txt", trash.Destination{Repo: w.other}, "bob",
-		func(types.Item) bool { return true })
+		func(model.Item) bool { return true })
 	if err != nil || n != 1 || !w.exists(w.other, "a/1.txt") {
 		t.Fatalf("permitted restore: %d, %v", n, err)
 	}
 	// Nothing trashed is reported before any item is asked about.
 	_, err = w.trash.Restore(ctx, "libs", "absent", trash.Destination{Repo: w.other}, "bob",
-		func(types.Item) bool { t.Fatal("asked with nothing selected"); return false })
+		func(model.Item) bool { t.Fatal("asked with nothing selected"); return false })
 	if !errors.Is(err, trash.ErrNothingTrashed) {
 		t.Fatalf("restore of nothing: %v", err)
 	}
@@ -294,12 +297,12 @@ func TestUnitRestoreIntoExistingFolder(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	if _, err := w.items.MakeFolder(ctx, item.Target{Repo: w.libs, Path: "d"},
-		types.Properties{"old": {"1"}}, "alice"); err != nil {
+		model.Properties{"old": {"1"}}, "alice"); err != nil {
 		t.Fatal(err)
 	}
 	w.remove(t, w.libs, "d")
 	keep, err := w.items.MakeFolder(ctx, item.Target{Repo: w.libs, Path: "d"},
-		types.Properties{"new": {"2"}}, "alice")
+		model.Properties{"new": {"2"}}, "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +329,7 @@ func TestUnitRestoreIntoExistingFolder(t *testing.T) {
 func TestUnitKeep(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
-	one := w.deploy(t, w.other, "a/one.txt", "same", types.Properties{"k": {"v"}}).Actual.SHA256
+	one := w.deploy(t, w.other, "a/one.txt", "same", model.Properties{"k": {"v"}}).Actual.SHA256
 	w.deploy(t, w.other, "a/b/two.txt", "same", nil)
 	three := w.deploy(t, w.other, "three.txt", "three", nil).Actual.SHA256
 	held, err := w.trash.Keep(ctx, w.other, "carol")
@@ -364,10 +367,10 @@ func TestUnitKeep(t *testing.T) {
 func TestUnitKeepPages(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
-	const n = store.MaxLimit + 1
+	const n = kernel.MaxLimit + 1
 	for i := range n {
 		if _, err := w.db.Items().
-			Put(ctx, types.Item{RepoKey: "other", Name: "f" + strconv.Itoa(i)}); err != nil {
+			Put(ctx, model.Item{RepoKey: "other", Name: "f" + strconv.Itoa(i)}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -405,8 +408,8 @@ func TestUnitCleanEmptyPurge(t *testing.T) {
 	w.clock = w.clock.Add(24 * time.Hour)
 	w.deploy(t, w.libs, "new.txt", "new", nil)
 	w.remove(t, w.libs, "new.txt")
-	if err := w.db.Settings().Put(ctx, types.SettingTrashcan,
-		types.TrashcanSettings{Enabled: true, RetentionDays: 1}); err != nil {
+	if err := w.db.Settings().Put(ctx, settings.SettingTrashcan,
+		model.TrashcanSettings{Enabled: true, RetentionDays: 1}); err != nil {
 		t.Fatal(err)
 	}
 	w.clock = w.clock.Add(time.Hour)
@@ -433,8 +436,8 @@ func TestUnitPurgeExpiredWhileOff(t *testing.T) {
 	w.remove(t, w.libs, "kept.txt")
 	put := func(on bool) {
 		t.Helper()
-		if err := w.db.Settings().Put(ctx, types.SettingTrashcan,
-			types.TrashcanSettings{Enabled: on, RetentionDays: 1}); err != nil {
+		if err := w.db.Settings().Put(ctx, settings.SettingTrashcan,
+			model.TrashcanSettings{Enabled: on, RetentionDays: 1}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -481,7 +484,7 @@ func TestUnitChildrenAndFind(t *testing.T) {
 	if err != nil || e.DeletedBy != "alice" {
 		t.Fatalf("find %+v, %v", e, err)
 	}
-	if _, err := w.trash.Find(ctx, "libs", "absent"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.trash.Find(ctx, "libs", "absent"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("find absent: %v", err)
 	}
 }
@@ -563,7 +566,7 @@ func TestUnitChildrenFiltered(t *testing.T) {
 	w.remove(t, w.libs, "top.txt")
 	w.remove(t, w.other, "o.txt")
 	// Everything trashed from libs under a/b, and the folders on the way.
-	sees := func(it types.Item) bool {
+	sees := func(it model.Item) bool {
 		return it.RepoKey == "libs" &&
 			(it.FullPath() == "a" || strings.HasPrefix(it.FullPath(), "a/b"))
 	}
@@ -595,13 +598,14 @@ type failing struct {
 	fail map[string]error
 }
 
-func (f failing) Trash() store.TrashStore       { return failTrash{f.Store.Trash(), f.fail} }
-func (f failing) Blobs() store.BlobIndex        { return failBlobs{f.Store.Blobs(), f.fail} }
-func (f failing) Settings() store.SettingsStore { return failSettings{f.Store.Settings(), f.fail} }
-func (f failing) Items() store.ItemStore        { return failItems{f.Store.Items(), f.fail} }
+func (f failing) Trash() port.TrashStore { return failTrash{f.Store.Trash(), f.fail} }
+func (f failing) Blobs() port.BlobIndex  { return failBlobs{f.Store.Blobs(), f.fail} }
+
+func (f failing) Settings() settings.SettingsStore { return failSettings{f.Store.Settings(), f.fail} }
+func (f failing) Items() port.ItemStore            { return failItems{f.Store.Items(), f.fail} }
 
 type failItems struct {
-	store.ItemStore
+	port.ItemStore
 	fail map[string]error
 }
 
@@ -610,15 +614,15 @@ func (f failItems) Descendants(
 	r string,
 	c bool,
 	p string,
-	pg store.Page,
-) ([]types.Item, string, error) {
+	pg kernel.Page,
+) ([]model.Item, string, error) {
 	if err := f.fail["descendants"]; err != nil {
 		return nil, "", err
 	}
 	return f.ItemStore.Descendants(ctx, r, c, p, pg) //nolint:wrapcheck // test double
 }
 
-func (f failItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (f failItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if err := f.fail["properties"]; err != nil {
 		return nil, err
 	}
@@ -630,22 +634,22 @@ func (f failing) Tx(ctx context.Context, fn func(context.Context) error) error {
 }
 
 type failTrash struct {
-	store.TrashStore
+	port.TrashStore
 	fail map[string]error
 }
 
 func (f failTrash) List(
 	ctx context.Context,
 	r, p string,
-	pg store.Page,
-) ([]types.TrashEntry, string, error) {
+	pg kernel.Page,
+) ([]model.TrashEntry, string, error) {
 	if err := f.fail["list"]; err != nil {
 		return nil, "", err
 	}
 	return f.TrashStore.List(ctx, r, p, pg) //nolint:wrapcheck // test double
 }
 
-func (f failTrash) Find(ctx context.Context, r, p string) ([]types.TrashEntry, error) {
+func (f failTrash) Find(ctx context.Context, r, p string) ([]model.TrashEntry, error) {
 	if err := f.fail["find"]; err != nil {
 		return nil, err
 	}
@@ -656,14 +660,14 @@ func (f failTrash) Expired(
 	ctx context.Context,
 	before time.Time,
 	n int,
-) ([]types.TrashEntry, error) {
+) ([]model.TrashEntry, error) {
 	if err := f.fail["expired"]; err != nil {
 		return nil, err
 	}
 	return f.TrashStore.Expired(ctx, before, n) //nolint:wrapcheck // test double
 }
 
-func (f failTrash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEntry, error) {
+func (f failTrash) Add(ctx context.Context, e model.TrashEntry) (model.TrashEntry, error) {
 	if err := f.fail["add"]; err != nil {
 		return e, err
 	}
@@ -678,19 +682,19 @@ func (f failTrash) Delete(ctx context.Context, id int64) error {
 }
 
 type failBlobs struct {
-	store.BlobIndex
+	port.BlobIndex
 	fail map[string]error
 }
 
-func (f failBlobs) Unref(ctx context.Context, sha string, n int64) (types.Blob, error) {
+func (f failBlobs) Unref(ctx context.Context, sha string, n int64) (blob.Blob, error) {
 	if err := f.fail["unref"]; err != nil {
-		return types.Blob{}, err
+		return blob.Blob{}, err
 	}
 	return f.BlobIndex.Unref(ctx, sha, n) //nolint:wrapcheck // test double
 }
 
 type failSettings struct {
-	store.SettingsStore
+	settings.SettingsStore
 	fail map[string]error
 }
 
@@ -773,12 +777,12 @@ func TestUnitStoreFailures(t *testing.T) {
 		}
 	}
 	// An entry purged concurrently, or a blob row already gone, is skipped.
-	n, err := svc(map[string]error{"delete": store.ErrNotFound}).Clean(ctx, "libs", "a")
+	n, err := svc(map[string]error{"delete": kernel.ErrNotFound}).Clean(ctx, "libs", "a")
 	if err != nil || n != 0 {
 		t.Fatalf("entries already gone: %d, %v", n, err)
 	}
 	if n, err = svc(
-		map[string]error{"unref": store.ErrNotFound},
+		map[string]error{"unref": kernel.ErrNotFound},
 	).Clean(ctx, "libs", "a"); err != nil ||
 		n != 2 {
 		t.Fatalf("blob row already gone: %d, %v", n, err)

@@ -10,7 +10,6 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitMetadataRootRequiresActualRootGrant(t *testing.T) {
@@ -33,10 +32,10 @@ func TestUnitMetadataRootRequiresActualRootGrant(t *testing.T) {
 				full, allows = q.Resource.PermissionPath, current.AllowsFolder
 			}
 			if !allows(
-				types.ResourceArtifact,
+				accessapi.ResourceArtifact,
 				accessapi.Repo{Key: q.Repo.Key},
 				full,
-				types.ActionRead,
+				accessapi.ActionRead,
 			) {
 				return source.ErrDenied
 			}

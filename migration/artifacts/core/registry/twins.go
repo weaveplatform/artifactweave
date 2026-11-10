@@ -6,8 +6,8 @@ import (
 	"path"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // loneTwin returns the manifest of a tag's digest twin in o's image: the
@@ -25,22 +25,22 @@ func (s *Service) loneTwin(
 	o Owner,
 	gone []string,
 	hex string,
-) (types.Item, bool, error) {
+) (model.Item, bool, error) {
 	free, err := s.unreferenced(ctx, o, gone, []string{"sha256:" + hex})
 	if err != nil || len(free) == 0 {
-		return types.Item{}, false, err
+		return model.Item{}, false, err
 	}
 	m, ok, err := layout.FolderManifest(ctx, s.Store.Items(), o.Repo.Key, false,
 		o.Name+"/"+free[0])
 	if err != nil {
-		return types.Item{}, false, err //nolint:wrapcheck // the layout names itself
+		return model.Item{}, false, err //nolint:wrapcheck // the layout names itself
 	}
 	if !ok || m.Actual.SHA256 != hex {
-		return types.Item{}, false, nil
+		return model.Item{}, false, nil
 	}
 	props, err := s.Store.Items().Properties(ctx, m.ID)
 	if err != nil {
-		return types.Item{}, false,
+		return model.Item{}, false,
 			fmt.Errorf("registry: properties of %s: %w", m.FullPath(), err)
 	}
 	return m, first(props, layout.ManifestProperty) == free[0], nil
@@ -63,7 +63,7 @@ func (s *Service) adoptTwin(
 	if err != nil || !ok {
 		return err
 	}
-	set := types.Properties{}
+	set := model.Properties{}
 	set.Set(layout.ManifestProperty, folder)
 	if err := items.Annotate(ctx, p.Repo, twin, set, nil); err != nil {
 		return fmt.Errorf("registry: retain %s: %w", path.Dir(twin.FullPath()), err)

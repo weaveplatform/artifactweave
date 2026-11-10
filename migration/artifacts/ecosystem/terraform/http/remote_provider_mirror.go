@@ -12,12 +12,12 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	tf "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type remoteMirrorArchive struct {
@@ -315,7 +315,7 @@ func (h handler) remoteProviderMirrorUpstream(
 		for platform := range archives {
 			q.os, q.arch, _ = strings.Cut(platform, "_")
 			path := providerArchivePath(q)
-			if h.k.Can(r, path, types.ActionRead) {
+			if h.k.Can(r, path, api.ActionRead) {
 				out[version] = struct{}{}
 				paths = append(paths, path)
 				results = append(results, result)
@@ -345,7 +345,7 @@ func (h handler) remoteMirrorArchives(
 	paths := []string{}
 	for platform, entry := range archives {
 		q.os, q.arch, _ = strings.Cut(platform, "_")
-		if !h.k.Can(r, providerArchivePath(q), types.ActionRead) {
+		if !h.k.Can(r, providerArchivePath(q), api.ActionRead) {
 			continue
 		}
 		bundle, e := h.providerMirrorArchive(r, q, entry, metadata, digest)

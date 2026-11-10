@@ -17,13 +17,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	gemfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gems"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const maxPackages = 10000
@@ -119,7 +119,7 @@ func (h handler) push(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	if !h.k.RequireFolder(w, r, "gems", types.ActionWrite) {
+	if !h.k.RequireFolder(w, r, "gems", api.ActionWrite) {
 		return
 	}
 	info, err := h.k.Upload(r, io.LimitReader(r.Body, gemfmt.MaxGemBytes+1))
@@ -148,7 +148,7 @@ func (h handler) push(w http.ResponseWriter, r *http.Request) {
 		path,
 		info,
 		nil,
-		types.Checksums{},
+		kernel.Checksums{},
 		func() error { return apierror.New(http.StatusConflict, "gem version already exists") },
 	)
 	if err != nil {
@@ -172,7 +172,7 @@ func (h handler) yank(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	if !h.k.RequireFolder(w, r, "gems", types.ActionDelete) {
+	if !h.k.RequireFolder(w, r, "gems", api.ActionDelete) {
 		return
 	}
 	input, err := io.ReadAll(io.LimitReader(r.Body, 4097))
@@ -240,7 +240,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, missing())
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", types.ActionRead) {
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	var entries []entry
@@ -425,7 +425,7 @@ func (h handler) local(r *http.Request) ([]entry, error) {
 	}
 	var out []entry
 	for _, it := range items {
-		if !gemfmt.ValidPath(it.FullPath()) || !h.k.Can(r, it.FullPath(), types.ActionRead) {
+		if !gemfmt.ValidPath(it.FullPath()) || !h.k.Can(r, it.FullPath(), api.ActionRead) {
 			continue
 		}
 		rc, info, err := h.k.Blobs().Open(r.Context(), it.Actual.SHA256)
@@ -452,7 +452,7 @@ func (h handler) members(r *http.Request) ([]*http.Request, error) {
 		}
 		seen[key] = true
 		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -488,8 +488,8 @@ func (h handler) collect(r *http.Request) ([]entry, error) {
 			return nil, err
 		}
 		for _, row := range rows {
-			if !h.k.Can(r, row.Path, types.ActionRead) ||
-				!h.k.Can(mr, row.Path, types.ActionRead) ||
+			if !h.k.Can(r, row.Path, api.ActionRead) ||
+				!h.k.Can(mr, row.Path, api.ActionRead) ||
 				selected[row.Path] {
 				continue
 			}
@@ -501,7 +501,7 @@ func (h handler) collect(r *http.Request) ([]entry, error) {
 }
 
 func (h handler) artifact(w http.ResponseWriter, r *http.Request, path string) {
-	if !h.k.Require(w, r, path, types.ActionRead) {
+	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
 	q := pkgroute.RequestFrom(r)
@@ -528,7 +528,7 @@ func (h handler) artifact(w http.ResponseWriter, r *http.Request, path string) {
 }
 
 func (h handler) remoteEntries(r *http.Request) ([]entry, error) {
-	if !h.k.Can(r, "", types.ActionRead) {
+	if !h.k.Can(r, "", api.ActionRead) {
 		return nil, source.ErrDenied
 	}
 	versions, err := h.remoteBytes(r, "versions")
@@ -562,7 +562,7 @@ func (h handler) remoteEntries(r *http.Request) ([]entry, error) {
 		}
 		for _, p := range rows {
 			if names[name].Versions[gemfmt.VersionToken(p)] &&
-				h.k.Can(r, p.Path, types.ActionRead) {
+				h.k.Can(r, p.Path, api.ActionRead) {
 				out = append(out, entry{Package: p, request: r})
 			}
 		}
@@ -571,7 +571,7 @@ func (h handler) remoteEntries(r *http.Request) ([]entry, error) {
 }
 
 func (h handler) remotePackage(r *http.Request, path string) (gemfmt.Package, error) {
-	if !h.k.Can(r, "", types.ActionRead) {
+	if !h.k.Can(r, "", api.ActionRead) {
 		return gemfmt.Package{}, source.ErrDenied
 	}
 	versions, err := h.remoteBytes(r, "versions")
@@ -589,7 +589,7 @@ func (h handler) remotePackage(r *http.Request, path string) (gemfmt.Package, er
 		}
 	}
 	if name == "" {
-		return gemfmt.Package{}, store.ErrNotFound
+		return gemfmt.Package{}, kernel.ErrNotFound
 	}
 	body, err := h.remoteBytes(r, "info/"+name)
 	if err != nil {
@@ -604,11 +604,11 @@ func (h handler) remotePackage(r *http.Request, path string) (gemfmt.Package, er
 	}
 	for _, p := range packages {
 		if p.Path == path && names[name].Versions[gemfmt.VersionToken(p)] &&
-			h.k.Can(r, path, types.ActionRead) {
+			h.k.Can(r, path, api.ActionRead) {
 			return p, nil
 		}
 	}
-	return gemfmt.Package{}, store.ErrNotFound
+	return gemfmt.Package{}, kernel.ErrNotFound
 }
 
 func (h handler) remoteBytes(r *http.Request, path string) ([]byte, error) {

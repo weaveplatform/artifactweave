@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -41,7 +43,7 @@ func TestAccCRANArchiveMigration(t *testing.T) {
 			before := w.item("cran-migrate", false, cranLegacyPath)
 			ctx := t.Context()
 			if err := w.db.Items().
-				RecordDownload(ctx, before.ID, store.Download{By: "reader", At: time.Now()}); err != nil {
+				RecordDownload(ctx, before.ID, port.Download{By: "reader", At: time.Now()}); err != nil {
 				t.Fatal(err)
 			}
 			props, err := w.db.Items().Properties(ctx, before.ID)
@@ -114,7 +116,7 @@ func TestAccCRANArchiveMigrationRollsBackWholeBatch(t *testing.T) {
 			valid := conanTestArchive(t, "zeta/DESCRIPTION", "Package: zeta\nVersion: 1.0\n")
 			wantStatus(t, w.do("PUT", "/artifactory/cran-migrate/"+secondPath, "admin", valid), 201)
 			if _, err := w.db.Items().
-				Put(t.Context(), types.Item{RepoKey: "cran-migrate", Name: "src/contrib/Archive/zeta/zeta_1.0.tar.gz", Folder: true}); err != nil {
+				Put(t.Context(), model.Item{RepoKey: "cran-migrate", Name: "src/contrib/Archive/zeta/zeta_1.0.tar.gz", Folder: true}); err != nil {
 				t.Fatal(err)
 			}
 			want, refs = 409, 1
@@ -127,7 +129,7 @@ func TestAccCRANArchiveMigrationRollsBackWholeBatch(t *testing.T) {
 				t.Fatal(err)
 			}
 			if _, err := w.db.Blobs().
-				Ref(t.Context(), types.Blob{Checksums: first.Actual, Size: first.Size}, 1); err != nil {
+				Ref(t.Context(), blob.Blob{Checksums: first.Actual, Size: first.Size}, 1); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -139,7 +141,7 @@ func TestAccCRANArchiveMigrationRollsBackWholeBatch(t *testing.T) {
 		if _, err := w.db.Items().
 			Get(t.Context(), "cran-migrate", false, cranArchivePath); !errors.Is(
 			err,
-			store.ErrNotFound,
+			kernel.ErrNotFound,
 		) {
 			t.Fatalf("earlier destination survived failure: %v", err)
 		}
@@ -198,7 +200,7 @@ func TestAccCRANArchiveMigrationCollision(t *testing.T) {
 		body := string(cranFixtureBytes(t, "assertthat_0.2.1.tar.gz"))
 		wantStatus(t, w.do("PUT", "/artifactory/cran-migrate/"+cranLegacyPath, "admin", body), 201)
 		_, err := w.db.Items().
-			Put(t.Context(), types.Item{RepoKey: "cran-migrate", Name: cranArchivePath, Folder: folder, Size: 123})
+			Put(t.Context(), model.Item{RepoKey: "cran-migrate", Name: cranArchivePath, Folder: folder, Size: 123})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -230,7 +232,7 @@ func TestAccCRANArchiveMigrationHonorsDestinationPolicy(t *testing.T) {
 	if _, err := w.db.Items().
 		Get(t.Context(), c.Key, false, cranArchivePath); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("published excluded archive: %v", err)
 	}
@@ -244,16 +246,16 @@ type (
 		cancel context.CancelFunc
 	}
 	cranMigrationItems struct {
-		store.ItemStore
+		port.ItemStore
 		owner *cranMigrationFailure
 	}
 )
 
-func (s *cranMigrationFailure) Items() store.ItemStore { return cranMigrationItems{s.Store.Items(), s} }
+func (s *cranMigrationFailure) Items() port.ItemStore { return cranMigrationItems{s.Store.Items(), s} }
 
-func (s cranMigrationItems) Create(ctx context.Context, it types.Item) (types.Item, error) {
+func (s cranMigrationItems) Create(ctx context.Context, it model.Item) (model.Item, error) {
 	if s.owner.fail {
-		return types.Item{}, errors.New("storage unavailable")
+		return model.Item{}, errors.New("storage unavailable")
 	}
 	return s.ItemStore.Create(ctx, it)
 }
@@ -263,8 +265,8 @@ func (s cranMigrationItems) Descendants(
 	key string,
 	cached bool,
 	folder string,
-	page store.Page,
-) ([]types.Item, string, error) {
+	page kernel.Page,
+) ([]model.Item, string, error) {
 	if s.owner.mode == "listing" {
 		return nil, "", errors.New("archive listing unavailable")
 	}
@@ -275,9 +277,9 @@ func (s cranMigrationItems) Descendants(
 	return entries, next, err
 }
 
-func (s cranMigrationItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
+func (s cranMigrationItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
 	if s.owner.mode == "locking" {
-		return types.Item{}, errors.New("archive lock unavailable")
+		return model.Item{}, errors.New("archive lock unavailable")
 	}
 	return s.ItemStore.GetByID(ctx, id)
 }
@@ -287,9 +289,9 @@ func (s cranMigrationItems) Get(
 	key string,
 	cached bool,
 	p string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if s.owner.mode == "destination" && p == cranArchivePath {
-		return types.Item{}, errors.New("archive destination unavailable")
+		return model.Item{}, errors.New("archive destination unavailable")
 	}
 	return s.ItemStore.Get(ctx, key, cached, p)
 }
@@ -314,7 +316,7 @@ func TestAccCRANArchiveMigrationStorageFailure(t *testing.T) {
 	if _, err := w.db.Items().
 		Get(t.Context(), "cran-migrate", false, cranArchivePath); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("failed migration published destination: %v", err)
 	}

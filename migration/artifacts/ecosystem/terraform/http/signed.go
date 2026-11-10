@@ -15,11 +15,10 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const signingPurpose = "terraform-registry-download"
@@ -32,7 +31,7 @@ var (
 type claims struct {
 	Provider   *providerClaim             `json:"provider,omitempty"`
 	Credential *kernel.DownloadCredential `json:"credential,omitempty"`
-	Source     *types.SourceIdentity      `json:"source,omitempty"`
+	Source     *model.SourceIdentity      `json:"source,omitempty"`
 	Subject    string                     `json:"sub"`
 	Repo       string                     `json:"repo"`
 	Path       string                     `json:"path"`
@@ -41,7 +40,7 @@ type claims struct {
 	Expires    int64                      `json:"exp"`
 }
 
-func (h handler) downloadURL(r *http.Request, it types.Item) (string, error) {
+func (h handler) downloadURL(r *http.Request, it model.Item) (string, error) {
 	if h.o.Keys == nil {
 		return "", apierror.ErrNotImplemented
 	}
@@ -154,7 +153,7 @@ func (h handler) signed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f, err := h.k.Item(r, c.Path)
-	if errors.Is(err, store.ErrNotFound) || err == nil && f.Item.Folder {
+	if errors.Is(err, kernel.ErrNotFound) || err == nil && f.Item.Folder {
 		h.k.Error(w, r, missing())
 		return
 	}
@@ -172,7 +171,7 @@ func (h handler) signed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r = r.WithContext(accessapi.WithCaller(r.Context(), p, d))
-	if !h.k.Can(r, c.Path, types.ActionRead) {
+	if !h.k.Can(r, c.Path, accessapi.ActionRead) {
 		h.k.Error(w, r, forbidden)
 		return
 	}
@@ -191,7 +190,7 @@ func (h handler) principal(
 	if name == kernel.AnonymousUser {
 		var err error
 		on, err = h.o.AnonymousAccess.Enabled(ctx)
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
+		if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 			return p, nil, fmt.Errorf("terraform: anonymous setting: %w", err)
 		}
 	} else {
@@ -199,7 +198,7 @@ func (h handler) principal(
 			return p, nil, fmt.Errorf("terraform: restricted download: %w", err)
 		}
 		u, err := h.o.Identity.User(ctx, name)
-		if errors.Is(err, store.ErrNotFound) || err == nil && !u.Enabled() {
+		if errors.Is(err, kernel.ErrNotFound) || err == nil && !u.Enabled() {
 			return p, nil, forbidden
 		}
 		if err != nil {
@@ -224,7 +223,7 @@ func downloadPrefix(c repo.Config) string {
 func (h handler) remoteDownloadURL(
 	r *http.Request,
 	path, digest string,
-	identity types.SourceIdentity,
+	identity model.SourceIdentity,
 	subdir, archive string,
 ) (string, error) {
 	p, _ := kernel.FromContext(r.Context())

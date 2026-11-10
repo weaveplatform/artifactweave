@@ -17,20 +17,22 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/reindexauth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func cacheReindexPackage(t *testing.T, w *world, path string, body []byte) types.Item {
+func cacheReindexPackage(t *testing.T, w *world, path string, body []byte) model.Item {
 	t.Helper()
 	it, err := w.items.Deploy(
 		w.ctx,
@@ -51,7 +53,7 @@ func TestUnitRemoteReindexRejectsMalformedCacheAtomically(t *testing.T) {
 	good := cacheReindexPackage(t, w, "Good.1.0.0.nupkg", pkg("Good", "1.0.0", ""))
 	cacheReindexPackage(t, w, "Broken.1.0.0.nupkg", []byte("broken archive"))
 	if err := w.st.Items().
-		SetProperties(w.ctx, good.ID, types.Properties{nuget.PropID: {"needs repair"}}, w.now); err != nil {
+		SetProperties(w.ctx, good.ID, model.Properties{nuget.PropID: {"needs repair"}}, w.now); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.items.Reindex(w.ctx, w.c); !errors.Is(err, nuget.ErrNotPackage) {
@@ -89,14 +91,14 @@ func TestUnitRemoteReindexStores(t *testing.T) {
 				t.Fatal(err)
 			}
 			if err = w.st.Items().
-				SetProperties(w.ctx, it.ID, types.Properties{nuget.PropID: {"wrong"}, "keep": {"mine"}}, w.now); err != nil {
+				SetProperties(w.ctx, it.ID, model.Properties{nuget.PropID: {"wrong"}, "keep": {"mine"}}, w.now); err != nil {
 				t.Fatal(err)
 			}
 			raw := cacheReindexRaw(t, w)
 			queueRemoteReindex(t, w)
 			abandoned, took, err := w.st.WorkQueue().
-				LeaseKey(w.ctx, format.KindReindex, w.c.Key, store.WorkLease{Holder: "stopped-worker", Now: w.now, Until: w.now.Add(time.Minute)})
-			if err != nil || !took || abandoned.State != types.WorkLeased {
+				LeaseKey(w.ctx, format.KindReindex, w.c.Key, work.WorkLease{Holder: "stopped-worker", Now: w.now, Until: w.now.Add(time.Minute)})
+			if err != nil || !took || abandoned.State != work.WorkLeased {
 				t.Fatal("lease before restart", abandoned, err)
 			}
 			w.now = w.now.Add(2 * time.Minute)
@@ -114,7 +116,7 @@ func TestUnitRemoteReindexStores(t *testing.T) {
 				t.Fatal("injected failure", err)
 			}
 			pending, err := w.st.WorkQueue().Get(w.ctx, format.KindReindex, w.c.Key)
-			if err != nil || pending.State != types.WorkPending || pending.Attempts != 2 {
+			if err != nil || pending.State != work.WorkPending || pending.Attempts != 2 {
 				t.Fatalf("failure not durable: %+v %v", pending, err)
 			}
 			props, err := w.st.Items().Properties(w.ctx, it.ID)
@@ -138,7 +140,7 @@ func TestUnitRemoteReindexStores(t *testing.T) {
 			if _, err = w.st.WorkQueue().
 				Get(w.ctx, format.KindReindex, w.c.Key); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("worker did not complete", err)
 			}
@@ -159,7 +161,7 @@ func TestUnitRemoteReindexStores(t *testing.T) {
 			// manufacturing package rows from the upstream version list.
 			empty := w.repo("empty", repo.Remote, nil)
 			if _, err = w.st.Packages().
-				Ensure(w.ctx, types.Package{RepoKey: empty.Key, Name: "orphan", Type: repo.NuGet, Created: w.now}); err != nil {
+				Ensure(w.ctx, model.Package{RepoKey: empty.Key, Name: "orphan", Type: repo.NuGet, Created: w.now}); err != nil {
 				t.Fatal(err)
 			}
 			w.c = empty
@@ -174,10 +176,10 @@ func TestUnitRemoteReindexStores(t *testing.T) {
 	}
 }
 
-func cacheReindexRaw(t *testing.T, w *world) types.RemoteCacheEntry {
+func cacheReindexRaw(t *testing.T, w *world) model.RemoteCacheEntry {
 	t.Helper()
 	token, err := w.st.RemoteCache().
-		Begin(w.ctx, types.RemoteCacheKey{RepoKey: w.c.Key, Path: ".upstream/versions", Variant: "raw"})
+		Begin(w.ctx, model.RemoteCacheKey{RepoKey: w.c.Key, Path: ".upstream/versions", Variant: "raw"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +189,7 @@ func cacheReindexRaw(t *testing.T, w *world) types.RemoteCacheEntry {
 		item.CacheUpload{
 			Repo:        w.c,
 			Token:       token,
-			Kind:        types.RemoteMetadata,
+			Kind:        model.RemoteMetadata,
 			Body:        strings.NewReader(body),
 			Length:      int64(len(body)),
 			ContentType: "application/json",
@@ -291,7 +293,7 @@ func TestUnitRemoteReindexQueuedSourceFences(t *testing.T) {
 				t.Fatalf("obsolete work: %v", err)
 			}
 			pending, err := w.st.WorkQueue().Get(w.ctx, format.KindReindex, w.c.Key)
-			if err != nil || pending.State != types.WorkParked {
+			if err != nil || pending.State != work.WorkParked {
 				t.Fatal("obsolete work not parked", pending, err)
 			}
 			if mutation != "wrong payload" && mutation != "unbound" {
@@ -329,7 +331,7 @@ func TestUnitRemoteReindexConcurrentChanges(t *testing.T) {
 					}
 					path := name + ".1.0.0.nupkg"
 					token, err := w.st.RemoteCache().
-						Begin(w.ctx, types.RemoteCacheKey{RepoKey: w.c.Key, Path: path, Variant: "test"})
+						Begin(w.ctx, model.RemoteCacheKey{RepoKey: w.c.Key, Path: path, Variant: "test"})
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -339,7 +341,7 @@ func TestUnitRemoteReindexConcurrentChanges(t *testing.T) {
 						item.CacheUpload{
 							Repo:        w.c,
 							Token:       token,
-							Kind:        types.RemoteUnique,
+							Kind:        model.RemoteUnique,
 							Body:        bytes.NewReader(body),
 							Length:      int64(len(body)),
 							ContentType: "application/zip",
@@ -365,7 +367,7 @@ func TestUnitRemoteReindexConcurrentChanges(t *testing.T) {
 					}
 				case "properties":
 					if err := w.st.Items().
-						SetProperties(w.ctx, it.ID, types.Properties{nuget.PropID: {"wrong"}, "concurrent": {"keep"}}, w.now.Add(time.Second)); err != nil {
+						SetProperties(w.ctx, it.ID, model.Properties{nuget.PropID: {"wrong"}, "concurrent": {"keep"}}, w.now.Add(time.Second)); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -387,7 +389,7 @@ func TestUnitRemoteReindexConcurrentChanges(t *testing.T) {
 					t.Fatal(props, err)
 				}
 			default:
-				if !errors.Is(err, store.ErrConflict) {
+				if !errors.Is(err, kernel.ErrConflict) {
 					t.Fatal("snapshot mutation admitted", err)
 				}
 				// Cache admission/deletion already applied its own correct hooks. The
@@ -457,7 +459,7 @@ func TestUnitRemoteReindexStoreFaults(t *testing.T) {
 			w.c = w.repo("remote", repo.Remote, nil)
 			it := cacheReindexPackage(t, w, "Foo.1.0.0.nupkg", pkg("Foo", "1.0.0", ""))
 			if err := w.st.Items().
-				SetProperties(w.ctx, it.ID, types.Properties{nuget.PropID: {"wrong"}}, w.now); err != nil {
+				SetProperties(w.ctx, it.ID, model.Properties{nuget.PropID: {"wrong"}}, w.now); err != nil {
 				t.Fatal(err)
 			}
 			p, _ := w.st.Packages().Find(w.ctx, w.c.Key, "foo")
@@ -492,10 +494,10 @@ func accessStore(t *testing.T, w *world) accesstest.Store {
 func reindexCredential(t *testing.T, w *world) json.RawMessage {
 	t.Helper()
 	acc := accessStore(t, w)
-	if _, err := acc.Users().Get(w.ctx, "tester"); errors.Is(err, store.ErrNotFound) {
+	if _, err := acc.Users().Get(w.ctx, "tester"); errors.Is(err, kernel.ErrNotFound) {
 		hash := accesstest.HashPassword(t, "pw")
 		if err = acc.Users().
-			Create(w.ctx, types.User{Name: "tester", PasswordHash: hash, Admin: true}); err != nil {
+			Create(w.ctx, model.User{Name: "tester", PasswordHash: hash, Admin: true}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -530,7 +532,7 @@ func TestUnitRemoteReindexWorkerRevocation(t *testing.T) {
 					t.Fatal(err)
 				}
 				if err = acc.Permissions().
-					Create(w.ctx, types.Permission{Name: "manager", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"tester": types.ActionManage}}, Targets: map[string]types.Target{w.c.Key: {Include: []string{"**"}}}}}}); err != nil {
+					Create(w.ctx, model.Permission{Name: "manager", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"tester": api.ActionManage}}, Targets: map[string]model.Target{w.c.Key: {Include: []string{"**"}}}}}}); err != nil {
 					t.Fatal(err)
 				}
 				queueRemoteReindex(t, w)
@@ -547,7 +549,7 @@ func TestUnitRemoteReindexWorkerRevocation(t *testing.T) {
 					t.Fatal(err)
 				}
 				if err = w.st.Items().
-					SetProperties(w.ctx, it.ID, types.Properties{nuget.PropID: {"wrong"}}, w.now); err != nil {
+					SetProperties(w.ctx, it.ID, model.Properties{nuget.PropID: {"wrong"}}, w.now); err != nil {
 					t.Fatal(err)
 				}
 				change := func() {
@@ -562,7 +564,7 @@ func TestUnitRemoteReindexWorkerRevocation(t *testing.T) {
 							t.Fatal(err)
 						}
 						if revoke == "disabled" {
-							u.Status = types.UserDisabled
+							u.Status = model.UserDisabled
 						} else {
 							u.PasswordHash = []byte("changed revision")
 						}
@@ -588,7 +590,7 @@ func TestUnitRemoteReindexWorkerRevocation(t *testing.T) {
 					t.Fatal("revoked job was not terminal", err)
 				}
 				failed, err := w.st.WorkQueue().Get(w.ctx, format.KindReindex, w.c.Key)
-				if err != nil || failed.State != types.WorkParked {
+				if err != nil || failed.State != work.WorkParked {
 					t.Fatal(failed, err)
 				}
 				props, err := w.st.Items().Properties(w.ctx, it.ID)

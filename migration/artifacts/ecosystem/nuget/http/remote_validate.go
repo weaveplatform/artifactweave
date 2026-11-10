@@ -11,7 +11,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Resource URLs are data from the remote, never client-provided targets. The
@@ -204,19 +204,19 @@ func validateEntry(c repo.Config, d remoteDoc, id string) error {
 	return err
 }
 
-func entryChecksum(d remoteDoc) (types.Checksums, error) {
+func entryChecksum(d remoteDoc) (kernel.Checksums, error) {
 	hash, algorithm := stringField(d, "packageHash"), stringField(d, "packageHashAlgorithm")
 	if hash == "" && algorithm == "" {
-		return types.Checksums{}, nil
+		return kernel.Checksums{}, nil
 	}
 	if !strings.EqualFold(algorithm, "SHA512") {
-		return types.Checksums{}, remoteFailure()
+		return kernel.Checksums{}, remoteFailure()
 	}
 	b, err := base64.StdEncoding.DecodeString(hash)
 	if err != nil || len(b) != 64 {
-		return types.Checksums{}, remoteFailure()
+		return kernel.Checksums{}, remoteFailure()
 	}
-	return types.Checksums{SHA512: hex.EncodeToString(b)}, nil
+	return kernel.Checksums{SHA512: hex.EncodeToString(b)}, nil
 }
 
 const sha256OID = "2.16.840.1.101.3.4.2.1"

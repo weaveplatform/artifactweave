@@ -10,9 +10,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitDebianSnapshotRejectsUnboundMetadata(t *testing.T) {
@@ -49,9 +49,9 @@ func TestUnitDebianSnapshotRejectsUnboundMetadata(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if _, err := w.db.Items().Put(t.Context(), types.Item{
+				if _, err := w.db.Items().Put(t.Context(), model.Item{
 					RepoKey: c.Key, Name: path,
-					Actual: types.Checksums{SHA256: info.Digests.SHA256}, Size: info.Size,
+					Actual: kernel.Checksums{SHA256: info.Digests.SHA256}, Size: info.Size,
 					Created: time.Now().UTC(), CreatedBy: "admin",
 				}); err != nil {
 					t.Fatal(err)

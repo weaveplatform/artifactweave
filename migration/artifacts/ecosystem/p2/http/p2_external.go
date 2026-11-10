@@ -21,12 +21,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const p2ExternalPrefix = "__p2_ext"
@@ -97,7 +96,7 @@ func p2ChildURL(c repo.Config, parent *url.URL, raw string) (*url.URL, error) {
 	return u, nil
 }
 
-func p2ChildDigest(id types.SourceIdentity, parent, rawURL string) string {
+func p2ChildDigest(id model.SourceIdentity, parent, rawURL string) string {
 	input, _ := json.Marshal([]any{id.Repository, id.Generation, id.ID, parent, rawURL})
 	sum := sha256.Sum256(input)
 	return hex.EncodeToString(sum[:])
@@ -152,14 +151,14 @@ func p2ChildResourceURL(child *url.URL, name string) (*url.URL, string, error) {
 type p2ReadResult struct {
 	body []byte
 	base *url.URL
-	id   types.SourceIdentity
+	id   model.SourceIdentity
 	used func(context.Context) error
 }
 
 //nolint:gocyclo // This bounded read handles cached, streamed, and archive-backed P2 resources.
 func (s p2Items) p2Read(r *http.Request, c repo.Config, cached bool,
 	pathName string, external *url.URL, archiveEntry string, p kernel.Principal, acc itemkit.Access,
-	expected ...types.Checksums,
+	expected ...kernel.Checksums,
 ) (p2ReadResult, error) {
 	if s.RemoteSources == nil {
 		return p2ReadResult{}, source.ErrUnavailable
@@ -188,7 +187,7 @@ func (s p2Items) p2Read(r *http.Request, c repo.Config, cached bool,
 			Method: http.MethodGet,
 		},
 	}
-	var want types.Checksums
+	var want kernel.Checksums
 	if len(expected) > 0 {
 		want = expected[0]
 	}
@@ -295,7 +294,7 @@ func (s p2Items) p2Read(r *http.Request, c repo.Config, cached bool,
 	return p2ReadResult{body: body, base: base, id: result.Identity, used: result.Used}, nil
 }
 
-func p2CheckBytes(body []byte, want types.Checksums) error {
+func p2CheckBytes(body []byte, want kernel.Checksums) error {
 	if want.SHA256 != "" {
 		sum := sha256.Sum256(body)
 		if hex.EncodeToString(sum[:]) != want.SHA256 {
@@ -320,27 +319,27 @@ func (s p2Items) p2ArtifactChecksums(
 	resource string,
 	p kernel.Principal,
 	acc itemkit.Access,
-) (types.Checksums, error) {
+) (kernel.Checksums, error) {
 	parent := strings.TrimSuffix(synthetic, "/"+resource)
 	for _, candidate := range []string{"artifacts.xml.xz", "artifacts.jar", "artifacts.xml"} {
 		target, entry, err := p2ChildResourceURL(site, candidate)
 		if err != nil {
-			return types.Checksums{}, source.ErrInvalidRequest
+			return kernel.Checksums{}, source.ErrInvalidRequest
 		}
 		metadata, err := s.p2Read(r, c, cached, parent+"/"+candidate, target, entry, p, acc)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
-			return types.Checksums{}, err
+			return kernel.Checksums{}, err
 		}
 		want, err := p2.ArtifactChecksums(candidate, metadata.body, resource)
 		if err != nil {
-			return types.Checksums{}, source.ErrInvalidResult
+			return kernel.Checksums{}, source.ErrInvalidResult
 		}
 		return want, nil
 	}
-	return types.Checksums{}, store.ErrNotFound
+	return kernel.Checksums{}, kernel.ErrNotFound
 }
 
 func p2CompositeCandidates(name string) []string {
@@ -468,7 +467,7 @@ func (s p2Items) p2ResolveExternal(r *http.Request, c repo.Config, cached bool,
 func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 	c repo.Config, cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
-	if !acc.File(c, req.Path, types.ActionRead) {
+	if !acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -500,7 +499,7 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 			return
 		}
 	}
-	var expected types.Checksums
+	var expected kernel.Checksums
 	if target != nil && p2.Classify(filename) == p2.KindArtifact {
 		expected, err = s.p2ArtifactChecksums(r, c, cached, name, target, filename, p, acc)
 		if err != nil {

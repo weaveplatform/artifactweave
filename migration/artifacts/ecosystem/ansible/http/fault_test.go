@@ -10,8 +10,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 var errStore = errors.New("injected store failure")
@@ -21,14 +22,14 @@ type failingStore struct {
 	stage string
 }
 
-func (s failingStore) Packages() store.PackageStore {
+func (s failingStore) Packages() port.PackageStore {
 	return failingPackages{s.Store.Packages(), s.stage}
 }
-func (s failingStore) Items() store.ItemStore { return failingItems{s.Store.Items(), s.stage} }
-func (s failingStore) Repos() store.RepoStore { return failingRepos{s.Store.Repos(), s.stage} }
+func (s failingStore) Items() port.ItemStore { return failingItems{s.Store.Items(), s.stage} }
+func (s failingStore) Repos() port.RepoStore { return failingRepos{s.Store.Repos(), s.stage} }
 
 type failingRepos struct {
-	store.RepoStore
+	port.RepoStore
 	stage string
 }
 
@@ -40,18 +41,18 @@ func (s failingRepos) Get(ctx context.Context, key string) (repo.Config, error) 
 }
 
 type failingPackages struct {
-	store.PackageStore
+	port.PackageStore
 	stage string
 }
 
-func (s failingPackages) Find(ctx context.Context, key, name string) (types.Package, error) {
+func (s failingPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
 	if s.stage == "find" {
-		return types.Package{}, errStore
+		return model.Package{}, errStore
 	}
 	return s.PackageStore.Find(ctx, key, name)
 }
 
-func (s failingPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (s failingPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if s.stage == "versions" {
 		return nil, errStore
 	}
@@ -63,7 +64,7 @@ func (s failingPackages) Versions(ctx context.Context, id int64) ([]types.Packag
 }
 
 type failingItems struct {
-	store.ItemStore
+	port.ItemStore
 	stage string
 }
 
@@ -72,13 +73,13 @@ func (s failingItems) Get(
 	key string,
 	cached bool,
 	path string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if strings.HasSuffix(path, ".tar.gz") {
 		switch s.stage {
 		case "get":
-			return types.Item{}, errStore
+			return model.Item{}, errStore
 		case "missing":
-			return types.Item{}, store.ErrNotFound
+			return model.Item{}, kernel.ErrNotFound
 		}
 	}
 	it, err := s.ItemStore.Get(ctx, key, cached, path)
@@ -90,9 +91,9 @@ func (s failingItems) Get(
 
 func (s failingItems) FindByChecksum(
 	ctx context.Context,
-	c types.Checksums,
-	page store.Page,
-) ([]types.Item, string, error) {
+	c kernel.Checksums,
+	page kernel.Page,
+) ([]model.Item, string, error) {
 	if s.stage == "task" {
 		return nil, "", errStore
 	}
@@ -135,7 +136,7 @@ func TestAccGalaxyRemoteArchiveIntegrityAndWriteDenial(t *testing.T) {
 	if _, err := f.db.Items().
 		Get(t.Context(), c.Key, true, "collections/weave/sample/1.2.3/weave-sample-1.2.3.tar.gz"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("corrupt archive published: %v", err)
 	}

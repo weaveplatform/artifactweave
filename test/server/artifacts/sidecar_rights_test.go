@@ -7,11 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -21,10 +23,10 @@ type sidecarGetStore struct {
 	path *string
 }
 
-func (s sidecarGetStore) Items() store.ItemStore { return sidecarGets{s.Store.Items(), s.path} }
+func (s sidecarGetStore) Items() port.ItemStore { return sidecarGets{s.Store.Items(), s.path} }
 
 type sidecarGets struct {
-	store.ItemStore
+	port.ItemStore
 	path *string
 }
 
@@ -34,9 +36,9 @@ func (s sidecarGets) Get(
 	key string,
 	cached bool,
 	p string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if p == *s.path {
-		return types.Item{}, errBoom
+		return model.Item{}, errBoom
 	}
 	return s.ItemStore.Get(ctx, key, cached, p)
 }
@@ -53,13 +55,13 @@ func sidecarWorld(t *testing.T) (*itemWorld, *string) {
 	if err := w.db.Repos().Create(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Permissions().Create(ctx, types.Permission{
+	if err := w.db.Permissions().Create(ctx, model.Permission{
 		Name: "deploy-charts",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"deployer": types.ActionRead | types.ActionWrite,
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{
+				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]types.Target{"charts": {Include: []string{"**"}}},
+			Targets: map[string]model.Target{"charts": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

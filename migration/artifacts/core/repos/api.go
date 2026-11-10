@@ -12,7 +12,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 var _ artifactsapi.Repositories = repositories{}
@@ -59,7 +58,7 @@ func (r repositories) Get(ctx context.Context, key string) (repo.Config, error) 
 
 func (r repositories) List(ctx context.Context, f artifactsapi.RepoFilter) ([]repo.Config, error) {
 	//nolint:wrapcheck // preserves upstream error identity
-	return r.st.Repos().List(ctx, store.RepoFilter(f))
+	return r.st.Repos().List(ctx, port.RepoFilter(f))
 }
 
 func (r repositories) UsingKeypair(ctx context.Context, name string) ([]string, error) {

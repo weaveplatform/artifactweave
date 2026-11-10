@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var chefRouteCases = []struct {
@@ -92,19 +92,19 @@ var chefMatrixPart = matrixPart{
 	rows: func() []matrixRow {
 		var out []matrixRow
 		for _, c := range chefRouteCases {
-			action := types.ActionRead
+			action := api.ActionRead
 			switch c.method {
 			case "POST":
-				action = types.ActionWrite
+				action = api.ActionWrite
 			case "DELETE":
-				action = types.ActionDelete
+				action = api.ActionDelete
 			}
 			permission := ""
 			if strings.Contains(c.path, "widget") {
 				permission = "widget"
 			}
 			if c.pattern == "/reindex" {
-				action = types.ActionManage
+				action = api.ActionManage
 			}
 			out = append(
 				out,

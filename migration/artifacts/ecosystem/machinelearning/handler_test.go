@@ -8,9 +8,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func rejectStatus(t *testing.T, err error, want int) {
@@ -99,7 +100,7 @@ func TestUnitStagingAdmissionRequiresLiveOwnedTransaction(t *testing.T) {
 		"owner",
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal(err)
 	}
@@ -121,7 +122,7 @@ func TestUnitPublicationIndexFollowsCompleteStoredVersions(t *testing.T) {
 	f.put("models/unrecognized", []byte("legacy"))
 	f.put(id.Staging("1793180000000")+"/"+ml.TransactionName, []byte("{}"))
 	if _, err := f.db.Items().
-		Put(f.ctx, types.Item{RepoKey: f.c.Key, Name: "models/folder", Folder: true}); err != nil {
+		Put(f.ctx, model.Item{RepoKey: f.c.Key, Name: "models/folder", Folder: true}); err != nil {
 		t.Fatal(err)
 	}
 	f.env.Store = limitedStore{Store: f.db}
@@ -149,7 +150,7 @@ func TestUnitPublicationIndexFollowsCompleteStoredVersions(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, p := range []string{manifest.FullPath(), id.Staging("1793180000000") + "/files/weights.bin"} {
-		rejectStatus(t, h.GuardTransferSource(f.ctx, f.env, f.c, types.Item{Name: p}), 403)
+		rejectStatus(t, h.GuardTransferSource(f.ctx, f.env, f.c, model.Item{Name: p}), 403)
 		if h.Classify(f.c, p) != format.ClassMetadata {
 			t.Fatal("private record classified as artifact")
 		}
@@ -161,17 +162,17 @@ func TestUnitPublicationIndexFollowsCompleteStoredVersions(t *testing.T) {
 		_, err := h.Resolve(f.ctx, f.env, f.c, format.Download{Path: p})
 		rejectStatus(t, err, 404)
 	}
-	rejectStatus(t, h.GuardTransferSource(f.ctx, f.env, f.c, types.Item{Name: "invalid"}), 400)
+	rejectStatus(t, h.GuardTransferSource(f.ctx, f.env, f.c, model.Item{Name: "invalid"}), 400)
 	if _, err := f.db.Items().Delete(f.ctx, f.c.Key, false, it.FullPath()); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Deleted(f.ctx, f.env, f.c, []types.Item{it}); err != nil {
+	if err := h.Deleted(f.ctx, f.env, f.c, []model.Item{it}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.db.Packages().
 		Version(f.ctx, pkg.ID, id.Version); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("incomplete model still indexed: %v", err)
 	}
@@ -182,11 +183,11 @@ func TestUnitPublicationIndexFollowsCompleteStoredVersions(t *testing.T) {
 		format.Download{Path: it.FullPath()},
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal(err)
 	}
-	if err := h.GuardTransferSource(f.ctx, f.env, f.c, it); !errors.Is(err, store.ErrNotFound) {
+	if err := h.GuardTransferSource(f.ctx, f.env, f.c, it); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal(err)
 	}
 	if _, err := f.db.Items().Put(f.ctx, it); err != nil {
@@ -198,17 +199,17 @@ func TestUnitPublicationIndexFollowsCompleteStoredVersions(t *testing.T) {
 	if _, err := f.db.Packages().Version(f.ctx, pkg.ID, id.Version); err != nil {
 		t.Fatalf("restored model not indexed: %v", err)
 	}
-	for _, record := range []types.Item{{Folder: true}, manifest, {Name: id.Staging("1793180000000") + "/files/weights.bin"}} {
+	for _, record := range []model.Item{{Folder: true}, manifest, {Name: id.Staging("1793180000000") + "/files/weights.bin"}} {
 		if err := h.Deployed(f.ctx, f.env, f.c, record); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, run := range []func() error{func() error { return h.Deployed(ml.Publication(f.ctx), f.env, f.c, types.Item{Name: "ignored"}) }, func() error { return h.Deleted(ml.Publication(f.ctx), f.env, f.c, nil) }} {
+	for _, run := range []func() error{func() error { return h.Deployed(ml.Publication(f.ctx), f.env, f.c, model.Item{Name: "ignored"}) }, func() error { return h.Deleted(ml.Publication(f.ctx), f.env, f.c, nil) }} {
 		if err := run(); err != nil {
 			t.Fatal(err)
 		}
 	}
-	rejectStatus(t, h.Deployed(f.ctx, f.env, f.c, types.Item{Name: "invalid"}), 400)
+	rejectStatus(t, h.Deployed(f.ctx, f.env, f.c, model.Item{Name: "invalid"}), 400)
 	bad := it
 	bad.Actual.SHA256 = "bad"
 	rejectStatus(t, h.Deployed(f.ctx, f.env, f.c, bad), 409)
@@ -218,7 +219,7 @@ func TestUnitPublicationIndexFollowsCompleteStoredVersions(t *testing.T) {
 	if err := h.Deployed(f.ctx, f.env, f.c, it); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.GuardTransferSource(f.ctx, f.env, f.c, it); !errors.Is(err, store.ErrNotFound) {
+	if err := h.GuardTransferSource(f.ctx, f.env, f.c, it); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal(err)
 	}
 	if _, err := h.Resolve(
@@ -228,7 +229,7 @@ func TestUnitPublicationIndexFollowsCompleteStoredVersions(t *testing.T) {
 		format.Download{Path: it.FullPath()},
 	); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal(err)
 	}
@@ -239,8 +240,8 @@ type limitedStore struct {
 	fault string
 }
 
-func (s limitedStore) Items() store.ItemStore { return limitedItems{s.Store.Items(), s.fault} }
-func (s limitedStore) Packages() store.PackageStore {
+func (s limitedStore) Items() port.ItemStore { return limitedItems{s.Store.Items(), s.fault} }
+func (s limitedStore) Packages() port.PackageStore {
 	return limitedPackages{s.Store.Packages(), s.fault}
 }
 
@@ -252,7 +253,7 @@ func (s limitedStore) Tx(ctx context.Context, f func(context.Context) error) err
 }
 
 type limitedItems struct {
-	store.ItemStore
+	port.ItemStore
 	fault string
 }
 
@@ -261,8 +262,8 @@ func (s limitedItems) Descendants(
 	key string,
 	cached bool,
 	path string,
-	page store.Page,
-) ([]types.Item, string, error) {
+	page kernel.Page,
+) ([]model.Item, string, error) {
 	if s.fault == "list" {
 		return nil, "", errFixture
 	}
@@ -271,15 +272,15 @@ func (s limitedItems) Descendants(
 }
 
 type limitedPackages struct {
-	store.PackageStore
+	port.PackageStore
 	fault string
 }
 
 func (s limitedPackages) List(
 	ctx context.Context,
 	key string,
-	page store.Page,
-) ([]types.Package, string, error) {
+	page kernel.Page,
+) ([]model.Package, string, error) {
 	if s.fault == "index" {
 		return nil, "", errFixture
 	}

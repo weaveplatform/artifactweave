@@ -16,10 +16,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 var errOpkgTest = errors.New("opkg test failure")
@@ -92,7 +94,7 @@ func TestUnitHandlerAdmissionAndDerivedOwnership(t *testing.T) {
 	for _, sha := range []string{"", "missing", "invalid"} {
 		w := format.Write{
 			Op: format.OpDeploy, Path: "feed/alpha_1.0_all.ipk",
-			Checksums: types.Checksums{SHA256: sha},
+			Checksums: kernel.Checksums{SHA256: sha},
 		}
 		if _, err := h.Inspect(
 			t.Context(),
@@ -126,17 +128,17 @@ func TestUnitHandlerDeletionAndWorkFailures(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	file := types.Item{
+	file := model.Item{
 		RepoKey: local.Key, Path: "feed", Name: "alpha_1.0_all.ipk",
-		Size: 123, Actual: types.Checksums{SHA256: strings.Repeat("a", 64)},
+		Size: 123, Actual: kernel.Checksums{SHA256: strings.Repeat("a", 64)},
 	}
 	stored, err := st.Items().Put(ctx, file)
 	if err != nil {
 		t.Fatal(err)
 	}
-	old, err := st.Items().Put(ctx, types.Item{
+	old, err := st.Items().Put(ctx, model.Item{
 		RepoKey: local.Key, Path: "old", Name: "Packages",
-		Actual: types.Checksums{SHA256: "old"}, Size: 1,
+		Actual: kernel.Checksums{SHA256: "old"}, Size: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -150,7 +152,7 @@ func TestUnitHandlerDeletionAndWorkFailures(t *testing.T) {
 			path: stored.FullPath(), pkg: pkg,
 		},
 		Enqueue:  func(context.Context, string, string, []byte) error { return errOpkgTest },
-		Derive:   func(context.Context, format.Derived) (types.Item, error) { return types.Item{}, errOpkgTest },
+		Derive:   func(context.Context, format.Derived) (model.Item, error) { return model.Item{}, errOpkgTest },
 		Underive: func(context.Context, repo.Config, bool, string) error { return errOpkgTest },
 	}
 	if err := h.Deleting(ctx, env, local, stored); !errors.Is(err, errOpkgTest) {
@@ -158,18 +160,18 @@ func TestUnitHandlerDeletionAndWorkFailures(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		c  repo.Config
-		it types.Item
+		it model.Item
 	}{
 		{remote, stored},
-		{local, types.Item{Folder: true, Name: "a.ipk"}},
-		{local, types.Item{Name: "README"}},
-		{local, types.Item{Name: "a.ipk", Cached: true}},
+		{local, model.Item{Folder: true, Name: "a.ipk"}},
+		{local, model.Item{Name: "README"}},
+		{local, model.Item{Name: "a.ipk", Cached: true}},
 	} {
 		if err := h.Deleting(ctx, env, tc.c, tc.it); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := h.Deployed(ctx, env, local, types.Item{Folder: true, Name: "a.ipk"}); err != nil {
+	if err := h.Deployed(ctx, env, local, model.Item{Folder: true, Name: "a.ipk"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.Deployed(ctx, env, local, stored); !errors.Is(err, errOpkgTest) {
@@ -178,28 +180,28 @@ func TestUnitHandlerDeletionAndWorkFailures(t *testing.T) {
 	if err := h.Deleted(ctx, env, local, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Deleted(ctx, env, local, []types.Item{stored, stored}); err != nil {
+	if err := h.Deleted(ctx, env, local, []model.Item{stored, stored}); err != nil {
 		t.Fatalf("duplicate coordinate removal: %v", err)
 	}
-	if err := h.Deleted(ctx, env, local, []types.Item{{Name: "bad.ipk"}}); err == nil {
+	if err := h.Deleted(ctx, env, local, []model.Item{{Name: "bad.ipk"}}); err == nil {
 		t.Fatal("deleted invalid package accepted")
 	}
 	for _, tc := range []struct{ kind, key string }{
 		{"retired", local.Key}, {KindIndex, "missing"}, {KindIndex, other.Key}, {KindIndex, remote.Key},
 	} {
-		if err := h.Work(ctx, env, types.WorkItem{Kind: tc.kind, Key: tc.key}); err != nil {
+		if err := h.Work(ctx, env, work.WorkItem{Kind: tc.kind, Key: tc.key}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	work := types.WorkItem{Kind: KindIndex, Key: local.Key}
+	work := work.WorkItem{Kind: KindIndex, Key: local.Key}
 	if err := h.Work(ctx, env, work); !errors.Is(err, errOpkgTest) {
 		t.Fatalf("derive failure: %v", err)
 	}
-	env.Derive = func(_ context.Context, d format.Derived) (types.Item, error) {
+	env.Derive = func(_ context.Context, d format.Derived) (model.Item, error) {
 		if d.Path != "feed/Packages" && d.Path != "feed/Packages.gz" && d.Path != "feed/Release" {
 			t.Errorf("unexpected derived path: %s", d.Path)
 		}
-		return types.Item{}, nil
+		return model.Item{}, nil
 	}
 	if err := h.Work(ctx, env, work); !errors.Is(err, errOpkgTest) {
 		t.Fatalf("underive failure: %v", err)
@@ -244,13 +246,13 @@ func TestUnitSignFeedBindsPackagesAndRejectsBadKeys(t *testing.T) {
 	if err := SignFeed(ctx, keys, local, files); err == nil {
 		t.Fatal("missing key accepted")
 	}
-	keys.Keypairs["wrong"] = types.Keypair{Name: "wrong", Type: types.KeypairRSA}
+	keys.Keypairs["wrong"] = accessapi.Keypair{Name: "wrong", Type: accessapi.KeypairRSA}
 	local.PrimaryKeyPairRef = "wrong"
 	if err := SignFeed(ctx, keys, local, files); err == nil {
 		t.Fatal("RSA key accepted as GPG")
 	}
-	keys.Keypairs["bad"] = types.Keypair{
-		Name: "bad", Type: types.KeypairGPG,
+	keys.Keypairs["bad"] = accessapi.Keypair{
+		Name: "bad", Type: accessapi.KeypairGPG,
 		PrivateKey: "not armored",
 	}
 	local.PrimaryKeyPairRef = "bad"
@@ -261,8 +263,8 @@ func TestUnitSignFeedBindsPackagesAndRejectsBadKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	keys.Keypairs["good"] = types.Keypair{
-		Name: "good", Type: types.KeypairGPG,
+	keys.Keypairs["good"] = accessapi.Keypair{
+		Name: "good", Type: accessapi.KeypairGPG,
 		PrivateKey: key.Private, PublicKey: key.Public,
 	}
 	local.PrimaryKeyPairRef = "good"
@@ -297,9 +299,9 @@ func TestUnitIndexWorkSignsFeedWithEnvKeys(t *testing.T) {
 	if err := st.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	stored, err := st.Items().Put(t.Context(), types.Item{
+	stored, err := st.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Path: "feed", Name: "alpha_1.0_all.ipk",
-		Size: 123, Actual: types.Checksums{SHA256: strings.Repeat("a", 64)},
+		Size: 123, Actual: kernel.Checksums{SHA256: strings.Repeat("a", 64)},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -319,13 +321,13 @@ func TestUnitIndexWorkSignsFeedWithEnvKeys(t *testing.T) {
 		Inspection: inspection{
 			sha: stored.Actual.SHA256, path: stored.FullPath(), pkg: validIndexPackage(),
 		},
-		Derive: func(_ context.Context, d format.Derived) (types.Item, error) {
+		Derive: func(_ context.Context, d format.Derived) (model.Item, error) {
 			body, err := io.ReadAll(d.Body)
 			generated[d.Path] = body
-			return types.Item{}, err
+			return model.Item{}, err
 		},
 	}
-	work := types.WorkItem{Kind: KindIndex, Key: c.Key}
+	work := work.WorkItem{Kind: KindIndex, Key: c.Key}
 	if err := (Handler{}).Work(t.Context(), env, work); err != nil {
 		t.Fatal(err)
 	}
@@ -351,9 +353,9 @@ func TestUnitHandlerLifecycleRejectsMissingAndUninspectableIPKs(t *testing.T) {
 	if err := st.Repos().Create(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	it, err := st.Items().Put(ctx, types.Item{
+	it, err := st.Items().Put(ctx, model.Item{
 		RepoKey: c.Key, Path: "feed", Name: "alpha_1.0_all.ipk",
-		Size: 10, Actual: types.Checksums{SHA256: "missing"},
+		Size: 10, Actual: kernel.Checksums{SHA256: "missing"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -365,7 +367,7 @@ func TestUnitHandlerLifecycleRejectsMissingAndUninspectableIPKs(t *testing.T) {
 	if err := h.Reindex(ctx, env, c); err == nil {
 		t.Fatal("reindex silently published uninspectable IPK")
 	}
-	if err := h.Work(ctx, env, types.WorkItem{Kind: KindIndex, Key: c.Key}); err == nil {
+	if err := h.Work(ctx, env, work.WorkItem{Kind: KindIndex, Key: c.Key}); err == nil {
 		t.Fatal("index worker silently published uninspectable IPK")
 	}
 	env.Inspection = inspection{
@@ -381,17 +383,17 @@ func TestUnitHandlerLifecycleRejectsMissingAndUninspectableIPKs(t *testing.T) {
 	if err := h.Reindex(canceled, env, c); err == nil {
 		t.Fatal("canceled reindex accepted")
 	}
-	if err := h.Deleted(canceled, env, c, []types.Item{it}); err == nil {
+	if err := h.Deleted(canceled, env, c, []model.Item{it}); err == nil {
 		t.Fatal("canceled version cleanup accepted")
 	}
 }
 
 type (
 	opkgFailedSearchStore struct{ format.Store }
-	opkgFailedSearchItems struct{ store.ItemStore }
+	opkgFailedSearchItems struct{ port.ItemStore }
 )
 
-func (s opkgFailedSearchStore) Items() store.ItemStore {
+func (s opkgFailedSearchStore) Items() port.ItemStore {
 	return opkgFailedSearchItems{s.Store.Items()}
 }
 
@@ -407,9 +409,9 @@ func TestUnitHandlerLifecycleStopsWhenPackageInventoryFails(t *testing.T) {
 	if err := st.Repos().Create(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	it, err := st.Items().Put(ctx, types.Item{
+	it, err := st.Items().Put(ctx, model.Item{
 		RepoKey: c.Key, Path: "feed", Name: "alpha_1.0_all.ipk",
-		Actual: types.Checksums{SHA256: "sha"}, Size: 10,
+		Actual: kernel.Checksums{SHA256: "sha"}, Size: 10,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -422,10 +424,10 @@ func TestUnitHandlerLifecycleStopsWhenPackageInventoryFails(t *testing.T) {
 	}
 	for name, run := range map[string]func() error{
 		"deploy":  func() error { return h.Deployed(ctx, env, c, it) },
-		"delete":  func() error { return h.Deleted(ctx, env, c, []types.Item{it}) },
+		"delete":  func() error { return h.Deleted(ctx, env, c, []model.Item{it}) },
 		"reindex": func() error { return h.Reindex(ctx, env, c) },
 		"work": func() error {
-			return h.Work(ctx, env, types.WorkItem{Kind: KindIndex, Key: c.Key})
+			return h.Work(ctx, env, work.WorkItem{Kind: KindIndex, Key: c.Key})
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

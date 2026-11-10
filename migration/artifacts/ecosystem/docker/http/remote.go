@@ -15,8 +15,6 @@ import (
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (g *Registry) serveRemote(w http.ResponseWriter, r *http.Request, q Request) {
@@ -32,7 +30,7 @@ func (g *Registry) serveRemote(w http.ResponseWriter, r *http.Request, q Request
 		)
 		return
 	}
-	if err := q.Require(r, q.Name+"/", types.ActionRead); err != nil {
+	if err := q.Require(r, q.Name+"/", accessapi.ActionRead); err != nil {
 		Write(w, err)
 		return
 	}
@@ -214,7 +212,7 @@ func (g *Registry) remoteListing(
 }
 
 func (g *Registry) remoteError(w http.ResponseWriter, r *http.Request, q Request, err error) {
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		switch q.Kind {
 		case KindBlob:
 			Write(w, blobUnknown(q.Reference))

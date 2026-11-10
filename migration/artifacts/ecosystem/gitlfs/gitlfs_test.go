@@ -8,7 +8,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitObjectPathRequiresCanonicalSHA256(t *testing.T) {
@@ -34,11 +34,11 @@ func TestUnitAdmitRejectsNonObjectWrites(t *testing.T) {
 		{name: "checksum sidecar", write: format.Write{Op: format.OpChecksum, Path: path}},
 		{name: "noncanonical path", write: format.Write{
 			Op: format.OpDeploy, Path: "objects/ff/ff/" + oid,
-			Checksums: types.Checksums{SHA256: oid},
+			Checksums: kernel.Checksums{SHA256: oid},
 		}},
 		{name: "mismatched digest", write: format.Write{
 			Op: format.OpDeploy, Path: path,
-			Checksums: types.Checksums{SHA256: strings.Repeat("b", 64)},
+			Checksums: kernel.Checksums{SHA256: strings.Repeat("b", 64)},
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

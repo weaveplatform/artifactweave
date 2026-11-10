@@ -12,11 +12,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/xet"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
@@ -297,7 +298,7 @@ func TestUnitXetRejectsCorruptContentAndGenericBypasses(t *testing.T) {
 		}
 	}
 	if e := w.db.Permissions().
-		Create(t.Context(), types.Permission{Name: "xet-private-only", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead | types.ActionWrite | types.ActionManage | types.ActionDelete}}, Targets: map[string]types.Target{"hf": {Include: []string{"models--acme--demo/.xet/**"}}, "other-local": {Include: []string{"**"}}}}}}); e != nil {
+		Create(t.Context(), model.Permission{Name: "xet-private-only", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"user": api.ActionRead | api.ActionWrite | api.ActionManage | api.ActionDelete}}, Targets: map[string]model.Target{"hf": {Include: []string{"models--acme--demo/.xet/**"}}, "other-local": {Include: []string{"**"}}}}}}); e != nil {
 		t.Fatal(e)
 	}
 	sum := sha256.Sum256(xetFixture(t, "large.xorb"))
@@ -363,7 +364,7 @@ func TestUnitXetShardAuthenticatesEveryDeclarationBeforePublication(t *testing.T
 			wantStatus(t, xetCall(w, write, "POST", "/v2/shards", corrupt), 422)
 			_, err := w.db.Items().
 				Get(t.Context(), "hf", false, "models--acme--demo/.xet/files/"+xetFixtureFile)
-			if !errors.Is(err, store.ErrNotFound) {
+			if !errors.Is(err, kernel.ErrNotFound) {
 				t.Fatalf("invalid shard published a file mapping: %v", err)
 			}
 		})
@@ -377,7 +378,7 @@ func TestUnitXetOversizedCapabilityIsRefusedAtIssuance(t *testing.T) {
 	// Legacy user creation does not impose Access v2's 255-byte name limit.
 	name := strings.Repeat("u", 16<<10)
 	if err := w.db.Users().
-		Create(t.Context(), types.User{Name: name, Admin: true, PasswordHash: cheapHash}); err != nil {
+		Create(t.Context(), model.User{Name: name, Admin: true, PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	endpoint := "/artifactory/api/huggingfaceml/hf"

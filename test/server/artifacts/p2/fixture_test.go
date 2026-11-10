@@ -13,9 +13,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -49,16 +49,16 @@ func (w *itemWorld) do(
 	return w.world().Do(method, path, as, body, headers...)
 }
 
-func (w *itemWorld) item(key string, cached bool, p string) types.Item {
+func (w *itemWorld) item(key string, cached bool, p string) model.Item {
 	w.t.Helper()
 	return w.world().Item(key, cached, p)
 }
 
 // sourceIdentity resolves every remote repository to one fixed HTTP source
 // identity, as the root fixture of the same name does.
-func sourceIdentity(context.Context, repo.Config) (types.SourceIdentity, error) {
-	return types.SourceIdentity{
-		Kind:       types.ExternalHTTP,
+func sourceIdentity(context.Context, repo.Config) (model.SourceIdentity, error) {
+	return model.SourceIdentity{
+		Kind:       model.ExternalHTTP,
 		Repository: "repo-1",
 		ID:         "http-1",
 		Generation: "revision-1",

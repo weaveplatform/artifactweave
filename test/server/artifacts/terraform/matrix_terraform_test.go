@@ -3,7 +3,7 @@ package terraform_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 )
 
 var terraformMatrixPart = matrixPart{
@@ -19,7 +19,7 @@ var terraformMatrixPart = matrixPart{
 		signed.open = true
 		signedHead := row(tfSignedHead, tfScopedBase+"1.0.0.zip?sig=bad", "", allow, 403)
 		signedHead.open = true
-		read := holds("tf-registry-local", "ns/name/aws/1.0.0.zip", types.ActionRead)
+		read := holds("tf-registry-local", "ns/name/aws/1.0.0.zip", api.ActionRead)
 		return []matrixRow{
 			discovery,
 			head,

@@ -23,19 +23,20 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	swifthttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/swift/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -118,7 +119,7 @@ func newFixture(
 			}
 			return err
 		},
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 			rc, _, openErr := blobs.Open(r.Context(), it.Actual.SHA256)
 			if openErr != nil {
 				t.Fatal(openErr)
@@ -362,7 +363,7 @@ func TestUnitSwiftDeleteRestoreAndReindex(t *testing.T) {
 	); rec.Code != http.StatusNotFound {
 		t.Fatalf("deleted version still listed: %d %s", rec.Code, rec.Body)
 	}
-	entries, _, err := f.db.Trash().List(t.Context(), "packages", "", store.Page{})
+	entries, _, err := f.db.Trash().List(t.Context(), "packages", "", kernel.Page{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -487,10 +488,10 @@ func accSwiftPMRegistry(t *testing.T, class repo.Class, authenticated bool) {
 		user = "swift-client"
 	}
 	if err := f.db.Permissions().
-		Create(t.Context(), types.Permission{Name: "swiftpm-acceptance", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{
-				user: types.ActionRead | types.ActionWrite,
-			}}, Targets: map[string]types.Target{"packages": {Include: []string{"**"}}}},
+		Create(t.Context(), model.Permission{Name: "swiftpm-acceptance", Resources: map[api.ResourceType]model.Resource{
+			api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{
+				user: api.ActionRead | api.ActionWrite,
+			}}, Targets: map[string]model.Target{"packages": {Include: []string{"**"}}}},
 		}}); err != nil {
 		t.Fatal(err)
 	}
@@ -618,7 +619,7 @@ func swiftCredentialHandler(t *testing.T, f *fixture, user string) http.Handler 
 	t.Helper()
 	hash := accesstest.HashPassword(t, "swift-client-password")
 	if err := f.db.Users().
-		Create(t.Context(), types.User{Name: user, PasswordHash: hash}); err != nil {
+		Create(t.Context(), model.User{Name: user, PasswordHash: hash}); err != nil {
 		t.Fatal(err)
 	}
 	verifier := accesstest.Over(t, f.db).API().Authenticator

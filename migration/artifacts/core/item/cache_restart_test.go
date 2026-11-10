@@ -13,10 +13,11 @@ import (
 	appstoretest "github.com/weaveplatform/artifactweave/migration/app/storetest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccCacheCleanupSQLiteRestart(t *testing.T) {
@@ -43,7 +44,7 @@ func TestAccCacheCleanupSQLiteRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	for n := range item.CacheCleanupBatch + 2 {
-		key := types.RemoteCacheKey{RepoKey: c.Key, Path: fmt.Sprintf("metadata/%03d", n)}
+		key := model.RemoteCacheKey{RepoKey: c.Key, Path: fmt.Sprintf("metadata/%03d", n)}
 		token, err := db.RemoteCache().Begin(ctx, key)
 		if err != nil {
 			t.Fatal(err)
@@ -55,7 +56,7 @@ func TestAccCacheCleanupSQLiteRestart(t *testing.T) {
 				Repo:   c,
 				Body:   strings.NewReader("versions"),
 				Length: 8,
-				Kind:   types.RemoteMetadata,
+				Kind:   model.RemoteMetadata,
 			},
 		); err != nil {
 			t.Fatal(err)
@@ -99,7 +100,7 @@ func TestAccCacheCleanupSQLiteRestart(t *testing.T) {
 	if _, err = db.WorkQueue().
 		Get(ctx, item.KindCacheCleanup, c.Key); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("cleanup job remains", err)
 	}
@@ -146,7 +147,7 @@ func TestAccCacheCleanupConcurrentDownload(t *testing.T) {
 			}
 			t.Cleanup(func() { _ = db.Repos().Delete(context.Background(), c.Key) })
 			token, err := db.RemoteCache().
-				Begin(ctx, types.RemoteCacheKey{RepoKey: c.Key, Path: "artifact.bin"})
+				Begin(ctx, model.RemoteCacheKey{RepoKey: c.Key, Path: "artifact.bin"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -155,7 +156,7 @@ func TestAccCacheCleanupConcurrentDownload(t *testing.T) {
 				item.CacheUpload{
 					Repo:   c,
 					Token:  token,
-					Kind:   types.RemoteUnique,
+					Kind:   model.RemoteUnique,
 					Body:   strings.NewReader("binary"),
 					Length: 6,
 				},
@@ -178,7 +179,7 @@ func TestAccCacheCleanupConcurrentDownload(t *testing.T) {
 			)
 			go func() {
 				downloaded <- db.Tx(ctx, func(ctx context.Context) error {
-					if err := db.Items().RecordDownload(ctx, cached.Item.ID, store.Download{At: now}); err != nil {
+					if err := db.Items().RecordDownload(ctx, cached.Item.ID, port.Download{At: now}); err != nil {
 						return err
 					}
 					close(recorded)

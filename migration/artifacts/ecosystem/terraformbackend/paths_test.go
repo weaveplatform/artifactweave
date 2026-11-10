@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestUnitCheckName(t *testing.T) {
@@ -70,12 +70,12 @@ func TestUnitParseFile(t *testing.T) {
 		}
 	}
 	created := time.UnixMilli(1700000000123)
-	latest := types.Item{Name: "workspaces/app/state.latest.json", Created: created}
+	latest := model.Item{Name: "workspaces/app/state.latest.json", Created: created}
 	if f, ok := tfbe.FileOf(latest); !ok || f.Ms != 1700000000123 || !f.Latest {
 		t.Errorf("FileOf(latest) = %+v, %v", f, ok)
 	}
 	if _, ok := tfbe.FileOf(
-		types.Item{Name: "workspaces/app/state.latest.json", Folder: true},
+		model.Item{Name: "workspaces/app/state.latest.json", Folder: true},
 	); ok {
 		t.Error("a folder is a state file")
 	}

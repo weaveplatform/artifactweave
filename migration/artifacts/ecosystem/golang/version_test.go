@@ -8,8 +8,8 @@ import (
 	"golang.org/x/mod/semver"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/golang"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // ascending holds the examples of the Go Modules Reference ("Versions" and
@@ -39,10 +39,10 @@ var ascending = []string{
 // The package index orders Go versions as golang.org/x/mod/semver does,
 // which is the order the go command uses.
 func TestUnitOrder(t *testing.T) {
-	c := types.ComparatorFor(repo.Go)
+	c := model.ComparatorFor(repo.Go)
 	for i, a := range ascending {
 		for j, b := range ascending {
-			got := c.Compare(types.PackageVersion{Version: a}, types.PackageVersion{Version: b})
+			got := c.Compare(model.PackageVersion{Version: a}, model.PackageVersion{Version: b})
 			want := semver.Compare(a, b)
 			if sign(got) != want || want != sign(i-j) {
 				t.Errorf("compare(%s, %s) = %d; semver says %d", a, b, got, want)
@@ -50,8 +50,8 @@ func TestUnitOrder(t *testing.T) {
 		}
 	}
 	if got := c.Compare(
-		types.PackageVersion{Version: "v2.0.0+incompatible"},
-		types.PackageVersion{Version: "v2.0.0"},
+		model.PackageVersion{Version: "v2.0.0+incompatible"},
+		model.PackageVersion{Version: "v2.0.0"},
 	); got != 0 {
 		t.Errorf("+incompatible changed the order: %d", got)
 	}
@@ -66,10 +66,10 @@ func sign(n int) int {
 // file was stored, in UTC.
 func TestUnitListed(t *testing.T) {
 	created := time.Date(2026, 10, 17, 9, 30, 0, 0, time.FixedZone("CEST", 2*3600))
-	v := func(version, meta string) types.PackageVersion {
-		return types.PackageVersion{Version: version, Created: created, Metadata: []byte(meta)}
+	v := func(version, meta string) model.PackageVersion {
+		return model.PackageVersion{Version: version, Created: created, Metadata: []byte(meta)}
 	}
-	got := golang.Listed([]types.PackageVersion{
+	got := golang.Listed([]model.PackageVersion{
 		v("v2.0.0+incompatible", ""),
 		v("v1.10.0", `{"time":"2026-10-01T08:00:00Z"}`),
 		v("v0.0.0-20191109021931-daa7c04131f5", `{"time":"2019-11-09T02:19:31Z"}`),

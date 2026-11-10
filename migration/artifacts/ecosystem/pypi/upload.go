@@ -5,7 +5,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // UploadPath resolves a legacy upload using the format's existing inspection,
@@ -26,7 +26,7 @@ func UploadPath(inspected any, repository repo.Config, name, version string) (st
 			"The form name does not match the distribution metadata",
 		)
 	}
-	if version != "" && types.ComparePEP440(version, d.Version) != 0 {
+	if version != "" && model.ComparePEP440(version, d.Version) != 0 {
 		return "", format.Rejectf(
 			http.StatusBadRequest,
 			"The form version does not match the distribution metadata",

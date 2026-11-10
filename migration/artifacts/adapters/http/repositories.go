@@ -15,14 +15,13 @@ import (
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The repositories API (research 02, decision 0003). Every write is for
@@ -124,7 +123,7 @@ func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 	if err != nil {
 		return nil, err
 	}
-	var f store.RepoFilter
+	var f port.RepoFilter
 	if req.Params.Type != nil {
 		if *req.Params.Type == artgen.GetRepositoriesByTypeAndProjectParamsTypeDistribution {
 			return artgen.GetRepositoriesByTypeAndProject200JSONResponse{}, nil
@@ -184,7 +183,7 @@ func (s ArtifactoryAPI) GetAllRepositoryConfigurations(
 	if err != nil {
 		return nil, err
 	}
-	all, err := st.Repos().List(ctx, store.RepoFilter{})
+	all, err := st.Repos().List(ctx, port.RepoFilter{})
 	if err != nil {
 		return nil, s.InternalError(ctx, "list repositories", err)
 	}
@@ -263,7 +262,7 @@ func (s ArtifactoryAPI) CheckIfRepositoryExists(
 	if req.Params.Type != nil && len(*req.Params.Type) > 0 {
 		asked = *req.Params.Type
 	}
-	f := store.RepoFilter{}
+	f := port.RepoFilter{}
 	if req.Params.ProjectKey != nil {
 		f.ProjectKey = *req.Params.ProjectKey
 	}
@@ -308,7 +307,7 @@ func (s ArtifactoryAPI) readOne(
 	}
 	c, err := st.Repos().Get(ctx, key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return p, repo.Config{}, itemkit.NotFoundRepo(key)
 	case err != nil:
 		return p, repo.Config{}, s.InternalError(ctx, "get repository", err)
@@ -424,7 +423,7 @@ func (s ArtifactoryAPI) GetRemoteRepositoryConfiguration(
 	key := string(req.RemoteRepoName)
 	c, err := st.Repos().Get(ctx, key)
 	switch {
-	case errors.Is(err, store.ErrNotFound), err == nil && c.Class != repo.Remote:
+	case errors.Is(err, kernel.ErrNotFound), err == nil && c.Class != repo.Remote:
 		return nil, apierror.New(http.StatusNotFound,
 			fmt.Sprintf("Remote repository '%s' does not exist", key))
 	case err != nil:
@@ -508,7 +507,7 @@ func (s ArtifactoryAPI) GetBatchOfRepositoriesByName(
 	for _, key := range names {
 		c, err := st.Repos().Get(ctx, key)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			continue
 		case err != nil:
 			return nil, s.InternalError(ctx, "get repository", err)
@@ -568,7 +567,7 @@ func (s ArtifactoryAPI) CreateRepository(
 	c := *body
 	// The key in the path wins over the body (research 03).
 	c.Key = string(req.RepoKey)
-	existing, err := st.Repos().List(ctx, store.RepoFilter{})
+	existing, err := st.Repos().List(ctx, port.RepoFilter{})
 	if err != nil {
 		return nil, s.InternalError(ctx, "list repositories", err)
 	}
@@ -585,7 +584,7 @@ func (s ArtifactoryAPI) CreateRepository(
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
 	switch err := st.Repos().Create(ctx, c); {
-	case errors.Is(err, store.ErrConflict):
+	case errors.Is(err, kernel.ErrConflict):
 		return nil, httpkit.BadRequestf(msgKeyExists)
 	case err != nil:
 		return nil, s.InternalError(ctx, "create repository", err)
@@ -619,7 +618,7 @@ func (s ArtifactoryAPI) CreateMultipleRepositories(
 	if err := batchSize(len(batch)); err != nil {
 		return nil, err
 	}
-	known, err := st.Repos().List(ctx, store.RepoFilter{})
+	known, err := st.Repos().List(ctx, port.RepoFilter{})
 	if err != nil {
 		return nil, s.InternalError(ctx, "list repositories", err)
 	}
@@ -664,7 +663,7 @@ func (s ArtifactoryAPI) CreateMultipleRepositories(
 		return nil
 	})
 	switch {
-	case errors.Is(err, store.ErrConflict):
+	case errors.Is(err, kernel.ErrConflict):
 		return nil, apierror.New(http.StatusConflict, msgKeyExists)
 	case err != nil:
 		return nil, s.InternalError(ctx, "create repositories", err)
@@ -720,7 +719,7 @@ func (s ArtifactoryAPI) UpdateRepositoryConfiguration(
 	key := string(req.RepoKey)
 	stored, err := st.Repos().Get(ctx, key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil, itemkit.NotFoundRepo(key)
 	case err != nil:
 		return nil, s.InternalError(ctx, "get repository", err)
@@ -803,7 +802,7 @@ func (s ArtifactoryAPI) checkReferences(
 	if c.Class != repo.Virtual {
 		return nil
 	}
-	known, err := st.Repos().List(ctx, store.RepoFilter{})
+	known, err := st.Repos().List(ctx, port.RepoFilter{})
 	if err != nil {
 		return s.InternalError(ctx, "list repositories", err)
 	}
@@ -857,7 +856,7 @@ func (s ArtifactoryAPI) UpdateMultipleRepositories(
 		}
 		stored, err := st.Repos().Get(ctx, key)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 			return nil, itemkit.NotFoundRepo(key)
 		case err != nil:
 			return nil, s.InternalError(ctx, "get repository", err)
@@ -906,10 +905,10 @@ func failed(key, msg string) artgen.RemoveRepositoryFailureReport {
 // bundle repository a 400. ok is false for any other key.
 func refuseDelete(key string) (msg string, forbidden, ok bool) {
 	switch {
-	case strings.EqualFold(key, types.BuildInfoRepository):
+	case strings.EqualFold(key, accessapi.BuildInfoRepository):
 		// Keys are unique without case, so any spelling names this one
 		// repository, and the message names it by its stored key.
-		return fmt.Sprintf(msgBuildInfo, types.BuildInfoRepository), true, true
+		return fmt.Sprintf(msgBuildInfo, accessapi.BuildInfoRepository), true, true
 	case repos.Protected(key):
 		return msgProtected, false, true
 	}

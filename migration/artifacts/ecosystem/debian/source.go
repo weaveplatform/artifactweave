@@ -18,7 +18,7 @@ import (
 
 	"github.com/ProtonMail/go-crypto/openpgp/clearsign"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 const maxSourceControl = 1 << 20
@@ -259,7 +259,7 @@ type IndexedSource struct {
 	Source    Source
 	Path      string
 	Size      int64
-	Checksums types.Checksums
+	Checksums kernel.Checksums
 	Archives  []SourceArchive
 }
 
@@ -271,7 +271,7 @@ type IndexedSource struct {
 type SourceArchive struct {
 	Name      string
 	Size      int64
-	Checksums types.Checksums
+	Checksums kernel.Checksums
 }
 
 // Sources emits the deb-src index with server-computed checksums. Client

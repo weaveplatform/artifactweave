@@ -14,13 +14,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	bowerfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bower"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -127,11 +127,11 @@ func (h handler) gitPackage(r *http.Request, name string) (gitPointer, error) {
 	if err == nil {
 		return gitPointerURL(c, name, registered.URL)
 	}
-	if !errors.Is(err, store.ErrNotFound) {
+	if !errors.Is(err, kernel.ErrNotFound) {
 		return gitPointer{}, fmt.Errorf("bower registration: %w", err)
 	}
 	if c.VCSGitProvider == repo.Stash || c.VCSGitProvider == repo.OldStash {
-		return gitPointer{}, store.ErrNotFound
+		return gitPointer{}, kernel.ErrNotFound
 	}
 	target, err := registryTarget(c, "/"+url.PathEscape(name))
 	if err != nil {
@@ -519,7 +519,7 @@ func (h handler) gitPackageNames(r *http.Request, query string) ([]string, error
 		},
 	}
 	result, err := h.k.Read(r, resource)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return registered, nil
 	}
 	if err != nil {
@@ -539,7 +539,7 @@ func (h handler) gitPackageNames(r *http.Request, query string) ([]string, error
 	}
 	visible := names[:0]
 	for _, name := range names {
-		if !h.k.CanFolder(r, name, types.ActionRead) {
+		if !h.k.CanFolder(r, name, api.ActionRead) {
 			continue
 		}
 		if result.CheckFolder != nil {

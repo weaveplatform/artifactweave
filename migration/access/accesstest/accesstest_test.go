@@ -15,11 +15,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	auth "github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/instance"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 var (
@@ -48,9 +49,9 @@ func reads(d accessapi.Decider, repo accessapi.Repo) bool {
 
 // readLibs returns a permission that lets the users and groups in g read
 // libs.
-func readLibs(name string, g types.Grants) types.Permission {
-	return types.Permission{Name: name, Resources: map[types.ResourceType]types.Resource{
-		types.ResourceArtifact: {Actions: g, Targets: map[string]types.Target{libs.Key: {}}},
+func readLibs(name string, g model.Grants) model.Permission {
+	return model.Permission{Name: name, Resources: map[accessapi.ResourceType]model.Resource{
+		accessapi.ResourceArtifact: {Actions: g, Targets: map[string]model.Target{libs.Key: {}}},
 	}}
 }
 
@@ -107,7 +108,7 @@ func (failingPermissions) ForPrincipal(
 	context.Context,
 	string,
 	[]string,
-) ([]types.Permission, error) {
+) ([]model.Permission, error) {
 	return nil, errBoom
 }
 
@@ -118,8 +119,8 @@ func (s noIdentity) Instance() instance.InstanceStore { return failingInstance{s
 
 type failingInstance struct{ instance.InstanceStore }
 
-func (failingInstance) Get(context.Context) (types.InstanceIdentity, error) {
-	return types.InstanceIdentity{}, errBoom
+func (failingInstance) Get(context.Context) (instance.InstanceIdentity, error) {
+	return instance.InstanceIdentity{}, errBoom
 }
 
 // noKeys is a store whose signing keys cannot be read.
@@ -129,17 +130,17 @@ func (s noKeys) Keys() port.KeyStore { return failingKeys{s.Store.Keys()} }
 
 type failingKeys struct{ port.KeyStore }
 
-func (failingKeys) SigningKeys(context.Context) ([]types.SigningKey, error) {
+func (failingKeys) SigningKeys(context.Context) ([]model.SigningKey, error) {
 	return nil, errBoom
 }
 
 // stubVerifier answers every token with rec and records the tokens it saw.
 type stubVerifier struct {
-	rec  types.Token
+	rec  model.Token
 	seen []string
 }
 
-func (v *stubVerifier) Verify(_ context.Context, raw string) (types.Token, error) {
+func (v *stubVerifier) Verify(_ context.Context, raw string) (model.Token, error) {
 	v.seen = append(v.seen, raw)
 	return v.rec, nil
 }
@@ -156,8 +157,8 @@ func TestUnitAuthorizeAndDecideReadTheTestStore(t *testing.T) {
 	if k.Store() != st || k.API().Settings != settings {
 		t.Fatalf("Store = %v, Settings = %+v; want the test's", k.Store(), k.API().Settings)
 	}
-	must(t, st.Groups().Create(ctx, types.Group{Name: "readers"}))
-	must(t, st.Groups().Create(ctx, types.Group{Name: "admins", AdminPrivileges: true}))
+	must(t, st.Groups().Create(ctx, model.Group{Name: "readers"}))
+	must(t, st.Groups().Create(ctx, model.Group{Name: "admins", AdminPrivileges: true}))
 	ann := kernel.Principal{Name: "ann", Groups: []string{"readers"}}
 	subject := accessapi.SubjectOf(ann)
 
@@ -174,8 +175,8 @@ func TestUnitAuthorizeAndDecideReadTheTestStore(t *testing.T) {
 		}
 	}
 	check(false)
-	must(t, st.Permissions().Create(ctx, readLibs("read-libs", types.Grants{
-		Groups: map[string]types.Actions{"readers": types.ActionRead},
+	must(t, st.Permissions().Create(ctx, readLibs("read-libs", model.Grants{
+		Groups: map[string]accessapi.Actions{"readers": accessapi.ActionRead},
 	})))
 	check(true)
 
@@ -205,8 +206,8 @@ func TestUnitAuthorizeAndDecideReadTheTestStore(t *testing.T) {
 func TestUnitAnonymousAccessOffGrantsNothing(t *testing.T) {
 	ctx := t.Context()
 	k := accesstest.New(t)
-	must(t, k.Store().Permissions().Create(ctx, readLibs("anonymous-reads", types.Grants{
-		Users: map[string]types.Actions{kernel.AnonymousUser: types.ActionRead},
+	must(t, k.Store().Permissions().Create(ctx, readLibs("anonymous-reads", model.Grants{
+		Users: map[string]accessapi.Actions{kernel.AnonymousUser: accessapi.ActionRead},
 	})))
 	for _, on := range []bool{false, true} {
 		authorised, err := k.Authorize(ctx, kernel.Anonymous, on)
@@ -230,9 +231,9 @@ func TestUnitAnonymousAccessOffGrantsNothing(t *testing.T) {
 func TestUnitMiddleware(t *testing.T) {
 	ctx := t.Context()
 	k := accesstest.New(t)
-	must(t, k.Store().Groups().Create(ctx, types.Group{Name: "admins", AdminPrivileges: true}))
-	must(t, k.Store().Permissions().Create(ctx, readLibs("read-libs", types.Grants{
-		Users: map[string]types.Actions{"ann": types.ActionRead},
+	must(t, k.Store().Groups().Create(ctx, model.Group{Name: "admins", AdminPrivileges: true}))
+	must(t, k.Store().Permissions().Create(ctx, readLibs("read-libs", model.Grants{
+		Users: map[string]accessapi.Actions{"ann": accessapi.ActionRead},
 	})))
 	principalOf := func(r *http.Request) kernel.Principal {
 		return kernel.Principal{Name: r.Header.Get("X-User"), Groups: r.Header.Values("X-Group")}
@@ -323,7 +324,7 @@ func TestUnitWithTokens(t *testing.T) {
 	if keys, err := k.Store().Keys().SigningKeys(ctx); err != nil || len(keys) != 1 {
 		t.Errorf("signing keys after New = %d, %v; want 1", len(keys), err)
 	}
-	must(t, k.Store().Users().Create(ctx, types.User{Name: "ann", Email: "ann@example.com"}))
+	must(t, k.Store().Users().Create(ctx, model.User{Name: "ann", Email: "ann@example.com"}))
 	issued, err := k.API().Tokens.Issue(ctx, accessapi.TokenRequest{Username: "ann"})
 	if err != nil {
 		t.Fatal(err)
@@ -339,7 +340,7 @@ func TestUnitWithTokens(t *testing.T) {
 
 	st := inmem.New()
 	const own = "fedcba98-7654-4321-8fed-cba987654321"
-	must(t, st.Instance().Init(ctx, types.InstanceIdentity{
+	must(t, st.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@" + own, ProtocolVersion: 1,
 	}))
 	kept := accesstest.Over(t, st, accesstest.WithTokens())
@@ -413,13 +414,13 @@ func TestUnitVerify(t *testing.T) {
 // groups.
 func TestUnitWithTokenVerifier(t *testing.T) {
 	ctx := t.Context()
-	v := &stubVerifier{rec: types.Token{
-		ID: "stub", Subject: kitIssuer + "/users/visitor", Scope: types.UserScope(),
-		Identity: types.IdentityTransient,
+	v := &stubVerifier{rec: model.Token{
+		ID: "stub", Subject: kitIssuer + "/users/visitor", Scope: kernel.UserScope(),
+		Identity: kernel.IdentityTransient,
 	}}
 
 	k := accesstest.New(t, accesstest.WithTokenVerifier(v))
-	must(t, k.Store().Groups().Create(ctx, types.Group{Name: "joiners", AutoJoin: true}))
+	must(t, k.Store().Groups().Create(ctx, model.Group{Name: "joiners", AutoJoin: true}))
 	p, err := k.API().Authenticator.Token(ctx, "raw", "")
 	if err != nil || p.Name != "visitor" || !slices.Equal(p.Groups, []string{"joiners"}) ||
 		!slices.Equal(v.seen, []string{"raw"}) {
@@ -450,7 +451,7 @@ func TestUnitHashPassword(t *testing.T) {
 		t.Errorf("hash %s; want the cost m=64,t=1,p=1", hash)
 	}
 	for _, name := range []string{"ann", "bob"} {
-		must(t, k.Store().Users().Create(ctx, types.User{Name: name, PasswordHash: hash}))
+		must(t, k.Store().Users().Create(ctx, model.User{Name: name, PasswordHash: hash}))
 	}
 	authn := k.API().Authenticator
 	if p, err := authn.Basic(ctx, "ann", "pw"); err != nil || p.Name != "ann" || !p.Password {
@@ -475,11 +476,14 @@ func TestUnitErrLoginSuspended(t *testing.T) {
 	ctx := t.Context()
 	at := now
 	k := accesstest.New(t, accesstest.WithNow(func() time.Time { return at }))
-	must(t, k.Store().Settings().Put(ctx, types.SettingAccessLockSettings, types.AccessLockSettings{
-		ClientLoginSuspensionEnabled: true, MaxLoginDelayIncorrectAttempts: 1,
-		BaseLoginDelayMillis: 60_000, MaxLoginDelayMillis: 60_000,
-	}))
-	must(t, k.Store().Users().Create(ctx, types.User{
+	must(
+		t,
+		k.Store().Settings().Put(ctx, settings.SettingAccessLockSettings, model.AccessLockSettings{
+			ClientLoginSuspensionEnabled: true, MaxLoginDelayIncorrectAttempts: 1,
+			BaseLoginDelayMillis: 60_000, MaxLoginDelayMillis: 60_000,
+		}),
+	)
+	must(t, k.Store().Users().Create(ctx, model.User{
 		Name: "ann", PasswordHash: accesstest.HashPassword(t, "pw"),
 	}))
 	authn := k.API().Authenticator

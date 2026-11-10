@@ -10,10 +10,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // prod adds docker-prod, a second local Docker repository to promote to.
@@ -46,7 +46,7 @@ func (w *world) treeIn(c repo.Config, dir string) map[string]string {
 }
 
 // propsIn are the properties of the item at path in c.
-func (w *world) propsIn(c repo.Config, path string) types.Properties {
+func (w *world) propsIn(c repo.Config, path string) model.Properties {
 	w.t.Helper()
 	it, err := w.item(c, path)
 	if err != nil {
@@ -64,7 +64,7 @@ func (w *world) versions(c repo.Config, name string) []string {
 	w.t.Helper()
 	ctx := context.Background()
 	p, err := w.db.Packages().Find(ctx, c.Key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -380,7 +380,7 @@ func TestAccPromoteErrors(t *testing.T) {
 				c.tag,
 			); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Errorf("%s: %v", name, err)
 			}
@@ -392,7 +392,7 @@ func TestAccPromoteErrors(t *testing.T) {
 		}
 		if err := w.svc.Promote(ctx, registry.Promotion{
 			From: o, To: w.owner("other"), Tags: []registry.Rename{{From: "v9", To: "v9"}},
-		}); !errors.Is(err, store.ErrNotFound) {
+		}); !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatalf("absent tag: %v", err)
 		}
 	})
@@ -445,7 +445,7 @@ func TestAccParentManifests(t *testing.T) {
 			}
 		}
 		for _, tag := range []string{"absent", layout.UploadsFolder} {
-			if _, err := w.svc.ParentManifests(ctx, o, tag); !errors.Is(err, store.ErrNotFound) {
+			if _, err := w.svc.ParentManifests(ctx, o, tag); !errors.Is(err, kernel.ErrNotFound) {
 				t.Errorf("%s: %v", tag, err)
 			}
 		}

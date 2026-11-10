@@ -14,8 +14,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 type condaTestReadCloser struct{ *bytes.Reader }
@@ -50,8 +52,11 @@ func TestUnitCondaReindexRestoresPackageAndChannelMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	digest := fmt.Sprintf("%x", sha256.Sum256(data))
-	it, err := st.Items().Put(ctx, types.Item{
-		RepoKey: c.Key, Name: path, Size: int64(len(data)), Actual: types.Checksums{SHA256: digest},
+	it, err := st.Items().Put(ctx, model.Item{
+		RepoKey: c.Key,
+		Name:    path,
+		Size:    int64(len(data)),
+		Actual:  kernel.Checksums{SHA256: digest},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -60,13 +65,13 @@ func TestUnitCondaReindexRestoresPackageAndChannelMetadata(t *testing.T) {
 	enqueued := 0
 	env := format.Env{
 		Store: st, Inspection: inspection{sha: digest, path: path, record: rec},
-		Derive: func(_ context.Context, d format.Derived) (types.Item, error) {
+		Derive: func(_ context.Context, d format.Derived) (model.Item, error) {
 			body, err := io.ReadAll(d.Body)
 			if err != nil {
-				return types.Item{}, err
+				return model.Item{}, err
 			}
 			generated[d.Path] = body
-			return types.Item{}, nil
+			return model.Item{}, nil
 		},
 		Underive: func(_ context.Context, _ repo.Config, _ bool, p string) error {
 			delete(generated, p)
@@ -100,7 +105,7 @@ func TestUnitCondaReindexRestoresPackageAndChannelMetadata(t *testing.T) {
 	if err != nil || props[PropName][0] != id.Name || props[PropChannel][0] != "team" {
 		t.Fatalf("reindex did not restore package properties: %+v %v", props, err)
 	}
-	if err := h.Work(ctx, env, types.WorkItem{Kind: KindIndex, Key: c.Key}); err != nil {
+	if err := h.Work(ctx, env, work.WorkItem{Kind: KindIndex, Key: c.Key}); err != nil {
 		t.Fatal(err)
 	}
 	meta := generated["team/noarch/repodata.json"]
@@ -119,10 +124,10 @@ func TestUnitCondaReindexRestoresPackageAndChannelMetadata(t *testing.T) {
 	if err != nil || index.Packages[fixtureName].Name != id.Name {
 		t.Fatalf("derived metadata does not describe stored package: %+v %v", index, err)
 	}
-	if err := h.Work(ctx, env, types.WorkItem{Kind: "unrelated", Key: c.Key}); err != nil {
+	if err := h.Work(ctx, env, work.WorkItem{Kind: "unrelated", Key: c.Key}); err != nil {
 		t.Fatalf("unrelated work failed: %v", err)
 	}
-	if err := h.Work(ctx, env, types.WorkItem{Kind: KindIndex, Key: "deleted"}); err != nil {
+	if err := h.Work(ctx, env, work.WorkItem{Kind: KindIndex, Key: "deleted"}); err != nil {
 		t.Fatalf("deleted repository work failed: %v", err)
 	}
 	if h.Classify(c, "team/noarch/repodata.json") != format.ClassDerived ||
@@ -165,11 +170,11 @@ func TestUnitCondaRejectsClientMetadataReplacementAndFailedQueue(t *testing.T) {
 	env := format.Env{
 		Enqueue: func(context.Context, string, string, []byte) error { return refused },
 	}
-	it := types.Item{RepoKey: c.Key, Path: "noarch", Name: fixtureName}
+	it := model.Item{RepoKey: c.Key, Path: "noarch", Name: fixtureName}
 	if err := h.Deleting(t.Context(), env, c, it); !errors.Is(err, refused) {
 		t.Fatalf("delete swallowed failed index queue: %v", err)
 	}
-	for _, inert := range []types.Item{{Folder: true, Name: fixtureName}, {Name: "README"}, {Name: fixtureName, Cached: true, Path: "noarch"}} {
+	for _, inert := range []model.Item{{Folder: true, Name: fixtureName}, {Name: "README"}, {Name: fixtureName, Cached: true, Path: "noarch"}} {
 		if err := h.Deleting(t.Context(), env, c, inert); err != nil {
 			t.Fatalf("unrelated delete queued index work: %v", err)
 		}
@@ -185,7 +190,7 @@ func TestUnitCondaInspectAndAdmissionValidateActualArchive(t *testing.T) {
 	sha := fmt.Sprintf("%x", sha256.Sum256(body))
 	h := Handler{}
 	c := repo.Config{Key: "conda-local", Class: repo.Local, PackageType: repo.Conda}
-	w := format.Write{Op: format.OpDeploy, Path: id.Path, Checksums: types.Checksums{SHA256: sha}}
+	w := format.Write{Op: format.OpDeploy, Path: id.Path, Checksums: kernel.Checksums{SHA256: sha}}
 	inspectionValue, err := h.Inspect(t.Context(), format.Env{Blobs: condaTestBlobs{body}}, c, w)
 	if err != nil {
 		t.Fatal(err)
@@ -200,7 +205,7 @@ func TestUnitCondaInspectAndAdmissionValidateActualArchive(t *testing.T) {
 		format.Write{
 			Op:        format.OpDeploy,
 			Path:      id.Path,
-			Checksums: types.Checksums{SHA256: "other"},
+			Checksums: kernel.Checksums{SHA256: "other"},
 		},
 	); err == nil {
 		t.Fatal("stale inspection bypassed archive validation")
@@ -224,11 +229,11 @@ func TestUnitCondaInspectAndAdmissionValidateActualArchive(t *testing.T) {
 		t.Context(),
 		format.Env{Blobs: condaTestBlobs{[]byte("bad")}},
 		c,
-		types.Item{
+		model.Item{
 			RepoKey: c.Key,
 			Path:    "noarch",
 			Name:    fixtureName,
-			Actual:  types.Checksums{SHA256: sha},
+			Actual:  kernel.Checksums{SHA256: sha},
 		},
 	); err == nil {
 		t.Fatal("malformed restored package was indexed")
@@ -244,7 +249,7 @@ func TestUnitCondaWorkRemovesStaleGeneratedMetadata(t *testing.T) {
 	}
 	for _, path := range []string{"noarch/repodata.json", "noarch/current_repodata.json.zst"} {
 		if _, err := st.Items().
-			Put(ctx, types.Item{RepoKey: c.Key, Name: path, Size: 1}); err != nil {
+			Put(ctx, model.Item{RepoKey: c.Key, Name: path, Size: 1}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -259,7 +264,7 @@ func TestUnitCondaWorkRemovesStaleGeneratedMetadata(t *testing.T) {
 			return nil
 		},
 	}
-	if err := (Handler{}).Work(ctx, env, types.WorkItem{Kind: KindIndex, Key: c.Key}); err != nil {
+	if err := (Handler{}).Work(ctx, env, work.WorkItem{Kind: KindIndex, Key: c.Key}); err != nil {
 		t.Fatal(err)
 	}
 	if !removed["noarch/repodata.json"] || !removed["noarch/current_repodata.json.zst"] {
@@ -272,7 +277,7 @@ func TestUnitCondaWorkRemovesStaleGeneratedMetadata(t *testing.T) {
 	if err := (Handler{}).Work(
 		ctx,
 		env,
-		types.WorkItem{Kind: KindIndex, Key: remote.Key},
+		work.WorkItem{Kind: KindIndex, Key: remote.Key},
 	); err != nil {
 		t.Fatalf("remote work generated hosted index: %v", err)
 	}
@@ -286,9 +291,9 @@ func TestUnitCondaReindexFailsOnCorruptStoredPackage(t *testing.T) {
 		t.Fatal(err)
 	}
 	const sha = "invalid-stored-package"
-	if _, err := st.Items().Put(ctx, types.Item{
+	if _, err := st.Items().Put(ctx, model.Item{
 		RepoKey: c.Key, Name: "noarch/" + fixtureName,
-		Size: 3, Actual: types.Checksums{SHA256: sha},
+		Size: 3, Actual: kernel.Checksums{SHA256: sha},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -296,14 +301,14 @@ func TestUnitCondaReindexFailsOnCorruptStoredPackage(t *testing.T) {
 	if err := (Handler{}).Reindex(ctx, env, c); err == nil {
 		t.Fatal("reindex accepted an invalid stored package")
 	}
-	if err := (Handler{}).Work(ctx, env, types.WorkItem{Kind: KindIndex, Key: c.Key}); err == nil {
+	if err := (Handler{}).Work(ctx, env, work.WorkItem{Kind: KindIndex, Key: c.Key}); err == nil {
 		t.Fatal("worker published metadata for an invalid stored package")
 	}
 	if err := (Handler{}).Deployed(
 		ctx,
 		env,
 		c,
-		types.Item{RepoKey: c.Key, Name: "README"},
+		model.Item{RepoKey: c.Key, Name: "README"},
 	); err != nil {
 		t.Fatalf("unrelated file entered Conda index: %v", err)
 	}
@@ -311,7 +316,7 @@ func TestUnitCondaReindexFailsOnCorruptStoredPackage(t *testing.T) {
 		ctx,
 		env,
 		c,
-		types.Item{RepoKey: c.Key, Name: fixtureName, Folder: true},
+		model.Item{RepoKey: c.Key, Name: fixtureName, Folder: true},
 	); err != nil {
 		t.Fatalf("folder entered Conda index: %v", err)
 	}
@@ -319,7 +324,7 @@ func TestUnitCondaReindexFailsOnCorruptStoredPackage(t *testing.T) {
 		ctx,
 		env,
 		c,
-		[]types.Item{{RepoKey: c.Key, Name: "README"}},
+		[]model.Item{{RepoKey: c.Key, Name: "README"}},
 	); err != nil {
 		t.Fatalf("unrelated delete changed Conda versions: %v", err)
 	}
@@ -343,12 +348,12 @@ func TestUnitCondaWorkerSurfacesPublicationAndRemovalFailures(t *testing.T) {
 	}
 	sha := fmt.Sprintf("%x", sha256.Sum256(body))
 	if _, err := st.Items().
-		Put(ctx, types.Item{RepoKey: c.Key, Name: "README", Size: 1}); err != nil {
+		Put(ctx, model.Item{RepoKey: c.Key, Name: "README", Size: 1}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.Items().Put(ctx, types.Item{
+	if _, err := st.Items().Put(ctx, model.Item{
 		RepoKey: c.Key, Name: id.Path,
-		Size: int64(len(body)), Actual: types.Checksums{SHA256: sha},
+		Size: int64(len(body)), Actual: kernel.Checksums{SHA256: sha},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -356,12 +361,12 @@ func TestUnitCondaWorkerSurfacesPublicationAndRemovalFailures(t *testing.T) {
 	env := format.Env{
 		Store:      st,
 		Inspection: inspection{sha: sha, path: id.Path, record: rec},
-		Derive:     func(context.Context, format.Derived) (types.Item, error) { return types.Item{}, refused },
+		Derive:     func(context.Context, format.Derived) (model.Item, error) { return model.Item{}, refused },
 	}
 	if err := (Handler{}).Work(
 		ctx,
 		env,
-		types.WorkItem{Kind: KindIndex, Key: c.Key},
+		work.WorkItem{Kind: KindIndex, Key: c.Key},
 	); !errors.Is(
 		err,
 		refused,
@@ -369,7 +374,7 @@ func TestUnitCondaWorkerSurfacesPublicationAndRemovalFailures(t *testing.T) {
 		t.Fatalf("failed derived metadata write was ignored: %v", err)
 	}
 	if _, err := st.Items().
-		Put(ctx, types.Item{RepoKey: c.Key, Name: "linux-64/repodata.json", Size: 1}); err != nil {
+		Put(ctx, model.Item{RepoKey: c.Key, Name: "linux-64/repodata.json", Size: 1}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := st.Items().Delete(ctx, c.Key, false, id.Path); err != nil {
@@ -380,7 +385,7 @@ func TestUnitCondaWorkerSurfacesPublicationAndRemovalFailures(t *testing.T) {
 	if err := (Handler{}).Work(
 		ctx,
 		env,
-		types.WorkItem{Kind: KindIndex, Key: c.Key},
+		work.WorkItem{Kind: KindIndex, Key: c.Key},
 	); !errors.Is(
 		err,
 		refused,

@@ -15,11 +15,11 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // A manifest's own artifactType and annotations are kept, and the type the
@@ -109,7 +109,7 @@ func findReferrers(t *testing.T, db item.Store) {
 	if err := db.Repos().Create(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	deploy := func(path, body string, props types.Properties) {
+	deploy := func(path, body string, props model.Properties) {
 		t.Helper()
 		if _, err := items.Deploy(ctx, item.Deploy{
 			Target: item.Target{Repo: c, Path: path}, Body: strings.NewReader(body),
@@ -118,8 +118,8 @@ func findReferrers(t *testing.T, db item.Store) {
 			t.Fatal(err)
 		}
 	}
-	refers := func(subject, artifactType string) types.Properties {
-		return types.Properties{"oci.subject": {subject}, "oci.artifactType": {artifactType}}
+	refers := func(subject, artifactType string) model.Properties {
+		return model.Properties{"oci.subject": {subject}, "oci.artifactType": {artifactType}}
 	}
 	deploy("a_b/sig/manifest.json", "sig", refers(digest("s"), "sig"))
 	sbom := "a_b/" + layout.DigestFolder(sum("sbom")) + "/manifest.json"
@@ -166,7 +166,7 @@ func findReferrers(t *testing.T, db item.Store) {
 		digest("s"),
 		"",
 	); err == nil ||
-		errors.Is(err, store.ErrNotFound) {
+		errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("err = %v", err)
 	}
 	if _, err := layout.ImageManifests(ctx, failingSearch{}, "r", "app"); err == nil {

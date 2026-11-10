@@ -5,9 +5,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Properties the format sets on an indexed chart from its Chart.yaml: the
@@ -77,7 +77,7 @@ func (Handler) Inspect(
 // chartOf is the chart the file it holds: the inspection of the write that
 // stored it when there was one of this content, or else a read of the
 // content, as a restore needs. Nil when it holds none.
-func chartOf(ctx context.Context, env format.Env, it types.Item) (*Chart, error) {
+func chartOf(ctx context.Context, env format.Env, it model.Item) (*Chart, error) {
 	if it.Folder || !IsChartPath(it.FullPath()) {
 		return nil, nil //nolint:nilnil // no chart is no failure
 	}
@@ -93,7 +93,7 @@ func chartOf(ctx context.Context, env format.Env, it types.Item) (*Chart, error)
 // queues the repository's index.yaml when the charts changed, and when a
 // client stored the root index.yaml, which the next run replaces
 // (RTFACT-18128).
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Cached != pkgindex.Stored(c).Cached {
 		return nil
 	}
@@ -121,7 +121,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 // that keeps another archive takes that one's Chart.yaml when the newest
 // goes (handOver). A chart's delete, or a client's delete of the root
 // index.yaml, queues the repository's index.yaml.
-func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || it.Cached != pkgindex.Stored(c).Cached {
 		return nil
 	}

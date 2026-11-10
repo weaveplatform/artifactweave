@@ -11,10 +11,11 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func remoteIndexURL(c repo.Config, name string) (string, error) {
@@ -96,7 +97,7 @@ func (h handler) remoteProject(w http.ResponseWriter, r *http.Request, name stri
 	var files []remoteFile
 	var paths []string
 	for _, f := range index.files {
-		if h.k.Can(r, f.path, types.ActionRead) {
+		if h.k.Can(r, f.path, api.ActionRead) {
 			files = append(files, f)
 			paths = append(paths, f.path)
 		}
@@ -186,7 +187,7 @@ func (h handler) remoteList(w http.ResponseWriter, r *http.Request) {
 	paths := []string{}
 	lookups := 0
 	for _, name := range index.projects {
-		if !h.k.CanFolder(r, name, types.ActionRead) {
+		if !h.k.CanFolder(r, name, api.ActionRead) {
 			continue
 		}
 		// A folder or invented marker can match permission rules while every real
@@ -203,7 +204,7 @@ func (h handler) remoteList(w http.ResponseWriter, r *http.Request) {
 		}
 		path := ""
 		for _, f := range child.files {
-			if h.k.Can(r, f.path, types.ActionRead) {
+			if h.k.Can(r, f.path, api.ActionRead) {
 				path = f.path
 				break
 			}
@@ -276,7 +277,7 @@ func (h handler) remoteDownload(w http.ResponseWriter, r *http.Request, p pkgrou
 	parent := strings.TrimSuffix(strings.TrimSuffix(path, metadataSuffix), ".asc")
 	suffix := strings.TrimPrefix(path, parent)
 	isMetadata := parent != path
-	if !h.k.Require(w, r, parent, types.ActionRead) {
+	if !h.k.Require(w, r, parent, api.ActionRead) {
 		return
 	}
 	index, _, err := h.upstreamIndex(r, p.Segments[0])
@@ -334,7 +335,7 @@ func (h handler) remoteFileResource(
 	resource.Method = http.MethodGet
 	resource.PermissionFolder = true
 	resource.PermissionPath = strings.Split(f.path, "/")[0]
-	resource.Checksums = types.Checksums{}
+	resource.Checksums = kernel.Checksums{}
 	if suffix == ".asc" {
 		if f.attrs["data-gpg-sig"] != "true" {
 			return resource, nil, notFound(r)

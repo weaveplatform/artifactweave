@@ -6,8 +6,8 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var _ accessapi.Grants = grants{}
@@ -33,7 +33,7 @@ func (b grants) ItemGrants(
 			return nil, nil, fmt.Errorf("permissions with target %s: %w", t, err)
 		}
 		for _, perm := range perms {
-			res, ok := perm.Resources[types.ResourceArtifact]
+			res, ok := perm.Resources[accessapi.ResourceArtifact]
 			if seen[perm.Name] || !ok {
 				continue
 			}
@@ -79,10 +79,10 @@ func (b grants) AccessChange(
 			// compared, so every grant it makes, to users, groups and the
 			// anonymous user, exclusions included, applies after the move
 			// exactly as before.
-			resource := perm.Resources[types.ResourceArtifact]
-			var covering []types.Target
+			resource := perm.Resources[accessapi.ResourceArtifact]
+			var covering []model.Target
 			for key, rule := range resource.Targets {
-				if types.MatchesRepository(key, repoKey, class) {
+				if model.MatchesRepository(key, repoKey, class) {
 					covering = append(covering, rule)
 				}
 			}
@@ -101,7 +101,7 @@ func (b grants) AccessChange(
 }
 
 // admits reports whether any of targets admits path.
-func admits(targets []types.Target, path string, folder bool) bool {
+func admits(targets []model.Target, path string, folder bool) bool {
 	for _, t := range targets {
 		if authz.TargetAllows(t, path, folder) {
 			return true

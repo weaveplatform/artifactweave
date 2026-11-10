@@ -15,7 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -273,7 +273,7 @@ func TestAccRegistryRemoteNoStoreAndNativeRoutes(t *testing.T) {
 	if got.Body.String() != string(layer[1:5]) {
 		t.Fatal("transient range changed")
 	}
-	entries, _, err := w.rt.Store.RemoteCache().List(t.Context(), "remote", "", store.Page{})
+	entries, _, err := w.rt.Store.RemoteCache().List(t.Context(), "remote", "", kernel.Page{})
 	if err != nil || len(entries) != 0 {
 		t.Fatal("no-store populated cache", entries, err)
 	}

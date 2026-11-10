@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
@@ -23,7 +23,7 @@ func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
 		}
 		seen[key] = true
 		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -50,7 +50,7 @@ func (h handler) virtualPackageNames(r *http.Request, query string) ([]string, e
 	seen := map[string]bool{}
 	var out []string
 	for _, mr := range members {
-		if !h.k.CanFolder(mr, "", types.ActionRead) {
+		if !h.k.CanFolder(mr, "", api.ActionRead) {
 			continue
 		}
 		names, err := h.packageNames(mr, query)

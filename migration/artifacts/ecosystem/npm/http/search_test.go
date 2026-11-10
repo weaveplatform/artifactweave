@@ -12,8 +12,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // search asks npm search's question as user and answers the names found.
@@ -152,7 +153,7 @@ func TestAccSearchReadsEveryPage(t *testing.T) {
 	ctx := context.Background()
 	const n = 501
 	for i := range n {
-		if _, err := f.db.Packages().Ensure(ctx, types.Package{
+		if _, err := f.db.Packages().Ensure(ctx, model.Package{
 			RepoKey: "npm-local", Name: fmt.Sprintf("bulk-%03d", i), Type: "npm",
 		}); err != nil {
 			t.Fatal(err)
@@ -239,18 +240,18 @@ func TestAccSearchFaults(t *testing.T) {
 // told to fail "list".
 type listFailing struct{ failingStore }
 
-func (s listFailing) Packages() store.PackageStore {
+func (s listFailing) Packages() port.PackageStore {
 	return listFailingPackages{PackageStore: s.failingStore.Packages(), fail: s.failing == "list"}
 }
 
 type listFailingPackages struct {
-	store.PackageStore
+	port.PackageStore
 	fail bool
 }
 
 func (p listFailingPackages) List(
-	ctx context.Context, key string, pg store.Page,
-) ([]types.Package, string, error) {
+	ctx context.Context, key string, pg kernel.Page,
+) ([]model.Package, string, error) {
 	if p.fail {
 		return nil, "", errBroken
 	}

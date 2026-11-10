@@ -13,6 +13,7 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/permission"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/wire"
@@ -21,7 +22,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The permission APIs (issue #82): the v1 and v2 permission targets under
@@ -118,18 +118,18 @@ func (c permCaller) admin() error {
 // scope. Reading one section is stricter, for those managers alone
 // (GetPermissionResource).
 func (c permCaller) reader() bool {
-	return c.managesAll() || c.dec.System("permissions", types.ScopeRead)
+	return c.managesAll() || c.dec.System("permissions", kernel.ScopeRead)
 }
 
 // manages reports whether the caller may manage p through the v2 API: a
 // caller that manages every permission, or a holder of MANAGE in any of
 // its sections.
-func (c permCaller) manages(p types.Permission) bool {
+func (c permCaller) manages(p model.Permission) bool {
 	if c.managesAll() {
 		return true
 	}
 	for _, r := range p.Resources {
-		if c.dec.Holds(r.Actions, types.ActionManage) {
+		if c.dec.Holds(r.Actions, accessapi.ActionManage) {
 			return true
 		}
 	}
@@ -143,16 +143,16 @@ func (c permCaller) manages(p types.Permission) bool {
 func (c permCaller) lookup(
 	ctx context.Context,
 	name string,
-	may func(types.Permission) bool,
-) (types.Permission, error) {
+	may func(model.Permission) bool,
+) (model.Permission, error) {
 	p, err := c.svc.Get(ctx, name)
 	switch {
 	case errors.Is(err, permission.ErrNotFound) && !c.reader():
-		return types.Permission{}, kernel.ErrForbidden
+		return model.Permission{}, kernel.ErrForbidden
 	case err != nil:
-		return types.Permission{}, fmt.Errorf("permissions: %w", err)
+		return model.Permission{}, fmt.Errorf("permissions: %w", err)
 	case !may(p):
-		return types.Permission{}, kernel.ErrForbidden
+		return model.Permission{}, kernel.ErrForbidden
 	}
 	return p, nil
 }
@@ -209,7 +209,7 @@ func (s SecurityAPI) GetPermissionTargets(
 func listItems(
 	ctx context.Context,
 	path string,
-	ps []types.Permission,
+	ps []model.Permission,
 ) []artgen.PermissionTargetListItem {
 	base := baseurl.From(ctx) + path
 	out := make([]artgen.PermissionTargetListItem, 0, len(ps))
@@ -238,7 +238,7 @@ func (s SecurityAPI) GetPermissionTargetDetails(
 	if err != nil {
 		return nil, s.permissionError(ctx, "get permission", err)
 	}
-	v1, err := types.PermissionToV1(p)
+	v1, err := model.PermissionToV1(p)
 	if err != nil {
 		return nil, s.permissionError(ctx, "render permission", err)
 	}
@@ -281,12 +281,12 @@ func (s SecurityAPI) CreateOrReplacePermissionTarget(
 		return nil, s.internalError(ctx, "read permission", err)
 	}
 	w.Name = name
-	p, err := types.PermissionFromV1(w)
+	p, err := model.PermissionFromV1(w)
 	if err != nil {
 		return nil, s.permissionError(ctx, "read permission", invalidDoc(err))
 	}
-	created, err := c.svc.PutResource(ctx, name, types.ResourceArtifact,
-		p.Resources[types.ResourceArtifact], true)
+	created, err := c.svc.PutResource(ctx, name, accessapi.ResourceArtifact,
+		p.Resources[accessapi.ResourceArtifact], true)
 	if err != nil {
 		return nil, s.permissionError(ctx, "store permission", err)
 	}
@@ -335,18 +335,18 @@ func (s SecurityAPI) GetPermissionTargetsV2(
 	if err != nil {
 		return nil, s.permissionError(ctx, "list permissions", err)
 	}
-	ps = slices.DeleteFunc(ps, func(p types.Permission) bool { return !c.manages(p) })
+	ps = slices.DeleteFunc(ps, func(p model.Permission) bool { return !c.manages(p) })
 	return artgen.GetPermissionTargetsV2200JSONResponse(listItems(ctx, permV2Path, ps)), nil
 }
 
 // v2Views renders the permissions the v2 form can express. One whose
 // targets carry different patterns has no v2 view and is left out of a
 // listing; reading it by name explains why.
-func v2Views(ps []types.Permission) ([]artgen.PermissionTargetV2, error) {
+func v2Views(ps []model.Permission) ([]artgen.PermissionTargetV2, error) {
 	out := make([]artgen.PermissionTargetV2, 0, len(ps))
 	for _, p := range ps {
-		w, err := types.PermissionToV2(p)
-		if errors.Is(err, types.ErrLossyProjection) {
+		w, err := model.PermissionToV2(p)
+		if errors.Is(err, model.ErrLossyProjection) {
 			continue
 		}
 		if err != nil {
@@ -381,7 +381,7 @@ func (s SecurityAPI) granting(
 	// getpermissiontargetsbyuserv2.json: an administrator, or a holder of
 	// MANAGE, who sees the permissions it manages; a Manage Resources holder
 	// sees them all.
-	ps = slices.DeleteFunc(ps, func(p types.Permission) bool { return !c.manages(p) })
+	ps = slices.DeleteFunc(ps, func(p model.Permission) bool { return !c.manages(p) })
 	views, err := v2Views(ps)
 	if err != nil {
 		return nil, s.internalError(ctx, "render permissions", err)
@@ -427,7 +427,7 @@ func (s SecurityAPI) GetPermissionTargetDetailsV2(
 	if err != nil {
 		return nil, s.permissionError(ctx, "get permission", err)
 	}
-	w, err := types.PermissionToV2(p)
+	w, err := model.PermissionToV2(p)
 	if err != nil {
 		return nil, s.permissionError(ctx, "render permission", err)
 	}
@@ -471,19 +471,19 @@ func (s SecurityAPI) readV2(
 	ctx context.Context,
 	path string,
 	body *artgen.PermissionTargetV2,
-) (types.Permission, error) {
+) (model.Permission, error) {
 	name, err := bodyName(path, body.Name)
 	if err != nil {
-		return types.Permission{}, err
+		return model.Permission{}, err
 	}
 	w, err := convert[wire.PermissionTargetV2](body)
 	if err != nil {
-		return types.Permission{}, s.internalError(ctx, "read permission", err)
+		return model.Permission{}, s.internalError(ctx, "read permission", err)
 	}
 	w.Name = name
-	p, err := types.PermissionFromV2(w)
+	p, err := model.PermissionFromV2(w)
 	if err != nil {
-		return types.Permission{}, s.permissionError(ctx, "read permission", invalidDoc(err))
+		return model.Permission{}, s.permissionError(ctx, "read permission", invalidDoc(err))
 	}
 	return p, nil
 }
@@ -523,8 +523,8 @@ func (s SecurityAPI) CreatePermissionTargetV2(
 // v2Sections are the sections the v2 form carries. A v2 replace drops those
 // of them the body leaves out and keeps the others (destination,
 // pipeline_source), which no v2 client can see or send.
-var v2Sections = []types.ResourceType{
-	types.ResourceArtifact, types.ResourceBuild, types.ResourceReleaseBundle,
+var v2Sections = []accessapi.ResourceType{
+	accessapi.ResourceArtifact, accessapi.ResourceBuild, accessapi.ResourceReleaseBundle,
 }
 
 // CreateOrReplacePermissionTargetV2 creates the permission or replaces its
@@ -557,15 +557,15 @@ func (s SecurityAPI) CreateOrReplacePermissionTargetV2(
 	_, err = c.svc.Write(
 		ctx,
 		p.Name,
-		func(old types.Permission, exists bool) (types.Permission, error) {
+		func(old model.Permission, exists bool) (model.Permission, error) {
 			switch {
 			case !exists:
 				return p, c.admin()
 			case !c.manages(old):
-				return types.Permission{}, kernel.ErrForbidden
+				return model.Permission{}, kernel.ErrForbidden
 			case !c.managesAll():
 				if err := permission.CheckManagerEdit(old, p, v2Sections, c.dec); err != nil {
-					return types.Permission{}, fmt.Errorf("permissions: %w", err)
+					return model.Permission{}, fmt.Errorf("permissions: %w", err)
 				}
 			}
 			p.Description = old.Description
@@ -680,7 +680,7 @@ func (s AccessService) GetPermissions(
 		return nil, httpkit.BadRequestf("expand requires a user or group filter")
 	}
 	var (
-		ps []types.Permission
+		ps []model.Permission
 		pr permission.Principals
 	)
 	if filtered {
@@ -701,7 +701,7 @@ func (s AccessService) GetPermissions(
 	if expand {
 		docs := make([]wire.AccessPermission, 0, len(page))
 		for _, p := range page {
-			docs = append(docs, types.PermissionToAccess(pr.Narrow(p)))
+			docs = append(docs, model.PermissionToAccess(pr.Narrow(p)))
 		}
 		return accessJSON{http.StatusOK, accessPage{Permissions: docs, Cursor: next}}, nil
 	}
@@ -728,13 +728,13 @@ type accessPage struct {
 // name of the page's last permission, passed back as the next call's
 // cursor, so the next page starts after that name rather than at it, which
 // would repeat it.
-func pageAfter(ps []types.Permission, cursor *string, limit int) ([]types.Permission, string) {
+func pageAfter(ps []model.Permission, cursor *string, limit int) ([]model.Permission, string) {
 	start := 0
 	if cursor != nil && *cursor != "" {
 		start = len(ps)
 		if i := slices.IndexFunc(
 			ps,
-			func(p types.Permission) bool { return p.Name > *cursor },
+			func(p model.Permission) bool { return p.Name > *cursor },
 		); i >= 0 {
 			start = i
 		}
@@ -778,7 +778,7 @@ func (s AccessService) CreatePermission(
 	if err != nil {
 		return nil, err
 	}
-	p, err := types.PermissionFromAccess(w)
+	p, err := model.PermissionFromAccess(w)
 	if err != nil {
 		return nil, s.errOf(ctx, "read permission", invalidDoc(err))
 	}
@@ -789,7 +789,7 @@ func (s AccessService) CreatePermission(
 	if err != nil {
 		return nil, s.errOf(ctx, "read permission", err)
 	}
-	return accessJSON{http.StatusCreated, types.PermissionToAccess(stored)}, nil
+	return accessJSON{http.StatusCreated, model.PermissionToAccess(stored)}, nil
 }
 
 // GetPermissionDetails returns one permission to an administrator, a
@@ -806,11 +806,11 @@ func (s AccessService) GetPermissionDetails(
 	if err := permission.ValidName(req.PermissionName); err != nil {
 		return nil, s.errOf(ctx, "get permission", err)
 	}
-	p, err := c.lookup(ctx, req.PermissionName, func(types.Permission) bool { return c.reader() })
+	p, err := c.lookup(ctx, req.PermissionName, func(model.Permission) bool { return c.reader() })
 	if err != nil {
 		return nil, s.errOf(ctx, "get permission", err)
 	}
-	return accessJSON{http.StatusOK, types.PermissionToAccess(p)}, nil
+	return accessJSON{http.StatusOK, model.PermissionToAccess(p)}, nil
 }
 
 // DeletePermission removes a permission, 204.
@@ -835,36 +835,36 @@ func (s AccessService) DeletePermission(
 }
 
 // resourceType checks a section path parameter.
-func resourceType(name string, rt string) (types.ResourceType, error) {
+func resourceType(name string, rt string) (accessapi.ResourceType, error) {
 	if err := permission.ValidName(name); err != nil {
 		return "", fmt.Errorf("permissions: %w", err)
 	}
-	if !permission.ValidResourceType(types.ResourceType(rt)) {
+	if !permission.ValidResourceType(accessapi.ResourceType(rt)) {
 		return "", fmt.Errorf("%w: Unknown resource type '%s'", permission.ErrInvalid, rt)
 	}
-	return types.ResourceType(rt), nil
+	return accessapi.ResourceType(rt), nil
 }
 
 // sectionFrom converts one Access section into the internal shape through
 // the permission converter, so action names are checked the same way.
-func sectionFrom(rt types.ResourceType, body any) (types.Resource, error) {
+func sectionFrom(rt accessapi.ResourceType, body any) (model.Resource, error) {
 	r, err := convert[wire.AccessResource](body)
 	if err != nil {
-		return types.Resource{}, err
+		return model.Resource{}, err
 	}
-	p, err := types.PermissionFromAccess(wire.AccessPermission{
+	p, err := model.PermissionFromAccess(wire.AccessPermission{
 		Resources: map[string]wire.AccessResource{string(rt): r},
 	})
 	if err != nil {
-		return types.Resource{}, invalidDoc(err)
+		return model.Resource{}, invalidDoc(err)
 	}
 	return p.Resources[rt], nil
 }
 
 // sectionTo renders one section in the Access shape.
-func sectionTo(rt types.ResourceType, r types.Resource) (accessgen.PermissionResource, error) {
-	w := types.PermissionToAccess(types.Permission{
-		Resources: map[types.ResourceType]types.Resource{rt: r},
+func sectionTo(rt accessapi.ResourceType, r model.Resource) (accessgen.PermissionResource, error) {
+	w := model.PermissionToAccess(model.Permission{
+		Resources: map[accessapi.ResourceType]model.Resource{rt: r},
 	})
 	return convert[accessgen.PermissionResource](w.Resources[string(rt)])
 }

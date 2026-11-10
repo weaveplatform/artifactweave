@@ -16,11 +16,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 type backend func(context.Context, source.Request, source.Permit) (source.Result, error)
@@ -33,9 +34,9 @@ func (f backend) Read(
 	return f(ctx, q, p)
 }
 
-func identity(context.Context, repo.Config) (types.SourceIdentity, error) {
-	return types.SourceIdentity{
-		Kind:       types.ExternalHTTP,
+func identity(context.Context, repo.Config) (model.SourceIdentity, error) {
+	return model.SourceIdentity{
+		Kind:       model.ExternalHTTP,
 		Repository: "created-1",
 		ID:         "source-1",
 		Generation: "revision-1",
@@ -47,17 +48,19 @@ func request(t *testing.T, scope string) source.Request {
 	st := inmem.New()
 	ctx := t.Context()
 	if err := st.Permissions().
-		Create(ctx, types.Permission{Name: "read", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}},
-				Targets: map[string]types.Target{"up": {Include: []string{"**"}}},
+		Create(ctx, model.Permission{Name: "read", Resources: map[accessapi.ResourceType]model.Resource{
+			accessapi.ResourceArtifact: {
+				Actions: model.Grants{
+					Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead},
+				},
+				Targets: map[string]model.Target{"up": {Include: []string{"**"}}},
 			},
 		}}); err != nil {
 		t.Fatal(err)
 	}
 	subject := accessapi.Subject{Name: "reader"}
 	if scope != "" {
-		sc, err := types.ParseScope(scope)
+		sc, err := kernel.ParseScope(scope)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -104,7 +107,7 @@ func stream(b io.ReadCloser) source.Result {
 }
 
 func itemResult() source.Result {
-	return source.Result{Item: &types.Item{RepoKey: "up", Name: "a.pkg", Cached: true}}
+	return source.Result{Item: &model.Item{RepoKey: "up", Name: "a.pkg", Cached: true}}
 }
 
 func TestUnitReadIntentsAndRepresentations(t *testing.T) {
@@ -182,9 +185,9 @@ func TestUnitRefusalsPrecedeSourceLookup(t *testing.T) {
 			q := request(t, "")
 			tc.change(&q)
 			s := source.Service{
-				Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
+				Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
 					t.Fatal("unauthorized source lookup")
-					return types.SourceIdentity{}, nil
+					return model.SourceIdentity{}, nil
 				},
 			}
 			if _, err := s.Read(t.Context(), q); err == nil {
@@ -211,17 +214,17 @@ func TestUnitUnsupportedAndUnresolvedSources(t *testing.T) {
 		{"cache miss never fetches", source.Service{Resolve: identity, HTTP: backend(func(context.Context, source.Request, source.Permit) (source.Result, error) {
 			t.Fatal("network from cache only")
 			return source.Result{}, nil
-		})}, true, store.ErrNotFound},
-		{"missing repo", source.Service{Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
-			return types.SourceIdentity{}, store.ErrNotFound
-		}}, false, store.ErrNotFound},
-		{"project source", source.Service{Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		})}, true, kernel.ErrNotFound},
+		{"missing repo", source.Service{Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+			return model.SourceIdentity{}, kernel.ErrNotFound
+		}}, false, kernel.ErrNotFound},
+		{"project source", source.Service{Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			id, _ := identity(ctx, c)
-			id.Kind = types.ProjectRepository
+			id.Kind = model.ProjectRepository
 			return id, nil
 		}}, false, source.ErrUnsupported},
-		{"incomplete identity", source.Service{Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
-			return types.SourceIdentity{Kind: types.ExternalHTTP}, nil
+		{"incomplete identity", source.Service{Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
+			return model.SourceIdentity{Kind: model.ExternalHTTP}, nil
 		}}, false, source.ErrUnavailable},
 		{"authorization revoked", source.Service{Resolve: identity, Revalidate: func(context.Context, source.Request, source.Permit) error { return source.ErrDenied }}, false, source.ErrDenied},
 	} {
@@ -248,14 +251,14 @@ func TestUnitResultValidationAndSafeErrors(t *testing.T) {
 	}{
 		{"neither", source.Result{}, nil, source.ErrInvalidResult},
 		{"both", source.Result{Item: itemResult().Item, Stream: stream(io.NopCloser(strings.NewReader("x"))).Stream}, nil, source.ErrInvalidResult},
-		{"other repository", source.Result{Item: &types.Item{RepoKey: "secret", Name: "a.pkg", Cached: true}}, nil, source.ErrInvalidResult},
-		{"wrong path", source.Result{Item: &types.Item{RepoKey: "up", Name: "b.pkg", Cached: true}}, nil, source.ErrInvalidResult},
-		{"not cached", source.Result{Item: &types.Item{RepoKey: "up", Name: "a.pkg"}}, nil, source.ErrInvalidResult},
-		{"folder", source.Result{Item: &types.Item{RepoKey: "up", Name: "a.pkg", Cached: true, Folder: true}}, nil, source.ErrInvalidResult},
+		{"other repository", source.Result{Item: &model.Item{RepoKey: "secret", Name: "a.pkg", Cached: true}}, nil, source.ErrInvalidResult},
+		{"wrong path", source.Result{Item: &model.Item{RepoKey: "up", Name: "b.pkg", Cached: true}}, nil, source.ErrInvalidResult},
+		{"not cached", source.Result{Item: &model.Item{RepoKey: "up", Name: "a.pkg"}}, nil, source.ErrInvalidResult},
+		{"folder", source.Result{Item: &model.Item{RepoKey: "up", Name: "a.pkg", Cached: true, Folder: true}}, nil, source.ErrInvalidResult},
 		{"nil body", source.Result{Stream: &source.Stream{Status: 200}}, nil, source.ErrInvalidResult},
 		{"bad size", source.Result{Stream: &source.Stream{Status: 200, Body: io.NopCloser(strings.NewReader("x")), Representation: source.Representation{Size: -2}}}, nil, source.ErrInvalidResult},
 		{"bad status", source.Result{Stream: &source.Stream{Status: 404, Body: io.NopCloser(strings.NewReader("x"))}}, nil, source.ErrInvalidResult},
-		{"confirmed missing", source.Result{}, fmt.Errorf("secret URL: %w", store.ErrNotFound), store.ErrNotFound},
+		{"confirmed missing", source.Result{}, fmt.Errorf("secret URL: %w", kernel.ErrNotFound), kernel.ErrNotFound},
 		{"unknown fault", source.Result{}, errors.New("https://user:secret@host/path?token=secret"), source.ErrUnavailable},
 		{"unexpected upstream status", source.Result{}, &source.HTTPError{Status: 201}, source.ErrUnavailable},
 	} {
@@ -319,7 +322,7 @@ func TestUnitStreamOwnershipAndLateFences(t *testing.T) {
 			b := &body{Reader: strings.NewReader("bytes"), closed: make(chan struct{})}
 			resolves, validates := 0, 0
 			s := source.Service{
-				Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+				Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 					resolves++
 					id, _ := identity(ctx, c)
 					if resolves > 1 {
@@ -327,7 +330,7 @@ func TestUnitStreamOwnershipAndLateFences(t *testing.T) {
 							id.Generation = "revision-2"
 						}
 						if mode == "resolver failure" {
-							return id, store.ErrNotFound
+							return id, kernel.ErrNotFound
 						}
 					}
 					return id, nil
@@ -662,9 +665,9 @@ func TestUnitMetadataMIMEAlternativesRequireExplicitValidatedContract(t *testing
 		q.Resource.Validate = func(context.Context, io.ReadSeeker, int64) error { return nil }
 		change(&q.Resource)
 		s := source.Service{
-			Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
+			Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
 				t.Fatal("invalid hint reached resolution")
-				return types.SourceIdentity{}, nil
+				return model.SourceIdentity{}, nil
 			},
 		}
 		if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
@@ -687,9 +690,9 @@ func TestUnitMetadataResponseValidatorRequiresExplicitContract(t *testing.T) {
 		q.Resource.ValidateMetadata = func(context.Context, io.ReadSeeker, int64, source.MetadataResponse) error { return nil }
 		change(&q.Resource)
 		s := source.Service{
-			Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
+			Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
 				t.Fatal("invalid validator reached resolution")
-				return types.SourceIdentity{}, nil
+				return model.SourceIdentity{}, nil
 			},
 		}
 		if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
@@ -710,9 +713,9 @@ func TestUnitDestinationGuardRequiresExplicitAdapterContract(t *testing.T) {
 			q.Resource.Variant = ""
 		}
 		s := source.Service{
-			Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
+			Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
 				t.Fatal("invalid guard reached resolution")
-				return types.SourceIdentity{}, nil
+				return model.SourceIdentity{}, nil
 			},
 		}
 		if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
@@ -740,9 +743,9 @@ func TestUnitModuleLocationRequiresValidatedMetadataGET(t *testing.T) {
 		q.Resource.ValidateMetadata = func(context.Context, io.ReadSeeker, int64, source.MetadataResponse) error { return nil }
 		change(&q.Resource)
 		s := source.Service{
-			Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
+			Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
 				t.Fatal("invalid module location contract reached resolution")
-				return types.SourceIdentity{}, nil
+				return model.SourceIdentity{}, nil
 			},
 		}
 		if _, err := s.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
@@ -773,9 +776,9 @@ func TestUnitNuGetEmptyFeedRequiresExplicitMetadataContract(t *testing.T) {
 		}
 		change(&q.Resource)
 		svc := source.Service{
-			Resolve: func(context.Context, repo.Config) (types.SourceIdentity, error) {
+			Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
 				t.Fatal("invalid projection reached source")
-				return types.SourceIdentity{}, nil
+				return model.SourceIdentity{}, nil
 			},
 		}
 		if _, err := svc.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {

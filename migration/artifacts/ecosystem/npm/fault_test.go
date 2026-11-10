@@ -10,9 +10,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errFault = errors.New("store fault")
@@ -42,14 +42,14 @@ type faulty struct {
 	f *faults
 }
 
-func (f *faulty) Packages() store.PackageStore { return faultyPackages{f.Store.Packages(), f.f} }
+func (f *faulty) Packages() port.PackageStore { return faultyPackages{f.Store.Packages(), f.f} }
 
-func (f *faulty) Items() store.ItemStore { return faultyItems{f.Store.Items(), f.f} }
+func (f *faulty) Items() port.ItemStore { return faultyItems{f.Store.Items(), f.f} }
 
-func (f *faulty) Repos() store.RepoStore { return faultyRepos{f.Store.Repos(), f.f} }
+func (f *faulty) Repos() port.RepoStore { return faultyRepos{f.Store.Repos(), f.f} }
 
 type faultyRepos struct {
-	store.RepoStore
+	port.RepoStore
 	f *faults
 }
 
@@ -62,20 +62,20 @@ func (r faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
 }
 
 type faultyPackages struct {
-	store.PackageStore
+	port.PackageStore
 	f *faults
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Ensure(ctx context.Context, v types.Package) (types.Package, error) {
+func (p faultyPackages) Ensure(ctx context.Context, v model.Package) (model.Package, error) {
 	if p.f.fail("Ensure") {
-		return types.Package{}, errFault
+		return model.Package{}, errFault
 	}
 	return p.PackageStore.Ensure(ctx, v)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (p faultyPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if p.f.fail("Versions") {
 		return nil, errFault
 	}
@@ -83,9 +83,9 @@ func (p faultyPackages) Versions(ctx context.Context, id int64) ([]types.Package
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) VersionOf(ctx context.Context, id int64) (types.PackageVersion, error) {
+func (p faultyPackages) VersionOf(ctx context.Context, id int64) (model.PackageVersion, error) {
 	if p.f.fail("VersionOf") {
-		return types.PackageVersion{}, errFault
+		return model.PackageVersion{}, errFault
 	}
 	return p.PackageStore.VersionOf(ctx, id)
 }
@@ -93,27 +93,27 @@ func (p faultyPackages) VersionOf(ctx context.Context, id int64) (types.PackageV
 //nolint:wrapcheck // test double
 func (p faultyPackages) Version(
 	ctx context.Context, id int64, version string,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	if p.f.fail("Version") {
-		return types.PackageVersion{}, errFault
+		return model.PackageVersion{}, errFault
 	}
 	return p.PackageStore.Version(ctx, id, version)
 }
 
 //nolint:wrapcheck // test double
-func (p faultyPackages) Find(ctx context.Context, key, name string) (types.Package, error) {
+func (p faultyPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
 	if p.f.fail("Find") {
-		return types.Package{}, errFault
+		return model.Package{}, errFault
 	}
 	return p.PackageStore.Find(ctx, key, name)
 }
 
 //nolint:wrapcheck // test double
 func (p faultyPackages) PutVersion(
-	ctx context.Context, v types.PackageVersion,
-) (types.PackageVersion, error) {
+	ctx context.Context, v model.PackageVersion,
+) (model.PackageVersion, error) {
 	if p.f.fail("PutVersion") {
-		return types.PackageVersion{}, errFault
+		return model.PackageVersion{}, errFault
 	}
 	return p.PackageStore.PutVersion(ctx, v)
 }
@@ -143,7 +143,7 @@ func (p faultyPackages) Files(ctx context.Context, id int64) ([]int64, error) {
 }
 
 type faultyItems struct {
-	store.ItemStore
+	port.ItemStore
 	f *faults
 }
 
@@ -153,15 +153,15 @@ func (i faultyItems) Get(
 	key string,
 	cached bool,
 	p string,
-) (types.Item, error) {
+) (model.Item, error) {
 	if i.f.fail("ItemGet") {
-		return types.Item{}, errFault
+		return model.Item{}, errFault
 	}
 	return i.ItemStore.Get(ctx, key, cached, p)
 }
 
 //nolint:wrapcheck // test double
-func (i faultyItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (i faultyItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if i.f.fail("Properties") {
 		return nil, errFault
 	}
@@ -170,7 +170,7 @@ func (i faultyItems) Properties(ctx context.Context, id int64) (types.Properties
 
 //nolint:wrapcheck // test double
 func (i faultyItems) PatchProperties(
-	ctx context.Context, id int64, set types.Properties, remove []string, at time.Time,
+	ctx context.Context, id int64, set model.Properties, remove []string, at time.Time,
 ) error {
 	if i.f.fail("PatchProperties") {
 		return errFault
@@ -195,7 +195,7 @@ func TestUnitStoreFaults(t *testing.T) {
 		w.deploy(
 			p1,
 			pkg("left-pad", "1.0.0", ""),
-			types.Properties{npm.PropDistTag: {"beta", "rc"}},
+			model.Properties{npm.PropDistTag: {"beta", "rc"}},
 		)
 		w.deploy(p2, pkg("left-pad", "2.0.0", ""), nil)
 	}
@@ -264,7 +264,7 @@ func deleteOne(w *world) error {
 
 func deprecate(w *world) error {
 	return annotateErr(w, "left-pad/-/left-pad-1.0.0.tgz",
-		types.Properties{npm.PropDeprecated: {"old"}})
+		model.Properties{npm.PropDeprecated: {"old"}})
 }
 
 func overwriteGarbage(w *world) error {
@@ -278,7 +278,7 @@ func tag(w *world) error {
 	if _, err := w.st.Items().Get(w.ctx, w.c.Key, false, p); err != nil {
 		p = "left-pad/-/left-pad-1.0.0.tgz"
 	}
-	return annotateErr(w, p, types.Properties{npm.PropDistTag: {"beta", "rc"}})
+	return annotateErr(w, p, model.Properties{npm.PropDistTag: {"beta", "rc"}})
 }
 
 // tagBeta gives 2.0.0 beta alone, so 1.0.0 keeps rc.
@@ -286,11 +286,11 @@ func tagBeta(w *world) error {
 	return annotateErr(
 		w,
 		"left-pad/-/left-pad-2.0.0.tgz",
-		types.Properties{npm.PropDistTag: {"beta"}},
+		model.Properties{npm.PropDistTag: {"beta"}},
 	)
 }
 
-func annotateErr(w *world, p string, set types.Properties) error {
+func annotateErr(w *world, p string, set model.Properties) error {
 	it, err := w.st.Items().Get(w.ctx, w.c.Key, false, p)
 	if err != nil {
 		return err //nolint:wrapcheck // test helper
@@ -308,7 +308,7 @@ func reindex(w *world) error {
 func TestUnitCorruptMetadata(t *testing.T) {
 	w := newWorld(t)
 	p1, p2 := "left-pad/-/left-pad-1.0.0.tgz", "left-pad/-/left-pad-2.0.0.tgz"
-	w.deploy(p1, pkg("left-pad", "1.0.0", ""), types.Properties{npm.PropDistTag: {"beta"}})
+	w.deploy(p1, pkg("left-pad", "1.0.0", ""), model.Properties{npm.PropDistTag: {"beta"}})
 	w.deploy(p2, pkg("left-pad", "2.0.0", ""), nil)
 	p, err := w.st.Packages().Find(w.ctx, w.c.Key, "left-pad")
 	if err != nil {
@@ -324,7 +324,7 @@ func TestUnitCorruptMetadata(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, set := range []types.Properties{
+	for _, set := range []model.Properties{
 		{npm.PropDistTag: {"beta"}}, {npm.PropDeprecated: {"x"}},
 	} {
 		if err := annotateErr(w, p2, set); err == nil {

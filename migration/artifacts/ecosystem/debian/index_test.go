@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitPackagesUsesStoredDigestsAndStableOrder(t *testing.T) {
@@ -25,7 +25,7 @@ func TestUnitPackagesUsesStoredDigestsAndStableOrder(t *testing.T) {
 	path := "pool/main/h/hello/hello_1.0-1_amd64.deb"
 	entry := IndexedBinary{
 		Binary: meta, Path: path, Size: int64(len(body)),
-		Checksums: types.Checksums{SHA256: fmt.Sprintf("%x", h), MD5: fmt.Sprintf("%x", m)},
+		Checksums: kernel.Checksums{SHA256: fmt.Sprintf("%x", h), MD5: fmt.Sprintf("%x", m)},
 	}
 	index, err := Packages([]IndexedBinary{entry})
 	if err != nil {

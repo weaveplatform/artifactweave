@@ -13,10 +13,11 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // entry is a test archive entry; dir entries end in "/", and link entries
@@ -87,11 +88,11 @@ func tarOf(t *testing.T, gz bool, entries ...entry) []byte {
 	return buf.Bytes()
 }
 
-func (w *world) explode(p string, body []byte, atomic bool) (types.Item, error) {
+func (w *world) explode(p string, body []byte, atomic bool) (model.Item, error) {
 	return w.svc.Explode(context.Background(), Explode{
 		Deploy: Deploy{
 			Target: Target{Repo: w.loc, Path: p}, Body: bytes.NewReader(body),
-			Properties: types.Properties{"from": {"archive"}}, By: "alice",
+			Properties: model.Properties{"from": {"archive"}}, By: "alice",
 		},
 		Atomic: atomic, CanOverwrite: true,
 	})
@@ -168,7 +169,7 @@ func TestUnitExplodeRefused(t *testing.T) {
 	}
 }
 
-var noLimit = store.Page{Limit: store.MaxLimit}
+var noLimit = kernel.Page{Limit: kernel.MaxLimit}
 
 func gzipOf(t *testing.T, s string) []byte {
 	t.Helper()
@@ -221,7 +222,7 @@ func TestUnitExplodeLimits(t *testing.T) {
 	// line, exercised here directly.
 	maxExplodeBytes = 4000
 	f, size, err := spool(bytes.NewReader(zipOf(t, entry{name: "e", body: "0123456789"})),
-		types.Checksums{}, false)
+		kernel.Checksums{}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,14 +240,14 @@ func TestUnitExplodeChecksumsAndConflicts(t *testing.T) {
 	body := zipOf(t, entry{name: "a.txt", body: "a"})
 	_, err := w.svc.Explode(ctx, Explode{Deploy: Deploy{
 		Target: Target{Repo: w.loc, Path: "x.zip"}, Body: bytes.NewReader(body),
-		Declared: types.Checksums{SHA1: strings.Repeat("0", 40)},
+		Declared: kernel.Checksums{SHA1: strings.Repeat("0", 40)},
 	}})
 	if !errors.Is(err, ErrChecksumMismatch) {
 		t.Fatalf("mismatch: %v", err)
 	}
 	if _, err := w.svc.Explode(ctx, Explode{Deploy: Deploy{
 		Target: Target{Repo: w.loc, Path: "x.zip"}, Body: bytes.NewReader(body),
-		Declared: types.Checksums{SHA1: "zz"},
+		Declared: kernel.Checksums{SHA1: "zz"},
 	}}); !errors.Is(err, ErrBadChecksum) {
 		t.Fatalf("malformed: %v", err)
 	}
@@ -276,7 +277,7 @@ func TestUnitExplodeChecksumsAndConflicts(t *testing.T) {
 	})
 	if _, err := w.svc.Explode(ctx, Explode{Deploy: Deploy{
 		Target: Target{Repo: srv, Path: "x.zip"}, Body: bytes.NewReader(body),
-		Declared: types.Checksums{SHA1: strings.Repeat("0", 40)},
+		Declared: kernel.Checksums{SHA1: strings.Repeat("0", 40)},
 	}}); err != nil {
 		t.Fatalf("server policy: %v", err)
 	}
@@ -389,7 +390,7 @@ func TestUnitArchiveFiles(t *testing.T) {
 	b := w.must("f/sub/b.txt", "bb")
 	for _, kind := range []ArchiveKind{Zip, Tar, TarGz} {
 		var buf bytes.Buffer
-		if err := w.svc.ArchiveFiles(ctx, []types.Item{a, b}, "f", kind, true, &buf); err != nil {
+		if err := w.svc.ArchiveFiles(ctx, []model.Item{a, b}, "f", kind, true, &buf); err != nil {
 			t.Fatal(err)
 		}
 		var names []string
@@ -413,13 +414,13 @@ func TestUnitArchiveFiles(t *testing.T) {
 	}
 	gone := a
 	gone.Actual.SHA256 = strings.Repeat("0", 64)
-	if err := w.svc.ArchiveFiles(ctx, []types.Item{gone}, "f", Zip, false, io.Discard); err == nil {
+	if err := w.svc.ArchiveFiles(ctx, []model.Item{gone}, "f", Zip, false, io.Discard); err == nil {
 		t.Fatal("a missing blob must fail")
 	}
 	for _, kind := range []ArchiveKind{Zip, Tar, TarGz} {
 		if err := w.svc.ArchiveFiles(
 			ctx,
-			[]types.Item{a},
+			[]model.Item{a},
 			"f",
 			kind,
 			false,
@@ -441,8 +442,8 @@ func TestUnitFolderDownloadSetting(t *testing.T) {
 	if err != nil || fd.Enabled || fd.MaxFiles != 5000 || fd.MaxDownloadSizeMB != 1024 {
 		t.Fatalf("defaults %+v %v", fd, err)
 	}
-	if err := w.db.Settings().Put(ctx, types.SettingFolderDownload,
-		types.FolderDownloadSettings{Enabled: true, MaxFiles: 3}); err != nil {
+	if err := w.db.Settings().Put(ctx, settings.SettingFolderDownload,
+		model.FolderDownloadSettings{Enabled: true, MaxFiles: 3}); err != nil {
 		t.Fatal(err)
 	}
 	if fd, _ := FolderDownload(
@@ -452,7 +453,8 @@ func TestUnitFolderDownloadSetting(t *testing.T) {
 		fd.MaxDownloadSizeMB != 1024 {
 		t.Fatalf("stored %+v", fd)
 	}
-	if err := w.db.Settings().Put(ctx, types.SettingFolderDownload, "not an object"); err != nil {
+	if err := w.db.Settings().
+		Put(ctx, settings.SettingFolderDownload, "not an object"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := FolderDownload(ctx, w.db); err == nil {

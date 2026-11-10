@@ -11,8 +11,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 func TestAccDebianRemoteSourceRejectsInvalidPackages(t *testing.T) {
@@ -51,7 +51,7 @@ func TestAccDebianRemoteSourceRejectsInvalidPackages(t *testing.T) {
 			Repo:     repo.Config{PackageType: repo.Debian},
 			Resource: source.Resource{Path: p, Method: http.MethodGet},
 		})
-		if !errors.Is(err, store.ErrNotFound) {
+		if !errors.Is(err, kernel.ErrNotFound) {
 			t.Errorf("unsafe remote path %q: %v", p, err)
 		}
 	}

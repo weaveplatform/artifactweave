@@ -9,9 +9,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func storedPodArchive(t *testing.T, blobs blob.Store, name, version string) (string, int64) {
@@ -45,7 +46,7 @@ func TestUnitHandlerAdmissionChecksStoredArchives(t *testing.T) {
 	c := repo.Config{Key: "pods-local", Class: repo.Local, PackageType: repo.CocoaPods}
 	sha, _ := storedPodArchive(t, blobs, "HelloPod", "1.0.0")
 	path := Path("HelloPod", "1.0.0")
-	w := format.Write{Op: format.OpDeploy, Path: path, Checksums: types.Checksums{SHA256: sha}}
+	w := format.Write{Op: format.OpDeploy, Path: path, Checksums: kernel.Checksums{SHA256: sha}}
 	env := format.Env{Blobs: blobs}
 	if !Serves(repo.CocoaPods) || Serves(repo.NPM) {
 		t.Fatal("CocoaPods handler claimed the wrong package type")
@@ -91,9 +92,9 @@ func TestUnitHandlerAdmissionChecksStoredArchives(t *testing.T) {
 	}{
 		{"generated cdn metadata", format.Write{Op: format.OpDeploy, Path: ".pod/cdn/all_pods.txt"}, env},
 		{"ambiguous archive path", format.Write{Op: format.OpDeploy, Path: "HelloPod/bad.tar.gz"}, env},
-		{"wrong archive identity", format.Write{Op: format.OpDeploy, Path: Path("OtherPod", "1.0.0"), Checksums: types.Checksums{SHA256: sha}}, format.Env{Blobs: blobs}},
-		{"inspected identity mismatch", format.Write{Op: format.OpDeploy, Path: Path("OtherPod", "1.0.0"), Checksums: types.Checksums{SHA256: sha}}, env},
-		{"missing blob", format.Write{Op: format.OpDeploy, Path: path, Checksums: types.Checksums{SHA256: strings.Repeat("f", 64)}}, format.Env{Blobs: blobs}},
+		{"wrong archive identity", format.Write{Op: format.OpDeploy, Path: Path("OtherPod", "1.0.0"), Checksums: kernel.Checksums{SHA256: sha}}, format.Env{Blobs: blobs}},
+		{"inspected identity mismatch", format.Write{Op: format.OpDeploy, Path: Path("OtherPod", "1.0.0"), Checksums: kernel.Checksums{SHA256: sha}}, env},
+		{"missing blob", format.Write{Op: format.OpDeploy, Path: path, Checksums: kernel.Checksums{SHA256: strings.Repeat("f", 64)}}, format.Env{Blobs: blobs}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := h.Admit(t.Context(), tc.env, c, tc.w); err == nil {
@@ -105,7 +106,7 @@ func TestUnitHandlerAdmissionChecksStoredArchives(t *testing.T) {
 		t.Context(),
 		env,
 		c,
-		format.Write{Path: path, Checksums: types.Checksums{SHA256: strings.Repeat("f", 64)}},
+		format.Write{Path: path, Checksums: kernel.Checksums{SHA256: strings.Repeat("f", 64)}},
 	); err == nil {
 		t.Fatal("inspection did not report missing archive")
 	}
@@ -133,9 +134,9 @@ func TestAccHandlerReindexRestoresPublishedVersions(t *testing.T) {
 	h := Handler{}
 	for _, version := range []string{"1.0.0", "2.0.0"} {
 		sha, size := storedPodArchive(t, blobs, "HelloPod", version)
-		item, err := db.Items().Put(t.Context(), types.Item{
+		item, err := db.Items().Put(t.Context(), model.Item{
 			RepoKey: c.Key, Name: Path("HelloPod", version), Size: size,
-			Actual: types.Checksums{SHA256: sha},
+			Actual: kernel.Checksums{SHA256: sha},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -163,12 +164,12 @@ func TestAccHandlerReindexRestoresPublishedVersions(t *testing.T) {
 			t.Fatalf("reindex lost %s: %v", version, err)
 		}
 	}
-	if err := h.Deployed(t.Context(), env, c, types.Item{Name: "README.md"}); err != nil {
+	if err := h.Deployed(t.Context(), env, c, model.Item{Name: "README.md"}); err != nil {
 		t.Fatalf("unrelated item affected CocoaPods index: %v", err)
 	}
-	bad := types.Item{
+	bad := model.Item{
 		Name:   Path("BrokenPod", "1.0.0"),
-		Actual: types.Checksums{SHA256: strings.Repeat("f", 64)},
+		Actual: kernel.Checksums{SHA256: strings.Repeat("f", 64)},
 	}
 	if err := h.Deployed(t.Context(), env, c, bad); err == nil {
 		t.Fatal("missing uploaded archive was indexed")
@@ -184,22 +185,22 @@ func TestAccHandlerReindexRestoresPublishedVersions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Deployed(t.Context(), env, c, types.Item{
-		Name: Path("BrokenPod", "1.0.0"), Actual: types.Checksums{SHA256: info.Digests.SHA256},
+	if err := h.Deployed(t.Context(), env, c, model.Item{
+		Name: Path("BrokenPod", "1.0.0"), Actual: kernel.Checksums{SHA256: info.Digests.SHA256},
 	}); err == nil {
 		t.Fatal("corrupt stored archive was indexed")
 	}
-	if err := h.Deployed(t.Context(), env, c, types.Item{
+	if err := h.Deployed(t.Context(), env, c, model.Item{
 		Name: Path(
 			"BrokenPod",
 			"1.0.0",
 		),
-		Actual: types.Checksums{SHA256: strings.Repeat("f", 64)},
+		Actual: kernel.Checksums{SHA256: strings.Repeat("f", 64)},
 		Cached: true,
 	}); err != nil {
 		t.Fatalf("cached remote archive was indexed as a hosted pod: %v", err)
 	}
-	if _, err := db.Items().Put(t.Context(), types.Item{
+	if _, err := db.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Name: bad.Name, Actual: bad.Actual,
 	}); err != nil {
 		t.Fatal(err)

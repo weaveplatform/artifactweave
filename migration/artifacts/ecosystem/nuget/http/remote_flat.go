@@ -9,11 +9,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/archive"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func shortHash(
@@ -90,11 +91,11 @@ func (s *remoteSession) flat(ctx context.Context, w http.ResponseWriter, p []str
 	s.packageFile(ctx, w, id, key, nuspec)
 }
 
-func (s *remoteSession) packageTarget(id, key string) (string, types.Checksums, error) {
+func (s *remoteSession) packageTarget(id, key string) (string, kernel.Checksums, error) {
 	if hv, ok := s.preferredHive(); ok {
 		vs, err := s.registrations(hv, id)
 		if err != nil {
-			return "", types.Checksums{}, err
+			return "", kernel.Checksums{}, err
 		}
 		for _, v := range vs {
 			if v.key == key {
@@ -107,15 +108,15 @@ func (s *remoteSession) packageTarget(id, key string) (string, types.Checksums, 
 				return target, checks, err
 			}
 		}
-		return "", types.Checksums{}, notFound(s.r)
+		return "", kernel.Checksums{}, notFound(s.r)
 	}
 	// A minimal v3 feed may expose only PackageBaseAddress. No invented hash or
 	// registration resource is required; native signature verification still runs.
 	base, err := s.endpoint("flatcontainer/")
 	if err != nil {
-		return "", types.Checksums{}, err
+		return "", kernel.Checksums{}, err
 	}
-	return appendResource(base, id, key, id+"."+key+".nupkg"), types.Checksums{}, nil
+	return appendResource(base, id, key, id+"."+key+".nupkg"), kernel.Checksums{}, nil
 }
 
 func (s *remoteSession) packageFile(
@@ -131,7 +132,7 @@ func (s *remoteSession) packageFile(
 		return
 	}
 	path := remotePackagePath(id, key)
-	if !s.h.k.Require(w, s.r, path, types.ActionRead) {
+	if !s.h.k.Require(w, s.r, path, api.ActionRead) {
 		return
 	}
 	target, checks, err := s.packageTarget(id, key)
@@ -146,7 +147,7 @@ func (s *remoteSession) deliverPackage(
 	ctx context.Context,
 	w http.ResponseWriter,
 	id, key, target string,
-	checks types.Checksums,
+	checks kernel.Checksums,
 	nuspec bool,
 ) {
 	path := remotePackagePath(id, key)

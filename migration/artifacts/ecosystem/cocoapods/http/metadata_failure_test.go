@@ -9,9 +9,9 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	podfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cocoapods"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type metadataBackend func(source.Request) (source.Result, error)
@@ -60,7 +60,7 @@ func TestAccMetadataRequiresStreamRepresentation(t *testing.T) {
 			f.source.HTTP = metadataBackend(func(q source.Request) (source.Result, error) {
 				calls++
 				dir, name := path.Split(q.Resource.Path)
-				return source.Result{Item: &types.Item{
+				return source.Result{Item: &model.Item{
 					RepoKey: q.Repo.Key,
 					Path:    strings.TrimSuffix(dir, "/"),
 					Name:    name,

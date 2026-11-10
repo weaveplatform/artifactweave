@@ -12,12 +12,11 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // limitOptions are the values the request-limit middleware takes from the
@@ -181,13 +180,13 @@ func (s requestLimiter) budgetResources(
 	if project != "" && len(project) <= 128 {
 		_, adminErr := kernel.RequireAdmin(ctx)
 		memberErr := s.cfg.Access.Projects.Member(ctx, project, p.Name)
-		if memberErr != nil && !errors.Is(memberErr, store.ErrNotFound) {
+		if memberErr != nil && !errors.Is(memberErr, kernel.ErrNotFound) {
 			return fmt.Errorf("budget project membership: %w", memberErr)
 		}
 		if adminErr == nil || memberErr == nil {
 			if err := s.cfg.Access.Projects.Exists(ctx, project); err == nil {
 				scope.Project = project
-			} else if !errors.Is(err, store.ErrNotFound) {
+			} else if !errors.Is(err, kernel.ErrNotFound) {
 				return fmt.Errorf("budget project: %w", err)
 			}
 		}
@@ -196,9 +195,9 @@ func (s requestLimiter) budgetResources(
 	if key == "" || len(key) > 255 {
 		return nil
 	}
-	key, _ = types.ResolveRepoKey(key)
+	key, _ = model.ResolveRepoKey(key)
 	c, err := s.cfg.Store.Repos().Get(ctx, key)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -245,7 +244,7 @@ func budgetRepository(r *http.Request) string {
 			"nix":
 			key = parts[2]
 		case "build", "builds":
-			key = types.BuildInfoRepo(build.ProjectKey(r.URL.Query().Get("project")))
+			key = model.BuildInfoRepo(build.ProjectKey(r.URL.Query().Get("project")))
 		}
 	}
 	if key == "" {

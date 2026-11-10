@@ -13,10 +13,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The keys of the repositories New seeds.
@@ -93,7 +93,7 @@ func (w *World[S]) Put(
 	cached bool,
 	fullPath string,
 	body []byte,
-) types.Item {
+) model.Item {
 	t.Helper()
 	ctx := t.Context()
 	u, err := w.Blobs.BeginUpload(ctx)
@@ -107,7 +107,7 @@ func (w *World[S]) Put(
 	if err != nil {
 		t.Fatal(err)
 	}
-	sums := types.Checksums{
+	sums := kernel.Checksums{
 		SHA256: info.Digests.SHA256,
 		SHA512: info.Digests.SHA512,
 		SHA1:   info.Digests.SHA1,
@@ -115,7 +115,7 @@ func (w *World[S]) Put(
 	}
 	// A fixed time keeps Last-Modified and conditional requests repeatable.
 	at := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
-	it, err := w.Store.Items().Put(ctx, types.Item{
+	it, err := w.Store.Items().Put(ctx, model.Item{
 		RepoKey:    c.Key,
 		Cached:     cached,
 		Name:       fullPath,

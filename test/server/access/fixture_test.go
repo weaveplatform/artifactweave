@@ -31,15 +31,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -139,17 +144,17 @@ func newStatusFixture(
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(ctx, types.User{Name: "user", PasswordHash: cheapHash}); err != nil {
+		Create(ctx, model.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	// A locked account, until securityStatusRows unlocks every user.
-	if err := db.Users().Create(ctx, types.User{
-		Name: "locked", PasswordHash: cheapHash, Status: types.UserLocked,
+	if err := db.Users().Create(ctx, model.User{
+		Name: "locked", PasswordHash: cheapHash, Status: model.UserLocked,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if anonymous {
-		if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+		if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -191,8 +196,8 @@ func newStatusFixture(
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Settings().Put(ctx, types.SettingFolderDownload,
-		types.FolderDownloadSettings{Enabled: true}); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingFolderDownload,
+		model.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	tokens, secrets := seedTokens(t, db)
@@ -225,14 +230,14 @@ func seedPermissions(t *testing.T, db *inmem.Store) {
 		Create(ctx, *repo.Defaults(&repo.Config{Key: "perm-local", Class: repo.Local})); err != nil {
 		t.Fatal(err)
 	}
-	libs := map[string]types.Target{"perm-local": {Include: []string{"**"}}}
+	libs := map[string]model.Target{"perm-local": {Include: []string{"**"}}}
 	for _, name := range []string{
 		"st-del-v1", "st-del-v2", "st-del-access", "st-res-put", "st-res-patch", "st-res-del",
 	} {
-		if err := db.Permissions().Create(ctx, types.Permission{
+		if err := db.Permissions().Create(ctx, model.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{
-				types.ResourceArtifact: {Targets: libs},
+			Resources: map[api.ResourceType]model.Resource{
+				api.ResourceArtifact: {Targets: libs},
 			},
 		}); err != nil {
 			t.Fatal(err)
@@ -241,11 +246,11 @@ func seedPermissions(t *testing.T, db *inmem.Store) {
 	for _, name := range []string{
 		"st-managed", "st-managed-put", "st-managed-del", "st-managed-grant", "st-managed-other",
 	} {
-		if err := db.Permissions().Create(ctx, types.Permission{
+		if err := db.Permissions().Create(ctx, model.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					"user": types.ActionRead | types.ActionManage,
+			Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+				Actions: model.Grants{Users: map[string]api.Actions{
+					"user": api.ActionRead | api.ActionManage,
 				}},
 				Targets: libs,
 			}},
@@ -342,7 +347,7 @@ type statusSecrets map[string]string
 func seedTokens(t *testing.T, db harness.Store) (*token.Service, statusSecrets) {
 	t.Helper()
 	ctx := context.Background()
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -352,7 +357,7 @@ func seedTokens(t *testing.T, db harness.Store) (*token.Service, statusSecrets) 
 		t.Fatal(err)
 	}
 	now := time.Now().Truncate(time.Second)
-	for _, r := range []types.Token{
+	for _, r := range []model.Token{
 		{ID: "admin-token", Subject: subjectOf(tokens, "admin"), Revocable: true},
 		{ID: "admin-token-2", Subject: subjectOf(tokens, "admin"), Revocable: true},
 		{ID: "user-token", Subject: subjectOf(tokens, "user"), Revocable: true},
@@ -361,7 +366,7 @@ func seedTokens(t *testing.T, db harness.Store) (*token.Service, statusSecrets) 
 			ExpiresAt: now.Add(time.Hour),
 		},
 	} {
-		r.Scope, r.IssuedAt, r.AccessDigest = types.UserScope(), now, []byte(r.ID)
+		r.Scope, r.IssuedAt, r.AccessDigest = kernel.UserScope(), now, []byte(r.ID)
 		if err := db.Tokens().Create(ctx, r); err != nil {
 			t.Fatal(err)
 		}
@@ -408,7 +413,7 @@ func seedTokens(t *testing.T, db harness.Store) (*token.Service, statusSecrets) 
 		secrets[r.name+"-access"], secrets[r.name+"-id"] = issued.AccessToken, issued.Record.ID
 	}
 	transient, err := tokens.Issue(ctx, token.Request{
-		Username: "ghost", ExpiresIn: &hour, ByAdmin: true, Identity: types.IdentityTransient,
+		Username: "ghost", ExpiresIn: &hour, ByAdmin: true, Identity: kernel.IdentityTransient,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -484,7 +489,7 @@ func newIdentityWorld(t *testing.T) identityWorld {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -538,7 +543,7 @@ func (w identityWorld) bearer(t *testing.T, user string, scope string) map[strin
 	t.Helper()
 	req := token.Request{Username: user, ByAdmin: true}
 	if scope != "" {
-		sc, err := types.ParseScope(scope)
+		sc, err := kernel.ParseScope(scope)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -658,13 +663,13 @@ func seedKeys(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	ctx := context.Background()
 	k := testKeys()
-	if err := db.Keys().CreateKeypair(ctx, types.Keypair{
-		Name: "kp-used", Type: types.KeypairRSA, Alias: "used",
+	if err := db.Keys().CreateKeypair(ctx, api.Keypair{
+		Name: "kp-used", Type: api.KeypairRSA, Alias: "used",
 		PrivateKey: k.private, PublicKey: k.public,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Keys().PutCertificate(ctx, types.Certificate{
+	if err := db.Keys().PutCertificate(ctx, api.Certificate{
 		Alias: "cert-used", PEM: k.bundle,
 	}); err != nil {
 		t.Fatal(err)

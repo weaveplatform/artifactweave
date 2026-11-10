@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 const configPath = "/artifactory/api/system/configuration"
@@ -107,7 +107,7 @@ func TestUnitPatchConfigurationAnonymousAccess(t *testing.T) {
 		t.Helper()
 		var enabled bool
 		if err := w.db.Settings().
-			Get(context.Background(), types.SettingAnonymousAccess, &enabled); err != nil {
+			Get(context.Background(), settings.SettingAnonymousAccess, &enabled); err != nil {
 			t.Fatal(err)
 		}
 		return enabled

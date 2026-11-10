@@ -7,14 +7,14 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 type hooks struct{}
 
-func (hooks) Deployed(context.Context, Env, repo.Config, types.Item) error  { return nil }
-func (hooks) Deleting(context.Context, Env, repo.Config, types.Item) error  { return nil }
-func (hooks) Deleted(context.Context, Env, repo.Config, []types.Item) error { return nil }
+func (hooks) Deployed(context.Context, Env, repo.Config, model.Item) error  { return nil }
+func (hooks) Deleting(context.Context, Env, repo.Config, model.Item) error  { return nil }
+func (hooks) Deleted(context.Context, Env, repo.Config, []model.Item) error { return nil }
 
 type derived struct{ hooks }
 

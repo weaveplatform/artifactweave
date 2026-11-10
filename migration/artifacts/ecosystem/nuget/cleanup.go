@@ -11,8 +11,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // KindSnapshots applies a package's maxUniqueSnapshots (decision 0038),
@@ -46,7 +47,7 @@ func (Handler) Owed(c repo.Config, cached bool, p string) []format.WorkRef {
 // is gone, or no longer a NuGet local/remote repository, owes nothing, and nor
 // does an item of a kind the format no longer runs, which an earlier build
 // may have left in the queue.
-func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) error {
+func (Handler) Work(ctx context.Context, env format.Env, it work.WorkItem) error {
 	if it.Kind == KindSymbols {
 		return symbolWork(ctx, env, it.Key)
 	}
@@ -56,7 +57,7 @@ func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) erro
 	}
 	c, err := env.Store.Repos().Get(ctx, key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	case err != nil:
 		return fmt.Errorf("nuget: repository %s: %w", key, err)
@@ -72,7 +73,7 @@ func markCleanup(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	key versionKey,
 ) error {
 	if (c.Class != repo.Local && c.Class != repo.Remote) ||
@@ -101,7 +102,7 @@ func cleanSnapshots(ctx context.Context, env format.Env, c repo.Config, name str
 	st := env.Store
 	p, err := st.Packages().Find(ctx, c.Key, name)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	case err != nil:
 		return fmt.Errorf("nuget: package %s: %w", name, err)
@@ -110,7 +111,7 @@ func cleanSnapshots(ctx context.Context, env format.Env, c repo.Config, name str
 	if err != nil {
 		return fmt.Errorf("nuget: versions of %s: %w", name, err)
 	}
-	releases := map[string][]types.PackageVersion{}
+	releases := map[string][]model.PackageVersion{}
 	for _, v := range vs {
 		m, err := DecodeMetadata(v.Metadata)
 		if err != nil {
@@ -125,8 +126,8 @@ func cleanSnapshots(ctx context.Context, env format.Env, c repo.Config, name str
 	var doomed []string
 	for _, r := range slices.Sorted(maps.Keys(releases)) {
 		list := releases[r]
-		slices.SortFunc(list, func(a, b types.PackageVersion) int {
-			return cmp.Or(a.Created.Compare(b.Created), types.CompareNuGet(a.Version, b.Version))
+		slices.SortFunc(list, func(a, b model.PackageVersion) int {
+			return cmp.Or(a.Created.Compare(b.Created), model.CompareNuGet(a.Version, b.Version))
 		})
 		for _, v := range list[:max(len(list)-limit, 0)] {
 			paths, err := filePaths(ctx, st, v)
@@ -143,7 +144,7 @@ func cleanSnapshots(ctx context.Context, env format.Env, c repo.Config, name str
 	return env.Remove(ctx, c, doomed, Deleter) //nolint:wrapcheck // the item service's own
 }
 
-func filePaths(ctx context.Context, st format.Store, v types.PackageVersion) ([]string, error) {
+func filePaths(ctx context.Context, st format.Store, v model.PackageVersion) ([]string, error) {
 	ids, err := st.Packages().Files(ctx, v.ID)
 	if err != nil {
 		return nil, fmt.Errorf("nuget: files of version %s: %w", v.Version, err)

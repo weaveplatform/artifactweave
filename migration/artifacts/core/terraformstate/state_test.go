@@ -11,8 +11,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // A write moves the current state to its timestamped name and stores the
@@ -442,7 +442,7 @@ func TestUnitStateWithoutTheIndex(t *testing.T) {
 	w := newWorld(t, memStore())
 	w.workspace(w.c, "app")
 	written := w.mustWrite(w.c, "app", 1)
-	pkgs, _, err := w.st.Packages().List(w.ctx, tfKey, store.Page{Limit: 10})
+	pkgs, _, err := w.st.Packages().List(w.ctx, tfKey, kernel.Page{Limit: 10})
 	if err != nil || len(pkgs) != 1 {
 		t.Fatalf("packages %v, %v", pkgs, err)
 	}

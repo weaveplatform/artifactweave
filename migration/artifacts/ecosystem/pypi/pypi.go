@@ -9,9 +9,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Properties the format keeps on an indexed file. Name, version, summary,
@@ -94,7 +94,7 @@ func (Handler) Inspect(
 // distOf is the core metadata of it: the inspection of the write that
 // stored it when there was one of this content and name, or else a read
 // of the content, as a restore needs. Nil for a file that yields none.
-func distOf(ctx context.Context, env format.Env, it types.Item) (*Dist, error) {
+func distOf(ctx context.Context, env format.Env, it model.Item) (*Dist, error) {
 	name := path.Base(it.FullPath())
 	if in, ok := env.Inspection.(*inspection); ok && in.sha256 == it.Actual.SHA256 &&
 		in.name == name {
@@ -109,7 +109,7 @@ func distOf(ctx context.Context, env format.Env, it types.Item) (*Dist, error) {
 // version, after setting the pypi.* properties its core metadata gives. A
 // file that no longer belongs to the version it was indexed under, such as
 // one overwritten with another version's content, leaves it.
-func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Cached != pkgindex.Stored(c).Cached || !IsDistribution(it.FullPath()) {
 		return nil
 	}
@@ -117,7 +117,7 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 	if err != nil {
 		return err
 	}
-	var props types.Properties
+	var props model.Properties
 	if d != nil {
 		props, err = setProperties(ctx, env.Store, it, d)
 	} else {
@@ -133,7 +133,7 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 // Deleting drops the record of a file about to be removed from its
 // version's metadata. The item service drops the file's link and prunes a
 // version left without files.
-func (Handler) Deleting(ctx context.Context, env format.Env, _ repo.Config, it types.Item) error {
+func (Handler) Deleting(ctx context.Context, env format.Env, _ repo.Config, it model.Item) error {
 	if !IsDistribution(it.FullPath()) {
 		return nil
 	}
@@ -170,7 +170,7 @@ func (Handler) Annotated(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
-	it types.Item,
+	it model.Item,
 	a format.Annotation,
 ) error {
 	if it.Folder || it.Cached != pkgindex.Stored(c).Cached || !IsDistribution(it.FullPath()) ||
@@ -212,10 +212,10 @@ func (Handler) Annotated(
 func reyank(
 	ctx context.Context,
 	st format.Store,
-	pv types.PackageVersion,
+	pv model.PackageVersion,
 	m Metadata,
 	f File,
-	props types.Properties,
+	props model.Properties,
 ) error {
 	yanked, reason := yankedBy(props)
 	if f.Yanked == yanked && f.YankedReason == reason {
@@ -239,6 +239,6 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 
 // uploaded is when it was last deployed: a copy or a move keeps the
 // source's, as 7.x keeps a copied or moved item's times.
-func uploaded(it types.Item) time.Time {
+func uploaded(it model.Item) time.Time {
 	return it.Modified.UTC().Truncate(time.Microsecond)
 }

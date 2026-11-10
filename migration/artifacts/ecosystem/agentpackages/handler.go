@@ -10,10 +10,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Serves reports whether t is the Agent Packages package type.
@@ -104,7 +104,7 @@ func (Handler) GuardWrite(
 	switch {
 	case err == nil:
 		return format.Rejectf(http.StatusConflict, "Agent Package version already published")
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	default:
 		return fmt.Errorf("agentpackages: check existing version: %w", err)
@@ -118,7 +118,7 @@ func (Handler) GuardWrite(
 // agentpackages.description when the descriptor has none, creates the
 // package owner/name when it is new, and links the version to the archive,
 // with its Metadata as the version's metadata.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || it.Cached {
 		return nil
 	}
@@ -139,7 +139,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	if err := setProperties(ctx, env.Store, it, meta); err != nil {
 		return err
 	}
-	p, err := env.Store.Packages().Ensure(ctx, types.Package{
+	p, err := env.Store.Packages().Ensure(ctx, model.Package{
 		RepoKey: c.Key, Type: c.PackageType, Name: meta.Name, Created: it.Created,
 	})
 	if err != nil {
@@ -157,13 +157,13 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 
 // Deleting does nothing: the item service drops a removed archive's
 // version link with it.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
 
 // Deleted does nothing: a version is one archive, so the item service's
 // pruning of versions left without files is all a delete needs.
-func (Handler) Deleted(context.Context, format.Env, repo.Config, []types.Item) error { return nil }
+func (Handler) Deleted(context.Context, format.Env, repo.Config, []model.Item) error { return nil }
 
-func metadataOf(ctx context.Context, env format.Env, it types.Item) (Metadata, error) {
+func metadataOf(ctx context.Context, env format.Env, it model.Item) (Metadata, error) {
 	if in, ok := env.Inspection.(*inspection); ok && in.sha == it.Actual.SHA256 {
 		return in.meta, in.err
 	}
@@ -175,12 +175,12 @@ func metadataOf(ctx context.Context, env format.Env, it types.Item) (Metadata, e
 	return ReadArchive(rc, info.Size)
 }
 
-func setProperties(ctx context.Context, st format.Store, it types.Item, meta Metadata) error {
+func setProperties(ctx context.Context, st format.Store, it model.Item, meta Metadata) error {
 	current, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("agentpackages: properties of %s: %w", it.FullPath(), err)
 	}
-	wanted := types.Properties{
+	wanted := model.Properties{
 		"agentpackages.name": {meta.Name}, "agentpackages.version": {meta.Version},
 		"agentpackages.sha256": {meta.SHA256},
 	}
@@ -188,7 +188,7 @@ func setProperties(ctx context.Context, st format.Store, it types.Item, meta Met
 		wanted["agentpackages.description"] = []string{meta.Description}
 	}
 	var remove []string
-	set := types.Properties{}
+	set := model.Properties{}
 	for _, key := range []string{"agentpackages.name", "agentpackages.version", "agentpackages.sha256", "agentpackages.description"} {
 		want, yes := wanted[key]
 		have, had := current[key]
@@ -215,7 +215,7 @@ func setProperties(ctx context.Context, st format.Store, it types.Item, meta Met
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	var all []pkgindex.Indexed
 	byName := map[string]int{}
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		items, next, err := env.Store.Items().Descendants(ctx, c.Key, false, "", page)
 		if err != nil {

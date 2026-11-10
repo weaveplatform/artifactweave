@@ -8,10 +8,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // NPMAPI is the npm ecosystem's partial strict server: the repository
@@ -86,7 +86,7 @@ func (s NPMAPI) ResumeNpmRepositoryMigration(
 	}
 	it, err := st.WorkQueue().Get(ctx, npmfmt.KindConvert, c.Key)
 	switch {
-	case errors.Is(err, store.ErrNotFound) || err == nil && it.State != types.WorkParked:
+	case errors.Is(err, kernel.ErrNotFound) || err == nil && it.State != work.WorkParked:
 		return nil, httpkit.BadRequestf("Repository '%s' has no failed conversion to resume", c.Key)
 	case err != nil:
 		return nil, s.InternalError(ctx, "npm conversion", err)

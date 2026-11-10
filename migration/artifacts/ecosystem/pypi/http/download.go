@@ -5,13 +5,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	pypifmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // metadataSuffix names a wheel's core metadata file (PEP 658).
@@ -44,7 +44,7 @@ func (h handler) download(w http.ResponseWriter, r *http.Request, p pkgroute.Pat
 			return
 		case found:
 			// Under the wheel's Read permission, whose metadata it is.
-			if h.k.Require(w, r, wheel, types.ActionRead) {
+			if h.k.Require(w, r, wheel, api.ActionRead) {
 				writePage(w, r, "application/octet-stream", false, []byte(text))
 			}
 			return
@@ -61,7 +61,7 @@ func (h handler) download(w http.ResponseWriter, r *http.Request, p pkgroute.Pat
 func (h handler) coreMetadata(r *http.Request, path string) (string, bool, error) {
 	f, err := h.k.Item(r, path)
 	switch {
-	case errors.Is(err, store.ErrNotFound) || err == nil && f.Item.Folder:
+	case errors.Is(err, kernel.ErrNotFound) || err == nil && f.Item.Folder:
 		return "", false, nil
 	case err != nil:
 		return "", false, err //nolint:wrapcheck // the kit names the protocol

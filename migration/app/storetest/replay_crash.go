@@ -11,14 +11,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/idempotency"
 	platstoretest "github.com/weaveplatform/artifactweave/migration/platform/store/storetest"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-func crashReplayRequest() store.ReplayRequest {
+func crashReplayRequest() idempotency.ReplayRequest {
 	digest := fmt.Sprintf("%x", sha256.Sum256([]byte("process-crash")))
 	now := time.Date(2026, 10, 28, 0, 0, 0, 0, time.UTC)
-	return store.ReplayRequest{
+	return idempotency.ReplayRequest{
 		Scope:       digest,
 		Key:         digest,
 		Fingerprint: digest,
@@ -69,7 +70,7 @@ func ReplayCrash(t *testing.T, s platstoretest.Store, env []string) {
 	if err := s.Settings().
 		Get(t.Context(), "api-replay-crash", &value); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("crashed mutation survived: %v, %v", value, err)
 	}

@@ -13,14 +13,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // copyOrMoveType is the media type of a copy or move report.
@@ -127,8 +127,8 @@ func (s ArtifactoryAPI) transfer(w http.ResponseWriter, r *http.Request, move bo
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve source repository", err))
 		return
 	}
-	if !acc.File(from, srcPath, types.ActionRead) ||
-		(move && !acc.File(from, srcPath, types.ActionDelete)) {
+	if !acc.File(from, srcPath, api.ActionRead) ||
+		(move && !acc.File(from, srcPath, api.ActionDelete)) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -144,7 +144,7 @@ func (s ArtifactoryAPI) transfer(w http.ResponseWriter, r *http.Request, move bo
 	toKey, toPath, into := splitTarget(to)
 	target, err := st.Repos().Get(ctx, toKey)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		refuseTransfer(w, fmt.Sprintf("The target repository '%s' does not exist", toKey))
 		return
 	case err != nil:
@@ -163,7 +163,7 @@ func (s ArtifactoryAPI) transfer(w http.ResponseWriter, r *http.Request, move bo
 	if into || toPath == "" {
 		dest = path.Join(toPath, path.Base(srcPath))
 	}
-	if !acc.File(target, dest, types.ActionWrite) {
+	if !acc.File(target, dest, api.ActionWrite) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -224,21 +224,21 @@ func (s ArtifactoryAPI) overwriteRight(
 	if err != nil {
 		return false, s.ItemError(ctx, "sidecars", err)
 	}
-	want := types.ActionRead
+	want := api.ActionRead
 	if l.shouldMove {
-		want |= types.ActionDelete
+		want |= api.ActionDelete
 	}
-	overwrite := acc.File(l.target, l.dest, types.ActionDelete)
+	overwrite := acc.File(l.target, l.dest, api.ActionDelete)
 	for _, m := range moves {
-		if !acc.File(l.src.Repo, m.From, want) || !acc.File(l.target, m.To, types.ActionWrite) {
+		if !acc.File(l.src.Repo, m.From, want) || !acc.File(l.target, m.To, api.ActionWrite) {
 			return false, httpkit.Denied(p)
 		}
-		if acc.File(l.target, m.To, types.ActionDelete) {
+		if acc.File(l.target, m.To, api.ActionDelete) {
 			continue
 		}
 		_, err := st.Items().Get(ctx, l.target.Key, false, m.To)
 		switch {
-		case errors.Is(err, store.ErrNotFound):
+		case errors.Is(err, kernel.ErrNotFound):
 		case err != nil:
 			return false, s.ItemError(ctx, "get sidecar target", err)
 		default:
@@ -319,7 +319,7 @@ func (s ArtifactoryAPI) downloadFolderArchive(w http.ResponseWriter, r *http.Req
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve repository", err))
 		return
 	}
-	if !acc.Folder(c, p, types.ActionRead) {
+	if !acc.Folder(c, p, api.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(caller))
 		return
 	}
@@ -347,13 +347,13 @@ func (s ArtifactoryAPI) downloadFolderArchive(w http.ResponseWriter, r *http.Req
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("%s is a file, not a folder", p))
 		return
 	}
-	var files []types.Item
+	var files []model.Item
 	var total int64
 	for _, it := range tree {
 		// Files the caller may not read are left out of the archive.
 		if !it.Folder && !protocolPrivateItem(c, it.FullPath()) &&
 			!machineLearningPrivate(c, it.FullPath()) && !chefMetadataItem(c, it.FullPath()) &&
-			acc.File(c, it.FullPath(), types.ActionRead) {
+			acc.File(c, it.FullPath(), api.ActionRead) {
 			files = append(files, it)
 			total += it.Size
 		}

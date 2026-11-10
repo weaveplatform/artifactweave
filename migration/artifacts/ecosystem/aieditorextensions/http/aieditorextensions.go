@@ -13,13 +13,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/aieditorextensions"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const galleryPath = "extensionquery"
@@ -66,7 +66,7 @@ func (h handler) query(w http.ResponseWriter, r *http.Request) {
 		catalog,
 		assetBase,
 		func(ctx context.Context, path string) bool {
-			if !h.k.Can(r, path, types.ActionRead) {
+			if !h.k.Can(r, path, api.ActionRead) {
 				return false
 			}
 			return original.CheckRead == nil || original.CheckRead(ctx, path) == nil

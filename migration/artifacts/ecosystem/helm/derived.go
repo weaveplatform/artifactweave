@@ -15,8 +15,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 // Settings controls how the protocol serves the stored index. Nil retains
@@ -103,13 +104,13 @@ func indexStamp(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05
 
 // Work derives one repository index from cached package metadata, without
 // opening chart archives. A removed repository no longer owes this work.
-func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) error {
+func (Handler) Work(ctx context.Context, env format.Env, work work.WorkItem) error {
 	if work.Kind != KindIndex {
 		return nil
 	}
 	c, err := env.Store.Repos().Get(ctx, work.Key)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, kernel.ErrNotFound):
 		return nil
 	case err != nil:
 		return fmt.Errorf("helm: repository %s: %w", work.Key, err)
@@ -121,7 +122,7 @@ func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) er
 		Entries:    map[string][]ChartVersion{},
 		Generated:  indexStamp(env.Now()),
 	}
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		packages, next, err := env.Store.Packages().List(ctx, c.Key, page)
 		if err != nil {
@@ -146,7 +147,7 @@ func (Handler) Work(ctx context.Context, env format.Env, work types.WorkItem) er
 			}
 			slices.SortStableFunc(
 				out.Entries[p.Name],
-				func(a, b ChartVersion) int { return types.CompareSemver(b.Version, a.Version) },
+				func(a, b ChartVersion) int { return model.CompareSemver(b.Version, a.Version) },
 			)
 		}
 		if next == "" {
@@ -183,14 +184,14 @@ func (Handler) Resolve(
 	switch {
 	case err == nil:
 		return d.Path, nil
-	case !errors.Is(err, store.ErrNotFound):
+	case !errors.Is(err, kernel.ErrNotFound):
 		return "", fmt.Errorf("helm: read index: %w", err)
 	}
 	_, err = env.WorkQueue.Get(ctx, KindIndex, c.Key)
 	switch {
 	case err == nil:
 		return d.Path, nil
-	case !errors.Is(err, store.ErrNotFound):
+	case !errors.Is(err, kernel.ErrNotFound):
 		return "", fmt.Errorf("helm: index work: %w", err)
 	}
 	if err := queueIndex(ctx, env, c, false); err != nil {

@@ -12,9 +12,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errFault = errors.New("injected failure")
@@ -41,13 +42,13 @@ type failureStore struct {
 	stage string
 }
 
-func (s failureStore) Items() store.ItemStore { return failureItems{s.Store.Items(), s.stage} }
-func (s failureStore) Packages() store.PackageStore {
+func (s failureStore) Items() port.ItemStore { return failureItems{s.Store.Items(), s.stage} }
+func (s failureStore) Packages() port.PackageStore {
 	return failurePackages{s.Store.Packages(), s.stage}
 }
 
 type failureItems struct {
-	store.ItemStore
+	port.ItemStore
 	stage string
 }
 
@@ -56,15 +57,15 @@ func (s failureItems) Descendants(
 	key string,
 	cached bool,
 	path string,
-	p store.Page,
-) ([]types.Item, string, error) {
+	p kernel.Page,
+) ([]model.Item, string, error) {
 	if s.stage == "descendants" {
 		return nil, "", errFault
 	}
 	return s.ItemStore.Descendants(ctx, key, cached, path, p)
 }
 
-func (s failureItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+func (s failureItems) Properties(ctx context.Context, id int64) (model.Properties, error) {
 	if s.stage == "properties" {
 		return nil, errFault
 	}
@@ -74,7 +75,7 @@ func (s failureItems) Properties(ctx context.Context, id int64) (types.Propertie
 func (s failureItems) PatchProperties(
 	ctx context.Context,
 	id int64,
-	set types.Properties,
+	set model.Properties,
 	remove []string,
 	at time.Time,
 ) error {
@@ -85,22 +86,22 @@ func (s failureItems) PatchProperties(
 }
 
 type failurePackages struct {
-	store.PackageStore
+	port.PackageStore
 	stage string
 }
 
 func (s failurePackages) List(
 	ctx context.Context,
 	key string,
-	p store.Page,
-) ([]types.Package, string, error) {
+	p kernel.Page,
+) ([]model.Package, string, error) {
 	if s.stage == "packages" {
 		return nil, "", errFault
 	}
 	return s.PackageStore.List(ctx, key, p)
 }
 
-func testEnv(t *testing.T) (format.Env, repo.Config, types.Item) {
+func testEnv(t *testing.T) (format.Env, repo.Config, model.Item) {
 	t.Helper()
 	db := inmem.New()
 	c := *repo.Defaults(&repo.Config{Key: "boxes", Class: repo.Local, PackageType: repo.Vagrant})
@@ -108,12 +109,12 @@ func testEnv(t *testing.T) (format.Env, repo.Config, types.Item) {
 		t.Fatal(err)
 	}
 	it, err := db.Items().
-		Put(t.Context(), types.Item{RepoKey: c.Key, Name: "test.box", Actual: types.Checksums{SHA256: "digest"}, Created: time.Unix(10, 0), Updated: time.Unix(10, 0)})
+		Put(t.Context(), model.Item{RepoKey: c.Key, Name: "test.box", Actual: kernel.Checksums{SHA256: "digest"}, Created: time.Unix(10, 0), Updated: time.Unix(10, 0)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Items().
-		PatchProperties(t.Context(), it.ID, types.Properties{PropName: {"widget"}, PropProvider: {"virtualbox"}, PropVersion: {"1.0"}}, nil, it.Updated); err != nil {
+		PatchProperties(t.Context(), it.ID, model.Properties{PropName: {"widget"}, PropProvider: {"virtualbox"}, PropVersion: {"1.0"}}, nil, it.Updated); err != nil {
 		t.Fatal(err)
 	}
 	return format.Env{
@@ -130,7 +131,7 @@ func TestUnitAdmissionBoundaries(t *testing.T) {
 	if !Serves(repo.Vagrant) || Serves(repo.Generic) {
 		t.Fatal("wrong type registration")
 	}
-	props := types.Properties{
+	props := model.Properties{
 		PropName:     {"widget"},
 		PropProvider: {"virtualbox"},
 		PropVersion:  {"1.0"},
@@ -147,7 +148,7 @@ func TestUnitAdmissionBoundaries(t *testing.T) {
 		{"extension", func(_ *repo.Config, w *format.Write, _ *format.Env) { w.Path = "image.txt" }, true},
 		{"identity", func(_ *repo.Config, w *format.Write, _ *format.Env) { w.Properties = nil }, true},
 		{"provider", func(_ *repo.Config, w *format.Write, _ *format.Env) {
-			w.Properties = types.Properties{PropName: {"widget"}, PropVersion: {"1.0"}, PropProvider: {"docker"}}
+			w.Properties = model.Properties{PropName: {"widget"}, PropVersion: {"1.0"}, PropProvider: {"docker"}}
 		}, true},
 		{"blob unavailable", func(_ *repo.Config, _ *format.Write, e *format.Env) { e.Blobs = boxStore{err: errFault} }, true},
 		{"archive invalid", func(_ *repo.Config, _ *format.Write, e *format.Env) { e.Blobs = boxStore{data: []byte("corrupt")} }, true},
@@ -167,7 +168,7 @@ func TestUnitAdmissionBoundaries(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, a := range []format.Annotation{{Set: types.Properties{propDigest: {"forged"}}}, {Removed: []string{propProvider}}} {
+	for _, a := range []format.Annotation{{Set: model.Properties{propDigest: {"forged"}}}, {Removed: []string{propProvider}}} {
 		if err := h.AdmitAnnotation(t.Context(), env, c, it, a); err == nil {
 			t.Fatal("derived property writable")
 		}
@@ -199,9 +200,9 @@ func TestUnitReindexPagesAndSkipsUnverifiedFiles(t *testing.T) {
 	env, c, _ := testEnv(t)
 	// Exercise a real page boundary while proving folders, unrelated files and
 	// preexisting boxes without verified identity never become native packages.
-	for i := range store.MaxLimit + 2 {
+	for i := range kernel.MaxLimit + 2 {
 		_, err := env.Store.Items().
-			Put(t.Context(), types.Item{RepoKey: c.Key, Name: fmt.Sprintf("unrelated-%04d", i), Folder: i%2 == 0})
+			Put(t.Context(), model.Item{RepoKey: c.Key, Name: fmt.Sprintf("unrelated-%04d", i), Folder: i%2 == 0})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -231,7 +232,7 @@ func TestUnitReindexPagesAndSkipsUnverifiedFiles(t *testing.T) {
 	if _, err := env.Store.Packages().
 		Find(t.Context(), c.Key, "widget"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("unverified indexed: %v", err)
 	}

@@ -15,21 +15,25 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	gemfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/gems"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -60,11 +64,11 @@ func newWorldWith(t *testing.T, configure harness.Tune) *world {
 	db := inmem.New()
 	support.Seed(t, db)
 	if err := db.Users().
-		Create(t.Context(), types.User{Name: "reader", PasswordHash: support.CheapHash}); err != nil {
+		Create(t.Context(), model.User{Name: "reader", PasswordHash: support.CheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Permissions().
-		Create(t.Context(), types.Permission{Name: "gem-reader", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}}, Targets: map[string]types.Target{"gems-local": {Include: []string{"**"}}, "gems-fed": {Include: []string{"**"}}, "gems-virtual": {Include: []string{"**"}}}}}}); err != nil {
+		Create(t.Context(), model.Permission{Name: "gem-reader", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]model.Target{"gems-local": {Include: []string{"**"}}, "gems-fed": {Include: []string{"**"}}, "gems-virtual": {Include: []string{"**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range []repo.Config{{Key: "gems-local", Class: repo.Local, PackageType: repo.Gems}, {Key: "gems-fed", Class: repo.Federated, PackageType: repo.Gems}, {Key: "gems-virtual", Class: repo.Virtual, PackageType: repo.Gems, Repositories: []string{"gems-local", "gems-fed"}, DefaultDeploymentRepo: "gems-local"}} {
@@ -321,7 +325,7 @@ func TestAccNativePushAndPermissions(t *testing.T) {
 func TestAccNativeMetadataRequiresReadPermission(t *testing.T) {
 	w := newWorld(t)
 	if err := w.db.Users().
-		Create(t.Context(), types.User{Name: "outsider", PasswordHash: support.CheapHash}); err != nil {
+		Create(t.Context(), model.User{Name: "outsider", PasswordHash: support.CheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range []string{"names", "versions", "api/v1/search.json?query=rake"} {
@@ -401,7 +405,7 @@ func TestAccNativeYankQueryForm(t *testing.T) {
 func TestAccNativeRawRubyGemsTokenAuth(t *testing.T) {
 	var tokens *token.Service
 	w := newWorldWith(t, func(cfg *harness.Config) {
-		if err := cfg.Store.Instance().Init(t.Context(), types.InstanceIdentity{
+		if err := cfg.Store.Instance().Init(t.Context(), instance.InstanceIdentity{
 			InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 		}); err != nil {
 			t.Fatal(err)
@@ -476,11 +480,11 @@ func TestAccVirtualFiltersUnreadableMember(t *testing.T) {
 		http.StatusCreated,
 	)
 	if err := w.db.Users().
-		Create(t.Context(), types.User{Name: "limited", PasswordHash: support.CheapHash}); err != nil {
+		Create(t.Context(), model.User{Name: "limited", PasswordHash: support.CheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), types.Permission{Name: "virtual-only", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"limited": types.ActionRead}}, Targets: map[string]types.Target{"gems-virtual": {Include: []string{"**"}}}}}}); err != nil {
+		Create(t.Context(), model.Permission{Name: "virtual-only", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"limited": api.ActionRead}}, Targets: map[string]model.Target{"gems-virtual": {Include: []string{"**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	versions := w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/versions", "limited", nil)
@@ -529,9 +533,9 @@ func TestAccVirtualRejectsMemberCycleAndSkipsRemovedMember(t *testing.T) {
 
 func TestAccLocalIndexFailsClosedOnMissingArchiveBlob(t *testing.T) {
 	w := newWorld(t)
-	if _, err := w.db.Items().Put(t.Context(), types.Item{
+	if _, err := w.db.Items().Put(t.Context(), model.Item{
 		RepoKey: "gems-local", Path: "gems", Name: "rake-12.3.1.gem",
-		Actual: types.Checksums{SHA256: strings.Repeat("a", 64)}, Size: 123,
+		Actual: kernel.Checksums{SHA256: strings.Repeat("a", 64)}, Size: 123,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -557,9 +561,9 @@ func TestAccLocalAndVirtualIndexesFailClosedOnCorruptStoredArchive(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.db.Items().Put(t.Context(), types.Item{
+	if _, err := w.db.Items().Put(t.Context(), model.Item{
 		RepoKey: "gems-local", Path: "gems", Name: "rake-12.3.1.gem",
-		Actual: types.Checksums{SHA256: info.Digests.SHA256}, Size: int64(len(invalid)),
+		Actual: kernel.Checksums{SHA256: info.Digests.SHA256}, Size: int64(len(invalid)),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -755,7 +759,7 @@ func newRemoteWorld(t *testing.T, up *fakeupstream.Server) *world {
 		cfg.RemoteSources = &source.Service{
 			HTTP:  policy,
 			Cache: policy,
-			Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+			Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 				return cfg.Store.RemoteCache().Source(ctx, c.Key)
 			},
 		}
@@ -863,11 +867,11 @@ func TestAccRemoteMetadataFiltersDeniedGem(t *testing.T) {
 	up.Set("/info/rake", fakeupstream.Resource{Body: gemfmt.CompactInfo("rake", packages)})
 	up.Set("/gems/rake-12.3.1.gem", fakeupstream.Resource{Body: w.gem})
 	if err := w.db.Users().
-		Create(t.Context(), types.User{Name: "remote-limited", PasswordHash: support.CheapHash}); err != nil {
+		Create(t.Context(), model.User{Name: "remote-limited", PasswordHash: support.CheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), types.Permission{Name: "remote-limited", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"remote-limited": types.ActionRead}}, Targets: map[string]types.Target{"gems-remote": {Include: []string{"**"}, Exclude: []string{"gems/rake-12.3.1.gem"}}}}}}); err != nil {
+		Create(t.Context(), model.Permission{Name: "remote-limited", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"remote-limited": api.ActionRead}}, Targets: map[string]model.Target{"gems-remote": {Include: []string{"**"}, Exclude: []string{"gems/rake-12.3.1.gem"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	base := "/artifactory/api/gems/gems-remote/"

@@ -18,8 +18,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errMissingGemBlob = errors.New("missing gem blob")
@@ -172,7 +173,7 @@ func TestUnitGemAdmissionProtectsGeneratedIndexesAndArchiveIdentity(t *testing.T
 	write := format.Write{
 		Op:        format.OpDeploy,
 		Path:      "gems/rake-12.3.1.gem",
-		Checksums: types.Checksums{SHA256: sha},
+		Checksums: kernel.Checksums{SHA256: sha},
 	}
 
 	if !Serves(repo.Gems) || Serves(repo.NPM) {
@@ -225,7 +226,7 @@ func TestUnitGemAdmissionProtectsGeneratedIndexesAndArchiveIdentity(t *testing.T
 		{"generated compact index", format.Write{Op: format.OpDeploy, Path: "versions"}, http.StatusConflict},
 		{"generated quick spec", format.Write{Op: format.OpDeploy, Path: "quick/Marshal.4.8/rake-12.3.1.gemspec.rz"}, http.StatusConflict},
 		{"unsafe archive path", format.Write{Op: format.OpDeploy, Path: "gems/../escape.gem"}, http.StatusBadRequest},
-		{"archive identity mismatch", format.Write{Op: format.OpDeploy, Path: "gems/rake-12.3.2.gem", Checksums: types.Checksums{SHA256: sha}}, http.StatusBadRequest},
+		{"archive identity mismatch", format.Write{Op: format.OpDeploy, Path: "gems/rake-12.3.2.gem", Checksums: kernel.Checksums{SHA256: sha}}, http.StatusBadRequest},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := h.Admit(t.Context(), env, c, tc.write)
@@ -248,13 +249,13 @@ func TestUnitGemAdmissionProtectsGeneratedIndexesAndArchiveIdentity(t *testing.T
 	if _, err := h.Admit(t.Context(), env, c, checksum); err != nil {
 		t.Fatalf("checksum sidecar was refused: %v", err)
 	}
-	for _, item := range []types.Item{{Folder: true}, {Name: "README.txt"}} {
+	for _, item := range []model.Item{{Folder: true}, {Name: "README.txt"}} {
 		if err := h.Deployed(t.Context(), env, c, item); err != nil {
 			t.Fatalf("non-gem item changed the native index: %v", err)
 		}
 	}
-	if err := h.Deployed(t.Context(), env, c, types.Item{
-		Name: write.Path, Actual: types.Checksums{SHA256: strings.Repeat("f", 64)},
+	if err := h.Deployed(t.Context(), env, c, model.Item{
+		Name: write.Path, Actual: kernel.Checksums{SHA256: strings.Repeat("f", 64)},
 	}); err == nil {
 		t.Fatal("missing stored gem content was indexed")
 	}
@@ -266,8 +267,8 @@ func TestUnitGemAdmissionProtectsGeneratedIndexesAndArchiveIdentity(t *testing.T
 		t.Fatalf("empty repository reindex failed: %v", err)
 	}
 	db := inmem.New()
-	if err := h.Deployed(t.Context(), format.Env{Store: db, Blobs: env.Blobs}, c, types.Item{
-		Name: write.Path, Actual: types.Checksums{SHA256: sha},
+	if err := h.Deployed(t.Context(), format.Env{Store: db, Blobs: env.Blobs}, c, model.Item{
+		Name: write.Path, Actual: kernel.Checksums{SHA256: sha},
 	}); err == nil {
 		t.Fatal("deployed gem without a stored item was linked into package index")
 	}
@@ -290,9 +291,9 @@ func TestAccGemReindexRebuildsNativePackageLinkFromStoredArchive(t *testing.T) {
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	item, err := db.Items().Put(t.Context(), types.Item{
+	item, err := db.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Name: "gems/rake-12.3.1.gem", Size: int64(len(content)),
-		Actual: types.Checksums{SHA256: sha},
+		Actual: kernel.Checksums{SHA256: sha},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -332,7 +333,7 @@ func TestAccGemReindexRebuildsNativePackageLinkFromStoredArchive(t *testing.T) {
 	if err != nil || len(files) != 1 || files[0] != item.ID {
 		t.Fatalf("reindex changed the archive identity: %v, %v", files, err)
 	}
-	if _, err := db.Items().Put(t.Context(), types.Item{
+	if _, err := db.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Name: "README.txt", Size: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -340,9 +341,9 @@ func TestAccGemReindexRebuildsNativePackageLinkFromStoredArchive(t *testing.T) {
 	if err := h.Reindex(t.Context(), env, c); err != nil {
 		t.Fatalf("non-gem item should be ignored during reindex: %v", err)
 	}
-	if _, err := db.Items().Put(t.Context(), types.Item{
+	if _, err := db.Items().Put(t.Context(), model.Item{
 		RepoKey: c.Key, Name: "gems/missing-1.0.0.gem", Size: 10,
-		Actual: types.Checksums{SHA256: strings.Repeat("f", 64)},
+		Actual: kernel.Checksums{SHA256: strings.Repeat("f", 64)},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -372,11 +373,11 @@ func TestAccGemReindexOrdersMultiplePackagesAndVersions(t *testing.T) {
 		sum := sha256.Sum256(body)
 		sha := hex.EncodeToString(sum[:])
 		blobs[sha] = body
-		if _, err := db.Items().Put(t.Context(), types.Item{
+		if _, err := db.Items().Put(t.Context(), model.Item{
 			RepoKey: c.Key,
 			Name:    "gems/" + tc.name + "-" + tc.version + ".gem",
 			Size:    int64(len(body)),
-			Actual:  types.Checksums{SHA256: sha},
+			Actual:  kernel.Checksums{SHA256: sha},
 		}); err != nil {
 			t.Fatal(err)
 		}

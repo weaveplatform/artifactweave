@@ -14,11 +14,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func sha256Hex(b []byte) string {
@@ -202,7 +203,7 @@ func TestUnitTypeGates(t *testing.T) {
 	}
 	// A stale entry, as an index kept before the type was known would
 	// leave, goes with a reindex.
-	_, err := w.st.Packages().Ensure(w.ctx, types.Package{
+	_, err := w.st.Packages().Ensure(w.ctx, model.Package{
 		RepoKey: untyped.Key, Name: "stale", Type: repo.Terraform,
 	})
 	w.must(err)
@@ -313,15 +314,15 @@ func TestUnitInspectReadsOnlyArchives(t *testing.T) {
 	h := terraform.Handler{}
 	env := format.Env{Blobs: w.blobs}
 	r := newRelease(t, "hashicorp/null/3.3.2", "null", "3.3.2", "linux_amd64")
-	sha := types.Checksums{SHA256: sha256Hex([]byte("x"))}
+	sha := kernel.Checksums{SHA256: sha256Hex([]byte("x"))}
 	for _, tc := range []struct {
 		tt   repo.TerraformType
 		path string
-		sums types.Checksums
+		sums kernel.Checksums
 	}{
 		{repo.TerraformModule, r.path("linux_amd64.zip"), sha},
 		{repo.TerraformProvider, r.path("SHA256SUMS"), sha},
-		{repo.TerraformProvider, r.path("linux_amd64.zip"), types.Checksums{}},
+		{repo.TerraformProvider, r.path("linux_amd64.zip"), kernel.Checksums{}},
 		{repo.TerraformProvider, "acme/vpc/aws/1.0.0.zip", sha},
 	} {
 		got, err := h.Inspect(context.Background(), env, repo.Config{TerraformType: tc.tt},

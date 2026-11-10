@@ -5,8 +5,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const cranArchiveRoute = "GET /artifactory/api/cran/{repoKey}/move-archives"
@@ -52,12 +53,12 @@ var cranArchiveStatusPart = statusPart{
 				continue
 			}
 			if _, err := db.Items().
-				Put(t.Context(), types.Item{RepoKey: key, Name: cranLegacyPath, Actual: types.Checksums{SHA256: sha256Hex("missing blob")}}); err != nil {
+				Put(t.Context(), model.Item{RepoKey: key, Name: cranLegacyPath, Actual: kernel.Checksums{SHA256: sha256Hex("missing blob")}}); err != nil {
 				t.Fatal(err)
 			}
 			if key == "cran-collision" {
 				if _, err := db.Items().
-					Put(t.Context(), types.Item{RepoKey: key, Name: cranArchivePath, Folder: true}); err != nil {
+					Put(t.Context(), model.Item{RepoKey: key, Name: cranArchivePath, Folder: true}); err != nil {
 					t.Fatal(err)
 				}
 			}

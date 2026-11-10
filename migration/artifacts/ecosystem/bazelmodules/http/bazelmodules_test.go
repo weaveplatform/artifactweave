@@ -33,6 +33,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	fmtbazel "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/bazelmodules"
@@ -42,7 +43,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type fixture struct {
@@ -94,7 +94,7 @@ func newFixtureWith(
 			}
 			return err
 		},
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 			rc, _, e := blobs.Open(r.Context(), it.Actual.SHA256)
 			if e != nil {
 				t.Fatal(e)
@@ -403,7 +403,7 @@ func TestAccDeleteRestoreAndMalformedNativePaths(t *testing.T) {
 	if _, err := f.items.Restore(
 		t.Context(),
 		item.Target{Repo: f.local, Path: p},
-		types.TrashRecord{Item: it, PackageType: string(repo.BazelModules)},
+		model.TrashRecord{Item: it, PackageType: string(repo.BazelModules)},
 		"admin",
 	); err != nil {
 		t.Fatal(err)

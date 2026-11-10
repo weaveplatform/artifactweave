@@ -13,8 +13,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vagrant"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The generic contract fixture has no deployment-property field. This adapter
@@ -31,7 +31,7 @@ func (h contractHandler) Admit(
 	parts := strings.Split(w.Path, "/")
 	if len(parts) >= 3 && strings.HasSuffix(w.Path, ".box") {
 		if w.Properties == nil {
-			w.Properties = types.Properties{}
+			w.Properties = model.Properties{}
 		}
 		w.Properties[vagrant.PropName] = []string{parts[len(parts)-3]}
 		w.Properties[vagrant.PropVersion] = []string{parts[len(parts)-2]}

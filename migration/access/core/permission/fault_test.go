@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/permission"
 	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var errBoom = errors.New("boom")
@@ -32,14 +33,14 @@ type faultyPerms struct {
 	f *faulty
 }
 
-func (p faultyPerms) Get(ctx context.Context, name string) (types.Permission, error) {
+func (p faultyPerms) Get(ctx context.Context, name string) (model.Permission, error) {
 	if p.f.fail == "perms.get" {
-		return types.Permission{}, errBoom
+		return model.Permission{}, errBoom
 	}
 	return p.PermissionStore.Get(ctx, name) //nolint:wrapcheck // test double
 }
 
-func (p faultyPerms) List(ctx context.Context, pg kernel.Page) ([]types.Permission, string, error) {
+func (p faultyPerms) List(ctx context.Context, pg kernel.Page) ([]model.Permission, string, error) {
 	if p.f.fail == "perms.list" {
 		return nil, "", errBoom
 	}
@@ -57,7 +58,7 @@ func (p faultyPerms) ForPrincipal(
 	ctx context.Context,
 	user string,
 	groups []string,
-) ([]types.Permission, error) {
+) ([]model.Permission, error) {
 	if p.f.fail == "perms.forprincipal" {
 		return nil, errBoom
 	}
@@ -69,14 +70,14 @@ type faultyUsers struct {
 	f *faulty
 }
 
-func (u faultyUsers) Get(ctx context.Context, name string) (types.User, error) {
+func (u faultyUsers) Get(ctx context.Context, name string) (model.User, error) {
 	if u.f.fail == "users.get" {
-		return types.User{}, errBoom
+		return model.User{}, errBoom
 	}
 	return u.UserStore.Get(ctx, name) //nolint:wrapcheck // test double
 }
 
-func (u faultyUsers) List(ctx context.Context, pg kernel.Page) ([]types.User, string, error) {
+func (u faultyUsers) List(ctx context.Context, pg kernel.Page) ([]model.User, string, error) {
 	if u.f.fail == "users.list" {
 		return nil, "", errBoom
 	}
@@ -88,9 +89,9 @@ type faultyGroups struct {
 	f *faulty
 }
 
-func (g faultyGroups) Get(ctx context.Context, name string) (types.Group, error) {
+func (g faultyGroups) Get(ctx context.Context, name string) (model.Group, error) {
 	if g.f.fail == "groups.get" {
-		return types.Group{}, errBoom
+		return model.Group{}, errBoom
 	}
 	return g.GroupStore.Get(ctx, name) //nolint:wrapcheck // test double
 }
@@ -103,9 +104,9 @@ func TestUnitStoreFailures(t *testing.T) {
 		Repositories: repositories{db: f.Store, fail: &f.fail},
 		Now:          func() time.Time { return clock },
 	}
-	grants := perm("g", map[types.ResourceType]types.Resource{
-		types.ResourceArtifact: artifact(everywhere("libs-local"),
-			map[string]types.Actions{"bob": r}, map[string]types.Actions{"devs": r}),
+	grants := perm("g", map[api.ResourceType]model.Resource{
+		api.ResourceArtifact: artifact(everywhere("libs-local"),
+			map[string]api.Actions{"bob": r}, map[string]api.Actions{"devs": r}),
 	})
 	if err := svc.Create(ctx, grants); err != nil {
 		t.Fatal(err)

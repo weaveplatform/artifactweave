@@ -15,12 +15,14 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 // The race this file proves closed (#64): garbage collection removes a blob
@@ -148,20 +150,20 @@ type seqStore struct {
 	seq *sequence
 }
 
-func (s seqStore) Blobs() store.BlobIndex { return seqIndex{s.raceStore.Blobs(), s.seq} }
+func (s seqStore) Blobs() port.BlobIndex { return seqIndex{s.raceStore.Blobs(), s.seq} }
 
 type seqIndex struct {
-	store.BlobIndex
+	port.BlobIndex
 	seq *sequence
 }
 
 func (x seqIndex) MarkDeleting(
 	ctx context.Context,
-	b types.Blob,
+	b blob.Blob,
 	at time.Time,
-) (types.Blob, error) {
+) (blob.Blob, error) {
 	var (
-		out types.Blob
+		out blob.Blob
 		err error
 	)
 	x.seq.step(ctx, "gc", "G1", func() { out, err = x.BlobIndex.MarkDeleting(ctx, b, at) })
@@ -255,11 +257,11 @@ func raceOnce(t *testing.T, base raceStore, orphan bool, order []string) {
 		t.Fatal(err)
 	}
 	libs, _ := base.Repos().Get(ctx, "libs")
-	if err := base.Settings().Put(ctx, types.SettingTrashcan,
-		types.TrashcanSettings{Enabled: false, RetentionDays: 1}); err != nil {
+	if err := base.Settings().Put(ctx, settings.SettingTrashcan,
+		model.TrashcanSettings{Enabled: false, RetentionDays: 1}); err != nil {
 		t.Fatal(err)
 	}
-	deploy := func(ctx context.Context, svc *item.Service, p, body string) (types.Item, error) {
+	deploy := func(ctx context.Context, svc *item.Service, p, body string) (model.Item, error) {
 		return svc.Deploy(ctx, item.Deploy{
 			Target: item.Target{Repo: libs, Path: p}, Body: strings.NewReader(body),
 		})
@@ -358,7 +360,7 @@ func raceOnce(t *testing.T, base raceStore, orphan bool, order []string) {
 		body, _ := io.ReadAll(r)
 		_ = r.Close()
 		row, err := base.Blobs().Get(ctx, it.Actual.SHA256)
-		if err != nil || row.State != types.BlobLive || row.Refs < 1 {
+		if err != nil || row.State != blob.BlobLive || row.Refs < 1 {
 			t.Fatalf("%s's blob row %+v, %v (content %q)", p, row, err, body)
 		}
 	}
@@ -374,8 +376,8 @@ func TestAccDeployFinishesACrashedCollection(t *testing.T) {
 	w.trashOff(t)
 	sha := w.deploy(t, "f.txt", raced).Actual.SHA256
 	w.remove(t, "f.txt")
-	if _, err := w.db.Blobs().MarkDeleting(ctx, types.Blob{
-		Checksums: types.Checksums{SHA256: sha}, Size: int64(len(raced)),
+	if _, err := w.db.Blobs().MarkDeleting(ctx, blob.Blob{
+		Checksums: kernel.Checksums{SHA256: sha}, Size: int64(len(raced)),
 	}, w.now()); err != nil {
 		t.Fatal(err)
 	}
@@ -385,7 +387,7 @@ func TestAccDeployFinishesACrashedCollection(t *testing.T) {
 	if !errors.Is(err, item.ErrCollected) {
 		t.Fatalf("deploy over a deleting blob: %v", err)
 	}
-	if row, err := w.db.Blobs().Get(ctx, sha); err != nil || row.State != types.BlobDeleted ||
+	if row, err := w.db.Blobs().Get(ctx, sha); err != nil || row.State != blob.BlobDeleted ||
 		w.stored(t, sha) {
 		t.Fatalf(
 			"the refused deploy finishes the removal: %+v, %v, stored %v",
@@ -400,14 +402,14 @@ func TestAccDeployFinishesACrashedCollection(t *testing.T) {
 	// A checksum deploy of content being removed is a miss, so the client
 	// uploads it in full.
 	w.remove(t, "g.txt")
-	if _, err := w.db.Blobs().MarkDeleting(ctx, types.Blob{
-		Checksums: types.Checksums{SHA256: sha}, Size: int64(len(raced)),
+	if _, err := w.db.Blobs().MarkDeleting(ctx, blob.Blob{
+		Checksums: kernel.Checksums{SHA256: sha}, Size: int64(len(raced)),
 	}, w.now()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.items.DeployByChecksum(ctx, item.Deploy{
 		Target:   item.Target{Repo: w.libs, Path: "h.txt"},
-		Declared: types.Checksums{SHA256: sha},
+		Declared: kernel.Checksums{SHA256: sha},
 	}); !errors.Is(err, item.ErrNoBlob) {
 		t.Fatalf("checksum deploy over a deleting blob: %v", err)
 	}

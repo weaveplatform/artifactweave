@@ -4,10 +4,11 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
@@ -150,7 +151,7 @@ func fixtureRepos(name string, t repo.PackageType) []repo.Config {
 
 // formatGrants is a grant of a on every format repository under the
 // prefix.
-func formatGrants(under string, a types.Actions) []matrixGrant {
+func formatGrants(under string, a api.Actions) []matrixGrant {
 	repos := formatRepos()
 	out := make([]matrixGrant, 0, len(repos))
 	for _, c := range repos {
@@ -161,10 +162,10 @@ func formatGrants(under string, a types.Actions) []matrixGrant {
 
 // formatTargets is a permission target on every format repository, for
 // paths under the prefix.
-func formatTargets(under string) map[string]types.Target {
-	out := map[string]types.Target{}
+func formatTargets(under string) map[string]model.Target {
+	out := map[string]model.Target{}
 	for _, c := range formatRepos() {
-		out[c.Key] = types.Target{Include: []string{under + "**"}}
+		out[c.Key] = model.Target{Include: []string{under + "**"}}
 	}
 	return out
 }

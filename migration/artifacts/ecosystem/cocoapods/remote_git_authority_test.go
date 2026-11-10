@@ -16,16 +16,18 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestAccCocoaPodsGitTransportCredentialIsolation(t *testing.T) {
@@ -233,12 +235,12 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	q.Resource.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
 		return ValidateSourceArchive(ctx, body, size, ".tar.gz")
 	}
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
-		Name: "git-reader", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Targets: map[string]types.Target{w.c.Key: {}},
-				Actions: types.Grants{
-					Users: map[string]types.Actions{"git-reader": types.ActionRead},
+	if err := w.db.Permissions().Create(t.Context(), model.Permission{
+		Name: "git-reader", Resources: map[accessapi.ResourceType]model.Resource{
+			accessapi.ResourceArtifact: {
+				Targets: map[string]model.Target{w.c.Key: {}},
+				Actions: model.Grants{
+					Users: map[string]accessapi.Actions{"git-reader": accessapi.ActionRead},
 				},
 			},
 		},
@@ -253,7 +255,7 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	kit := accesstest.Over(t, w.db)
 	w.p.CheckCurrent = func(ctx context.Context, st remote.Store, q source.Request, _ source.Permit, revision string) error {
 		current, err := st.Repos().Get(ctx, q.Repo.Key)
-		if err != nil || store.RemotePolicyChanged(current, q.Repo) {
+		if err != nil || port.RemotePolicyChanged(current, q.Repo) {
 			return source.ErrSuperseded
 		}
 		opts, err := resolver.Options(ctx, q.Repo)
@@ -262,8 +264,10 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 		}
 		access, err := kit.Decide(ctx, q.Subject, false)
 		if err != nil || !access.Allows(
-			types.ResourceArtifact, accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
-			q.Resource.Path, types.ActionRead,
+			accessapi.ResourceArtifact,
+			accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
+			q.Resource.Path,
+			accessapi.ActionRead,
 		) {
 			return source.ErrDenied
 		}
@@ -272,7 +276,7 @@ func cocoaPodsAuthorityFixture(t *testing.T) (*policyWorld, source.Request) {
 	return w, q
 }
 
-func cocoaPodsAuthorityIdentity(t *testing.T, w *policyWorld) types.SourceIdentity {
+func cocoaPodsAuthorityIdentity(t *testing.T, w *policyWorld) model.SourceIdentity {
 	t.Helper()
 	identity, err := w.db.RemoteCache().Source(t.Context(), w.c.Key)
 	if err != nil {
@@ -327,11 +331,11 @@ func cocoaPodsAuthorityNoPublication(t *testing.T, w *policyWorld, q source.Requ
 	if _, err := w.db.Items().
 		Get(t.Context(), q.Repo.Key, true, q.Resource.Path); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("denied Git archive was published: %v", err)
 	}
-	entries, _, err := w.db.RemoteCache().List(t.Context(), q.Repo.Key, "", store.Page{Limit: 10})
+	entries, _, err := w.db.RemoteCache().List(t.Context(), q.Repo.Key, "", kernel.Page{Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}

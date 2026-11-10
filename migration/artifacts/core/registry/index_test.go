@@ -12,12 +12,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // tagRow is one version of an image in the index as a test compares it.
@@ -39,7 +39,7 @@ type imageRow struct {
 func (w *world) index(c repo.Config) map[string]imageRow {
 	w.t.Helper()
 	ctx := context.Background()
-	pkgs, _, err := w.db.Packages().List(ctx, c.Key, store.Page{Limit: 1000})
+	pkgs, _, err := w.db.Packages().List(ctx, c.Key, kernel.Page{Limit: 1000})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func (w *world) tags(c repo.Config, name string) []string {
 	w.t.Helper()
 	ctx := context.Background()
 	p, err := w.db.Packages().Find(ctx, c.Key, name)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -361,7 +361,7 @@ func TestAccReindexRebuildsTheSameIndex(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := w.db.Packages().PutVersion(ctx, types.PackageVersion{
+		if _, err := w.db.Packages().PutVersion(ctx, model.PackageVersion{
 			PackageID: app.ID, Version: "ghost", Created: start,
 		}); err != nil {
 			t.Fatal(err)
@@ -374,7 +374,7 @@ func TestAccReindexRebuildsTheSameIndex(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := w.db.Packages().LinkFile(ctx, types.VersionFile{
+		if err := w.db.Packages().LinkFile(ctx, model.VersionFile{
 			VersionID: v2.ID, ItemID: stray.ID,
 		}); err != nil {
 			t.Fatal(err)

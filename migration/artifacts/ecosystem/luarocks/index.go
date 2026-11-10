@@ -8,12 +8,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
-func indexedVersion(version string, its []types.Item) pkgindex.IndexedVersion {
+func indexedVersion(version string, its []model.Item) pkgindex.IndexedVersion {
 	v := pkgindex.IndexedVersion{Version: version}
 	for _, it := range its {
 		if v.Created.IsZero() || it.Created.Before(v.Created) {
@@ -30,7 +30,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, id Identity
 	if err != nil {
 		return err
 	}
-	var its []types.Item
+	var its []model.Item
 	for _, it := range all {
 		other, ok := Parse(it.FullPath())
 		if ok && other.Name == id.Name && other.Version == id.Version {
@@ -43,7 +43,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, id Identity
 	}
 	v := indexedVersion(id.Version, its)
 	p, err := env.Store.Packages().
-		Ensure(ctx, types.Package{RepoKey: c.Key, Name: id.Name, Type: c.PackageType, Created: v.Created})
+		Ensure(ctx, model.Package{RepoKey: c.Key, Name: id.Name, Type: c.PackageType, Created: v.Created})
 	if err != nil {
 		return fmt.Errorf("luarocks: package %s: %w", id.Name, err)
 	}
@@ -51,17 +51,17 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, id Identity
 	return err //nolint:wrapcheck
 }
 
-func setProperties(ctx context.Context, st format.Store, it types.Item, id Identity) error {
+func setProperties(ctx context.Context, st format.Store, it model.Item, id Identity) error {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("luarocks: properties: %w", err)
 	}
-	want := types.Properties{
-		PropName:     {types.TruncatePropertyValue(id.Name, types.PropertyValueMax)},
-		PropVersion:  {types.TruncatePropertyValue(id.Version, types.PropertyValueMax)},
+	want := model.Properties{
+		PropName:     {model.TruncatePropertyValue(id.Name, model.PropertyValueMax)},
+		PropVersion:  {model.TruncatePropertyValue(id.Version, model.PropertyValueMax)},
 		PropRevision: {id.Revision}, PropArch: {id.Arch},
 	}
-	set := types.Properties{}
+	set := model.Properties{}
 	for key, values := range want {
 		if !slices.Equal(props[key], values) {
 			set[key] = values
@@ -98,7 +98,7 @@ func VersionFile(
 	c repo.Config,
 	wanted int64,
 ) (Identity, error) {
-	page := store.Page{Limit: store.MaxLimit}
+	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		ps, next, err := st.Packages().List(ctx, c.Key, page)
 		if err != nil {
@@ -126,5 +126,5 @@ func VersionFile(
 		}
 		page.After = next
 	}
-	return Identity{}, store.ErrNotFound
+	return Identity{}, kernel.ErrNotFound
 }

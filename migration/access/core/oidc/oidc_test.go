@@ -14,7 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 )
 
 var errBoom = errors.New("boom")
@@ -34,33 +34,33 @@ type faultyConfigs struct {
 
 func (c faultyConfigs) Get(
 	ctx context.Context,
-	k types.ConfigKind,
+	k configdoc.ConfigKind,
 	key string,
-) (types.ConfigDocument, error) {
+) (configdoc.ConfigDocument, error) {
 	if c.f.fail == "get "+string(k) {
-		return types.ConfigDocument{}, errBoom
+		return configdoc.ConfigDocument{}, errBoom
 	}
 	return c.ConfigStore.Get(ctx, k, key) //nolint:wrapcheck // a test double
 }
 
 func (c faultyConfigs) List(
 	ctx context.Context,
-	k types.ConfigKind,
-) ([]types.ConfigDocument, error) {
+	k configdoc.ConfigKind,
+) ([]configdoc.ConfigDocument, error) {
 	if c.f.fail == "list "+string(k) {
 		return nil, errBoom
 	}
 	return c.ConfigStore.List(ctx, k) //nolint:wrapcheck // a test double
 }
 
-func (c faultyConfigs) Put(ctx context.Context, d types.ConfigDocument) error {
+func (c faultyConfigs) Put(ctx context.Context, d configdoc.ConfigDocument) error {
 	if c.f.fail == "put "+string(d.Kind) {
 		return errBoom
 	}
 	return c.ConfigStore.Put(ctx, d) //nolint:wrapcheck // a test double
 }
 
-func (c faultyConfigs) Delete(ctx context.Context, k types.ConfigKind, key string) error {
+func (c faultyConfigs) Delete(ctx context.Context, k configdoc.ConfigKind, key string) error {
 	if c.f.fail == "delete "+string(k) {
 		return errBoom
 	}
@@ -89,7 +89,7 @@ func newWorld(t *testing.T) world {
 	t.Helper()
 	ctx := context.Background()
 	db := &faulty{Store: inmem.New()}
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -234,7 +234,7 @@ func TestUnitProviders(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := w.db.Store.Configs().
-		Get(ctx, types.ConfigOIDCMapping, "gh2/m"); !errors.Is(
+		Get(ctx, configdoc.ConfigOIDCMapping, "gh2/m"); !errors.Is(
 		err,
 		kernel.ErrNotFound,
 	) {
@@ -519,11 +519,11 @@ func TestUnitProjectRolesWithoutUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := types.ParseScope(roles)
+	want, err := kernel.ParseScope(roles)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.Username != "oidc-ci-roles" || out.Record.Identity != types.IdentitySynthetic ||
+	if out.Username != "oidc-ci-roles" || out.Record.Identity != kernel.IdentitySynthetic ||
 		out.Record.Scope.String() != want.String() || out.Record.ProjectKey != "my-project" {
 		t.Fatalf("exchange = %q %+v", out.Username, out.Record)
 	}
@@ -776,7 +776,7 @@ func TestUnitExchangeTokens(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got.ExpiresIn != int64(oidc.MaxExpiry/time.Second) || got.Record.Audience != "jfrt@*" ||
-		got.ReferenceToken == "" || got.Record.Identity != types.IdentityTransient ||
+		got.ReferenceToken == "" || got.Record.Identity != kernel.IdentityTransient ||
 		got.Record.Description != "OIDC token exchange through ci/long (repo=o/r, branch=main, run_id=42)" {
 		t.Fatalf("long = %+v", got)
 	}
@@ -790,7 +790,7 @@ func TestUnitExchangeTokens(t *testing.T) {
 	}
 	got, err = w.exchange(raw, func(r *oidc.ExchangeRequest) { r.MappingName = "groups" })
 	if err != nil || got.Username != "oidc-ci-groups" ||
-		got.Record.Identity != types.IdentitySynthetic {
+		got.Record.Identity != kernel.IdentitySynthetic {
 		t.Fatalf("groups = %+v, %v", got, err)
 	}
 	if !strings.HasSuffix(got.Record.Subject, "/users/oidc-ci-groups") {
@@ -961,9 +961,9 @@ func TestUnitCorruptDocuments(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	s := w.svc
-	for _, d := range []types.ConfigDocument{
-		{Kind: types.ConfigOIDC, Key: "bad", Document: []byte("{")},
-		{Kind: types.ConfigOIDCMapping, Key: "ci/bad", Document: []byte("{")},
+	for _, d := range []configdoc.ConfigDocument{
+		{Kind: configdoc.ConfigOIDC, Key: "bad", Document: []byte("{")},
+		{Kind: configdoc.ConfigOIDCMapping, Key: "ci/bad", Document: []byte("{")},
 	} {
 		if err := w.db.Store.Configs().Put(ctx, d); err != nil {
 			t.Fatal(err)

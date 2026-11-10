@@ -24,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/config"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
@@ -35,8 +36,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 	"github.com/weaveplatform/artifactweave/migration/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/workers/core/model"
 )
 
 // isolateAWS points the AWS SDK at a shared configuration holding only the
@@ -197,11 +197,11 @@ func TestAccLogSigning(t *testing.T) {
 // failingRepos is a store whose repository listing fails.
 type failingRepos struct{ *inmem.Store }
 
-func (f failingRepos) Repos() store.RepoStore { return failingRepoList{f.Store.Repos()} }
+func (f failingRepos) Repos() port.RepoStore { return failingRepoList{f.Store.Repos()} }
 
-type failingRepoList struct{ store.RepoStore }
+type failingRepoList struct{ port.RepoStore }
 
-func (failingRepoList) List(context.Context, store.RepoFilter) ([]repo.Config, error) {
+func (failingRepoList) List(context.Context, port.RepoFilter) ([]repo.Config, error) {
 	return nil, errors.New("listing failed")
 }
 
@@ -701,7 +701,7 @@ func TestAccRotateKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := s.Workers().
-		Create(ctx, types.Worker{Key: "w", Action: "BEFORE_DOWNLOAD"}); err != nil {
+		Create(ctx, model.Worker{Key: "w", Action: "BEFORE_DOWNLOAD"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Workers().PutSecret(ctx, "w", "token", "secret"); err != nil {

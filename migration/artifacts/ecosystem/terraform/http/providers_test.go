@@ -7,9 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -26,7 +28,7 @@ func providerFixture(t *testing.T) (*fixture, terraformtest.Key, terraformtest.R
 		t.Fatal(err)
 	}
 	if err = f.db.Keys().
-		CreateKeypair(t.Context(), types.Keypair{Name: "primary", Type: types.KeypairGPG, PublicKey: k.Public}); err != nil {
+		CreateKeypair(t.Context(), api.Keypair{Name: "primary", Type: api.KeypairGPG, PublicKey: k.Public}); err != nil {
 		t.Fatal(err)
 	}
 	c, err := f.db.Repos().Get(t.Context(), "provider")
@@ -152,7 +154,7 @@ func TestAccProviderVerificationAndKeyRotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pair := types.Keypair{Name: "primary", Type: types.KeypairGPG, PublicKey: other.Public}
+	pair := api.Keypair{Name: "primary", Type: api.KeypairGPG, PublicKey: other.Public}
 	if err = f.db.Keys().UpdateKeypair(t.Context(), pair); err != nil {
 		t.Fatal(err)
 	}
@@ -178,12 +180,12 @@ func TestAccProviderVerificationAndKeyRotation(t *testing.T) {
 	}
 	for _, name := range []string{"", "absent", "rsa", "invalid"} {
 		if name == "rsa" || name == "invalid" {
-			kind := types.KeypairRSA
+			kind := api.KeypairRSA
 			if name == "invalid" {
-				kind = types.KeypairGPG
+				kind = api.KeypairGPG
 			}
 			if err = f.db.Keys().
-				CreateKeypair(t.Context(), types.Keypair{Name: name, Type: kind, PublicKey: "bad"}); err != nil {
+				CreateKeypair(t.Context(), api.Keypair{Name: name, Type: kind, PublicKey: "bad"}); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -203,7 +205,7 @@ func TestAccProviderVisibilityAndPermissionRevocation(t *testing.T) {
 		t.Helper()
 		_ = f.db.Permissions().Delete(t.Context(), "providers")
 		err := f.db.Permissions().
-			Create(t.Context(), types.Permission{Name: "providers", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}}, Targets: map[string]types.Target{"provider": {Include: paths}}}}})
+			Create(t.Context(), model.Permission{Name: "providers", Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {Actions: model.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]model.Target{"provider": {Include: paths}}}}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -307,13 +309,13 @@ type (
 		replaced bool
 	}
 	replacingItems struct {
-		store.ItemStore
+		port.ItemStore
 		s *replacingStore
 	}
 )
 
-func (s *replacingStore) Items() store.ItemStore { return replacingItems{s.serverStore.Items(), s} }
-func (i replacingItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
+func (s *replacingStore) Items() port.ItemStore { return replacingItems{s.serverStore.Items(), s} }
+func (i replacingItems) GetByID(ctx context.Context, id int64) (model.Item, error) {
 	it, err := i.ItemStore.GetByID(ctx, id)
 	if err == nil && it.FullPath() == i.s.path && !i.s.replaced {
 		i.s.replaced = true
@@ -345,14 +347,14 @@ func TestAccProviderMetadataReplacement(t *testing.T) {
 
 type (
 	staleMetaStore    struct{ serverStore }
-	staleMetaPackages struct{ store.PackageStore }
+	staleMetaPackages struct{ port.PackageStore }
 )
 
-func (s staleMetaStore) Packages() store.PackageStore {
+func (s staleMetaStore) Packages() port.PackageStore {
 	return staleMetaPackages{s.serverStore.Packages()}
 }
 
-func (p staleMetaPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (p staleMetaPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	vs, err := p.PackageStore.Versions(ctx, id)
 	for i := range vs {
 		vs[i].Metadata = []byte(`{"archives":{}}`)

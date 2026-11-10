@@ -13,12 +13,12 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	nugetfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const (
@@ -283,7 +283,7 @@ func (s *remoteSession) fence(ctx context.Context) error {
 
 func (s *remoteSession) allowed(id, version string, result source.Result) bool {
 	path := remotePackagePath(id, version)
-	if !s.h.k.Can(s.r, path, types.ActionRead) {
+	if !s.h.k.Can(s.r, path, api.ActionRead) {
 		return false
 	}
 	s.disclosed[path] = result

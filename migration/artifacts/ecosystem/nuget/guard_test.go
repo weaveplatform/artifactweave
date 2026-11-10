@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 )
 
 func TestUnitWriteLockFailuresRollback(t *testing.T) {
@@ -29,7 +29,7 @@ func TestUnitWriteLockFailuresRollback(t *testing.T) {
 			if _, err := w.st.Items().
 				Get(w.ctx, w.c.Key, false, "Foo.1.0.0.nupkg"); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatalf("failed write landed: %v", err)
 			}
@@ -46,14 +46,14 @@ type guardStore struct {
 	failure string
 }
 
-func (s guardStore) Leases() store.LeaseStore { return guardLeases{s.Store.Leases(), s.failure} }
+func (s guardStore) Leases() work.LeaseStore { return guardLeases{s.Store.Leases(), s.failure} }
 
 type guardLeases struct {
-	store.LeaseStore
+	work.LeaseStore
 	failure string
 }
 
-func (s guardLeases) Acquire(ctx context.Context, l types.Lease, now time.Time) (bool, error) {
+func (s guardLeases) Acquire(ctx context.Context, l work.Lease, now time.Time) (bool, error) {
 	if s.failure == "acquire" {
 		return false, errFault
 	}

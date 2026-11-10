@@ -17,12 +17,15 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -31,7 +34,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type routeFixture struct {
@@ -96,7 +98,7 @@ func newRouteFixture(t *testing.T) *routeFixture {
 	t.Cleanup(pool.Close)
 	service := &source.Service{
 		HTTP: policy, Cache: policy,
-		Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 			return db.RemoteCache().Source(ctx, c.Key)
 		},
 	}
@@ -111,7 +113,7 @@ func newRouteFixture(t *testing.T) *routeFixture {
 	}))
 	k := pkgroute.Mount(r, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 			body, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				t.Fatal(err)
@@ -144,7 +146,7 @@ func (f *routeFixture) seedLocal(name, version string) {
 	f.t.Helper()
 	ctx := f.t.Context()
 	p, err := f.db.Packages().
-		Ensure(ctx, types.Package{RepoKey: "pods-local", Type: repo.CocoaPods, Name: name})
+		Ensure(ctx, model.Package{RepoKey: "pods-local", Type: repo.CocoaPods, Name: name})
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -155,7 +157,7 @@ func (f *routeFixture) seedLocal(name, version string) {
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	if _, err := f.db.Packages().PutVersion(ctx, types.PackageVersion{
+	if _, err := f.db.Packages().PutVersion(ctx, model.PackageVersion{
 		PackageID: p.ID, Version: version, Metadata: metadata,
 	}); err != nil {
 		f.t.Fatal(err)
@@ -506,11 +508,11 @@ func TestUnitVirtualStopsOnInvalidUpstreamMetadata(t *testing.T) {
 func TestUnitRemoteAndVirtualDoNotDiscloseForbiddenSource(t *testing.T) {
 	f := newRouteFixture(t)
 	f.seedRemote(t)
-	if err := f.db.Permissions().Create(t.Context(), types.Permission{
+	if err := f.db.Permissions().Create(t.Context(), model.Permission{
 		Name: "podspec-only",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"partial": types.ActionRead}},
-			Targets: map[string]types.Target{
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
+			Targets: map[string]model.Target{
 				"pods-remote":  {Include: []string{"RemotePod/2.0.0/safe.txt"}},
 				"pods-virtual": {Include: []string{"RemotePod/2.0.0/safe.txt"}},
 			},
@@ -539,7 +541,7 @@ func TestUnitRemoteAndVirtualDoNotDiscloseForbiddenSource(t *testing.T) {
 func TestUnitLocalRefusesCorruptIndexedPodspec(t *testing.T) {
 	f := newRouteFixture(t)
 	f.seedLocal("LocalPod", "1.0.0")
-	p, err := f.db.Packages().Ensure(t.Context(), types.Package{
+	p, err := f.db.Packages().Ensure(t.Context(), model.Package{
 		RepoKey: "pods-local", Type: repo.CocoaPods, Name: "LocalPod",
 	})
 	if err != nil {
@@ -734,7 +736,7 @@ func TestUnitVirtualRejectsCorruptMemberIndexOnEveryProjection(t *testing.T) {
 func TestUnitLocalCDNOmitsMalformedIndexedPackageNames(t *testing.T) {
 	f := newRouteFixture(t)
 	f.seedLocal("LocalPod", "1.0.0")
-	if _, err := f.db.Packages().Ensure(t.Context(), types.Package{
+	if _, err := f.db.Packages().Ensure(t.Context(), model.Package{
 		RepoKey: "pods-local", Type: repo.CocoaPods, Name: "../escape",
 	}); err != nil {
 		t.Fatal(err)
@@ -775,11 +777,11 @@ func TestUnitLocalCDNPaginatesPackageIndex(t *testing.T) {
 func TestUnitVirtualDoesNotExposeUnreadablePodArchiveOrShard(t *testing.T) {
 	f := newRouteFixture(t)
 	f.seedLocal("LocalPod", "1.0.0")
-	if err := f.db.Permissions().Create(t.Context(), types.Permission{
+	if err := f.db.Permissions().Create(t.Context(), model.Permission{
 		Name: "pod-next-version-only",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"partial": types.ActionRead}},
-			Targets: map[string]types.Target{
+		Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
+			Actions: model.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
+			Targets: map[string]model.Target{
 				"pods-local":   {Include: []string{"LocalPod/2.0.0/**"}},
 				"pods-virtual": {Include: []string{"LocalPod/2.0.0/**"}},
 			},

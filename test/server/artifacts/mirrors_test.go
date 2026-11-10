@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/mirror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 type fakeMirrors struct {
@@ -32,19 +30,19 @@ func TestAccStorageInfoReportsMirrors(t *testing.T) {
 			{
 				Name: "near", Zone: "home", Kind: "s3", WriteEnabled: true, Available: true,
 				Latency: 12 * time.Millisecond,
-				Replicas: []store.ReplicaCount{
-					{Member: "near", State: types.ReplicaPresent, Count: 2, Bytes: 2048},
+				Replicas: []mirror.ReplicaCount{
+					{Member: "near", State: mirror.ReplicaPresent, Count: 2, Bytes: 2048},
 				},
 				SoleCopies: 1,
 			},
-			{Name: "far", Kind: "gcs", Replicas: []store.ReplicaCount{
-				{Member: "far", State: types.ReplicaPending, Count: 1, Bytes: 10},
+			{Name: "far", Kind: "gcs", Replicas: []mirror.ReplicaCount{
+				{Member: "far", State: mirror.ReplicaPending, Count: 1, Bytes: 10},
 			}},
 		},
 		Removed: []mirror.RemovedMember{{
 			Name: "retired", SoleCopies: 3,
-			Replicas: []store.ReplicaCount{
-				{Member: "retired", State: types.ReplicaPresent, Count: 3, Bytes: 30},
+			Replicas: []mirror.ReplicaCount{
+				{Member: "retired", State: mirror.ReplicaPresent, Count: 3, Bytes: 30},
 			},
 		}},
 	}}}}

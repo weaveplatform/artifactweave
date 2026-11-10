@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // Discover requires the caller's existing permit. Public adapters invoke it
@@ -57,7 +57,7 @@ func (s *Smart) Discover(
 		return remote.SmartPeer{}, err
 	}
 	key := s.policy.FlightKey(
-		types.RemoteCacheKey{
+		model.RemoteCacheKey{
 			RepoKey:          q.Repo.Key,
 			SettingsRevision: opts.Revision,
 			Variant:          "smart-discovery-v1",
@@ -125,7 +125,7 @@ func (s *Smart) discover(
 			if e != nil {
 				return smartError("operation", e)
 			}
-			state.Smart = &types.RemoteSmartPeer{
+			state.Smart = &model.RemoteSmartPeer{
 				BaseURL: peer.BaseURL, Repository: peer.Repository,
 				Class: string(peer.Class), Version: peer.Version, CheckedAt: policyNow(s.policy),
 			}
@@ -209,7 +209,7 @@ func (s *Smart) document(
 
 func smartStatus(status int) error {
 	if status == http.StatusNotFound {
-		return store.ErrNotFound
+		return kernel.ErrNotFound
 	}
 	if status >= 400 && status <= 599 {
 		return &source.HTTPError{Status: status, Kind: source.FailureKindHTTP}

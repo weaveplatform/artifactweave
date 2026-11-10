@@ -19,9 +19,9 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // ResourceKind distinguishes protocol metadata and version queries from bytes.
@@ -73,7 +73,7 @@ type Resource struct {
 	// Checksums pin the selected representation independently of the repository's
 	// policy for optional upstream checksum headers. Variant identifies the
 	// adapter validation schema; it must change if validation semantics change.
-	Checksums           types.Checksums
+	Checksums           kernel.Checksums
 	ExpectedContentType string
 	// ExpectedContentTypes is an exact metadata MIME allowlist for negotiated APIs.
 	// It requires complete body validation and cannot accompany the singular hint.
@@ -156,11 +156,11 @@ type Request struct {
 	Repo      repo.Config
 	Subject   accessapi.Subject
 	Access    accessapi.Decider
-	Matrix    types.Matrix
+	Matrix    model.Matrix
 	Resource  Resource
 	CacheOnly bool
 	Project   string
-	Visited   []types.RepositoryIncarnation
+	Visited   []model.RepositoryIncarnation
 }
 
 // Permit is request-scoped authority. A future project backend may narrow
@@ -168,7 +168,7 @@ type Request struct {
 // bytes. Each hop must narrow this permit; it cannot borrow a more privileged
 // flight's newly fetched result. It is not a persisted credential.
 type Permit struct {
-	Identity               types.SourceIdentity
+	Identity               model.SourceIdentity
 	Intent                 RetrievalIntent
 	UpstreamNetworkAllowed bool
 }
@@ -187,12 +187,12 @@ type MetadataResponse struct {
 type Representation struct {
 	// OriginalChecksums retain upstream declarations for Maven pass-through;
 	// Checksums always describe the computed bytes.
-	OriginalChecksums types.Checksums
+	OriginalChecksums kernel.Checksums
 	MediaType         string
 	Size              int64
 	ETag              string
 	Modified          time.Time
-	Checksums         types.Checksums
+	Checksums         kernel.Checksums
 	ContentRange      string
 }
 
@@ -220,9 +220,9 @@ type Result struct {
 	CheckFolder func(context.Context, string) error
 	// Revalidate fences backend-specific credentials immediately before delivery.
 	Revalidate func(context.Context) error
-	Item       *types.Item
+	Item       *model.Item
 	Stream     *Stream
-	Identity   types.SourceIdentity
+	Identity   model.SourceIdentity
 	// Used records successful content delivery using the backend's opaque cache
 	// token. The delivery adapter calls it after a successful GET/range or signed
 	// URL issuance, never on lookup, HEAD, 304 or a failed body. Nil for no-store.
@@ -244,7 +244,7 @@ type Backend interface {
 // The application must not install this service in production routes until the
 // relevant adapter is ready. Nil Cache is a cache miss, never a network fallback.
 type Service struct {
-	Resolve    func(context.Context, repo.Config) (types.SourceIdentity, error)
+	Resolve    func(context.Context, repo.Config) (model.SourceIdentity, error)
 	Revalidate func(context.Context, Request, Permit) error
 	HTTP       Backend
 	Cache      Backend
@@ -267,7 +267,7 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 	if err != nil {
 		return Result{}, safeError(err)
 	}
-	if identity.Kind != types.ExternalHTTP {
+	if identity.Kind != model.ExternalHTTP {
 		return Result{}, ErrUnsupported
 	}
 	if identity.Repository == "" || identity.ID == "" || identity.Generation == "" {
@@ -284,7 +284,7 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 	}
 	if backend == nil {
 		if q.CacheOnly {
-			return Result{}, store.ErrNotFound
+			return Result{}, kernel.ErrNotFound
 		}
 		return Result{}, ErrUnsupported
 	}
@@ -299,7 +299,7 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 		err = s.revalidate(ctx, q, p)
 	}
 	if err == nil {
-		var current types.SourceIdentity
+		var current model.SourceIdentity
 		current, err = s.Resolve(ctx, q.Repo)
 		if err == nil && current != identity {
 			err = ErrSuperseded
@@ -328,7 +328,7 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 func (s *Service) fenceDelivery(
 	q Request,
 	p Permit,
-	identity types.SourceIdentity,
+	identity model.SourceIdentity,
 	result *Result,
 ) {
 	result.Identity = identity
@@ -403,7 +403,7 @@ func authorize(q Request) error {
 			return ErrInvalidRequest
 		}
 	}
-	if _, _, _, err := types.SplitItemPath(r.Path); err != nil {
+	if _, _, _, err := kernel.SplitItemPath(r.Path); err != nil {
 		return ErrInvalidRequest
 	}
 	if r.UpstreamPath != "" {
@@ -413,7 +413,7 @@ func authorize(q Request) error {
 			strings.ContainsAny(decoded, "\r\n") {
 			return ErrInvalidRequest
 		}
-		if _, _, _, err := types.SplitItemPath(decoded); err != nil {
+		if _, _, _, err := kernel.SplitItemPath(decoded); err != nil {
 			return ErrInvalidRequest
 		}
 	}
@@ -464,7 +464,7 @@ func validateGitLFSLocksGET(r Resource) error {
 		r.ExpectedContentType != "application/vnd.git-lfs+json" ||
 		r.ValidateMetadata == nil || r.Validate != nil ||
 		!r.PermissionFolder || r.PermissionPath != "" || r.PermissionRoot ||
-		r.Checksums != (types.Checksums{}) || len(r.PostBody) != 0 ||
+		r.Checksums != (kernel.Checksums{}) || len(r.PostBody) != 0 ||
 		r.Range != "" || r.IfRange != "" || r.IfNoneMatch != "" ||
 		r.IfModifiedSince != "" || len(r.Query) > 4096 ||
 		galleryPOSTHasUnsupportedOptions(r) {
@@ -496,7 +496,7 @@ func validateGalleryPOST(q Request) error {
 		r.ExpectedContentType != "application/json" ||
 		len(r.ExpectedContentTypes) != 0 || r.ValidateMetadata == nil ||
 		r.Validate != nil || !r.PermissionFolder || r.PermissionRoot ||
-		r.Checksums != (types.Checksums{}) || len(r.PostBody) == 0 ||
+		r.Checksums != (kernel.Checksums{}) || len(r.PostBody) == 0 ||
 		len(r.PostBody) > 64<<10 || !json.Valid(r.PostBody) {
 		return ErrInvalidRequest
 	}
@@ -516,7 +516,7 @@ func validateGitLFSPOST(r Resource) error {
 		r.Variant != "gitlfs-batch-v1" || r.Accept != lfsMedia ||
 		r.ExpectedContentType != lfsMedia || len(r.ExpectedContentTypes) != 0 ||
 		r.ValidateMetadata == nil || r.Validate != nil || r.PermissionFolder ||
-		r.PermissionRoot || r.Checksums != (types.Checksums{}) || !r.Transient ||
+		r.PermissionRoot || r.Checksums != (kernel.Checksums{}) || !r.Transient ||
 		len(r.PostBody) == 0 || len(r.PostBody) > 4096 || !json.Valid(r.PostBody) ||
 		galleryPOSTHasUnsupportedOptions(r) {
 		return ErrInvalidRequest
@@ -562,9 +562,9 @@ func authorizePath(q Request, checkedPath string) error {
 	if r.PermissionFolder {
 		allows = q.Access.AllowsFolder
 	}
-	if !allows(types.ResourceArtifact,
+	if !allows(accessapi.ResourceArtifact,
 		accessapi.Repo{Key: q.Repo.Key, Class: string(q.Repo.Class)},
-		checkedPath, types.ActionRead) {
+		checkedPath, accessapi.ActionRead) {
 		return ErrDenied
 	}
 	if err := generic.CheckDownload(
@@ -591,7 +591,7 @@ func permissionPath(r Resource) (string, error) {
 			r.PermissionPath != strings.Trim(r.PermissionPath, "/") {
 			return "", ErrInvalidRequest
 		}
-		if _, _, _, err := types.SplitItemPath(
+		if _, _, _, err := kernel.SplitItemPath(
 			r.PermissionPath,
 		); r.PermissionPath != "" &&
 			err != nil {
@@ -738,7 +738,7 @@ func safeError(err error) error {
 	}
 	for _, allowed := range []error{
 		ErrDenied, ErrInvalidRequest, ErrUnsupported,
-		ErrUnavailable, ErrSuperseded, ErrInvalidResult, store.ErrNotFound,
+		ErrUnavailable, ErrSuperseded, ErrInvalidResult, kernel.ErrNotFound,
 		context.Canceled, context.DeadlineExceeded,
 	} {
 		if errors.Is(err, allowed) {
@@ -821,7 +821,7 @@ func validateModuleLocationContract(r Resource) error {
 		return nil
 	}
 	if r.Kind != ResourceKindMetadata || r.Method != http.MethodGet ||
-		r.ValidateMetadata == nil || r.Variant == "" || r.Checksums != (types.Checksums{}) ||
+		r.ValidateMetadata == nil || r.Variant == "" || r.Checksums != (kernel.Checksums{}) ||
 		r.ExpectedContentType != "application/json" || len(r.ExpectedContentTypes) > 0 {
 		return ErrInvalidRequest
 	}
@@ -833,7 +833,7 @@ func validateNuGetEmptyFeedContract(r Resource) error {
 		return nil
 	}
 	if r.Kind != ResourceKindMetadata || r.Method != http.MethodGet ||
-		r.ValidateMetadata == nil || r.Variant == "" || r.Checksums != (types.Checksums{}) ||
+		r.ValidateMetadata == nil || r.Variant == "" || r.Checksums != (kernel.Checksums{}) ||
 		(r.ExpectedContentType != "application/atom+xml" && !slices.Contains(r.ExpectedContentTypes, "application/atom+xml")) {
 		return ErrInvalidRequest
 	}
@@ -858,7 +858,7 @@ func validateSmartAQLContract(r Resource) error {
 		r.ModuleDownloadLocation ||
 		!r.PermissionFolder ||
 		r.PermissionPath != "" ||
-		r.Checksums != (types.Checksums{}) {
+		r.Checksums != (kernel.Checksums{}) {
 		return ErrInvalidRequest
 	}
 	parsed, err := aql.Parse(r.SmartAQL)

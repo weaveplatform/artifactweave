@@ -13,9 +13,10 @@ import (
 
 	appsql "github.com/weaveplatform/artifactweave/migration/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/migration/app/config"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/migration/configuration/core/descriptor"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
 
 func writeFile(t *testing.T, body string) string {
@@ -39,7 +40,7 @@ func repoKeys(t *testing.T, cfg config.Config) []string {
 		t.Fatal(err)
 	}
 	defer func() { _ = st.Close() }()
-	rs, err := st.Repos().List(context.Background(), store.RepoFilter{})
+	rs, err := st.Repos().List(context.Background(), port.RepoFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,8 +152,10 @@ func TestAccBootstrapDescriptorAppliesOnce(t *testing.T) {
 		t.Fatalf("bootstrap repository: %v", err)
 	}
 	var marker bootstrapMarker
-	if err := rt.Store.Settings().Get(ctx, types.SettingBootstrapDescriptor, &marker); err != nil ||
-		marker.File != cfg.Bootstrap.Descriptor || len(marker.SHA256) != 64 {
+	if err := rt.Store.Settings().
+		Get(ctx, settings.SettingBootstrapDescriptor, &marker); err != nil ||
+		marker.File != cfg.Bootstrap.Descriptor ||
+		len(marker.SHA256) != 64 {
 		t.Fatalf("marker %+v %v", marker, err)
 	}
 	// An operator deletes the repository; a later start must not bring it
@@ -173,7 +176,7 @@ func TestAccBootstrapDescriptorAppliesOnce(t *testing.T) {
 	}
 	defer func() { _ = rt.Close(ctx) }()
 	for _, key := range []string{"boot-local", "later-local"} {
-		if _, err := rt.Store.Repos().Get(ctx, key); !errors.Is(err, store.ErrNotFound) {
+		if _, err := rt.Store.Repos().Get(ctx, key); !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatalf("the bootstrap descriptor was applied again: %s: %v", key, err)
 		}
 	}

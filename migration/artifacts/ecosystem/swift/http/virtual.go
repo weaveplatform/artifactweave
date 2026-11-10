@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
@@ -23,7 +23,7 @@ func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
 		}
 		seen[key] = true
 		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -45,10 +45,10 @@ func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
 func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, q request) {
 	path := q.packageID.ArchivePath()
 	if q.kind == "releases" {
-		if !h.k.RequireFolder(w, r, q.packageID.Scope+"/"+q.packageID.Name, types.ActionRead) {
+		if !h.k.RequireFolder(w, r, q.packageID.Scope+"/"+q.packageID.Name, api.ActionRead) {
 			return
 		}
-	} else if !h.k.Require(w, r, path, types.ActionRead) {
+	} else if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
 	members, err := h.virtualMembers(r)
@@ -63,7 +63,7 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, q request) 
 	if q.kind == "releases" {
 		merged := releases{Releases: map[string]release{}}
 		for _, mr := range members {
-			if !h.k.CanFolder(mr, q.packageID.Scope+"/"+q.packageID.Name, types.ActionRead) {
+			if !h.k.CanFolder(mr, q.packageID.Scope+"/"+q.packageID.Name, api.ActionRead) {
 				continue
 			}
 			response := h.memberMetadata(mr, q)
@@ -83,7 +83,7 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, q request) 
 				p := q.packageID
 				p.Version = version
 				if _, exists := merged.Releases[version]; !exists &&
-					h.k.Can(r, p.ArchivePath(), types.ActionRead) {
+					h.k.Can(r, p.ArchivePath(), api.ActionRead) {
 					merged.Releases[version] = release{URL: releaseURL(r, p)}
 				}
 			}
@@ -96,7 +96,7 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, q request) 
 		return
 	}
 	for _, mr := range members {
-		if !h.k.Can(mr, path, types.ActionRead) {
+		if !h.k.Can(mr, path, api.ActionRead) {
 			continue
 		}
 		response := h.memberMetadata(mr, q)
@@ -149,12 +149,12 @@ func (h handler) virtualArchive(
 	p := q.packageID
 	path := p.ArchivePath()
 	for _, mr := range members {
-		if !h.k.Can(mr, path, types.ActionRead) {
+		if !h.k.Can(mr, path, api.ActionRead) {
 			continue
 		}
 		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
 			result, err := h.remoteArchive(mr, p)
-			if errors.Is(err, store.ErrNotFound) {
+			if errors.Is(err, kernel.ErrNotFound) {
 				continue
 			}
 			if err != nil {
@@ -167,7 +167,7 @@ func (h handler) virtualArchive(
 			return
 		}
 		found, err := h.k.ResolveItem(mr, path)
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {

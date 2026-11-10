@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Upstream is the remote part of a module search: what a remote
@@ -108,7 +108,7 @@ func ModuleVersions(
 	}
 	slices.SortStableFunc(
 		out,
-		func(x, y VersionEntry) int { return types.CompareMercury(y.V, x.V) },
+		func(x, y VersionEntry) int { return model.CompareMercury(y.V, x.V) },
 	)
 	if limit := r.Capped(0); upstream != nil && limit >= 0 && len(out) > limit {
 		out = out[:limit]

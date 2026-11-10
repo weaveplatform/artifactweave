@@ -25,6 +25,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	pubhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pub/http"
@@ -33,7 +34,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 const base = "/artifactory/api/pub/pub-local"
@@ -90,7 +90,7 @@ func newFixtureWith(t *testing.T, class repo.Class, tune func(*pkgroute.Protocol
 			}
 			return err
 		},
-		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it types.Item) {
+		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 			rc, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
 				t.Fatal(err)
@@ -191,7 +191,7 @@ func (s metadataSource) Read(
 	}
 	if s.badCachedItem {
 		result.Stream = nil
-		result.Item = &types.Item{Actual: types.Checksums{SHA256: "missing"}}
+		result.Item = &model.Item{Actual: kernel.Checksums{SHA256: "missing"}}
 	}
 	return result, nil
 }

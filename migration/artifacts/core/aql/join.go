@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 )
 
 // Corpus is everything the reference evaluator may find or join: the items
@@ -16,8 +16,8 @@ import (
 // between calls.
 type Corpus struct {
 	Items      []Hit
-	Builds     []types.Build
-	Promotions []types.BuildPromotion
+	Builds     []model.Build
+	Promotions []model.BuildPromotion
 	idx        *corpusIndex
 }
 
@@ -25,15 +25,15 @@ type Corpus struct {
 // without its modules, properties or document, and for build.promotions
 // the promotion.
 type BuildHit struct {
-	Build     types.Build
-	Promotion *types.BuildPromotion
+	Build     model.Build
+	Promotion *model.BuildPromotion
 }
 
 type corpusIndex struct {
 	items        map[string][]*row
 	artifacts    map[string][]*row
 	dependencies map[string][]*row
-	builds       map[int64]*types.Build
+	builds       map[int64]*model.Build
 	promotions   map[int64][]*row
 }
 
@@ -43,10 +43,10 @@ type corpusIndex struct {
 type row struct {
 	rel    rel
 	hit    *Hit
-	build  *types.Build
+	build  *model.Build
 	module int
-	file   *types.BuildFile
-	promo  *types.BuildPromotion
+	file   *model.BuildFile
+	promo  *model.BuildPromotion
 }
 
 func (c *Corpus) index() *corpusIndex {
@@ -55,7 +55,7 @@ func (c *Corpus) index() *corpusIndex {
 	}
 	x := &corpusIndex{
 		items: map[string][]*row{}, artifacts: map[string][]*row{},
-		dependencies: map[string][]*row{}, builds: map[int64]*types.Build{},
+		dependencies: map[string][]*row{}, builds: map[int64]*model.Build{},
 		promotions: map[int64][]*row{},
 	}
 	for i := range c.Items {
@@ -87,7 +87,7 @@ func (c *Corpus) index() *corpusIndex {
 }
 
 // files calls fn with a row for each artifact or dependency of module m.
-func files(b *types.Build, m int, r rel, fn func(*row)) {
+func files(b *model.Build, m int, r rel, fn func(*row)) {
 	list := b.Modules[m].Artifacts
 	if r == relDependency {
 		list = b.Modules[m].Dependencies
@@ -167,7 +167,7 @@ func (r *row) text(f string) string {
 	return strings.Join(r.file.Scopes, ",")
 }
 
-func buildText(b *types.Build, f string) string {
+func buildText(b *model.Build, f string) string {
 	switch f {
 	case "url":
 		return b.URL
@@ -180,10 +180,10 @@ func buildText(b *types.Build, f string) string {
 	case "modified_by":
 		return b.ModifiedBy
 	}
-	return types.BuildInfoRepo(b.ProjectKey)
+	return model.BuildInfoRepo(b.ProjectKey)
 }
 
-func promotionText(p *types.BuildPromotion, f string) string {
+func promotionText(p *model.BuildPromotion, f string) string {
 	switch f {
 	case "created_by":
 		return p.CreatedBy
@@ -217,7 +217,7 @@ func (r *row) time(f string) time.Time {
 	return micro(t)
 }
 
-func (r *row) properties() types.Properties {
+func (r *row) properties() model.Properties {
 	switch r.rel {
 	case relItem:
 		return r.hit.Properties
@@ -498,8 +498,8 @@ func SelectBuilds(q *Query, o Options, c *Corpus) []BuildHit {
 }
 
 // runOf is the run's own columns, which is what a store's search returns.
-func runOf(b *types.Build) types.Build {
-	return types.Build{
+func runOf(b *model.Build) model.Build {
+	return model.Build{
 		ID: b.ID, ProjectKey: b.ProjectKey, Name: b.Name, Number: b.Number, Started: b.Started,
 		URL: b.URL, Created: b.Created, CreatedBy: b.CreatedBy, Modified: b.Modified,
 		ModifiedBy: b.ModifiedBy,

@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestAccRegistryRemoteForeignLayers(t *testing.T) {
@@ -119,7 +119,7 @@ func TestAccRegistryRemoteRevocationDuringFetch(t *testing.T) {
 					t.Context(),
 					token.Request{
 						Username:  "reader",
-						Scope:     types.UserScope(),
+						Scope:     kernel.UserScope(),
 						ExpiresIn: new(time.Hour),
 					},
 				)
@@ -134,9 +134,9 @@ func TestAccRegistryRemoteRevocationDuringFetch(t *testing.T) {
 					Username:  "reader",
 					ExpiresIn: time.Hour,
 					Parent:    parent,
-					Access: types.RegistryAccess{
+					Access: kernel.RegistryAccess{
 						Realm: "remote",
-						Grants: []types.RegistryGrant{
+						Grants: []kernel.RegistryGrant{
 							{
 								Type:    "repository",
 								Name:    "remote/team/image",
@@ -176,7 +176,7 @@ func TestAccRegistryRemoteRevocationDuringFetch(t *testing.T) {
 					t.Fatal(e)
 				}
 				if mutation == "user" {
-					u.Status = types.UserDisabled
+					u.Status = model.UserDisabled
 				} else {
 					u.PasswordHash = []byte("changed")
 				}
@@ -211,7 +211,7 @@ func TestAccRegistryRemoteRevocationDuringFetch(t *testing.T) {
 			if _, err = w.rt.Store.Items().
 				Get(t.Context(), "remote", true, layout.UploadPath("team/image", h)); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("revoked read published", err)
 			}

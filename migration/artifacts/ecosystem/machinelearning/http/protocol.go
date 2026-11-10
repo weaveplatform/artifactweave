@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -19,8 +20,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Protocol returns the FrogML model protocol for machinelearning
@@ -100,7 +99,7 @@ func (h handler) start(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, apierror.New(http.StatusUnauthorized, "authentication required"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, id.Prefix(), types.ActionWrite) {
+	if !h.k.RequireFolder(w, r, id.Prefix(), api.ActionWrite) {
 		return
 	}
 	if _, err := h.k.DB().
@@ -110,7 +109,7 @@ func (h handler) start(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		h.fail(w, r, err)
 		return
@@ -129,7 +128,7 @@ func (h handler) start(w http.ResponseWriter, r *http.Request) {
 			path+"/"+ml.TransactionName,
 			info,
 			nil,
-			types.Checksums{},
+			kernel.Checksums{},
 			func() error { return errTransactionCollision },
 		)
 		if errors.Is(err, errTransactionCollision) {
@@ -161,7 +160,7 @@ func (h handler) manifest(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
-	if !h.k.Require(w, r, id.Manifest(), types.ActionRead) {
+	if !h.k.Require(w, r, id.Manifest(), api.ActionRead) {
 		return
 	}
 	c := pkgroute.RequestFrom(r).Repo
@@ -176,7 +175,7 @@ func (h handler) manifest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, it := range files {
-		if !h.k.Require(w, r, it.FullPath(), types.ActionRead) {
+		if !h.k.Require(w, r, it.FullPath(), api.ActionRead) {
 			return
 		}
 	}
@@ -212,7 +211,7 @@ func escapePath(p string) string {
 }
 
 func (h handler) missingFile(message string, err error) error {
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return apierror.New(http.StatusConflict, message)
 	}
 	return fmt.Errorf("machinelearning: %s: %w", message, err)
@@ -223,7 +222,7 @@ func (h handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.As(err, &rejection) {
 		err = apierror.New(rejection.Status, rejection.Message)
 	}
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		err = apierror.New(http.StatusNotFound, "model or upload transaction not found")
 	}
 	h.k.Error(w, r, err)

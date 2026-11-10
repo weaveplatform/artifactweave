@@ -8,8 +8,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func TestUnitLinkAndUnlink(t *testing.T) {
@@ -22,7 +23,7 @@ func TestUnitLinkAndUnlink(t *testing.T) {
 	}
 	var ids []int64
 	for _, n := range []string{"a.tgz", "a.json", "b.tgz"} {
-		it, err := db.Items().Put(ctx, types.Item{RepoKey: "npm", Name: n})
+		it, err := db.Items().Put(ctx, model.Item{RepoKey: "npm", Name: n})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -45,7 +46,7 @@ func TestUnitLinkAndUnlink(t *testing.T) {
 	}
 	versions := func() int {
 		vs, err := db.Packages().Versions(ctx, p.ID)
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
+		if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatal(err)
 		}
 		return len(vs)
@@ -57,7 +58,7 @@ func TestUnitLinkAndUnlink(t *testing.T) {
 	// without files, and the package with its last version.
 	prune := func(drop ...int64) {
 		t.Helper()
-		var vs []types.PackageVersion
+		var vs []model.PackageVersion
 		for _, id := range drop {
 			pv, ok, err := VersionOf(ctx, db, id)
 			if err != nil || !ok {
@@ -87,7 +88,7 @@ func TestUnitLinkAndUnlink(t *testing.T) {
 		t.Fatalf("an empty version survived: %d versions", versions())
 	}
 	prune(ids[2])
-	if _, err := db.Packages().Find(ctx, "npm", "left-pad"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := db.Packages().Find(ctx, "npm", "left-pad"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("package survived its last version: %v", err)
 	}
 	if _, ok, err := VersionOf(ctx, db, 999); ok || err != nil {
@@ -104,10 +105,10 @@ type failing struct {
 	fail string
 }
 
-func (f failing) Packages() store.PackageStore { return failingPackages{f.Store.Packages(), f.fail} }
+func (f failing) Packages() port.PackageStore { return failingPackages{f.Store.Packages(), f.fail} }
 
 type failingPackages struct {
-	store.PackageStore
+	port.PackageStore
 	fail string
 }
 
@@ -120,7 +121,7 @@ func (f failingPackages) err(op string) error {
 	return nil
 }
 
-func (f failingPackages) Ensure(ctx context.Context, p types.Package) (types.Package, error) {
+func (f failingPackages) Ensure(ctx context.Context, p model.Package) (model.Package, error) {
 	if err := f.err("ensure"); err != nil {
 		return p, err
 	}
@@ -131,16 +132,16 @@ func (f failingPackages) Version(
 	ctx context.Context,
 	id int64,
 	v string,
-) (types.PackageVersion, error) {
+) (model.PackageVersion, error) {
 	if err := f.err("version"); err != nil {
-		return types.PackageVersion{}, err
+		return model.PackageVersion{}, err
 	}
 	return f.PackageStore.Version(ctx, id, v)
 }
 
-func (f failingPackages) VersionOf(ctx context.Context, id int64) (types.PackageVersion, error) {
+func (f failingPackages) VersionOf(ctx context.Context, id int64) (model.PackageVersion, error) {
 	if err := f.err("versionOf"); err != nil {
-		return types.PackageVersion{}, err
+		return model.PackageVersion{}, err
 	}
 	return f.PackageStore.VersionOf(ctx, id)
 }
@@ -159,7 +160,7 @@ func (f failingPackages) DeleteVersion(ctx context.Context, id int64) error {
 	return f.PackageStore.DeleteVersion(ctx, id)
 }
 
-func (f failingPackages) Versions(ctx context.Context, id int64) ([]types.PackageVersion, error) {
+func (f failingPackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	if err := f.err("versions"); err != nil {
 		return nil, err
 	}
@@ -179,7 +180,7 @@ func TestUnitStoreFailures(t *testing.T) {
 	v := Version{RepoKey: "r", PackageType: repo.Generic, Package: "p", Version: "1"}
 	for _, op := range []string{"ensure", "version"} {
 		db := inmem.New()
-		it, _ := db.Items().Put(ctx, types.Item{RepoKey: "r", Name: "f"})
+		it, _ := db.Items().Put(ctx, model.Item{RepoKey: "r", Name: "f"})
 		if err := Link(ctx, failing{db, op}, v, it.ID, at); !errors.Is(err, errBoom) {
 			t.Errorf("link with %s failing: %v", op, err)
 		}
@@ -188,7 +189,7 @@ func TestUnitStoreFailures(t *testing.T) {
 	// reach every step of Prune.
 	for _, op := range []string{"versionOf", "files", "deleteVersion", "versions", "delete"} {
 		db := inmem.New()
-		it, _ := db.Items().Put(ctx, types.Item{RepoKey: "r", Name: "f"})
+		it, _ := db.Items().Put(ctx, model.Item{RepoKey: "r", Name: "f"})
 		if err := Link(ctx, db, v, it.ID, at); err != nil {
 			t.Fatal(err)
 		}
@@ -205,7 +206,7 @@ func TestUnitStoreFailures(t *testing.T) {
 		if err := Prune(
 			ctx,
 			failing{db, op},
-			[]types.PackageVersion{pv, pv},
+			[]model.PackageVersion{pv, pv},
 		); !errors.Is(
 			err,
 			errBoom,

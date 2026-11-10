@@ -9,13 +9,15 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/model"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/platform/instance"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -65,7 +67,7 @@ func npmServer(
 	cheapSeed(t, db)
 	for _, name := range []string{"dev", "user"} {
 		if err := db.Users().
-			Create(ctx, types.User{Name: name, PasswordHash: cheapHash}); err != nil {
+			Create(ctx, model.User{Name: name, PasswordHash: cheapHash}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -74,7 +76,7 @@ func npmServer(
 			t.Fatal(err)
 		}
 	}
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -138,7 +140,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...harness.Tune) *itemWorld
 	h, db, _ := npmServer(t, func(cfg *harness.Config) {
 		for _, name := range []string{"deployer"} {
 			if err := cfg.Store.Users().
-				Create(t.Context(), types.User{Name: name, PasswordHash: cheapHash}); err != nil {
+				Create(t.Context(), model.User{Name: name, PasswordHash: cheapHash}); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -148,7 +150,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...harness.Tune) *itemWorld
 		}
 		if anonymous {
 			if err := cfg.Store.Settings().
-				Put(t.Context(), types.SettingAnonymousAccess, true); err != nil {
+				Put(t.Context(), settings.SettingAnonymousAccess, true); err != nil {
 				t.Fatal(err)
 			}
 		}

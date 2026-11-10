@@ -9,8 +9,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/port"
 	nugethttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget/http"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // searchDoc is a search's body as the client reads it
@@ -70,7 +70,7 @@ func TestAccSearchAsDotnetSends(t *testing.T) {
 		t.Fatal(err)
 	}
 	for range 3 {
-		if err := f.db.Items().RecordDownload(ctx, it.ID, store.Download{
+		if err := f.db.Items().RecordDownload(ctx, it.ID, port.Download{
 			By: "reader", At: time.Now(),
 		}); err != nil {
 			t.Fatal(err)
@@ -288,7 +288,7 @@ func TestAccSearchVisibleCountsAndDependencySemVer(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := f.db.Items().
-			RecordDownload(ctx, it.ID, store.Download{By: "reader", At: time.Now()}); err != nil {
+			RecordDownload(ctx, it.ID, port.Download{By: "reader", At: time.Now()}); err != nil {
 			t.Fatal(err)
 		}
 	}

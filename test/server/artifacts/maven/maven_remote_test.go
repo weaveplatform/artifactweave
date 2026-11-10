@@ -21,8 +21,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -97,7 +97,7 @@ func TestAccMavenRemoteMetadataArtifactsAndOutage(t *testing.T) {
 	if _, err := w.rt.Store.Items().
 		Get(t.Context(), w.c.Key, true, "org/acme/app/maven-metadata.xml"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("source metadata became a derived item", err)
 	}
@@ -231,7 +231,7 @@ func TestAccMavenRemoteDenialsAndAdmission(t *testing.T) {
 				if _, err := w.rt.Store.Items().
 					Get(t.Context(), w.c.Key, true, p); !errors.Is(
 					err,
-					store.ErrNotFound,
+					kernel.ErrNotFound,
 				) {
 					t.Fatal("invalid source published", err)
 				}
@@ -337,14 +337,14 @@ func TestAccMavenRemoteEagerCompanionsAndRetention(t *testing.T) {
 	if err := (maven.Handler{}).Work(
 		t.Context(),
 		items.Env(),
-		types.WorkItem{Kind: maven.KindSnapshots, Key: "remote/org.acme:snap"},
+		work.WorkItem{Kind: maven.KindSnapshots, Key: "remote/org.acme:snap"},
 	); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.rt.Store.Items().
 		Get(t.Context(), w.c.Key, true, "org/acme/snap/1.0-SNAPSHOT/snap-1.0-20261021.120001-1.jar"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("old remote snapshot retained", err)
 	}
@@ -566,7 +566,7 @@ func TestAccMavenColdChecksumHeadDoesNotAdmitOwner(t *testing.T) {
 	if _, err := w.rt.Store.Items().
 		Get(t.Context(), w.c.Key, true, p); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("HEAD admitted owner", err)
 	}

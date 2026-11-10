@@ -9,9 +9,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // TestAccReadsContent covers what the HTTP tests cannot reach: a file in a
@@ -29,13 +28,13 @@ func TestAccReadsContent(t *testing.T) {
 	sum := sha256Hex("content")
 	put := func(key, name string) {
 		t.Helper()
-		if _, err := db.Items().Put(ctx, types.Item{
-			RepoKey: key, Name: name, Actual: types.Checksums{SHA256: sum},
+		if _, err := db.Items().Put(ctx, model.Item{
+			RepoKey: key, Name: name, Actual: kernel.Checksums{SHA256: sum},
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for n := range store.MaxLimit {
+	for n := range kernel.MaxLimit {
 		put("gone", fmt.Sprintf("f%d.bin", n))
 	}
 	acc, err := itemkit.AccessFor(

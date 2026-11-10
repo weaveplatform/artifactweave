@@ -12,7 +12,7 @@ import (
 	"golang.org/x/net/html"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 func parseHTMLListing(
@@ -116,7 +116,7 @@ func listingLink(page *listingPage, token html.Token, base *url.URL, folder stri
 	if child == "" || strings.Contains(child, "/") {
 		return nil
 	}
-	if _, _, _, err := types.SplitItemPath(child); err != nil {
+	if _, _, _, err := kernel.SplitItemPath(child); err != nil {
 		return nil
 	}
 	childPath := child

@@ -16,10 +16,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
 // MaxManifestBytes bounds a bower.json, hosted or fetched, at 1 MiB; a
@@ -209,7 +209,7 @@ func (Handler) Admit(
 // Deployed links a stored bower.json to its version in the package index,
 // creating the package and version when they are new. Folders and other
 // files change nothing.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || !strings.HasSuffix(it.FullPath(), "/bower.json") {
 		return nil
 	}
@@ -234,7 +234,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	storedRef := pkgindex.Stored(c)
 	var wanted []pkgindex.Indexed
 	byName := map[string][]pkgindex.IndexedVersion{}
-	for page := (store.Page{Limit: store.MaxLimit}); ; {
+	for page := (kernel.Page{Limit: kernel.MaxLimit}); ; {
 		items, next, err := env.Store.Items().Descendants(ctx, c.Key, storedRef.Cached, "", page)
 		if err != nil {
 			return fmt.Errorf("bower: list manifests: %w", err)
