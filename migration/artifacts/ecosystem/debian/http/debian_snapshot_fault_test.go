@@ -222,7 +222,7 @@ func TestUnitDebianSnapshotThroughTheQueue(t *testing.T) {
 			if tc.target != snapshotJob.Target {
 				w.debRepos(repo.Config{Key: tc.target, Class: repo.Local})
 			}
-			queued := w.db
+			var queued work.Store = w.db
 			if tc.queue != nil {
 				queued = tc.queue(w.db)
 			}
