@@ -41,21 +41,29 @@ type cranCandidate struct {
 	pkg  cran.Package
 }
 
-// cranAPI is the CRAN ecosystem's partial strict server: the archive
+// CranAPI is the CRAN ecosystem's partial strict server: the archive
 // migration operation, the source and binary upload routes, and the item
 // overlay that serves CRAN's indexes and packages, over the item kit.
-type cranAPI struct {
+type CranAPI struct {
 	*itemkit.Kit
-	// archiveMoverEnabled is Config.CranArchiveMoverEnabled: while it is
-	// off, MoveCranArchives answers 404, as the legacy mover is opt-in.
-	archiveMoverEnabled bool
+	// ArchiveMoverEnabled is the cran.archive_mover_enabled setting, which
+	// the router passes on: while it is off, MoveCranArchives answers 404,
+	// as the legacy mover is opt-in.
+	ArchiveMoverEnabled bool
 }
 
-func tryCranItem(
+// TryCranItem is the overlay (itemkit.Overlay) that serves a CRAN
+// repository's PACKAGES and PACKAGES.gz, listing only the packages the
+// caller may read, and a virtual or remote repository's packages, only as
+// an index the caller can see lists them. It answers 404 for PACKAGES.rds,
+// which sends R to PACKAGES.gz. It reports whether it answered; every other
+// request, a folder or a local repository's package among them, it leaves
+// to the overlays after it and the generic lookup.
+func TryCranItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
-	s := cranAPI{Kit: k}
+	s := CranAPI{Kit: k}
 	if !cran.Serves(c.PackageType) || req.IsFolder {
 		return false
 	}
@@ -77,7 +85,7 @@ func tryCranItem(
 	return false
 }
 
-func (s cranAPI) serveCranIndex(
+func (s CranAPI) serveCranIndex(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
@@ -166,7 +174,7 @@ func cranPackageReadable(
 	return true, nil
 }
 
-func (s cranAPI) cranMemberIndex(
+func (s CranAPI) cranMemberIndex(
 	ctx context.Context, st store.Store, c repo.Config, cached bool, indexPath string,
 	p kernel.Principal, acc itemkit.Access,
 ) (cranIndexView, error) {
@@ -248,7 +256,7 @@ func (s cranAPI) cranMemberIndex(
 	return view, nil
 }
 
-func (s cranAPI) readCranBlob(ctx context.Context, sha string) ([]byte, error) {
+func (s CranAPI) readCranBlob(ctx context.Context, sha string) ([]byte, error) {
 	rc, _, err := s.Blobs.Open(ctx, sha)
 	if err != nil {
 		return nil, fmt.Errorf("cran: open blob: %w", err)
@@ -261,7 +269,7 @@ func (s cranAPI) readCranBlob(ctx context.Context, sha string) ([]byte, error) {
 	return body, nil
 }
 
-func (s cranAPI) cranCandidates(
+func (s CranAPI) cranCandidates(
 	ctx context.Context, st store.Store, c repo.Config, indexPath string,
 	p kernel.Principal, acc itemkit.Access, seen map[string]bool,
 ) ([]cranCandidate, error) {
@@ -336,7 +344,7 @@ func (s cranAPI) cranCandidates(
 	return out, nil
 }
 
-func (s cranAPI) serveCranPackage(
+func (s CranAPI) serveCranPackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
@@ -395,7 +403,7 @@ func (s cranAPI) serveCranPackage(
 	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 }
 
-func (s cranAPI) serveRemoteCranPackage(
+func (s CranAPI) serveRemoteCranPackage(
 	w http.ResponseWriter, r *http.Request, c repo.Config, cached bool,
 	req itemkit.ItemRequest, expected cran.Package, p kernel.Principal, acc itemkit.Access,
 ) {

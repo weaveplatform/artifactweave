@@ -307,11 +307,11 @@ var overlays = []itemkit.Overlay{
 	artifactshttp.TryCondaItem,
 	artifactshttp.TryMachineLearningItem,
 	artifactshttp.TryChefItem,
-	tryCranItem,
+	TryCranItem,
 	debianhttp.TryDebianItem,
 	rpmhttp.TryRPMItem,
 	opkghttp.TryOpkgItem,
-	tryP2Item,
+	TryP2Item,
 }
 
 // kitDeps returns the item kit's dependencies from cfg, with the router's
@@ -387,7 +387,7 @@ func New(cfg Config) http.Handler {
 	npmOps := npmAPI{kit}
 	dockerOps := dockerAPI{kit}
 	debianOps := debianhttp.DebianAPI{Kit: kit}
-	cranOps := cranAPI{Kit: kit, archiveMoverEnabled: cfg.CranArchiveMoverEnabled}
+	cranOps := CranAPI{Kit: kit, ArchiveMoverEnabled: cfg.CranArchiveMoverEnabled}
 	rpmOps := rpmhttp.RPMAPI{Kit: kit}
 	sysAPI := configurationhttp.New(configurationhttp.Deps{
 		Store:         cfg.Store,
@@ -492,7 +492,7 @@ func New(cfg Config) http.Handler {
 	// sitting beside it (decision 0002).
 	artAPI.RegisterItemRoutes(r)
 	agentPluginItems{kit}.registerAgentMarketplaceRoutes(r)
-	cranOps.registerCranRoutes(r)
+	cranOps.RegisterCranRoutes(r)
 	artAPI.RegisterTransferRoutes(r)
 	debianOps.RegisterDebianSnapshotRoutes(r)
 	artAPI.RegisterStorageRoutes(r)
@@ -551,7 +551,7 @@ func New(cfg Config) http.Handler {
 				npmAPI:         &npmOps,
 				dockerAPI:      &dockerOps,
 				DebianAPI:      &debianOps,
-				cranAPI:        &cranOps,
+				CranAPI:        &cranOps,
 				RPMAPI:         &rpmOps,
 			}, nil, strictOpts),
 			artgen.ChiServerOptions{

@@ -5152,7 +5152,7 @@
     "operation_id": "moveCranArchives",
     "state": "implemented",
     "contract": "Relocates legacy source archives from src/contrib/Archive/package/version/file to src/contrib/Archive/package/file in a local or federated CRAN repository. Requires an administrator and cran.archive_mover_enabled (off by default). Existing destinations are never overwritten. All moves commit together; a repeated request succeeds with zero moves. The response reports the number of archives relocated by this request in the moved field.",
-    "handler": "internal/server/cran_archive.go: cranAPI.moveCranArchives",
+    "handler": "internal/server/cran_archive.go: CranAPI.moveCranArchives",
     "direct_calls": [
       "cran.LegacyArchiveTarget",
       "ctx.Err",
@@ -15771,7 +15771,7 @@
   {
     "route": "POST /artifactory/api/cran/{repoKey}/binaries",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.cranAPI.uploadCranBinary-fm",
+    "handler": "internal/server/server.go: internal/server.CranAPI.uploadCranBinary-fm",
     "review_family": "native-cran",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -15790,7 +15790,7 @@
   {
     "route": "POST /artifactory/api/cran/{repoKey}/sources",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.cranAPI.uploadCranSource-fm",
+    "handler": "internal/server/server.go: internal/server.CranAPI.uploadCranSource-fm",
     "review_family": "native-cran",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",

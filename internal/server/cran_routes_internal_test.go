@@ -129,10 +129,10 @@ func TestUnitCRANUploadRequiresStoreAndAuthenticatedCaller(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/artifactory/api/cran/cran-local/sources",
 		bytes.NewReader(body))
 	missingStore := httptest.NewRecorder()
-	cranAPI{Kit: newKit(Config{})}.uploadCranSource(missingStore, req)
+	CranAPI{Kit: newKit(Config{})}.uploadCranSource(missingStore, req)
 	wantStatus(t, missingStore, http.StatusNotImplemented)
 	w := newItemWorld(t, false)
 	withoutCaller := httptest.NewRecorder()
-	cranAPI{Kit: newKit(Config{Store: w.db})}.uploadCranSource(withoutCaller, req)
+	CranAPI{Kit: newKit(Config{Store: w.db})}.uploadCranSource(withoutCaller, req)
 	wantStatus(t, withoutCaller, http.StatusUnauthorized)
 }

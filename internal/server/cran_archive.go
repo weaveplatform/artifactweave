@@ -21,14 +21,14 @@ import (
 // All item moves, lifecycle hooks and queued work commit together. JFrog
 // documents the endpoint and switch, but not its response document; moved is
 // artifactweave's count of source archives relocated by this request.
-func (s cranAPI) MoveCranArchives(
+func (s CranAPI) MoveCranArchives(
 	ctx context.Context,
 	req artgen.MoveCranArchivesRequestObject,
 ) (artgen.MoveCranArchivesResponseObject, error) {
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	if !s.archiveMoverEnabled {
+	if !s.ArchiveMoverEnabled {
 		return nil, apierror.New(http.StatusNotFound, "CRAN archive migration is disabled")
 	}
 	st, c, by, err := s.OperationRepo(ctx, repo.Cran, itemkit.ReindexOp{
@@ -57,7 +57,7 @@ func (s cranAPI) MoveCranArchives(
 	return artgen.MoveCranArchives200JSONResponse{"moved": moved}, nil
 }
 
-func (s cranAPI) moveCranArchives(
+func (s CranAPI) moveCranArchives(
 	ctx context.Context,
 	st store.Store,
 	c repo.Config,

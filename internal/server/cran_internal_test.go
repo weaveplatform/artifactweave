@@ -110,7 +110,7 @@ func TestUnitCRANVirtualRejectsCyclesAndWrongMembers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := cranAPI{Kit: newKit(Config{Store: w.db, Blobs: w.blobs})}
+	svc := CranAPI{Kit: newKit(Config{Store: w.db, Blobs: w.blobs})}
 	for _, tc := range []struct {
 		key      string
 		expected error

@@ -33,9 +33,17 @@ var errP2VirtualCycle = errors.New("server: p2 virtual repository cycle")
 // kit.
 type p2Items struct{ *itemkit.Kit }
 
-// tryP2Item reserves the update-site wire paths before generic item routing.
-// Remote reads still cross the common source policy and cache boundary.
-func tryP2Item(
+// TryP2Item is the overlay (itemkit.Overlay) that reserves a P2
+// repository's update-site wire paths before generic item routing: a
+// virtual repository's p2.index and composite metadata over the members the
+// caller may traverse, and each member's files under __p2/<n>/; a remote's
+// composite metadata and external children; and a remote site.zip!/
+// archive's entries. A folder, matrix parameters, a query, a path P2 does
+// not class or a repository that is neither remote nor virtual answers
+// 404. Remote reads still cross the common source policy and cache
+// boundary. It reports whether it answered; a repository of another type,
+// and a remote's own update-site files, it leaves to the generic lookup.
+func TryP2Item(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {

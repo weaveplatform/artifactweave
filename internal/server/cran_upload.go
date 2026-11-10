@@ -23,18 +23,21 @@ import (
 // inspect the body before the item service commits it under its canonical path.
 const cranUploadLimit = 512 << 20
 
-// registerCranRoutes serves CRAN's native source and binary package
-// uploads.
-func (s cranAPI) registerCranRoutes(r chi.Router) {
+// RegisterCranRoutes mounts CRAN's native source and binary package
+// uploads on r: POST /artifactory/api/cran/{repoKey}/sources, and
+// /binaries with its distribution and rVersion query. The URL gives only
+// the feed: each deploys the package under the file name its archive's
+// name and version give, after the same archive checks as a PUT.
+func (s CranAPI) RegisterCranRoutes(r chi.Router) {
 	r.Post("/artifactory/api/cran/{repoKey}/sources", s.uploadCranSource)
 	r.Post("/artifactory/api/cran/{repoKey}/binaries", s.uploadCranBinary)
 }
 
-func (s cranAPI) uploadCranSource(w http.ResponseWriter, r *http.Request) {
+func (s CranAPI) uploadCranSource(w http.ResponseWriter, r *http.Request) {
 	s.uploadCran(w, r, "src/contrib", ".tar.gz")
 }
 
-func (s cranAPI) uploadCranBinary(w http.ResponseWriter, r *http.Request) {
+func (s CranAPI) uploadCranBinary(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	distribution := q.Get("distribution")
 	version := q.Get("rVersion")
@@ -59,7 +62,7 @@ func (s cranAPI) uploadCranBinary(w http.ResponseWriter, r *http.Request) {
 	s.uploadCran(w, r, feed, suffix)
 }
 
-func (s cranAPI) uploadCran(
+func (s CranAPI) uploadCran(
 	w http.ResponseWriter,
 	r *http.Request,
 	feed, suffix string,

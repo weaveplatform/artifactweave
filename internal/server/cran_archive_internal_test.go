@@ -114,7 +114,7 @@ func TestAccCRANArchiveMigrationPaginationAndCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	failure := &cranMigrationFailure{Store: w.db, cancel: cancel}
-	service := cranAPI{Kit: newKit(cfg)}
+	service := CranAPI{Kit: newKit(cfg)}
 	if _, err := service.moveCranArchives(
 		ctx,
 		failure,
