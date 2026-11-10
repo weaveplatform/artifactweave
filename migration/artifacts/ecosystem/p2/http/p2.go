@@ -1,4 +1,4 @@
-package server
+package p2http
 
 import (
 	"bytes"

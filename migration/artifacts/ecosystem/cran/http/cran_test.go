@@ -1,4 +1,4 @@
-package server
+package cranhttp
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -110,7 +111,7 @@ func TestUnitCRANVirtualRejectsCyclesAndWrongMembers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := CranAPI{Kit: newKit(Config{Store: w.db, Blobs: w.blobs})}
+	svc := CranAPI{Kit: newKit(server.Config{Store: w.db, Blobs: w.blobs})}
 	for _, tc := range []struct {
 		key      string
 		expected error

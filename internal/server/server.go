@@ -36,10 +36,12 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	alpinehttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/alpine/http"
+	cranhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cran/http"
 	debianhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian/http"
 	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
 	luarockshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks/http"
 	opkghttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/opkg/http"
+	p2http "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2/http"
 	rpmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm/http"
 	terraformbackendhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend/http"
 	configurationhttp "github.com/weaveplatform/artifactweave/migration/configuration/adapters/http"
@@ -307,11 +309,11 @@ var overlays = []itemkit.Overlay{
 	artifactshttp.TryCondaItem,
 	artifactshttp.TryMachineLearningItem,
 	artifactshttp.TryChefItem,
-	TryCranItem,
+	cranhttp.TryCranItem,
 	debianhttp.TryDebianItem,
 	rpmhttp.TryRPMItem,
 	opkghttp.TryOpkgItem,
-	TryP2Item,
+	p2http.TryP2Item,
 }
 
 // kitDeps returns the item kit's dependencies from cfg, with the router's
@@ -387,7 +389,7 @@ func New(cfg Config) http.Handler {
 	npmOps := npmAPI{kit}
 	dockerOps := dockerAPI{kit}
 	debianOps := debianhttp.DebianAPI{Kit: kit}
-	cranOps := CranAPI{Kit: kit, ArchiveMoverEnabled: cfg.CranArchiveMoverEnabled}
+	cranOps := cranhttp.CranAPI{Kit: kit, ArchiveMoverEnabled: cfg.CranArchiveMoverEnabled}
 	rpmOps := rpmhttp.RPMAPI{Kit: kit}
 	sysAPI := configurationhttp.New(configurationhttp.Deps{
 		Store:         cfg.Store,

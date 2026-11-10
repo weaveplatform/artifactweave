@@ -14,7 +14,7 @@
 // the format hooks (decision 0032), so every write and delete in a CRAN
 // repository reaches it whichever API carried it, and it rebuilds the
 // indexes as queued work (decision 0033). The CRAN protocol is still the
-// root files internal/server/cran.go, cran_upload.go and cran_archive.go,
+// root files migration/artifacts/ecosystem/cran/http/cran.go, cran_upload.go and cran_archive.go,
 // which serve every class's index, the native POST uploads and the legacy
 // archive migration with this package.
 //

@@ -12,7 +12,7 @@
 // bound rules of the P2 slice. A P2 repository is remote or virtual and is
 // never deployed to, so the slice registers no format Handler and the item
 // service gives P2 repositories the generic hooks (decision 0032). The P2
-// protocol is still the root files internal/server/p2.go and
+// protocol is still the root files migration/artifacts/ecosystem/p2/http/p2.go and
 // p2_external.go, which serve a remote's update site, its site.zip!/
 // archive form and its composite children, and a virtual repository's
 // composite metadata, with this package.

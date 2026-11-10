@@ -17,6 +17,7 @@
     "migration/artifacts/ecosystem/composer/http": "composer",
     "migration/artifacts/ecosystem/conan/http": "conan",
     "migration/artifacts/ecosystem/conda/http": "conda",
+    "migration/artifacts/ecosystem/cran/http": "cran",
     "migration/artifacts/ecosystem/debian/http": "debian",
     "migration/artifacts/ecosystem/docker/http": "docker",
     "migration/artifacts/ecosystem/gems/http": "gems",
@@ -33,6 +34,7 @@
     "migration/artifacts/ecosystem/npm/http": "npm",
     "migration/artifacts/ecosystem/nuget/http": "nuget",
     "migration/artifacts/ecosystem/opkg/http": "opkg",
+    "migration/artifacts/ecosystem/p2/http": "p2",
     "migration/artifacts/ecosystem/pub/http": "pub",
     "migration/artifacts/ecosystem/puppet/http": "puppet",
     "migration/artifacts/ecosystem/pypi/http": "pypi",
@@ -106,9 +108,6 @@
       "api_ledger_test.go",
       "api_restrictions_parts_test.go",
       "builds_status_test.go",
-      "cran_archive_internal_test.go",
-      "cran_internal_test.go",
-      "cran_routes_internal_test.go",
       "error_profiles_p8_test.go",
       "fixtures_test.go",
       "format_tables_test.go",
@@ -120,9 +119,6 @@
       "npm_auth_paths_test.go",
       "npm_fixture_test.go",
       "oidc_status_test.go",
-      "p2_external_error_internal_test.go",
-      "p2_external_helpers_test.go",
-      "p2_internal_test.go",
       "permissions_status_test.go",
       "registry_shared_test.go",
       "reindex_internal_test.go",
@@ -275,9 +271,6 @@
       "internal/app/conda_remote_test.go"
     ],
     "cran": [
-      "internal/server/cran_archive_internal_test.go",
-      "internal/server/cran_internal_test.go",
-      "internal/server/cran_routes_internal_test.go",
       "internal/server/status_cran_archive_test.go"
     ],
     "docker": [
@@ -320,11 +313,6 @@
     "nuget": [
       "internal/app/nuget_reindex_test.go",
       "test/server/artifacts/repositories_test.go"
-    ],
-    "p2": [
-      "internal/server/p2_external_error_internal_test.go",
-      "internal/server/p2_external_helpers_test.go",
-      "internal/server/p2_internal_test.go"
     ],
     "puppet": [
       "internal/app/puppet_remote_test.go",

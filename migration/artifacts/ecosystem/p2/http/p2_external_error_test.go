@@ -1,4 +1,4 @@
-package server
+package p2http
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -36,7 +37,7 @@ func TestUnitP2ReadFailsClosedAtSourceAndDeliveryFences(t *testing.T) {
 		"/artifactory/p2-read-errors/compositeContent.xml",
 		nil,
 	)
-	s := p2Items{newKit(Config{})}
+	s := p2Items{newKit(server.Config{})}
 	if _, err := s.p2Read(
 		r,
 		c,
@@ -186,7 +187,7 @@ func TestUnitP2ReadCachedMetadataUsesItsStoredBytes(t *testing.T) {
 			}}, nil
 		},
 	)
-	s := p2Items{newKit(Config{
+	s := p2Items{newKit(server.Config{
 		Blobs:         w.blobs,
 		RemoteSources: &source.Service{Resolve: sourceIdentity, Cache: backend},
 	})}
@@ -219,7 +220,7 @@ func TestUnitP2ReadBoundsStreamAndExtractsOnlyValidArchives(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/artifactory/p2-bounded-read/content.jar", nil)
 	longMetadata := bytes.Repeat([]byte("x"), p2.MaxMetadata+1)
 	streamBody := longMetadata
-	s := p2Items{newKit(Config{RemoteSources: &source.Service{
+	s := p2Items{newKit(server.Config{RemoteSources: &source.Service{
 		Resolve: sourceIdentity,
 		HTTP: sourceBackend(
 			func(context.Context, source.Request, source.Permit) (source.Result, error) {
@@ -280,7 +281,7 @@ func TestUnitP2ArchiveEntryValidationFailsBeforePublication(t *testing.T) {
 		{"not a zip", []byte("bad archive"), int64(len("bad archive"))},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := p2Items{newKit(Config{RemoteSources: &source.Service{
+			s := p2Items{newKit(server.Config{RemoteSources: &source.Service{
 				Resolve: sourceIdentity,
 				HTTP: sourceBackend(
 					func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {

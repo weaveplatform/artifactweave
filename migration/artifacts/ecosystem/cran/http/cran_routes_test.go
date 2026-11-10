@@ -1,4 +1,4 @@
-package server
+package cranhttp
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -129,10 +130,10 @@ func TestUnitCRANUploadRequiresStoreAndAuthenticatedCaller(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/artifactory/api/cran/cran-local/sources",
 		bytes.NewReader(body))
 	missingStore := httptest.NewRecorder()
-	CranAPI{Kit: newKit(Config{})}.uploadCranSource(missingStore, req)
+	CranAPI{Kit: newKit(server.Config{})}.uploadCranSource(missingStore, req)
 	wantStatus(t, missingStore, http.StatusNotImplemented)
 	w := newItemWorld(t, false)
 	withoutCaller := httptest.NewRecorder()
-	CranAPI{Kit: newKit(Config{Store: w.db})}.uploadCranSource(withoutCaller, req)
+	CranAPI{Kit: newKit(server.Config{Store: w.db})}.uploadCranSource(withoutCaller, req)
 	wantStatus(t, withoutCaller, http.StatusUnauthorized)
 }
