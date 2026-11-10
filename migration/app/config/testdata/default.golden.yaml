@@ -1,0 +1,197 @@
+listen: :8081
+base_url: ""
+data_dir: ./data
+compat:
+    artifactory_version: 7.155.0
+database:
+    driver: sqlite
+    dsn: ""
+blob:
+    backend: fs
+    fs:
+        root: ""
+    s3:
+        bucket: ""
+        prefix: ""
+        endpoint: ""
+        region: ""
+        path_style: false
+        profile: ""
+        cdn:
+            cloudfront:
+                domain: ""
+                key_pair_id: ""
+                private_key_file: ""
+                hash: ""
+                path_prefix: ""
+    gcs:
+        bucket: ""
+        prefix: ""
+        endpoint: ""
+        credentials_file: ""
+        google_access_id: ""
+        part_size: "0"
+        cdn:
+            cloud_cdn:
+                domain: ""
+                key_name: ""
+                key_file: ""
+                path_prefix: ""
+    azure:
+        account: ""
+        endpoint: ""
+        container: ""
+        prefix: ""
+        credential: ""
+        account_key: ""
+        sas_token: ""
+        connection_string: ""
+        managed_identity_client_id: ""
+        part_size: "0"
+        copy_range_size: "0"
+        concurrency: 0
+        cdn:
+            front_door:
+                endpoint: ""
+                path_prefix: ""
+    stores: {}
+    mirror:
+        members: []
+        redundancy: 0
+        write_quorum: 0
+        zone: ""
+        member_timeout: 0s
+cold_blob:
+    backend: ""
+    fs:
+        root: ""
+    s3:
+        bucket: ""
+        prefix: ""
+        endpoint: ""
+        region: ""
+        path_style: false
+        profile: ""
+        cdn:
+            cloudfront:
+                domain: ""
+                key_pair_id: ""
+                private_key_file: ""
+                hash: ""
+                path_prefix: ""
+    gcs:
+        bucket: ""
+        prefix: ""
+        endpoint: ""
+        credentials_file: ""
+        google_access_id: ""
+        part_size: "0"
+        cdn:
+            cloud_cdn:
+                domain: ""
+                key_name: ""
+                key_file: ""
+                path_prefix: ""
+    azure:
+        account: ""
+        endpoint: ""
+        container: ""
+        prefix: ""
+        credential: ""
+        account_key: ""
+        sas_token: ""
+        connection_string: ""
+        managed_identity_client_id: ""
+        part_size: "0"
+        copy_range_size: "0"
+        concurrency: 0
+        cdn:
+            front_door:
+                endpoint: ""
+                path_prefix: ""
+    stores: {}
+    mirror:
+        members: []
+        redundancy: 0
+        write_quorum: 0
+        zone: ""
+        member_timeout: 0s
+master_key: ""
+master_key_previous: ""
+bootstrap:
+    admin_password: ""
+    descriptor: ""
+docker:
+    subdomain_match: false
+log:
+    level: info
+    format: json
+gc:
+    interval: 0s
+    grace_period: 0s
+download:
+    redirect:
+        min_size: 1MiB
+        ttl: 5m0s
+    folder:
+        max_concurrent_requests: 10
+search:
+    aql:
+        max_results: 500000
+        non_admin_scan_factor: 1
+    user_query_limit: 1000
+    limit_anonymous_users_only: true
+work:
+    workers: 4
+    lease: 2m0s
+    max_attempts: 10
+build:
+    block_duplicate_entries: true
+npm:
+    login_token_expiry: 720h0m0s
+    tag_latest_by_publish: false
+    enforce_path: false
+    max_publish_size: 1GiB
+token:
+    allow_basic_auth: false
+deploy:
+    enforce_permission_check_on_identical_checksum_deploy: false
+environments:
+    global_limit: 10
+aql_timeout:
+    query: 15m0s
+    streamed: 2h0m0s
+maven:
+    snapshot_cleanup_interval: 5m0s
+helm:
+    relative_urls: true
+nuget:
+    snapshot_cleanup_interval: 5m0s
+huggingface:
+    xet_enabled: false
+conda:
+    shards_enabled: false
+pypi:
+    enforce_layout: false
+    enforce_naming_normalization: false
+    simple_json: false
+    core_metadata: false
+cran:
+    archive_mover_enabled: false
+remote:
+    allowed_private_origins: []
+api:
+    enabled: true
+    authentication_per_minute: 120000
+    global_per_minute: 60000
+    principal_per_minute: 6000
+    project_per_minute: 12000
+    repository_per_minute: 12000
+    expensive_per_minute: 6000
+    expensive_principal_per_minute: 600
+    max_concurrent: 128
+    expensive_concurrent: 32
+    expensive_principal_concurrent: 16
+    max_keys: 16384
+    budget_timeout: 500ms
+    expensive_timeout: 2m0s
