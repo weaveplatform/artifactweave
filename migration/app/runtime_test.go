@@ -157,3 +157,28 @@ func TestAccRuntimeOnPostgresAndMinIO(t *testing.T) {
 		t.Fatalf("read back %d bytes, %v", len(got), err)
 	}
 }
+
+func TestAccRuntimeRunsGC(t *testing.T) {
+	var logs syncBuffer
+	log := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	cfg := testConfig(t)
+	cfg.GC.Interval = 10 * time.Millisecond
+	ctx := context.Background()
+	rt, err := openRuntime(ctx, cfg, log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rt.modules.artifacts.GC() == nil || rt.location.Type != "file-system" {
+		t.Fatalf("runtime %+v", rt)
+	}
+	for deadline := time.Now().Add(5 * time.Second); !strings.Contains(logs.String(),
+		"garbage collection: nothing to do"); {
+		if time.Now().After(deadline) {
+			t.Fatalf("no garbage collection pass logged:\n%s", logs.String())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if err := rt.close(ctx); err != nil {
+		t.Fatal(err)
+	}
+}

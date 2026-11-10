@@ -127,20 +127,18 @@
     ],
     "migration/app": [
       "access_test.go",
-      "blob_test.go",
       "conan_client_test.go",
       "conan_remote_test.go",
       "conda_remote_test.go",
       "descriptor_test.go",
-      "gc_test.go",
       "hash_test.go",
       "instance_test.go",
       "mapped_remote_test.go",
       "maven_remote_test.go",
-      "mirrors_test.go",
       "modules_test.go",
       "nix_remote_test.go",
       "nuget_reindex_test.go",
+      "platform_test.go",
       "puppet_remote_test.go",
       "registry_remote_fault_test.go",
       "registry_remote_test.go",
@@ -148,9 +146,7 @@
       "run_test.go",
       "runtime_test.go",
       "seed_test.go",
-      "serverlog_test.go",
-      "state_test.go",
-      "store_test.go"
+      "serverlog_test.go"
     ],
     "migration/artifacts/adapters/http": [
       "aql_related_test.go",
