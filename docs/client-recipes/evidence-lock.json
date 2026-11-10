@@ -33,7 +33,7 @@
   "test/acceptance/clients/cocoapods.Dockerfile": "29a815b708ebb7cb205c3ac65bdf9fbb15d1ae2673292e23c5426544ba8cf9dd",
   "test/acceptance/clients/composer.Dockerfile": "d870977196c2e7bb368f380a450d83b10837fa6d40b67944bbe556c3c07dff9d",
   "test/acceptance/clients/conda.Dockerfile": "f059c45ac5fcaec26f96c7a0e733ada6c60ff41700c9bc23d0b2e2effedcbeeb",
-  "test/acceptance/clients/dart.Dockerfile": "7601bed02b0f2fd183d0f4600a085e77bd49cd7c90640393f811e26866dd72cc",
+  "test/acceptance/clients/dart.Dockerfile": "0db42682c06e00a0e83f852ca7d752d3920150cb7bfc02b3ba3e0072c32bdc09",
   "test/acceptance/clients/debian.Dockerfile": "33c11ce0ec298939dddcee698cb7aec00abc683fa15504d9d88df9123f3c1887",
   "test/acceptance/clients/dotnet-11.Dockerfile": "41955c2b8cee6d7bf26782f5faa610f900cb7b4ee90d9f6b53a7561587c7db37",
   "test/acceptance/clients/dotnet.Dockerfile": "9bfd9a97d97b07f1f6d3448969a6345624bc09ec2ee7c01bbf053c02cd327c37",
