@@ -97,9 +97,14 @@
 // signing with a missing, an RSA and an invalid GPG key; remote member
 // repodata that is corrupt, oversized, unreadable or revoked; a remote
 // package pinned to its indexed SHA-256; and local member content that is
-// incomplete or drifted. Its item GETs run through the kit with TryRPMItem
-// as the only overlay. The route suite test/server/artifacts/rpm checks
-// through the router that virtual repodata is signed with the configured
-// GPG key, and the @rpm acceptance partition
-// (test/acceptance/features/rpm.feature) is the native dnf evidence.
+// incomplete or drifted. rpm_paths_test.go adds the paths the overlay
+// leaves alone, packages served only when listed below their yum root,
+// members skipped when blacked out, excluded or a folder, remote packages
+// whose bytes are not an RPM or whose cached copy is revoked, and the YUM
+// calculation's path and virtual view checks. Their item GETs run through
+// the kit with TryRPMItem as the only overlay. The route suite
+// test/server/artifacts/rpm checks through the router that virtual
+// repodata is signed with the configured GPG key, and the @rpm acceptance
+// partition (test/acceptance/features/rpm.feature) is the native dnf
+// evidence.
 package rpmhttp

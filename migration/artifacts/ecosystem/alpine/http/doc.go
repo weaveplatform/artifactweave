@@ -82,7 +82,15 @@
 //
 // # Testing
 //
-// The package has no tests of its own, as the root file had none. The
-// @alpine acceptance partition (test/acceptance/features/alpine.feature)
-// drives its indexes and packages through the router with apk.
+// alpine_test.go calls the overlay and its helpers without the router, over
+// a kittest world (fixture_test.go, modelled on rpmhttp's): paths outside
+// the layout and callers who may not download refused; local index content
+// that is a folder, lost, empty, unreadable or malformed; a remote index
+// whose authority is rechecked, streamed or cached; virtual indexes that
+// skip unreadable members and fail closed on cycles, wrong member types,
+// store faults and unusable signing keys; and virtual packages served from
+// a listed local file or relayed from a remote member. Its item GETs run
+// through the kit with TryAlpineItem as the only overlay. The @alpine
+// acceptance partition (test/acceptance/features/alpine.feature) drives its
+// indexes and packages through the router with apk.
 package alpinehttp
