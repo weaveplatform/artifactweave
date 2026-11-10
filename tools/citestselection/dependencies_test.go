@@ -110,7 +110,7 @@ func TestUnitImportGraphIncludesStagedPackages(t *testing.T) {
 	write("internal/artifacts/ecosystem/npm/npm.go",
 		imports("npm", "migration/artifacts/ecosystem/npm"))
 	write("internal/server/server.go", imports("server", "migration/artifacts/ecosystem/npm/http"))
-	write("migration/app/app.go", imports("app", "internal/server"))
+	write("migration/app/run.go", imports("app", "internal/server"))
 	write("cmd/artifactweave/main.go", imports("main", "migration/app"))
 	write("migration/artifacts/ecosystem/pypi/pypi.go", imports("pypi"))
 	// The go command builds neither of these, so their imports are not edges.

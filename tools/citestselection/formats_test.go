@@ -236,7 +236,7 @@ func TestUnitFormatSourceOwnerStagedLayouts(t *testing.T) {
 		"migration/artifacts/core/item/item.go":                  "",
 		"migration/artifacts/adapters/http/items.go":             "",
 		"migration/app/router_test.go":                           "",
-		"migration/app/app.go":                                   "",
+		"migration/app/run.go":                                   "",
 		"pkg/artifacts/ecosystem/npm/handler.go":                 "",
 		"migration/artifacts/ecosystem/npm/http/README.md":       "",
 	} {

@@ -127,7 +127,6 @@
     ],
     "migration/app": [
       "access_test.go",
-      "app_test.go",
       "blob_test.go",
       "conan_client_test.go",
       "conan_remote_test.go",
@@ -146,6 +145,7 @@
       "registry_remote_fault_test.go",
       "registry_remote_test.go",
       "remote_test.go",
+      "run_test.go",
       "runtime_test.go",
       "seed_test.go",
       "serverlog_test.go",

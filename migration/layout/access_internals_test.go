@@ -207,7 +207,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		// Each allowlisted root uses its entry; a file under test/ is a
 		// test even without the _test.go suffix.
 		"internal/server/server_test.go":  file(authenticator, tokens),
-		"migration/app/app_test.go":       file(tokens),
+		"migration/app/run_test.go":       file(tokens),
 		"test/server/access/auth_test.go": file(authenticator),
 		"test/server/support/assemble.go": file(tokens),
 		// Access's own tests: staged, and in legacy packages whose entries
