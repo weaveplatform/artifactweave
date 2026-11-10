@@ -1,4 +1,4 @@
-package item
+package item_test
 
 import (
 	"context"
@@ -10,10 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -23,8 +22,8 @@ import (
 func TestAccCacheCleanupSQLiteRestart(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "cache.db")
-	open := func() *sqlcommon.Store {
-		s, err := sqlite.Open(ctx, dbPath, sqlite.Options{})
+	open := func() *sqltest.SQLStore {
+		s, err := sqltest.OpenSQLite(ctx, dbPath, sqltest.SQLiteOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -36,14 +35,14 @@ func TestAccCacheCleanupSQLiteRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	now := at
-	svc := &Service{Store: db, Blobs: blobs, Now: func() time.Time { return now }}
+	now := item.At
+	svc := &item.Service{Store: db, Blobs: blobs, Now: func() time.Time { return now }}
 	hours := 1
 	c := *repo.Defaults(&repo.Config{Key: "remote", Class: repo.Remote, PackageType: repo.Generic, URL: "https://upstream.example", UnusedArtifactsCleanupPeriodHours: &hours})
 	if err = db.Repos().Create(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	for n := range CacheCleanupBatch + 2 {
+	for n := range item.CacheCleanupBatch + 2 {
 		key := types.RemoteCacheKey{RepoKey: c.Key, Path: fmt.Sprintf("metadata/%03d", n)}
 		token, err := db.RemoteCache().Begin(ctx, key)
 		if err != nil {
@@ -51,7 +50,7 @@ func TestAccCacheCleanupSQLiteRestart(t *testing.T) {
 		}
 		if _, err = svc.Cache(
 			ctx,
-			CacheUpload{
+			item.CacheUpload{
 				Token:  token,
 				Repo:   c,
 				Body:   strings.NewReader("versions"),
@@ -62,18 +61,18 @@ func TestAccCacheCleanupSQLiteRestart(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	now = at.Add(2 * time.Hour)
-	q := newQueue(t, db, work.Options{Now: svc.Now})
+	now = item.At.Add(2 * time.Hour)
+	q := item.NewQueue(t, db, work.Options{Now: svc.Now})
 	if err = svc.RegisterCacheMaintenance(ctx, q); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = q.RunDue(ctx, KindCacheCleanupSchedule); err != nil {
+	if _, err = q.RunDue(ctx, item.KindCacheCleanupSchedule); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = q.RunDue(ctx, KindCacheCleanup); err != nil {
+	if _, err = q.RunDue(ctx, item.KindCacheCleanup); err != nil {
 		t.Fatal(err)
 	}
-	checkpoint, err := db.WorkQueue().Get(ctx, KindCacheCleanup, c.Key)
+	checkpoint, err := db.WorkQueue().Get(ctx, item.KindCacheCleanup, c.Key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,23 +81,23 @@ func TestAccCacheCleanupSQLiteRestart(t *testing.T) {
 	}
 	db = open()
 	svc.Store = db
-	q = newQueue(t, db, work.Options{Now: svc.Now})
+	q = item.NewQueue(t, db, work.Options{Now: svc.Now})
 	if err = svc.RegisterCacheMaintenance(ctx, q); err != nil {
 		t.Fatal(err)
 	}
-	resumed, err := db.WorkQueue().Get(ctx, KindCacheCleanup, c.Key)
+	resumed, err := db.WorkQueue().Get(ctx, item.KindCacheCleanup, c.Key)
 	if err != nil || string(resumed.Payload) != string(checkpoint.Payload) {
 		t.Fatal("restart reset durable cursor", err)
 	}
-	if n := runCleanup(t, q); n != 2 {
+	if n := item.RunCleanup(t, q); n != 2 {
 		t.Fatal("restart did not drain remaining pages", n)
 	}
-	ref, err := db.Blobs().Get(ctx, sums("versions").SHA256)
+	ref, err := db.Blobs().Get(ctx, item.Sums("versions").SHA256)
 	if err != nil || ref.Refs != 0 {
 		t.Fatal("restart leaked raw metadata", ref, err)
 	}
 	if _, err = db.WorkQueue().
-		Get(ctx, KindCacheCleanup, c.Key); !errors.Is(
+		Get(ctx, item.KindCacheCleanup, c.Key); !errors.Is(
 		err,
 		store.ErrNotFound,
 	) {
@@ -111,16 +110,20 @@ func TestAccCacheCleanupConcurrentDownload(t *testing.T) {
 		t.Run(backend, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			var db *sqlcommon.Store
+			var db *sqltest.SQLStore
 			var err error
 			if backend == "postgres" {
 				dsn := os.Getenv("ARTIFACTWEAVE_TEST_POSTGRES_DSN")
 				if dsn == "" {
 					t.Skip("ARTIFACTWEAVE_TEST_POSTGRES_DSN not set")
 				}
-				db, err = postgres.Open(ctx, dsn, postgres.Options{MaxOpenConns: 4})
+				db, err = sqltest.OpenPostgres(ctx, dsn, sqltest.PostgresOptions{MaxOpenConns: 4})
 			} else {
-				db, err = sqlite.Open(ctx, filepath.Join(t.TempDir(), "race.db"), sqlite.Options{})
+				db, err = sqltest.OpenSQLite(
+					ctx,
+					filepath.Join(t.TempDir(), "race.db"),
+					sqltest.SQLiteOptions{},
+				)
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -130,8 +133,8 @@ func TestAccCacheCleanupConcurrentDownload(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			now := at
-			svc := &Service{Store: db, Blobs: blobs, Now: func() time.Time { return now }}
+			now := item.At
+			svc := &item.Service{Store: db, Blobs: blobs, Now: func() time.Time { return now }}
 			hours := 1
 			c := *repo.Defaults(&repo.Config{Key: fmt.Sprintf("cleanup-%d", time.Now().UnixNano()), Class: repo.Remote, PackageType: repo.Generic, URL: "https://upstream.example", UnusedArtifactsCleanupPeriodHours: &hours})
 			if err = db.Repos().Create(ctx, c); err != nil {
@@ -145,7 +148,7 @@ func TestAccCacheCleanupConcurrentDownload(t *testing.T) {
 			}
 			cached, err := svc.Cache(
 				ctx,
-				CacheUpload{
+				item.CacheUpload{
 					Repo:   c,
 					Token:  token,
 					Kind:   types.RemoteUnique,
@@ -156,12 +159,11 @@ func TestAccCacheCleanupConcurrentDownload(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			now = at.Add(2 * time.Hour)
+			now = item.At.Add(2 * time.Hour)
 			identity, err := db.RemoteCache().Source(ctx, c.Key)
 			if err != nil {
 				t.Fatal(err)
 			}
-			cursor := cacheCleanupCursor{Repository: c.Key, Incarnation: identity.Repository}
 			recorded, release, downloaded := make(
 				chan struct{},
 			), make(
@@ -192,7 +194,9 @@ func TestAccCacheCleanupConcurrentDownload(t *testing.T) {
 				t.Fatal(ctx.Err())
 			}
 			cleaned := make(chan error, 1)
-			go func() { cleaned <- svc.cleanupCachedItem(ctx, cursor, cached.Item) }()
+			go func() {
+				cleaned <- svc.CleanupCachedItem(ctx, c.Key, identity.Repository, cached.Item)
+			}()
 			// The downloader holds the item's usage lock. Cleanup must wait until
 			// that transaction decides whether the successful read is durable.
 			select {

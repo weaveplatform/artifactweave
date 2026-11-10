@@ -5,20 +5,52 @@ import (
 	"fmt"
 	"maps"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
+	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+// backends are the stores the suite's own tests run on, the three that
+// app/apptest.FormatBackends gives the formats, built here because apptest
+// imports this package: the in-memory composite, the SQLite composite on
+// disk and the PostgreSQL composite on the shared server, emptied first.
+func backends() []Backend {
+	return []Backend{
+		{"inmem", func(*testing.T) item.Store { return inmem.New() }},
+		{"sqlite", func(t *testing.T) item.Store {
+			st, err := sqltest.OpenSQLite(context.Background(),
+				filepath.Join(t.TempDir(), "aw.db"), sqltest.SQLiteOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = st.Close() })
+			return st
+		}},
+		{"postgres", func(t *testing.T) item.Store {
+			st, err := sqltest.OpenPostgres(context.Background(),
+				platsqltest.PostgresDSN(t), sqltest.PostgresOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = st.Close() })
+			sqltest.Reset(t, st.DB(), st.Dialect())
+			return st
+		}},
+	}
+}
 
 // tagKey is the property the tagged format indexes, as npm's dist-tags
 // are.
@@ -202,7 +234,7 @@ func taggedFormat(h format.Handler) Format {
 }
 
 func TestUnitTaggedFormatKeepsTheContract(t *testing.T) {
-	Run(t, taggedFormat(tagged{}))
+	Run(t, taggedFormat(tagged{}), backends())
 }
 
 // indexKind is the work the indexing format queues per repository.
@@ -247,7 +279,7 @@ func indexingFormat(h format.Handler) Format {
 // A format with work keyed by repository passes beside work keyed by
 // package.
 func TestUnitRepositoryWorkKeepsTheContract(t *testing.T) {
-	Run(t, indexingFormat(indexing{}))
+	Run(t, indexingFormat(indexing{}), backends())
 }
 
 // prov is the suffix of the sidecars the keeping format keeps.
@@ -286,14 +318,14 @@ func keepingFormat(h format.Handler) Format {
 // A format whose files own sidecars passes, the sidecars following them
 // through every write and its metadata noting them rebuilt from empty.
 func TestUnitSidecarsKeepTheContract(t *testing.T) {
-	Run(t, keepingFormat(keeping{tagged{unlinked: prov}}))
+	Run(t, keepingFormat(keeping{tagged{unlinked: prov}}), backends())
 }
 
 // Both options together, as the Helm format runs them.
 func TestUnitRepositoryWorkAndSidecarsKeepTheContract(t *testing.T) {
 	f := keepingFormat(keepingIndex{indexing{tagged{unlinked: prov}}})
 	f.RepoWork = []string{indexKind}
-	Run(t, f)
+	Run(t, f, backends())
 }
 
 // keepingIndex keeps sidecars and queues an index per repository.

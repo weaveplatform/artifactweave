@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 )
@@ -72,7 +73,7 @@ func TestUnitModuleContract(t *testing.T) {
 				Linked: []string{pkg + "/1.0.0.zip"},
 			}
 		},
-	})
+	}, apptest.FormatBackends())
 }
 
 // A Terraform provider package is a package <ns>/<type>, in lower case,
@@ -90,7 +91,7 @@ func TestUnitProviderPackageContract(t *testing.T) {
 		// As for modules, a remote repository takes no terraformType.
 		NoRemoteCache: true,
 		Version:       providerRelease(t),
-	})
+	}, apptest.FormatBackends())
 }
 
 // providerRelease is the contract's fixture of Terraform provider package

@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -27,9 +25,9 @@ import (
 // blocked by PostgreSQL itself, not by a mutex or lease polling in this process.
 func TestAccNuGetWriteTransactionsOnPostgres(t *testing.T) {
 	dsn := platsqltest.PostgresDSN(t)
-	open := func() *sqlcommon.Store {
+	open := func() *sqltest.SQLStore {
 		t.Helper()
-		db, err := postgres.Open(context.Background(), dsn, postgres.Options{})
+		db, err := sqltest.OpenPostgres(context.Background(), dsn, sqltest.PostgresOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -193,7 +191,7 @@ func existsAt(ctx context.Context, db pkgroute.Store, repo, path string) bool {
 	return err == nil
 }
 
-func waitForBlocked(t *testing.T, ctx context.Context, db *sqlcommon.Store, done <-chan error) {
+func waitForBlocked(t *testing.T, ctx context.Context, db *sqltest.SQLStore, done <-chan error) {
 	t.Helper()
 	tick := time.NewTicker(10 * time.Millisecond)
 	defer tick.Stop()

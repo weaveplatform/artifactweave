@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks"
@@ -67,7 +68,7 @@ func TestUnitFormatContract(t *testing.T) {
 				Linked: []string{rockspec, stem + ".src.rock"},
 			}
 		},
-	})
+	}, apptest.FormatBackends())
 }
 
 func TestUnitPublicDottedPackageName(t *testing.T) {

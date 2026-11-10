@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
@@ -51,5 +52,5 @@ func TestUnitContract(t *testing.T) {
 				Linked: []string{archive, mirror},
 			}
 		},
-	})
+	}, apptest.FormatBackends())
 }

@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/model"
@@ -122,7 +120,7 @@ func TestUnitSeedInMemory(t *testing.T) { seedTwice(t, inmem.New()) }
 
 func TestAccSeedSQLite(t *testing.T) {
 	ctx := context.Background()
-	st, err := sqlite.Open(ctx, filepath.Join(t.TempDir(), "aw.db"), sqlite.Options{})
+	st, err := sqltest.OpenSQLite(ctx, filepath.Join(t.TempDir(), "aw.db"), sqltest.SQLiteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +132,7 @@ func TestAccSeedSQLite(t *testing.T) {
 func TestAccSeedPostgres(t *testing.T) {
 	dsn := platsqltest.PostgresDSN(t)
 	ctx := context.Background()
-	st, err := postgres.Open(ctx, dsn, postgres.Options{})
+	st, err := sqltest.OpenPostgres(ctx, dsn, sqltest.PostgresOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef"
@@ -53,5 +54,6 @@ func TestAccFormatLifecycle(t *testing.T) {
 				Files:   []formattest.File{{Path: chef.Path(name, version), Body: out.Bytes()}},
 			}
 		}},
+		apptest.FormatBackends(),
 	)
 }

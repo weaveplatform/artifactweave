@@ -30,6 +30,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -74,7 +75,7 @@ func withAccess(t *testing.T, c Config) Config {
 // as the router would.
 type itemWorld struct {
 	t     *testing.T
-	world *kittest.World
+	world *kittest.World[*inmem.Store]
 	db    store.Store
 	blobs blob.Store
 	kit   *itemkit.Kit
@@ -85,7 +86,7 @@ type itemWorld struct {
 // configuration first, and the access module is bound over the store.
 func newItemWorld(t *testing.T, tune ...func(*Config)) *itemWorld {
 	t.Helper()
-	k := kittest.New(t)
+	k := kittest.New(t, inmem.New())
 	c := Config{Store: k.Store, Blobs: k.Blobs}
 	for _, f := range tune {
 		f(&c)

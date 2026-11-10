@@ -34,6 +34,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // The keys of the Agent Plugins repositories the tests store, beside
@@ -66,7 +67,7 @@ func itemPath(key, name string) string { return "/artifactory/" + key + "/" + na
 // requests as the router would, and what the kit logged.
 type itemWorld struct {
 	t     *testing.T
-	world *kittest.World
+	world *kittest.World[*inmem.Store]
 	logs  *bytes.Buffer
 	kit   *itemkit.Kit
 	h     http.Handler
@@ -78,7 +79,7 @@ type itemWorld struct {
 // nothing, so a caller holds only what the decider in its request grants.
 func newItemWorld(t *testing.T, tune ...func(*itemkit.Deps)) *itemWorld {
 	t.Helper()
-	k := kittest.New(t)
+	k := kittest.New(t, inmem.New())
 	logs := &bytes.Buffer{}
 	d := itemkit.Deps{
 		Store:  k.Store,

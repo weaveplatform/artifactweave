@@ -17,9 +17,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
+	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/reindexauth"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
@@ -69,7 +69,7 @@ func TestUnitRemoteReindexRejectsMalformedCacheAtomically(t *testing.T) {
 // Both persistent backends retain the payload, failure and retry state across
 // worker replacement. They publish the repaired index and properties atomically.
 func TestUnitRemoteReindexStores(t *testing.T) {
-	for _, backend := range formattest.Backends() {
+	for _, backend := range apptest.FormatBackends() {
 		t.Run(backend.Name, func(t *testing.T) {
 			w := newWorldOn(t, backend.Open(t), nil)
 			w.c = w.repo("remote", repo.Remote, nil)

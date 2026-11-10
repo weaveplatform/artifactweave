@@ -9,10 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
@@ -99,7 +98,7 @@ func memStore() item.Store { return inmem.New() }
 // does.
 type sqliteFile struct {
 	path string
-	st   *sqlcommon.Store
+	st   *sqltest.SQLStore
 }
 
 func sqliteBackend(t *testing.T) *sqliteFile {
@@ -109,7 +108,7 @@ func sqliteBackend(t *testing.T) *sqliteFile {
 
 func (f *sqliteFile) open(t *testing.T) item.Store {
 	t.Helper()
-	st, err := sqlite.Open(context.Background(), f.path, sqlite.Options{})
+	st, err := sqltest.OpenSQLite(context.Background(), f.path, sqltest.SQLiteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +279,7 @@ func (w *world) reindexed(c repo.Config) map[string]map[string]string {
 // eachStore runs fn on a fresh world over every store backend.
 func eachStore(t *testing.T, fn func(t *testing.T, w *world)) {
 	t.Helper()
-	for _, b := range formattest.Backends() {
+	for _, b := range apptest.FormatBackends() {
 		t.Run(b.Name, func(t *testing.T) { fn(t, newWorld(t, b.Open(t))) })
 	}
 }

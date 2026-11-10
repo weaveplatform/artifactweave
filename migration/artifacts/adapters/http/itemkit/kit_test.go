@@ -21,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -32,7 +33,7 @@ var errFault = errors.New("fault")
 // lists them, and stops at the first that answers, before the generic
 // lookup. When none answers, the generic lookup serves the file.
 func TestUnitGetItemTriesOverlaysInOrder(t *testing.T) {
-	w := kittest.New(t)
+	w := kittest.New(t, inmem.New())
 	w.Put(t, w.Local, false, "a/b.txt", []byte("generic"))
 	var k *itemkit.Kit
 	var asked []string
@@ -125,7 +126,7 @@ func TestUnitContentWithoutStoreIsNotImplemented(t *testing.T) {
 	) {
 		t.Errorf("without a store: %v; want ErrNotImplemented", err)
 	}
-	w := kittest.New(t)
+	w := kittest.New(t, inmem.New())
 	if st, err := w.Kit(itemkit.Deps{}).Content(); err != nil || st != w.Store {
 		t.Errorf("with a store: %v, %v; want the store", st, err)
 	}
@@ -223,7 +224,7 @@ func TestUnitItemErrorStatuses(t *testing.T) {
 // passes over a member the caller may not read, and never searches a
 // repository twice, which ends a virtual repository that includes itself.
 func TestUnitLookupSearchesVirtualMembersInOrder(t *testing.T) {
-	w := kittest.New(t)
+	w := kittest.New(t, inmem.New())
 	ctx := t.Context()
 	w.Put(t, w.Local, false, "a.txt", []byte("local"))
 	w.Put(t, w.Remote, true, "a.txt", []byte("cached"))
@@ -286,7 +287,7 @@ func TestUnitLookupSearchesVirtualMembersInOrder(t *testing.T) {
 // TestUnitResolveRepoNamesOnlyRemoteCaches: a key resolves to the repository
 // it names, and a cache alias only to a remote repository's cache.
 func TestUnitResolveRepoNamesOnlyRemoteCaches(t *testing.T) {
-	w := kittest.New(t)
+	w := kittest.New(t, inmem.New())
 	for _, tc := range []struct {
 		key    string
 		repo   string
@@ -315,7 +316,7 @@ func TestUnitResolveRepoNamesOnlyRemoteCaches(t *testing.T) {
 // repository, and is refused by a remote repository, its cache, a virtual
 // repository without a default deployment repository and P2.
 func TestUnitDeployTargetResolvesVirtualRepositories(t *testing.T) {
-	w := kittest.New(t)
+	w := kittest.New(t, inmem.New())
 	for _, tc := range []struct {
 		name   string
 		c      repo.Config

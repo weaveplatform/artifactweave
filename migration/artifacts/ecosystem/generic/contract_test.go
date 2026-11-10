@@ -3,6 +3,7 @@ package generic_test
 import (
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 )
@@ -21,5 +22,5 @@ func TestUnitContract(t *testing.T) {
 				Files: []formattest.File{{Path: p + "/" + v + "/" + p + ".bin", Body: body}},
 			}
 		},
-	})
+	}, apptest.FormatBackends())
 }

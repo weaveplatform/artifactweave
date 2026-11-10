@@ -16,7 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -31,10 +30,13 @@ const (
 // Admin is the principal Request acts as.
 var Admin = kernel.Principal{Name: "admin", Admin: true}
 
-// World is a seeded in-memory world for unit tests of the item kit.
-type World struct {
-	// Store is the in-memory metadata store.
-	Store *inmem.Store
+// World is a seeded world for unit tests of the item kit, over the metadata
+// store the test passes New. The world keeps the store's own type, S, so
+// that a test reaches the store's other parts, such as the access module's
+// stores of the in-memory composite, through it.
+type World[S itemkit.Store] struct {
+	// Store is the metadata store New was given.
+	Store S
 	// Blobs is a file-system blob store in the test's temporary directory.
 	Blobs blob.Store
 	// Local, Remote, Federated and Virtual are the seeded generic
@@ -43,17 +45,19 @@ type World struct {
 	Local, Remote, Federated, Virtual repo.Config
 }
 
-// New returns a world of its own: a fresh in-memory store seeded with a
-// generic repository of each class, and an empty blob store under t's
-// temporary directory.
-func New(t testing.TB) *World {
+// New returns a world of its own over st, a fresh, empty store, which it
+// seeds with a generic repository of each class, and an empty blob store
+// under t's temporary directory. The test passes the store, the in-memory
+// composite for most, because this package, which only tests import, may
+// not import the composition root's stores.
+func New[S itemkit.Store](t testing.TB, st S) *World[S] {
 	t.Helper()
 	ctx := t.Context()
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	w := &World{Store: inmem.New(), Blobs: blobs}
+	w := &World[S]{Store: st, Blobs: blobs}
 	for _, s := range []struct {
 		into *repo.Config
 		c    repo.Config
@@ -83,7 +87,7 @@ func New(t testing.TB) *World {
 // with the blob's checksums as both actual and original, as a deploy that
 // declared them leaves it. Parent folders are not created, because a
 // lookup reads the file's own item.
-func (w *World) Put(
+func (w *World[S]) Put(
 	t testing.TB,
 	c repo.Config,
 	cached bool,
@@ -135,7 +139,7 @@ func (w *World) Put(
 // leaves them nil, Store and Blobs are the world's, and Access.Authorizer
 // is a fake whose evaluation allows nothing: a request whose context
 // carries no decider is refused rather than panicking.
-func (w *World) Kit(d itemkit.Deps) *itemkit.Kit {
+func (w *World[S]) Kit(d itemkit.Deps) *itemkit.Kit {
 	if d.Store == nil {
 		d.Store = w.Store
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/pypi"
@@ -40,5 +41,5 @@ func TestUnitContract(t *testing.T) {
 			{pypi.PropYanked: {"true"}},
 			{pypi.PropYanked: {"use 2.0"}, "formattest.k": {"x"}},
 		},
-	})
+	}, apptest.FormatBackends())
 }

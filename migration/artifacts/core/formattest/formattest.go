@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -14,18 +13,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	platsqltest "github.com/weaveplatform/artifactweave/migration/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -106,44 +100,20 @@ type Backend struct {
 	Open func(t *testing.T) item.Store
 }
 
-// Backends are the stores the suite runs on: the in-memory reference,
-// SQLite on disk and PostgreSQL, which skips where Docker cannot run Linux
-// containers.
-func Backends() []Backend {
-	return []Backend{
-		{"inmem", func(*testing.T) item.Store { return inmem.New() }},
-		{"sqlite", func(t *testing.T) item.Store {
-			st, err := sqlite.Open(context.Background(),
-				filepath.Join(t.TempDir(), "aw.db"), sqlite.Options{})
-			if err != nil {
-				t.Fatal(err)
-			}
-			t.Cleanup(func() { _ = st.Close() })
-			return st
-		}},
-		{"postgres", func(t *testing.T) item.Store {
-			dsn := platsqltest.PostgresDSN(t)
-			st, err := postgres.Open(context.Background(), dsn, postgres.Options{})
-			if err != nil {
-				t.Fatal(err)
-			}
-			t.Cleanup(func() { _ = st.Close() })
-			// The test binary shares one server, so each scenario starts
-			// empty.
-			sqltest.Reset(t, st.DB(), st.Dialect())
-			return st
-		}},
-	}
-}
-
-// Run runs every scenario of the contract for f on every backend, each on
-// a fresh store.
-func Run(t *testing.T, f Format) {
+// Run runs every scenario of the contract for f on each of backends, each
+// scenario on a fresh store. The caller supplies the backends, so that the
+// suite opens no store of its own: the formats pass
+// app/apptest.FormatBackends. An empty list fails t, because a suite that
+// ran on no backend would pass without checking anything.
+func Run(t *testing.T, f Format, backends []Backend) {
 	t.Helper()
+	if len(backends) == 0 {
+		t.Fatal("formattest: Run needs at least one backend")
+	}
 	if err := check(f); err != nil {
 		t.Fatal(err)
 	}
-	for _, b := range Backends() {
+	for _, b := range backends {
 		t.Run(b.Name, func(t *testing.T) {
 			for _, s := range scenarios {
 				t.Run(s.name, func(t *testing.T) {

@@ -10,8 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -212,8 +211,8 @@ var raceStores = map[string]func(t *testing.T) raceStore{
 	"inmem": func(*testing.T) raceStore { return inmem.New() },
 	"sqlite": func(t *testing.T) raceStore {
 		t.Helper()
-		st, err := sqlite.Open(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
-			sqlite.Options{Options: sqlcommon.Options{}})
+		st, err := sqltest.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "aw.db"),
+			sqltest.SQLiteOptions{Options: sqltest.Options{}})
 		if err != nil {
 			t.Fatal(err)
 		}

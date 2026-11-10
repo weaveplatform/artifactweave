@@ -11,9 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -53,7 +50,7 @@ func backends() []backend {
 		{"sqlite", func(t *testing.T) (registry.Store, func() registry.Store) {
 			path := filepath.Join(t.TempDir(), "aw.db")
 			open := func() registry.Store {
-				st, err := sqlite.Open(context.Background(), path, sqlite.Options{})
+				st, err := sqltest.OpenSQLite(context.Background(), path, sqltest.SQLiteOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -64,8 +61,12 @@ func backends() []backend {
 		}},
 		{"postgres", func(t *testing.T) (registry.Store, func() registry.Store) {
 			dsn := platsqltest.PostgresDSN(t)
-			open := func() *sqlcommon.Store {
-				st, err := postgres.Open(context.Background(), dsn, postgres.Options{})
+			open := func() *sqltest.SQLStore {
+				st, err := sqltest.OpenPostgres(
+					context.Background(),
+					dsn,
+					sqltest.PostgresOptions{},
+				)
 				if err != nil {
 					t.Fatal(err)
 				}

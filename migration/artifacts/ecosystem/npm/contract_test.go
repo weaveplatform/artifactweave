@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
@@ -38,5 +39,5 @@ func TestUnitContract(t *testing.T) {
 			{npm.PropDistTag: {"beta"}},
 			{npm.PropDistTag: {"beta", "next"}, npm.PropDeprecated: {"use 2.0.0"}},
 		},
-	})
+	}, apptest.FormatBackends())
 }

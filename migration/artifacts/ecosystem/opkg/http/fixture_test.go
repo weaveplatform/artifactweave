@@ -84,7 +84,7 @@ type itemWorld struct {
 // configuration first, and the access module is bound over the store.
 func newItemWorld(t *testing.T, tune ...func(*Config)) *itemWorld {
 	t.Helper()
-	k := kittest.New(t)
+	k := kittest.New(t, inmem.New())
 	c := Config{Store: k.Store, Blobs: k.Blobs}
 	for _, f := range tune {
 		f(&c)

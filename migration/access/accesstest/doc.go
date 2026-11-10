@@ -20,8 +20,9 @@
 //     and which Middleware reports a failed authorisation to.
 //   - A Store, access.Store with the instance identity, holding the users,
 //     groups, permissions, settings, tokens and API restrictions that every
-//     answer reads: a fresh in-memory store from New, or the test's own
-//     through Over.
+//     answer reads: a fresh in-memory store from New, the access module's
+//     and the platform's in-memory stores over one unit of work, or the
+//     test's own through Over.
 //   - The options: WithNow, WithTokens, WithTokenVerifier and WithSettings.
 //
 // # Outputs
@@ -77,9 +78,8 @@
 //
 // Implemented P9d. Over takes the access Store with the instance identity
 // (https://github.com/weaveplatform/artifactweave/issues/1073), and New
-// builds over the shared in-memory store, the kit's one reach into
-// pkg/store, until https://github.com/weaveplatform/artifactweave/issues/1098
-// builds it over the module in-memory adapters.
+// builds over the access module's and the platform's in-memory adapters
+// (https://github.com/weaveplatform/artifactweave/issues/1098).
 //
 // # Testing
 //

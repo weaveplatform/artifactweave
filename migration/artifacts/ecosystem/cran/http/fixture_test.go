@@ -112,7 +112,7 @@ type itemWorld struct {
 // errors are written as the router writes them.
 func newItemWorld(t *testing.T, tune ...func(*Config)) *itemWorld {
 	t.Helper()
-	k := kittest.New(t)
+	k := kittest.New(t, inmem.New())
 	c := Config{Store: k.Store, Blobs: k.Blobs}
 	for _, f := range tune {
 		f(&c)

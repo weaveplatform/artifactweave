@@ -9,12 +9,14 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/migration/access"
+	accinmem "github.com/weaveplatform/artifactweave/migration/access/adapters/inmem"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/instance"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	platinmem "github.com/weaveplatform/artifactweave/migration/platform/store/inmem"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -107,11 +109,44 @@ func WithSettings(s accessapi.Settings) Option {
 }
 
 // New is Over with a fresh in-memory store, which the test reaches through
-// Store.
+// Store: the access module's in-memory stores and the platform's, over one
+// unit of work.
 func New(tb testing.TB, opts ...Option) *Kit {
 	tb.Helper()
-	return Over(tb, inmem.New(), opts...)
+	return Over(tb, newMemStore(), opts...)
 }
+
+// accessStore and platformStore name the two stores memStore embeds, which
+// would both be named Store as embedded fields.
+type (
+	accessStore   = accinmem.Store
+	platformStore = platinmem.Store
+)
+
+// memStore is the store New builds: the access module's in-memory stores and
+// the platform's over one memtx unit of work, so that every call joins the
+// transaction ctx carries, whichever store it reaches. Both stores embed the
+// unit of work, so the Tx and AfterCommit they promote would be ambiguous
+// selectors; memStore declares them itself.
+type memStore struct {
+	*accessStore
+	*platformStore
+	db *memtx.Store
+}
+
+func newMemStore() *memStore {
+	db := memtx.New()
+	return &memStore{accessStore: accinmem.New(db), platformStore: platinmem.New(db), db: db}
+}
+
+// Tx runs fn as one transaction of the store's unit of work.
+func (s *memStore) Tx(ctx context.Context, fn func(context.Context) error) error {
+	//nolint:wrapcheck // fn's own error, which the kit's callers match
+	return s.db.Tx(ctx, fn)
+}
+
+// AfterCommit defers fn until the transaction ctx carries commits.
+func (s *memStore) AfterCommit(ctx context.Context, fn func()) { s.db.AfterCommit(ctx, fn) }
 
 // Over builds the access module over st, the test's own store, as app does:
 // the authenticator over st's users and settings, with st's groups (which a

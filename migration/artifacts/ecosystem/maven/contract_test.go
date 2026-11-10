@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
@@ -56,7 +57,7 @@ func TestUnitContract(t *testing.T) {
 				Linked: []string{build + ".jar", build + ".pom"},
 			}
 		},
-	})
+	}, apptest.FormatBackends())
 }
 
 // Gradle's layout keeps a version's Ivy descriptor beside the module's
@@ -82,7 +83,7 @@ func TestUnitContractGradle(t *testing.T) {
 				},
 			}
 		},
-	})
+	}, apptest.FormatBackends())
 }
 
 // Ivy's layout keeps each type of file in a folder of its own inside the
@@ -103,7 +104,7 @@ func TestUnitContractIvy(t *testing.T) {
 				},
 			}
 		},
-	})
+	}, apptest.FormatBackends())
 }
 
 // sbt-default reads only sbt plugins' paths, whose files carry no version
@@ -124,5 +125,5 @@ func TestUnitContractSBT(t *testing.T) {
 				},
 			}
 		},
-	})
+	}, apptest.FormatBackends())
 }

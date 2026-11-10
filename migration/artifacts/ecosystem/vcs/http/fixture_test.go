@@ -36,6 +36,6 @@ type itemWorld struct {
 // newItemWorld returns a kittest world.
 func newItemWorld(t *testing.T) *itemWorld {
 	t.Helper()
-	k := kittest.New(t)
+	k := kittest.New(t, inmem.New())
 	return &itemWorld{db: k.Store, blobs: k.Blobs}
 }

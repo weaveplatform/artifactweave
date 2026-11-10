@@ -48,20 +48,20 @@
 //
 // # Outputs
 //
-//   - Run: subtests over a seeded world, one for each backend and scenario
-//     (sqlite/move, for example). Each scenario gets a fresh store from
-//     Backends, seeded with three empty local repositories of the format's
-//     type, and the item and trash services over them, with a clock that
-//     moves a minute on every write. A scenario that finds the contract
-//     broken fails its subtest with what differs; a fixture that contradicts
-//     itself fails Run before any scenario runs.
-//   - Backends: the in-memory reference store, SQLite on disk and
-//     PostgreSQL, each opened as the item service's store (item.Store),
-//     which the world's item and trash services run over. PostgreSQL skips in -short runs and where Docker cannot
-//     run Linux containers, unless ARTIFACTWEAVE_TEST_POSTGRES_DSN names a
-//     server; the test binary shares one server, which each scenario
-//     resets. NuGet's remote reindex test and the Terraform state service's
-//     tests run their own cases on the same stores.
+//   - Run: subtests over a seeded world, one for each backend the caller
+//     passes and each scenario (sqlite/move, for example). Each scenario
+//     gets a fresh store from its backend, seeded with three empty local
+//     repositories of the format's type, and the item and trash services
+//     over them, with a clock that moves a minute on every write. A scenario
+//     that finds the contract broken fails its subtest with what differs; a
+//     fixture that contradicts itself, or an empty list of backends, fails
+//     Run before any scenario runs.
+//   - Backend: a named opener of a fresh store, as the item service's store
+//     (item.Store), which the world's item and trash services run over. The
+//     suite opens no store itself: app/apptest.FormatBackends gives the
+//     formats the in-memory, SQLite and PostgreSQL composite stores, and
+//     NuGet's remote reindex test and the Terraform state service's tests
+//     run their own cases on the same stores.
 //
 // # Invariants
 //
@@ -100,7 +100,7 @@
 //     sidecar) and 0040 (Terraform: terraformType, which Format.Local sets).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Artifacts and remote" (formattest may import the registry),
-//     "Persistence" (formattest.Run takes its backends as a parameter) and
+//     "Persistence" (Run takes its backends as a parameter) and
 //     "Dependency rules" (rule 1).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 198 (core/formattest, the contract suite every slice runs), line
@@ -125,9 +125,9 @@
 // (https://github.com/weaveplatform/artifactweave/issues/533), and
 // Format.Local for Terraform's terraformType. Staged in P9d, which narrowed
 // the backends and the world to the item service's store
-// (https://github.com/weaveplatform/artifactweave/issues/1088). Roadmap:
-// Run takes its backends from its caller instead of opening them, so that
-// artifacts core never imports app
+// (https://github.com/weaveplatform/artifactweave/issues/1088), and Run takes
+// its backends from its caller instead of opening them, so that artifacts
+// core never imports app
 // (https://github.com/weaveplatform/artifactweave/issues/1098).
 //
 // # Testing
@@ -140,7 +140,9 @@
 //     TestUnitRepositoryWorkKeepsTheContract,
 //     TestUnitSidecarsKeepTheContract and
 //     TestUnitRepositoryWorkAndSidecarsKeepTheContract: a format that keeps
-//     the contract passes Run, with either fixture option and with both.
+//     the contract passes Run, with either fixture option and with both, on
+//     the three composite stores, which the tests build themselves because
+//     app/apptest imports this package.
 //   - TestUnitTheSuiteCatchesBrokenFormats: each way of breaking the
 //     contract fails the scenario that guards it.
 //   - TestUnitInconsistentFixturesFail: a fixture that contradicts itself

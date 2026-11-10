@@ -104,7 +104,7 @@ type itemWorld struct {
 // router writes them.
 func newItemWorld(t *testing.T) *itemWorld {
 	t.Helper()
-	k := kittest.New(t)
+	k := kittest.New(t, inmem.New())
 	ops := DebianAPI{newKit(withAccess(t, Config{Store: k.Store, Blobs: k.Blobs}))}
 	opts := artgen.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/migration/app/apptest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/formattest"
@@ -47,5 +48,5 @@ func TestUnitContract(t *testing.T) {
 		},
 		// No remote Terraform backend repository exists to cache.
 		NoRemoteCache: true,
-	})
+	}, apptest.FormatBackends())
 }

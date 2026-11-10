@@ -1,6 +1,6 @@
-// Package kittest builds the item kit over a seeded in-memory world, for
-// unit tests of the kit and of the handlers that embed it, without a router
-// or the access module.
+// Package kittest builds the item kit over a seeded world, for unit tests of
+// the kit and of the handlers that embed it, without a router or the access
+// module.
 //
 // # Role
 //
@@ -12,14 +12,18 @@
 // # Inputs
 //
 //   - The test, for its temporary directory and its failures.
+//   - The metadata store New seeds, fresh and empty: for most tests the
+//     in-memory composite, which a test file may import and this package,
+//     whose files are not test files, may not (dependency rule 1).
 //   - The Deps a test builds the kit with; World.Kit fills in what they
 //     leave nil.
 //
 // # Outputs
 //
-//   - World: an in-memory store seeded with a generic repository of each
-//     class (Local, Remote, Federated, and Virtual over Local and Remote,
-//     deploying to Local), and an empty blob store on disk.
+//   - World: the store, kept with its own type and seeded with a generic
+//     repository of each class (Local, Remote, Federated, and Virtual over
+//     Local and Remote, deploying to Local), and an empty blob store on
+//     disk.
 //   - World.Put: a file stored as a deploy leaves it, blob and item.
 //   - World.Kit: an itemkit.Kit over the world.
 //   - Admin, AdminAccess and Request: an administrator, its access, and a
@@ -27,8 +31,9 @@
 //
 // # Invariants
 //
-//   - Each New has its own store and blob directory, so tests that build
-//     their own worlds may run in parallel.
+//   - Each New has its own blob directory and seeds only the store it is
+//     given, so tests that build their own worlds over their own stores may
+//     run in parallel.
 //   - The world holds no permissions. A test grants through the decider it
 //     puts in a request's context (Request, or accessapi.WithCaller with an
 //     accessapitest.Decider), and World.Kit's authorizer fake allows nothing
@@ -42,16 +47,16 @@
 //   - Decision 0015: docs/research/decisions/0015-testing-and-acceptance.md
 //     (unit tests without a router).
 //   - https://github.com/weaveplatform/artifactweave/issues/1075
+//   - https://github.com/weaveplatform/artifactweave/issues/1098
 //
 // # Status
 //
-// Implemented P9d (WEB-06).
+// Implemented P9d (WEB-06), with the store from the caller (STO-19).
 //
 // # Testing
 //
 // It has no tests of its own: the item kit's tests (itemkit's kit_test.go)
-// build every world they use with it. Its remaining branches are t.Fatal
-// paths taken only when the in-memory store or the blob directory fails,
-// so it is excluded from coverage (.testcoverage.yml) like the other
-// fixtures.
+// build every world they use with it. Its remaining branches are t.Fatal paths
+// taken only when the store or the blob directory fails, so it is excluded
+// from coverage (.testcoverage.yml) like the other fixtures.
 package kittest

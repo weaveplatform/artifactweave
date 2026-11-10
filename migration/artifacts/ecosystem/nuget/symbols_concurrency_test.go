@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -22,7 +21,7 @@ import (
 func TestAccSymbolsOppositeMovesOnPostgres(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
-	db, err := postgres.Open(ctx, platsqltest.PostgresDSN(t), postgres.Options{})
+	db, err := sqltest.OpenPostgres(ctx, platsqltest.PostgresDSN(t), sqltest.PostgresOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
