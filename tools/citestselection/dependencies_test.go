@@ -10,16 +10,15 @@ import (
 
 func TestUnitReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
 	base := modulePath + "/internal/"
-	migration := modulePath + "/migration/"
-	staged := modulePath + "/migration/artifacts/ecosystem/"
+	ecosystem := base + "artifacts/ecosystem/"
 	// app reaches npm only through npm/http, which its router mounts.
 	graph := map[string][]string{
-		staged + "npm":        nil,
-		staged + "npm/http":   {staged + "npm"},
-		migration + "app":     {staged + "npm/http"},
-		base + "format/maven": nil,
+		ecosystem + "npm":      nil,
+		ecosystem + "npm/http": {ecosystem + "npm"},
+		base + "app":           {ecosystem + "npm/http"},
+		ecosystem + "maven":    nil,
 	}
-	got := reverseClosure(graph, []string{staged + "npm"}, "npm")
+	got := reverseClosure(graph, []string{ecosystem + "npm"}, "npm")
 	for _, want := range []string{"./internal/artifacts/ecosystem/npm", "./internal/artifacts/ecosystem/npm/http", "./internal/app"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("reverse closure omitted %s: %v", want, got)
@@ -34,16 +33,16 @@ func TestUnitReverseClosureIncludesTransitiveProductionConsumers(t *testing.T) {
 // configuration package, which app imports, so app's tests are selected
 // although app imports no package of the format.
 func TestUnitReverseClosureCarriesFormatChangesThroughAppConfig(t *testing.T) {
-	migration := modulePath + "/migration/"
-	staged := migration + "artifacts/ecosystem/"
+	base := modulePath + "/internal/"
+	ecosystem := base + "artifacts/ecosystem/"
 	graph := map[string][]string{
-		staged + "npm":           nil,
-		staged + "maven":         nil,
-		migration + "app/config": {staged + "npm"},
-		migration + "app":        {migration + "app/config"},
-		migration + "artifacts":  {staged + "maven"},
+		ecosystem + "npm":   nil,
+		ecosystem + "maven": nil,
+		base + "app/config": {ecosystem + "npm"},
+		base + "app":        {base + "app/config"},
+		base + "artifacts":  {ecosystem + "maven"},
 	}
-	got := reverseClosure(graph, []string{staged + "npm"}, "npm")
+	got := reverseClosure(graph, []string{ecosystem + "npm"}, "npm")
 	want := []string{
 		"./internal/app",
 		"./internal/app/config",
@@ -72,7 +71,7 @@ func TestUnitSourceImportGraphFailsOnMissingInternalPackage(t *testing.T) {
 
 func TestUnitActualNPMReverseDependencies(t *testing.T) {
 	got, err := reverseDependentUnits(
-		[]string{modulePath + "/migration/artifacts/ecosystem/npm"},
+		[]string{modulePath + "/internal/artifacts/ecosystem/npm"},
 		"npm",
 	)
 	if err != nil {
@@ -107,32 +106,29 @@ func TestUnitImportGraphIncludesStagedPackages(t *testing.T) {
 	write("internal/artifacts/ecosystem/npm/npm.go", imports("npm"))
 	write("internal/artifacts/ecosystem/npm/http/routes.go",
 		imports("npmhttp", "internal/artifacts/ecosystem/npm"))
-	write("internal/artifacts/ecosystem/npm/npm.go",
-		imports("npm", "internal/artifacts/ecosystem/npm"))
 	write("internal/app/router.go", imports("app", "internal/artifacts/ecosystem/npm/http"))
 	write("cmd/artifactweave/main.go", imports("main", "internal/app"))
 	write("internal/artifacts/ecosystem/pypi/pypi.go", imports("pypi"))
 	// The go command builds neither of these, so their imports are not edges.
-	write("migration/.staging/stale.go", imports("stale", "migration/missing"))
+	write("internal/.cache/stale.go", imports("stale", "internal/missing"))
 	write("internal/artifacts/ecosystem/npm/testdata/fixture.go",
-		imports("fixture", "migration/missing"))
+		imports("fixture", "internal/missing"))
 	graph, err := sourceImportGraph(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := graph[modulePath+"/migration/app"]; !slices.Equal(
-		got, []string{modulePath + "/migration/artifacts/ecosystem/npm/http"},
+	if got := graph[modulePath+"/internal/app"]; !slices.Equal(
+		got, []string{modulePath + "/internal/artifacts/ecosystem/npm/http"},
 	) {
 		t.Fatalf("composition root's staged import was not recorded: %q", got)
 	}
-	for _, pkg := range []string{"migration/.staging", "internal/artifacts/ecosystem/npm/testdata"} {
+	for _, pkg := range []string{"internal/.cache", "internal/artifacts/ecosystem/npm/testdata"} {
 		if _, ok := graph[modulePath+"/"+pkg]; ok {
 			t.Errorf("graph includes unbuilt package %s", pkg)
 		}
 	}
-	got := reverseClosure(graph, []string{modulePath + "/migration/artifacts/ecosystem/npm"}, "npm")
+	got := reverseClosure(graph, []string{modulePath + "/internal/artifacts/ecosystem/npm"}, "npm")
 	want := []string{
-		"./internal/artifacts/ecosystem/npm",
 		"./internal/app",
 		"./internal/artifacts/ecosystem/npm",
 		"./internal/artifacts/ecosystem/npm/http",

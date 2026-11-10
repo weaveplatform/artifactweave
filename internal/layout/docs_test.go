@@ -16,7 +16,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/devtools/ledger"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
@@ -43,7 +42,7 @@ var placeholderStatus = regexp.MustCompile(
 	`^Placeholder: implemented by P\d{1,2}[a-z]?(, P\d{1,2}[a-z]?)*\.`,
 )
 
-// layerWord matches the layer that the Role of a staged package names.
+// layerWord matches the layer that the Role of a package under internal/ names.
 var layerWord = regexp.MustCompile(
 	`(?i)\b(api|core|adapters?|ecosystem|platform|kernel|app|devtools|gateway|layout|test support|module root)\b`,
 )
@@ -55,8 +54,7 @@ func TestUnitPackageDocs(t *testing.T) {
 }
 
 // checkPackageDocs returns, sorted, every way a package directory under root
-// falls short of the documentation standard. Directories in the legacy roots
-// keep their documentation debt until they move, so they are not checked.
+// falls short of the documentation standard.
 func checkPackageDocs(root string) []string {
 	dirs, err := repopath.GoDirs(root)
 	if err != nil {
@@ -64,9 +62,7 @@ func checkPackageDocs(root string) []string {
 	}
 	var problems []string
 	for _, dir := range dirs {
-		if !ledger.IsLegacy(dir) {
-			problems = append(problems, checkPackageDoc(root, dir)...)
-		}
+		problems = append(problems, checkPackageDoc(root, dir)...)
 	}
 	slices.Sort(problems)
 	return problems
@@ -211,7 +207,7 @@ type docSection struct {
 }
 
 // checkSections checks the headings of text, a package comment of a package
-// in dir, and the text under Status and, for staged packages, Role.
+// in dir, and the text under Status and, for packages under internal/, Role.
 func checkSections(dir, text string, placeholder bool) []string {
 	// go/doc/comment also turns a lone capitalised line between paragraphs
 	// into a heading. Counting the "# " lines tells such an old-style heading
@@ -292,7 +288,7 @@ func checkSections(dir, text string, placeholder bool) []string {
 			"Status reads %q, but the directory holds code; give the implemented phases", status,
 		))
 	}
-	if strings.HasPrefix(dir+"/", "migration/") && seen["Role"] &&
+	if strings.HasPrefix(dir+"/", root+"/") && seen["Role"] &&
 		!layerWord.MatchString(sectionText(sections, "Role")) {
 		problems = append(
 			problems,
@@ -388,9 +384,9 @@ func TestUnitPackageDocsRejectsNonConformingPackages(t *testing.T) {
 		cmdDoc   = "tools/cmd/doc.go"
 		suiteDoc = "test/server/suite/doc.go"
 	)
-	// A conforming tree: a staged package with code and tests, a placeholder,
-	// a command, a test-only directory and a generated client, the last two
-	// outside migration/, where Role needs no layer word.
+	// A conforming tree: a package with code and tests, a placeholder, a
+	// command, a test-only directory and a generated client, the last two
+	// outside internal/, where Role needs no layer word.
 	conforming := map[string]string{
 		libDoc: fixtureDoc(
 			"Package lib",
@@ -551,7 +547,7 @@ func TestUnitPackageDocsRejectsNonConformingPackages(t *testing.T) {
 			want:   laterDoc + `: Status reads "Placeholder: implemented by P11, P16b.", but the directory holds code`,
 		},
 		{
-			name: "staged role without a layer", change: replace(libDoc, "devtools layer.", "a library."),
+			name: "role without a layer", change: replace(libDoc, "devtools layer.", "a library."),
 			want: libDoc + ": Role names no layer",
 		},
 		{
@@ -568,7 +564,7 @@ func TestUnitPackageDocsRejectsNonConformingPackages(t *testing.T) {
 			name: "worktree copies are skipped",
 			change: both(
 				set(".worktrees/copy/go.mod", "module example.com/copy\n"),
-				set(".worktrees/copy/migration/devtools/x/x.go", "package x\n"),
+				set(".worktrees/copy/internal/devtools/x/x.go", "package x\n"),
 			),
 		},
 		{
@@ -576,7 +572,6 @@ func TestUnitPackageDocsRejectsNonConformingPackages(t *testing.T) {
 			change: both(set("nested/go.mod", "module example.com/nested\n"), set("nested/x/x.go", "package x\n")),
 		},
 		{name: "testdata is skipped", change: set("internal/devtools/lib/testdata/x/x.go", "package x\n")},
-		{name: "legacy roots are skipped", change: set("internal/x/x.go", "package x\n")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			files := maps.Clone(conforming)

@@ -150,13 +150,13 @@ func v(p auth.Principal, ref kernel.CredentialReference, r [32]byte) {
 			want: v + ":12: sets PasswordRevision in a Principal literal",
 		},
 		{
-			name: "file in a legacy auth package",
+			name: "file in an auth package outside access",
 			file: "internal/web/auth/principal.go",
 			src:  file(`	_ = p.TokenSubject`),
 			want: "internal/web/auth/principal.go:11: selects TokenSubject",
 		},
 		{
-			name: "subpackage of a legacy auth package",
+			name: "subpackage of an auth package outside access",
 			file: "internal/web/auth/token/token.go",
 			src:  file(`	_ = p.TokenSubject`),
 			want: "internal/web/auth/token/token.go:11: selects TokenSubject",
@@ -225,7 +225,7 @@ func checkPrincipalInternals(dir string) []string {
 
 // ownsPrincipalInternals reports whether the Go file at rel, a path relative
 // to the repository root, belongs to access or the kernel: any file under
-// the staged kernel and access trees.
+// the kernel and access trees.
 func ownsPrincipalInternals(rel string) bool {
 	return strings.HasPrefix(rel, root+"/kernel/") || strings.HasPrefix(rel, root+"/access/")
 }

@@ -58,9 +58,6 @@ func moduleRoot() (string, error) {
 // Parse committed Go source directly, including OS/build-tag alternatives, so
 // the planner does not need a network-dependent module download. Including
 // more imports than one runner compiles can only broaden the selected set.
-// Staged packages under migration/ have no internal path segment, so their
-// imports are recorded too; otherwise a format change would never reach the
-// legacy and staged packages that import it.
 func sourceImportGraph(root string) (map[string][]string, error) {
 	graph := map[string][]string{}
 	visit := func(file string, entry fs.DirEntry, walkErr error) error {
@@ -95,14 +92,13 @@ func sourceImportGraph(root string) (map[string][]string, error) {
 			if err != nil {
 				return err
 			}
-			if strings.HasPrefix(imported, modulePath+"/internal/") ||
-				strings.HasPrefix(imported, modulePath+"/migration/") {
+			if strings.HasPrefix(imported, modulePath+"/internal/") {
 				graph[pkg] = append(graph[pkg], imported)
 			}
 		}
 		return nil
 	}
-	for _, source := range []string{"api", "cmd", "internal", "migration", "pkg"} {
+	for _, source := range []string{"api", "cmd", "internal", "pkg"} {
 		dir := filepath.Join(root, source)
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			continue
@@ -166,33 +162,17 @@ func reverseClosure(graph map[string][]string, changedPackages []string, owner s
 // and so does the composition root's configuration package, which builds
 // the formats' settings for app. Without it a change to a format whose
 // settings that package builds would select the configuration's tests but
-// not app's, although app starts the server with those settings. As in
-// formatPackageOwner, the package is named under both roots, since
-// migration/ is renamed to internal/ at promotion.
+// not app's, although app starts the server with those settings.
 func carriesChange(pkg, owner string) bool {
-	if formatPackageOwner(pkg) == owner {
-		return true
-	}
-	for _, root := range []string{"/migration", "/internal"} {
-		if pkg == modulePath+root+"/app/config" {
-			return true
-		}
-	}
-	return false
+	return formatPackageOwner(pkg) == owner || pkg == modulePath+"/internal/app/config"
 }
 
 // formatPackageOwner names the format whose packages carry a change onward
-// through the reverse closure; migration/ is renamed to internal/ at
-// promotion, so the staged ecosystem prefix appears under both roots.
+// through the reverse closure.
 func formatPackageOwner(pkg string) string {
-	for _, prefix := range []string{
-		modulePath + "/internal/format/",
-		modulePath + "/migration/artifacts/ecosystem/",
-		modulePath + "/internal/artifacts/ecosystem/",
-	} {
-		if rest, ok := strings.CutPrefix(pkg, prefix); ok {
-			return strings.Split(rest, "/")[0]
-		}
+	rest, ok := strings.CutPrefix(pkg, modulePath+"/internal/artifacts/ecosystem/")
+	if !ok {
+		return ""
 	}
-	return ""
+	return strings.Split(rest, "/")[0]
 }

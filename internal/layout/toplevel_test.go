@@ -8,13 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/devtools/ledger"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
-
-// rootFiles are the only files allowed directly under root; promotion deletes
-// all three.
-var rootFiles = []string{"README.md", "ledger.json", "ledger.schema.json"}
 
 func TestUnitTopLevelDirectories(t *testing.T) {
 	for _, p := range checkTopLevel(repopath.Root(t)) {
@@ -22,9 +17,6 @@ func TestUnitTopLevelDirectories(t *testing.T) {
 	}
 
 	conforming := []string{
-		"migration/README.md",
-		"migration/ledger.json",
-		"migration/ledger.schema.json",
 		"internal/artifacts/doc.go",
 		"internal/estate/doc.go",
 		"internal/layout/doc.go",
@@ -41,24 +33,24 @@ func TestUnitTopLevelDirectories(t *testing.T) {
 	}{
 		{name: "conforming"},
 		{
-			name: "unknown top-level directory", add: "migration/artifact/doc.go",
-			want: "migration/artifact: unknown top-level directory",
+			name: "unknown top-level directory", add: "internal/artifact/doc.go",
+			want: "internal/artifact: unknown top-level directory",
 		},
 		{
-			name: "another file under the staging root", add: "migration/notes.md",
-			want: "migration/notes.md: only README.md, ledger.json and ledger.schema.json",
+			name: "a file directly under internal/", add: "internal/README.md",
+			want: "internal/README.md: no file may sit directly under internal/",
 		},
 		{
-			name: "a Go file under the staging root", add: "migration/doc.go",
-			want: "migration/doc.go: only README.md, ledger.json and ledger.schema.json",
+			name: "a Go file directly under internal/", add: "internal/doc.go",
+			want: "internal/doc.go: no file may sit directly under internal/",
 		},
 		{
 			name: "unknown pkg directory", add: "pkg/util/util.go",
-			want: "pkg/util: pkg/ holds only client, containertest and the legacy packages",
+			want: "pkg/util: pkg/ holds only client and containertest",
 		},
-		{name: "dot files are skipped", add: "migration/.DS_Store"},
+		{name: "dot files are skipped", add: "internal/.DS_Store"},
 		{name: "dot directories are skipped", add: "pkg/.cache/x.go"},
-		{name: "no staging root", drop: "migration", want: "migration: "},
+		{name: "no internal directory", drop: "internal", want: "internal: "},
 		{name: "no pkg directory", drop: "pkg", want: "pkg: "},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -100,9 +92,8 @@ func checkTopLevel(dir string) []string {
 		case e.IsDir() && !slices.Contains(modules, name) && !slices.Contains(otherTops, name):
 			report("%s/%s: unknown top-level directory; decision 0044 fixes the set, "+
 				"listed in modules and otherTops in internal/layout", root, name)
-		case !e.IsDir() && !slices.Contains(rootFiles, name):
-			report("%s/%s: only README.md, ledger.json and ledger.schema.json may sit "+
-				"directly under %s/", root, name, root)
+		case !e.IsDir():
+			report("%s/%s: no file may sit directly under %s/", root, name, root)
 		}
 	}
 
@@ -113,10 +104,19 @@ func checkTopLevel(dir string) []string {
 	for _, e := range entries {
 		p := "pkg/" + e.Name()
 		if e.IsDir() && !strings.HasPrefix(e.Name(), ".") &&
-			p != "pkg/client" && p != "pkg/containertest" && !ledger.IsLegacy(p) {
-			report("%s: pkg/ holds only client, containertest and the legacy packages "+
-				"that have not moved yet", p)
+			p != "pkg/client" && p != "pkg/containertest" {
+			report("%s: pkg/ holds only client and containertest", p)
 		}
 	}
 	return problems
+}
+
+func write(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -26,7 +26,7 @@ exclude:
     - ^internal/platform/testkit/storekit/
     # Per-module store contract suites (decision 0015); their remaining
     # branches are t.Fatal paths taken only when a backend breaks the contract.
-    - ^migration/[a-z]+/adapters/storetest/
+    - ^internal/[a-z]+/adapters/storetest/
     # The platform's store contract suite (decision 0015), in platform/store
     # rather than an adapters directory: the same t.Fatal paths.
     - ^internal/platform/store/storetest/

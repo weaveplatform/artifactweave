@@ -17,7 +17,7 @@
 //   - test_ownership.json, embedded in the binary: the reviewed owner of
 //     every directory with server tests.
 //   - The TestUnit and TestAcc tests it finds in the source under api/,
-//     internal/, migration/, pkg/, test/ and tools/, and the source import
+//     internal/, pkg/, test/ and tools/, and the source import
 //     graph, which adds the packages that import a changed one.
 //   - With -check-coverage and -packages: a merged coverage directory and the
 //     changed production packages.

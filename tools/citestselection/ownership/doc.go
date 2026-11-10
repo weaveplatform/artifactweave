@@ -1,14 +1,10 @@
 // Package ownership holds the rule that decides which test directories need a
-// reviewed owner in tools/citestselection/test_ownership.json, so the selector
-// and the migration's move tool apply the same rule.
+// reviewed owner in tools/citestselection/test_ownership.json.
 //
 // # Role
 //
 // Library of the repository tooling under tools/: not part of the server
-// binary, and it keeps its path through the modular-monolith migration.
-// tools/citestselection validates the inventory with it, and
-// internal/devtools/pkgmove drops an inventory key whose package moves to a
-// directory the rule does not own.
+// binary. tools/citestselection validates the inventory with it.
 //
 // # Inputs
 //
@@ -28,5 +24,5 @@
 //
 // # Status
 //
-// Implemented P9d (issue 951); issue 955 made it importable for pkgmove.
+// Implemented P9d (issues 951 and 955).
 package ownership

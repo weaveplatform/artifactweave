@@ -47,8 +47,6 @@
 //     revision of the Artifactory version response.
 //   - docs/testing/ci.md, "Releases": the release build stamps the package
 //     as make build does.
-//   - migration/README.md, "Per-ticket checklist", item 3: the -X flags are
-//     a path coupling that pkgmove rewrites when a package moves.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Dependency rules": the platform imports no module.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,

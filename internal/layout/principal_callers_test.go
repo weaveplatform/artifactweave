@@ -96,7 +96,7 @@ func WithPrincipal(ctx context.Context, p any) context.Context { return ctx }
 	}{
 		{name: "conforming"},
 		{
-			name: "call through a legacy package",
+			name: "call through another package",
 			src:  file(`	_ = auth.WithPrincipal(ctx, p)`),
 			want: v + ":11: names WithPrincipal; " + withPrincipalRule,
 		},
@@ -123,7 +123,7 @@ func WithPrincipal(ctx context.Context, p any) context.Context { return ctx }
 			want: v + ":11: names WithPrincipal",
 		},
 		{
-			name: "unqualified call in a legacy package",
+			name: "unqualified call in another package",
 			file: "internal/web/auth/x.go",
 			src:  file(`	_ = WithPrincipal(ctx, p)`),
 			want: "internal/web/auth/x.go:11: names WithPrincipal",

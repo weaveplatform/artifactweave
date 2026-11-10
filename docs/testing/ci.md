@@ -28,11 +28,9 @@ platform-specific and build-tagged sources; `go run ./tools/testnames -json`
 prints the complete inventory. `make test`, `make accept-go` and `make accept`
 run the guard. The `Select CI tests` job runs it before planning any profile.
 
-Go reserves `TestMain` for a package hook. Its four reviewed owners are
-`internal/access/core/authn` and `internal/devtools/pkgmove` (three-OS Go matrix; the
-pkgmove hook runs the test binary as a failing `git` for its fixture scripts),
-`test/acceptance` (Linux native acceptance), and `test/platform` (real-cloud
-platform scenarios). The four
+Go reserves `TestMain` for a package hook. Its three reviewed owners are
+`internal/access/core/authn` (three-OS Go matrix), `test/acceptance` (Linux native
+acceptance), and `test/platform` (real-cloud platform scenarios). The four
 `Fuzz...` entry points, `FuzzPatternMatch`, `FuzzXetWireParsing`, `FuzzPDBKey` and `FuzzParseScope`,
 retain Go's required names and run their seed corpora in the three-OS Go test
 matrix. The guard fails when an unclassified test or an unowned hook or fuzz

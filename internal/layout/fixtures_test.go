@@ -18,9 +18,7 @@ import (
 )
 
 // rootRelative is the fix every violation names. A path counted from the
-// package directory stops resolving when its package moves to another depth,
-// and tools/pkgmove can rewrite a fixture path only when it is one
-// root-relative literal.
+// package directory stops resolving when its package moves to another depth.
 const rootRelative = "name the path from the repository root through platform/testkit/repopath"
 
 // fileCalls are the calls, by import path, whose first argument is a path the

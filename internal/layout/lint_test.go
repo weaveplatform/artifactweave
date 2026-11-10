@@ -9,13 +9,12 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/weaveplatform/artifactweave/internal/devtools/ledger"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
 // scopePattern is the path-except of the exclusion rule that keeps every
-// linter but revive to internal/ and migration/ (decision 0044).
-const scopePattern = "^(internal|migration)/"
+// linter but revive to internal/ (decision 0044).
+const scopePattern = "^internal/"
 
 // wantRevive is the whole of revive's settings in .golangci.yml: the two
 // documentation rules, with the stuttering check off and
@@ -87,7 +86,7 @@ func TestUnitLintScopeListsEveryLinter(t *testing.T) {
 		},
 		{
 			name:   "no scope rule",
-			change: func(c *lintConfig) { c.Linters.Exclusions.Rules[scopeRuleIndex(c)].PathExcept = "^internal/" },
+			change: func(c *lintConfig) { c.Linters.Exclusions.Rules[scopeRuleIndex(c)].PathExcept = "^(internal|pkg)/" },
 			want:   "0 exclusion rules have path-except",
 		},
 		{
@@ -96,6 +95,15 @@ func TestUnitLintScopeListsEveryLinter(t *testing.T) {
 				c.Linters.Exclusions.Rules[scopeRuleIndex(c)].Text = "SA1019"
 			},
 			want: "the scope rule must have no condition besides path-except",
+		},
+		{
+			name: "a rule that silences revive",
+			change: func(c *lintConfig) {
+				c.Linters.Exclusions.Rules = append(c.Linters.Exclusions.Rules, exclusionRule{
+					Path: "^internal/", Linters: []string{"revive"},
+				})
+			},
+			want: "silences revive",
 		},
 		{
 			name: "revive not enabled",
@@ -159,8 +167,7 @@ func scopeRuleIndex(c *lintConfig) int {
 }
 
 // checkLintScope returns every way cfg lets a linter other than revive report
-// outside internal/ and migration/, or keeps revive's documentation checks
-// from reporting.
+// outside internal/, or keeps revive's documentation checks from reporting.
 func checkLintScope(cfg lintConfig) []string {
 	var problems []string
 	var scope []exclusionRule
@@ -193,6 +200,17 @@ func checkLintScope(cfg lintConfig) []string {
 			slices.Sorted(slices.Values(scope[0].Linters)), want,
 		))
 	}
+	// The scope rule's linters are checked above, so a revive there is
+	// reported once.
+	for _, r := range cfg.Linters.Exclusions.Rules {
+		if r.PathExcept != scopePattern && slices.Contains(r.Linters, "revive") {
+			problems = append(problems, fmt.Sprintf(
+				"the exclusion rule with path %q and path-except %q silences revive, "+
+					"which reports everywhere",
+				r.Path, r.PathExcept,
+			))
+		}
+	}
 	if !slices.Contains(cfg.Linters.Enable, "revive") {
 		problems = append(problems, "revive is not enabled")
 	}
@@ -209,100 +227,4 @@ func checkLintScope(cfg lintConfig) []string {
 		)
 	}
 	return problems
-}
-
-func TestUnitLintLegacyRuleMatchesLedgerLegacyRoots(t *testing.T) {
-	data := repopath.Read(t, ".golangci.yml")
-	for _, p := range checkLegacyRule(readLintConfig(t, data), ledger.LegacyRegexp()) {
-		t.Error(p)
-	}
-
-	for _, tc := range []struct {
-		name   string
-		change func(*lintConfig)
-		want   string
-	}{
-		{
-			name: "a root missing from the pattern",
-			change: func(c *lintConfig) {
-				i := legacyRuleIndex(c)
-				c.Linters.Exclusions.Rules[i].Path = strings.Replace(c.Linters.Exclusions.Rules[i].Path, "cdn|", "", 1)
-			},
-			want: fmt.Sprintf("want path %q", ledger.LegacyRegexp()),
-		},
-		{
-			name: "no legacy rule",
-			change: func(c *lintConfig) {
-				c.Linters.Exclusions.Rules = slices.Delete(c.Linters.Exclusions.Rules, legacyRuleIndex(c), legacyRuleIndex(c)+1)
-			},
-			want: "0 exclusion rules name revive",
-		},
-		{
-			name: "revive silenced elsewhere",
-			change: func(c *lintConfig) {
-				c.Linters.Exclusions.Rules = append(c.Linters.Exclusions.Rules, exclusionRule{
-					Path: "^test/", Linters: []string{"revive", "gosec"},
-				})
-			},
-			want: "2 exclusion rules name revive",
-		},
-		{
-			name: "a narrowed legacy rule",
-			change: func(c *lintConfig) {
-				c.Linters.Exclusions.Rules[legacyRuleIndex(c)].Text = "exported"
-			},
-			want: "and no other condition",
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			cfg := readLintConfig(t, data)
-			tc.change(&cfg)
-			problems := checkLegacyRule(cfg, ledger.LegacyRegexp())
-			if len(problems) != 1 || !strings.Contains(problems[0], tc.want) {
-				t.Fatalf("problems = %q; want one containing %q", problems, tc.want)
-			}
-		})
-	}
-}
-
-// legacyRuleIndex returns the index of the rule that silences revive alone,
-// for the cases that break it; the configuration under test always has one.
-func legacyRuleIndex(c *lintConfig) int {
-	return slices.IndexFunc(c.Linters.Exclusions.Rules, func(r exclusionRule) bool {
-		return slices.Equal(r.Linters, []string{"revive"})
-	})
-}
-
-// checkLegacyRule reports unless exactly one exclusion rule names revive: the
-// one that silences revive alone in the legacy roots, whose path is want,
-// ledger.LegacyRegexp(). The ledger is where the legacy roots are defined, so
-// the lint exclusion cannot drift from the roots the migration empties.
-func checkLegacyRule(cfg lintConfig, want string) []string {
-	var rules []exclusionRule
-	for _, r := range cfg.Linters.Exclusions.Rules {
-		if slices.Contains(r.Linters, "revive") {
-			rules = append(rules, r)
-		}
-	}
-	switch r := rules; {
-	case len(r) != 1:
-		return []string{
-			fmt.Sprintf("%d exclusion rules name revive; want one, for the legacy roots", len(r)),
-		}
-	case r[0].Path != want || r[0].PathExcept != "" || r[0].Text != "" || r[0].Source != "" ||
-		!slices.Equal(r[0].Linters, []string{"revive"}):
-		return []string{
-			fmt.Sprintf(
-				"the rule that names revive has path %q, path-except %q, text %q, source %q and linters %v; "+
-					"want path %q from ledger.LegacyRegexp, linters [revive] and no other condition",
-				r[0].Path,
-				r[0].PathExcept,
-				r[0].Text,
-				r[0].Source,
-				r[0].Linters,
-				want,
-			),
-		}
-	}
-	return nil
 }

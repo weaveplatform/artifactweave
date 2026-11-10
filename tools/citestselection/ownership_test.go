@@ -19,7 +19,7 @@ func TestUnitServerTestOwnershipInventory(t *testing.T) {
 	}
 	root := filepath.Clean("../..")
 	seenPackages, seenFiles := map[string]bool{}, map[string]bool{}
-	// Every scanned root, not a fixed list, so a staged directory that
+	// Every scanned root, not a fixed list, so a directory that
 	// ownership.OwnedTestDir accepts is checked from the commit that creates it.
 	for _, area := range scanRoots {
 		base := filepath.Join(root, area)
@@ -165,11 +165,8 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 			o.Packages["test/server/artifacts/npm"] = ""
 		}, "invalid test package owner"},
 		{"shared files without a package", func(o *testOwnership) {
-			// The final root's app directory, which valid does not list, in
-			// two parts: written whole, it is also the legacy path that
-			// WEB-18 moved to internal/app, which pkgmove's stale check
-			// reports until promotion moves the composition root back there.
-			o.SharedFiles["internal"+"/app"] = []string{"app_test.go"}
+			// An owned test directory that valid does not list.
+			o.SharedFiles["internal/artifacts/adapters/http"] = []string{"items_test.go"}
 		}, "invalid shared test directory"},
 		{"shared files in a format package", func(o *testOwnership) {
 			o.SharedFiles["test/server/artifacts/npm"] = []string{"publish_test.go"}

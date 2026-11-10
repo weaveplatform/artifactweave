@@ -159,10 +159,11 @@ func TestAccChangedPathsUsesMergeBase(t *testing.T) {
 		t.Fatalf("release PR with docs-only diff profile = %q", got)
 	}
 	git("checkout", "-qb", "format", base)
-	if err := os.MkdirAll(filepath.Join(dir, "internal", "format", "npm"), 0o755); err != nil {
+	npmDir := filepath.Join(dir, "internal", "artifacts", "ecosystem", "npm")
+	if err := os.MkdirAll(npmDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "internal", "format", "npm", "handler.go"),
+	if err := os.WriteFile(filepath.Join(npmDir, "handler.go"),
 		[]byte("package npm\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

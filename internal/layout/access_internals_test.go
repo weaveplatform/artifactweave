@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/devtools/ledger"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
@@ -21,8 +20,7 @@ import (
 // root and the server harnesses wire into the router themselves, and the
 // roles and OIDC services, with which the router's route and principal
 // matrix creates its principals' environments, roles, providers and
-// mappings. The evaluator is never one, and neither is a legacy path of
-// them.
+// mappings. The evaluator is never one.
 var allowlistedInternals = []string{
 	root + "/access/core/authn",
 	root + "/access/core/token",
@@ -59,11 +57,7 @@ const accessInternalsRule = "outside access, tests reach it through access/api a
 	"support (accesstest, accessapitest, idtokentest)"
 
 func TestUnitTestsAvoidAccessInternals(t *testing.T) {
-	l, err := ledger.Load(repopath.Path(t, root+"/ledger.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	problems := checkAccessInternals(repopath.Root(t), l, accessInternalsAllowlist)
+	problems := checkAccessInternals(repopath.Root(t), accessInternalsAllowlist)
 	for _, p := range problems {
 		t.Error(p)
 	}
@@ -76,7 +70,7 @@ func TestUnitTestsAvoidAccessInternals(t *testing.T) {
 // by a test outside access in the repository at dir, as "file imports
 // path", and each entry of allow that no importing file uses. A test is a
 // _test.go file, or any Go file under test/; the walk uses repopath.SkipDir.
-func checkAccessInternals(dir string, l *ledger.Ledger, allow []accessAllowance) []string {
+func checkAccessInternals(dir string, allow []accessAllowance) []string {
 	var problems []string
 	used := make([]bool, len(allow))
 	fset := token.NewFileSet()
@@ -88,7 +82,7 @@ func checkAccessInternals(dir string, l *ledger.Ledger, allow []accessAllowance)
 			return fs.SkipDir
 		case d.IsDir() || !strings.HasSuffix(rel, ".go"),
 			!strings.HasSuffix(rel, "_test.go") && !under(rel, "test"),
-			insideAccess(l, path.Dir(rel)):
+			under(rel, root+"/access"):
 			return nil
 		}
 		imports, err := moduleImports(fset, dir, rel)
@@ -125,23 +119,9 @@ func checkAccessInternals(dir string, l *ledger.Ledger, allow []accessAllowance)
 	return problems
 }
 
-// insideAccess reports whether dir, a directory relative to the repository
-// root, belongs to access: it is staged under access, or its ledger entry
-// moves it into access.
-func insideAccess(l *ledger.Ledger, dir string) bool {
-	if under(dir, root+"/access") {
-		return true
-	}
-	if !ledger.IsLegacy(dir) {
-		return false
-	}
-	target, _, ok := l.Translate(modulePath + "/" + dir)
-	return ok && under(target, modulePath+"/"+root+"/access")
-}
-
 // accessInternal reports whether imported, a path relative to the
-// repository root, is an access internal: a package of staged access core
-// other than test support, whose name ends in test, as idtokentest's does.
+// repository root, is an access internal: a package of access core other
+// than test support, whose name ends in test, as idtokentest's does.
 func accessInternal(imported string) bool {
 	return under(imported, root+"/access/core") && !strings.HasSuffix(path.Base(imported), "test")
 }
@@ -168,25 +148,6 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		b.WriteString(")\n")
 		return b.String()
 	}
-	// internal/web is made up, outside every ledger entry, so that no move
-	// rewrites this data.
-	l := &ledger.Ledger{
-		Module:      modulePath,
-		StagingRoot: root,
-		Packages: []ledger.Package{
-			{
-				From:   "internal/service/accounts",
-				Action: ledger.ActionMove,
-				To:     "access/core/accounts",
-			},
-			{
-				From:   "internal/web/xyz",
-				Action: ledger.ActionMove,
-				To:     "artifacts/ecosystem/npm/http",
-			},
-			{From: "internal/web/auth", Action: ledger.ActionMove, To: "access/core/authn"},
-		},
-	}
 	allow := []accessAllowance{
 		{"internal/web/*_test.go", "TST-04"},
 		{"internal/app/*_test.go", "TST-07"},
@@ -202,19 +163,15 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		"internal/app/run_test.go":        file(tokens),
 		"test/server/access/auth_test.go": file(authenticator),
 		"test/server/support/assemble.go": file(tokens),
-		// Access's own tests: staged, and in legacy packages whose entries
-		// move them into access.
-		root + "/access/core/authn/authn_test.go":    file(evaluator, authenticator),
-		"internal/web/auth/auth_test.go":             file(evaluator, authenticator),
-		"internal/service/accounts/accounts_test.go": file(evaluator, tokens),
-		// The published contracts and access test support, staged and legacy.
+		// Access's own tests.
+		root + "/access/core/authn/authn_test.go": file(evaluator, authenticator),
+		// The published contracts and access test support.
 		"internal/web/xyz/npm_test.go": file(
 			root+"/access",
 			root+"/access/api",
 			root+"/access/accesstest",
 			root+"/access/api/accessapitest",
 			root+"/access/core/idtoken/idtokentest",
-			"internal/access/core/idtoken/idtokentest",
 		),
 		// Production code is the import tiers' to judge, as are the files
 		// of skipped directories.
@@ -250,7 +207,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 			want: protocol + " imports " + tokens,
 		},
 		{
-			name: "staged artifacts test importing access core",
+			name: "artifacts test importing access core",
 			file: root + "/artifacts/core/item/item_test.go",
 			src:  file(root + "/access/core/authn"),
 			want: root + "/artifacts/core/item/item_test.go imports " + root + "/access/core/authn",
@@ -299,7 +256,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 			if tc.extra != "" {
 				entries = append(slices.Clone(allow), accessAllowance{tc.extra, "ECO-06"})
 			}
-			problems := checkAccessInternals(dir, l, entries)
+			problems := checkAccessInternals(dir, entries)
 			if tc.want == "" && problems != nil {
 				t.Fatalf("problems in a conforming tree: %q", problems)
 			}
@@ -311,7 +268,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 
 	t.Run("missing root", func(t *testing.T) {
 		missing := filepath.Join(t.TempDir(), "missing")
-		problems := checkAccessInternals(missing, l, nil)
+		problems := checkAccessInternals(missing, nil)
 		if len(problems) != 1 {
 			t.Errorf("problems = %q; want one for the missing root", problems)
 		}

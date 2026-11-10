@@ -13,21 +13,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/devtools/ledger"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
-// root is the staging root. The rows name staged packages relative to it, so
-// promotion changes it to "internal" and leaves the rows as they are.
-const root = "migration"
+// root holds the project-only packages. The rows name its packages relative
+// to it.
+const root = "internal"
 
-// modulePath is the module whose imports the rows judge. ledger.Validate pins
-// the ledger's module to the same path.
+// modulePath is the module whose imports the rows judge.
 const modulePath = "github.com/weaveplatform/artifactweave"
 
 // modules and otherTops are the only names allowed directly under root
-// (decision 0044). devtools/ledger holds the same set to validate ledger
-// targets, so the two change together.
+// (decision 0044).
 var (
 	modules = []string{
 		"artifacts", "access", "configuration", "notifications", "retention", "federation",
@@ -36,34 +33,25 @@ var (
 	otherTops = []string{"kernel", "platform", "gateway", "app", "layout", "devtools"}
 )
 
-// walkRoots are the trees whose imports the rows judge: the staged packages and
-// the two pkg/ packages that keep their paths. Legacy packages are judged once
-// they move.
+// walkRoots are the trees whose imports the rows judge: root and the two pkg/
+// packages.
 var walkRoots = []string{root, "pkg/client", "pkg/containertest"}
 
-// sharedTypes are the staged packages that generated clients and servers name
-// through x-go-type-import (decision 0002), so rows 3 and 6 allow them.
+// sharedTypes are the packages under root that generated clients and servers
+// name through x-go-type-import (decision 0002), so rows 3 and 6 allow them.
 var sharedTypes = []string{"artifacts/api/repo", "kernel/wire"}
 
 func TestUnitImportTiers(t *testing.T) {
-	l, err := ledger.Load(repopath.Path(t, root+"/ledger.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	violations, splits := checkImports(repopath.Root(t), l)
-	for _, s := range splits {
-		t.Log(s)
-	}
-	t.Logf("%d imports of split legacy packages allowed", len(splits))
-	for _, v := range violations {
+	for _, v := range checkImports(repopath.Root(t)) {
 		t.Error(v)
 	}
 }
 
 // checkImports judges every import of a module package by a Go file under
-// walkRoots in the repository at dir, walking with repopath.SkipDir. It returns,
-// sorted, the violations and the allowed imports of split legacy packages.
-func checkImports(dir string, l *ledger.Ledger) (violations, splits []string) {
+// walkRoots in the repository at dir, walking with repopath.SkipDir. It returns
+// the violations, sorted.
+func checkImports(dir string) []string {
+	var violations []string
 	fset := token.NewFileSet()
 	visit := func(rel string, d fs.DirEntry, err error) error {
 		switch {
@@ -79,10 +67,7 @@ func checkImports(dir string, l *ledger.Ledger) (violations, splits []string) {
 			violations = append(violations, err.Error())
 		}
 		for _, imported := range imports {
-			switch line, split := judge(l, rel, imported); {
-			case split:
-				splits = append(splits, line)
-			case line != "":
+			if line := judge(rel, imported); line != "" {
 				violations = append(violations, line)
 			}
 		}
@@ -94,8 +79,7 @@ func checkImports(dir string, l *ledger.Ledger) (violations, splits []string) {
 		}
 	}
 	slices.Sort(violations)
-	slices.Sort(splits)
-	return violations, splits
+	return violations
 }
 
 // moduleImports returns the imports of the Go file at rel, a path relative to
@@ -124,53 +108,32 @@ func moduleImports(fset *token.FileSet, dir, rel string) ([]string, error) {
 }
 
 // judge applies the rows to the import of imported, a path relative to the
-// repository root, by the Go file at file. It returns the line that reports the
-// import, with split true when the line logs an allowed import of a split legacy
-// package. line is empty when the import is allowed without a log.
-func judge(l *ledger.Ledger, file, imported string) (line string, split bool) {
-	from, fromStaged := rulePath(path.Dir(file))
-	to, toStaged := rulePath(imported)
-	shown := imported
-	if !toStaged && ledger.IsLegacy(imported) {
-		target, action, ok := l.Translate(modulePath + "/" + imported)
-		switch {
-		case !ok:
-			return file + " imports " + imported + " (legacy package with no ledger entry)", false
-		case action == ledger.ActionDelete:
-			return file + " imports " + imported + " (legacy package marked delete)", false
-		case action == ledger.ActionSplit && fromStaged:
-			return file + " imports " + imported +
-				" (legacy package marked split; allowed until it is emptied)", true
-		case action == ledger.ActionSplit:
-			// Decision 0044 lets staged code import a split package until its
-			// narrowing. pkg/client and pkg/containertest are not staged code,
-			// so the rows judge the legacy path itself, and rows 3 and 4
-			// reject it.
-		default:
-			target = strings.TrimPrefix(target, modulePath+"/")
-			to, _ = rulePath(target)
-			shown = imported + ", judged as " + target
-		}
-	}
-	row, ok := allowed(from, to, strings.HasSuffix(file, "_test.go"))
+// repository root, by the Go file at file. It returns the line that reports
+// the import, or "" when the rows allow it.
+func judge(file, imported string) string {
+	row, ok := allowed(
+		rulePath(path.Dir(file)),
+		rulePath(imported),
+		strings.HasSuffix(file, "_test.go"),
+	)
 	if ok {
-		return "", false
+		return ""
 	}
-	return fmt.Sprintf("%s imports %s (row %d: %s)", file, shown, row, rows[row].text), false
+	return fmt.Sprintf("%s imports %s (row %d: %s)", file, imported, row, rows[row].text)
 }
 
 // rulePath returns the path by which the rows name the package at p, a path
-// relative to the repository root, and whether the package is staged. A staged
-// package is named relative to root ("artifacts/core/item"), any other package
-// relative to the repository root ("pkg/client/artifactory", "test/server",
-// "api"). The two cannot be confused: TestUnitTopLevelDirectories keeps every
-// staged path starting with a name in modules or otherTops, and no directory
-// at the repository root has such a name.
-func rulePath(p string) (string, bool) {
+// relative to the repository root. A package under root is named relative to
+// root ("artifacts/core/item"), any other package relative to the repository
+// root ("pkg/client/artifactory", "test/server", "api"). The two cannot be
+// confused: TestUnitTopLevelDirectories keeps every path under root starting
+// with a name in modules or otherTops, and no directory at the repository
+// root has such a name.
+func rulePath(p string) string {
 	if rest, ok := strings.CutPrefix(p, root+"/"); ok {
-		return rest, true
+		return rest
 	}
-	return p, false
+	return p
 }
 
 // rule is a row of the dependency table. decide reports whether the row applies
@@ -206,9 +169,9 @@ var rows = []rule{
 		},
 	},
 	{
-		text: "pkg/containertest imports no staged or legacy package",
+		text: "pkg/containertest imports no package under internal/",
 		decide: func(from, to string, _ bool) (bool, bool) {
-			return under(from, "pkg/containertest") && (staged(to) || ledger.IsLegacy(to)), false
+			return under(from, "pkg/containertest") && underRoot(to), false
 		},
 	},
 	{
@@ -327,8 +290,8 @@ func testSupport(p string) bool {
 		under(p, "test")
 }
 
-// staged reports whether p, a rule path, names a staged package.
-func staged(p string) bool {
+// underRoot reports whether p, a rule path, names a package under root.
+func underRoot(p string) bool {
 	top, _, _ := strings.Cut(p, "/")
 	return slices.Contains(modules, top) || slices.Contains(otherTops, top)
 }
@@ -406,10 +369,8 @@ func TestUnitImportRulesDetectViolations(t *testing.T) {
 		{3, "pkg/client/artifactory", "pkg/client/access", code, 3, allow},
 		{3, "pkg/client/artifactory", "kernel", code, 3, violation},
 		{3, "pkg/client/artifactory", "api", code, 3, violation},
-		{3, "pkg/client/artifactory", "internal/oldtypes", code, 3, violation},
 
 		{4, "pkg/containertest", "platform/blob", code, 4, violation},
-		{4, "pkg/containertest", "internal/oldstore", code, 4, violation},
 		{4, "pkg/containertest", "pkg/client/artifactory", code, none, allow},
 
 		{5, "app", "artifacts/adapters/sql", code, 5, allow},
@@ -541,76 +502,35 @@ func TestUnitImportRulesDetectViolations(t *testing.T) {
 		}
 		return dir
 	}
-	// Every path is made up: pkgmove rewrites a real legacy path in this data
-	// once its package moves.
-	l := &ledger.Ledger{
-		Module:      modulePath,
-		StagingRoot: root,
-		Packages: []ledger.Package{
-			{From: "internal/accounts/token", Action: ledger.ActionMove, To: "access/core/token"},
-			{
-				From: "internal/fixture", Action: ledger.ActionMove, To: "test/fixture",
-				Scope: ledger.ScopeRepo,
-			},
-			{From: "internal/oldlayout", Action: ledger.ActionDelete},
-			{From: "internal/oldtypes", Action: ledger.ActionSplit},
-			// pkg/client may import its target.
-			{From: "internal/repomodel", Action: ledger.ActionMove, To: "artifacts/api/repo"},
-		},
-	}
 	const m = modulePath + "/"
 
-	t.Run("the walk judges legacy imports by their ledger target", func(t *testing.T) {
+	t.Run("the walk judges every module import by the rows", func(t *testing.T) {
 		const item = "internal/artifacts/core/item/item.go"
 		dir := tree(t, map[string]string{
-			// Its own module once judged as the target, so allowed.
-			"internal/access/core/user/user.go": src(m + "internal/accounts/token"),
+			// Its own module, so allowed.
+			"internal/access/core/user/user.go": src(m + "internal/access/core/token"),
 			item: src(
 				"fmt", "example.com/elsewhere", m+"internal/artifacts/core/port",
-				m+"internal/artifacts/adapters/sql", m+"internal/accounts/token",
-				m+"internal/fixture", m+"internal/oldtypes", m+"internal/oldlayout",
-				m+"internal/unmapped",
+				m+"internal/artifacts/adapters/sql",
 			),
-			"internal/artifacts/core/item/item_test.go": src(
-				m+"internal/artifacts/core/item", m+"internal/fixture", m+"internal/oldtypes",
-			),
+			"internal/artifacts/core/item/item_test.go": src(m + "internal/artifacts/core/item"),
 			// Each import below would break a row if the walk reached it.
-			"internal/kernel/testdata/x.go": src(m + "internal/app"),
-			"internal/kernel/.cache/x.go":   src(m + "internal/app"),
-			"internal/kernel/nested/go.mod": "module example.com/nested\n",
-			"internal/kernel/nested/x.go":   src(m + "internal/app"),
-			// A legacy file, made up outside every ledger entry so that no
-			// move rewrites it.
-			"internal/web/router.go": src(m + "test/server/support"),
-			"pkg/client/artifactory/client.go": src(
-				m+"internal/repomodel",
-				m+"internal/oldtypes",
-			),
+			"internal/kernel/testdata/x.go":      src(m + "internal/app"),
+			"internal/kernel/.cache/x.go":        src(m + "internal/app"),
+			"internal/kernel/nested/go.mod":      "module example.com/nested\n",
+			"internal/kernel/nested/x.go":        src(m + "internal/app"),
+			"pkg/client/artifactory/client.go":   src(m + "internal/artifacts/api/repo"),
 			"pkg/containertest/containertest.go": src(m + "internal/platform/blob"),
 		})
-		violation := func(file, shown string, row int) string {
-			return fmt.Sprintf("%s imports %s (row %d: %s)", file, shown, row, rows[row].text)
+		violation := func(file, imported string, row int) string {
+			return fmt.Sprintf("%s imports %s (row %d: %s)", file, imported, row, rows[row].text)
 		}
-		wantViolations := []string{
-			violation(item, "internal/accounts/token, judged as internal/access/core/token", 11),
-			violation(item, "internal/fixture, judged as test/fixture", 2),
-			item + " imports internal/oldlayout (legacy package marked delete)",
-			item + " imports internal/unmapped (legacy package with no ledger entry)",
+		want := []string{
 			violation(item, "internal/artifacts/adapters/sql", 12),
-			violation("pkg/client/artifactory/client.go", "internal/oldtypes", 3),
 			violation("pkg/containertest/containertest.go", "internal/platform/blob", 4),
 		}
-		wantSplits := []string{
-			item + " imports internal/oldtypes (legacy package marked split; allowed until it is emptied)",
-			"internal/artifacts/core/item/item_test.go imports internal/oldtypes " +
-				"(legacy package marked split; allowed until it is emptied)",
-		}
-		violations, splits := checkImports(dir, l)
-		if !slices.Equal(violations, wantViolations) {
-			t.Errorf("violations:\n%q\nwant:\n%q", violations, wantViolations)
-		}
-		if !slices.Equal(splits, wantSplits) {
-			t.Errorf("splits:\n%q\nwant:\n%q", splits, wantSplits)
+		if violations := checkImports(dir); !slices.Equal(violations, want) {
+			t.Errorf("violations:\n%q\nwant:\n%q", violations, want)
 		}
 	})
 
@@ -638,10 +558,9 @@ func TestUnitImportRulesDetectViolations(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			violations, splits := checkImports(tree(t, tc.files), l)
-			if len(violations) != 1 || !strings.Contains(violations[0], tc.want) || splits != nil {
-				t.Fatalf("violations = %q, splits = %q; want one violation containing %q",
-					violations, splits, tc.want)
+			violations := checkImports(tree(t, tc.files))
+			if len(violations) != 1 || !strings.Contains(violations[0], tc.want) {
+				t.Fatalf("violations = %q; want one violation containing %q", violations, tc.want)
 			}
 		})
 	}

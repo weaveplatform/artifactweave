@@ -105,7 +105,7 @@ func TestUnitPathAndReadAreRootRelative(t *testing.T) {
 		t.Errorf("Path(go.mod) = %q; want %q", got, want)
 	}
 	if got, want := Path(t, "internal/platform/testkit/repopath/doc.go"),
-		filepath.Join(root, "migration", "platform", "testkit", "repopath", "doc.go"); got != want {
+		filepath.Join(root, "internal", "platform", "testkit", "repopath", "doc.go"); got != want {
 		t.Errorf("Path of this package's doc.go = %q; want %q", got, want)
 	}
 	want, err := os.ReadFile(filepath.Join(root, "go.mod"))
@@ -123,7 +123,7 @@ func TestUnitPathAndReadAreRootRelative(t *testing.T) {
 			t.Errorf("Path(%q) failed with %q; want a rejection", rel, msg)
 		}
 	}
-	msg := fatalOf(t, func(tb testing.TB) { Read(tb, "migration/no-such-file") })
+	msg := fatalOf(t, func(tb testing.TB) { Read(tb, "internal/no-such-file") })
 	if !strings.Contains(msg, "no-such-file") {
 		t.Errorf("Read of a missing file failed with %q; want the read error", msg)
 	}

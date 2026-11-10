@@ -72,9 +72,6 @@ jobs:
       - name: Verify every Go test has a declared kind
         run: go run ./tools/testnames
 
-      - name: Verify no stale pre-migration paths
-        run: go run ./tools/pkgmove check
-
       - name: Select profile
         id: plan
         env:

@@ -197,7 +197,6 @@ func TestUnitFormatSourceOwnerStagedLayouts(t *testing.T) {
 	useTestOwnership(t, testOwnership{
 		Version: 2,
 		Packages: map[string]string{
-			"internal/artifacts/ecosystem/npm/http": "npm",
 			"internal/app":                          "shared",
 			"internal/artifacts/adapters/http":      "shared",
 			"internal/artifacts/ecosystem/npm/http": "npm",
@@ -217,15 +216,12 @@ func TestUnitFormatSourceOwnerStagedLayouts(t *testing.T) {
 	for file, want := range map[string]string{
 		"internal/artifacts/ecosystem/npm/tarball.go":           "npm",
 		"internal/artifacts/ecosystem/npm/tarball_test.go":      "npm",
-		"internal/artifacts/ecosystem/npm/tarball.go":           "npm",
 		"internal/artifacts/ecosystem/npm/http/routes.go":       "npm",
-		"internal/artifacts/ecosystem/npm/http/routes_test.go":  "npm",
 		"internal/artifacts/ecosystem/npm/http/routes_test.go":  "npm",
 		"test/server/artifacts/npm/publish_test.go":             "npm",
 		"test/server/artifacts/npm/fixture.go":                  "npm",
 		"internal/artifacts/ecosystem/npm/handler.go":           "npm",
 		"test/server/cargo/publish_test.go":                     "cargo",
-		"internal/artifacts/ecosystem/pypi/http/routes_test.go": "",
 		"internal/artifacts/ecosystem/pypi/http/routes_test.go": "",
 		"test/server/artifacts/helm/push_test.go":               "",
 		"test/server/artifacts/items_test.go":                   "",
@@ -250,14 +246,14 @@ func TestUnitFormatSourceOwnerStagedLayouts(t *testing.T) {
 		{status: "M", path: "test/server/artifacts/npm/fixture.go"},
 	})
 	want := []string{
-		modulePath + "/migration/artifacts/ecosystem/npm",
-		modulePath + "/migration/artifacts/ecosystem/npm/http",
+		modulePath + "/internal/artifacts/ecosystem/npm",
+		modulePath + "/internal/artifacts/ecosystem/npm/http",
 	}
 	if staged.profile != "format" || staged.owner != "npm" ||
 		!slices.Equal(staged.changedPackages, want) {
 		t.Fatalf("staged npm plan: %+v", staged)
 	}
-	for _, pkg := range append(want, modulePath+"/migration/artifacts/ecosystem/npm/http/...") {
+	for _, pkg := range append(want, modulePath+"/internal/artifacts/ecosystem/npm/http/...") {
 		if !slices.Contains(strings.Split(staged.coverpkg, ","), pkg) {
 			t.Errorf("staged npm plan does not instrument %s: %s", pkg, staged.coverpkg)
 		}

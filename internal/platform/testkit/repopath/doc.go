@@ -1,14 +1,13 @@
 // Package repopath finds the repository root and reads files by their
 // root-relative paths, so a test names a fixture such as
 // "api/access.openapi.yaml" the same way from any package directory. It
-// also holds the walk rule that every repository walk of the migration
-// shares.
+// also holds the walk rule that every repository walk shares.
 //
 // # Role
 //
 // platform module, test support layer (platform/testkit). It imports only
-// the standard library, so it moves unchanged when migration/ is promoted
-// to internal/.
+// the standard library, so a test in any package can use it without an
+// import cycle.
 //
 // # Inputs
 //
@@ -21,7 +20,7 @@
 //   - Absolute paths and file contents. A failed lookup fails the test
 //     through testing.TB instead of returning an error to every caller.
 //   - The sorted root-relative directories that hold Go files, for the
-//     layout and ledger tests.
+//     layout tests.
 //
 // # Invariants
 //
@@ -34,7 +33,6 @@
 // # References
 //
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md.
-//   - migration/README.md, "Walk rule".
 //   - Plan: docs/implementation/plan.md#p9d-modular-monolith-migration.
 //   - https://github.com/weaveplatform/artifactweave/issues/950
 //

@@ -151,7 +151,7 @@ func TestUnitEveryMappedFormatOwnerHasAnExplicitGoKind(t *testing.T) {
 	}
 	for owner := range formats {
 		candidate := proposeAffected([]change{{
-			status: "M", path: "internal/format/" + owner + "/format.go",
+			status: "M", path: "internal/artifacts/ecosystem/" + owner + "/format.go",
 		}})
 		if candidate.profile != "format" {
 			t.Errorf("%s: %+v", owner, candidate)
@@ -249,7 +249,7 @@ func TestUnitFormatAppDependenciesSelectOnlyOwnedFiles(t *testing.T) {
 	} {
 		t.Run(owner, func(t *testing.T) {
 			candidate := proposeAffected([]change{{
-				status: "M", path: "internal/format/" + owner + "/handler.go",
+				status: "M", path: "internal/artifacts/ecosystem/" + owner + "/handler.go",
 			}})
 			// The remote suite runs from the owner's own package, which the
 			// plan runs whole; of app's tests, only the router guards the
@@ -303,26 +303,12 @@ func TestUnitScanKindsIncludesMigrationAndToleratesMissingRoots(t *testing.T) {
 func TestUnitLegacy() {}
 func TestAccLegacy() {}
 `)
-	// Only internal/ exists, so every other root, migration/ included, is missing.
+	// Only internal/ exists, so every other root is missing.
 	before, err := scanKinds(root, plan{profile: "full"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(before.Unit, []string{"./internal/legacy"}) {
-		t.Fatalf("tree without migration/: %+v", before)
-	}
-	write("migration/staged/staged_test.go", `package staged
-func TestUnitStaged() {}
-func TestAccStaged() {}
-func FuzzStaged() {}
-`)
-	after, err := scanKinds(root, plan{profile: "full"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !slices.Equal(after.Unit, []string{"./internal/legacy", "./migration/staged"}) ||
-		!slices.Equal(after.Acc, []string{"./internal/legacy", "./migration/staged"}) ||
-		!slices.Equal(after.Fuzz, []string{"./migration/staged"}) {
-		t.Fatalf("staged package not selected: %+v", after)
+		t.Fatalf("tree with missing roots: %+v", before)
 	}
 }

@@ -275,7 +275,7 @@ func ownerCoverPackages(owner string, conf formatImpact, inventory testOwnership
 		// Test-only owners still need a stable instrumented package set.
 		coverPackages = append(
 			coverPackages,
-			modulePath+"/migration/artifacts/ecosystem/docker/http/...",
+			modulePath+"/internal/artifacts/ecosystem/docker/http/...",
 		)
 	}
 	slices.Sort(coverPackages)
@@ -291,17 +291,14 @@ func formatSourceOwner(file string) (string, bool) {
 		return "", false
 	}
 	var owner string
-	// The staged ecosystem cases accept both roots because migration/ is
-	// renamed to internal/ at promotion. Each needs a fifth part so that the
-	// owner is a directory: test/server/artifacts/x_test.go is shared.
+	// The ecosystem cases each need a fifth part so that the owner is a
+	// directory: test/server/artifacts/x_test.go is shared.
 	switch {
-	case len(parts) >= 5 && (parts[0] == "migration" || parts[0] == "internal") &&
-		parts[1] == "artifacts" && parts[2] == "ecosystem":
+	case len(parts) >= 5 && parts[0] == "internal" && parts[1] == "artifacts" &&
+		parts[2] == "ecosystem":
 		owner = parts[3]
 	case len(parts) >= 5 && parts[0] == "test" && parts[1] == "server" && parts[2] == "artifacts":
 		owner = parts[3]
-	case parts[0] == "internal" && parts[1] == "format":
-		owner = parts[2]
 	case parts[0] == "test" && parts[1] == "server":
 		owner = parts[2]
 	default:
