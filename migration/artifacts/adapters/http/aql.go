@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -96,7 +97,7 @@ func (s ArtifactoryAPI) searchAQL(w http.ResponseWriter, r *http.Request) {
 	if s.dispatchAlternateAQL(w, r, st, p, q) {
 		return
 	}
-	configs, err := repoConfigs(ctx, st)
+	configs, err := search.RepoConfigs(ctx, st)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "aql repositories", err))
 		return
@@ -282,18 +283,6 @@ func writeAQLBytes(w http.ResponseWriter, b []byte) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(b)
-}
-
-func repoConfigs(ctx context.Context, st store.Store) (map[string]repo.Config, error) {
-	configs, err := st.Repos().List(ctx, store.RepoFilter{})
-	if err != nil {
-		return nil, fmt.Errorf("repositories: %w", err)
-	}
-	byKey := make(map[string]repo.Config, len(configs))
-	for _, c := range configs {
-		byKey[c.Key] = c
-	}
-	return byKey, nil
 }
 
 // readable keeps the rows p may read, by repository and path, that the

@@ -168,7 +168,6 @@
       "idempotency_test.go",
       "items_test.go",
       "repositories_test.go",
-      "searches_layout_test.go",
       "searches_upstream_routes_test.go",
       "storage_test.go",
       "storageinfo_test.go",

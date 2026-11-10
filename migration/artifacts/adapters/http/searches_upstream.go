@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -28,7 +29,7 @@ const upstreamMetadataLimit = 100
 
 type upstreamSearch struct {
 	r           *searchRun
-	ls          layoutScope
+	ls          search.LayoutScope
 	g, a        string
 	keys        []string
 	budget      remote.ListingBudget
@@ -43,7 +44,7 @@ type upstreamSearch struct {
 }
 
 func (r *searchRun) upstreamSearch(
-	ls layoutScope,
+	ls search.LayoutScope,
 	repos, g, a *string,
 	enabled bool,
 ) *upstreamSearch {
@@ -56,10 +57,10 @@ func (r *searchRun) upstreamSearch(
 }
 
 func (u *upstreamSearch) request(key string) source.Request {
-	c := u.r.configs[key]
+	c := u.r.Configs[key]
 	return source.Request{
 		Repo:    c,
-		Subject: accessapi.SubjectOf(u.r.p),
+		Subject: accessapi.SubjectOf(u.r.Principal),
 		Access:  u.r.acc.Decider,
 		Project: c.ProjectKey,
 	}
@@ -74,15 +75,17 @@ func (u *upstreamSearch) revalidate(ctx context.Context) error {
 			//nolint:wrapcheck // typed HTTP response
 			return pkgroute.SourceError(
 				err,
-				u.r.p.Anonymous,
+				u.r.Principal.Anonymous,
 			)
 		}
 	}
 	if err := u.checkRoutes(ctx); err != nil {
-		return pkgroute.SourceError(err, u.r.p.Anonymous) //nolint:wrapcheck // typed HTTP response
+		//nolint:wrapcheck // typed HTTP response
+		return pkgroute.SourceError(err, u.r.Principal.Anonymous)
 	}
 	if err := u.checkDisclosures(ctx); err != nil {
-		return pkgroute.SourceError(err, u.r.p.Anonymous) //nolint:wrapcheck // typed HTTP response
+		//nolint:wrapcheck // typed HTTP response
+		return pkgroute.SourceError(err, u.r.Principal.Anonymous)
 	}
 	return nil
 }
@@ -93,45 +96,49 @@ func (u *upstreamSearch) failure(key string, err error) error {
 	if err == nil || errors.Is(err, store.ErrNotFound) {
 		return nil
 	}
-	c := u.r.configs[key]
+	c := u.r.Configs[key]
 	var failure *source.HTTPError
 	if (c.HardFail == nil || !*c.HardFail) && errors.As(err, &failure) &&
 		(failure.Kind == source.FailureKindConnectivity || failure.Kind == source.FailureKindTimeout ||
 			failure.Kind == source.FailureKindHTTP && (failure.Status == 429 || failure.Status >= 500)) {
 		return nil
 	}
-	return pkgroute.SourceError(err, u.r.p.Anonymous) //nolint:wrapcheck // typed HTTP response
+	//nolint:wrapcheck // typed HTTP response
+	return pkgroute.SourceError(err, u.r.Principal.Anonymous)
 }
 
-func (u *upstreamSearch) versions(
+func (u *upstreamSearch) Versions(
 	ctx context.Context,
 	v string,
 	files bool,
-) ([]versionEntry, error) {
+) ([]search.VersionEntry, error) {
 	if err := u.checkRoutes(ctx); err != nil {
 		return nil, u.failure("", err)
 	}
-	var out []versionEntry
+	var out []search.VersionEntry
 	for _, key := range u.keys {
 		if _, err := u.mapping(ctx, key); err != nil {
 			return nil, u.failure(key, err)
 		}
-		var found []versionEntry
+		var found []search.VersionEntry
 		var err error
 		if maven.IsMavenLayout(u.mappings[key].Upstream()) {
 			found, err = u.mavenVersions(ctx, key, v, files)
-		} else if c := u.r.configs[key]; c.ListRemoteFolderItems.Bool() {
-			var hits []layoutHit
+		} else if c := u.r.Configs[key]; c.ListRemoteFolderItems.Bool() {
+			var hits []search.LayoutHit
 			hits, err = u.listFiles(ctx, key)
 			for _, hit := range hits {
-				if v != "" && !hasWildcard(v) && (!hit.Integration() || hit.Version() != v) {
+				if v != "" && !search.HasWildcard(v) && (!hit.Integration() || hit.Version() != v) {
 					continue
 				}
 				version := hit.Version()
-				if hit.Integration() && (files || v != "" && !hasWildcard(v)) {
+				if hit.Integration() && (files || v != "" && !search.HasWildcard(v)) {
 					version = hit.FileVersion()
 				}
-				found = append(found, versionEntry{version, hit.Integration()})
+				found = append(
+					found,
+					search.VersionEntry{V: version, IsIntegration: hit.Integration()},
+				)
 			}
 		}
 		if err != nil {
@@ -145,11 +152,11 @@ func (u *upstreamSearch) versions(
 	return out, nil
 }
 
-func (u *upstreamSearch) gavc(ctx context.Context, v, c *string) ([]layoutHit, error) {
+func (u *upstreamSearch) gavc(ctx context.Context, v, c *string) ([]search.LayoutHit, error) {
 	if err := u.checkRoutes(ctx); err != nil {
 		return nil, u.failure("", err)
 	}
-	var out []layoutHit
+	var out []search.LayoutHit
 	for _, key := range u.keys {
 		if _, err := u.mapping(ctx, key); err != nil {
 			return nil, u.failure(key, err)
@@ -161,9 +168,9 @@ func (u *upstreamSearch) gavc(ctx context.Context, v, c *string) ([]layoutHit, e
 			}
 			continue
 		}
-		vp, cp := wildcard(v), wildcard(c)
+		vp, cp := search.Wildcard(v), search.Wildcard(c)
 		for _, hit := range found {
-			if matches(vp, hit.Version()) && matches(cp, hit.Classifier) {
+			if search.Matches(vp, hit.Version()) && search.Matches(cp, hit.Classifier) {
 				out = append(out, hit)
 			}
 		}
@@ -175,11 +182,11 @@ func (u *upstreamSearch) mapping(ctx context.Context, key string) (*remote.Disco
 	if d := u.mappings[key]; d != nil {
 		return d, nil
 	}
-	d, err := remote.NewDiscovery(ctx, &item.Service{Store: u.r.st}, u.r.configs[key])
+	d, err := remote.NewDiscovery(ctx, &item.Service{Store: u.r.st}, u.r.Configs[key])
 	if err != nil {
 		return nil, fmt.Errorf("prepare search mapping: %w", err)
 	}
-	if d.Canonical().Definition() != u.ls.layouts[key].Definition() {
+	if d.Canonical().Definition() != u.ls.Layouts[key].Definition() {
 		return nil, source.ErrSuperseded
 	}
 	if u.mappings == nil {
@@ -192,17 +199,17 @@ func (u *upstreamSearch) mapping(ctx context.Context, key string) (*remote.Disco
 
 func searchValues(g, a string) layout.Values {
 	values := layout.Values{}
-	if g != "" && !hasWildcard(g) {
+	if g != "" && !search.HasWildcard(g) {
 		values[layout.TokenOrg] = g
 	}
-	if a != "" && !hasWildcard(a) {
+	if a != "" && !search.HasWildcard(a) {
 		values[layout.TokenModule] = a
 	}
 	return values
 }
 
 func (u *upstreamSearch) allowed(key, full string, folder bool) bool {
-	c := u.r.configs[key]
+	c := u.r.Configs[key]
 	return u.routeKey(key, full, folder) != "" && repo.PatternsOf(c).Accepts(full, folder) &&
 		u.r.acc.Item(c, full, folder, types.ActionRead)
 }
@@ -224,7 +231,7 @@ func gavcRemote(ctx context.Context, specific bool, g, a *string) (bool, error) 
 	}
 	enabled := specific && remote != "0"
 	if enabled &&
-		(httpkit.Deref(g) == "" || httpkit.Deref(a) == "" || hasWildcard(httpkit.Deref(g)+httpkit.Deref(a))) {
+		(httpkit.Deref(g) == "" || httpkit.Deref(a) == "" || search.HasWildcard(httpkit.Deref(g)+httpkit.Deref(a))) {
 		if remote == "1" {
 			return false, httpkit.BadRequestf("remote GAVC search requires exact g and a")
 		}
@@ -333,14 +340,15 @@ func (u *upstreamSearch) walkScope(
 	return nil
 }
 
-func (u *upstreamSearch) listFiles(ctx context.Context, key string) ([]layoutHit, error) {
-	var out []layoutHit
-	gp, ap := wildcard(&u.g), wildcard(&u.a)
+func (u *upstreamSearch) listFiles(ctx context.Context, key string) ([]search.LayoutHit, error) {
+	var out []search.LayoutHit
+	gp, ap := search.Wildcard(&u.g), search.Wildcard(&u.a)
 	err := u.walk(ctx, key, false, func(full string) (bool, error) {
-		co, ok := u.ls.layouts[key].Read(full)
-		if ok && matches(gp, co.Org) && matches(ap, co.Module) && u.disclose(key, full, false) {
+		co, ok := u.ls.Layouts[key].Read(full)
+		if ok && search.Matches(gp, co.Org) && search.Matches(ap, co.Module) &&
+			u.Disclose(key, full, false) {
 			dir, name := path.Split(full)
-			out = append(out, layoutHit{
+			out = append(out, search.LayoutHit{
 				Hit: aql.Hit{
 					Item: types.Item{RepoKey: key, Path: strings.TrimSuffix(dir, "/"), Name: name},
 				},

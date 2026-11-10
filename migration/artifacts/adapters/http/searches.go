@@ -16,6 +16,8 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel/antpath"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -27,8 +29,9 @@ import (
 
 // The GET searches (decision 0012, research 22 §2) build an items query and
 // run it through the store's AQL path, so they share its compilation to each
-// dialect and its parity fixtures; this file only scopes, filters, caps and
-// renders.
+// dialect and its parity fixtures. artifacts/core/search scopes, pages,
+// filters and caps them; this file binds their parameters, builds their
+// criteria and renders their results.
 
 // SearchLimits bounds the GET searches, as Artifactory's
 // artifactory.search.userQueryLimit and limitAnonymousUsersOnly do.
@@ -60,10 +63,6 @@ const (
 	// badChecksumCap is the documented ceiling of the bad checksum search,
 	// which the user query limit does not apply to.
 	badChecksumCap = 10000
-	// searchPage is how many rows one store query reads. Permission
-	// filtering runs on each page, so a search keeps reading until it holds
-	// its limit of readable results or the rows run out.
-	searchPage = 1000
 )
 
 // searchResponse is a search's 200, in the vendor media type when the
@@ -124,16 +123,36 @@ func results(entries []map[string]any) map[string]any {
 	return map[string]any{"results": entries}
 }
 
-// searchRun is one GET search: the caller, what it may read, and the
-// repositories as they stand, as configured and as repo criteria resolve.
+// searchRun is one GET search: the search core's run, with the handler's
+// store, whose builds the build searches read, and the caller's access,
+// which the result info and the upstream search read.
 type searchRun struct {
-	s       ArtifactoryAPI
-	st      store.Store
-	p       kernel.Principal
-	acc     itemkit.Access
-	configs map[string]repo.Config
-	repos   aql.Repositories
-	now     time.Time
+	*search.SearchRun
+	s   ArtifactoryAPI
+	st  store.Store
+	acc itemkit.Access
+}
+
+// searchAccess is the search core's view of what the caller may read: the
+// request's decider for the repositories they may see, and readable, which
+// the AQL search shares, for the rows of each page.
+type searchAccess struct {
+	acc itemkit.Access
+	az  accessapi.Authorizer
+	p   kernel.Principal
+}
+
+// Visible reports whether the caller may see c.
+func (a searchAccess) Visible(c repo.Config) bool { return a.acc.Visible(c) }
+
+// Readable keeps the hits the caller may read that their repository's
+// patterns accept (readable).
+func (a searchAccess) Readable(
+	ctx context.Context,
+	configs map[string]repo.Config,
+	hits []aql.Hit,
+) ([]aql.Hit, error) {
+	return readable(ctx, a.az, a.p, configs, hits)
 }
 
 // newSearch starts a search. named refuses anonymous callers with 401, for
@@ -155,158 +174,23 @@ func (s ArtifactoryAPI) newSearch(ctx context.Context, named bool) (*searchRun, 
 	if err != nil {
 		return nil, s.InternalError(ctx, "search permissions", err)
 	}
-	configs, err := repoConfigs(ctx, st)
+	run, err := search.NewSearch(
+		ctx,
+		st,
+		search.Limits{
+			UserQueryLimit:     s.cfg.Search.UserQueryLimit,
+			LimitInternalUsers: s.cfg.Search.LimitInternalUsers,
+			MaxResults:         s.cfg.AQL.MaxResults,
+		},
+		p,
+		searchAccess{acc: acc, az: s.cfg.Access.Authorizer, p: p},
+		(&item.Service{Store: st}).Layout,
+	)
 	if err != nil {
 		return nil, s.InternalError(ctx, "search repositories", err)
 	}
-	return &searchRun{
-		s: s, st: st, p: p, acc: acc, configs: configs, repos: aql.AQLRepositories(configs),
-		now: time.Now().UTC(),
-	}, nil
-}
-
-// userLimit is the most results the caller may get from a search the user
-// query limit applies to, under the AQL hard cap; -1 is no limit.
-func (r *searchRun) userLimit() int {
-	l := r.s.cfg.Search
-	if r.p.Anonymous || (!r.p.Admin && l.LimitInternalUsers) {
-		return r.capped(l.UserQueryLimit)
-	}
-	return r.capped(0)
-}
-
-// capped is limit, zero for none, under the AQL hard cap; -1 is no limit.
-func (r *searchRun) capped(limit int) int {
-	out := -1
-	for _, n := range []int{limit, r.s.cfg.AQL.MaxResults} {
-		if n > 0 && (out < 0 || n < out) {
-			out = n
-		}
-	}
-	return out
-}
-
-// collect runs criteria a page at a time, in item order, and returns the
-// hits the caller may read that keep accepts (nil accepts all), at most want
-// of them (-1 for all). Administrators read everything, as in AQL; anyone
-// else gets the rows readable reports, so a page may yield fewer.
-func (r *searchRun) collect(
-	ctx context.Context,
-	criteria aql.Node,
-	include []string,
-	want int,
-	keep func(aql.Hit) bool,
-) ([]aql.Hit, error) {
-	out := []aql.Hit{}
-	for offset := 0; ; offset += searchPage {
-		q := &aql.Query{
-			Criteria: criteria, Include: include,
-			Offset: offset, HasOffset: true, Limit: searchPage, HasLimit: true,
-		}
-		q.Resolve(r.repos)
-		hits, err := r.st.Items().Search(ctx, q, aql.Options{Now: r.now})
-		if err != nil {
-			return nil, r.s.InternalError(ctx, "search", err)
-		}
-		read := len(hits)
-		if !r.p.Admin {
-			if hits, err = readable(
-				ctx,
-				r.s.cfg.Access.Authorizer,
-				r.p,
-				r.configs,
-				hits,
-			); err != nil {
-				return nil, r.s.InternalError(ctx, "search permissions", err)
-			}
-		}
-		for _, h := range hits {
-			if keep != nil && !keep(h) {
-				continue
-			}
-			out = append(out, h)
-			if len(out) == want {
-				return out, nil
-			}
-		}
-		if read < searchPage {
-			return out, nil
-		}
-	}
-}
-
-// repoScope turns a repos parameter into a criterion on the items'
-// repositories, nil for every repository, which collect resolves as AQL
-// resolves repo criteria: a remote's key, like its cache key, selects its
-// cache, and a virtual key its members, through nested virtual
-// repositories. A virtual key counts only when virtual is set. Keys that
-// name no repository select nothing; missing lists them, with the keys of
-// repositories the caller may not see, for the search that refuses them. A
-// parameter whose every key selects nothing matches no item.
-func (r *searchRun) repoScope(repos *string, virtual bool) (scope aql.Node, missing []string) {
-	if repos == nil || strings.TrimSpace(*repos) == "" {
-		return nil, nil
-	}
-	var keys []string
-	for _, key := range strings.Split(*repos, ",") {
-		key = strings.TrimSpace(key)
-		if key == "" {
-			continue
-		}
-		// A configured key wins over reading "-cache" as a remote's cache,
-		// as AQL resolves it.
-		c, ok := r.configs[key]
-		if !ok {
-			stored, cached := types.ResolveRepoKey(key)
-			c, ok = r.configs[stored]
-			ok = ok && cached && c.Class == repo.Remote
-		}
-		switch {
-		case !ok:
-			missing = append(missing, key)
-			continue
-		case c.Class == repo.Virtual && !virtual:
-			continue
-		// Permissions name no virtual repository, so a virtual key is
-		// not checked here: readable drops what the caller may not read.
-		case c.Class != repo.Virtual && !r.acc.Visible(c):
-			missing = append(missing, key)
-			continue
-		}
-		if !slices.Contains(keys, c.Key) {
-			keys = append(keys, c.Key)
-		}
-	}
-	either := make(aql.Or, 0, len(keys))
-	for _, key := range keys {
-		either = append(either, &aql.FieldCriterion{Field: aql.FieldRepo, Op: aql.OpEq, Text: key})
-	}
-	return either, missing
-}
-
-// files is the criterion that leaves folders out: a hand-built query has no
-// implicit type, unlike a parsed one.
-func files() aql.Node {
-	return &aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"}
-}
-
-// all is the conjunction of the criteria given, skipping nil ones.
-func all(nodes ...aql.Node) aql.And {
-	out := make(aql.And, 0, len(nodes))
-	for _, n := range nodes {
-		if n != nil {
-			out = append(out, n)
-		}
-	}
-	return out
-}
-
-// within is the criterion that a time field lies in [from, to].
-func within(f aql.Field, from, to time.Time) aql.Node {
-	return aql.And{
-		&aql.FieldCriterion{Field: f, Op: aql.OpGte, Time: from},
-		&aql.FieldCriterion{Field: f, Op: aql.OpLte, Time: to},
-	}
+	run.Internal = s.InternalError
+	return &searchRun{SearchRun: run, s: s, st: st, acc: acc}, nil
 }
 
 // uri is the storage API URL of an item under the key clients see for it;
@@ -361,7 +245,7 @@ func (r *searchRun) entries(
 	for _, h := range hits {
 		e := map[string]any{"uri": r.uri(ctx, h.Item)}
 		if d.shouldIncludeInfo {
-			c := r.configs[h.Item.RepoKey]
+			c := r.Configs[h.Item.RepoKey]
 			v := storageView{
 				s: r.s, st: r.st, key: h.Item.ReportedRepoKey(), repo: c,
 				isCached: h.Item.Cached, acc: r.acc,
@@ -387,7 +271,7 @@ func (r *searchRun) uriSearch(
 	d resultDetail,
 	vendor string,
 ) (searchResponse, error) {
-	hits, err := r.collect(ctx, criteria, d.include(), r.userLimit(), nil)
+	hits, err := r.Collect(ctx, criteria, d.include(), r.UserLimit(), nil)
 	if err != nil {
 		return searchResponse{}, err
 	}
@@ -413,8 +297,8 @@ func (s ArtifactoryAPI) SearchArtifact(
 	if name == "" {
 		return nil, httpkit.BadRequestf("name must not be empty")
 	}
-	scope, _ := r.repoScope(req.Params.Repos, false)
-	return r.uriSearch(ctx, all(files(), scope, &aql.FieldCriterion{
+	scope, _ := r.RepoScope(req.Params.Repos, false)
+	return r.uriSearch(ctx, search.All(search.Files(), scope, &aql.FieldCriterion{
 		Field: aql.FieldName, Op: aql.OpMatch, Text: "*" + name + "*",
 	}), detailOf(req.Params.XResultDetail), mediaArtifactSearch)
 }
@@ -435,8 +319,8 @@ func (s ArtifactoryAPI) SearchProperty(
 	if err != nil {
 		return nil, err
 	}
-	scope, _ := r.repoScope(req.Params.Repos, true)
-	return r.uriSearch(ctx, all(scope, criteria), detailOf(req.Params.XResultDetail),
+	scope, _ := r.RepoScope(req.Params.Repos, true)
+	return r.uriSearch(ctx, search.All(scope, criteria), detailOf(req.Params.XResultDetail),
 		mediaPropertySearch)
 }
 
@@ -511,7 +395,7 @@ func (s ArtifactoryAPI) SearchChecksum(
 	if err != nil {
 		return nil, err
 	}
-	crit := aql.And{files()}
+	crit := aql.And{search.Files()}
 	for _, c := range []struct {
 		name  string
 		field aql.Field
@@ -533,8 +417,8 @@ func (s ArtifactoryAPI) SearchChecksum(
 	if len(crit) == 1 {
 		return nil, httpkit.BadRequestf("name one of md5, sha1 or sha256")
 	}
-	scope, _ := r.repoScope(req.Params.Repos, true)
-	return r.uriSearch(ctx, all(append(crit, scope)...), detailOf(req.Params.XResultDetail),
+	scope, _ := r.RepoScope(req.Params.Repos, true)
+	return r.uriSearch(ctx, search.All(append(crit, scope)...), detailOf(req.Params.XResultDetail),
 		mediaChecksumSearch)
 }
 
@@ -558,8 +442,8 @@ func (s ArtifactoryAPI) SearchBadChecksum(
 	default:
 		return nil, httpkit.BadRequestf("type must be md5 or sha1")
 	}
-	scope, _ := r.repoScope(req.Params.Repos, true)
-	hits, err := r.collect(ctx, all(files(), scope), nil, r.capped(badChecksumCap),
+	scope, _ := r.RepoScope(req.Params.Repos, true)
+	hits, err := r.Collect(ctx, search.All(search.Files(), scope), nil, r.Capped(badChecksumCap),
 		func(h aql.Hit) bool { return of(h.Item.Original) != of(h.Item.Actual) })
 	if err != nil {
 		return nil, err
@@ -577,7 +461,7 @@ func (s ArtifactoryAPI) SearchBadChecksum(
 
 // window reads a search's [from, to] bounds; a missing to is now.
 func (r *searchRun) window(from time.Time, to *time.Time) (time.Time, time.Time, error) {
-	end := r.now
+	end := r.Now
 	if to != nil {
 		end = *to
 	}
@@ -615,12 +499,17 @@ func (s ArtifactoryAPI) SearchCreation(
 	if err != nil {
 		return nil, err
 	}
-	scope, missing := r.repoScope(req.Params.Repos, false)
+	scope, missing := r.RepoScope(req.Params.Repos, false)
 	if len(missing) > 0 {
 		return nil, itemkit.NotFoundRepo(missing[0])
 	}
-	hits, err := r.collect(ctx, all(files(), scope, within(aql.FieldCreated, from, to)), nil,
-		r.userLimit(), nil)
+	hits, err := r.Collect(
+		ctx,
+		search.All(search.Files(), scope, search.Within(aql.FieldCreated, from, to)),
+		nil,
+		r.UserLimit(),
+		nil,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -679,9 +568,9 @@ func (s ArtifactoryAPI) SearchDates(
 	for _, f := range fields {
 		switch f {
 		case "created":
-			either = append(either, within(aql.FieldCreated, from, to))
+			either = append(either, search.Within(aql.FieldCreated, from, to))
 		case "lastModified":
-			either = append(either, within(aql.FieldModified, from, to))
+			either = append(either, search.Within(aql.FieldModified, from, to))
 		default:
 			include = []string{"stat"}
 			either = append(either, aql.And{
@@ -690,8 +579,14 @@ func (s ArtifactoryAPI) SearchDates(
 			})
 		}
 	}
-	scope, _ := r.repoScope(req.Params.Repos, false)
-	hits, err := r.collect(ctx, all(files(), scope, either), include, r.userLimit(), nil)
+	scope, _ := r.RepoScope(req.Params.Repos, false)
+	hits, err := r.Collect(
+		ctx,
+		search.All(search.Files(), scope, either),
+		include,
+		r.UserLimit(),
+		nil,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -758,15 +653,15 @@ func (s ArtifactoryAPI) SearchUsage(
 	if req.Params.CreatedBefore != nil {
 		before = time.UnixMilli(*req.Params.CreatedBefore).UTC()
 	}
-	scope, _ := r.repoScope(req.Params.Repos, false)
-	hits, err := r.collect(ctx, all(
-		files(), scope,
+	scope, _ := r.RepoScope(req.Params.Repos, false)
+	hits, err := r.Collect(ctx, search.All(
+		search.Files(), scope,
 		&aql.FieldCriterion{Field: aql.FieldCreated, Op: aql.OpLt, Time: before},
 		aql.Or{
 			&aql.StatCriterion{Field: aql.StatDownloaded, Op: aql.OpEq, Null: true},
 			&aql.StatCriterion{Field: aql.StatDownloaded, Op: aql.OpLt, Time: since},
 		},
-	), []string{"stat"}, r.userLimit(), nil)
+	), []string{"stat"}, r.UserLimit(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -813,7 +708,7 @@ func (s ArtifactoryAPI) SearchPattern(
 		return nil, httpkit.BadRequestf("pattern %q has an empty path segment", pattern)
 	}
 	paths := []string{}
-	scope, _ := r.repoScope(&key, false)
+	scope, _ := r.RepoScope(&key, false)
 	if scope, ok := scope.(aql.Or); ok && len(scope) == 1 {
 		dir := types.RootPath
 		if len(segs) > 1 {
@@ -822,12 +717,12 @@ func (s ArtifactoryAPI) SearchPattern(
 		// $match's * crosses "/", so the query narrows by depth and globs,
 		// and the Ant pattern decides.
 		ant := antpath.CompilePattern(pattern)
-		hits, err := r.collect(ctx, all(
-			files(), scope,
+		hits, err := r.Collect(ctx, search.All(
+			search.Files(), scope,
 			&aql.FieldCriterion{Field: aql.FieldDepth, Op: aql.OpEq, Number: int64(len(segs))},
 			&aql.FieldCriterion{Field: aql.FieldPath, Op: aql.OpMatch, Text: dir},
 			&aql.FieldCriterion{Field: aql.FieldName, Op: aql.OpMatch, Text: segs[len(segs)-1]},
-		), nil, r.capped(0), func(h aql.Hit) bool { return ant.Match(h.Item.FullPath()) })
+		), nil, r.Capped(0), func(h aql.Hit) bool { return ant.Match(h.Item.FullPath()) })
 		if err != nil {
 			return nil, err
 		}

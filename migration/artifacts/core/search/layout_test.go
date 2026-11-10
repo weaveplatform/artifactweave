@@ -1,4 +1,4 @@
-package artifactshttp
+package search
 
 import (
 	"testing"

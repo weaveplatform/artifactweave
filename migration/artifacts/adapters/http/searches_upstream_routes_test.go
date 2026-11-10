@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
@@ -14,8 +15,8 @@ import (
 // refused; one that discloses nothing has nothing to recheck.
 func TestUnitSearchUpstreamDisclosuresWithoutAuthenticator(t *testing.T) {
 	u := &upstreamSearch{r: &searchRun{
-		s: newArtifactoryAPI(withAccess(t, Config{Store: inmem.New()})),
-		p: kernel.Principal{Name: "admin", Password: true},
+		SearchRun: &search.SearchRun{Principal: kernel.Principal{Name: "admin", Password: true}},
+		s:         newArtifactoryAPI(withAccess(t, Config{Store: inmem.New()})),
 	}}
 	if err := u.checkDisclosures(t.Context()); err != nil {
 		t.Fatalf("a search that discloses nothing: %v", err)

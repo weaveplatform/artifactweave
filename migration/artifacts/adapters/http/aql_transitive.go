@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
@@ -90,7 +91,7 @@ func (s ArtifactoryAPI) transitiveAQL(
 			return transitiveSearch{}, fmt.Errorf("transitive aql: %w", err)
 		}
 	}
-	configs, err := repoConfigs(ctx, st)
+	configs, err := search.RepoConfigs(ctx, st)
 	if err != nil {
 		return transitiveSearch{}, fmt.Errorf("transitive repositories: %w", err)
 	}
@@ -413,7 +414,7 @@ func (s ArtifactoryAPI) fenceTransitive(
 	fences []transitiveResult,
 	hits []aql.Hit,
 ) error {
-	latest, err := repoConfigs(ctx, st)
+	latest, err := search.RepoConfigs(ctx, st)
 	if err != nil {
 		return err
 	}

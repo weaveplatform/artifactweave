@@ -8,6 +8,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -68,7 +69,7 @@ func (s ArtifactoryAPI) latestVersionByProperties(w http.ResponseWriter, req *ht
 	}
 	var scope aql.Node
 	if key != anyTarget {
-		scope, _ = r.repoScope(&key, true)
+		scope, _ = r.RepoScope(&key, true)
 	}
 	var within aql.Node
 	if folder != anyTarget && folder != "" {
@@ -77,10 +78,10 @@ func (s ArtifactoryAPI) latestVersionByProperties(w http.ResponseWriter, req *ht
 			&aql.FieldCriterion{Field: aql.FieldPath, Op: aql.OpMatch, Text: folder + "/*"},
 		}
 	}
-	criteria := all(files(), scope, within, &aql.PropertyCriterion{
+	criteria := search.All(search.Files(), scope, within, &aql.PropertyCriterion{
 		Part: aql.PartPair, Key: versionProperty, Op: aql.OpMatch, Value: "*",
 	})
-	hits, err := r.collect(ctx, append(criteria, filters...), []string{"property"}, r.capped(0),
+	hits, err := r.Collect(ctx, append(criteria, filters...), []string{"property"}, r.Capped(0),
 		func(h aql.Hit) bool {
 			// $match's * reads a * or ? in the folder as a wildcard too.
 			return within == nil || h.Item.Path == folder ||

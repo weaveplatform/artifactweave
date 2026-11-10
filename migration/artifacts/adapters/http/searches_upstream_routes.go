@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -34,7 +35,7 @@ func (u *upstreamSearch) prepareRoutes(requested *string) {
 	keys := strings.Split(httpkit.Deref(requested), ",")
 	if requested == nil || strings.TrimSpace(*requested) == "" {
 		keys = nil
-		for key, c := range u.r.configs {
+		for key, c := range u.r.Configs {
 			if c.Class != repo.Virtual {
 				keys = append(keys, key)
 			}
@@ -56,14 +57,14 @@ func (u *upstreamSearch) visitRoute(key string, route searchRoute, nodes *int) {
 		u.routeErr = invalidSearchMetadata()
 		return
 	}
-	c, ok := u.r.configs[key]
+	c, ok := u.r.Configs[key]
 	if !ok {
 		// Explicit aliases retain cached authority and never initiate discovery.
 		if base, alias := strings.CutSuffix(
 			key,
 			"-cache",
 		); alias &&
-			u.r.configs[base].Class == repo.Remote {
+			u.r.Configs[base].Class == repo.Remote {
 			route.isCacheOnly = true
 			u.routes[base] = append(u.routes[base], route)
 		}
@@ -80,7 +81,7 @@ func (u *upstreamSearch) visitRoute(key string, route searchRoute, nodes *int) {
 		}
 		return
 	}
-	if u.ls.layouts[key] == nil || !u.r.acc.Visible(c) {
+	if u.ls.Layouts[key] == nil || !u.r.acc.Visible(c) {
 		return
 	}
 	u.routes[key] = append(u.routes[key], route)
@@ -108,8 +109,8 @@ func (u *upstreamSearch) scopeAllowed(key string, scope remote.DiscoveryScope) b
 	return scope.Allows(u.request(key)) && u.routeKey(key, scope.Path, true) != ""
 }
 
-func (u *upstreamSearch) disclose(key, full string, folder bool, cached ...bool) bool {
-	c := u.r.configs[key]
+func (u *upstreamSearch) Disclose(key, full string, folder bool, cached ...bool) bool {
+	c := u.r.Configs[key]
 	if u.routeKey(key, full, folder, cached...) == "" ||
 		!repo.PatternsOf(c).
 			Accepts(full, folder) ||
@@ -128,10 +129,10 @@ func (u *upstreamSearch) disclose(key, full string, folder bool, cached ...bool)
 	return true
 }
 
-func (u *upstreamSearch) filterHits(hits []layoutHit) []layoutHit {
+func (u *upstreamSearch) filterHits(hits []search.LayoutHit) []search.LayoutHit {
 	out := hits[:0]
 	for _, hit := range hits {
-		if u.disclose(hit.Item.RepoKey, hit.Item.FullPath(), false, hit.Item.Cached) {
+		if u.Disclose(hit.Item.RepoKey, hit.Item.FullPath(), false, hit.Item.Cached) {
 			out = append(out, hit)
 		}
 	}
@@ -148,7 +149,7 @@ func (u *upstreamSearch) checkRoutes(ctx context.Context) error {
 	if len(u.virtuals) == 0 {
 		return nil
 	}
-	current, err := repoConfigs(ctx, u.r.st)
+	current, err := search.RepoConfigs(ctx, u.r.st)
 	if err != nil {
 		return fmt.Errorf("read search routes: %w", err)
 	}
@@ -168,7 +169,7 @@ func (u *upstreamSearch) checkDisclosures(ctx context.Context) error {
 	if api.Authenticator == nil {
 		return source.ErrDenied
 	}
-	current, err := api.Authenticator.Current(ctx, u.r.p)
+	current, err := api.Authenticator.Current(ctx, u.r.Principal)
 	if err != nil {
 		return source.ErrDenied
 	}
@@ -183,7 +184,7 @@ func (u *upstreamSearch) checkDisclosures(ctx context.Context) error {
 		}
 		if !allows(
 			types.ResourceArtifact,
-			itemkit.Target(u.r.configs[entry.key]),
+			itemkit.Target(u.r.Configs[entry.key]),
 			entry.path,
 			types.ActionRead,
 		) ||

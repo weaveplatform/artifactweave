@@ -54,7 +54,7 @@ func (s ArtifactoryAPI) SearchDependency(
 	if err != nil {
 		return nil, s.InternalError(ctx, "dependency search", err)
 	}
-	a, limit := buildAccess{r.acc}, r.capped(0)
+	a, limit := buildAccess{r.acc}, r.Capped(0)
 	seen := map[[3]string]bool{}
 	entries := []map[string]any{}
 	for _, ref := range refs {
@@ -134,7 +134,7 @@ func (s ArtifactoryAPI) SearchBuildArtifacts(
 		mappings = append(mappings, re)
 	}
 	var in func(types.Item) bool
-	if refs := r.refsOf(httpkit.Deref(body.Repos)); refs != nil {
+	if refs := r.RefsOf(httpkit.Deref(body.Repos)); refs != nil {
 		in = func(it types.Item) bool { return refs[aql.RepoRef{Key: it.RepoKey, Cached: it.Cached}] }
 	}
 	missing := noBuildArtifacts(body.BuildName, number, status)
@@ -145,13 +145,13 @@ func (s ArtifactoryAPI) SearchBuildArtifacts(
 	svc, a := s.builds(r.st), buildAccess{r.acc}
 	b, err := svc.Find(ctx, "", body.BuildName, which, status, a)
 	if err != nil {
-		return nil, s.buildError(ctx, r.p, "", missing, err)
+		return nil, s.buildError(ctx, r.Principal, "", missing, err)
 	}
 	items, err := svc.SearchArtifacts(ctx, b, in, a)
 	if err != nil {
 		return nil, s.InternalError(ctx, "build artifacts search", err)
 	}
-	limit := r.capped(0)
+	limit := r.Capped(0)
 	entries := []map[string]any{}
 	for _, it := range items {
 		full := it.FullPath()
@@ -195,22 +195,4 @@ func noBuildArtifacts(name, number, status string) string {
 		msg += fmt.Sprintf(" status '%s'", status)
 	}
 	return msg
-}
-
-// refsOf is the stored locations the repository keys stand for, as a repo
-// criterion's $eq resolves them; nil for no keys.
-func (r *searchRun) refsOf(keys []string) map[aql.RepoRef]bool {
-	var out map[aql.RepoRef]bool
-	for _, key := range keys {
-		if key = strings.TrimSpace(key); key == "" {
-			continue
-		}
-		if out == nil {
-			out = map[aql.RepoRef]bool{}
-		}
-		for _, ref := range r.repos.Expand(key) {
-			out[ref] = true
-		}
-	}
-	return out
 }

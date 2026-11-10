@@ -153,6 +153,16 @@ linters:
       # return them as they did while the kit was the server root's own
       # code; a wrap would change what the response or the log says.
       # Without these lines wrapcheck reports 161 returns in the server root.
+      #
+      # The search core's runs and checks (artifacts/core/search) return the
+      # 500s that the adapter's Internal hook made of a store, permission or
+      # layout failure and logged under its label, the apierror 400s of
+      # ModuleSearch, an upstream search's typed answer, and RepoConfigs'
+      # "repositories: " error, which the AQL handlers label. The search and
+      # AQL handlers return them as they did while the logic was their own
+      # code; a wrap would change what the response or the log says.
+      # Without these lines wrapcheck reports 16 returns in the artifacts
+      # adapter.
       extra-ignore-sigs:
         - apierror.New(
         - format.Rejectf(
@@ -200,6 +210,13 @@ linters:
         - itemkit.OpkgSourceRequest(
         - itemkit.P2SourceRequest(
         - itemkit.RPMSourceRequest(
+        - search.RepoConfigs(
+        - search.SearchRun).Collect(
+        - search.SearchRun).LayoutScope(
+        - search.SearchRun).ModuleScope(
+        - search.LayoutScope).Find(
+        - search.ModuleSearch[
+        - search.ModuleVersions(
 
   # 4) Issue-filtering (not disabling analysis, just silencing reports)
   exclusions:

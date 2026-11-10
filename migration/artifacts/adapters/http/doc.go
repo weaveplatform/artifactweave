@@ -96,7 +96,8 @@
 //
 // Implemented P1 to P9c as the server root's management handlers; P9d made
 // them the ArtifactoryAPI partial (WEB-08) and moved them here (WEB-12).
-// ART-16 and ART-17 extract the search logic to artifacts/core/search.
+// The GET searches' logic is in artifacts/core/search, where ART-17 also
+// moves the upstream search.
 //
 // # Testing
 //
