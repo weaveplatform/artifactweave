@@ -7,124 +7,62 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"strings"
 	"time"
 
-	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
+	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
-
-// Result names what a patch changed, as "section.key".
-type Result struct {
-	Created, Updated, Deleted, Unchanged []string
-	// Changes is Patch.Changes.
-	Changes int
-	// DryRun is set when nothing was written.
-	DryRun bool
-}
-
-// Merged is the PATCH endpoint's answer, in Artifactory's words. It counts
-// the document's values rather than what changed, as Artifactory does, so
-// applying the same patch again gives the same number.
-func (r Result) Merged() string {
-	return fmt.Sprintf("%d changes to config merged successfully", r.Changes)
-}
-
-// String is the plain-text summary `config apply` prints.
-func (r Result) String() string {
-	var b strings.Builder
-	if r.DryRun {
-		b.WriteString("Dry run: the configuration is valid and nothing was written.\n")
-	} else {
-		b.WriteString("Applied the configuration descriptor.\n")
-	}
-	for _, l := range []struct {
-		label string
-		names []string
-	}{
-		{"Created", r.Created},
-		{"Updated", r.Updated},
-		{"Deleted", r.Deleted},
-		{"Unchanged", r.Unchanged},
-	} {
-		if len(l.names) > 0 {
-			fmt.Fprintf(&b, "%s: %s\n", l.label, strings.Join(l.names, ", "))
-		}
-	}
-	return b.String()
-}
 
 type repoOp struct {
 	name         string
 	shouldCreate bool
 	cfg          repo.Config
 	// shouldReindex is an update that owes the repository a reindex
-	// (repos.OwesReindex), queued in the patch's transaction.
+	// (Repositories.OwesReindex), queued in the patch's transaction.
 	shouldReindex bool
 }
 
 type configOp struct {
 	name         string
 	shouldDelete bool
-	doc          types.ConfigDocument
+	doc          configdoc.ConfigDocument
 }
 
-// Access is what Apply reads and writes of the access module: the key pairs
-// and the global and project environments that repository entries name,
-// and the anonymous access setting of the security section. Every field is
-// required. Apply calls each with the context it was given, or inside its
-// transaction with that transaction's context, so an implementation must
-// take part in the store transaction its context carries: the setting is
-// written in the same transaction as the repositories and configuration
-// documents, and rolls back with them (decision 0009). A server binds them
-// from the access module's API over the store it applies to; config apply
-// and the bootstrap descriptor, which run before any module exists, bind
-// access's store-only contracts over that store.
-type Access struct {
-	Keys            accessapi.Keys
-	Projects        accessapi.Projects
-	AnonymousAccess accessapi.AnonymousAccess
-}
-
-// Apply checks the whole patch against the store's current state and a,
-// then, unless dryRun, writes it in one transaction of st, so a patch with
-// one bad entry changes nothing. Entries that would not change are left
-// alone, which makes applying the same descriptor twice a no-op the second
-// time; the result names what was, or with dryRun would be, created,
-// updated, deleted and left alone. An anonymous access setting that was
-// never written counts as off. A patch the checks refuse answers an error
-// matching ErrInvalid; a failed write is wrapped as "apply configuration:
-// %w". A repository the patch deletes is removed as repos.Remove removes
-// it, by ctx's principal, or by no one when ctx carries none.
+// Apply checks the whole patch against the current state that d reads,
+// then, unless dryRun, writes it in one transaction of d.Tx, so a patch with
+// one bad entry, or one whose last write fails, changes nothing. Entries
+// that would not change are left alone, which makes applying the same
+// descriptor twice a no-op the second time; the result names what was, or
+// with dryRun would be, created, updated, deleted and left alone. An
+// anonymous access setting that was never written counts as off. A patch the
+// checks refuse answers an error matching ErrInvalid; a failed write is
+// wrapped as "apply configuration: %w". A repository the patch deletes is
+// removed as Repositories.Remove removes it, by ctx's principal, or by no
+// one when ctx carries none.
 func Apply(
 	ctx context.Context,
-	st store.Store,
-	a Access,
+	d Deps,
 	p *Patch,
 	now time.Time,
 	dryRun bool,
-) (Result, error) {
-	res := Result{Changes: p.Changes, DryRun: dryRun}
-	deletes, writes, err := planRepos(ctx, st, a, p.Repos, &res)
+) (configapi.Result, error) {
+	res := configapi.Result{Changes: p.Changes, DryRun: dryRun}
+	deletes, writes, err := planRepos(ctx, d.Repositories, p.Repos, &res)
 	if err != nil {
 		return res, err
 	}
-	configs, err := planConfigs(ctx, st, p.Configs, now, &res)
+	configs, err := planConfigs(ctx, d, p.Configs, now, &res)
 	if err != nil {
 		return res, err
 	}
 	var anonymousChanged bool
 	if p.AnonymousAccess != nil {
-		current, err := a.AnonymousAccess.Enabled(ctx)
-		if errors.Is(err, store.ErrNotFound) {
+		current, err := d.AnonymousAccess.Enabled(ctx)
+		if errors.Is(err, kernel.ErrNotFound) {
 			current, err = false, nil
 		}
 		if err != nil {
@@ -147,16 +85,16 @@ func Apply(
 	if p, ok := kernel.FromContext(ctx); ok {
 		by = p.Name
 	}
-	err = st.Tx(ctx, func(ctx context.Context) error {
+	err = d.Tx.Tx(ctx, func(ctx context.Context) error {
 		for _, key := range deletes {
-			if _, _, err := repos.Remove(ctx, st, key, by); err != nil {
+			if _, _, err := d.Repositories.Remove(ctx, key, by); err != nil {
 				return err //nolint:wrapcheck // names the repository
 			}
 		}
 		for _, op := range writes {
-			write := st.Repos().Update
+			write := d.Repositories.Update
 			if op.shouldCreate {
-				write = st.Repos().Create
+				write = d.Repositories.Create
 			}
 			if err := write(ctx, op.cfg); err != nil {
 				return fmt.Errorf("%s: %w", op.name, err)
@@ -164,18 +102,16 @@ func Apply(
 			if op.shouldReindex {
 				// The runtime's queue polls the store, so the reindex runs
 				// whether or not a server applied the patch.
-				payload, _ := json.Marshal(format.WorkRequest{By: by})
-				if err := st.WorkQueue().Enqueue(ctx, format.KindReindex, op.cfg.Key,
-					payload, now); err != nil {
+				if err := d.Repositories.RequestReindex(ctx, op.cfg.Key, by, now); err != nil {
 					return fmt.Errorf("%s: queue its reindex: %w", op.name, err)
 				}
 			}
 		}
 		for _, op := range configs {
 			if op.shouldDelete {
-				err = st.Configs().Delete(ctx, op.doc.Kind, op.doc.Key)
+				err = d.Configs.Delete(ctx, op.doc.Kind, op.doc.Key)
 			} else {
-				err = st.Configs().Put(ctx, op.doc)
+				err = d.Configs.Put(ctx, op.doc)
 			}
 			if err != nil {
 				return fmt.Errorf("%s: %w", op.name, err)
@@ -184,7 +120,7 @@ func Apply(
 		// Write whenever requested: another admin may have changed the setting
 		// after the planning read and before this transaction began.
 		if p.AnonymousAccess != nil {
-			if err := a.AnonymousAccess.SetEnabled(ctx, *p.AnonymousAccess); err != nil {
+			if err := d.AnonymousAccess.SetEnabled(ctx, *p.AnonymousAccess); err != nil {
 				return fmt.Errorf("security.anonAccessEnabled: %w", err)
 			}
 		}
@@ -201,12 +137,11 @@ func Apply(
 // list members deleted, by the same patch.
 func planRepos(
 	ctx context.Context,
-	st store.Store,
-	a Access,
+	repos artifactsapi.Repositories,
 	changes []RepoChange,
-	res *Result,
+	res *configapi.Result,
 ) ([]string, []repoOp, error) {
-	existing, err := st.Repos().List(ctx, store.RepoFilter{})
+	existing, err := repos.List(ctx, artifactsapi.RepoFilter{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("list repositories: %w", err)
 	}
@@ -252,8 +187,8 @@ func planRepos(
 			continue
 		}
 		name := c.Section + "." + c.Key
-		op, changed, err := planRepo(c, stored, final, func(c *repo.Config) error {
-			return repos.CheckEnvironments(ctx, a.Projects, c)
+		op, changed, err := planRepo(repos, c, stored, final, func(c *repo.Config) error {
+			return repos.CheckEnvironments(ctx, c)
 		})
 		if err != nil {
 			return nil, nil, entryError(name, err)
@@ -280,7 +215,7 @@ func planRepos(
 		if err := repos.CheckMembers(op.cfg, known); err != nil {
 			return nil, nil, entryError(op.name, err)
 		}
-		if err := repos.CheckKeypairs(ctx, a.Keys, op.cfg); err != nil {
+		if err := repos.CheckKeypairs(ctx, op.cfg); err != nil {
 			return nil, nil, entryError(op.name, err)
 		}
 	}
@@ -292,6 +227,7 @@ func planRepos(
 // stored configuration, so a descriptor spelling "dev" for DEV is unchanged
 // on the second apply.
 func planRepo(
+	repos artifactsapi.Repositories,
 	c RepoChange,
 	stored, final map[string]repo.Config,
 	environments func(*repo.Config) error,
@@ -365,17 +301,17 @@ func entryError(name string, err error) error {
 
 func planConfigs(
 	ctx context.Context,
-	st store.Store,
+	d Deps,
 	changes []ConfigChange,
 	now time.Time,
-	res *Result,
+	res *configapi.Result,
 ) ([]configOp, error) {
 	var ops []configOp
 	for _, c := range changes {
 		name := c.Section + "." + c.Key
-		cur, err := st.Configs().Get(ctx, c.Kind, c.Key)
+		cur, err := d.Configs.Get(ctx, c.Kind, c.Key)
 		found := err == nil
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
+		if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 		if c.Delete {
@@ -391,7 +327,7 @@ func planConfigs(
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
-		if err := validateConfig(c.Kind, c.Key, doc); err != nil {
+		if err := validateConfig(d.Layouts, c.Kind, c.Key, doc); err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 		encoded, err := json.Marshal(doc)
@@ -407,7 +343,7 @@ func planConfigs(
 		} else {
 			res.Created = append(res.Created, name)
 		}
-		ops = append(ops, configOp{name: name, doc: types.ConfigDocument{
+		ops = append(ops, configOp{name: name, doc: configdoc.ConfigDocument{
 			Kind:     c.Kind,
 			Key:      c.Key,
 			Enabled:  true,
@@ -422,7 +358,7 @@ func planConfigs(
 // mergeConfig applies a change to the stored document field by field.
 // Secret fields go to the sealed secrets, never the document.
 func mergeConfig(
-	cur types.ConfigDocument,
+	cur configdoc.ConfigDocument,
 	found bool,
 	c ConfigChange,
 ) (map[string]any, map[string]string, error) {
@@ -464,7 +400,7 @@ func mergeConfig(
 
 // sameDocument compares through a re-encoding of the stored document, so a
 // store that returns it with different whitespace still compares equal.
-func sameDocument(cur types.ConfigDocument, encoded []byte, secrets map[string]string) bool {
+func sameDocument(cur configdoc.ConfigDocument, encoded []byte, secrets map[string]string) bool {
 	var stored any
 	if err := json.Unmarshal(cur.Document, &stored); err != nil {
 		return false
@@ -476,9 +412,14 @@ func sameDocument(cur types.ConfigDocument, encoded []byte, secrets map[string]s
 	return bytes.Equal(again, encoded) && maps.Equal(cur.Secrets, secrets)
 }
 
-func validateConfig(kind types.ConfigKind, key string, doc map[string]any) error {
+func validateConfig(
+	layouts artifactsapi.Layouts,
+	kind configdoc.ConfigKind,
+	key string,
+	doc map[string]any,
+) error {
 	switch kind {
-	case types.ConfigProxy:
+	case configdoc.ConfigProxy:
 		if host, _ := doc["host"].(string); host == "" {
 			return fmt.Errorf("%w: a proxy needs a host", ErrInvalid)
 		}
@@ -488,8 +429,8 @@ func validateConfig(kind types.ConfigKind, key string, doc map[string]any) error
 			port != float64(int(port)) {
 			return fmt.Errorf("%w: a proxy needs a port between 1 and 65535", ErrInvalid)
 		}
-	case types.ConfigLayout:
-		def := layout.Definition{Name: key}
+	case configdoc.ConfigLayout:
+		def := artifactsapi.LayoutDefinition{Name: key}
 		strs := map[string]*string{
 			"artifactPathPattern":             &def.ArtifactPathPattern,
 			"descriptorPathPattern":           &def.DescriptorPathPattern,
@@ -518,10 +459,10 @@ func validateConfig(kind types.ConfigKind, key string, doc map[string]any) error
 		if def.ArtifactPathPattern == "" {
 			return fmt.Errorf("%w: a layout needs an artifactPathPattern", ErrInvalid)
 		}
-		if _, err := layout.Compile(def); err != nil {
+		if err := layouts.Check(def); err != nil {
 			return fmt.Errorf("%w: %w", ErrInvalid, err)
 		}
-	case types.ConfigPropertySet:
+	case configdoc.ConfigPropertySet:
 		if v, ok := doc["properties"]; ok {
 			props, ok := v.(map[string]any)
 			if !ok {

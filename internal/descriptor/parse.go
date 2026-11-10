@@ -1,14 +1,7 @@
-// Package descriptor reads Artifactory's YAML configuration descriptor and
-// applies it (decision 0009): the body of PATCH /api/system/configuration,
-// `artifactweave config apply` and the bootstrap descriptor. Named entities
-// that do not exist are created, existing ones are updated field by field,
-// omitted keys are untouched, and an entry or a string field whose value is
-// null is deleted.
 package descriptor
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"maps"
 	"reflect"
@@ -19,12 +12,14 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 )
 
-// ErrInvalid reports a descriptor that cannot be applied; its message names
-// the first problem. Entry points answer it with 400.
-var ErrInvalid = errors.New("descriptor: invalid configuration descriptor")
+// ErrInvalid is configapi.ErrInvalid, the same value, which every refusal of
+// a descriptor wraps: errors.Is matches it under either name, and the
+// refusal's message names the first problem.
+var ErrInvalid = configapi.ErrInvalid
 
 // Sections artifactweave applies. Any other top-level section is refused, so
 // a pipeline never takes a 200 for settings that changed nothing.
@@ -57,16 +52,16 @@ var repoSections = []struct {
 // and never part of the stored document).
 var configSections = []struct {
 	name    string
-	kind    types.ConfigKind
+	kind    configdoc.ConfigKind
 	fields  []string
 	secrets []string
 }{
-	{SectionProxies, types.ConfigProxy, []string{
+	{SectionProxies, configdoc.ConfigProxy, []string{
 		"host", "port", "username", "password", "domain", "ntHost", "redirectedToHosts",
 		"platformDefault", "services",
 	}, []string{"password"}},
-	{SectionPropertySets, types.ConfigPropertySet, []string{"properties", "visible"}, nil},
-	{SectionLayouts, types.ConfigLayout, []string{
+	{SectionPropertySets, configdoc.ConfigPropertySet, []string{"properties", "visible"}, nil},
+	{SectionLayouts, configdoc.ConfigLayout, []string{
 		"artifactPathPattern", "distinctiveDescriptorPathPattern", "descriptorPathPattern",
 		"folderIntegrationRevisionRegExp", "fileIntegrationRevisionRegExp",
 	}, nil},
@@ -80,7 +75,8 @@ var configSections = []struct {
 // compare as changed.
 var ownNames = map[string]string{SectionLayouts: "name"}
 
-// Patch is a parsed descriptor.
+// Patch is a parsed descriptor: the configapi.Plan that Parse returns
+// through the Descriptor NewAPI binds, and that Apply takes.
 type Patch struct {
 	Repos   []RepoChange
 	Configs []ConfigChange
@@ -109,7 +105,7 @@ type RepoChange struct {
 // section.
 type ConfigChange struct {
 	Section string
-	Kind    types.ConfigKind
+	Kind    configdoc.ConfigKind
 	Key     string
 	Delete  bool
 	// Fields are the descriptor's own names; a nil value removes the field.

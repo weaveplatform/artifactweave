@@ -101,6 +101,39 @@ func TestAccApplyDescriptorCommandErrors(t *testing.T) {
 	}
 }
 
+// TestUnitApplyDescriptorErrorPrecedence: config apply checks the master
+// key, then parses the descriptor, and only then builds the keyring and
+// opens the store. A broken descriptor therefore reports a missing master
+// key ahead of its own error, and its own error ahead of an unreachable
+// database.
+func TestUnitApplyDescriptorErrorPrecedence(t *testing.T) {
+	const doc = "localRepositories:\n  x:\n    nonsense: 1\n"
+	broken := writeFile(t, doc)
+	_, parseErr := descriptor.NewAPI(descriptor.Deps{}).Descriptor.Parse([]byte(doc), os.LookupEnv)
+	noKey := testConfig(t)
+	noKey.MasterKey = ""
+	keyErr := noKey.RequireMasterKey()
+	if parseErr == nil || keyErr == nil {
+		t.Fatalf("the cases need both errors: parse %v, master key %v", parseErr, keyErr)
+	}
+	unreachable := testConfig(t)
+	unreachable.MasterKey = keyOne
+	unreachable.Database.Driver = "postgres"
+	unreachable.Database.DSN = "postgres://artifactweave@127.0.0.1:1/artifactweave?connect_timeout=1"
+	for name, c := range map[string]struct {
+		cfg      config.Config
+		expected string
+	}{
+		"missing master key":   {noKey, "config apply: " + keyErr.Error()},
+		"unreachable database": {unreachable, "config apply: " + broken + ": " + parseErr.Error()},
+	} {
+		err := ApplyDescriptor(t.Context(), c.cfg, broken, false, io.Discard)
+		if err == nil || err.Error() != c.expected {
+			t.Errorf("%s: %v, want %s", name, err, c.expected)
+		}
+	}
+}
+
 func TestAccBootstrapDescriptorAppliesOnce(t *testing.T) {
 	ctx := context.Background()
 	cfg := testConfig(t)

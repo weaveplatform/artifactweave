@@ -2,20 +2,22 @@ package descriptor
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 func TestUnitDescriptorClassesForLuaRocksNIMAndAgentFormats(t *testing.T) {
@@ -48,7 +50,7 @@ func TestUnitDescriptorClassesForLuaRocksNIMAndAgentFormats(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				_, err = Apply(context.Background(), db, accessOf(db), p, now, false)
+				_, err = Apply(context.Background(), depsOf(t, db), p, now, false)
 				if !tc.allowed[pair.class] {
 					if !errors.Is(err, ErrInvalid) {
 						t.Fatalf("invalid type/class should fail: %v", err)
@@ -88,26 +90,37 @@ federatedRepositories:
 
 var now = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
 
-// accessOf binds access's store-only contracts over st, as config apply and
-// the bootstrap descriptor do, so a fault a test puts in st reaches them.
-func accessOf(st store.Store) Access {
-	return Access{
-		Keys:            access.KeysOf(st),
-		Projects:        access.ProjectsOf(st),
-		AnonymousAccess: access.AnonymousAccessOf(st),
+// reindexKind is the work kind of a repository's reindex: the text of
+// KindReindex in artifacts/core/format, which a configuration test may not
+// import.
+const reindexKind = "reindex"
+
+// depsOf binds what Apply applies through over st, as config apply and the
+// bootstrap descriptor do: the artifacts module's contracts with the key
+// pairs and projects that access reads from st, the access module's
+// anonymous access switch, and st's own unit of work and configuration
+// documents. A fault a test puts in st reaches each of them.
+func depsOf(t *testing.T, st store.Store) Deps {
+	t.Helper()
+	return Deps{
+		Tx:              st,
+		Repositories:    support.Repositories(st),
+		Layouts:         support.Layouts(),
+		Configs:         st.Configs(),
+		AnonymousAccess: accesstest.Over(t, st).API().AnonymousAccess,
 	}
 }
 
-func apply(t *testing.T, st store.Store, doc string) (Result, error) {
+func apply(t *testing.T, st store.Store, doc string) (configapi.Result, error) {
 	t.Helper()
 	p, err := Parse([]byte(doc), env(map[string]string{"PROXY_PASSWORD": "pp"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return Apply(context.Background(), st, accessOf(st), p, now, false)
+	return Apply(context.Background(), depsOf(t, st), p, now, false)
 }
 
-func mustApply(t *testing.T, st store.Store, doc string) Result {
+func mustApply(t *testing.T, st store.Store, doc string) configapi.Result {
 	t.Helper()
 	res, err := apply(t, st, doc)
 	if err != nil {
@@ -345,7 +358,7 @@ func TestUnitApplyTrashesDeletedRepositoriesAsTheCaller(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := Apply(ctx, db, accessOf(db), p, now, false); err != nil {
+		if _, err := Apply(ctx, depsOf(t, db), p, now, false); err != nil {
 			t.Fatal(err)
 		}
 		trashed, _, err := db.Trash().List(ctx, "gone", "", store.Page{})
@@ -419,7 +432,7 @@ func TestUnitApplyKeepsKeysAndUpdatesBuildInfo(t *testing.T) {
 	} {
 		p, err := Parse([]byte(doc), env(nil))
 		if err == nil {
-			_, err = Apply(ctx, db, accessOf(db), p, now, false)
+			_, err = Apply(ctx, depsOf(t, db), p, now, false)
 		}
 		if !errors.Is(err, ErrInvalid) {
 			t.Errorf("%q: %v", doc, err)
@@ -476,7 +489,7 @@ func TestUnitApplyDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := Apply(context.Background(), db, accessOf(db), p, now, true)
+	res, err := Apply(context.Background(), depsOf(t, db), p, now, true)
 	if err != nil || len(res.Created) != 6 || !strings.HasPrefix(res.String(), "Dry run") {
 		t.Fatalf("dry run %+v %v", res, err)
 	}
@@ -502,7 +515,7 @@ security:
 		t.Fatal(err)
 	}
 	st := faulty{Store: db, fail: "setting put"}
-	_, err = Apply(context.Background(), st, accessOf(st), p, now, false)
+	_, err = Apply(context.Background(), depsOf(t, st), p, now, false)
 	if !errors.Is(err, errBoom) {
 		t.Fatalf("setting write error = %v", err)
 	}
@@ -538,10 +551,10 @@ security:
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := accessOf(db)
-	written := &failAfterWrite{AnonymousAccess: a.AnonymousAccess, inTx: db.InTx}
-	a.AnonymousAccess = written
-	if _, err := Apply(ctx, db, a, p, now, false); !errors.Is(err, errBoom) {
+	d := depsOf(t, db)
+	written := &failAfterWrite{AnonymousAccess: d.AnonymousAccess, inTx: db.InTx}
+	d.AnonymousAccess = written
+	if _, err := Apply(ctx, d, p, now, false); !errors.Is(err, errBoom) {
 		t.Fatalf("a failure after the write = %v", err)
 	}
 	if !written.readBack {
@@ -550,7 +563,8 @@ security:
 	if _, err := db.Repos().Get(ctx, "new-local"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("repository survived the failed transaction: %v", err)
 	}
-	if on, err := access.AnonymousAccessOf(db).Enabled(ctx); !errors.Is(err, store.ErrNotFound) {
+	anonymous := accesstest.Over(t, db).API().AnonymousAccess
+	if on, err := anonymous.Enabled(ctx); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("setting survived the failed transaction: enabled %t, error %v", on, err)
 	}
 }
@@ -577,6 +591,99 @@ func (f *failAfterWrite) SetEnabled(ctx context.Context, on bool) error {
 	}
 	f.readBack, _ = f.AnonymousAccess.Enabled(ctx)
 	return errBoom
+}
+
+// TestUnitApplyFailingLastEntryLeavesTheStoreUnchanged: every port joins the
+// apply's transaction, so when the write of the descriptor's last entry
+// fails, the delete, the create, the update with its reindex request and the
+// document written before it roll back with it, and the store is as it was
+// (decision 0009).
+func TestUnitApplyFailingLastEntryLeavesTheStoreUnchanged(t *testing.T) {
+	db := inmem.New()
+	seedRepo(t, db, repo.Config{Key: "gone", Class: repo.Local})
+	seedRepo(t, db, repo.Config{Key: "tf", Class: repo.Local, PackageType: repo.Terraform})
+	p, err := Parse([]byte(`localRepositories:
+  gone: null
+  new-local: {type: generic}
+  tf:
+    terraformType: module
+proxies:
+  corp:
+    host: h
+    port: 80
+propertySets:
+  last:
+    visible: true
+`), noEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := storeState(t, db)
+	d := depsOf(t, db)
+	last := &failingPut{ConfigStore: d.Configs, key: "last", before: "corp"}
+	d.Configs = last
+	if _, err := Apply(t.Context(), d, p, now, false); !errors.Is(err, errBoom) ||
+		errors.Is(err, ErrInvalid) {
+		t.Fatalf("a failing last write = %v", err)
+	}
+	if !last.readBack {
+		t.Fatal("the transaction did not see the entries written before the last")
+	}
+	if after := storeState(t, db); after != before {
+		t.Fatalf("the store changed:\nbefore %s\nafter  %s", before, after)
+	}
+}
+
+// failingPut fails the write of the document under key, the descriptor's
+// last entry. First it reads back, with the same context, the proxy under
+// before, which the apply wrote earlier in the transaction.
+type failingPut struct {
+	store.ConfigStore
+	key, before string
+	readBack    bool
+}
+
+func (f *failingPut) Put(ctx context.Context, d types.ConfigDocument) error {
+	if d.Key != f.key {
+		return f.ConfigStore.Put(ctx, d) //nolint:wrapcheck // test double
+	}
+	_, err := f.ConfigStore.Get(ctx, types.ConfigProxy, f.before)
+	f.readBack = err == nil
+	return errBoom
+}
+
+// storeState is what the descriptor of
+// TestUnitApplyFailingLastEntryLeavesTheStoreUnchanged can change, as JSON:
+// the repositories, the proxy and property set documents, the queued work
+// and the trash can's entries of the repository it deletes.
+func storeState(t *testing.T, db *inmem.Store) string {
+	t.Helper()
+	ctx := t.Context()
+	repos, err := db.Repos().List(ctx, store.RepoFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxies, err := db.Configs().List(ctx, types.ConfigProxy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sets, err := db.Configs().List(ctx, types.ConfigPropertySet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	work, err := db.WorkQueue().Stats(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	trashed, _, err := db.Trash().List(ctx, "gone", "", store.Page{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := json.Marshal([]any{repos, proxies, sets, work, trashed})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(state)
 }
 
 var errBoom = errors.New("boom")
@@ -690,7 +797,7 @@ func TestUnitApplyQueuesATerraformReindex(t *testing.T) {
 		}
 		var n int64
 		for _, s := range stats {
-			if s.Kind == format.KindReindex {
+			if s.Kind == reindexKind {
 				n += s.Pending
 			}
 		}
@@ -700,7 +807,7 @@ func TestUnitApplyQueuesATerraformReindex(t *testing.T) {
 	if c, err := db.Repos().Get(ctx, "tf"); err != nil || c.TerraformType != repo.TerraformModule {
 		t.Fatalf("%+v %v", c.TerraformType, err)
 	}
-	if _, err := db.WorkQueue().Get(ctx, format.KindReindex, "tf"); err != nil || queued() != 1 {
+	if _, err := db.WorkQueue().Get(ctx, reindexKind, "tf"); err != nil || queued() != 1 {
 		t.Fatalf("no reindex queued: %v", err)
 	}
 	mustApply(t, db, "localRepositories:\n  tf:\n    terraformType: MODULE\n    description: x\n")

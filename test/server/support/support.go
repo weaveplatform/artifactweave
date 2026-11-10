@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -41,6 +42,10 @@ var CheapHash = func() []byte {
 func Repositories(db store.Store) artifactsapi.Repositories {
 	return repos.NewRepositories(db, access.KeysOf(db), access.ProjectsOf(db))
 }
+
+// Layouts is the artifacts module's Layouts, bound as the server binds it:
+// the layout engine's check, which reads and writes nothing.
+func Layouts() artifactsapi.Layouts { return layout.Checker{} }
 
 // Seed creates the built-in principals in db as a new server does (the admin
 // user, anonymous, the readers group, the Anything and Any Remote permissions

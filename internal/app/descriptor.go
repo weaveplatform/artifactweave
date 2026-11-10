@@ -15,6 +15,9 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/descriptor"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/migration/access"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
+	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -41,7 +44,9 @@ func ApplyDescriptor(
 	if err := cfg.RequireMasterKey(); err != nil {
 		return fmt.Errorf("config apply: %w", err)
 	}
-	p, err := readDescriptor(file)
+	// Parse reads no store and no key, so a broken descriptor is reported
+	// ahead of a keyring or database error.
+	p, err := readDescriptor(descriptor.NewAPI(descriptor.Deps{}).Descriptor, file)
 	if err != nil {
 		return fmt.Errorf("config apply: %w", err)
 	}
@@ -54,7 +59,7 @@ func ApplyDescriptor(
 		return fmt.Errorf("config apply: %w", err)
 	}
 	defer func() { _ = st.Close() }()
-	res, err := descriptor.Apply(ctx, st, storeAccess(st), p, time.Now(), dryRun)
+	res, err := configurationOver(st).Descriptor.Apply(ctx, p, time.Now(), dryRun)
 	if err != nil {
 		return fmt.Errorf("config apply: %w", err)
 	}
@@ -62,24 +67,28 @@ func ApplyDescriptor(
 	return nil
 }
 
-// storeAccess binds the access a descriptor applies through over st alone:
-// config apply never builds the access module, and the bootstrap descriptor
-// is applied before openRuntime builds it. Bound over the store Apply
-// writes, the anonymous access setting is written in Apply's transaction.
-func storeAccess(st store.Store) descriptor.Access {
-	return descriptor.Access{
-		Keys:            access.KeysOf(st),
-		Projects:        access.ProjectsOf(st),
+// configurationOver binds the configuration API over st alone, with the
+// artifacts and access contracts it applies through: config apply never
+// builds the modules, and the bootstrap descriptor is applied before
+// openRuntime builds them. Every contract is bound over st, the store whose
+// unit of work Apply writes in, so the anonymous access setting and the
+// repositories are written in Apply's transaction.
+func configurationOver(st store.Store) configapi.API {
+	return descriptor.NewAPI(descriptor.Deps{
+		Tx:              st,
+		Repositories:    repos.NewRepositories(st, access.KeysOf(st), access.ProjectsOf(st)),
+		Layouts:         layout.Checker{},
+		Configs:         st.Configs(),
 		AnonymousAccess: access.AnonymousAccessOf(st),
-	}
+	})
 }
 
-func readDescriptor(file string) (*descriptor.Patch, error) {
+func readDescriptor(d configapi.Descriptor, file string) (configapi.Plan, error) {
 	doc, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("read descriptor: %w", err)
 	}
-	p, err := descriptor.Parse(doc, os.LookupEnv)
+	p, err := d.Parse(doc, os.LookupEnv)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", file, err)
 	}
@@ -121,16 +130,19 @@ func applyBootstrap(
 	if err != nil {
 		return fmt.Errorf("bootstrap descriptor: %w", err)
 	}
-	p, err := descriptor.Parse(doc, os.LookupEnv)
+	conf := configurationOver(st)
+	p, err := conf.Descriptor.Parse(doc, os.LookupEnv)
 	if err != nil {
 		return fmt.Errorf("bootstrap descriptor %s: %w", file, err)
 	}
 	sum := sha256.Sum256(doc)
 	now := time.Now()
-	var res descriptor.Result
+	var res configapi.Result
+	// Apply joins this transaction rather than opening its own, so the
+	// marker is written only with the whole descriptor.
 	err = st.Tx(ctx, func(ctx context.Context) error {
 		var err error
-		if res, err = descriptor.Apply(ctx, st, storeAccess(st), p, now, false); err != nil {
+		if res, err = conf.Descriptor.Apply(ctx, p, now, false); err != nil {
 			return err //nolint:wrapcheck // wrapped below
 		}
 		return st.Settings().

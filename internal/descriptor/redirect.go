@@ -8,8 +8,8 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/configdoc"
 )
 
 // SectionDownloadRedirect is the system's direct cloud storage download
@@ -26,8 +26,8 @@ const fileMinimumSize = "fileMinimumSize"
 // package's own: only the descriptor writes it and only
 // DownloadRedirectMinSize reads it back.
 const (
-	downloadRedirectKind types.ConfigKind = "download_redirect"
-	downloadRedirectKey  string           = "default"
+	downloadRedirectKind configdoc.ConfigKind = "download_redirect"
+	downloadRedirectKey  string               = "default"
 )
 
 // megabyte is the unit of fileMinimumSize. 6.20 converts it with
@@ -82,9 +82,12 @@ func parseDownloadRedirect(top map[string]any, p *Patch) error {
 // when none has. It then takes precedence over download.redirect.min_size,
 // the installation's default: the descriptor is the instance's own setting,
 // which the API and its clients change at run time.
-func DownloadRedirectMinSize(ctx context.Context, configs store.ConfigStore) (int64, bool, error) {
+func DownloadRedirectMinSize(
+	ctx context.Context,
+	configs configdoc.ConfigStore,
+) (int64, bool, error) {
 	d, err := configs.Get(ctx, downloadRedirectKind, downloadRedirectKey)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) {
 		return 0, false, nil
 	}
 	if err != nil {

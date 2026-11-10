@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/descriptor"
+	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
@@ -22,8 +22,9 @@ func (s artifactoryAPI) patchConfiguration(w http.ResponseWriter, r *http.Reques
 		fail(err)
 		return
 	}
-	st, err := s.Content()
-	if err != nil {
+	// Without a store there is no configuration to apply, and the router
+	// binds Configuration only over one.
+	if _, err := s.Content(); err != nil {
 		fail(err)
 		return
 	}
@@ -38,18 +39,15 @@ func (s artifactoryAPI) patchConfiguration(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	// ${NAME} references resolve from the server's own environment.
-	p, err := descriptor.Parse(body, os.LookupEnv)
+	conf := s.cfg.Configuration.Descriptor
+	p, err := conf.Parse(body, os.LookupEnv)
 	if err != nil {
 		fail(httpkit.BadRequestf("%s", err.Error()))
 		return
 	}
-	res, err := descriptor.Apply(ctx, st, descriptor.Access{
-		Keys:            s.cfg.Access.Keys,
-		Projects:        s.cfg.Access.Projects,
-		AnonymousAccess: s.cfg.Access.AnonymousAccess,
-	}, p, time.Now(), false)
+	res, err := conf.Apply(ctx, p, time.Now(), false)
 	switch {
-	case errors.Is(err, descriptor.ErrInvalid):
+	case errors.Is(err, configapi.ErrInvalid):
 		fail(httpkit.BadRequestf("%s", err.Error()))
 		return
 	case err != nil:

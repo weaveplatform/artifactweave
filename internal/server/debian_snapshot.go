@@ -193,7 +193,7 @@ func snapshotSourceClass(c repo.Class) bool {
 // reference is checked against current credentials and permissions on every
 // attempt, including retries after a restart.
 func RegisterDebianSnapshotWork(q *work.Queue, cfg Config) error {
-	cfg = withAccess(cfg)
+	cfg = withConfiguration(withAccess(cfg))
 	s := debianAPI{newKit(cfg)}
 	err := q.Handle(debianSnapshotKind, func(ctx context.Context, it types.WorkItem) error {
 		var job debianSnapshotRequest

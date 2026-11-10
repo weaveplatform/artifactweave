@@ -29,6 +29,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/gc"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
@@ -68,6 +69,7 @@ import (
 	terraformhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/http"
 	terraformbackendhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend/http"
 	vagranthttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/vagrant/http"
+	configapi "github.com/weaveplatform/artifactweave/migration/configuration/api"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -148,6 +150,13 @@ type Config struct {
 	// Config built by hand, as tests build it, answers as the application's
 	// does. Without a store it stays zero.
 	Access accessapi.API
+	// Configuration is the configuration module's API, through which PATCH
+	// /api/system/configuration applies the descriptor and the item routes
+	// read its minimum redirect size. When both its contracts are nil and
+	// Store is set, New and RegisterDebianSnapshotWork bind one over Store
+	// and Access with the descriptor core, as they bind Access. Without a
+	// store it stays zero.
+	Configuration configapi.API
 	// AllowBasicAuthTokens lets a password sent with Basic create tokens
 	// through POST /access/api/v1/tokens (token.allow_basic_auth); the zero
 	// value refuses it, as Artifactory 7.x does by default.
@@ -435,6 +444,26 @@ func accessUnset(a accessapi.API) bool {
 		a.Projects == nil && a.Grants == nil && a.AnonymousAccess == nil
 }
 
+// withConfiguration returns cfg with Configuration bound over its store by
+// the descriptor core when cfg sets a store and neither contract of
+// Configuration. It runs after withAccess: the descriptor checks the key
+// pairs and environments that repository entries name, and writes the
+// anonymous access setting, through cfg.Access.
+func withConfiguration(cfg Config) Config {
+	if cfg.Store == nil || cfg.Configuration.Descriptor != nil ||
+		cfg.Configuration.System != nil {
+		return cfg
+	}
+	cfg.Configuration = descriptor.NewAPI(descriptor.Deps{
+		Tx:              cfg.Store,
+		Repositories:    repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects),
+		Layouts:         layout.Checker{},
+		Configs:         cfg.Store.Configs(),
+		AnonymousAccess: cfg.Access.AnonymousAccess,
+	})
+	return cfg
+}
+
 // overlays are the format routes an item GET tries before the generic
 // lookup, in their dispatch order (itemkit.Deps.Overlays).
 var overlays = []itemkit.Overlay{
@@ -458,8 +487,9 @@ func privateItem(c repo.Config, p string) bool {
 }
 
 // newKit returns the item kit over cfg, with the router's overlays and
-// private predicate. The descriptor stays behind DownloadRedirectMinSize:
-// the artifacts module may not import the configuration module's core.
+// private predicate. The descriptor's minimum redirect size comes from the
+// configuration API's System: the artifacts module may not import the
+// configuration module's core.
 func newKit(cfg Config) *itemkit.Kit {
 	d := itemkit.Deps{
 		Store:                          cfg.Store,
@@ -478,10 +508,8 @@ func newKit(cfg Config) *itemkit.Kit {
 		Overlays:                       overlays,
 		Private:                        privateItem,
 	}
-	if cfg.Store != nil {
-		d.DownloadRedirectMinSize = func(ctx context.Context) (int64, bool, error) {
-			return descriptor.DownloadRedirectMinSize(ctx, cfg.Store.Configs())
-		}
+	if cfg.Configuration.System != nil {
+		d.DownloadRedirectMinSize = cfg.Configuration.System.DownloadRedirectMinSize
 	}
 	return itemkit.New(d)
 }
@@ -508,7 +536,7 @@ const managementBodyLimit = 64 << 20
 
 // New returns the fully wired handler.
 func New(cfg Config) http.Handler {
-	cfg = withAccess(cfg)
+	cfg = withConfiguration(withAccess(cfg))
 	logger := cfg.Logger
 	if logger == nil {
 		logger = slog.Default()
