@@ -20,7 +20,8 @@ env:
   # GitHub-hosted runners are discarded after every job, so testcontainers'
   # reaper (Ryuk) has nothing to clean up here, and starting it sometimes
   # times out ("wait for reaper ... context deadline exceeded", #148).
-  # testcontainers-go v0.44.0 reads this variable in internal/config/config.go
+  # testcontainers-go v0.44.0 reads this variable in
+  # github.com/testcontainers/testcontainers-go/internal/config/config.go
   # and then skips connectReaper (docker.go). The emulators still terminate
   # through testcontainers.CleanupContainer at the end of each test; the one
   # PostgreSQL container per test binary (migration/platform/sql/sqltest)

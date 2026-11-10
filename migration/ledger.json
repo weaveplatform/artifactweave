@@ -4,7 +4,7 @@
     "staging_root": "migration",
     "final_root": "internal",
     "packages": [
-        {"from":"internal/app","action":"split","ticket":"WEB-18"},
+        {"from":"internal/app","action":"move","to":"app","ticket":"WEB-18"},
         {"from":"internal/archive","action":"move","to":"platform/archive","ticket":"PLT-08"},
         {"from":"internal/archivecheck","action":"move","to":"platform/archivecheck","ticket":"PLT-08"},
         {"from":"internal/auth","action":"move","to":"access/core/authn","name":"authn","ticket":"ACC-12"},
