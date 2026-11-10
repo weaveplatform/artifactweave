@@ -10,6 +10,12 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// subjectOf is the subject of name's tokens, as access/adapters/http writes
+// it, so that the seeded token records belong to the users the tests name.
+func subjectOf(svc *token.Service, name string) string {
+	return svc.Issuer() + "/users/" + name
+}
+
 // statusSecrets are the fixture's token values, which only its own signing
 // key can produce, by the name a row writes as {name}. These tokens expired
 // an hour ago, within the refresh grace:

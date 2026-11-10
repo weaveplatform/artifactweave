@@ -13,14 +13,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -37,7 +38,7 @@ func (s artifactoryService) tryP2Item(w http.ResponseWriter, r *http.Request,
 		return false
 	}
 	if req.isFolder || len(req.props) != 0 || r.URL.RawQuery != "" {
-		writeErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return true
 	}
 	if c.Class == repo.Virtual {
@@ -45,7 +46,7 @@ func (s artifactoryService) tryP2Item(w http.ResponseWriter, r *http.Request,
 		return true
 	}
 	if c.Class != repo.Remote || p2.Classify(req.path) == p2.KindInvalid {
-		writeErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return true
 	}
 	if strings.HasPrefix(req.path, "__p2_ext/") || p2CompositeName(req.path) {
@@ -79,11 +80,11 @@ func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Reques
 ) {
 	if !acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		writeErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	if s.cfg.RemoteSources == nil {
-		writeErr(w, r, pkgroute.SourceError(source.ErrUnavailable, p.Anonymous))
+		httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrUnavailable, p.Anonymous))
 		return
 	}
 	q := source.Request{
@@ -118,7 +119,7 @@ func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Reques
 	}
 	result, err := s.cfg.RemoteSources.Read(r.Context(), q)
 	if err != nil {
-		writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+		httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 		return
 	}
 	if !s.remoteDeliveryAllowed(w, r, result, p.Anonymous) {
@@ -140,12 +141,12 @@ func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Reques
 		err = source.ErrInvalidResult
 	}
 	if err != nil || len(site) > p2.MaxArtifact {
-		writeErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
+		httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
 		return
 	}
 	body, err := p2.ExtractArchive(site, req.path)
 	if err != nil {
-		writeErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
+		httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
 		return
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
@@ -163,29 +164,29 @@ func (s artifactoryService) serveP2Virtual(w http.ResponseWriter, r *http.Reques
 	if !acc.folder(c, req.path, types.ActionRead) ||
 		!acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		writeErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	members, err := p2Members(r.Context(), st, c, acc, map[string]bool{})
 	if err != nil {
-		writeErr(w, r, s.itemError(r.Context(), "P2 virtual members", err))
+		httpkit.WriteErr(w, r, s.itemError(r.Context(), "P2 virtual members", err))
 		return
 	}
 	if strings.HasPrefix(req.path, "__p2/") {
 		parts := strings.SplitN(strings.TrimPrefix(req.path, "__p2/"), "/", 2)
 		if len(parts) != 2 || p2.Classify(parts[1]) == p2.KindInvalid {
-			writeErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, itemNotFound())
 			return
 		}
 		i, parseErr := strconv.Atoi(parts[0])
 		if parseErr != nil || i < 0 || i >= len(members) || strconv.Itoa(i) != parts[0] {
-			writeErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, itemNotFound())
 			return
 		}
 		member := members[i]
 		if !acc.file(member, parts[1], types.ActionRead) ||
 			generic.CheckDownload(member, parts[1], false) != nil {
-			writeErr(w, r, denied(p))
+			httpkit.WriteErr(w, r, httpkit.Denied(p))
 			return
 		}
 		// The cloned request retains the authenticated principal. The ordinary
@@ -210,7 +211,7 @@ func (s artifactoryService) serveP2Virtual(w http.ResponseWriter, r *http.Reques
 	case "compositeArtifacts.xml":
 		body = p2Composite("artifact", members)
 	default:
-		writeErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	w.Header().Set("Cache-Control", "private, no-store")

@@ -19,8 +19,10 @@ because their repository and permission models differ.
 
 `test/server/support/harness` is the one place the suites build the router
 from. `Config` and `Tune` alias the router's configuration and its option
-function, and `Router` builds the production handler, so a change of router
-edits the harness and no suite. The harness also exports the item world of the
+function, `Mirrors`, `MirrorStatus`, `SearchLimits` and `DefaultRedirectTTL`
+alias the configuration types and the default that suites name, and `Router`
+builds the production handler, so a change of router edits the harness and no
+suite. The harness also exports the item world of the
 root `internal/server` tests (`NewItemWorld`, with `Do`, `Item` and
 `WantStatus`) for the route suites that move out of that package, and
 `RepoFile`, which resolves a root-relative fixture path. Because the harness
@@ -35,8 +37,19 @@ Docker and Helm OCI; `test/server/support/agentcommon` assembles the world of
 Agent Packages and Agent Plugins. Like the harness, they build the router, so
 `test/server/support` never imports them.
 
-`test/server/access` is the access module's suite and contains the full-router
-authentication assertion.
+`test/server/access` is the access module's suite: authentication, tokens,
+users and groups, permissions, roles and environments, key pairs and
+certificates, the OIDC exchange and API restrictions, through the full router.
+`test/server/configuration` is the configuration module's suite: the base URL
+behind a chain of proxies and the configured base URL. `test/server/artifacts`
+is the artifacts module's management API suite: items with their checksums,
+properties and sidecars, the storage views and summary, the trash can, copy and
+move, build-info and promotion, the GET searches and AQL, reindex, repository
+configuration, remote sources and upstream searches, download redirects,
+multipart uploads and idempotent build appends. Each suite's `fixture_test.go`
+keeps the root helper names the tests call (`statusFixture`, `newItemWorld`,
+`newRepoWorld`, `tokenFixture`, `do`, `basic`) as adapters over the harness and
+`test/server/support`.
 `test/server/artifacts/nuget` contains the NuGet v2/v3 status table, route ×
 principal matrix, API-key and force-authentication cases, symbols lifecycle,
 remote status cases, and generated reindex method check.
@@ -57,7 +70,8 @@ push, AQL, properties and build-info sequence from `jf helm push`.
 and principal matrices, signed downloads, network mirror, and real
 Terraform/JF publish and install routes.
 `test/server/artifacts/terraformbackend` owns backend workspace, state,
-locking, encryption, item-route, status and principal assertions.
+locking, encryption, item-route, status and principal assertions, and the
+generic v1 repository read that sends `encryptStates`.
 `test/server/artifacts/agentpackages` owns APM package publish, discovery,
 search, permissions, lifecycle and reindex through a shared agent format router
 fixture. `test/server/artifacts/agentplugins` owns plugin marketplace,
@@ -65,11 +79,23 @@ permission, lifecycle and reindex routes using the same fixture.
 `test/server/artifacts/gems` owns RubyGems and Bundler push, permissions,
 metadata, yanks, token authentication, remote caching, virtual members, and
 indexes that fail closed when a stored archive is missing or corrupt; it runs
-the gem and Bundler clients when they are installed. Run each independently
-with:
+the gem and Bundler clients when they are installed.
+`test/server/artifacts/conan` owns the Conan protocol, revision, virtual and
+remote assertions and runs the pinned Conan 2 and Conan 1 clients when they are
+installed. `test/server/artifacts/conda`, `cran`, `hex`, `p2`, `chef` and
+`debian` own those formats' native channels, indexes, remote and virtual
+repositories and their refusals; `test/server/artifacts/huggingface` owns the
+Xet routes and runs the pinned Hub client when it is installed;
+`test/server/artifacts/vcs` owns the VCS REST routes, the legacy providers and
+file delivery and runs `curl` when it is present; `test/server/artifacts/opkg`
+and `rpm` own the signing of virtual feeds and metadata. Where such a suite's
+tests call unexported server code, those tests stay in the root as
+`<name>_internal_test.go`. Run each independently with:
 
 ```sh
 go test ./test/server/access
+go test ./test/server/configuration
+go test ./test/server/artifacts
 go test ./test/server/artifacts/nuget
 go test ./test/server/artifacts/npm
 go test ./test/server/artifacts/golang
@@ -83,24 +109,44 @@ go test ./test/server/artifacts/terraformbackend
 go test ./test/server/artifacts/agentpackages
 go test ./test/server/artifacts/agentplugins
 go test ./test/server/artifacts/gems
+go test ./test/server/artifacts/chef
+go test ./test/server/artifacts/conan
+go test ./test/server/artifacts/conda
+go test ./test/server/artifacts/cran
+go test ./test/server/artifacts/debian
+go test ./test/server/artifacts/hex
+go test ./test/server/artifacts/huggingface
+go test ./test/server/artifacts/opkg
+go test ./test/server/artifacts/p2
+go test ./test/server/artifacts/rpm
+go test ./test/server/artifacts/vcs
 ```
 
-`go test ./test/server/artifacts/...` runs every ecosystem suite at once.
+`go test ./test/server/artifacts/...` runs the management API suite and every
+ecosystem suite at once.
 
 The root `internal/server` package still contains shared cross-format and
 private server helper tests. NuGet-only, npm-only, Go-only, Maven-only, PyPI-only,
 classic Helm-only, Docker-only, Helm OCI-only, Terraform registry-only,
 Terraform backend-only, Agent Packages-only and Agent Plugins-only route
-assertions no longer run from it. The root registration and stub guards retain
+assertions no longer run from it, nor do the router-level access,
+configuration and artifacts management API assertions. The router-level
+suites of Chef, Conan, Conda, CRAN, Debian, Hex, Hugging Face, Opkg, P2, RPM
+and VCS run from their own packages as well; their status tables, the tests
+that call unexported server code (`<name>_internal_test.go`) and the Debian
+and P2 tests that move with their code stay in the root. The root registration
+and stub guards retain
 the implemented route patterns through
 `test/server/support.NuGetRoutes`, `NPMRoutes`, `GoRoutes`, `MavenRoutes`,
 `PyPIRoutes`, `HelmRoutes`, `DockerRoutes`, `TerraformRoutes` and
 `TerraformBackendRoutes`; those format packages check that every pattern has
 both a status and principal row. The shared P8 reindex
-envelope and generic v1 `encryptStates` repository read remain in root because
-they cover several formats.
+envelope remains in root because it covers several formats.
 Its `statusFixture`, `matrixFixture`, and `newItemWorld` construct different
-repository matrices and remain for the shared root assertions. Their common auth, request, and package
+repository matrices and remain for the shared root assertions. The in-package
+fixtures that several root files share live in `fixtures_test.go`, and a suite
+split out of the package keeps its in-package part, which calls unexported
+server code, in `<name>_internal_test.go`. Their common auth, request, and package
 primitives now come from `test/server/support`. Keep a root wrapper where a
 shared helper has many existing callers; the wrapper must delegate rather than
 maintain another copy of fixture behavior.

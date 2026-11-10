@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	apmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"

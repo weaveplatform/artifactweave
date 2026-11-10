@@ -6,7 +6,7 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authz"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -17,7 +17,7 @@ var _ accessapi.Grants = grants{}
 // Hugging Face repository migration
 // (migration/artifacts/ecosystem/huggingface/http) ran themselves, with their
 // order and error texts.
-type grants struct{ st store.Store }
+type grants struct{ st Store }
 
 func (b grants) ItemGrants(
 	ctx context.Context,
@@ -61,7 +61,7 @@ func (b grants) AccessChange(
 	pairs []accessapi.PathPair,
 	limit int,
 ) (string, error) {
-	page := store.Page{Limit: limit}
+	page := kernel.Page{Limit: limit}
 	seen := 0
 	for {
 		perms, next, err := b.st.Permissions().List(ctx, page)

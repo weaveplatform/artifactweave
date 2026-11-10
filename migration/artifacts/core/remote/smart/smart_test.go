@@ -1,15 +1,19 @@
 package smart
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/upstreamtest"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
@@ -358,6 +363,62 @@ func (w *smartWorld) saveConfig() {
 	var err error
 	w.permit.Identity, err = w.db.RemoteCache().Source(w.ctx, w.c.Key)
 	if err != nil {
+		w.t.Fatal(err)
+	}
+}
+
+func (w *smartWorld) peerCalls() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.calls
+}
+
+// queued queues file.bin's refresh or statistics job and returns it.
+func (w *smartWorld) queued(statistics bool) types.WorkItem {
+	w.t.Helper()
+	key, err := w.s.enqueue(w.ctx, w.smartRequest(), w.permit, w.smartEntry().Token.Key, statistics)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	job, err := w.db.WorkQueue().Get(w.ctx, w.s.kind, key)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	return job
+}
+
+// changeEntry rewrites file.bin's cache entry with change.
+func (w *smartWorld) changeEntry(change func(*types.RemoteCacheEntry)) {
+	w.t.Helper()
+	key := w.smartEntry().Token.Key
+	if err := w.db.Tx(w.ctx, func(tx context.Context) error {
+		entry, err := w.db.RemoteCache().Read(tx, key)
+		if err != nil {
+			return err
+		}
+		change(&entry)
+		_, err = w.db.RemoteCache().Put(tx, entry.Token, entry)
+		return err
+	}); err != nil {
+		w.t.Fatal(err)
+	}
+}
+
+// throttle holds the peer off for d, as a 429 with Retry-After does. It
+// records the hold under the current credential revision because the policy
+// drops one recorded under any other.
+func (w *smartWorld) throttle(d time.Duration) {
+	w.t.Helper()
+	opts, err := w.p.Options(w.ctx, w.c)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	state, err := w.db.RemoteCache().State(w.ctx, w.c.Key)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	state.SettingsRevision, state.RetryAfterUntil = opts.Revision, w.clock.Now().Add(d)
+	if err = w.db.RemoteCache().PutState(w.ctx, w.c.Key, state); err != nil {
 		w.t.Fatal(err)
 	}
 }
@@ -704,5 +765,222 @@ func TestAccSmartPropertyOwnershipAcrossRepresentations(t *testing.T) {
 	props, err = w.db.Items().Properties(w.ctx, first.Item.ID)
 	if err != nil || strings.Join(props["color"], ",") != "local" {
 		t.Fatal("local edit overwritten through alternate representation", props, err)
+	}
+}
+
+// Status reads in one transaction and answers no representations when any
+// read fails: a partial answer would pass for a complete one.
+func TestAccSmartStatusFailsOnUnreadableState(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		key   string
+		fail  func(string) bool
+		setup func(*smartWorld)
+		want  error
+		text  string
+	}{
+		{
+			name: "repository unreadable", fail: failFrom("Repos.Get", 1),
+			want: errStoreFault, text: "smart remote operation: smart test: store fault: Repos.Get",
+		},
+		{name: "not a remote repository", key: "local", setup: func(w *smartWorld) {
+			local := repo.Defaults(&repo.Config{Key: "local", Class: repo.Local, PackageType: repo.Generic})
+			if err := w.db.Repos().Create(w.ctx, *local); err != nil {
+				w.t.Fatal(err)
+			}
+		}, want: source.ErrInvalidRequest},
+		{
+			name: "source unreadable", fail: failFrom("RemoteCache.Source", 1),
+			want: errStoreFault, text: "store fault: RemoteCache.Source",
+		},
+		{
+			name: "repository unreadable under its lock", fail: failFrom("Repos.Get", 2),
+			want: errStoreFault, text: "smart remote current repository",
+		},
+		{name: "credentials unresolved", setup: func(w *smartWorld) {
+			w.p.Options = func(context.Context, repo.Config) (remote.Options, error) {
+				return remote.Options{}, remote.ErrConfiguration
+			}
+		}, want: remote.ErrConfiguration},
+		{
+			name: "representations unreadable", fail: failFrom("RemoteCache.Exact", 1),
+			want: errStoreFault, text: "store fault: RemoteCache.Exact",
+		},
+		{
+			name: "item unreadable", fail: failFrom("Items.GetByID", 1),
+			want: errStoreFault, text: "store fault: Items.GetByID",
+		},
+		{
+			name: "work unreadable", fail: failFrom("WorkQueue.Get", 1),
+			want: errStoreFault, text: "store fault: WorkQueue.Get",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := smartFixture(t)
+			w.smartRead()
+			if tc.setup != nil {
+				tc.setup(w)
+			}
+			if tc.fail != nil {
+				w.p.Store = &faultStore{Store: w.db, fail: tc.fail}
+			}
+			status, err := w.s.Status(w.ctx, cmp.Or(tc.key, w.c.Key), "file.bin")
+			if !errors.Is(err, tc.want) || !strings.Contains(fmt.Sprint(err), tc.text) ||
+				len(status.Representations) != 0 {
+				t.Fatal(status, err)
+			}
+		})
+	}
+}
+
+// A representation whose item was removed, or replaced by other content,
+// describes nothing this repository still serves.
+func TestAccSmartStatusOmitsRepresentationsWithoutTheirItem(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		change func(*smartWorld, types.Item) error
+	}{
+		{"removed", func(w *smartWorld, _ types.Item) error {
+			_, err := w.db.Items().Delete(w.ctx, w.c.Key, true, "file.bin")
+			return err
+		}},
+		{"replaced", func(w *smartWorld, it types.Item) error {
+			it.Actual.SHA256 = strings.Repeat("f", 64)
+			_, err := w.db.Items().Put(w.ctx, it)
+			return err
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := smartFixture(t)
+			result := w.smartRead()
+			if err := tc.change(w, *result.Item); err != nil {
+				t.Fatal(err)
+			}
+			status, err := w.s.Status(w.ctx, w.c.Key, "file.bin")
+			if err != nil || len(status.Representations) != 0 {
+				t.Fatal(status, err)
+			}
+		})
+	}
+}
+
+// The application serves registry remotes with a second Smart whose jobs
+// carry the kind remote.smart.registry (internal/app), so Status reads a
+// registry remote's work under that kind.
+func TestAccSmartStatusFindsRegistryWorkUnderItsKind(t *testing.T) {
+	w := smartFixture(t)
+	w.c.PackageType = repo.Docker
+	w.saveConfig()
+	w.s.kind = "remote.smart.registry"
+	if err := w.smartRead().Used(w.ctx); err != nil {
+		t.Fatal(err)
+	}
+	status, err := w.s.Status(w.ctx, w.c.Key, "file.bin")
+	want := []SmartWorkStatus{{Operation: "statistics", State: types.WorkPending}}
+	if err != nil || len(status.Representations) != 1 ||
+		!slices.Equal(status.Representations[0].Work, want) {
+		t.Fatal(status, err)
+	}
+}
+
+// Read resolves the credentials again after discovery and goes on only
+// under the revision the peer was discovered with.
+func TestAccSmartReadRefusesOptionsThatMovedAfterDiscovery(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		later func(remote.Options) (remote.Options, error)
+		want  error
+	}{
+		{"resolver fails", func(remote.Options) (remote.Options, error) {
+			return remote.Options{}, remote.ErrConfiguration
+		}, &source.HTTPError{Status: http.StatusBadGateway, Kind: source.FailureKindProtocol}},
+		{"revision moved", func(opts remote.Options) (remote.Options, error) {
+			opts.Revision += "-moved"
+			return opts, nil
+		}, source.ErrSuperseded},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := smartFixture(t)
+			w.smartRead()
+			resolve := w.p.Options
+			var resolved atomic.Int32
+			w.p.Options = func(ctx context.Context, c repo.Config) (remote.Options, error) {
+				opts, err := resolve(ctx, c)
+				if err != nil || resolved.Add(1) == 1 {
+					return opts, err
+				}
+				return tc.later(opts)
+			}
+			before := w.peerCalls()
+			if _, err := w.s.Read(w.ctx, w.smartRequest(), w.permit); !failsWith(err, tc.want) {
+				t.Fatal(err)
+			}
+			// The first resolution is discovery's, which the earlier read
+			// left cached; only the second may move.
+			if resolved.Load() != 2 || w.peerCalls() != before {
+				t.Fatal("resolutions", resolved.Load(), "peer calls", w.peerCalls()-before)
+			}
+		})
+	}
+}
+
+// Read checks whether a refresh is due from the representation's Smart
+// state, and fails rather than deliver without that check.
+func TestAccSmartReadFailsWithoutItsRefreshState(t *testing.T) {
+	w := smartFixture(t)
+	w.smartRead()
+	// The policy reads the entry and then the item it delivers; the read of
+	// the Smart state is the next entry read.
+	var delivered atomic.Bool
+	w.p.Store = &faultStore{Store: w.db, fail: func(call string) bool {
+		switch call {
+		case "Items.GetByID":
+			delivered.Store(true)
+		case "RemoteCache.Read":
+			return delivered.Load()
+		}
+		return false
+	}}
+	_, err := w.s.Read(w.ctx, w.smartRequest(), w.permit)
+	if !errors.Is(err, errStoreFault) ||
+		!strings.HasPrefix(fmt.Sprint(err), "smart remote read: ") {
+		t.Fatal(err)
+	}
+}
+
+// A due refresh runs before the read delivers. When it fails the read fails
+// too, and the job stays queued for a retry.
+func TestAccSmartReadFailsWhenItsDueRefreshFails(t *testing.T) {
+	w := smartFixture(t)
+	w.smartRead()
+	w.mu.Lock()
+	w.status = http.StatusServiceUnavailable
+	w.mu.Unlock()
+	w.clock.Advance(31 * time.Second)
+	_, err := w.s.Read(w.ctx, w.smartRequest(), w.permit)
+	outage := &source.HTTPError{Status: http.StatusServiceUnavailable, Kind: source.FailureKindHTTP}
+	if !failsWith(err, outage) || !strings.HasPrefix(fmt.Sprint(err), "smart remote refresh: ") {
+		t.Fatal(err)
+	}
+	job, err := w.db.WorkQueue().
+		Get(w.ctx, w.s.kind, smartWorkKey(w.smartEntry().Token.Key, w.permit.Identity, false))
+	if err != nil || job.State != types.WorkPending || job.Attempts != 1 {
+		t.Fatal(job, err)
+	}
+}
+
+// A download counts for the peer only once the policy has recorded the use
+// of the cached copy, so a use it failed to record counts nothing.
+func TestAccSmartUseCountsOnlyWhatThePolicyRecorded(t *testing.T) {
+	w := smartFixture(t)
+	result := w.smartRead()
+	w.p.Store = &faultStore{Store: w.db, fail: failFrom("RemoteCache.Touch", 1)}
+	if err := result.Used(w.ctx); !errors.Is(err, errStoreFault) ||
+		!strings.Contains(fmt.Sprint(err), "record remote cache use") {
+		t.Fatal(err)
+	}
+	stats, err := w.db.WorkQueue().Stats(w.ctx)
+	if err != nil || len(stats) != 0 || w.smartEntry().Smart.Downloads != 0 {
+		t.Fatal("unrecorded use was counted", stats, err)
 	}
 }

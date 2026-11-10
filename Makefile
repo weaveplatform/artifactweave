@@ -106,7 +106,7 @@ accept: test-names
 conan-accept:
 	@rm -rf $(COVER_DIR)/conan && mkdir -p $(COVER_DIR)/conan/parts $(BIN_DIR)
 	$(GO) build -o $(BIN_DIR)/coverexec$(GOEXE) ./tools/coverexec
-	$(GO) test -timeout=15m -count=1 -cover -covermode=atomic -coverpkg=$(CONAN_COVERPKG) -run '^TestAccConan' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) ./internal/server ./internal/app -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/conan/parts
+	$(GO) test -timeout=15m -count=1 -cover -covermode=atomic -coverpkg=$(CONAN_COVERPKG) -run '^TestAccConan' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) ./test/server/artifacts/conan ./internal/app -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/conan/parts
 	@parts=($(COVER_DIR)/conan/parts/*/); IFS=,; $(GO) tool covdata merge -i="$${parts[*]}" -o=$(COVER_DIR)/conan
 	@rm -rf $(COVER_DIR)/conan/parts
 

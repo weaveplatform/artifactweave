@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -257,7 +258,7 @@ func (s artifactoryService) CalculateYumRepositoryMetadata(
 		if err != nil {
 			return nil, err
 		}
-		p, err := principal(ctx)
+		p, err := httpkit.Principal(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -285,7 +286,7 @@ func (s artifactoryService) CalculateYumRepositoryMetadata(
 			fmt.Sprintf("YUM metadata for virtual repository %s was calculated.", c.Key)), nil
 	}
 	if req.Params.Path != nil && *req.Params.Path != "" {
-		return nil, badRequestf(
+		return nil, httpkit.BadRequestf(
 			"RPM metadata path calculation is only valid on a virtual repository",
 		)
 	}
@@ -305,7 +306,9 @@ func yumVirtualRoot(value *string) (string, error) {
 	}
 	p := strings.TrimSuffix(*value, "/")
 	if path.Clean(p) != p || strings.HasPrefix(p, "/") || !strings.HasSuffix(p, "/repodata") {
-		return "", badRequestf("YUM path must name a repository-relative repodata directory")
+		return "", httpkit.BadRequestf(
+			"YUM path must name a repository-relative repodata directory",
+		)
 	}
 	return strings.TrimSuffix(p, "repodata"), nil
 }
@@ -358,7 +361,7 @@ func (s artifactoryService) reindexAs(
 		kind, workKey = format.KindReindexPath, c.Key+"/"+path
 		// [I] 7.x's answer to an overlong path is unknown (#216).
 		if len(workKey) > store.MaxWorkKey {
-			return "", badRequestf("The path '%s' is too long to reindex", path)
+			return "", httpkit.BadRequestf("The path '%s' is too long to reindex", path)
 		}
 		// Decision 0039: a mistyped partial-reindex path must not claim
 		// that useful work was scheduled. This status is inferred (#216).
@@ -405,12 +408,12 @@ func (s artifactoryService) operationRepo(
 	if err != nil {
 		return nil, c, "", s.itemError(ctx, "resolve repository", err)
 	}
-	p, err := principal(ctx)
+	p, err := httpkit.Principal(ctx)
 	if err != nil {
 		return nil, c, "", err
 	}
 	if op.isAdminOnly && !p.Admin {
-		return nil, c, "", denied(p)
+		return nil, c, "", httpkit.Denied(p)
 	}
 	if !op.isAdminOnly {
 		d, _ := accessapi.DeciderFrom(ctx)
@@ -419,7 +422,7 @@ func (s artifactoryService) operationRepo(
 			return nil, c, "", s.internalError(ctx, "operation rights", err)
 		}
 		if !acc.file(c, "", types.ActionManage) {
-			return nil, c, "", denied(p)
+			return nil, c, "", httpkit.Denied(p)
 		}
 	}
 	class := c.Class
@@ -431,7 +434,7 @@ func (s artifactoryService) operationRepo(
 		return nil, c, "", apierror.New(http.StatusNotImplemented, fmt.Sprintf(
 			"'%s' is a %s repository, which artifactweave does not reindex yet", key, class))
 	case c.PackageType != t || !slices.Contains(op.classes, class):
-		return nil, c, "", badRequestf(op.refused, key)
+		return nil, c, "", httpkit.BadRequestf(op.refused, key)
 	}
 	return st, c, p.Name, nil
 }
@@ -493,16 +496,16 @@ func (s artifactoryService) queueRemoteReindex(
 			if err != nil {
 				return s.internalError(ctx, "reindex source", err)
 			}
-			p, err := principal(ctx)
+			p, err := httpkit.Principal(ctx)
 			if err != nil {
 				return err
 			}
 			if s.cfg.Access.Authenticator == nil {
-				return denied(p)
+				return httpkit.Denied(p)
 			}
 			current, err := s.cfg.Access.Authenticator.Current(ctx, p)
 			if err != nil {
-				return denied(p)
+				return httpkit.Denied(p)
 			}
 			ctx = kernel.WithPrincipal(ctx, current)
 			_, latest, by, err := s.operationRepo(
@@ -583,7 +586,7 @@ func (s artifactoryService) helmPartialReindex(next http.Handler) http.Handler {
 		}
 		msg, err := s.reindex(r.Context(), repo.Helm, key, p, false)
 		if err != nil {
-			writeErr(w, r, err)
+			httpkit.WriteErr(w, r, err)
 			return
 		}
 		// The generated reindex operations answer the same way.

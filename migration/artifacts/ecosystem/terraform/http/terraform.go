@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
@@ -120,4 +120,17 @@ func writeJSON(w http.ResponseWriter, r *http.Request, v any) {
 
 func missing() error {
 	return apierror.New(http.StatusNotFound, "Terraform module or operation not found")
+}
+
+// IsTerraformReindex reports whether path is the JFrog reindex operation
+// beside the Terraform registry. It is Artifactory's REST operation, not
+// the registry's, so it answers in Artifactory's envelope, as the JFrog
+// operations beside npm's registry do (RTFACT-30181), where the registry's
+// routes answer {"errors":["..."]} (decision 0040). [I] No 7.x capture shows
+// this operation's error body (#216). Only POST is the operation, and no
+// registry route has two segments, so any method takes the envelope.
+func IsTerraformReindex(path string) bool {
+	rest, ok := strings.CutPrefix(path, "/artifactory/api/terraform/")
+	key, op, _ := strings.Cut(rest, "/")
+	return ok && key != "" && op == "reindex"
 }

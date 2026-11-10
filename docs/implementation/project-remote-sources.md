@@ -58,7 +58,7 @@ The source inspection for this design is against the P8 baseline:
   identity or a monotonic authorization revision. [authz](../../migration/access/core/authz/authz.go)
   evaluates current identity/permission/token rules; that is not proof of P11 sharing
   administration or project-aware read enforcement.
-- **[S]** [pkgroute.Source](../../internal/server/pkgroute/pkgroute.go) returns persisted
+- **[S]** [pkgroute.Source](../../migration/artifacts/adapters/http/pkgroute/pkgroute.go) returns persisted
   items. #616 extends that seam for remote metadata, queries and streams without importing
   server packages into formats. Ordinary item and Docker routes must use the same source
   policy even though their routing adapters differ.

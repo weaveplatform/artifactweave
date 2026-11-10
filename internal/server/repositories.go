@@ -13,8 +13,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
-
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -22,8 +20,10 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -68,73 +68,68 @@ const (
 
 // slashCollections are the collection paths the Terraform provider calls
 // with a trailing slash, which chi would otherwise read as a member with an
-// empty key: it lists repositories at /api/repositories/ (research 08) and
-// creates key pairs with POST /api/security/keypair/ (its KeypairEndPoint).
-// Only these exact paths are rewritten, because a trailing slash elsewhere
-// under /artifactory names a folder.
+// empty key: it lists repositories at /api/repositories/ (research 08), and
+// access adds the key pairs' (SlashCollections). Only these exact paths are
+// rewritten, because a trailing slash elsewhere under /artifactory names a
+// folder.
 var slashCollections = map[string]string{
-	"/artifactory/api/repositories/":     "/artifactory/api/repositories",
-	"/artifactory/api/security/keypair/": "/artifactory/api/security/keypair",
+	"/artifactory/api/repositories/": "/artifactory/api/repositories",
 }
 
-// collectionSlash routes each of slashCollections as its path without the
-// trailing slash.
-func collectionSlash(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if bare, ok := slashCollections[r.URL.Path]; ok {
-			r.URL.Path, r.URL.RawPath = bare, ""
-			if rctx := chi.RouteContext(r.Context()); rctx != nil {
-				rctx.RoutePath = r.URL.Path
-			}
-		}
-		next.ServeHTTP(w, r)
-	})
+// detailOptions name the requests whose details requestDetails keeps. Each
+// contribution is declared beside the handler that reads what it keeps.
+type detailOptions struct {
+	// SearchQuery reports the requests whose raw query is kept
+	// (httpkit.RawSearchQuery), for parameters the generated binding drops.
+	SearchQuery []func(*http.Request) bool
+	// Rewrite normalises a request's body before the generated binding
+	// decodes it, each in order; an error answers 400 as a binding error.
+	Rewrite []func(*http.Request) error
+	// RawBody reports the requests whose raw body is kept (httpkit.RawBody),
+	// for handlers that must tell what the decoded type cannot.
+	RawBody []func(*http.Request) bool
 }
 
 // requestDetails keeps what the strict handlers need beyond their decoded
-// request: the Accept header for media-type negotiation, the raw query of a
-// property search, and the raw body of a repository or Access v2 group
-// update. repo.Config cannot tell a field left out (keep the stored value)
-// from one sent as null (reset it to its default), and an update needs both.
-// A build-info publish or append keeps its raw body too, because the
-// document is stored as published (decision 0014). It runs after bodyLimit,
-// so the copy is bounded.
-func requestDetails(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := withAccept(r.Context(), r.Header.Get("Accept"))
-		if r.URL.Path == propertySearchPath || r.URL.Path == "/artifactory/api/search/gavc" {
-			ctx = withSearchQuery(ctx, r.URL.RawQuery)
-		}
-		if r.Method == http.MethodPut && policyPaths[r.URL.Path] {
-			if err := normalizePolicyBody(r); err != nil {
-				bindingError(http.StatusBadRequest)(w, r, err)
-				return
+// request: the Accept header of every request, for media-type negotiation,
+// and the raw query, rewritten body and raw body of the requests o names.
+// It runs after middleware.BodyLimit, so the copy is bounded.
+func requestDetails(o detailOptions) func(http.Handler) http.Handler {
+	matches := func(preds []func(*http.Request) bool, r *http.Request) bool {
+		return slices.ContainsFunc(preds, func(p func(*http.Request) bool) bool { return p(r) })
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := httpkit.WithAccept(r.Context(), r.Header.Get("Accept"))
+			if matches(o.SearchQuery, r) {
+				ctx = httpkit.WithSearchQuery(ctx, r.URL.RawQuery)
 			}
-		}
-		// A permission create keeps its raw body too: the generated Access
-		// type drops the destination and pipeline_source sections.
-		if (r.Method == http.MethodPost &&
-			(isRepositoryUpdate(r.URL.Path) || r.URL.Path == "/access/api/v2/permissions" ||
-				strings.HasPrefix(r.URL.Path, buildsPath+"/append/"))) ||
-			(r.Method == http.MethodPut && r.URL.Path == buildsPath) ||
-			(r.Method == http.MethodPatch && isGroupUpdate(r.URL.Path)) {
-			b, err := io.ReadAll(r.Body)
-			if err != nil {
-				bindingError(http.StatusBadRequest)(w, r, err)
-				return
+			for _, rewrite := range o.Rewrite {
+				if err := rewrite(r); err != nil {
+					middleware.BindingError(http.StatusBadRequest)(w, r, err)
+					return
+				}
 			}
-			r.Body = io.NopCloser(bytes.NewReader(b))
-			ctx = withRawBody(ctx, b)
-		}
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+			if matches(o.RawBody, r) {
+				b, err := io.ReadAll(r.Body)
+				if err != nil {
+					middleware.BindingError(http.StatusBadRequest)(w, r, err)
+					return
+				}
+				r.Body = io.NopCloser(bytes.NewReader(b))
+				ctx = httpkit.WithRawBody(ctx, b)
+			}
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
-// isGroupUpdate matches PATCH /access/api/v2/groups/{name}, whose raw body
-// tells a field left out from one sent with its stored value.
-func isGroupUpdate(path string) bool {
-	name, ok := strings.CutPrefix(path, accessGroups)
-	return ok && name != "" && !strings.Contains(name, "/")
+// keepsRepositoryBody reports a repository update, which keeps its raw
+// body: repo.Config cannot tell a field left out (keep the stored value)
+// from one sent as null (reset it to its default), and an update needs
+// both.
+func keepsRepositoryBody(r *http.Request) bool {
+	return r.Method == http.MethodPost && isRepositoryUpdate(r.URL.Path)
 }
 
 func isRepositoryUpdate(path string) bool {
@@ -156,7 +151,7 @@ func (s artifactoryService) content() (store.Store, error) {
 
 // internalError logs err and returns a 500 that names nothing internal.
 func (s artifactoryService) internalError(ctx context.Context, op string, err error) error {
-	s.log().ErrorContext(ctx, op, "request_id", requestIDFrom(ctx), "error", err)
+	s.log().ErrorContext(ctx, op, "request_id", httpkit.RequestIDFrom(ctx), "error", err)
 	return apierror.New(http.StatusInternalServerError, "internal error")
 }
 
@@ -169,39 +164,6 @@ func (s artifactoryService) log() *slog.Logger {
 	return s.cfg.Logger
 }
 
-// adminOnly refuses a caller who is not an administrator (kernel.RequireAdmin).
-// The wrap keeps the typed error, so the response carries its status.
-func adminOnly(ctx context.Context) error {
-	if _, err := kernel.RequireAdmin(ctx); err != nil {
-		return fmt.Errorf("repositories: %w", err)
-	}
-	return nil
-}
-
-// principal returns the caller of a read. The middleware lets a request
-// without one through only to public routes, so none here means a router
-// built without authentication, which is refused as unauthenticated.
-func principal(ctx context.Context) (kernel.Principal, error) {
-	p, ok := kernel.FromContext(ctx)
-	if !ok {
-		return p, kernel.ErrUnauthenticated
-	}
-	return p, nil
-}
-
-// denied refuses a read: anonymous is told to authenticate, a user that
-// they lack the right.
-func denied(p kernel.Principal) error {
-	if p.Anonymous {
-		return kernel.ErrUnauthenticated
-	}
-	return kernel.ErrForbidden
-}
-
-func badRequestf(format string, a ...any) error {
-	return apierror.New(http.StatusBadRequest, fmt.Sprintf(format, a...))
-}
-
 func notFoundRepo(key string) error {
 	return apierror.New(http.StatusNotFound, fmt.Sprintf("Repository '%s' does not exist", key))
 }
@@ -211,7 +173,7 @@ func (s artifactoryService) readerFor(
 	ctx context.Context,
 	st store.Store,
 ) (kernel.Principal, func(repo.Config) bool, error) {
-	p, err := principal(ctx)
+	p, err := httpkit.Principal(ctx)
 	if err != nil {
 		return p, nil, err
 	}
@@ -282,7 +244,7 @@ func (s artifactoryService) GetRepositoriesByTypeAndProject(
 			e.Description = &d
 		}
 	}
-	if accepts(ctx, mediaDetails) {
+	if httpkit.Accepts(ctx, mediaDetails) {
 		return artgen.GetRepositoriesByTypeAndProject200ApplicationVndOrgJfrogArtifactoryRepositoriesRepositoryDetailsListPlusJSONResponse(
 			out,
 		), nil
@@ -294,7 +256,7 @@ func (s artifactoryService) GetAllRepositoryConfigurations(
 	ctx context.Context,
 	req artgen.GetAllRepositoryConfigurationsRequestObject,
 ) (artgen.GetAllRepositoryConfigurationsResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	st, err := s.content()
@@ -331,7 +293,7 @@ func (s artifactoryService) GetAllRepositoryConfigurations(
 			out.FEDERATED = append(out.FEDERATED, c)
 		}
 	}
-	if accepts(ctx, mediaConfigs) {
+	if httpkit.Accepts(ctx, mediaConfigs) {
 		return artgen.GetAllRepositoryConfigurations200ApplicationVndOrgJfrogArtifactoryRepositoriesRepositoryConfigurationsListPlusJSONResponse(
 			out,
 		), nil
@@ -361,7 +323,7 @@ func (s artifactoryService) CheckIfRepositoryExists(
 	ctx context.Context,
 	req artgen.CheckIfRepositoryExistsRequestObject,
 ) (artgen.CheckIfRepositoryExistsResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	st, err := s.content()
@@ -427,7 +389,7 @@ func (s artifactoryService) readOne(
 	case err != nil:
 		return p, repo.Config{}, s.internalError(ctx, "get repository", err)
 	case !can(c):
-		return p, repo.Config{}, denied(p)
+		return p, repo.Config{}, httpkit.Denied(p)
 	}
 	return p, view(p, c), nil
 }
@@ -453,19 +415,19 @@ func (s artifactoryService) GetRepositoryConfigurationV2(
 	}
 	c = repo.Relevant(c)
 	switch {
-	case c.Class == repo.Local && accepts(ctx, mediaLocal):
+	case c.Class == repo.Local && httpkit.Accepts(ctx, mediaLocal):
 		return artgen.GetRepositoryConfigurationV2200ApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONResponse(
 			c,
 		), nil
-	case c.Class == repo.Remote && accepts(ctx, mediaRemote):
+	case c.Class == repo.Remote && httpkit.Accepts(ctx, mediaRemote):
 		return artgen.GetRepositoryConfigurationV2200ApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONResponse(
 			c,
 		), nil
-	case c.Class == repo.Virtual && accepts(ctx, mediaVirtual):
+	case c.Class == repo.Virtual && httpkit.Accepts(ctx, mediaVirtual):
 		return artgen.GetRepositoryConfigurationV2200ApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONResponse(
 			c,
 		), nil
-	case c.Class == repo.Federated && accepts(ctx, mediaFederated):
+	case c.Class == repo.Federated && httpkit.Accepts(ctx, mediaFederated):
 		return artgen.GetRepositoryConfigurationV2200ApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONResponse(
 			c,
 		), nil
@@ -480,19 +442,19 @@ func configResponse(
 	c repo.Config,
 ) artgen.GetRepositoryConfigurationResponseObject {
 	switch {
-	case c.Class == repo.Local && accepts(ctx, mediaLocal):
+	case c.Class == repo.Local && httpkit.Accepts(ctx, mediaLocal):
 		return artgen.GetRepositoryConfiguration200ApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONResponse(
 			c,
 		)
-	case c.Class == repo.Remote && accepts(ctx, mediaRemote):
+	case c.Class == repo.Remote && httpkit.Accepts(ctx, mediaRemote):
 		return artgen.GetRepositoryConfiguration200ApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONResponse(
 			c,
 		)
-	case c.Class == repo.Virtual && accepts(ctx, mediaVirtual):
+	case c.Class == repo.Virtual && httpkit.Accepts(ctx, mediaVirtual):
 		return artgen.GetRepositoryConfiguration200ApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONResponse(
 			c,
 		)
-	case c.Class == repo.Federated && accepts(ctx, mediaFederated):
+	case c.Class == repo.Federated && httpkit.Accepts(ctx, mediaFederated):
 		return artgen.GetRepositoryConfiguration200ApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONResponse(
 			c,
 		)
@@ -516,12 +478,12 @@ func (s artifactoryService) GetRemoteRepositoryConfiguration(
 	if err != nil {
 		return nil, err
 	}
-	p, err := principal(ctx)
+	p, err := httpkit.Principal(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if p.Anonymous {
-		return nil, denied(p)
+		return nil, httpkit.Denied(p)
 	}
 	key := string(req.RemoteRepoName)
 	c, err := st.Repos().Get(ctx, key)
@@ -532,7 +494,7 @@ func (s artifactoryService) GetRemoteRepositoryConfiguration(
 	case err != nil:
 		return nil, s.internalError(ctx, "get repository", err)
 	case !p.Admin && (c.ShareConfiguration == nil || !*c.ShareConfiguration):
-		return nil, denied(p)
+		return nil, httpkit.Denied(p)
 	}
 	doc, err := json.Marshal(repo.Masked(c))
 	if err != nil {
@@ -549,7 +511,7 @@ func (s artifactoryService) GetRemoteRepositoryConfiguration(
 		)
 	}
 	media := "application/json"
-	if accepts(ctx, mediaShared) {
+	if httpkit.Accepts(ctx, mediaShared) {
 		media = mediaShared
 	}
 	return sharedRemoteResponse{media: media, fields: fields}, nil
@@ -595,9 +557,12 @@ func (s artifactoryService) GetBatchOfRepositoriesByName(
 	}
 	switch {
 	case len(names) == 0:
-		return nil, badRequestf("No repository names were given")
+		return nil, httpkit.BadRequestf("No repository names were given")
 	case len(names) > repoBatchLimit:
-		return nil, badRequestf("At most %d repositories can be read at once", repoBatchLimit)
+		return nil, httpkit.BadRequestf(
+			"At most %d repositories can be read at once",
+			repoBatchLimit,
+		)
 	}
 	out := artgen.GetBatchOfRepositoriesByName200JSONResponse{}
 	for _, key := range names {
@@ -639,7 +604,7 @@ func (s artifactoryService) CreateRepository(
 	ctx context.Context,
 	req artgen.CreateRepositoryRequestObject,
 ) (artgen.CreateRepositoryResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	st, err := s.content()
@@ -654,7 +619,7 @@ func (s artifactoryService) CreateRepository(
 		req.ApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody,
 	)
 	if body == nil {
-		return nil, badRequestf("A repository configuration is required")
+		return nil, httpkit.BadRequestf("A repository configuration is required")
 	}
 	c := *body
 	// The key in the path wins over the body (research 03).
@@ -677,7 +642,7 @@ func (s artifactoryService) CreateRepository(
 	}
 	switch err := st.Repos().Create(ctx, c); {
 	case errors.Is(err, store.ErrConflict):
-		return nil, badRequestf(msgKeyExists)
+		return nil, httpkit.BadRequestf(msgKeyExists)
 	case err != nil:
 		return nil, s.internalError(ctx, "create repository", err)
 	}
@@ -690,7 +655,7 @@ func (s artifactoryService) CreateMultipleRepositories(
 	ctx context.Context,
 	req artgen.CreateMultipleRepositoriesRequestObject,
 ) (artgen.CreateMultipleRepositoriesResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	st, err := s.content()
@@ -716,7 +681,7 @@ func (s artifactoryService) CreateMultipleRepositories(
 	prepared := make([]repo.Config, 0, len(batch))
 	for i, c := range batch {
 		if c.Key == "" {
-			return nil, badRequestf("Repository %d of the batch has no key", i+1)
+			return nil, httpkit.BadRequestf("Repository %d of the batch has no key", i+1)
 		}
 		if slices.ContainsFunc(
 			known,
@@ -767,9 +732,9 @@ func (s artifactoryService) CreateMultipleRepositories(
 func batchSize(n int) error {
 	switch {
 	case n == 0:
-		return badRequestf("No repositories were given")
+		return httpkit.BadRequestf("No repositories were given")
 	case n > repoBatchLimit:
-		return badRequestf("At most %d repositories can be changed at once", repoBatchLimit)
+		return httpkit.BadRequestf("At most %d repositories can be changed at once", repoBatchLimit)
 	}
 	return nil
 }
@@ -779,7 +744,7 @@ func batchSize(n int) error {
 // express null resets, and it always carries description and notes, so it
 // overwrites both; only the router supplies a body that leaves them out.
 func updateBody(ctx context.Context, decoded any) ([]byte, error) {
-	if b := rawBody(ctx); b != nil {
+	if b := httpkit.RawBody(ctx); b != nil {
 		return b, nil
 	}
 	b, err := json.Marshal(decoded)
@@ -793,7 +758,7 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.UpdateRepositoryConfigurationRequestObject,
 ) (artgen.UpdateRepositoryConfigurationResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	st, err := s.content()
@@ -820,7 +785,7 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 	}
 	var patch map[string]json.RawMessage
 	if err := json.Unmarshal(body, &patch); err != nil || patch == nil {
-		return nil, badRequestf("A repository configuration object is required")
+		return nil, httpkit.BadRequestf("A repository configuration object is required")
 	}
 	updated, err := repos.Merge(stored, patch)
 	if err != nil {
@@ -847,7 +812,7 @@ func (s artifactoryService) writeUpdates(
 	stored, updated []repo.Config,
 ) error {
 	var by string
-	if p, err := principal(ctx); err == nil {
+	if p, err := httpkit.Principal(ctx); err == nil {
 		by = p.Name
 	}
 	err := st.Tx(ctx, func(ctx context.Context) error {
@@ -900,7 +865,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 	ctx context.Context,
 	req artgen.UpdateMultipleRepositoriesRequestObject,
 ) (artgen.UpdateMultipleRepositoriesResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	st, err := s.content()
@@ -919,7 +884,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 	}
 	var patches []map[string]json.RawMessage
 	if err := json.Unmarshal(body, &patches); err != nil {
-		return nil, badRequestf("A list of repository configurations is required")
+		return nil, httpkit.BadRequestf("A list of repository configurations is required")
 	}
 	if err := batchSize(len(patches)); err != nil {
 		return nil, err
@@ -932,7 +897,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 			_ = json.Unmarshal(raw, &key)
 		}
 		if key == "" {
-			return nil, badRequestf("Repository %d of the batch has no key", i+1)
+			return nil, httpkit.BadRequestf("Repository %d of the batch has no key", i+1)
 		}
 		stored, err := st.Repos().Get(ctx, key)
 		switch {

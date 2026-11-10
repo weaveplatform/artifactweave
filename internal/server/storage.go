@@ -14,13 +14,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -49,18 +51,18 @@ func noProperties() error {
 }
 
 // registerStorageRoutes serves the storage API (/api/storage) and the
-// partial property update (/api/metadata) under the patterns chiPatterns
+// partial property update (/api/metadata) under the patterns httpkit.ChiPatterns
 // derives from the spec, replacing their 501 stubs. The bare /{repoKey}
 // form adds the repository root, which the spec addresses with an empty
 // item path.
 func (s artifactoryService) registerStorageRoutes(r chi.Router) {
-	for _, p := range append(chiPatterns(storagePrefix+"{repoKey}/{itemPath}"), storagePrefix+"{repoKey}") {
+	for _, p := range append(httpkit.ChiPatterns(storagePrefix+"{repoKey}/{itemPath}"), storagePrefix+"{repoKey}") {
 		r.Get(p, s.getStorage)
 		r.Put(p, s.setProperties)
 		r.Delete(p, s.deleteProperties)
 	}
-	for _, p := range append(chiPatterns(metadataPrefix+"{repoKey}/{itemPath}"), metadataPrefix+"{repoKey}") {
-		r.With(bodyLimit(managementBodyLimit)).Patch(p, s.patchMetadata)
+	for _, p := range append(httpkit.ChiPatterns(metadataPrefix+"{repoKey}/{itemPath}"), metadataPrefix+"{repoKey}") {
+		r.With(middleware.BodyLimit(managementBodyLimit)).Patch(p, s.patchMetadata)
 	}
 }
 
@@ -76,11 +78,11 @@ func rawQuery(raw string) (url.Values, error) {
 		k, v, _ := strings.Cut(pair, "=")
 		key, err := url.QueryUnescape(k)
 		if err != nil {
-			return nil, badRequestf("malformed query parameter %q", k)
+			return nil, httpkit.BadRequestf("malformed query parameter %q", k)
 		}
 		value, err := url.QueryUnescape(v)
 		if err != nil {
-			return nil, badRequestf("malformed value of query parameter %q", key)
+			return nil, httpkit.BadRequestf("malformed value of query parameter %q", key)
 		}
 		q[key] = append(q[key], value)
 	}
@@ -98,7 +100,7 @@ func flag(q url.Values, name string, def bool) (bool, error) {
 	case "0", "false":
 		return false, nil
 	}
-	return false, badRequestf("%s must be 0 or 1", name)
+	return false, httpkit.BadRequestf("%s must be 0 or 1", name)
 }
 
 // storageModes are the views a storage GET selects; at most one may be
@@ -115,14 +117,17 @@ func storageMode(q url.Values) (string, error) {
 			continue
 		}
 		if mode != "" {
-			return "", badRequestf("only one of %s may be given", strings.Join(storageModes, ", "))
+			return "", httpkit.BadRequestf(
+				"only one of %s may be given",
+				strings.Join(storageModes, ", "),
+			)
 		}
 		mode = m
 	}
 	if mode != "list" {
 		for _, p := range listingParams {
 			if q.Has(p) {
-				return "", badRequestf("%s is a listing parameter and needs list", p)
+				return "", httpkit.BadRequestf("%s is a listing parameter and needs list", p)
 			}
 		}
 	}
@@ -146,13 +151,13 @@ type storageView struct {
 func (v storageView) uri(ctx context.Context, p string) string {
 	u := baseurl.From(ctx) + storagePrefix + v.key
 	if p != "" {
-		u += "/" + escapePath(p)
+		u += "/" + httpkit.EscapePath(p)
 	}
 	return u
 }
 
 func (v storageView) downloadURI(ctx context.Context, p string) string {
-	return baseurl.From(ctx) + "/artifactory/" + v.key + "/" + escapePath(p)
+	return baseurl.From(ctx) + "/artifactory/" + v.key + "/" + httpkit.EscapePath(p)
 }
 
 // target finds the item the request names, through a virtual repository's
@@ -261,25 +266,25 @@ func (s artifactoryService) getStorage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	v, p, q, err := s.storageRequest(r, storagePrefix)
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	mode, err := storageMode(q)
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	// A folder check first, as for a download; the exact right once the
 	// item is found.
 	if !v.acc.folder(v.repo, v.path, types.ActionRead) {
-		writeErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	switch {
 	case mode == "list" && p.Anonymous,
 		mode == "lastModified" && !v.acc.folder(v.repo, v.path, types.ActionWrite),
 		mode == "permissions" && !p.Admin:
-		writeErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	// The file list of a blacked-out repository answers 404 with
@@ -288,17 +293,17 @@ func (s artifactoryService) getStorage(w http.ResponseWriter, r *http.Request) {
 	// info checks read permission alone (prepareStorageInfoResponse).
 	if mode == "list" && v.repo.Class != repo.Virtual {
 		if err := generic.CheckBlackedOut(v.repo, v.path); err != nil {
-			writeErr(w, r, s.itemError(ctx, "storage list", err))
+			httpkit.WriteErr(w, r, s.itemError(ctx, "storage list", err))
 			return
 		}
 	}
 	f, err := v.target(ctx)
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "storage item", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "storage item", err))
 		return
 	}
 	if !v.acc.item(f.repo, f.item.FullPath(), f.item.Folder, types.ActionRead) {
-		writeErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	var (
@@ -320,7 +325,7 @@ func (s artifactoryService) getStorage(w http.ResponseWriter, r *http.Request) {
 		media, body, err = v.permissions(ctx, f)
 	}
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "storage "+mode, err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "storage "+mode, err))
 		return
 	}
 	w.Header().Set("Content-Type", media)
@@ -365,7 +370,7 @@ func (s artifactoryService) storageRequest(
 // unknown (the repository root has no stored item).
 func putTime(body map[string]any, key string, t time.Time) {
 	if !t.IsZero() {
-		body[key] = formatTime(t)
+		body[key] = httpkit.FormatTime(t)
 	}
 }
 
@@ -411,7 +416,10 @@ func (v storageView) info(ctx context.Context, f found) (string, any, error) {
 // list renders the FileList view of a folder.
 func (v storageView) list(ctx context.Context, f found, q url.Values) (string, any, error) {
 	if !f.item.Folder {
-		return "", nil, badRequestf("%s is a file; list needs a folder", f.item.StoragePath())
+		return "", nil, httpkit.BadRequestf(
+			"%s is a file; list needs a folder",
+			f.item.StoragePath(),
+		)
 	}
 	l, err := parseListing(q)
 	if err != nil {
@@ -456,7 +464,7 @@ func parseListing(q url.Values) (listing, error) {
 	if d := q.Get("depth"); d != "" {
 		n, err := strconv.Atoi(d)
 		if err != nil || n < 0 {
-			return l, badRequestf("depth must be a non-negative integer")
+			return l, httpkit.BadRequestf("depth must be a non-negative integer")
 		}
 		l.depth = n
 	}
@@ -495,7 +503,7 @@ func (l listing) render(uri, folder string, self types.Item, items []listed) map
 			b["uri"].(string),
 		) //nolint:forcetypeassert // set above
 	})
-	return map[string]any{"uri": uri, "created": formatTime(time.Now()), "files": files}
+	return map[string]any{"uri": uri, "created": httpkit.FormatTime(time.Now()), "files": files}
 }
 
 // listEntry is one entry of a FileList. size is a JSON number, -1 for a
@@ -512,7 +520,9 @@ func listEntry(it types.Item, uri string, mdTimestamps bool) map[string]any {
 		entry["sha2"] = it.Actual.SHA256
 	}
 	if mdTimestamps && !it.PropertiesModified.IsZero() {
-		entry["mdTimestamps"] = map[string]string{"properties": formatTime(it.PropertiesModified)}
+		entry["mdTimestamps"] = map[string]string{
+			"properties": httpkit.FormatTime(it.PropertiesModified),
+		}
 	}
 	return entry
 }
@@ -554,7 +564,7 @@ func (v storageView) properties(ctx context.Context, f found, names string) (str
 // stats renders a file's download statistics. A folder has none.
 func (v storageView) stats(ctx context.Context, f found) (string, any, error) {
 	if f.item.Folder {
-		return "", nil, badRequestf("%s is a folder; statistics are kept for files",
+		return "", nil, httpkit.BadRequestf("%s is a folder; statistics are kept for files",
 			f.item.StoragePath())
 	}
 	st, err := v.st.Items().Stats(ctx, f.item.ID)
@@ -596,7 +606,7 @@ func (v storageView) lastModified(ctx context.Context, f found) (string, any, er
 	}
 	return mediaLastModified, map[string]any{
 		"uri":          v.uri(ctx, newest.FullPath()),
-		"lastModified": formatTime(newest.Modified),
+		"lastModified": httpkit.FormatTime(newest.Modified),
 	}, nil
 }
 
@@ -670,7 +680,7 @@ func (s artifactoryService) deleteProperties(w http.ResponseWriter, r *http.Requ
 			}
 		}
 		if len(keys) == 0 {
-			return propertyEdit{}, badRequestf("properties names no keys to delete")
+			return propertyEdit{}, httpkit.BadRequestf("properties names no keys to delete")
 		}
 		return propertyEdit{remove: keys}, nil
 	})
@@ -709,35 +719,39 @@ func (s artifactoryService) editProperties(
 	ctx := r.Context()
 	v, p, q, err := s.storageRequest(r, prefix)
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	if !v.acc.file(v.repo, v.path, types.ActionAnnotate) {
-		writeErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	switch {
 	case v.repo.Class == repo.Virtual:
-		writeErr(w, r, badRequestf("properties of virtual repository '%s' cannot be changed; "+
-			"address the member that holds the item", v.key))
-		return
-	case v.repo.Class == repo.Remote && !v.isCached:
-		writeErr(
+		httpkit.WriteErr(
 			w,
 			r,
-			badRequestf("properties of remote repository '%s' are set on its cache, '%s'",
+			httpkit.BadRequestf("properties of virtual repository '%s' cannot be changed; "+
+				"address the member that holds the item", v.key),
+		)
+		return
+	case v.repo.Class == repo.Remote && !v.isCached:
+		httpkit.WriteErr(
+			w,
+			r,
+			httpkit.BadRequestf("properties of remote repository '%s' are set on its cache, '%s'",
 				v.key, v.repo.Key+types.CacheSuffix),
 		)
 		return
 	}
 	recursive, err := flag(q, recursiveParam, true)
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	edit, err := parse(q)
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	cached := v.isCached || v.repo.Class == repo.Remote
@@ -785,7 +799,7 @@ func (s artifactoryService) editProperties(
 		}
 	})
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "edit properties", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "edit properties", err))
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -828,15 +842,15 @@ func parseProperties(s string) (types.Properties, error) {
 		kv := splitUnescaped(p, "=")
 		key := unescapeBackslashes(kv[0])
 		if err := types.ValidatePropertyKey(key); err != nil {
-			return nil, badRequestf("%v", err)
+			return nil, httpkit.BadRequestf("%v", err)
 		}
 		if len(kv) < 2 {
-			return nil, badRequestf("property %q has no value", key)
+			return nil, httpkit.BadRequestf("property %q has no value", key)
 		}
 		props[key] = append(props[key], pkgroute.SplitValues(strings.Join(kv[1:], "="))...)
 	}
 	if len(props) == 0 {
-		return nil, badRequestf("properties names nothing to set")
+		return nil, httpkit.BadRequestf("properties names nothing to set")
 	}
 	return props, nil
 }
@@ -879,10 +893,10 @@ func parseMetadataPatch(r *http.Request) (propertyEdit, error) {
 		Stats map[string]json.RawMessage `json:"stats"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		return propertyEdit{}, badRequestf("malformed JSON body: %v", err)
+		return propertyEdit{}, httpkit.BadRequestf("malformed JSON body: %v", err)
 	}
 	if body.Props == nil && body.Stats == nil {
-		return propertyEdit{}, badRequestf("props or stats fields required")
+		return propertyEdit{}, httpkit.BadRequestf("props or stats fields required")
 	}
 	// "props":{} changes nothing, so it walks nothing either.
 	edit := propertyEdit{set: types.Properties{}, shouldSkipProperties: len(body.Props) == 0}
@@ -896,7 +910,7 @@ func parseMetadataPatch(r *http.Request) (propertyEdit, error) {
 	}
 	for key, raw := range body.Props {
 		if err := types.ValidatePropertyKey(key); err != nil {
-			return propertyEdit{}, badRequestf("%v", err)
+			return propertyEdit{}, httpkit.BadRequestf("%v", err)
 		}
 		var one string
 		var many []string
@@ -910,7 +924,7 @@ func parseMetadataPatch(r *http.Request) (propertyEdit, error) {
 		case json.Unmarshal(raw, &many) == nil:
 			edit.set[key] = many
 		default:
-			return propertyEdit{}, badRequestf(
+			return propertyEdit{}, httpkit.BadRequestf(
 				"the value of %q must be a string, an array of strings or null", key)
 		}
 	}

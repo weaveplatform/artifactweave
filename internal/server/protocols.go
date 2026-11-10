@@ -4,10 +4,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -27,8 +28,8 @@ func (s artifactoryService) protocolOptions() pkgroute.Options {
 		},
 		ItemError: s.itemError,
 		Created: func(w http.ResponseWriter, r *http.Request, it types.Item) {
-			writeJSON(w, http.StatusCreated, itemCreated(r.Context(), it))
+			httpkit.WriteJSON(w, http.StatusCreated, itemCreated(r.Context(), it))
 		},
-		Fault: func(r *http.Request, err error) { noteCause(r.Context(), err) },
+		Fault: func(r *http.Request, err error) { httpkit.NoteCause(r.Context(), err) },
 	}
 }

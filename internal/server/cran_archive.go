@@ -10,6 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/cran"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -23,7 +24,7 @@ func (s artifactoryService) MoveCranArchives(
 	ctx context.Context,
 	req artgen.MoveCranArchivesRequestObject,
 ) (artgen.MoveCranArchivesResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
+	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
 	if !s.cfg.CranArchiveMoverEnabled {
@@ -126,7 +127,7 @@ func moveCranArchive(
 		return 0, fmt.Errorf("cran: move archive: %w", err)
 	}
 	if result.Failed != 0 || result.Files != 1 {
-		return 0, badRequestf("CRAN archive cannot be migrated; no archives were moved")
+		return 0, httpkit.BadRequestf("CRAN archive cannot be migrated; no archives were moved")
 	}
 	return 1, nil
 }

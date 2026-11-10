@@ -11,13 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/opkg"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -59,7 +60,7 @@ func (s artifactoryService) tryOpkgItem(
 	}
 	if strings.HasSuffix(req.path, ".ipk") {
 		if !opkg.ValidPath(req.path) {
-			writeErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, itemNotFound())
 			return true
 		}
 		if c.Class == repo.Virtual || c.Class == repo.Remote {
@@ -78,13 +79,13 @@ func (s artifactoryService) serveOpkgIndex(
 	feed, ok := opkg.FeedPath(req.path)
 	if !ok || len(req.props) != 0 || r.URL.RawQuery != "" ||
 		cached && c.Class != repo.Remote {
-		writeErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	if !acc.folder(c, req.path, types.ActionRead) ||
 		!acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		writeErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	var body []byte
@@ -93,7 +94,7 @@ func (s artifactoryService) serveOpkgIndex(
 		indexPath := opkg.IndexPath(feed, opkg.PackagesName)
 		candidates, err := s.opkgCandidates(ctx, st, c, indexPath, p, acc, map[string]bool{})
 		if err != nil {
-			writeErr(w, r, s.itemError(ctx, "Opkg virtual feed", err))
+			httpkit.WriteErr(w, r, s.itemError(ctx, "Opkg virtual feed", err))
 			return
 		}
 		packages := make([]opkg.Package, 0, len(candidates))
@@ -105,34 +106,34 @@ func (s artifactoryService) serveOpkgIndex(
 			err = opkg.SignFeed(ctx, s.cfg.Access.Keys, c, files)
 		}
 		if err != nil {
-			writeErr(w, r, s.internalError(ctx, "Opkg virtual feed", err))
+			httpkit.WriteErr(w, r, s.internalError(ctx, "Opkg virtual feed", err))
 			return
 		}
 		body = files[path.Base(req.path)]
 		if body == nil {
-			writeErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, itemNotFound())
 			return
 		}
 	} else {
 		view, err := s.opkgMemberIndex(ctx, st, c, cached, req.path, p, acc)
 		if err != nil {
-			writeErr(w, r, s.itemError(ctx, "Opkg feed", err))
+			httpkit.WriteErr(w, r, s.itemError(ctx, "Opkg feed", err))
 			return
 		}
 		if view.revalidate != nil {
 			if err := view.revalidate(ctx); err != nil {
-				writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+				httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 				return
 			}
 		}
 		for _, pkg := range view.packages {
 			allowed, err := opkgPackageReadable(ctx, c, pkg.Path, acc, view.checkRead)
 			if err != nil {
-				writeErr(w, r, s.itemError(ctx, "Opkg package read authority", err))
+				httpkit.WriteErr(w, r, s.itemError(ctx, "Opkg package read authority", err))
 				return
 			}
 			if !allowed {
-				writeErr(w, r, denied(p))
+				httpkit.WriteErr(w, r, httpkit.Denied(p))
 				return
 			}
 		}
@@ -318,12 +319,12 @@ func (s artifactoryService) serveOpkgPackage(
 	cached bool, req itemRequest, p kernel.Principal, acc access,
 ) {
 	if len(req.props) != 0 || r.URL.RawQuery != "" || cached && c.Class != repo.Remote {
-		writeErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	if !acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		writeErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	indexPath := opkg.IndexPath(opkg.Feed(req.path), opkg.PackagesName)
@@ -344,7 +345,7 @@ func (s artifactoryService) serveOpkgPackage(
 		}
 	}
 	if err != nil {
-		writeErr(w, r, s.itemError(r.Context(), "Opkg package index", err))
+		httpkit.WriteErr(w, r, s.itemError(r.Context(), "Opkg package index", err))
 		return
 	}
 	for _, candidate := range candidates {
@@ -357,17 +358,17 @@ func (s artifactoryService) serveOpkgPackage(
 		}
 		it, err := st.Items().Get(r.Context(), candidate.repo.Key, false, req.path)
 		if err != nil {
-			writeErr(w, r, s.itemError(r.Context(), "Opkg member package", err))
+			httpkit.WriteErr(w, r, s.itemError(r.Context(), "Opkg member package", err))
 			return
 		}
 		if it.Folder || it.Actual.SHA256 != candidate.pkg.SHA256 {
-			writeErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, itemNotFound())
 			return
 		}
 		s.serveFile(w, r, st, found{repo: candidate.repo, item: it}, p)
 		return
 	}
-	writeErr(w, r, itemNotFound())
+	httpkit.WriteErr(w, r, itemNotFound())
 }
 
 func (s artifactoryService) serveRemoteOpkgPackage(
@@ -384,12 +385,12 @@ func (s artifactoryService) serveRemoteOpkgPackage(
 	}
 	query, err := opkgSourceRequest(query)
 	if err != nil {
-		writeErr(w, r, s.itemError(r.Context(), "Opkg source", err))
+		httpkit.WriteErr(w, r, s.itemError(r.Context(), "Opkg source", err))
 		return
 	}
 	result, err := s.cfg.RemoteSources.Read(r.Context(), query)
 	if err != nil {
-		writeErr(
+		httpkit.WriteErr(
 			w,
 			r,
 			s.itemError(r.Context(), "Opkg source", pkgroute.SourceError(err, p.Anonymous)),
@@ -405,7 +406,7 @@ func (s artifactoryService) serveRemoteOpkgPackage(
 	}
 	if result.Item == nil || result.Item.Actual.SHA256 != expected.SHA256 ||
 		result.Item.Size != expected.Size {
-		writeErr(w, r, s.internalError(r.Context(), "Opkg source", source.ErrInvalidResult))
+		httpkit.WriteErr(w, r, s.internalError(r.Context(), "Opkg source", source.ErrInvalidResult))
 		return
 	}
 	s.serveFile(w, r, s.cfg.Store,

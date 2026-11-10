@@ -8,19 +8,21 @@ import (
 	"cmp"
 	"context"
 	"log/slog"
+	"maps"
 	"net/http"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
+	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
@@ -28,6 +30,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	agentpackageshttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/agentpackages/http"
@@ -75,7 +78,9 @@ import (
 	gridgen "github.com/weaveplatform/artifactweave/migration/platform/gen/grid"
 	pfedgen "github.com/weaveplatform/artifactweave/migration/platform/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/migration/platform/gen/worker"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -345,12 +350,12 @@ func newRegistry(cfg Config, artSvc artifactoryService) *dockerhttp.Registry {
 		SubdomainMatch: cfg.DockerSubdomainMatch,
 		BaseURL:        cfg.BaseURL,
 		// The middleware authenticates every request whenever an
-		// authenticator is configured (authenticate). cfg.Access holds one
-		// bound over that authenticator whenever there is a store; without
-		// one the registry serves no repository, so the setting decides
-		// nothing.
+		// authenticator is configured (accesshttp.Authenticate). cfg.Access
+		// holds one bound over that authenticator whenever there is a store;
+		// without one the registry serves no repository, so the setting
+		// decides nothing.
 		Authenticated: cfg.Access.Authenticator != nil,
-		Fault:         func(r *http.Request, err error) { noteCause(r.Context(), err) },
+		Fault:         func(r *http.Request, err error) { httpkit.NoteCause(r.Context(), err) },
 		// The registry serves only docker, oci and helmoci repositories,
 		// whose format takes no settings.
 		Formats: ecosystem.For,
@@ -442,26 +447,46 @@ func New(cfg Config) http.Handler {
 			chan struct{},
 			cmp.Or(cfg.FolderDownloadMaxConcurrent, defaultFolderSlots),
 		),
-		instanceID: new(atomic.Pointer[string]),
 	}
+	sysAPI := systemAPI{cfg: cfg, instanceID: new(atomic.Pointer[string])}
+	accessHTTP := accesshttp.New(accesshttp.Deps{
+		API:           cfg.Access,
+		Store:         cfg.Store,
+		Authenticator: cfg.Auth,
+		Tokens:        cfg.Tokens,
+		Settings: accessapi.Settings{
+			AllowBasicAuthTokens:   cfg.AllowBasicAuthTokens,
+			GlobalEnvironmentLimit: cfg.GlobalEnvironmentLimit,
+		},
+		PasswordHash:  cfg.PasswordHash,
+		CompatVersion: cfg.CompatVersion,
+		Log:           cfg.Logger,
+		Repositories:  repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects),
+	})
+	// The repositories collection is the router's own; access adds the key
+	// pairs'.
+	slashes := maps.Clone(slashCollections)
+	maps.Copy(slashes, accesshttp.SlashCollections())
 	// The registry exists before the middleware, whose challenge it writes.
 	registry := newRegistry(cfg, artSvc)
 	r.Use(
-		requestID,
-		recoverPanic(logger),
-		accessLog(logger),
+		httpkit.ErrorProfiles(errorProfileRules),
+		middleware.RequestID,
+		middleware.RecoverPanic(logger, redactLoggedPath),
+		middleware.AccessLog(logger, redactLoggedPath),
 		baseurl.Middleware(cfg.BaseURL),
 		smart.SmartTrace,
 		dockerhttp.APIVersion,
 		registry.Challenge,
-		normalizeContentType,
-		collectionSlash,
-		plusAsSpace,
+		middleware.NormalizeContentType(keepContentType),
+		middleware.CollectionSlash(slashes),
+		accesshttp.PlusAsSpace,
 		idempotencyRoutes,
-		apiRecoveryContext,
+		accesshttp.APIRecoveryContext,
 	)
+	limits := newLimitOptions(cfg.RequestLimits)
 	if cfg.RequestLimits != nil {
-		r.Use(artSvc.limitIngress)
+		r.Use(artSvc.limitIngress(limits))
 	}
 	mounted := make([]pkgroute.Protocol, 0, len(protocols)+len(cfg.Protocols))
 	for _, p := range protocols {
@@ -469,53 +494,54 @@ func New(cfg Config) http.Handler {
 	}
 	mounted = append(mounted, cfg.Protocols...)
 	if cfg.Auth != nil {
-		r.Use(authenticate(cfg.Auth, cfg.Store, func(req *http.Request) bool {
-			if terraformbackendhttp.IsPath(req.URL.Path) {
-				return terraformbackendhttp.SkipsAuthentication(req)
-			}
-			return slices.ContainsFunc(mounted, func(p pkgroute.Protocol) bool {
-				return p.SkipsAuthentication(req)
-			})
-		}))
+		r.Use(
+			accesshttp.Authenticate(
+				newAuthnOptions(cfg.Auth, cfg.Store, func(req *http.Request) bool {
+					if terraformbackendhttp.IsPath(req.URL.Path) {
+						return terraformbackendhttp.SkipsAuthentication(req)
+					}
+					return slices.ContainsFunc(mounted, func(p pkgroute.Protocol) bool {
+						return p.SkipsAuthentication(req)
+					})
+				}),
+			),
+		)
 	}
 	// After authentication, which it needs, and ahead of routing, which
 	// cannot match it (helmPartialReindex).
 	if cfg.Store != nil {
-		r.Use(artSvc.checkAPIRestriction)
+		r.Use(accessHTTP.CheckAPIRestriction(healthRequest, writeLimitError))
 	}
 	if cfg.RequestLimits != nil {
-		r.Use(artSvc.limitPrincipal)
+		r.Use(artSvc.limitPrincipal(limits))
 	}
 	r.Use(artSvc.helmPartialReindex)
 	r.NotFound(notFound)
 	r.MethodNotAllowed(methodNotAllowed)
 
-	// One verifier per handler, so providers' keys stay cached between
-	// exchanges.
-	accSvc := accessService{cfg: cfg, idTokens: idtoken.New(idtoken.Options{})}
-
 	// Hand-written routes go first so they win over anything a generated mux
 	// might later claim for the same prefix.
-	r.Get("/artifactory/api/system/ping", artSvc.ping(artifactoryService.probeArtifactory))
-	r.With(bodyLimit(sinkBodyLimit)).Post("/artifactory/api/system/usage", sinkHandler)
-	r.With(bodyLimit(sinkBodyLimit)).Post("/jfconnect/api/v1/backoffice/metrics/log", sinkHandler)
-	r.Get("/access/api/v1/system/ping", artSvc.ping(artifactoryService.probeAccess))
+	r.Get("/artifactory/api/system/ping", sysAPI.ping(systemAPI.probeArtifactory))
+	r.With(middleware.BodyLimit(sinkBodyLimit)).Post("/artifactory/api/system/usage", sinkHandler)
+	r.With(middleware.BodyLimit(sinkBodyLimit)).
+		Post("/jfconnect/api/v1/backoffice/metrics/log", sinkHandler)
+	r.Get("/access/api/v1/system/ping", sysAPI.ping(systemAPI.probeAccess))
 	// Access's and the router's own probes, which JFrog's Helm charts and
 	// secret rotator poll through the public URL. The router is ready when
 	// the services behind it are.
-	r.Get("/access/api/v1/system/readiness", artSvc.readiness(artifactoryService.probeAccess))
+	r.Get("/access/api/v1/system/readiness", sysAPI.readiness(systemAPI.probeAccess))
 	r.Get("/access/api/v1/system/liveness", liveness)
-	r.Get("/router/api/v1/system/readiness", artSvc.readiness(artifactoryService.probeArtifactory))
+	r.Get("/router/api/v1/system/readiness", sysAPI.readiness(systemAPI.probeArtifactory))
 	r.Get("/router/api/v1/system/liveness", liveness)
-	r.Get("/router/api/v1/system/health", artSvc.routerHealth)
+	r.Get("/router/api/v1/system/health", sysAPI.routerHealth)
 	r.Get("/artifactory/api/artifactweave/remote-status/{repoKey}", artSvc.smartStatus)
-	r.With(bodyLimit(managementBodyLimit)).
+	r.With(middleware.BodyLimit(managementBodyLimit)).
 		Patch("/artifactory/api/system/configuration", artSvc.patchConfiguration)
 	artSvc.registerItemRoutes(r)
 	artSvc.registerStorageRoutes(r)
 	artSvc.registerTrashRoutes(r)
 	artSvc.registerMultipartRoutes(r)
-	artSvc.registerTokenRoutes(r)
+	r.With(middleware.BodyLimit(managementBodyLimit)).Group(accessHTTP.RegisterRoutes)
 	artSvc.registerSearchRoutes(r)
 	artSvc.registerMavenRoutes(r)
 	// GitLab subgroup owners span path segments; the generated VCS routes
@@ -527,7 +553,7 @@ func New(cfg Config) http.Handler {
 		terraformbackendhttp.Options{
 			Items:        artSvc.items(cfg.Store),
 			Keys:         cfg.Keys,
-			Fault:        func(r *http.Request, err error) { noteCause(r.Context(), err) },
+			Fault:        func(r *http.Request, err error) { httpkit.NoteCause(r.Context(), err) },
 			Authorizer:   cfg.Access.Authorizer,
 			Identity:     cfg.Access.Identity,
 			Restrictions: cfg.Access.Restrictions,
@@ -551,46 +577,54 @@ func New(cfg Config) http.Handler {
 	// Generated strict servers, one per spec, each under its service prefix
 	// with the management body limit.
 	r.Group(func(g chi.Router) {
-		g.Use(bodyLimit(managementBodyLimit), requestDetails)
+		g.Use(middleware.BodyLimit(managementBodyLimit), requestDetails(newDetailOptions()))
 		strictOpts := artgen.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  bindingError(http.StatusBadRequest),
-			ResponseErrorHandlerFunc: bindingError(http.StatusInternalServerError),
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		artgen.HandlerWithOptions(
-			artgen.NewStrictHandlerWithOptions(artSvc, nil, strictOpts),
+			artgen.NewStrictHandlerWithOptions(artifactoryServer{
+				SecurityAPI:        accessHTTP.Security,
+				systemAPI:          &sysAPI,
+				artifactoryService: &artSvc,
+			}, nil, strictOpts),
 			artgen.ChiServerOptions{
 				BaseURL:          "/artifactory",
 				BaseRouter:       g,
-				ErrorHandlerFunc: bindingError(http.StatusBadRequest),
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
 		)
 		accessOpts := accessgen.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  bindingError(http.StatusBadRequest),
-			ResponseErrorHandlerFunc: bindingError(http.StatusInternalServerError),
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		accessgen.HandlerWithOptions(
-			accessgen.NewStrictHandlerWithOptions(accSvc, nil, accessOpts),
+			accessgen.NewStrictHandlerWithOptions(
+				accessServer{AccessService: accessHTTP.Access},
+				nil,
+				accessOpts,
+			),
 			accessgen.ChiServerOptions{
 				BaseURL:          "/access",
 				BaseRouter:       g,
-				ErrorHandlerFunc: bindingError(http.StatusBadRequest),
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
 		)
 		eventOpts := eventgen.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  bindingError(http.StatusBadRequest),
-			ResponseErrorHandlerFunc: bindingError(http.StatusInternalServerError),
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		eventgen.HandlerWithOptions(
 			eventgen.NewStrictHandlerWithOptions(eventService{}, nil, eventOpts),
 			eventgen.ChiServerOptions{
 				BaseURL:          "/event",
 				BaseRouter:       g,
-				ErrorHandlerFunc: bindingError(http.StatusBadRequest),
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
 		)
 		distributionOpts := distributiongen.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  bindingError(http.StatusBadRequest),
-			ResponseErrorHandlerFunc: bindingError(http.StatusInternalServerError),
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		distributiongen.HandlerWithOptions(
 			distributiongen.NewStrictHandlerWithOptions(
@@ -601,43 +635,43 @@ func New(cfg Config) http.Handler {
 			distributiongen.ChiServerOptions{
 				BaseURL:          "/distribution",
 				BaseRouter:       g,
-				ErrorHandlerFunc: bindingError(http.StatusBadRequest),
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
 		)
 		workerOpts := workergen.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  bindingError(http.StatusBadRequest),
-			ResponseErrorHandlerFunc: bindingError(http.StatusInternalServerError),
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		workergen.HandlerWithOptions(
 			workergen.NewStrictHandlerWithOptions(workerService{}, nil, workerOpts),
 			workergen.ChiServerOptions{
 				BaseURL:          "/worker",
 				BaseRouter:       g,
-				ErrorHandlerFunc: bindingError(http.StatusBadRequest),
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
 		)
 		pfedOpts := pfedgen.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  bindingError(http.StatusBadRequest),
-			ResponseErrorHandlerFunc: bindingError(http.StatusInternalServerError),
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		pfedgen.HandlerWithOptions(
 			pfedgen.NewStrictHandlerWithOptions(pfedService{}, nil, pfedOpts),
 			pfedgen.ChiServerOptions{
 				BaseURL:          "/pfed",
 				BaseRouter:       g,
-				ErrorHandlerFunc: bindingError(http.StatusBadRequest),
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
 		)
 		gridOpts := gridgen.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  bindingError(http.StatusBadRequest),
-			ResponseErrorHandlerFunc: bindingError(http.StatusInternalServerError),
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		gridgen.HandlerWithOptions(
 			gridgen.NewStrictHandlerWithOptions(gridService{}, nil, gridOpts),
 			gridgen.ChiServerOptions{
 				BaseURL:          "/grid",
 				BaseRouter:       g,
-				ErrorHandlerFunc: bindingError(http.StatusBadRequest),
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
 		)
 	})
@@ -650,4 +684,75 @@ func New(cfg Config) http.Handler {
 	registerHandwrittenStubs(r, logger)
 
 	return r
+}
+
+// keepContentType reports the requests that keep their vendor media type
+// (middleware.NormalizeContentType): registry requests, whose manifest
+// media type is part of the content they store and serve back, and Git LFS
+// protocol requests, whose media type is the protocol's.
+func keepContentType(r *http.Request) bool {
+	return dockerhttp.IsRegistryPath(r.URL.Path) ||
+		strings.HasPrefix(r.URL.Path, "/artifactory/api/lfs/")
+}
+
+// redactLoggedPath is a path as the access and panic logs record it, with
+// the credentials that LuaRocks's upload paths and npm's logout paths name
+// replaced. Each redactor leaves a path outside its protocol unchanged.
+func redactLoggedPath(path string) string {
+	return npmLoggedPath(luarockshttp.RedactAPIKey(path))
+}
+
+// newAuthnOptions returns Authenticate's options as the router composes
+// them: the multipart calls verify themselves, npm's login and logout are
+// skipped before the skips the caller adds, the registry decides where a
+// registry token is good and which paths challenge anonymous requests,
+// npm's configuration operations keep their credential, and Access's and
+// the system's public routes answer anyone.
+func newAuthnOptions(
+	a *authn.Authenticator,
+	st store.Store,
+	skip ...func(*http.Request) bool,
+) accesshttp.AuthnOptions {
+	public := accesshttp.PublicRoutes()
+	maps.Copy(public, systemPublicRoutes)
+	return accesshttp.AuthnOptions{
+		Auth:               a,
+		Store:              st,
+		SelfAuthenticated:  selfAuthenticated,
+		Skip:               append([]func(*http.Request) bool{npmUserRequest}, skip...),
+		RegistryPath:       dockerhttp.IsRegistryPath,
+		ChallengeAnonymous: dockerhttp.ChallengesAnonymous,
+		CredentialKeepers: []func(context.Context, *http.Request, kernel.Principal) context.Context{
+			keepNPMCredential,
+		},
+		PublicRoutes: public,
+	}
+}
+
+// newLimitOptions returns the request-limit middleware's options as the
+// router composes them: the probes (healthRequest) and the recovery API
+// (APIRecoveryRequest) pass the shared limits.
+func newLimitOptions(limits *apilimit.Service) limitOptions {
+	return limitOptions{
+		Health:   healthRequest,
+		Recovery: accesshttp.APIRecoveryRequest,
+		Limits:   limits,
+	}
+}
+
+// newDetailOptions returns requestDetails' options as the router composes
+// them, from the contributions beside each handler, access's through
+// DetailRules: the property and GAVC searches' raw queries, the policy body
+// rewrite, and the raw bodies of repository updates, build-info publishes
+// and appends, permission creates and group updates.
+func newDetailOptions() detailOptions {
+	access := accesshttp.DetailRules()
+	return detailOptions{
+		SearchQuery: []func(*http.Request) bool{keepsSearchQuery},
+		Rewrite:     access.Rewrite,
+		RawBody: append(
+			[]func(*http.Request) bool{keepsRepositoryBody, keepsBuildBody},
+			access.RawBody...,
+		),
+	}
 }

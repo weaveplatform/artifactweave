@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -37,17 +38,54 @@ func healthRequest(r *http.Request) bool {
 	return false
 }
 
-func (s artifactoryService) limitIngress(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if healthRequest(r) {
-			next.ServeHTTP(w, r)
-			return
-		}
-		if apiRecoveryRequest(r) {
-			release, decision, err := s.cfg.RequestLimits.EnterRecovery(r.Context())
-			if decision.Policy != "" {
-				setLimitHeaders(w, decision)
+// limitOptions are the values the request-limit middleware takes from the
+// router, which builds them from the code that owns each request kind.
+type limitOptions struct {
+	// Health reports the probes, which pass every limit so that a busy
+	// server still answers its health checks.
+	Health func(*http.Request) bool
+	// Recovery reports the administrative recovery API's requests, which
+	// take the small reserved recovery lane (apilimit.Service.EnterRecovery)
+	// instead of the shared limits, so that an administrator can still reach
+	// it when those are exhausted.
+	Recovery func(*http.Request) bool
+	// Limits is the request-limit service (Config.RequestLimits).
+	Limits *apilimit.Service
+}
+
+// limitIngress admits each request to the process's concurrency and
+// authentication limits before authentication runs.
+func (s artifactoryService) limitIngress(o limitOptions) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if o.Health(r) {
+				next.ServeHTTP(w, r)
+				return
 			}
+			if o.Recovery(r) {
+				release, decision, err := o.Limits.EnterRecovery(r.Context())
+				if decision.Policy != "" {
+					setLimitHeaders(w, decision)
+				}
+				if err != nil {
+					writeLimitError(w, r, err)
+					return
+				}
+				if !decision.Allowed {
+					writeLimitDecision(w, r, decision)
+					return
+				}
+				defer release()
+				next.ServeHTTP(w, r)
+				return
+			}
+			release, err := o.Limits.Enter(r.Context())
+			if err != nil {
+				writeLimitError(w, r, err)
+				return
+			}
+			defer release()
+			decision, err := o.Limits.Authentication(r.Context())
 			if err != nil {
 				writeLimitError(w, r, err)
 				return
@@ -56,71 +94,57 @@ func (s artifactoryService) limitIngress(next http.Handler) http.Handler {
 				writeLimitDecision(w, r, decision)
 				return
 			}
-			defer release()
 			next.ServeHTTP(w, r)
-			return
-		}
-		release, err := s.cfg.RequestLimits.Enter(r.Context())
-		if err != nil {
-			writeLimitError(w, r, err)
-			return
-		}
-		defer release()
-		decision, err := s.cfg.RequestLimits.Authentication(r.Context())
-		if err != nil {
-			writeLimitError(w, r, err)
-			return
-		}
-		if !decision.Allowed {
-			writeLimitDecision(w, r, decision)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+		})
+	}
 }
 
-func (s artifactoryService) limitPrincipal(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if healthRequest(r) || apiRecoveryRequest(r) {
-			next.ServeHTTP(w, r)
-			return
-		}
-		p, authenticated := kernel.FromContext(r.Context())
-		name := "anonymous"
-		if authenticated && !p.Anonymous {
-			name = p.Name
-		}
-		scope := apilimit.Scope{Principal: name, Expensive: expensiveRequest(r)}
-		if err := s.budgetResources(r, p, &scope); err != nil {
-			writeLimitError(w, r, err)
-			return
-		}
-		decision, err := s.cfg.RequestLimits.Admit(r.Context(), scope)
-		if err != nil {
-			writeLimitError(w, r, err)
-			return
-		}
-		setLimitHeaders(w, decision)
-		if !decision.Allowed {
-			writeLimitDecision(w, r, decision)
-			return
-		}
-		if scope.Expensive {
-			release, err := s.cfg.RequestLimits.EnterExpensive(r.Context(), name)
+// limitPrincipal admits an authenticated request to its principal's
+// budget and, for an expensive one, to the expensive lane.
+func (s artifactoryService) limitPrincipal(o limitOptions) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if o.Health(r) || o.Recovery(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			p, authenticated := kernel.FromContext(r.Context())
+			name := "anonymous"
+			if authenticated && !p.Anonymous {
+				name = p.Name
+			}
+			scope := apilimit.Scope{Principal: name, Expensive: expensiveRequest(r)}
+			if err := s.budgetResources(r, p, &scope); err != nil {
+				writeLimitError(w, r, err)
+				return
+			}
+			decision, err := o.Limits.Admit(r.Context(), scope)
 			if err != nil {
 				writeLimitError(w, r, err)
 				return
 			}
-			defer release()
-			ctx, cancel := context.WithTimeout(
-				r.Context(),
-				s.cfg.RequestLimits.Options().ExpensiveTimeout,
-			)
-			defer cancel()
-			r = r.WithContext(ctx)
-		}
-		next.ServeHTTP(w, r)
-	})
+			setLimitHeaders(w, decision)
+			if !decision.Allowed {
+				writeLimitDecision(w, r, decision)
+				return
+			}
+			if scope.Expensive {
+				release, err := o.Limits.EnterExpensive(r.Context(), name)
+				if err != nil {
+					writeLimitError(w, r, err)
+					return
+				}
+				defer release()
+				ctx, cancel := context.WithTimeout(
+					r.Context(),
+					o.Limits.Options().ExpensiveTimeout,
+				)
+				defer cancel()
+				r = r.WithContext(ctx)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func expensiveRequest(r *http.Request) bool {
@@ -265,7 +289,7 @@ func writeLimitError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, apilimit.ErrBusy) {
 		status, message = http.StatusTooManyRequests, "API concurrent work limit exceeded"
 	} else {
-		noteCause(r.Context(), err)
+		httpkit.NoteCause(r.Context(), err)
 	}
 	e := apierror.New(status, message)
 	e.RetryAfterSeconds = 1

@@ -180,8 +180,8 @@ func (a *Authenticator) transientUser(ctx context.Context, name string) (model.U
 
 // passwordUsable applies to an encrypted password what Basic applies to the
 // password it stands for. Setting or expiring the password revokes it
-// (internal/service/identity), but the age policy expires a password with
-// no write to revoke on, so expiry is checked here as well.
+// (migration/access/core/identity), but the age policy expires a password
+// with no write to revoke on, so expiry is checked here as well.
 func (a *Authenticator) passwordUsable(ctx context.Context, u model.User) error {
 	if len(u.PasswordHash) == 0 || u.InternalPasswordDisabled {
 		return kernel.ErrBadCredentials

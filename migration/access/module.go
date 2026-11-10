@@ -7,9 +7,20 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/settings"
 )
+
+// Store is the access data the bindings read and write: the access ports
+// and the settings that hold the anonymous access switch. The application
+// passes its store aggregate. Every call joins the transaction ctx carries.
+type Store interface {
+	port.Store
+	// Settings holds the anonymous access switch, which AnonymousAccess
+	// reads and writes and the authorizer reads.
+	Settings() settings.SettingsStore
+}
 
 // errNoStore refuses Deps without a store, which every binding reads.
 var errNoStore = errors.New("access: Deps.Store is required")
@@ -21,7 +32,7 @@ type Deps struct {
 	// Store holds the users, groups, permissions, tokens, keys, projects,
 	// settings and API restrictions that the bindings read and write. It is
 	// required.
-	Store store.Store
+	Store Store
 	// Authenticator verifies credentials; nil leaves API().Authenticator nil,
 	// as a server without authentication has none.
 	Authenticator *authn.Authenticator
@@ -88,15 +99,17 @@ func (m *Module) API() accessapi.API { return m.api }
 // KeysOf returns the Keys binding over st alone, for code that holds a store
 // before any module exists, such as bootstrap and reseal. The errors are the
 // store's, unwrapped.
-func KeysOf(st store.Store) accessapi.Keys { return keys{st: st} }
+func KeysOf(st port.Store) accessapi.Keys { return keys{st: st} }
 
 // ProjectsOf returns the Projects binding over st alone, for code that holds
 // a store before any module exists. The errors are the store's, unwrapped.
-func ProjectsOf(st store.Store) accessapi.Projects { return projects{st: st} }
+func ProjectsOf(st port.Store) accessapi.Projects { return projects{st: st} }
 
 // AnonymousAccessOf returns the AnonymousAccess binding over st alone, for
 // code that holds a store before any module exists, such as applying the
 // bootstrap descriptor. The errors are the store's, unwrapped.
-func AnonymousAccessOf(st store.Store) accessapi.AnonymousAccess {
+func AnonymousAccessOf(
+	st interface{ Settings() settings.SettingsStore },
+) accessapi.AnonymousAccess {
 	return anonymousAccess{st: st}
 }

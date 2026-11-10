@@ -1,0 +1,1068 @@
+package accesshttp
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"slices"
+	"strings"
+
+	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	"github.com/weaveplatform/artifactweave/migration/access/core/identity"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
+	accessgen "github.com/weaveplatform/artifactweave/migration/platform/gen/access"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
+	"github.com/weaveplatform/artifactweave/pkg/types"
+)
+
+// Access v2 users and groups, the basic authentication switch, the password
+// policy and the default token lifetime (issue #81). Users and groups go
+// through the identity service the legacy security API uses, so both APIs
+// read and write one record.
+
+const (
+	accessUsers  = "/access/api/v2/users/"
+	accessGroups = "/access/api/v2/groups/"
+	// defaultListLimit is a list page's size when the request names none.
+	defaultListLimit = 1000
+	// maxUsernameLength is the spec's bound on a username.
+	maxUsernameLength = 255
+)
+
+func (s AccessService) identity() (*identity.Service, error) {
+	st, err := s.content()
+	if err != nil {
+		return nil, err
+	}
+	return &identity.Service{Store: st, Hash: s.deps.PasswordHash}, nil
+}
+
+// adminIdentity checks the caller is an administrator, then returns the
+// service.
+func (s AccessService) adminIdentity(ctx context.Context) (*identity.Service, error) {
+	if err := httpkit.AdminOnly(ctx); err != nil {
+		return nil, err
+	}
+	return s.identity()
+}
+
+// readerIdentity checks the caller may read users and groups, then returns
+// the service.
+func (s AccessService) readerIdentity(ctx context.Context) (*identity.Service, error) {
+	return s.identityFor(ctx, "")
+}
+
+// identityFor returns the service when the caller may read users and
+// groups, or self's record: administrators, and tokens whose system scope
+// covers identities:r, as the permission evaluator decides (decision 0006).
+func (s AccessService) identityFor(ctx context.Context, self string) (*identity.Service, error) {
+	p, err := kernel.RequireAuthenticated(ctx)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // an apierror value
+	}
+	svc, err := s.identity()
+	if err != nil {
+		return nil, err
+	}
+	if self != "" && p.Name == self {
+		return svc, nil
+	}
+	d, _ := accessapi.DeciderFrom(ctx)
+	d, err = deciderFor(ctx, s.deps.API.Authorizer, p, d)
+	if err != nil {
+		return nil, s.identityErr(ctx, "evaluate permissions", "", err)
+	}
+	if !d.System("identities", types.ScopeRead) {
+		return nil, kernel.ErrForbidden
+	}
+	return svc, nil
+}
+
+// identityErr maps the identity service's errors the way Access v2 documents
+// them: a protected principal is 403, a taken name 409, and the rest as the
+// legacy API maps them (400, 404 or 500).
+func (s AccessService) identityErr(ctx context.Context, op, notFound string, err error) error {
+	switch {
+	case errors.Is(err, identity.ErrProtected):
+		return apierror.New(http.StatusForbidden, afterSentinels(err))
+	case errors.Is(err, identity.ErrExists):
+		return apierror.New(http.StatusConflict, notFound)
+	}
+	return s.accessState.identityErr(ctx, op, notFound, err)
+}
+
+// afterSentinels is an error's message without its sentinel prefixes.
+func afterSentinels(err error) string {
+	msg := err.Error()
+	for _, prefix := range []string{identity.ErrInvalid.Error() + ": ", identity.ErrProtected.Error() + ": "} {
+		msg = strings.TrimPrefix(msg, prefix)
+	}
+	return msg
+}
+
+func userExists(name string) string  { return fmt.Sprintf("User '%s' already exists", name) }
+func groupExists(name string) string { return fmt.Sprintf("Group '%s' already exists", name) }
+
+// --- Users -------------------------------------------------------------------
+
+// GetUserList lists users a page at a time for a caller that may read
+// identities (GET /access/api/v2/users).
+func (s AccessService) GetUserList(
+	ctx context.Context,
+	req accessgen.GetUserListRequestObject,
+) (accessgen.GetUserListResponseObject, error) {
+	svc, err := s.readerIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	p := req.Params
+	limit, err := listLimit(p.Limit)
+	if err != nil {
+		return nil, err
+	}
+	if err := projectsUnsupported(p.Role, p.ProjectKey); err != nil {
+		return nil, err
+	}
+	if p.Status != nil && !slices.Contains(
+		[]types.UserStatus{
+			types.UserInvited,
+			types.UserEnabled,
+			types.UserDisabled,
+			types.UserLocked,
+		},
+		types.UserStatus(*p.Status),
+	) {
+		return nil, httpkit.BadRequestf(
+			"status %q is not one of invited, enabled, disabled or locked",
+			*p.Status,
+		)
+	}
+	resource, err := identityResource(p.ResourceType, p.ResourceName)
+	if err != nil {
+		return nil, err
+	}
+	pageItems, next, err := svc.Store.Users().ListSummaries(ctx, port.UserFilter{
+		IdentityFilter: port.IdentityFilter{
+			NameContains: httpkit.Deref(
+				p.Username,
+			),
+			Descending: httpkit.Deref(p.DescendingOrder),
+			Resource:   resource,
+		},
+		Status: types.UserStatus(httpkit.Deref(p.Status)), OnlyAdmins: httpkit.Deref(p.OnlyAdmins),
+	}, kernel.Page{After: httpkit.Deref(p.Cursor), Limit: limit})
+	if errors.Is(err, kernel.ErrInvalidCursor) {
+		return nil, httpkit.BadRequestf("cursor is not valid")
+	}
+	if err != nil {
+		return nil, s.identityErr(ctx, "list users", "", err)
+	}
+	out := accessgen.GetUserList200JSONResponse{Users: []struct {
+		Realm    string `json:"realm"`
+		Status   string `json:"status"`
+		Uri      string `json:"uri"`
+		Username string `json:"username"`
+	}{}}
+	base := baseurl.From(ctx) + accessUsers
+	for _, u := range pageItems {
+		out.Users = append(out.Users, struct {
+			Realm    string `json:"realm"`
+			Status   string `json:"status"`
+			Uri      string `json:"uri"`
+			Username string `json:"username"`
+		}{
+			Realm: realmOf(u.Realm), Status: string(u.Status),
+			Uri: base + url.PathEscape(u.Name), Username: u.Name,
+		})
+	}
+	out.Cursor = identityCursor(next)
+	return out, nil
+}
+
+// CreateUser creates a user for an administrator (POST
+// /access/api/v2/users).
+func (s AccessService) CreateUser(
+	ctx context.Context,
+	req accessgen.CreateUserRequestObject,
+) (accessgen.CreateUserResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	b := req.Body
+	if b == nil {
+		return nil, httpkit.BadRequestf("a body with the user is required")
+	}
+	// The spec stores usernames lower-case, as Artifactory does.
+	name := strings.ToLower(b.Username)
+	if name == "" || len(name) > maxUsernameLength {
+		return nil, httpkit.BadRequestf("username must be 1 to %d characters", maxUsernameLength)
+	}
+	u := types.User{
+		Name:             name,
+		Email:            string(b.Email),
+		Admin:            httpkit.Deref(b.Admin),
+		ProfileUpdatable: derefOr(b.ProfileUpdatable, true),
+		DisableUIAccess: httpkit.Deref(
+			b.DisableUiAccess,
+		),
+		InternalPasswordDisabled: httpkit.Deref(b.InternalPasswordDisabled),
+		Groups:                   httpkit.DerefSlice(b.Groups),
+		Roles: types.RoleFlags{
+			WatchManager: httpkit.Deref(
+				b.WatchManager,
+			),
+			PolicyViewer: httpkit.Deref(b.PolicyViewer),
+			PolicyManager: httpkit.Deref(
+				b.PolicyManager,
+			),
+			ReportsManager: httpkit.Deref(b.ReportsManager),
+			ResourcesManager: httpkit.Deref(
+				b.ResourcesManager,
+			),
+			ManageWebhook:   httpkit.Deref(b.ManageWebhook),
+			PlatformAuditor: httpkit.Deref(b.PlatformAuditor),
+		},
+	}
+	if err := svc.CreateUser(ctx, u, httpkit.Deref(b.Password)); err != nil {
+		return nil, s.identityErr(ctx, "create user", userExists(name), err)
+	}
+	d, err := s.userDetails(ctx, svc, name)
+	if err != nil {
+		return nil, err
+	}
+	return accessgen.CreateUser201JSONResponse(d), nil
+}
+
+// GetUserDetails returns a user to a caller that may read identities, and to
+// the user itself (GET /access/api/v2/users/{username}).
+func (s AccessService) GetUserDetails(
+	ctx context.Context,
+	req accessgen.GetUserDetailsRequestObject,
+) (accessgen.GetUserDetailsResponseObject, error) {
+	name := string(req.Username)
+	// A user may always read their own record.
+	svc, err := s.identityFor(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	d, err := s.userDetails(ctx, svc, name)
+	if err != nil {
+		return nil, err
+	}
+	return accessgen.GetUserDetails200JSONResponse(d), nil
+}
+
+// UpdateUser changes the fields a patch sends for an administrator (PATCH
+// /access/api/v2/users/{username}).
+func (s AccessService) UpdateUser(
+	ctx context.Context,
+	req accessgen.UpdateUserRequestObject,
+) (accessgen.UpdateUserResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	name := string(req.Username)
+	b := req.Body
+	if b == nil {
+		b = &accessgen.UpdateUserJSONRequestBody{}
+	}
+	patch := identity.UserPatch{
+		Password: b.Password, Admin: b.Admin, ProfileUpdatable: b.ProfileUpdatable,
+		DisableUIAccess: b.DisableUiAccess, InternalPasswordDisabled: b.InternalPasswordDisabled,
+		PolicyViewer: b.PolicyViewer, PolicyManager: b.PolicyManager, WatchManager: b.WatchManager,
+		ReportsManager: b.ReportsManager, ResourcesManager: b.ResourcesManager,
+		ManageWebhook: b.ManageWebhook, PlatformAuditor: b.PlatformAuditor,
+	}
+	if b.Email != nil {
+		e := string(*b.Email)
+		patch.Email = &e
+	}
+	// Turning the internal password back on needs a password to log in with.
+	if b.InternalPasswordDisabled != nil && !*b.InternalPasswordDisabled && b.Password == nil {
+		u, err := svc.User(ctx, name)
+		if err != nil {
+			return nil, s.identityErr(ctx, "update user", userNotFound(name), err)
+		}
+		if len(u.PasswordHash) == 0 {
+			return nil, httpkit.BadRequestf(
+				"a password is required to enable the internal password",
+			)
+		}
+	}
+	if err := svc.PatchUser(ctx, name, patch); err != nil {
+		return nil, s.identityErr(ctx, "update user", userNotFound(name), err)
+	}
+	d, err := s.userDetails(ctx, svc, name)
+	if err != nil {
+		return nil, err
+	}
+	return accessgen.UpdateUser200JSONResponse(d), nil
+}
+
+// DeleteUser deletes a user for an administrator (DELETE
+// /access/api/v2/users/{username}).
+func (s AccessService) DeleteUser(
+	ctx context.Context,
+	req accessgen.DeleteUserRequestObject,
+) (accessgen.DeleteUserResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	name := string(req.Username)
+	if err := svc.DeleteUser(ctx, name); err != nil {
+		return nil, s.identityErr(ctx, "delete user", userNotFound(name), err)
+	}
+	return accessgen.DeleteUser204Response{}, nil
+}
+
+// UpdateUserGroups adds and removes a user's group memberships for an
+// administrator (PATCH /access/api/v2/users/{username}/groups).
+func (s AccessService) UpdateUserGroups(
+	ctx context.Context,
+	req accessgen.UpdateUserGroupsRequestObject,
+) (accessgen.UpdateUserGroupsResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	name := string(req.Username)
+	var add, remove []string
+	if req.Body != nil {
+		add, remove = httpkit.DerefSlice(req.Body.Add), httpkit.DerefSlice(req.Body.Remove)
+	}
+	groups, err := svc.UpdateUserGroups(ctx, name, add, remove)
+	if err != nil {
+		return nil, s.identityErr(ctx, "update user groups", userNotFound(name), err)
+	}
+	return accessgen.UpdateUserGroups200JSONResponse{Groups: nonNil(groups)}, nil
+}
+
+// ChangeUserPassword sets a user's password (PUT
+// /access/api/v2/users/{username}/password): an administrator sets anyone's,
+// and a user its own, even once it has expired, but not through a narrowed
+// token.
+func (s AccessService) ChangeUserPassword(
+	ctx context.Context,
+	req accessgen.ChangeUserPasswordRequestObject,
+) (accessgen.ChangeUserPasswordResponseObject, error) {
+	p, err := kernel.RequireAuthenticated(ctx)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // an apierror value
+	}
+	name := string(req.Username)
+	// An administrator sets anyone's password; any user sets their own, even
+	// with an expired password (the middleware lets that one request through),
+	// but not through a narrowed token (narrowedToken).
+	if !p.Admin && (p.Name != name || narrowedToken(p)) {
+		return nil, kernel.ErrForbidden
+	}
+	if req.Body == nil || req.Body.Password == nil || *req.Body.Password == "" {
+		return nil, httpkit.BadRequestf("a body with the new password is required")
+	}
+	svc, err := s.identity()
+	if err != nil {
+		return nil, err
+	}
+	if err := svc.SetPassword(ctx, name, *req.Body.Password); err != nil {
+		return nil, s.identityErr(ctx, "change password", userNotFound(name), err)
+	}
+	return accessgen.ChangeUserPassword204Response{}, nil
+}
+
+// ExpireUserPassword expires a user's password for an administrator (POST
+// /access/api/v2/users/{username}/password/expire).
+func (s AccessService) ExpireUserPassword(
+	ctx context.Context,
+	req accessgen.ExpireUserPasswordRequestObject,
+) (accessgen.ExpireUserPasswordResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	name := string(req.Username)
+	unknown, err := svc.ExpirePasswords(ctx, []string{name})
+	if err != nil {
+		return nil, s.identityErr(ctx, "expire password", userNotFound(name), err)
+	}
+	if len(unknown) > 0 {
+		return nil, apierror.New(http.StatusNotFound, userNotFound(name))
+	}
+	return accessgen.ExpireUserPassword204Response{}, nil
+}
+
+// ExpirePasswordForAllUsers expires every internal user's password for an
+// administrator (POST /access/api/v2/users/expire_password_for_all_users).
+func (s AccessService) ExpirePasswordForAllUsers(
+	ctx context.Context,
+	_ accessgen.ExpirePasswordForAllUsersRequestObject,
+) (accessgen.ExpirePasswordForAllUsersResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := svc.ExpireAllPasswords(ctx); err != nil {
+		return nil, s.identityErr(ctx, "expire passwords", "", err)
+	}
+	return accessgen.ExpirePasswordForAllUsers200TextResponse("All passwords were expired"), nil
+}
+
+// UnexpirePasswordForAllUsers clears the expired flag on every password for
+// an administrator (POST
+// /access/api/v2/users/unexpire_password_for_all_users).
+func (s AccessService) UnexpirePasswordForAllUsers(
+	ctx context.Context,
+	_ accessgen.UnexpirePasswordForAllUsersRequestObject,
+) (accessgen.UnexpirePasswordForAllUsersResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := svc.UnexpireAllPasswords(ctx); err != nil {
+		return nil, s.identityErr(ctx, "unexpire passwords", "", err)
+	}
+	return accessgen.UnexpirePasswordForAllUsers200TextResponse(
+		"All passwords were un-expired",
+	), nil
+}
+
+// UnlockUser lifts a user's lockout for an administrator (POST
+// /access/api/v2/users/{username}/unlock); unlocking a user that is not
+// locked succeeds.
+func (s AccessService) UnlockUser(
+	ctx context.Context,
+	req accessgen.UnlockUserRequestObject,
+) (accessgen.UnlockUserResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	name := string(req.Username)
+	// Unlocking an unlocked user succeeds; an unknown one is 404.
+	if _, err := svc.User(ctx, name); err != nil {
+		return nil, s.identityErr(ctx, "unlock user", userNotFound(name), err)
+	}
+	if err := svc.Unlock(ctx, []string{name}); err != nil {
+		return nil, s.identityErr(ctx, "unlock user", userNotFound(name), err)
+	}
+	return accessgen.UnlockUser204Response{}, nil
+}
+
+// userDetails reads a user in the Access v2 shape.
+func (s AccessService) userDetails(
+	ctx context.Context,
+	svc *identity.Service,
+	name string,
+) (accessgen.UserDetails, error) {
+	u, err := svc.User(ctx, name)
+	if err != nil {
+		return accessgen.UserDetails{}, s.identityErr(ctx, "read user", userNotFound(name), err)
+	}
+	admins, err := adminGroups(ctx, svc)
+	if err != nil {
+		return accessgen.UserDetails{}, s.identityErr(ctx, "read user", "", err)
+	}
+	r := u.Roles
+	d := accessgen.UserDetails{
+		Username:                 u.Name,
+		Email:                    u.Email,
+		Admin:                    u.Admin,
+		EffectiveAdmin:           effectiveAdmin(u, admins),
+		DisableUiAccess:          u.DisableUIAccess,
+		InternalPasswordDisabled: u.InternalPasswordDisabled,
+		ProfileUpdatable:         u.ProfileUpdatable,
+		Realm:                    realmOf(u.Realm),
+		Status:                   statusOf(u),
+		Groups:                   nonNil(u.Groups),
+		WatchManager:             &r.WatchManager,
+		PolicyViewer:             &r.PolicyViewer,
+		PolicyManager:            &r.PolicyManager,
+		ReportsManager:           &r.ReportsManager,
+		ResourcesManager:         &r.ResourcesManager,
+		ManageWebhook:            &r.ManageWebhook,
+		PlatformAuditor:          &r.PlatformAuditor,
+	}
+	// Left nil for a user who never logged in, it encodes as null, as
+	// Artifactory answers since 7.98.7.
+	if !u.LastLoggedIn.IsZero() {
+		t := u.LastLoggedIn
+		d.LastLoggedIn = &t
+	}
+	return d, nil
+}
+
+// --- Groups ------------------------------------------------------------------
+
+// GetGroupList lists groups a page at a time for a caller that may read
+// identities: an administrator, or a token whose scope covers identities:r
+// (GET /access/api/v2/groups).
+func (s AccessService) GetGroupList(
+	ctx context.Context,
+	req accessgen.GetGroupListRequestObject,
+) (accessgen.GetGroupListResponseObject, error) {
+	svc, err := s.readerIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	p := req.Params
+	limit, err := listLimit(p.Limit)
+	if err != nil {
+		return nil, err
+	}
+	if err := projectsUnsupported(p.Role, p.ProjectKey); err != nil {
+		return nil, err
+	}
+	resource, err := identityResource(p.ResourceType, p.ResourceName)
+	if err != nil {
+		return nil, err
+	}
+	pageItems, next, err := svc.Store.Groups().ListNames(ctx, port.IdentityFilter{
+		NameContains: httpkit.Deref(
+			p.GroupName,
+		),
+		Descending: httpkit.Deref(p.DescendingOrder),
+		Resource:   resource,
+	}, kernel.Page{After: httpkit.Deref(p.Cursor), Limit: limit})
+	if errors.Is(err, kernel.ErrInvalidCursor) {
+		return nil, httpkit.BadRequestf("cursor is not valid")
+	}
+	if err != nil {
+		return nil, s.identityErr(ctx, "list groups", "", err)
+	}
+	out := accessgen.GetGroupList200JSONResponse{
+		Groups: []accessgen.GroupRecordResponse{},
+		Cursor: identityCursor(next),
+	}
+	base := baseurl.From(ctx) + accessGroups
+	for _, g := range pageItems {
+		out.Groups = append(out.Groups, accessgen.GroupRecordResponse{
+			GroupName: g, Uri: base + url.PathEscape(g),
+		})
+	}
+	return out, nil
+}
+
+// CreateGroup creates a group for an administrator (POST
+// /access/api/v2/groups).
+func (s AccessService) CreateGroup(
+	ctx context.Context,
+	req accessgen.CreateGroupRequestObject,
+) (accessgen.CreateGroupResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	b := req.Body
+	if b == nil || b.Name == "" {
+		return nil, httpkit.BadRequestf("a body with the group name is required")
+	}
+	if b.ImportFromLdapGroupSetting != nil {
+		if b.Members != nil {
+			return nil, httpkit.BadRequestf(
+				"members and import_from_ldap_group_setting are mutually exclusive",
+			)
+		}
+		return nil, httpkit.BadRequestf("LDAP group import is not available in artifactweave")
+	}
+	g := types.Group{
+		Name:            b.Name,
+		Description:     httpkit.Deref(b.Description),
+		AutoJoin:        httpkit.Deref(b.AutoJoin),
+		AdminPrivileges: httpkit.Deref(b.AdminPrivileges),
+		ExternalID:      httpkit.Deref(b.ExternalId),
+		Roles: types.RoleFlags{
+			WatchManager: httpkit.Deref(
+				b.WatchManager,
+			),
+			PolicyViewer: httpkit.Deref(b.PolicyViewer),
+			PolicyManager: httpkit.Deref(
+				b.PolicyManager,
+			),
+			ReportsManager: httpkit.Deref(b.ReportsManager),
+			ResourcesManager: httpkit.Deref(
+				b.ManageResources,
+			),
+			ManageWebhook: httpkit.Deref(b.ManageWebhook),
+		},
+	}
+	if err := svc.CreateGroup(ctx, g, httpkit.DerefSlice(b.Members)); err != nil {
+		if errors.Is(err, kernel.ErrNotFound) {
+			return nil, apierror.New(
+				http.StatusNotFound,
+				"One or more users in members were not found",
+			)
+		}
+		return nil, s.identityErr(ctx, "create group", groupExists(b.Name), err)
+	}
+	d, err := s.groupDetails(ctx, svc, b.Name)
+	if err != nil {
+		return nil, err
+	}
+	return accessgen.CreateGroup201JSONResponse(d), nil
+}
+
+// GetGroupDetails returns a group to a caller that may read identities (GET
+// /access/api/v2/groups/{name}).
+func (s AccessService) GetGroupDetails(
+	ctx context.Context,
+	req accessgen.GetGroupDetailsRequestObject,
+) (accessgen.GetGroupDetailsResponseObject, error) {
+	svc, err := s.readerIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	d, err := s.groupDetails(ctx, svc, string(req.Name))
+	if err != nil {
+		return nil, err
+	}
+	return accessgen.GetGroupDetails200JSONResponse(d), nil
+}
+
+// UpdateGroup changes the fields a patch sends for an administrator (PATCH
+// /access/api/v2/groups/{name}). The raw body (keepsGroupUpdateBody) tells a
+// field left out from one sent with its stored value.
+func (s AccessService) UpdateGroup(
+	ctx context.Context,
+	req accessgen.UpdateGroupRequestObject,
+) (accessgen.UpdateGroupResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	name := string(req.Name)
+	g, err := svc.Group(ctx, name)
+	if err != nil {
+		return nil, s.identityErr(ctx, "update group", groupNotFound(name), err)
+	}
+	if err := fixedGroupFields(httpkit.RawBody(ctx), g); err != nil {
+		return nil, err
+	}
+	b := req.Body
+	if b == nil {
+		b = &accessgen.UpdateGroupJSONRequestBody{}
+	}
+	patch := identity.GroupPatch{
+		Description:      b.Description,
+		AutoJoin:         b.AutoJoin,
+		AdminPrivileges:  b.AdminPrivileges,
+		WatchManager:     b.WatchManager,
+		PolicyManager:    b.PolicyManager,
+		ReportsManager:   b.ReportsManager,
+		ExternalID:       b.ExternalId,
+		PolicyViewer:     b.PolicyViewer,
+		ResourcesManager: b.ManageResources,
+		ManageWebhook:    b.ManageWebhook,
+	}
+	if err := svc.PatchGroup(ctx, name, patch); err != nil {
+		return nil, s.identityErr(ctx, "update group", groupNotFound(name), err)
+	}
+	d, err := s.groupDetails(ctx, svc, name)
+	if err != nil {
+		return nil, err
+	}
+	return accessgen.UpdateGroup200JSONResponse(d), nil
+}
+
+// fixedGroupFields refuses a group update that changes the name, realm or
+// realm attributes, which JFrog's update request does not carry and Access
+// does not change. One sent with its stored value is accepted, and members
+// are ignored, since they have their own endpoint: platform_group PATCHes
+// its whole model.
+func fixedGroupFields(raw []byte, g types.Group) error {
+	if len(raw) == 0 {
+		return nil
+	}
+	var sent struct {
+		Name            *string `json:"name"`
+		Realm           *string `json:"realm"`
+		RealmAttributes *string `json:"realm_attributes"`
+	}
+	if err := json.Unmarshal(raw, &sent); err != nil {
+		return httpkit.BadRequestf("the body is not a group update: %v", err)
+	}
+	switch {
+	case sent.Name != nil && *sent.Name != g.Name:
+		return httpkit.BadRequestf("name cannot be changed")
+	case sent.Realm != nil && *sent.Realm != realmOf(g.Realm):
+		return httpkit.BadRequestf("realm cannot be changed")
+	case sent.RealmAttributes != nil && *sent.RealmAttributes != g.RealmAttributes:
+		return httpkit.BadRequestf("realm_attributes cannot be changed")
+	}
+	return nil
+}
+
+// DeleteGroup deletes a group for an administrator (DELETE
+// /access/api/v2/groups/{name}).
+func (s AccessService) DeleteGroup(
+	ctx context.Context,
+	req accessgen.DeleteGroupRequestObject,
+) (accessgen.DeleteGroupResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	name := string(req.Name)
+	if err := svc.DeleteGroup(ctx, name); err != nil {
+		return nil, s.identityErr(ctx, "delete group", groupNotFound(name), err)
+	}
+	return accessgen.DeleteGroup204Response{}, nil
+}
+
+// UpdateGroupMembers adds and removes a group's members for an administrator
+// (PATCH /access/api/v2/groups/{name}/members).
+func (s AccessService) UpdateGroupMembers(
+	ctx context.Context,
+	req accessgen.UpdateGroupMembersRequestObject,
+) (accessgen.UpdateGroupMembersResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	name := string(req.Name)
+	var add, remove []string
+	if req.Body != nil {
+		add, remove = httpkit.DerefSlice(req.Body.Add), httpkit.DerefSlice(req.Body.Remove)
+	}
+	members, err := svc.UpdateGroupMembers(ctx, name, add, remove)
+	if errors.Is(err, kernel.ErrNotFound) {
+		// The group was found first, so a miss names an unknown user.
+		if _, gerr := svc.Group(ctx, name); gerr == nil {
+			return nil, apierror.New(http.StatusNotFound, "A user to add does not exist")
+		}
+	}
+	if err != nil {
+		return nil, s.identityErr(ctx, "update group members", groupNotFound(name), err)
+	}
+	return accessgen.UpdateGroupMembers200JSONResponse{Members: nonNil(members)}, nil
+}
+
+// groupDetails reads a group in the Access v2 shape.
+func (s AccessService) groupDetails(
+	ctx context.Context,
+	svc *identity.Service,
+	name string,
+) (accessgen.GroupDetails, error) {
+	g, err := svc.Group(ctx, name)
+	if err != nil {
+		return accessgen.GroupDetails{}, s.identityErr(ctx, "read group", groupNotFound(name), err)
+	}
+	r := g.Roles
+	d := accessgen.GroupDetails{
+		Name:            g.Name,
+		AutoJoin:        g.AutoJoin,
+		AdminPrivileges: g.AdminPrivileges,
+		Members:         nonNil(g.Members),
+		Realm:           realmOf(g.Realm),
+		WatchManager:    &r.WatchManager,
+		PolicyViewer:    &r.PolicyViewer,
+		PolicyManager:   &r.PolicyManager,
+		ReportsManager:  &r.ReportsManager,
+		ManageResources: &r.ResourcesManager,
+		ManageWebhook:   &r.ManageWebhook,
+	}
+	if g.Description != "" {
+		d.Description = &g.Description
+	}
+	if g.ExternalID != "" {
+		d.ExternalId = &g.ExternalID
+	}
+	if g.RealmAttributes != "" {
+		d.RealmAttributes = &g.RealmAttributes
+	}
+	return d, nil
+}
+
+// --- Configuration -------------------------------------------------------------
+
+// GetBasicAuthenticationStatus answers an administrator whether Basic
+// authentication with a password is on (GET
+// /access/api/v1/config/security/authentication/basic_authentication_enabled).
+func (s AccessService) GetBasicAuthenticationStatus(
+	ctx context.Context,
+	_ accessgen.GetBasicAuthenticationStatusRequestObject,
+) (accessgen.GetBasicAuthenticationStatusResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	on, err := authn.BasicAuthEnabled(ctx, svc.Store.Settings())
+	if err != nil {
+		return nil, s.identityErr(ctx, "read basic authentication switch", "", err)
+	}
+	return accessgen.GetBasicAuthenticationStatus200JSONResponse{Enabled: &on}, nil
+}
+
+// SetBasicAuthenticationStatus switches passwords over HTTP Basic on or
+// off. Tokens keep working either way, which is how an administrator turns
+// it back on.
+func (s AccessService) SetBasicAuthenticationStatus(
+	ctx context.Context,
+	req accessgen.SetBasicAuthenticationStatusRequestObject,
+) (accessgen.SetBasicAuthenticationStatusResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if req.Body == nil {
+		return nil, httpkit.BadRequestf("a body with enabled is required")
+	}
+	if err := svc.Store.Settings().
+		Put(ctx, types.SettingBasicAuthEnabled, req.Body.Enabled); err != nil {
+		return nil, s.identityErr(ctx, "set basic authentication switch", "", err)
+	}
+	s.forgetPolicies()
+	return accessgen.SetBasicAuthenticationStatus200Response{}, nil
+}
+
+// CreatePasswordPolicy replaces the whole policy: an omitted field returns
+// to its default, as JFrog documents for this PUT.
+func (s AccessService) CreatePasswordPolicy(
+	ctx context.Context,
+	req accessgen.CreatePasswordPolicyRequestObject,
+) (accessgen.CreatePasswordPolicyResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	p := types.DefaultPasswordPolicy()
+	if req.Body != nil {
+		p = mergePolicy(p, *req.Body)
+	}
+	if err := svc.SetPasswordPolicy(ctx, p); err != nil {
+		return nil, s.identityErr(ctx, "set password policy", "", err)
+	}
+	return accessgen.CreatePasswordPolicy204Response{}, nil
+}
+
+// UpdatePasswordPolicy merges the fields sent into the stored policy.
+func (s AccessService) UpdatePasswordPolicy(
+	ctx context.Context,
+	req accessgen.UpdatePasswordPolicyRequestObject,
+) (accessgen.UpdatePasswordPolicyResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	p, err := svc.PasswordPolicy(ctx)
+	if err != nil {
+		return nil, s.identityErr(ctx, "read password policy", "", err)
+	}
+	if req.Body != nil {
+		p = mergePolicy(p, *req.Body)
+	}
+	if err := svc.SetPasswordPolicy(ctx, p); err != nil {
+		return nil, s.identityErr(ctx, "set password policy", "", err)
+	}
+	return accessgen.UpdatePasswordPolicy204Response{}, nil
+}
+
+func mergePolicy(p types.PasswordPolicy, b accessgen.PasswordPolicy) types.PasswordPolicy {
+	setIf(&p.Uppercase, b.Uppercase)
+	setIf(&p.Lowercase, b.Lowercase)
+	setIf(&p.Digit, b.Digit)
+	setIf(&p.SpecialChar, b.SpecialChar)
+	setIf(&p.Length, b.Length)
+	setIf(&p.NotMatchOld, b.NotMatchOld)
+	return p
+}
+
+// GetAccessUserLockPolicy returns the Access view of the state that
+// /artifactory/api/security/userLockPolicy and the password expiration
+// policy also read.
+func (s AccessService) GetAccessUserLockPolicy(
+	ctx context.Context,
+	_ accessgen.GetAccessUserLockPolicyRequestObject,
+) (accessgen.GetAccessUserLockPolicyResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	p, err := svc.AccessLockPolicy(ctx)
+	if err != nil {
+		return nil, s.identityErr(ctx, "read user lock policy", "", err)
+	}
+	return accessgen.GetAccessUserLockPolicy200JSONResponse(lockPolicyDoc(p)), nil
+}
+
+// ConfigureAccessUserLockPolicy replaces the policy. An omitted field is
+// stored as 0 or false, not as its default: Access's request model has plain
+// numbers and booleans, and JFrog documents the consequences (omitting
+// attempts turns locking off).
+func (s AccessService) ConfigureAccessUserLockPolicy(
+	ctx context.Context,
+	req accessgen.ConfigureAccessUserLockPolicyRequestObject,
+) (accessgen.ConfigureAccessUserLockPolicyResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if req.Body == nil {
+		return nil, httpkit.BadRequestf("a user lock policy is required")
+	}
+	b := req.Body
+	stored, err := svc.SetAccessLockPolicy(ctx, identity.AccessLockPolicy{
+		Attempts:           derefOr(b.Attempts, 0),
+		PasswordExpiryDays: derefOr(b.PasswordExpiryDays, 0),
+		AccessLockSettings: types.AccessLockSettings{
+			SecondsToUnlock:                derefOr(b.SecondsToUnlock, 0),
+			AdminPasswordExpirable:         derefOr(b.AdminPasswordExpirable, false),
+			MaxLoginDelayIncorrectAttempts: derefOr(b.MaxLoginDelayIncorrectAttempts, 0),
+			MaxLoginDelayMillis:            derefOr(b.MaxLoginDelayMillis, 0),
+			BaseLoginDelayMillis:           derefOr(b.BaseLoginDelayMillis, 0),
+			ClientLoginSuspensionEnabled:   derefOr(b.ClientLoginSuspensionEnabled, false),
+		},
+	})
+	if err != nil {
+		return nil, s.identityErr(ctx, "set user lock policy", "", err)
+	}
+	s.forgetPolicies()
+	return accessgen.ConfigureAccessUserLockPolicy200JSONResponse(lockPolicyDoc(stored)), nil
+}
+
+// lockPolicyDoc sets every field, so a 0 or false is sent rather than
+// omitted.
+func lockPolicyDoc(p identity.AccessLockPolicy) accessgen.UserLockPolicyConfig {
+	return accessgen.UserLockPolicyConfig{
+		Attempts:                       &p.Attempts,
+		SecondsToUnlock:                &p.SecondsToUnlock,
+		PasswordExpiryDays:             &p.PasswordExpiryDays,
+		AdminPasswordExpirable:         &p.AdminPasswordExpirable,
+		MaxLoginDelayIncorrectAttempts: &p.MaxLoginDelayIncorrectAttempts,
+		MaxLoginDelayMillis:            &p.MaxLoginDelayMillis,
+		BaseLoginDelayMillis:           &p.BaseLoginDelayMillis,
+		ClientLoginSuspensionEnabled:   &p.ClientLoginSuspensionEnabled,
+	}
+}
+
+// forgetPolicies makes this instance's next login read the switch and the
+// policies again; other instances follow within the authenticator's cache
+// lifetime.
+func (s AccessService) forgetPolicies() {
+	if s.deps.Authenticator != nil {
+		s.deps.Authenticator.ForgetPolicies()
+	}
+}
+
+// --- Helpers -------------------------------------------------------------------
+
+// The existing API ignores an incomplete resource selector.
+func identityResource(resourceType, resourceName *string) (*port.IdentityResource, error) {
+	if resourceType == nil || resourceName == nil {
+		return nil, nil //nolint:nilnil // no filter
+	}
+	rt := types.ResourceType(*resourceType)
+	switch rt {
+	case types.ResourceArtifact, types.ResourceBuild, types.ResourceReleaseBundle,
+		types.ResourceDestination, types.ResourcePipelineSource:
+		return &port.IdentityResource{Type: rt, Name: *resourceName}, nil
+	default:
+		return nil, httpkit.BadRequestf(
+			"resourceType %q is not a permission resource type",
+			*resourceType,
+		)
+	}
+}
+
+func identityCursor(next string) *string {
+	if next == "" {
+		return nil
+	}
+	return &next
+}
+
+// projectsUnsupported refuses the role and project filters: roles are held
+// within projects, which artifactweave does not serve yet.
+func projectsUnsupported(role, projectKey *string) error {
+	if role != nil || projectKey != nil {
+		return httpkit.BadRequestf(
+			"filtering by role or projectKey needs projects, which artifactweave does not serve yet",
+		)
+	}
+	return nil
+}
+
+func listLimit(limit *int) (int, error) {
+	if limit == nil {
+		return defaultListLimit, nil
+	}
+	if *limit < 1 || *limit > kernel.MaxLimit {
+		return 0, httpkit.BadRequestf("limit must be between 1 and %d", kernel.MaxLimit)
+	}
+	return *limit, nil
+}
+
+// adminGroups returns the names of groups whose members are admins.
+func adminGroups(ctx context.Context, svc *identity.Service) (map[string]bool, error) {
+	groups, err := svc.Groups(ctx)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // the caller maps it with identityErr
+	}
+	out := map[string]bool{}
+	for _, g := range groups {
+		if g.AdminPrivileges {
+			out[g.Name] = true
+		}
+	}
+	return out, nil
+}
+
+// effectiveAdmin is the admin flag or membership of an admin group.
+func effectiveAdmin(u types.User, adminGroups map[string]bool) bool {
+	return u.Admin || slices.ContainsFunc(u.Groups, func(g string) bool { return adminGroups[g] })
+}
+
+func statusOf(u types.User) accessgen.UserDetailsStatus {
+	if u.Status == "" {
+		return accessgen.UserDetailsStatusEnabled
+	}
+	return accessgen.UserDetailsStatus(u.Status)
+}
+
+func realmOf(realm string) string {
+	if realm == "" {
+		return types.RealmInternal
+	}
+	return realm
+}
+
+func nonNil(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
+}
+
+func derefOr[T any](p *T, def T) T {
+	if p == nil {
+		return def
+	}
+	return *p
+}
+
+func setIf[T any](dst *T, v *T) {
+	if v != nil {
+		*dst = *v
+	}
+}
+
+// isGroupUpdate matches PATCH /access/api/v2/groups/{name}, whose raw body
+// tells a field left out from one sent with its stored value.
+func isGroupUpdate(path string) bool {
+	name, ok := strings.CutPrefix(path, accessGroups)
+	return ok && name != "" && !strings.Contains(name, "/")
+}
+
+// keepsGroupUpdateBody reports an Access v2 group update, whose raw body
+// requestDetails keeps (isGroupUpdate).
+func keepsGroupUpdateBody(r *http.Request) bool {
+	return r.Method == http.MethodPatch && isGroupUpdate(r.URL.Path)
+}

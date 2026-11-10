@@ -20,8 +20,5 @@ type Page = kernel.Page
 
 var Cursor = kernel.Cursor
 
-func Trim[T any](rows []T, limit int, key func(T) []string) ([]T, string) {
-	return kernel.Trim(rows, limit, key)
-}
 func Clone[V any](v V) V     { return kernel.Clone(v) }
 func Normalise[V any](v V) V { return kernel.Normalise(v) }

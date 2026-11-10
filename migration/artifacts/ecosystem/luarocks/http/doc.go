@@ -39,6 +39,8 @@
 //     when they exist; a rockspec upload's JSON (api/1/{key}/upload), with
 //     the version id and the module URL; and a rock upload's success
 //     (api/1/{key}/upload_rock/{versionID}).
+//   - RedactAPIKey: a path with the upload API's key replaced, which the
+//     server's access and panic logs record instead of the path.
 //
 // # Invariants
 //

@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -88,7 +89,7 @@ func (s artifactoryService) minRedirectSize(ctx context.Context, st store.Store)
 	n, ok, err := descriptor.DownloadRedirectMinSize(ctx, st.Configs())
 	if err != nil {
 		s.log().WarnContext(ctx, "download redirect: reading the minimum size",
-			"request_id", requestIDFrom(ctx), "error", err)
+			"request_id", httpkit.RequestIDFrom(ctx), "error", err)
 	}
 	if !ok {
 		return s.cfg.Redirect.MinSize
@@ -202,7 +203,7 @@ func (s artifactoryService) signFailed(
 		return
 	}
 	s.log().WarnContext(ctx, "download redirect: signing failed, streaming instead",
-		"repo", repoKey, "via", via.String(), "request_id", requestIDFrom(ctx), "error", err,
+		"repo", repoKey, "via", via.String(), "request_id", httpkit.RequestIDFrom(ctx), "error", err,
 		"held_back", held)
 }
 

@@ -18,6 +18,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/access"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
+	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -34,6 +35,13 @@ var CheapHash = func() []byte {
 	return h
 }()
 
+// Repositories is the artifacts module's Repositories over db, bound as the
+// server binds them, with the key pairs and projects that access reads from
+// db. Every call takes part in a transaction of db that its context carries.
+func Repositories(db store.Store) artifactsapi.Repositories {
+	return repos.NewRepositories(db, access.KeysOf(db), access.ProjectsOf(db))
+}
+
 // Seed creates the built-in principals in db as a new server does (the admin
 // user, anonymous, the readers group, the Anything and Any Remote permissions
 // and the artifactory-build-info repository), with "pw" as the admin
@@ -41,7 +49,7 @@ var CheapHash = func() []byte {
 // seeded is left as it is.
 func Seed(t *testing.T, db store.Store) {
 	t.Helper()
-	repositories := repos.NewRepositories(db, access.KeysOf(db), access.ProjectsOf(db))
+	repositories := Repositories(db)
 	if _, err := authn.SeedHashed(
 		context.Background(),
 		db,

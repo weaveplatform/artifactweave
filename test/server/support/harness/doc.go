@@ -22,6 +22,9 @@
 // # Outputs
 //
 //   - Router: the production http.Handler built from a Config.
+//   - Mirrors, MirrorStatus, SearchLimits and DefaultRedirectTTL: the types
+//     and the default of the Config fields that suites name, as aliases of
+//     the router's own, so that a suite never imports internal/server.
 //   - ItemWorld, from NewItemWorld: the router over a store seeded with the
 //     users reader, deployer and user, the deploy-libs permission, anonymous
 //     read of every remote repository when asked for (AnonymousRemotes) and

@@ -23,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/work"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -50,13 +51,13 @@ func (s artifactoryService) CreateDebianSnapshot(
 		!debianSnapshotSegment.MatchString(req.Body.Distribution) ||
 		req.Body.TargetRepo == "" ||
 		req.Params.Async != nil && !req.Params.Async.Valid() {
-		return nil, badRequestf("A safe tag, targetRepo and distribution are required")
+		return nil, httpkit.BadRequestf("A safe tag, targetRepo and distribution are required")
 	}
 	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
-	p, err := principal(ctx)
+	p, err := httpkit.Principal(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +88,7 @@ func (s artifactoryService) CreateDebianSnapshot(
 		}
 		key := job.Target + "/" + job.Tag
 		if len(key) > store.MaxWorkKey {
-			return nil, badRequestf("Debian snapshot key is too long")
+			return nil, httpkit.BadRequestf("Debian snapshot key is too long")
 		}
 		if err := s.cfg.Work.Enqueue(ctx, debianSnapshotKind, key, payload); err != nil {
 			return nil, s.internalError(ctx, "Debian snapshot queue", err)
@@ -172,13 +173,13 @@ func snapshotRepos(
 	if sourceRepo.PackageType != repo.Debian || targetRepo.PackageType != repo.Debian ||
 		targetRepo.Class != repo.Local ||
 		!snapshotSourceClass(sourceRepo.Class) {
-		return repo.Config{}, repo.Config{}, badRequestf(
+		return repo.Config{}, repo.Config{}, httpkit.BadRequestf(
 			"Debian snapshots require a Debian source and local Debian target",
 		)
 	}
 	if !acc.file(sourceRepo, "dists/"+job.Distribution+"/Release", types.ActionRead) ||
 		!acc.file(targetRepo, snapshotRoot(job), types.ActionWrite|types.ActionManage) {
-		return repo.Config{}, repo.Config{}, denied(p)
+		return repo.Config{}, repo.Config{}, httpkit.Denied(p)
 	}
 	return sourceRepo, targetRepo, nil
 }
@@ -270,7 +271,7 @@ func (s artifactoryService) createDebianSnapshot(
 	slices.Sort(paths)
 	for _, name := range paths {
 		if !acc.file(targetRepo, root+"/"+name, types.ActionWrite) {
-			return denied(p)
+			return httpkit.Denied(p)
 		}
 		_, err := s.items(st).Deploy(debian.WithSnapshotWrite(ctx), item.Deploy{
 			Target: item.Target{Repo: targetRepo, Path: root + "/" + name},
@@ -318,7 +319,7 @@ func (s artifactoryService) debianSnapshotFiles(
 	total := int64(len(release))
 	for _, ref := range refs {
 		if ref.Size > debianIndexLimit || total+ref.Size > 512<<20 {
-			return nil, badRequestf("Debian snapshot metadata exceeds limit")
+			return nil, httpkit.BadRequestf("Debian snapshot metadata exceeds limit")
 		}
 		body, checkRead, err := s.debianMemberBytes(ctx, st, c, ref.Path, p, acc)
 		if err != nil {
@@ -336,7 +337,7 @@ func (s artifactoryService) debianSnapshotFiles(
 			for _, artifact := range paths {
 				if !acc.file(c, artifact, types.ActionRead) ||
 					generic.CheckDownload(c, artifact, false) != nil {
-					return nil, denied(p)
+					return nil, httpkit.Denied(p)
 				}
 				if checkRead != nil {
 					if err := checkRead(ctx, artifact); err != nil {
@@ -380,59 +381,59 @@ func (s artifactoryService) registerDebianSnapshotRoutes(r chi.Router) {
 func (s artifactoryService) getDebianSnapshot(w http.ResponseWriter, r *http.Request) {
 	st, err := s.content()
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	p, acc, err := s.itemCaller(r.Context(), st)
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	key, tag := chi.URLParam(r, "repoKey"), chi.URLParam(r, "tag")
 	if !debianSnapshotSegment.MatchString(tag) {
-		writeErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	c, err := st.Repos().Get(r.Context(), key)
 	if err != nil || c.PackageType != repo.Debian || c.Class != repo.Local {
-		writeErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	root := "snapshots/" + tag
 	marker, err := st.Items().Get(r.Context(), key, false, root)
 	if err != nil || !marker.Folder {
-		writeErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	props, err := st.Items().Properties(r.Context(), marker.ID)
 	if err != nil || len(props["deb.snapshot.source"]) != 1 {
-		writeErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	sourceKey := props["deb.snapshot.source"][0]
 	sourceRepo, err := st.Repos().Get(r.Context(), sourceKey)
 	if err != nil || sourceRepo.PackageType != repo.Debian {
-		writeErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	rel := strings.TrimPrefix(chi.URLParam(r, "*"), "/")
 	if rel == "" || path.Clean(rel) != rel || strings.HasPrefix(rel, "../") {
-		writeErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	if !acc.file(c, root+"/"+rel, types.ActionRead) ||
 		!acc.file(sourceRepo, rel, types.ActionRead) {
-		writeErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	if strings.HasPrefix(rel, "dists/") {
 		it, err := st.Items().Get(r.Context(), key, false, root+"/"+rel)
 		if err != nil || it.Folder {
-			writeErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, itemNotFound())
 			return
 		}
 		if err := s.checkDebianSnapshotIndex(r.Context(), rel, it, sourceRepo, p, acc); err != nil {
-			writeErr(w, r, s.itemError(r.Context(), "Debian snapshot index", err))
+			httpkit.WriteErr(w, r, s.itemError(r.Context(), "Debian snapshot index", err))
 			return
 		}
 		s.serveFile(w, r, st, found{repo: c, item: it}, p)
@@ -440,10 +441,10 @@ func (s artifactoryService) getDebianSnapshot(w http.ResponseWriter, r *http.Req
 	}
 	if !debian.ValidBinaryPath(rel) && !debian.ValidSourcePath(rel) &&
 		!strings.HasPrefix(rel, "pool/") {
-		writeErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
-	w.Header().Set("Location", "/artifactory/"+sourceKey+"/"+escapePath(rel))
+	w.Header().Set("Location", "/artifactory/"+sourceKey+"/"+httpkit.EscapePath(rel))
 	w.WriteHeader(http.StatusFound)
 }
 
@@ -466,7 +467,7 @@ func (s artifactoryService) checkDebianSnapshotIndex(
 	for _, artifact := range paths {
 		if !acc.file(sourceRepo, artifact, types.ActionRead) ||
 			generic.CheckDownload(sourceRepo, artifact, false) != nil {
-			return denied(p)
+			return httpkit.Denied(p)
 		}
 	}
 	return nil

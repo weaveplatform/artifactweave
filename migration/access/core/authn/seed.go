@@ -8,11 +8,12 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/model"
+	"github.com/weaveplatform/artifactweave/migration/access/core/port"
 	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/migration/platform/tx"
 )
 
 // Names of the built-in principals Artifactory ships (research 05).
@@ -32,6 +33,23 @@ const (
 	AnyRemotePermission = "Any Remote"
 )
 
+// SeedStore is what the seed writes: the users, the group and the
+// permissions it creates, the settings that hold the seeded marker, and the
+// transaction they are created in. The application passes its store
+// aggregate. Every call joins the transaction ctx carries.
+type SeedStore interface {
+	tx.Runner
+	// Users holds the admin and anonymous users the seed creates.
+	Users() port.UserStore
+	// Groups holds the readers group the seed creates.
+	Groups() port.GroupStore
+	// Permissions holds the Anything and Any Remote permissions the seed
+	// creates.
+	Permissions() port.PermissionStore
+	// Settings holds the seeded marker.
+	Settings() settings.SettingsStore
+}
+
 // seedMarker is the SettingSeeded value.
 type seedMarker struct {
 	Version int       `json:"version"`
@@ -39,7 +57,7 @@ type seedMarker struct {
 }
 
 // Seeded reports whether the built-in principals have been created.
-func Seeded(ctx context.Context, st store.Store) (bool, error) {
+func Seeded(ctx context.Context, st interface{ Settings() settings.SettingsStore }) (bool, error) {
 	var m seedMarker
 	err := st.Settings().Get(ctx, settings.SettingSeeded, &m)
 	if errors.Is(err, kernel.ErrNotFound) {
@@ -62,7 +80,7 @@ func Seeded(ctx context.Context, st store.Store) (bool, error) {
 // creates do.
 func Seed(
 	ctx context.Context,
-	st store.Store,
+	st SeedStore,
 	repos artifactsapi.Repositories,
 	adminPassword string,
 	now time.Time,
@@ -81,7 +99,7 @@ func Seed(
 // HashPasswordWith).
 func SeedHashed(
 	ctx context.Context,
-	st store.Store,
+	st SeedStore,
 	repos artifactsapi.Repositories,
 	adminHash []byte,
 	now time.Time,
@@ -120,7 +138,7 @@ var errAlreadySeeded = errors.New("auth: already seeded")
 
 func seed(
 	ctx context.Context,
-	st store.Store,
+	st SeedStore,
 	repos artifactsapi.Repositories,
 	adminHash []byte,
 	now time.Time,

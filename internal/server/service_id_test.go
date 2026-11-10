@@ -99,7 +99,7 @@ func TestAccServiceIDGrantAdmin(t *testing.T) {
 // server fault, never an empty id a client would build a scope from.
 func TestAccServiceIDWithoutIdentity(t *testing.T) {
 	ctx := kernel.WithPrincipal(context.Background(), kernel.Principal{Name: "admin", Admin: true})
-	_, err := artifactoryService{cfg: Config{Store: inmem.New()}}.
+	_, err := systemAPI{cfg: Config{Store: inmem.New()}}.
 		GetServiceId(ctx, artgen.GetServiceIdRequestObject{})
 	var e *apierror.Error
 	if !errors.As(err, &e) || e.Status != http.StatusInternalServerError {

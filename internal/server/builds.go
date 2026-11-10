@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -66,9 +67,12 @@ func (s artifactoryService) buildError(
 ) error {
 	switch {
 	case errors.Is(err, build.ErrForbidden):
-		return denied(p)
+		return httpkit.Denied(p)
 	case errors.Is(err, build.ErrInvalid):
-		return badRequestf("%s", strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "))
+		return httpkit.BadRequestf(
+			"%s",
+			strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "),
+		)
 	case errors.Is(err, build.ErrNoRepository):
 		return notFoundRepo(types.BuildInfoRepo(build.ProjectKey(project)))
 	case errors.Is(err, build.ErrConflict):
@@ -88,12 +92,15 @@ func noRun(name, number string) string {
 // started reads an optional started parameter; nil or empty is zero, which
 // selects a number's latest run.
 func started(s *string) (time.Time, error) {
-	if deref(s) == "" {
+	if httpkit.Deref(s) == "" {
 		return time.Time{}, nil
 	}
 	t, err := build.ParseStarted(*s)
 	if err != nil {
-		return t, badRequestf("%s", strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "))
+		return t, httpkit.BadRequestf(
+			"%s",
+			strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "),
+		)
 	}
 	return t, nil
 }
@@ -117,7 +124,7 @@ func (s artifactoryService) GetAllBuilds(
 	if err != nil {
 		return nil, err
 	}
-	project := deref(req.Params.Project)
+	project := httpkit.Deref(req.Params.Project)
 	names, err := svc.Names(ctx, project, a)
 	if err != nil {
 		return nil, s.buildError(ctx, p, project, "", err)
@@ -125,10 +132,13 @@ func (s artifactoryService) GetAllBuilds(
 	list := make([]artgen.BuildSummary, 0, len(names))
 	for _, n := range names {
 		list = append(list, artgen.BuildSummary{
-			Uri: ptrTo("/" + n.Name), LastStarted: ptrTo(build.FormatStarted(n.LastStarted)),
+			Uri: httpkit.PtrTo(
+				"/" + n.Name,
+			),
+			LastStarted: httpkit.PtrTo(build.FormatStarted(n.LastStarted)),
 		})
 	}
-	return artgen.GetAllBuilds200JSONResponse{Uri: ptrTo(buildURI(ctx)), Builds: &list}, nil
+	return artgen.GetAllBuilds200JSONResponse{Uri: httpkit.PtrTo(buildURI(ctx)), Builds: &list}, nil
 }
 
 // UploadBuild publishes a build-info document and answers 204, as 7.x
@@ -144,16 +154,16 @@ func (s artifactoryService) UploadBuild(
 	if err != nil {
 		return nil, err
 	}
-	project := deref(req.Params.Project)
+	project := httpkit.Deref(req.Params.Project)
 	if err := checkBuildRepo(project, req.Params.BuildRepo); err != nil {
 		return nil, err
 	}
-	pub, err := svc.Publish(ctx, project, rawBody(ctx), p.Name, a)
+	pub, err := svc.Publish(ctx, project, httpkit.RawBody(ctx), p.Name, a)
 	if err != nil {
 		return nil, s.buildError(ctx, p, project, "", err)
 	}
 	if pub.Retention != nil {
-		s.log().WarnContext(ctx, "build retention", "request_id", requestIDFrom(ctx),
+		s.log().WarnContext(ctx, "build retention", "request_id", httpkit.RequestIDFrom(ctx),
 			"build", pub.Run.Name, "error", pub.Retention)
 	}
 	return artgen.UploadBuild204Response{
@@ -166,8 +176,8 @@ func (s artifactoryService) UploadBuild(
 // holds its runs.
 func checkBuildRepo(project string, buildRepo *string) error {
 	want := types.BuildInfoRepo(build.ProjectKey(project))
-	if deref(buildRepo) != "" && *buildRepo != want {
-		return badRequestf(
+	if httpkit.Deref(buildRepo) != "" && *buildRepo != want {
+		return httpkit.BadRequestf(
 			"The build-info repository '%s' does not hold this project's builds; '%s' does",
 			*buildRepo, want)
 	}
@@ -185,7 +195,7 @@ func (s artifactoryService) GetBuildRuns(
 	if err != nil {
 		return nil, err
 	}
-	project := deref(req.Params.Project)
+	project := httpkit.Deref(req.Params.Project)
 	runs, err := svc.Runs(ctx, project, req.BuildName, a)
 	if err != nil {
 		return nil, s.buildError(ctx, p, project, noBuild(req.BuildName), err)
@@ -193,11 +203,14 @@ func (s artifactoryService) GetBuildRuns(
 	list := make([]artgen.BuildNumber, 0, len(runs))
 	for _, r := range runs {
 		list = append(list, artgen.BuildNumber{
-			Uri: ptrTo("/" + r.Number), Started: ptrTo(build.FormatStarted(r.Started)),
+			Uri: httpkit.PtrTo(
+				"/" + r.Number,
+			),
+			Started: httpkit.PtrTo(build.FormatStarted(r.Started)),
 		})
 	}
 	return artgen.GetBuildRuns200JSONResponse{
-		Uri: ptrTo(buildURI(ctx, req.BuildName)), BuildsNumbers: &list,
+		Uri: httpkit.PtrTo(buildURI(ctx, req.BuildName)), BuildsNumbers: &list,
 	}, nil
 }
 
@@ -218,14 +231,14 @@ func (s artifactoryService) GetBuildInfo(
 	if err != nil {
 		return nil, err
 	}
-	project := deref(req.Params.Project)
+	project := httpkit.Deref(req.Params.Project)
 	b, err := svc.Run(ctx, project, req.BuildName, req.BuildNumber, at, a)
 	if err != nil {
 		return nil, s.buildError(ctx, p, project, noRun(req.BuildName, req.BuildNumber), err)
 	}
 	if diff := req.Params.Diff; diff != nil {
 		if *diff == "null" {
-			return nil, badRequestf("Parameter 'diff' must contain a value, if specified.")
+			return nil, httpkit.BadRequestf("Parameter 'diff' must contain a value, if specified.")
 		}
 		older, err := svc.Run(ctx, project, req.BuildName, *diff, time.Time{}, a)
 		if err != nil {
@@ -237,7 +250,7 @@ func (s artifactoryService) GetBuildInfo(
 			), err)
 		}
 		if b.Started.Before(older.Started) {
-			return nil, badRequestf(
+			return nil, httpkit.BadRequestf(
 				"Build number should be greater than the build number to compare against.")
 		}
 		return nil, apierror.New(http.StatusNotImplemented,
@@ -280,7 +293,7 @@ func (s artifactoryService) AppendBuild(
 	if err != nil {
 		return nil, err
 	}
-	project := deref(req.Params.Project)
+	project := httpkit.Deref(req.Params.Project)
 	if err := checkBuildRepo(project, req.Params.BuildRepo); err != nil {
 		return nil, err
 	}
@@ -290,7 +303,7 @@ func (s artifactoryService) AppendBuild(
 	}
 	ap := build.Append{
 		ProjectKey: project, Name: req.BuildName, Number: req.BuildNumber, Started: at,
-		Modules: rawBody(ctx), By: p.Name,
+		Modules: httpkit.RawBody(ctx), By: p.Name,
 	}
 	if req.Params.IdempotencyKey != nil {
 		err = s.appendOnce(ctx, svc, p, ap, *req.Params.IdempotencyKey)
@@ -312,7 +325,7 @@ func (s artifactoryService) RenameBuild(
 	if err != nil {
 		return nil, err
 	}
-	project, to := deref(req.Params.Project), req.Params.To
+	project, to := httpkit.Deref(req.Params.Project), req.Params.To
 	if err := svc.Rename(ctx, project, req.BuildName, to, p.Name, a); err != nil {
 		if errors.Is(err, build.ErrConflict) {
 			return nil, apierror.New(http.StatusConflict,
@@ -334,15 +347,15 @@ func (s artifactoryService) DeleteBuilds(
 	req artgen.DeleteBuildsRequestObject,
 ) (artgen.DeleteBuildsResponseObject, error) {
 	var numbers []string
-	for n := range strings.SplitSeq(deref(req.Params.BuildNumbers), ",") {
+	for n := range strings.SplitSeq(httpkit.Deref(req.Params.BuildNumbers), ",") {
 		if n = strings.TrimSpace(n); n != "" {
 			numbers = append(numbers, n)
 		}
 	}
 	msg, err := s.deleteBuilds(ctx, build.Delete{
 		Name: req.BuildName, Numbers: numbers,
-		All:       deref(req.Params.DeleteAll) == 1,
-		Artifacts: deref(req.Params.Artifacts) == 1,
+		All:       httpkit.Deref(req.Params.DeleteAll) == 1,
+		Artifacts: httpkit.Deref(req.Params.Artifacts) == 1,
 	})
 	if err != nil {
 		return nil, err
@@ -357,9 +370,9 @@ func (s artifactoryService) DeleteBuildsMultiple(
 	req artgen.DeleteBuildsMultipleRequestObject,
 ) (artgen.DeleteBuildsMultipleResponseObject, error) {
 	msg, err := s.deleteBuilds(ctx, build.Delete{
-		ProjectKey: deref(req.Body.Project), Name: req.Body.BuildName,
-		Numbers: derefSlice(req.Body.BuildNumbers), All: deref(req.Body.DeleteAll),
-		Artifacts: deref(req.Body.DeleteArtifacts),
+		ProjectKey: httpkit.Deref(req.Body.Project), Name: req.Body.BuildName,
+		Numbers: httpkit.DerefSlice(req.Body.BuildNumbers), All: httpkit.Deref(req.Body.DeleteAll),
+		Artifacts: httpkit.Deref(req.Body.DeleteArtifacts),
 	})
 	if err != nil {
 		return nil, err
@@ -408,7 +421,11 @@ func (s artifactoryService) GetBuildArtifacts(
 	out := make(artgen.GetBuildArtifacts200JSONResponse, 0, len(items))
 	for _, it := range items {
 		out = append(out, artgen.BuildArtifact{
-			Repo: ptrTo(it.ReportedRepoKey()), Path: ptrTo(it.Path), Name: ptrTo(it.Name),
+			Repo: httpkit.PtrTo(
+				it.ReportedRepoKey(),
+			),
+			Path: httpkit.PtrTo(it.Path),
+			Name: httpkit.PtrTo(it.Name),
 		})
 	}
 	return out, nil
@@ -433,13 +450,13 @@ func (s artifactoryService) PromoteBuild(
 	if err != nil {
 		return nil, err
 	}
-	project := deref(req.Params.Project)
+	project := httpkit.Deref(req.Params.Project)
 	at, err := started(body.Timestamp)
 	if err != nil {
-		return refusePromotion("The timestamp " + deref(body.Timestamp) +
+		return refusePromotion("The timestamp " + httpkit.Deref(body.Timestamp) +
 			" is not in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ"), nil
 	}
-	props, bad := promotionProperties(deref(body.Properties))
+	props, bad := promotionProperties(httpkit.Deref(body.Properties))
 	if bad != "" {
 		return refusePromotion(fmt.Sprintf(
 			"The value of property '%s' must be a string or an array of strings", bad)), nil
@@ -457,17 +474,34 @@ func (s artifactoryService) PromoteBuild(
 		failFast = *body.FailFast
 	}
 	res, err := svc.Promote(ctx, build.Promotion{
-		ProjectKey: project, Name: req.BuildName, Number: req.BuildNumber,
-		Status: deref(body.Status), Comment: deref(body.Comment), CIUser: deref(body.CiUser),
-		Timestamp: at, SourceRepo: deref(body.SourceRepo), TargetRepo: deref(body.TargetRepo),
-		Copy: deref(body.Copy), Artifacts: artifacts, Dependencies: deref(body.Dependencies),
-		Scopes: derefSlice(body.Scopes), Properties: props, DryRun: deref(body.DryRun),
-		FailFast: failFast, By: p.Name,
+		ProjectKey: project,
+		Name:       req.BuildName,
+		Number:     req.BuildNumber,
+		Status: httpkit.Deref(
+			body.Status,
+		),
+		Comment:    httpkit.Deref(body.Comment),
+		CIUser:     httpkit.Deref(body.CiUser),
+		Timestamp:  at,
+		SourceRepo: httpkit.Deref(body.SourceRepo),
+		TargetRepo: httpkit.Deref(body.TargetRepo),
+		Copy: httpkit.Deref(
+			body.Copy,
+		),
+		Artifacts:    artifacts,
+		Dependencies: httpkit.Deref(body.Dependencies),
+		Scopes: httpkit.DerefSlice(
+			body.Scopes,
+		),
+		Properties: props,
+		DryRun:     httpkit.Deref(body.DryRun),
+		FailFast:   failFast,
+		By:         p.Name,
 	}, a)
 	switch {
 	case errors.Is(err, build.ErrNoTarget):
 		return nil, apierror.New(http.StatusNotFound, fmt.Sprintf(
-			"Cannot find target repository by the key '%s'.", deref(body.TargetRepo)))
+			"Cannot find target repository by the key '%s'.", httpkit.Deref(body.TargetRepo)))
 	case errors.Is(err, build.ErrInvalid):
 		return refusePromotion(strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": ")), nil
 	case err != nil:
@@ -491,7 +525,10 @@ func promotionReport(msgs []item.Message) artgen.BuildPromotionResponse {
 	list := make([]artgen.PromotionMessage, 0, len(msgs))
 	for _, m := range msgs {
 		list = append(list, artgen.PromotionMessage{
-			Level: ptrTo(artgen.PromotionMessageLevel(m.Level)), Message: ptrTo(m.Text),
+			Level: httpkit.PtrTo(
+				artgen.PromotionMessageLevel(m.Level),
+			),
+			Message: httpkit.PtrTo(m.Text),
 		})
 	}
 	return artgen.BuildPromotionResponse{Messages: &list}
@@ -536,18 +573,21 @@ func (s artifactoryService) ControlBuildRetention(
 	if err != nil {
 		return nil, err
 	}
-	project := deref(req.Params.Project)
+	project := httpkit.Deref(req.Params.Project)
 	// The generated binder always decodes the body, whatever its type.
 	r, err := build.RetentionSettings{
-		Count: deref(req.Body.Count), MinimumBuildDate: deref(req.Body.MinimumBuildDate),
-		DeleteBuildArtifacts:         deref(req.Body.DeleteBuildArtifacts),
-		BuildNumbersNotToBeDiscarded: derefSlice(req.Body.BuildNumbersNotToBeDiscarded),
+		Count: httpkit.Deref(
+			req.Body.Count,
+		),
+		MinimumBuildDate:             httpkit.Deref(req.Body.MinimumBuildDate),
+		DeleteBuildArtifacts:         httpkit.Deref(req.Body.DeleteBuildArtifacts),
+		BuildNumbersNotToBeDiscarded: httpkit.DerefSlice(req.Body.BuildNumbersNotToBeDiscarded),
 	}.Retention(true)
 	if err != nil {
 		return nil, s.buildError(ctx, p, project, "", err)
 	}
 	d := build.Discard{ProjectKey: project, Name: req.BuildName, Retention: r, By: p.Name}
-	if !deref(req.Params.Async) {
+	if !httpkit.Deref(req.Params.Async) {
 		if _, err := svc.Discard(ctx, d, a); err != nil {
 			return nil, s.buildError(ctx, p, project, noBuild(req.BuildName), err)
 		}
@@ -560,7 +600,7 @@ func (s artifactoryService) ControlBuildRetention(
 	bg := context.WithoutCancel(ctx)
 	go func() {
 		if _, err := svc.Discard(bg, d, a); err != nil {
-			s.log().ErrorContext(bg, "build retention", "request_id", requestIDFrom(bg),
+			s.log().ErrorContext(bg, "build retention", "request_id", httpkit.RequestIDFrom(bg),
 				"build", d.Name, "error", err)
 		}
 	}()
@@ -575,4 +615,12 @@ func buildInfoProject(repoKey string) (string, bool) {
 	}
 	p, ok := strings.CutSuffix(repoKey, "-build-info")
 	return p, ok && p != ""
+}
+
+// keepsBuildBody reports a build-info publish or append, whose raw body
+// requestDetails keeps because the document is stored as published
+// (decision 0014).
+func keepsBuildBody(r *http.Request) bool {
+	return r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, buildsPath+"/append/") ||
+		r.Method == http.MethodPut && r.URL.Path == buildsPath
 }

@@ -39,8 +39,7 @@ exclude:
     # or simulate signing failures; production server coverage remains gated.
     - ^test/server/support/registryfixture/
     # Server-assembly harness: remaining branches abort on fixture setup
-    # failures or belong to helpers whose callers are the route suites still
-    # in internal/server; production server coverage remains gated.
+    # failures; production server coverage remains gated.
     - ^test/server/support/harness/
     # Shared Agent Packages/Plugins route fixture. Its uncovered branches
     # abort on fixture setup failures or malformed test responses; the

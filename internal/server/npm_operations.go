@@ -8,6 +8,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -71,7 +72,7 @@ func (s artifactoryService) ResumeNpmRepositoryMigration(
 	it, err := st.WorkQueue().Get(ctx, npmfmt.KindConvert, c.Key)
 	switch {
 	case errors.Is(err, store.ErrNotFound) || err == nil && it.State != types.WorkParked:
-		return nil, badRequestf("Repository '%s' has no failed conversion to resume", c.Key)
+		return nil, httpkit.BadRequestf("Repository '%s' has no failed conversion to resume", c.Key)
 	case err != nil:
 		return nil, s.internalError(ctx, "npm conversion", err)
 	}

@@ -69,7 +69,7 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 	if conan.profile != "format" || conan.owner != "conan" {
 		t.Fatalf("Conan source selection = %+v", conan)
 	}
-	for _, pkg := range []string{"./migration/artifacts/ecosystem/conan/...", "./migration/artifacts/ecosystem/conan/http", "./internal/server"} {
+	for _, pkg := range []string{"./migration/artifacts/ecosystem/conan/...", "./migration/artifacts/ecosystem/conan/http", "./test/server/artifacts/conan"} {
 		if !slices.Contains(conan.units, pkg) {
 			t.Errorf("Conan plan omitted %s", pkg)
 		}

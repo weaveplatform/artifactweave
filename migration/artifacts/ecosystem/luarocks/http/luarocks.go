@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/luarocks"
@@ -290,4 +290,19 @@ func validateSignature(sig pkgroute.FormFile, owner string) error {
 func writeJSON(w http.ResponseWriter, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(body)
+}
+
+// RedactAPIKey returns path as a log may record it: the upload API names
+// the uploader's API key in its paths (api/1/{key}/...), and that key is a
+// credential, so it is replaced by [redacted]. Any other path comes back
+// unchanged.
+func RedactAPIKey(path string) string {
+	if rest, ok := strings.CutPrefix(path, "/artifactory/api/luarocks/"); ok {
+		parts := strings.Split(rest, "/")
+		if len(parts) >= 5 && parts[1] == "api" && parts[2] == "1" {
+			parts[3] = "[redacted]"
+			return "/artifactory/api/luarocks/" + strings.Join(parts, "/")
+		}
+	}
+	return path
 }

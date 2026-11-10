@@ -9,17 +9,16 @@
 // # Role
 //
 // access module, core layer: the authenticator. The request middleware in
-// internal/server and the access module's binding of the access/api
+// access/adapters/http and the access module's binding of the access/api
 // Authenticator call it; other modules reach it only through access/api.
 // It also evaluates a request's permissions once (Authorize), carries the
 // principal and its decider in the context (WithAuthorized, DeciderFrom),
 // and seeds the users, group, permissions and build-info repository a
 // fresh instance starts with. The package imports the standard library,
-// golang.org/x/crypto/argon2, the kernel, platform/settings and
-// platform/httpkit/apierror, the module's api, core/authz, core/model and
-// core/port, artifacts/api for the Repositories through which the seed
-// creates the build-info repository, and pkg/store for the store the seed
-// writes everything else to.
+// golang.org/x/crypto/argon2, the kernel, platform/settings, platform/tx
+// (the seed's transaction) and platform/httpkit/apierror, the module's api,
+// core/authz, core/model and core/port, and artifacts/api for the
+// Repositories through which the seed creates the build-info repository.
 //
 // # Inputs
 //
@@ -34,8 +33,10 @@
 //     earlier, or the reference a download envelope carries, with the token
 //     store.
 //   - Authorize: authz.Sources and the principal.
-//   - Seed and SeedHashed: the metadata store, the artifacts module's
-//     Repositories over it, the admin password or its hash, and the time.
+//   - Seed and SeedHashed: a SeedStore (the users, groups, permissions,
+//     settings and transaction the seed writes in), the artifacts module's
+//     Repositories over the same unit of work, the admin password or its
+//     hash, and the time. Seeded needs only the settings.
 //
 // # Outputs
 //

@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -54,7 +55,7 @@ func (s artifactoryService) searchTransitiveAQL(
 	}
 	found, err := s.transitiveAQL(ctx, r, st, p, q)
 	if err != nil {
-		writeErr(w, r, transitiveError(err))
+		httpkit.WriteErr(w, r, transitiveError(err))
 		return
 	}
 	response := q.Response(found.hits)
@@ -64,7 +65,7 @@ func (s artifactoryService) searchTransitiveAQL(
 	body := renderAQL(r, response)
 	if found.revalidate != nil {
 		if err = found.revalidate(ctx); err != nil {
-			writeErr(w, r, transitiveError(err))
+			httpkit.WriteErr(w, r, transitiveError(err))
 			return
 		}
 	}
@@ -306,7 +307,7 @@ func transitiveError(err error) error {
 		errors.Is(err, aql.ErrUnsupported),
 		errors.Is(err, source.ErrInvalidRequest),
 		errors.Is(err, source.ErrUnsupported):
-		return badRequestf("unsupported transitive AQL query or source")
+		return httpkit.BadRequestf("unsupported transitive AQL query or source")
 	case errors.Is(err, source.ErrDenied):
 		return apierror.New(http.StatusForbidden, "transitive AQL access denied")
 	case errors.Is(err, context.DeadlineExceeded):

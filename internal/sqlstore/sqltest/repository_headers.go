@@ -7,9 +7,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/internal/service/roles"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/migration/access/core/roles"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
 )
 
@@ -30,7 +31,12 @@ func RepositoryHeaderEnvironmentRename(t *testing.T, open Opener) {
 func repositoryHeaderEnvironmentRename(t *testing.T, s *sqlcommon.Store) {
 	t.Helper()
 	ctx := t.Context()
-	service := roles.Service{Store: s}
+	// The roles service lists and updates repositories and nothing more, so
+	// the binding needs no key pairs or projects: those serve CheckKeypairs
+	// and CheckEnvironments only. Building them with the access module root
+	// would close an import cycle, as the authenticator's tests import this
+	// package.
+	service := roles.Service{Store: s, Repositories: repos.NewRepositories(s, nil, nil)}
 	headerMust(t, service.CreateEnvironment(ctx, "QA"))
 	config := repo.Config{
 		Key:          "rewrite-headers",

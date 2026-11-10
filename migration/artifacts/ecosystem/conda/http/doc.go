@@ -89,6 +89,6 @@
 //   - shards_test.go: the shard URL confinement and the metadata reader's
 //     bounds.
 //
-// The routes are also tested end to end from the server root
+// The routes are also tested end to end from test/server/artifacts/conda
 // (conda_test.go) and from internal/app (conda_remote_test.go).
 package condahttp

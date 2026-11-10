@@ -17,12 +17,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -460,7 +461,7 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 	c repo.Config, cached bool, req itemRequest, p kernel.Principal, acc access,
 ) {
 	if !acc.file(c, req.path, types.ActionRead) {
-		writeErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	var target *url.URL
@@ -469,7 +470,7 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 	if strings.HasPrefix(name, p2ExternalPrefix+"/") {
 		target, err = s.p2ResolveExternal(r, c, cached, name, p, acc)
 		if err != nil {
-			writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+			httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 			return
 		}
 	}
@@ -477,7 +478,7 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 	if target != nil {
 		_, filename, err = p2ExternalParts(name)
 		if err != nil {
-			writeErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, itemNotFound())
 			return
 		}
 	}
@@ -487,7 +488,7 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 		var err error
 		external, archiveEntry, err = p2ChildResourceURL(target, filename)
 		if err != nil {
-			writeErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, itemNotFound())
 			return
 		}
 	}
@@ -495,13 +496,13 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 	if target != nil && p2.Classify(filename) == p2.KindArtifact {
 		expected, err = s.p2ArtifactChecksums(r, c, cached, name, target, filename, p, acc)
 		if err != nil {
-			writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+			httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 			return
 		}
 	}
 	result, err := s.p2Read(r, c, cached, name, external, archiveEntry, p, acc, expected)
 	if err != nil {
-		writeErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+		httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 		return
 	}
 	body := result.body
@@ -538,7 +539,7 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 			return p2ExternalPrefix + "/" + digest, nil
 		})
 		if err != nil {
-			writeErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
+			httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
 			return
 		}
 	}

@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	format "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/huggingface/xet"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"

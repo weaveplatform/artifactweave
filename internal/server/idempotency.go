@@ -12,6 +12,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -37,7 +38,7 @@ func idempotencyRoutes(next http.Handler) http.Handler {
 				apierror.Write(
 					w,
 					errorProfileFor(r.URL.Path),
-					badRequestf("Idempotency-Key is supported only once, on build append"),
+					httpkit.BadRequestf("Idempotency-Key is supported only once, on build append"),
 				)
 				return
 			}
@@ -48,7 +49,7 @@ func idempotencyRoutes(next http.Handler) http.Handler {
 
 func replayKey(raw string) (string, error) {
 	if len(raw) < 3 || len(raw) > 130 || raw[0] != '"' || raw[len(raw)-1] != '"' {
-		return "", badRequestf(
+		return "", httpkit.BadRequestf(
 			"Idempotency-Key must be a quoted string of 1-128 letters, digits, . _ : or -",
 		)
 	}
@@ -58,7 +59,7 @@ func replayKey(raw string) (string, error) {
 			c == '.' || c == '_' || c == ':' || c == '-' {
 			continue
 		}
-		return "", badRequestf("Idempotency-Key contains an unsupported character")
+		return "", httpkit.BadRequestf("Idempotency-Key contains an unsupported character")
 	}
 	return digestReplay([]byte(key)), nil
 }
@@ -76,7 +77,7 @@ func appendReplayRequest(
 		return request, err
 	}
 	if p.Anonymous || p.Registry != nil || !p.Password && p.TokenID == "" {
-		return request, denied(p)
+		return request, httpkit.Denied(p)
 	}
 	scope, err := json.Marshal(struct {
 		Credential kernel.CredentialReference `json:"credential"`

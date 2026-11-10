@@ -21,6 +21,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 
+	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
@@ -218,14 +219,33 @@ func sortedReview(in []string) []string { sort.Strings(in); return slices.Compac
 
 func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	t.Helper()
-	files, err := filepath.Glob("*.go")
-	if err != nil {
-		t.Fatal(err)
+	// The handlers live in the server root and in the modules' HTTP
+	// adapters, named by their paths from the repository root.
+	root := repopath.Root(t)
+	var files []string
+	for _, dir := range []string{"internal/server", "migration/access/adapters/http"} {
+		found, err := filepath.Glob(filepath.Join(root, dir, "*.go"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, found...)
+	}
+	// The artifactory spec's operations are split over partials
+	// (composites.go); each receiver keys its handlers by its spec.
+	specOf := map[string]string{
+		"artifactoryService": "artifactory",
+		"SecurityAPI":        "artifactory",
+		"systemAPI":          "artifactory",
+		"AccessService":      "access",
 	}
 	out := map[string]apiReviewHandler{}
 	for _, file := range files {
 		if strings.HasSuffix(file, "_test.go") {
 			continue
+		}
+		rel, err := filepath.Rel(root, file)
+		if err != nil {
+			t.Fatal(err)
 		}
 		fset := token.NewFileSet()
 		f, err := parser.ParseFile(fset, file, nil, 0)
@@ -238,7 +258,11 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 				continue
 			}
 			receiver, ok := fn.Recv.List[0].Type.(*ast.Ident)
-			if !ok || receiver.Name != "artifactoryService" && receiver.Name != "accessService" {
+			if !ok {
+				continue
+			}
+			spec, ok := specOf[receiver.Name]
+			if !ok {
 				continue
 			}
 			var calls []string
@@ -250,8 +274,8 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 				}
 				return true
 			})
-			out[strings.TrimSuffix(receiver.Name, "Service")+":"+strings.ToLower(fn.Name.Name)] = apiReviewHandler{
-				Source: "internal/server/" + file + ": " + receiver.Name + "." + fn.Name.Name,
+			out[spec+":"+strings.ToLower(fn.Name.Name)] = apiReviewHandler{
+				Source: filepath.ToSlash(rel) + ": " + receiver.Name + "." + fn.Name.Name,
 				Calls:  sortedReview(calls),
 			}
 		}
@@ -308,7 +332,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	if healthRequest(r) {
 		e.Admission = "health exemption"
 	}
-	if apiRecoveryRequest(r) {
+	if accesshttp.APIRecoveryRequest(r) {
 		e.Admission = "administrator recovery reserve: 2 concurrent and 60/min per process; 5s deadline"
 	}
 	e.Effects = "resource mutation/action; see served contract and handler calls"
@@ -382,14 +406,14 @@ func apiReviewPolicy(e *apiReviewOperation) {
 func apiReviewPersistence(path string) (string, string, []string) {
 	if strings.HasPrefix(path, apiRestrictionPath) || path == apiRestrictionAuditPath {
 		return "restriction", "audit: default100/max1000, sequence DESC strict id<cursor; filter+administrator-bound cursor; other operations singular", []string{
-			"internal/server/api_restrictions.go",
+			"migration/access/adapters/http/api_restrictions.go",
 			"migration/access/adapters/sql/api_restriction.go",
 			"migration/access/adapters/storetest/api_restriction.go",
 		}
 	}
 	if path == "/access/api/v2/users" || path == "/access/api/v2/groups" {
 		return "identity-pages", "GET: default/max1000, indexed name keyset both directions, SQL filters and LIMIT+1; other methods singular mutations; existing name cursor retained", []string{
-			"internal/server/access_identity.go",
+			"migration/access/adapters/http/access_identity.go",
 			"migration/access/adapters/sql/identity_query.go",
 			"migration/access/adapters/storetest/identity_query.go",
 		}
@@ -397,9 +421,9 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	if strings.HasPrefix(path, "/access/") ||
 		strings.HasPrefix(path, "/artifactory/api/security/") {
 		return "identity", "legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service", []string{
-			"internal/server/access_identity.go",
-			"internal/server/tokens.go",
-			"internal/service/identity/identity.go",
+			"migration/access/adapters/http/access_identity.go",
+			"migration/access/adapters/http/tokens.go",
+			"migration/access/core/identity/identity.go",
 			"migration/access/core/token/token.go",
 			"migration/access/adapters/sql/identity.go",
 			"migration/access/adapters/sql/projects.go",
@@ -436,7 +460,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 			return "native-" + protocol, "native wire contract retained: complete indexes, catalog/offset/cursor variants and streaming files differ by route; see family review for exact execution and limits", []string{
 				"docs/research/api-reliability/README.md#native-protocols",
 				"internal/server/server.go",
-				"internal/server/pkgroute/pkgroute.go",
+				"migration/artifacts/adapters/http/pkgroute/pkgroute.go",
 				"migration/artifacts/core/item/item.go",
 				"migration/artifacts/adapters/sql/content_items.go",
 			}

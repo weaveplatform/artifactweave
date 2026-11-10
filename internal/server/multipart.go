@@ -10,8 +10,10 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -26,14 +28,27 @@ const (
 	uploadsAbort    = "/artifactory/api/v1/uploads/abort"
 )
 
+// selfAuthenticated routes verify their own credential, so the middleware
+// passes them untouched: the multipart upload calls carry the upload token
+// as a Bearer token, which only the multipart service can verify until
+// access tokens arrive (P4), and a part PUT carries a signed URL and no
+// credentials at all, as the CLI sends it.
+var selfAuthenticated = map[string]bool{
+	"POST " + uploadsURLPart:  true,
+	"PUT " + uploadsPart:      true,
+	"POST " + uploadsComplete: true,
+	"POST " + uploadsStatus:   true,
+	"POST " + uploadsAbort:    true,
+}
+
 func (s artifactoryService) registerMultipartRoutes(r chi.Router) {
-	r.With(bodyLimit(managementBodyLimit)).Post(uploadsCreate, s.createMultipart)
-	r.With(bodyLimit(managementBodyLimit)).Post(uploadsURLPart, s.multipartPartURL)
+	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsCreate, s.createMultipart)
+	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsURLPart, s.multipartPartURL)
 	// A part is up to 5 GiB: no management body limit.
 	r.Put(uploadsPart, s.putMultipartPart)
-	r.With(bodyLimit(managementBodyLimit)).Post(uploadsComplete, s.completeMultipart)
-	r.With(bodyLimit(managementBodyLimit)).Post(uploadsStatus, s.multipartStatus)
-	r.With(bodyLimit(managementBodyLimit)).Post(uploadsAbort, s.abortMultipart)
+	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsComplete, s.completeMultipart)
+	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsStatus, s.multipartStatus)
+	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsAbort, s.abortMultipart)
 }
 
 func (s artifactoryService) multipartService() (*multipart.Service, error) {
@@ -54,7 +69,7 @@ func (s artifactoryService) multipartError(r *http.Request, op string, err error
 	case errors.Is(err, multipart.ErrBadToken):
 		return kernel.ErrBadCredentials
 	case errors.Is(err, multipart.ErrInvalid):
-		return badRequestf("%s", err.Error())
+		return httpkit.BadRequestf("%s", err.Error())
 	case errors.Is(err, multipart.ErrState):
 		return apierror.New(http.StatusConflict, err.Error())
 	}
@@ -76,28 +91,28 @@ func (s artifactoryService) createMultipart(w http.ResponseWriter, r *http.Reque
 	ctx := r.Context()
 	mp, err := s.multipartService()
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	st, err := s.content()
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	q := r.URL.Query()
 	partSizeMB, perr := strconv.ParseInt(q.Get("partSizeMB"), 10, 64)
 	repoPath := strings.Trim(q.Get("repoPath"), "/")
 	if perr != nil || q.Get("repoKey") == "" || repoPath == "" {
-		writeErr(w, r, badRequestf("repoKey, repoPath and partSizeMB are required"))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("repoKey, repoPath and partSizeMB are required"))
 		return
 	}
 	if _, _, _, err := types.SplitItemPath(repoPath); err != nil {
-		writeErr(w, r, badRequestf("malformed path %q", repoPath))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("malformed path %q", repoPath))
 		return
 	}
 	c, cached, err := resolveRepo(ctx, st, q.Get("repoKey"))
@@ -105,50 +120,50 @@ func (s artifactoryService) createMultipart(w http.ResponseWriter, r *http.Reque
 		c, err = deployTarget(ctx, st, c, cached)
 	}
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "resolve deploy target", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "resolve deploy target", err))
 		return
 	}
 	if !acc.file(c, repoPath, types.ActionWrite) {
-		writeErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	token, err := mp.Create(ctx, c.Key, repoPath, partSizeMB, p.Name)
 	if err != nil {
-		writeErr(w, r, s.multipartError(r, "create multipart upload", err))
+		httpkit.WriteErr(w, r, s.multipartError(r, "create multipart upload", err))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"token": token})
+	httpkit.WriteJSON(w, http.StatusOK, map[string]string{"token": token})
 }
 
 func (s artifactoryService) multipartPartURL(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	part, err := strconv.Atoi(r.URL.Query().Get("partNumber"))
 	if err != nil {
-		writeErr(w, r, badRequestf("partNumber is required"))
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("partNumber is required"))
 		return
 	}
 	ref, err := mp.PartURL(r.Context(), bearer(r), part)
 	if err != nil {
-		writeErr(w, r, s.multipartError(r, "multipart part URL", err))
+		httpkit.WriteErr(w, r, s.multipartError(r, "multipart part URL", err))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"url": baseurl.From(r.Context()) + ref})
+	httpkit.WriteJSON(w, http.StatusOK, map[string]string{"url": baseurl.From(r.Context()) + ref})
 }
 
 func (s artifactoryService) putMultipartPart(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	q := r.URL.Query()
 	part, err := strconv.Atoi(q.Get("partNumber"))
 	if err != nil {
-		writeErr(w, r, kernel.ErrBadCredentials)
+		httpkit.WriteErr(w, r, kernel.ErrBadCredentials)
 		return
 	}
 	if err := mp.PutPart(
@@ -158,7 +173,7 @@ func (s artifactoryService) putMultipartPart(w http.ResponseWriter, r *http.Requ
 		q.Get("signature"),
 		r.Body,
 	); err != nil {
-		writeErr(w, r, s.multipartError(r, "multipart part", err))
+		httpkit.WriteErr(w, r, s.multipartError(r, "multipart part", err))
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -167,11 +182,11 @@ func (s artifactoryService) putMultipartPart(w http.ResponseWriter, r *http.Requ
 func (s artifactoryService) completeMultipart(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	if err := mp.Complete(r.Context(), bearer(r), r.URL.Query().Get("sha1")); err != nil {
-		writeErr(w, r, s.multipartError(r, "complete multipart upload", err))
+		httpkit.WriteErr(w, r, s.multipartError(r, "complete multipart upload", err))
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
@@ -180,25 +195,25 @@ func (s artifactoryService) completeMultipart(w http.ResponseWriter, r *http.Req
 func (s artifactoryService) multipartStatus(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	st, err := mp.Status(r.Context(), bearer(r))
 	if err != nil {
-		writeErr(w, r, s.multipartError(r, "multipart upload status", err))
+		httpkit.WriteErr(w, r, s.multipartError(r, "multipart upload status", err))
 		return
 	}
-	writeJSON(w, http.StatusOK, st)
+	httpkit.WriteJSON(w, http.StatusOK, st)
 }
 
 func (s artifactoryService) abortMultipart(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
-		writeErr(w, r, err)
+		httpkit.WriteErr(w, r, err)
 		return
 	}
 	if err := mp.Abort(r.Context(), bearer(r)); err != nil {
-		writeErr(w, r, s.multipartError(r, "abort multipart upload", err))
+		httpkit.WriteErr(w, r, s.multipartError(r, "abort multipart upload", err))
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

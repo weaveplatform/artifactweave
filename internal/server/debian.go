@@ -10,13 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -41,7 +42,7 @@ func (s artifactoryService) tryDebianItem(
 			debian.PackagesIndexPath(req.path) || byHash {
 			s.serveVirtualDebianMetadata(w, r, st, c, req, p, acc)
 		} else {
-			writeErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, itemNotFound())
 		}
 		return true
 	}
@@ -63,17 +64,17 @@ func (s artifactoryService) serveDebianIndex(
 ) {
 	ctx := r.Context()
 	if len(req.props) != 0 || r.URL.RawQuery != "" {
-		writeErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	if !acc.folder(c, req.path, types.ActionRead) ||
 		!acc.file(c, req.path, types.ActionRead) ||
 		generic.CheckDownload(c, req.path, false) != nil {
-		writeErr(w, r, denied(p))
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	if cached && c.Class != repo.Remote {
-		writeErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, itemNotFound())
 		return
 	}
 	var body []byte
@@ -124,11 +125,11 @@ func (s artifactoryService) serveDebianIndex(
 		err = store.ErrNotFound
 	}
 	if err != nil {
-		writeErr(w, r, s.itemError(ctx, "Debian Packages index", err))
+		httpkit.WriteErr(w, r, s.itemError(ctx, "Debian Packages index", err))
 		return
 	}
 	if len(body) > debianIndexLimit {
-		writeErr(
+		httpkit.WriteErr(
 			w,
 			r,
 			s.internalError(ctx, "Debian Packages index", errDebianIndexTooLarge),
@@ -137,21 +138,21 @@ func (s artifactoryService) serveDebianIndex(
 	}
 	paths, err := debianIndexPaths(req.path, body)
 	if err != nil {
-		writeErr(w, r, s.internalError(ctx, "Debian index", err))
+		httpkit.WriteErr(w, r, s.internalError(ctx, "Debian index", err))
 		return
 	}
 	for _, path := range paths {
 		if !acc.file(c, path, types.ActionRead) ||
 			generic.CheckDownload(c, path, false) != nil {
-			writeErr(w, r, denied(p))
+			httpkit.WriteErr(w, r, httpkit.Denied(p))
 			return
 		}
 		if checkRead != nil {
 			if err := checkRead(ctx, path); err != nil {
 				if errors.Is(err, source.ErrDenied) {
-					writeErr(w, r, denied(p))
+					httpkit.WriteErr(w, r, httpkit.Denied(p))
 				} else {
-					writeErr(w, r, s.itemError(ctx, "Debian package read authority", err))
+					httpkit.WriteErr(w, r, s.itemError(ctx, "Debian package read authority", err))
 				}
 				return
 			}

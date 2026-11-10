@@ -7,6 +7,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 )
 
 // Stored shards and CAS containers can span several read grants. Their native
@@ -17,7 +18,7 @@ func (artifactoryService) tryCondaItem(
 	if !protocolPrivateItem(c, req.path) {
 		return false
 	}
-	writeErr(w, r, itemNotFound())
+	httpkit.WriteErr(w, r, itemNotFound())
 	return true
 }
 

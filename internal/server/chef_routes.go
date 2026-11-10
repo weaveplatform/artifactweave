@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
@@ -15,7 +16,7 @@ func (s artifactoryService) registerChefReindex(r chi.Router) {
 			apierror.Write(
 				w,
 				apierror.ProfileArtifactory,
-				badRequestf("Chef reindex does not accept query parameters"),
+				httpkit.BadRequestf("Chef reindex does not accept query parameters"),
 			)
 			return
 		}

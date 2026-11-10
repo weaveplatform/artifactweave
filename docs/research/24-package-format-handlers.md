@@ -67,13 +67,13 @@ Helm, Terraform registry and Terraform backend handlers. The backend has separat
 state/lock semantics in `internal/service/terraformstate` and
 `internal/server/terraformbackend`.
 
-`internal/server/pkgroute` mounts the package protocols, enforces repository class
-and permissions, supports host-root discovery and multipart uploads, and uses the
-ordinary item download path. `internal/server/reindex.go` wires the implemented
-formats' reindex operations through the persistent work queue; they are no longer
-the baseline's blanket 501 stubs. `formattest` proves rebuilding from the item tree,
-and `test/acceptance/features/package_wiring.feature` proves the REST lifecycle
-across the P7 and P8 formats.
+`migration/artifacts/adapters/http/pkgroute` mounts the package protocols, enforces
+repository class and permissions, supports host-root discovery and multipart uploads,
+and uses the ordinary item download path. `internal/server/reindex.go` wires the
+implemented formats' reindex operations through the persistent work queue; they are
+no longer the baseline's blanket 501 stubs. `formattest` proves rebuilding from the
+item tree, and `test/acceptance/features/package_wiring.feature` proves the REST
+lifecycle across the P7 and P8 formats.
 
 The source abstraction now serves P9 remote package protocol adapters; final P9
 qualification remains in the [sign-off ledger](../testing/phase9-signoff.md). Virtual

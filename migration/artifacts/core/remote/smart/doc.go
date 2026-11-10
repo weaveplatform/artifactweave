@@ -91,15 +91,20 @@
 // # Testing
 //
 //   - smart_test.go: property refresh and ownership, statistics claims,
-//     origin absence, the flags, authority rechecks and the status document.
-//   - smart_durable_test.go: retries, capacity, lost acknowledgements,
-//     observation order, discovery throttling, no-store and credential
-//     revisions across the durable queue.
+//     origin absence, the flags, authority rechecks, the status document
+//     (unreadable state, items gone, registry work), and reads that fail
+//     closed when their options moved or their refresh state is missing or
+//     fails.
+//   - smart_durable_test.go: retries, capacity shared with peer work, lost
+//     acknowledgements, observation order, discovery throttling, no-store
+//     and credential revisions across the durable queue; enqueue and queued
+//     job refusals, refresh publication and held-off statistics.
 //   - smart_fault_test.go: discovery protocol failures, shared discovery,
 //     property document admission, the metadata target and redirect fence,
-//     and the loop bound.
-//   - smart_aql_test.go: the transient authenticated AQL POST and its
-//     admission, failure and boundary cases.
+//     and the loop bound; its store and pool fakes drive the peer request,
+//     discovery, storage and upload paths that fail closed.
+//   - smart_aql_test.go: the transient authenticated AQL POST, its query
+//     preflight, and its admission, failure and boundary cases.
 //   - smart_listing_test.go: Smart listings through real discovery and the
 //     cache fences.
 //   - smart_registry_test.go (package smart_test): the registry grant and

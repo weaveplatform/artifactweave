@@ -19,7 +19,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/instance"
 	"github.com/weaveplatform/artifactweave/migration/platform/settings"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
@@ -45,7 +44,7 @@ func newStore(t *testing.T) *inmem.Store {
 	return db
 }
 
-func newService(t *testing.T, db store.Store, c *clock) *Service {
+func newService(t *testing.T, db Store, c *clock) *Service {
 	t.Helper()
 	s, err := New(context.Background(), db, Options{Now: c.now, KeyBits: testBits})
 	if err != nil {

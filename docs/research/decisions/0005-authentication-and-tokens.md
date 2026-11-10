@@ -773,9 +773,9 @@ source states are inferred and listed on
   route refuses the password, the legacy route and `jf c add` with a password still work, and
   the token from the legacy route creates one through the Access route.
 - `artifactory_scoped_token` and `platform_permission` Terraform acceptance.
-- OIDC: `internal/service/oidc` and `internal/auth/idtoken` tests against a fake issuer
-  (`idtokentest`), including every dynamic mapping example on the integration page;
-  `TestAccOIDCDynamicMappings`, which follows a narrowed token to what it may read;
+- OIDC: `migration/access/core/oidc` and `migration/access/core/idtoken` tests against a
+  fake issuer (`idtokentest`), including every dynamic mapping example on the integration
+  page; `TestAccOIDCDynamicMappings`, which follows a narrowed token to what it may read;
   `oidc.feature`, where the real `jf eot` exchanges a token and downloads with it, also
   through a dynamic mapping narrowed to one repository;
   `deploy/artifactweave/terraform/oidc` in the `terraform` job.

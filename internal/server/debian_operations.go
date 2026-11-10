@@ -7,6 +7,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 )
 
 // CalculateDebianRepositoryMetadata rebuilds a local apt view. The REST
@@ -17,7 +18,7 @@ func (s artifactoryService) CalculateDebianRepositoryMetadata(
 	req artgen.CalculateDebianRepositoryMetadataRequestObject,
 ) (artgen.CalculateDebianRepositoryMetadataResponseObject, error) {
 	if req.Params.WriteProps != nil && !req.Params.WriteProps.Valid() {
-		return nil, badRequestf("Invalid writeProps value")
+		return nil, httpkit.BadRequestf("Invalid writeProps value")
 	}
 	async := req.Params.Async != nil && *req.Params.Async
 	writeProps := req.Params.WriteProps == nil ||

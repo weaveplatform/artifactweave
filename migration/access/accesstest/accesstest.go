@@ -14,7 +14,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/instance"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -46,6 +45,17 @@ var identity = instance.InstanceIdentity{
 // importing access internals.
 var ErrLoginSuspended = authn.ErrLoginSuspended
 
+// Store is what the kit builds the access module over: the module's Store
+// plus the instance identity its token service names as its issuer. The
+// in-memory store New makes satisfies it, as does a test's own store
+// aggregate; every call joins the transaction ctx carries.
+type Store interface {
+	access.Store
+	// Instance holds the instance identity, which WithTokens stores when
+	// there is none.
+	Instance() instance.InstanceStore
+}
+
 // Kit is the access module a running server would build, over one store: the
 // real authenticator, permission evaluator and, with WithTokens, token
 // service, bound through access.New as app binds them. Its methods may be
@@ -53,7 +63,7 @@ var ErrLoginSuspended = authn.ErrLoginSuspended
 // which fails the test.
 type Kit struct {
 	tb     testing.TB
-	st     store.Store
+	st     Store
 	api    accessapi.API
 	tokens *token.Service
 }
@@ -113,7 +123,7 @@ func New(tb testing.TB, opts ...Option) *Kit {
 // API().Tokens is nil, as in most route tests. Over fails tb with Fatal when
 // the module cannot be built, so it must be called from the goroutine
 // running the test.
-func Over(tb testing.TB, st store.Store, opts ...Option) *Kit {
+func Over(tb testing.TB, st Store, opts ...Option) *Kit {
 	tb.Helper()
 	var o options
 	for _, opt := range opts {
@@ -146,7 +156,7 @@ func Over(tb testing.TB, st store.Store, opts ...Option) *Kit {
 
 // newTokens builds the token service over st, which refuses to start without
 // an instance identity.
-func newTokens(ctx context.Context, st store.Store, now func() time.Time) (*token.Service, error) {
+func newTokens(ctx context.Context, st Store, now func() time.Time) (*token.Service, error) {
 	_, err := st.Instance().Get(ctx)
 	if errors.Is(err, kernel.ErrNotFound) {
 		err = st.Instance().Init(ctx, identity)
@@ -170,7 +180,7 @@ func fatalIf(tb testing.TB, err error) {
 
 // Store returns the store the kit was built over: New's fresh in-memory
 // store, or the one the test passed to Over.
-func (k *Kit) Store() store.Store { return k.st }
+func (k *Kit) Store() Store { return k.st }
 
 // API returns the module's published surface, as API() of the module app
 // builds: every access/api contract bound over the store, Tokens nil without

@@ -66,7 +66,7 @@
       ]
     },
     {
-      "path": "internal/server/vcs_routes_test.go",
+      "path": "test/server/artifacts/vcs/vcs_routes_test.go",
       "contains": [
         "TestAccVCSRemoteRESTAndSubgroup",
         "native curl archive request"
@@ -83,7 +83,7 @@
       ]
     },
     {
-      "path": "internal/server/vcs_legacy_test.go",
+      "path": "test/server/artifacts/vcs/vcs_legacy_test.go",
       "contains": [
         "TestAccVCSLegacyResolvesCommitAndRejectsRedirectChanges",
         "TestAccVCSPeerBoundsCombinedTagAndBranchCounts"
@@ -122,7 +122,7 @@
       ]
     },
     {
-      "path": "internal/server/vcs_delivery_test.go",
+      "path": "test/server/artifacts/vcs/vcs_delivery_test.go",
       "contains": [
         "TestAccVCSCustomRootlessFilePrecedesNestedBasename",
         "TestAccVCSPeerFileUsageRequiresSuccessfulDelivery"

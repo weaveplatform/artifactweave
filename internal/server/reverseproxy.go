@@ -8,6 +8,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 )
 
@@ -19,7 +20,7 @@ import (
 // needs (decision 0003): SUBDOMAIN when docker.subdomain_match is on and
 // REPOPATHPREFIX otherwise, with serverName the base URL's host and, for
 // subdomains, its wildcard.
-func (s artifactoryService) GetReverseProxyConfiguration(
+func (s systemAPI) GetReverseProxyConfiguration(
 	ctx context.Context,
 	_ artgen.GetReverseProxyConfigurationRequestObject,
 ) (artgen.GetReverseProxyConfigurationResponseObject, error) {
@@ -53,7 +54,7 @@ func methodAndPorts(
 }
 
 // reverseProxy describes this server as the reverse proxy settings.
-func (s artifactoryService) reverseProxy(
+func (s systemAPI) reverseProxy(
 	ctx context.Context,
 ) artgen.GetReverseProxyConfiguration200JSONResponse {
 	base := s.cfg.BaseURL
@@ -66,16 +67,16 @@ func (s artifactoryService) reverseProxy(
 	}
 	method := artgen.REPOPATHPREFIX
 	body := artgen.GetReverseProxyConfiguration200JSONResponse{
-		Key:                      ptrTo("nginx"),
-		WebServerType:            ptrTo(artgen.NGINX),
-		ArtifactoryAppContext:    ptrTo("artifactory"),
-		PublicAppContext:         ptrTo("artifactory"),
-		ServerName:               ptrTo(host),
+		Key:                      httpkit.PtrTo("nginx"),
+		WebServerType:            httpkit.PtrTo(artgen.NGINX),
+		ArtifactoryAppContext:    httpkit.PtrTo("artifactory"),
+		PublicAppContext:         httpkit.PtrTo("artifactory"),
+		ServerName:               httpkit.PtrTo(host),
 		DockerReverseProxyMethod: &method,
 	}
 	if s.cfg.DockerSubdomainMatch {
 		method = artgen.SUBDOMAIN
-		body.ServerNameExpression = ptrTo("*." + host)
+		body.ServerNameExpression = httpkit.PtrTo("*." + host)
 	}
 	return body
 }

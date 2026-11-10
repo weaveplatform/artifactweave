@@ -6,6 +6,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 )
 
 // TestAccMethodAndPorts: a user who is no administrator keeps the Docker
@@ -14,31 +15,31 @@ import (
 func TestAccMethodAndPorts(t *testing.T) {
 	method := artgen.SUBDOMAIN
 	full := artgen.GetReverseProxyConfiguration200JSONResponse{
-		Key:                      ptrTo("nginx"),
-		WebServerType:            ptrTo(artgen.NGINX),
-		ArtifactoryAppContext:    ptrTo("artifactory"),
-		PublicAppContext:         ptrTo("artifactory"),
-		ServerName:               ptrTo("reg.example.com"),
-		ServerNameExpression:     ptrTo("*.reg.example.com"),
-		ArtifactoryServerName:    ptrTo("localhost"),
-		SslCertificate:           ptrTo("/etc/ssl/reg.crt"),
-		SslKey:                   ptrTo("/etc/ssl/reg.key"),
+		Key:                      httpkit.PtrTo("nginx"),
+		WebServerType:            httpkit.PtrTo(artgen.NGINX),
+		ArtifactoryAppContext:    httpkit.PtrTo("artifactory"),
+		PublicAppContext:         httpkit.PtrTo("artifactory"),
+		ServerName:               httpkit.PtrTo("reg.example.com"),
+		ServerNameExpression:     httpkit.PtrTo("*.reg.example.com"),
+		ArtifactoryServerName:    httpkit.PtrTo("localhost"),
+		SslCertificate:           httpkit.PtrTo("/etc/ssl/reg.crt"),
+		SslKey:                   httpkit.PtrTo("/etc/ssl/reg.key"),
 		DockerReverseProxyMethod: &method,
-		ArtifactoryPort:          ptrTo(8081),
-		HttpPort:                 ptrTo(80),
-		HttpsPort:                ptrTo(443),
-		SslPort:                  ptrTo(443),
-		UseHttp:                  ptrTo(true),
-		UseHttps:                 ptrTo(true),
+		ArtifactoryPort:          httpkit.PtrTo(8081),
+		HttpPort:                 httpkit.PtrTo(80),
+		HttpsPort:                httpkit.PtrTo(443),
+		SslPort:                  httpkit.PtrTo(443),
+		UseHttp:                  httpkit.PtrTo(true),
+		UseHttps:                 httpkit.PtrTo(true),
 	}
 	want := artgen.GetReverseProxyConfiguration200JSONResponse{
 		DockerReverseProxyMethod: &method,
-		ArtifactoryPort:          ptrTo(8081),
-		HttpPort:                 ptrTo(80),
-		HttpsPort:                ptrTo(443),
-		SslPort:                  ptrTo(443),
-		UseHttp:                  ptrTo(true),
-		UseHttps:                 ptrTo(true),
+		ArtifactoryPort:          httpkit.PtrTo(8081),
+		HttpPort:                 httpkit.PtrTo(80),
+		HttpsPort:                httpkit.PtrTo(443),
+		SslPort:                  httpkit.PtrTo(443),
+		UseHttp:                  httpkit.PtrTo(true),
+		UseHttps:                 httpkit.PtrTo(true),
 	}
 	if diff := cmp.Diff(want, methodAndPorts(full)); diff != "" {
 		t.Fatalf("(-want +got):\n%s", diff)

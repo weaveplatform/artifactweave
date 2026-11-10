@@ -10,6 +10,7 @@ import (
 	npmhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm/http"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 )
@@ -39,6 +40,10 @@ func npmUserPath(escaped string) bool {
 	return ok && key != "" && strings.HasPrefix(after, "-/user/")
 }
 
+// npmUserRequest is npmUserPath of r's escaped path, the skip
+// accesshttp.Authenticate asks first.
+func npmUserRequest(r *http.Request) bool { return npmUserPath(r.URL.EscapedPath()) }
+
 // npmOperation reports whether path is one of the JFrog operations that
 // answer npm's configuration, which answer errors in the Artifactory
 // envelope, {"errors":[...]}, as 7.x does (RTFACT-30181), where the
@@ -52,17 +57,11 @@ func npmOperation(path string) bool {
 	return rest == "auth" || len(segs) == 3 && segs[0] != "" && segs[1] == "auth" && segs[2] != ""
 }
 
-// loggedPath is path as the access log records it: the token a logout's
-// path names is a credential, which must not reach the log. A token that
-// cannot be revoked outlives the logout, and the log outlives both.
-func loggedPath(path string) string {
-	if rest, ok := strings.CutPrefix(path, "/artifactory/api/luarocks/"); ok {
-		parts := strings.Split(rest, "/")
-		if len(parts) >= 5 && parts[1] == "api" && parts[2] == "1" {
-			parts[3] = "[redacted]"
-			return "/artifactory/api/luarocks/" + strings.Join(parts, "/")
-		}
-	}
+// npmLoggedPath is path as the access log records it: the token a
+// logout's path names is a credential, which must not reach the log. A
+// token that cannot be revoked outlives the logout, and the log outlives
+// both. Any other path comes back unchanged.
+func npmLoggedPath(path string) string {
 	const marker = "/-/user/token/"
 	if i := strings.Index(path, marker); i >= 0 && strings.HasPrefix(path, npmAPI) {
 		return path[:i+len(marker)] + "[redacted]"
@@ -156,11 +155,11 @@ func (s artifactoryService) GetNpmScopeAuth(
 	case err != nil:
 		return nil, s.itemError(ctx, "resolve repository", err)
 	case cached || rc.PackageType != repo.NPM:
-		return nil, badRequestf("Repository '%s' is not an npm repository", req.RepoKey)
+		return nil, httpkit.BadRequestf("Repository '%s' is not an npm repository", req.RepoKey)
 	}
 	scope := strings.TrimPrefix(req.Scope, "@")
 	if !npmhttp.ValidScope(scope) {
-		return nil, badRequestf("'%s' is not an npm scope", req.Scope)
+		return nil, httpkit.BadRequestf("'%s' is not an npm scope", req.Scope)
 	}
 	registry := baseurl.From(ctx) + npmAPI + url.PathEscape(rc.Key) + "/"
 	return artgen.GetNpmScopeAuth200TextResponse(npmhttp.ScopeAuthLines(scope, registry, c)), nil

@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -49,7 +50,7 @@ func (r *searchRun) upstreamSearch(
 	if !enabled || r.s.cfg.RemoteSources == nil {
 		return nil
 	}
-	u := &upstreamSearch{r: r, ls: ls, g: deref(g), a: deref(a)}
+	u := &upstreamSearch{r: r, ls: ls, g: httpkit.Deref(g), a: httpkit.Deref(a)}
 	u.prepareRoutes(repos)
 	return u
 }
@@ -210,21 +211,22 @@ func (u *upstreamSearch) allowed(key, full string, folder bool) bool {
 // send remote=0/1. Keep that explicit override without synthesizing storage
 // records for bytes that have never been downloaded.
 func gavcRemote(ctx context.Context, specific bool, g, a *string) (bool, error) {
-	query, err := rawQuery(rawSearchQuery(ctx))
+	query, err := rawQuery(httpkit.RawSearchQuery(ctx))
 	if err != nil {
 		return false, err
 	}
 	remote := query.Get("remote")
 	if remote != "" && remote != "0" && remote != "1" {
-		return false, badRequestf("remote must be 0 or 1")
+		return false, httpkit.BadRequestf("remote must be 0 or 1")
 	}
 	if remote == "1" && !specific {
-		return false, badRequestf("remote GAVC search requires specific=true")
+		return false, httpkit.BadRequestf("remote GAVC search requires specific=true")
 	}
 	enabled := specific && remote != "0"
-	if enabled && (deref(g) == "" || deref(a) == "" || hasWildcard(deref(g)+deref(a))) {
+	if enabled &&
+		(httpkit.Deref(g) == "" || httpkit.Deref(a) == "" || hasWildcard(httpkit.Deref(g)+httpkit.Deref(a))) {
 		if remote == "1" {
-			return false, badRequestf("remote GAVC search requires exact g and a")
+			return false, httpkit.BadRequestf("remote GAVC search requires exact g and a")
 		}
 		return false, nil
 	}
