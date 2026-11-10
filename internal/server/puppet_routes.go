@@ -42,7 +42,7 @@ func (s artifactoryService) registerPuppetMetadataRoutes(r chi.Router) {
 				)
 				return
 			}
-			_, err := s.reindex(
+			_, err := s.Reindex(
 				r.Context(),
 				repo.Puppet,
 				chi.URLParam(r, "repoKey"),

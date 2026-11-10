@@ -35,7 +35,7 @@ var withPrincipalSites = []string{
 	// The remote reindex stores the caller it has just rechecked without a
 	// decider, so that the repository check that follows evaluates that
 	// caller's current permissions rather than the request's.
-	"internal/server/reindex.go",
+	"internal/server/reindex_itemkit.go",
 }
 
 // withPrincipalRule ends every problem: what to use instead.
@@ -72,7 +72,7 @@ func v(ctx context.Context, p kernel.Principal) {
 		"go.mod":                                 "module github.com/weaveplatform/artifactweave\n",
 		"internal/auth/bridge_kernel.go":         uses,
 		"migration/access/api/context.go":        uses,
-		"internal/server/reindex.go":             uses,
+		"internal/server/reindex_itemkit.go":     uses,
 		"internal/server/handler_test.go":        uses,
 		"migration/kernel/context_test.go":       uses,
 		"internal/server/testdata/x.go":          uses,

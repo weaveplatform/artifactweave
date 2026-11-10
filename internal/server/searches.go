@@ -128,7 +128,7 @@ type searchRun struct {
 	s       artifactoryService
 	st      store.Store
 	p       kernel.Principal
-	acc     access
+	acc     Access
 	configs map[string]repo.Config
 	repos   aql.Repositories
 	now     time.Time
@@ -137,7 +137,7 @@ type searchRun struct {
 // newSearch starts a search. named refuses anonymous callers with 401, for
 // the searches JFrog documents as needing a non-anonymous user.
 func (s artifactoryService) newSearch(ctx context.Context, named bool) (*searchRun, error) {
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
@@ -149,13 +149,13 @@ func (s artifactoryService) newSearch(ctx context.Context, named bool) (*searchR
 		return nil, err //nolint:wrapcheck // apierror values, rendered by status
 	}
 	d, _ := accessapi.DeciderFrom(ctx)
-	acc, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
+	acc, err := AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
-		return nil, s.internalError(ctx, "search permissions", err)
+		return nil, s.InternalError(ctx, "search permissions", err)
 	}
 	configs, err := repoConfigs(ctx, st)
 	if err != nil {
-		return nil, s.internalError(ctx, "search repositories", err)
+		return nil, s.InternalError(ctx, "search repositories", err)
 	}
 	return &searchRun{
 		s: s, st: st, p: p, acc: acc, configs: configs, repos: aqlRepositories(configs),
@@ -204,7 +204,7 @@ func (r *searchRun) collect(
 		q.Resolve(r.repos)
 		hits, err := r.st.Items().Search(ctx, q, aql.Options{Now: r.now})
 		if err != nil {
-			return nil, r.s.internalError(ctx, "search", err)
+			return nil, r.s.InternalError(ctx, "search", err)
 		}
 		read := len(hits)
 		if !r.p.Admin {
@@ -215,7 +215,7 @@ func (r *searchRun) collect(
 				r.configs,
 				hits,
 			); err != nil {
-				return nil, r.s.internalError(ctx, "search permissions", err)
+				return nil, r.s.InternalError(ctx, "search permissions", err)
 			}
 		}
 		for _, h := range hits {
@@ -267,7 +267,7 @@ func (r *searchRun) repoScope(repos *string, virtual bool) (scope aql.Node, miss
 			continue
 		// Permissions name no virtual repository, so a virtual key is
 		// not checked here: readable drops what the caller may not read.
-		case c.Class != repo.Virtual && !r.acc.visible(c):
+		case c.Class != repo.Virtual && !r.acc.Visible(c):
 			missing = append(missing, key)
 			continue
 		}
@@ -364,9 +364,9 @@ func (r *searchRun) entries(
 				s: r.s, st: r.st, key: h.Item.ReportedRepoKey(), repo: c,
 				isCached: h.Item.Cached, acc: r.acc,
 			}
-			_, body, err := v.info(ctx, found{repo: c, item: h.Item})
+			_, body, err := v.info(ctx, Found{Repo: c, Item: h.Item})
 			if err != nil {
-				return nil, r.s.internalError(ctx, "search result info", err)
+				return nil, r.s.InternalError(ctx, "search result info", err)
 			}
 			e, _ = body.(map[string]any)
 		}
@@ -615,7 +615,7 @@ func (s artifactoryService) SearchCreation(
 	}
 	scope, missing := r.repoScope(req.Params.Repos, false)
 	if len(missing) > 0 {
-		return nil, notFoundRepo(missing[0])
+		return nil, NotFoundRepo(missing[0])
 	}
 	hits, err := r.collect(ctx, all(files(), scope, within(aql.FieldCreated, from, to)), nil,
 		r.userLimit(), nil)

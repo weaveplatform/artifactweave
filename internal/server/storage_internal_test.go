@@ -37,7 +37,7 @@ func TestUnitStoragePermissionsRenderGrants(t *testing.T) {
 		return users, map[string]accessapi.Actions{"readers": types.ActionRead}, nil
 	}}
 	v := storageView{
-		s:   artifactoryService{cfg: Config{Access: accessapi.API{Grants: grants}}},
+		s:   newArtifactoryService(Config{Access: accessapi.API{Grants: grants}}),
 		key: "libs",
 	}
 	item := types.Item{RepoKey: "libs", Path: "dir", Name: "a.txt"}
@@ -54,7 +54,7 @@ func TestUnitStoragePermissionsRenderGrants(t *testing.T) {
 		repo.Remote:    {"libs", types.TargetAny, types.TargetAnyRemote},
 		repo.Virtual:   {"libs", types.TargetAny},
 	} {
-		f := found{repo: repo.Config{Key: "libs", Class: class}, item: item}
+		f := Found{Repo: repo.Config{Key: "libs", Class: class}, Item: item}
 		media, body, err := v.permissions(t.Context(), f)
 		if err != nil || media != "application/json" || !reflect.DeepEqual(body, want) {
 			t.Errorf("%s: %q, %v, %v; want %v", class, media, body, err, want)
@@ -68,7 +68,7 @@ func TestUnitStoragePermissionsRenderGrants(t *testing.T) {
 	) (map[string]accessapi.Actions, map[string]accessapi.Actions, error) {
 		return nil, nil, errBoom
 	}
-	f := found{repo: repo.Config{Key: "libs", Class: repo.Local}, item: item}
+	f := Found{Repo: repo.Config{Key: "libs", Class: repo.Local}, Item: item}
 	if _, _, err := v.permissions(t.Context(), f); !errors.Is(err, errBoom) ||
 		err.Error() != errBoom.Error() {
 		t.Errorf("a Grants error: %v, want it as Grants gave it", err)

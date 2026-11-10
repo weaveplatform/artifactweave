@@ -37,42 +37,47 @@ type rpmCandidate struct {
 	pkg  rpm.Package
 }
 
-func (s artifactoryService) tryRPMItem(
-	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p kernel.Principal, acc access,
+// rpmAPI serves the RPM virtual repositories' metadata and packages over
+// the item kit.
+type rpmAPI struct{ *Kit }
+
+func tryRPMItem(
+	k *Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	cached bool, req ItemRequest, p kernel.Principal, acc Access,
 ) bool {
-	if c.PackageType != repo.RPM || c.Class != repo.Virtual || cached || req.isFolder {
+	s := rpmAPI{k}
+	if c.PackageType != repo.RPM || c.Class != repo.Virtual || cached || req.IsFolder {
 		return false
 	}
-	if strings.Contains(req.path, "repodata/") {
+	if strings.Contains(req.Path, "repodata/") {
 		s.serveVirtualRPMMetadata(w, r, st, c, req, p, acc)
 		return true
 	}
-	if strings.HasSuffix(req.path, ".rpm") {
+	if strings.HasSuffix(req.Path, ".rpm") {
 		s.serveVirtualRPMPackage(w, r, st, c, req, p, acc)
 		return true
 	}
 	return false
 }
 
-func (s artifactoryService) serveVirtualRPMMetadata(
+func (s rpmAPI) serveVirtualRPMMetadata(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	req itemRequest, p kernel.Principal, acc access,
+	req ItemRequest, p kernel.Principal, acc Access,
 ) {
-	root, name, ok := strings.Cut(req.path, "repodata/")
-	if !ok || name == "" || strings.Contains(name, "/") || len(req.props) != 0 ||
+	root, name, ok := strings.Cut(req.Path, "repodata/")
+	if !ok || name == "" || strings.Contains(name, "/") || len(req.Props) != 0 ||
 		r.URL.RawQuery != "" {
-		httpkit.WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
-	if !acc.folder(c, req.path, types.ActionRead) || !acc.file(c, req.path, types.ActionRead) ||
-		generic.CheckDownload(c, req.path, false) != nil {
+	if !acc.Folder(c, req.Path, types.ActionRead) || !acc.File(c, req.Path, types.ActionRead) ||
+		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	candidates, err := s.rpmCandidates(r.Context(), st, c, root, p, acc, map[string]bool{})
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(r.Context(), "RPM virtual members", err))
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM virtual members", err))
 		return
 	}
 	packages := make([]rpm.Package, 0, len(candidates))
@@ -81,21 +86,21 @@ func (s artifactoryService) serveVirtualRPMMetadata(
 	}
 	meta, err := rpm.EncodeMetadata(packages, root, time.Unix(0, 0))
 	if err != nil {
-		httpkit.WriteErr(w, r, s.internalError(r.Context(), "RPM virtual metadata", err))
+		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "RPM virtual metadata", err))
 		return
 	}
-	if err := signVirtualRPM(r.Context(), s.cfg.Access.Keys, c, meta.Files); err != nil {
-		httpkit.WriteErr(w, r, s.internalError(r.Context(), "RPM virtual signature", err))
+	if err := signVirtualRPM(r.Context(), s.Access.Keys, c, meta.Files); err != nil {
+		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "RPM virtual signature", err))
 		return
 	}
 	body, ok := meta.Files["repodata/"+name]
 	if !ok {
-		httpkit.WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
-	sw := &statusWriter{ResponseWriter: w}
+	sw := &StatusWriter{ResponseWriter: w}
 	http.ServeContent(sw, r, name, time.Time{}, bytes.NewReader(body))
-	_ = sw.complete(r)
+	_ = sw.Complete(r)
 }
 
 func signVirtualRPM(
@@ -123,78 +128,78 @@ func signVirtualRPM(
 	return nil
 }
 
-func (s artifactoryService) serveVirtualRPMPackage(
+func (s rpmAPI) serveVirtualRPMPackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	req itemRequest, p kernel.Principal, acc access,
+	req ItemRequest, p kernel.Principal, acc Access,
 ) {
-	if len(req.props) != 0 || r.URL.RawQuery != "" {
-		httpkit.WriteErr(w, r, itemNotFound())
+	if len(req.Props) != 0 || r.URL.RawQuery != "" {
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
-	if !acc.folder(c, req.path, types.ActionRead) || !acc.file(c, req.path, types.ActionRead) ||
-		generic.CheckDownload(c, req.path, false) != nil {
+	if !acc.Folder(c, req.Path, types.ActionRead) || !acc.File(c, req.Path, types.ActionRead) ||
+		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	root := ""
 	if c.YumRootDepth != nil && *c.YumRootDepth > 0 {
-		parts := strings.Split(req.path, "/")
+		parts := strings.Split(req.Path, "/")
 		if len(parts) <= *c.YumRootDepth {
-			httpkit.WriteErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, ItemNotFound())
 			return
 		}
 		root = strings.Join(parts[:*c.YumRootDepth], "/") + "/"
 	}
 	candidates, err := s.rpmCandidates(r.Context(), st, c, root, p, acc, map[string]bool{})
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(r.Context(), "RPM virtual members", err))
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM virtual members", err))
 		return
 	}
 	for _, candidate := range candidates {
-		if candidate.pkg.Path != req.path {
+		if candidate.pkg.Path != req.Path {
 			continue
 		}
 		if candidate.repo.Class == repo.Remote {
 			s.serveVirtualRemoteRPMPackage(w, r, candidate.repo, req, candidate.pkg.SHA256, p, acc)
 			return
 		}
-		it, err := st.Items().Get(r.Context(), candidate.repo.Key, false, req.path)
+		it, err := st.Items().Get(r.Context(), candidate.repo.Key, false, req.Path)
 		if err != nil {
-			httpkit.WriteErr(w, r, s.itemError(r.Context(), "RPM virtual package", err))
+			httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM virtual package", err))
 			return
 		}
 		if it.Folder || it.Actual.SHA256 != candidate.pkg.SHA256 {
-			httpkit.WriteErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, ItemNotFound())
 			return
 		}
-		s.serveFile(w, r, st, found{repo: candidate.repo, item: it}, p)
+		s.ServeFile(w, r, st, Found{Repo: candidate.repo, Item: it}, p)
 		return
 	}
-	httpkit.WriteErr(w, r, itemNotFound())
+	httpkit.WriteErr(w, r, ItemNotFound())
 }
 
-func (s artifactoryService) serveVirtualRemoteRPMPackage(
-	w http.ResponseWriter, r *http.Request, c repo.Config, req itemRequest,
-	wantSHA string, p kernel.Principal, acc access,
+func (s rpmAPI) serveVirtualRemoteRPMPackage(
+	w http.ResponseWriter, r *http.Request, c repo.Config, req ItemRequest,
+	wantSHA string, p kernel.Principal, acc Access,
 ) {
-	if s.cfg.RemoteSources == nil {
-		httpkit.WriteErr(w, r, itemNotFound())
+	if s.RemoteSources == nil {
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
 	q := source.Request{
 		Repo:    c,
 		Subject: accessapi.SubjectOf(p),
-		Access:  acc.d,
+		Access:  acc.Decider,
 		Project: c.ProjectKey,
 		Resource: source.Resource{
 			Kind:   source.ResourceKindArtifact,
-			Path:   req.path,
+			Path:   req.Path,
 			Method: r.Method,
 		},
 	}
-	q, err := rpmSourceRequest(q)
+	q, err := RPMSourceRequest(q)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(r.Context(), "RPM source", err))
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM source", err))
 		return
 	}
 	validate := q.Resource.Validate
@@ -204,41 +209,41 @@ func (s artifactoryService) serveVirtualRemoteRPMPackage(
 			return err
 		}
 		if _, err := body.Seek(0, io.SeekStart); err != nil {
-			return rpmSourceIntegrity()
+			return RPMSourceIntegrity()
 		}
 		h := sha256.New()
 		read, err := io.Copy(h, io.LimitReader(body, size))
 		if err != nil || read != size || fmt.Sprintf("%x", h.Sum(nil)) != wantSHA {
-			return rpmSourceIntegrity()
+			return RPMSourceIntegrity()
 		}
 		return nil
 	}
-	result, err := s.cfg.RemoteSources.Read(r.Context(), q)
+	result, err := s.RemoteSources.Read(r.Context(), q)
 	if err != nil {
 		httpkit.WriteErr(
 			w,
 			r,
-			s.itemError(r.Context(), "RPM source", pkgroute.SourceError(err, p.Anonymous)),
+			s.ItemError(r.Context(), "RPM source", pkgroute.SourceError(err, p.Anonymous)),
 		)
 		return
 	}
 	if result.Stream != nil {
-		s.serveRemoteStream(w, r, result, c, req, q.Resource, "", p.Anonymous)
+		s.ServeRemoteStream(w, r, result, c, req, q.Resource, "", p.Anonymous)
 		return
 	}
-	if !s.remoteDeliveryAllowed(w, r, result, p.Anonymous) {
+	if !s.RemoteDeliveryAllowed(w, r, result, p.Anonymous) {
 		return
 	}
 	if result.Item == nil || result.Item.Actual.SHA256 != wantSHA {
-		httpkit.WriteErr(w, r, pkgroute.SourceError(rpmSourceIntegrity(), p.Anonymous))
+		httpkit.WriteErr(w, r, pkgroute.SourceError(RPMSourceIntegrity(), p.Anonymous))
 		return
 	}
-	s.serveFile(w, r, s.cfg.Store, found{repo: c, item: *result.Item, used: result.Used}, p)
+	s.ServeFile(w, r, s.Store, Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }
 
-func (s artifactoryService) rpmCandidates(
+func (s rpmAPI) rpmCandidates(
 	ctx context.Context, st store.Store, c repo.Config, root string,
-	p kernel.Principal, acc access, seen map[string]bool,
+	p kernel.Principal, acc Access, seen map[string]bool,
 ) ([]rpmCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
 		return nil, errRPMVirtualCycle
@@ -259,8 +264,8 @@ func (s artifactoryService) rpmCandidates(
 		if member.PackageType != repo.RPM {
 			return nil, fmt.Errorf("%w: %s", errRPMMemberType, key)
 		}
-		if !acc.folder(member, indexPath, types.ActionRead) ||
-			!acc.file(member, indexPath, types.ActionRead) ||
+		if !acc.Folder(member, indexPath, types.ActionRead) ||
+			!acc.File(member, indexPath, types.ActionRead) ||
 			generic.CheckDownload(member, indexPath, false) != nil {
 			continue
 		}
@@ -281,8 +286,8 @@ func (s artifactoryService) rpmCandidates(
 			return nil, fmt.Errorf("rpm: member %s index: %w", key, err)
 		}
 		for _, entry := range entries {
-			if selected[entry.pkg.Path] || !acc.file(c, entry.pkg.Path, types.ActionRead) ||
-				!acc.file(entry.repo, entry.pkg.Path, types.ActionRead) ||
+			if selected[entry.pkg.Path] || !acc.File(c, entry.pkg.Path, types.ActionRead) ||
+				!acc.File(entry.repo, entry.pkg.Path, types.ActionRead) ||
 				generic.CheckDownload(c, entry.pkg.Path, false) != nil ||
 				generic.CheckDownload(entry.repo, entry.pkg.Path, false) != nil {
 				continue
@@ -294,9 +299,9 @@ func (s artifactoryService) rpmCandidates(
 	return out, nil
 }
 
-func (s artifactoryService) rpmMemberPackages(
+func (s rpmAPI) rpmMemberPackages(
 	ctx context.Context, st store.Store, c repo.Config, root string,
-	p kernel.Principal, acc access,
+	p kernel.Principal, acc Access,
 ) ([]rpm.Package, error) {
 	manifest, err := s.rpmMemberBytes(ctx, st, c, root+"repodata/repomd.xml", p, acc)
 	if err != nil {
@@ -306,7 +311,7 @@ func (s artifactoryService) rpmMemberPackages(
 	if err != nil {
 		return nil, fmt.Errorf("rpm: parse member repomd: %w", err)
 	}
-	if !acc.file(c, primaryPath, types.ActionRead) ||
+	if !acc.File(c, primaryPath, types.ActionRead) ||
 		generic.CheckDownload(c, primaryPath, false) != nil {
 		return nil, store.ErrNotFound
 	}
@@ -321,23 +326,23 @@ func (s artifactoryService) rpmMemberPackages(
 	return packages, nil
 }
 
-func (s artifactoryService) rpmMemberBytes(
+func (s rpmAPI) rpmMemberBytes(
 	ctx context.Context, st store.Store, c repo.Config, path string,
-	p kernel.Principal, acc access,
+	p kernel.Principal, acc Access,
 ) ([]byte, error) {
 	if c.Class == repo.Remote {
-		if s.cfg.RemoteSources == nil {
+		if s.RemoteSources == nil {
 			return nil, source.ErrUnavailable
 		}
 		q := source.Request{
-			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
+			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
 			Resource: source.Resource{Path: path, Method: http.MethodGet},
 		}
-		q, err := rpmSourceRequest(q)
+		q, err := RPMSourceRequest(q)
 		if err != nil {
 			return nil, err
 		}
-		result, err := s.cfg.RemoteSources.Read(ctx, q)
+		result, err := s.RemoteSources.Read(ctx, q)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"rpm: remote metadata source: %w",
@@ -395,8 +400,8 @@ func (s artifactoryService) rpmMemberBytes(
 	return s.rpmBlob(ctx, it.Actual.SHA256)
 }
 
-func (s artifactoryService) rpmBlob(ctx context.Context, sha string) ([]byte, error) {
-	rc, _, err := s.cfg.Blobs.Open(ctx, sha)
+func (s rpmAPI) rpmBlob(ctx context.Context, sha string) ([]byte, error) {
+	rc, _, err := s.Blobs.Open(ctx, sha)
 	if err != nil {
 		return nil, fmt.Errorf("rpm: metadata blob: %w", err)
 	}

@@ -1266,7 +1266,7 @@
     "contract": "Deletes a tag of a Docker, OCI or Helm OCI image, including a multi-architecture tag. The tag folder is removed, and when it holds a manifest list or image index, so are the descriptive `\u003ctag\u003e-\u003cos\u003e-\u003carchitecture\u003e` tags its push added that still hold their platform manifests, and the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay. A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the error envelope, as for every REST operation under the Docker API path.",
     "handler": "internal/server/docker_rest.go: artifactoryService.DeleteDockerTag",
     "direct_calls": [
-      "acc.file",
+      "acc.File",
       "apierror.New",
       "artgen.DeleteDockerTag200TextResponse",
       "dockerhttp.ValidName",
@@ -1276,10 +1276,10 @@
       "httpkit.Denied",
       "layout.ReservedTag",
       "layout.ValidTag",
-      "s.content",
-      "s.internalError",
-      "s.itemCaller",
-      "s.itemError",
+      "s.Content",
+      "s.InternalError",
+      "s.ItemCaller",
+      "s.ItemError",
       "s.registry",
       "s.registry().DeleteMultiArch"
     ],
@@ -1500,9 +1500,9 @@
       "kernel.FromContext",
       "kernel.RequireAdmin",
       "repos.Remove",
-      "s.cfg.RemoteHTTP.Remove",
-      "s.content",
-      "s.internalError"
+      "s.Content",
+      "s.InternalError",
+      "s.cfg.RemoteHTTP.Remove"
     ],
     "review_family": "repository",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
@@ -2039,9 +2039,9 @@
       "kernel.FromContext",
       "kernel.RequireAdmin",
       "repos.Remove",
-      "s.cfg.RemoteHTTP.Remove",
-      "s.content",
-      "s.internalError"
+      "s.Content",
+      "s.InternalError",
+      "s.cfg.RemoteHTTP.Remove"
     ],
     "review_family": "repository",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
@@ -5157,7 +5157,7 @@
       "ctx.Err",
       "entry.FullPath",
       "fmt.Errorf",
-      "s.items",
+      "s.Items",
       "st.Items",
       "st.Items().Descendants"
     ],
@@ -6471,8 +6471,8 @@
       "httpkit.BadRequestf",
       "npmhttp.ScopeAuthLines",
       "npmhttp.ValidScope",
-      "s.content",
-      "s.itemError",
+      "s.Content",
+      "s.ItemError",
       "s.npmCredential",
       "strings.TrimPrefix",
       "url.PathEscape"
@@ -7206,8 +7206,8 @@
       "httpkit.Accepts",
       "repo.Class",
       "repo.PackageTypeName",
-      "s.content",
-      "s.internalError",
+      "s.Content",
+      "s.InternalError",
       "s.readerFor",
       "st.Repos",
       "st.Repos().List",
@@ -7247,8 +7247,8 @@
       "packageTypes.has",
       "repo.Masked",
       "repo.Relevant",
-      "s.content",
-      "s.internalError",
+      "s.Content",
+      "s.InternalError",
       "st.Repos",
       "st.Repos().List"
     ],
@@ -7286,8 +7286,8 @@
     "handler": "internal/server/repositories.go: artifactoryService.CheckIfRepositoryExists",
     "direct_calls": [
       "httpkit.AdminOnly",
-      "s.content",
-      "s.internalError",
+      "s.Content",
+      "s.InternalError",
       "slices.ContainsFunc",
       "st.Repos",
       "st.Repos().List",
@@ -7327,8 +7327,8 @@
       "json.Unmarshal",
       "maps.DeleteFunc",
       "repo.Masked",
-      "s.content",
-      "s.internalError",
+      "s.Content",
+      "s.InternalError",
       "slices.Contains",
       "st.Repos",
       "st.Repos().Get"
@@ -7698,7 +7698,7 @@
       "r.capped",
       "r.st.Builds",
       "r.st.Builds().FindDependencies",
-      "s.internalError",
+      "s.InternalError",
       "s.newSearch",
       "strings.ToLower",
       "url.QueryEscape"
@@ -8765,13 +8765,13 @@
     "contract": "Returns the storage usage snapshot, computed on every request. Requires an administrator or a token whose scope includes `system:info/storage:r`.",
     "handler": "internal/server/storageinfo.go: artifactoryService.GetStorageSummaryInfo",
     "direct_calls": [
-      "a.d.System",
+      "a.Decider.System",
       "accessapi.DeciderFrom",
       "artgen.GetStorageSummaryInfo200JSONResponse",
       "kernel.RequireAuthenticated",
+      "s.Content",
+      "s.InternalError",
       "s.cfg.Mirrors.Status",
-      "s.content",
-      "s.internalError",
       "usage.Summarize"
     ],
     "review_family": "content-and-configuration",
@@ -9677,8 +9677,8 @@
     "direct_calls": [
       "errors.Is",
       "httpkit.BadRequestf",
-      "s.content",
-      "s.internalError",
+      "s.Content",
+      "s.InternalError",
       "s.readerFor",
       "slices.Contains",
       "st.Repos",
@@ -10438,7 +10438,7 @@
   {
     "route": "GET /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.getItem-fm",
+    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -10457,7 +10457,7 @@
   {
     "route": "GET /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/{archivePath}!/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.getItem-fm",
+    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -10476,7 +10476,7 @@
   {
     "route": "GET /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/{archivePath}!/{entryPath}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.getItem-fm",
+    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -10495,7 +10495,7 @@
   {
     "route": "GET /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/{filePath}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.getItem-fm",
+    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12973,7 +12973,7 @@
   {
     "route": "HEAD /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.getItem-fm",
+    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12992,7 +12992,7 @@
   {
     "route": "HEAD /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/{archivePath}!/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.getItem-fm",
+    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13011,7 +13011,7 @@
   {
     "route": "HEAD /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/{archivePath}!/{entryPath}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.getItem-fm",
+    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13030,7 +13030,7 @@
   {
     "route": "HEAD /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/{filePath}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.getItem-fm",
+    "handler": "internal/server/server.go: internal/server.(*Kit).GetItem-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -15308,10 +15308,10 @@
       "httpkit.Deref",
       "httpkit.DerefSlice",
       "httpkit.RequestIDFrom",
+      "s.Log",
+      "s.Log().ErrorContext",
       "s.buildCaller",
       "s.buildError",
-      "s.log",
-      "s.log().ErrorContext",
       "svc.Discard",
       "svc.Discards"
     ],
@@ -15813,16 +15813,16 @@
     "contract": "Captures signed Debian metadata for one distribution from a local, remote, virtual or federated repository in a local Debian target. Package files remain in the source repository. The snapshot client root is /artifactory/api/deb/{targetRepo}/snapshots/{tag}.",
     "handler": "internal/server/debian_snapshot.go: artifactoryService.createDebianSnapshot",
     "direct_calls": [
-      "acc.file",
+      "acc.File",
       "apierror.New",
       "bytes.NewReader",
       "debian.WithSnapshotWrite",
       "errors.Is",
       "fmt.Errorf",
       "httpkit.Denied",
+      "s.Items",
+      "s.Items().Deploy",
       "s.debianSnapshotFiles",
-      "s.items",
-      "s.items().Deploy",
       "slices.Sort",
       "st.Items",
       "st.Items().Get",
@@ -16238,7 +16238,7 @@
     "handler": "internal/server/reindex.go: artifactoryService.CalculateHelmChartIndex",
     "direct_calls": [
       "artgen.CalculateHelmChartIndex200TextResponse",
-      "s.reindex"
+      "s.Reindex"
     ],
     "review_family": "native-helm",
     "effects": "resource mutation/action; see served contract and handler calls; index rebuild/possibly queued work; queue coalescing is not a replay guarantee",
@@ -16940,7 +16940,7 @@
     "handler": "internal/server/npm_operations.go: artifactoryService.CalculateNpmRepositoryMetadata",
     "direct_calls": [
       "artgen.CalculateNpmRepositoryMetadata200TextResponse",
-      "s.reindex"
+      "s.Reindex"
     ],
     "review_family": "native-npm",
     "effects": "resource mutation/action; see served contract and handler calls; index rebuild/possibly queued work; queue coalescing is not a replay guarantee",
@@ -17112,7 +17112,7 @@
     "handler": "internal/server/reindex.go: artifactoryService.CalculatePypiRepositoryMetadata",
     "direct_calls": [
       "artgen.CalculatePypiRepositoryMetadata200TextResponse",
-      "s.reindex"
+      "s.Reindex"
     ],
     "review_family": "native-pypi",
     "effects": "resource mutation/action; see served contract and handler calls; index rebuild/possibly queued work; queue coalescing is not a replay guarantee",
@@ -17254,9 +17254,9 @@
       "httpkit.BadRequestf",
       "json.Unmarshal",
       "repos.Merge",
+      "s.Content",
+      "s.InternalError",
       "s.checkReferences",
-      "s.content",
-      "s.internalError",
       "s.writeUpdates",
       "st.Repos",
       "st.Repos().Get"
@@ -17488,9 +17488,9 @@
       "r.refsOf",
       "re.MatchString",
       "regexp.Compile",
+      "s.InternalError",
       "s.buildError",
       "s.builds",
-      "s.internalError",
       "s.newSearch",
       "slices.ContainsFunc",
       "svc.Find",
@@ -18301,8 +18301,8 @@
     "direct_calls": [
       "c.Run",
       "httpkit.AdminOnly",
-      "s.collector",
-      "s.internalError"
+      "s.InternalError",
+      "s.collector"
     ],
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
@@ -18559,7 +18559,7 @@
     "handler": "internal/server/reindex.go: artifactoryService.CalculateTerraformIndex",
     "direct_calls": [
       "artgen.CalculateTerraformIndex200TextResponse",
-      "s.reindex"
+      "s.Reindex"
     ],
     "review_family": "native-terraform",
     "effects": "resource mutation/action; see served contract and handler calls; index rebuild/possibly queued work; queue coalescing is not a replay guarantee",
@@ -18585,8 +18585,8 @@
     "handler": "internal/server/trash.go: artifactoryService.EmptyTrashCan",
     "direct_calls": [
       "httpkit.Principal",
-      "s.content",
-      "s.internalError",
+      "s.Content",
+      "s.InternalError",
       "s.trashService",
       "s.trashService().Empty"
     ],
@@ -18750,7 +18750,7 @@
     "contract": "Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with \"Enforce strict layout\" on, so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, with its properties, and indexed there. A tarball without a readable package.json is left where it is, and so is one whose canonical path already holds the same content, which needs no move. A tarball whose canonical path holds anything else, or whose move the repository refuses, as its release and snapshot handling may, is left where it is too, and the conversion fails naming it, after moving every other tarball; the queue retries a failed conversion and parks it once its retries run out, for resume to queue again. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. Answers 202 with no body.",
     "handler": "internal/server/npm_operations.go: artifactoryService.MigrateNpmRepositoryToStrictLayout",
     "direct_calls": [
-      "s.enqueue",
+      "s.Enqueue",
       "s.npmOperation"
     ],
     "review_family": "content-and-configuration",
@@ -18778,8 +18778,8 @@
     "direct_calls": [
       "errors.Is",
       "httpkit.BadRequestf",
-      "s.enqueue",
-      "s.internalError",
+      "s.Enqueue",
+      "s.InternalError",
       "s.npmOperation",
       "st.WorkQueue",
       "st.WorkQueue().Get"
@@ -18966,9 +18966,9 @@
       "httpkit.BadRequestf",
       "json.Unmarshal",
       "repos.Merge",
+      "s.Content",
+      "s.InternalError",
       "s.checkReferences",
-      "s.content",
-      "s.internalError",
       "s.writeUpdates",
       "st.Repos",
       "st.Repos().Get"
@@ -20608,10 +20608,10 @@
       "httpkit.Deref",
       "httpkit.RawBody",
       "httpkit.RequestIDFrom",
+      "s.Log",
+      "s.Log().WarnContext",
       "s.buildCaller",
       "s.buildError",
-      "s.log",
-      "s.log().WarnContext",
       "svc.Publish"
     ],
     "review_family": "build",
@@ -21451,8 +21451,8 @@
       "repos.CheckKeypairs",
       "repos.CheckMembers",
       "repos.PrepareCreate",
-      "s.content",
-      "s.internalError",
+      "s.Content",
+      "s.InternalError",
       "st.Repos",
       "st.Repos().Create",
       "st.Repos().List"
@@ -21933,8 +21933,8 @@
       "repos.CheckKeypairs",
       "repos.CheckMembers",
       "repos.PrepareCreate",
-      "s.content",
-      "s.internalError",
+      "s.Content",
+      "s.InternalError",
       "slices.ContainsFunc",
       "st.Repos",
       "st.Repos().Create",

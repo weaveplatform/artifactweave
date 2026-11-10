@@ -49,7 +49,7 @@ func (s artifactoryService) registerMavenRoutes(r chi.Router) {
 // caller may act on it.
 type mavenTarget struct {
 	p    kernel.Principal
-	acc  access
+	acc  Access
 	st   store.Store
 	c    repo.Config
 	path string
@@ -66,27 +66,27 @@ func (s artifactoryService) mavenTargetOf(
 	want types.Actions,
 ) (mavenTarget, error) {
 	ctx := r.Context()
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return mavenTarget{}, err
 	}
-	key, p, _, err := splitRepoPath(strings.TrimPrefix(r.URL.EscapedPath(), prefix))
+	key, p, _, err := SplitRepoPath(strings.TrimPrefix(r.URL.EscapedPath(), prefix))
 	if err != nil {
 		return mavenTarget{}, err
 	}
-	who, acc, err := s.itemCaller(ctx, st)
+	who, acc, err := s.ItemCaller(ctx, st)
 	if err != nil {
 		return mavenTarget{}, err
 	}
 	missing := apierror.New(http.StatusNotFound, fmt.Sprintf("Could not find path '%s/%s'", key, p))
-	c, cached, err := resolveRepo(ctx, st, key)
+	c, cached, err := ResolveRepo(ctx, st, key)
 	var api *apierror.Error
 	switch {
 	case errors.As(err, &api) && api.Status == http.StatusNotFound:
 		return mavenTarget{}, missing
 	case err != nil:
-		return mavenTarget{}, s.itemError(ctx, "resolve repository", err)
-	case !acc.file(c, p, want):
+		return mavenTarget{}, s.ItemError(ctx, "resolve repository", err)
+	case !acc.File(c, p, want):
 		return mavenTarget{}, httpkit.Denied(who)
 	case cached || c.Class != repo.Local:
 		return mavenTarget{}, apierror.New(http.StatusNotFound,
@@ -103,7 +103,7 @@ func (s artifactoryService) mavenTargetOf(
 	case errors.Is(err, store.ErrNotFound):
 		return mavenTarget{}, missing
 	case err != nil:
-		return mavenTarget{}, s.itemError(ctx, "get item", err)
+		return mavenTarget{}, s.ItemError(ctx, "get item", err)
 	}
 	return t, nil
 }
@@ -129,12 +129,12 @@ func (s artifactoryService) calculateMavenMetadata(w http.ResponseWriter, r *htt
 	ctx := r.Context()
 	if err := maven.CalculateMetadata(
 		ctx,
-		s.items(t.st).Env(),
+		s.Items(t.st).Env(),
 		t.c,
 		t.path,
 		recursive,
 	); err != nil {
-		httpkit.WriteErr(w, r, s.itemError(ctx, "calculate Maven metadata", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "calculate Maven metadata", err))
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
@@ -157,10 +157,10 @@ func (s artifactoryService) generateMavenPom(w http.ResponseWriter, r *http.Requ
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	svc := s.items(t.st)
+	svc := s.Items(t.st)
 	at, body, err := maven.GeneratePOM(ctx, svc.Env(), t.c, t.it)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(ctx, "generate POM", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "generate POM", err))
 		return
 	}
 	if err := s.writePom(ctx, svc, t, at, body); err != nil {
@@ -179,7 +179,7 @@ func (s artifactoryService) writePom(
 	p string,
 	body []byte,
 ) error {
-	if !t.acc.file(t.c, p, types.ActionWrite) {
+	if !t.acc.File(t.c, p, types.ActionWrite) {
 		return httpkit.Denied(t.p)
 	}
 	_, err := svc.Deploy(ctx, item.Deploy{
@@ -189,5 +189,5 @@ func (s artifactoryService) writePom(
 	if err == nil || errors.Is(err, item.ErrExists) {
 		return nil
 	}
-	return s.itemError(ctx, "deploy POM", err)
+	return s.ItemError(ctx, "deploy POM", err)
 }

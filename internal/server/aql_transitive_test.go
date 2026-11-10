@@ -109,7 +109,7 @@ func transitiveFixture(t *testing.T) *transitiveWorld {
 					path = q.Resource.PermissionPath
 					allows = decider.AllowsFolder
 				}
-				if !allows(types.ResourceArtifact, target(q.Repo), path, types.ActionRead) {
+				if !allows(types.ResourceArtifact, Target(q.Repo), path, types.ActionRead) {
 					return source.ErrDenied
 				}
 				return nil
@@ -478,7 +478,7 @@ func TestAccTransitiveAQLTrimmingSurvivesFilteringAndDuplicates(t *testing.T) {
 // Without an authenticator a transitive search cannot recheck its caller's
 // credential, so the caller is refused, with no principal and no decider.
 func TestUnitTransitivePrincipalWithoutAuthenticator(t *testing.T) {
-	s := artifactoryService{cfg: withAccess(Config{Store: inmem.New()})}
+	s := newArtifactoryService(withAccess(Config{Store: inmem.New()}))
 	p, d, err := s.transitivePrincipal(t.Context(), kernel.Principal{Name: "admin", Password: true})
 	if !errors.Is(err, source.ErrDenied) || d != nil || !reflect.DeepEqual(p, kernel.Principal{}) {
 		t.Fatalf("transitivePrincipal = %+v, %v, %v; want source.ErrDenied alone", p, d, err)

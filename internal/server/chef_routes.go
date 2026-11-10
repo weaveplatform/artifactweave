@@ -20,7 +20,7 @@ func (s artifactoryService) registerChefReindex(r chi.Router) {
 			)
 			return
 		}
-		_, err := s.reindex(r.Context(), repo.Chef, chi.URLParam(r, "repoKey"), "", true)
+		_, err := s.Reindex(r.Context(), repo.Chef, chi.URLParam(r, "repoKey"), "", true)
 		if err != nil {
 			apierror.Write(w, apierror.ProfileArtifactory, err)
 			return

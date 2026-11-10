@@ -127,7 +127,7 @@ func (s artifactoryService) appendOnce(
 		// Not the request's decider: a replay evaluates the permissions of
 		// the credential as it stands now, so revoked permissions cannot
 		// recover a replayed append (decision 0043).
-		a, err := accessFor(ctx, s.cfg.Access.Authorizer, current, nil)
+		a, err := AccessFor(ctx, s.cfg.Access.Authorizer, current, nil)
 		return buildAccess{a}, err
 	})
 	switch {

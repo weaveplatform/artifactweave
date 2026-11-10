@@ -22,7 +22,7 @@ func (s artifactoryService) patchConfiguration(w http.ResponseWriter, r *http.Re
 		fail(err)
 		return
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		fail(err)
 		return
@@ -53,7 +53,7 @@ func (s artifactoryService) patchConfiguration(w http.ResponseWriter, r *http.Re
 		fail(httpkit.BadRequestf("%s", err.Error()))
 		return
 	case err != nil:
-		fail(s.internalError(ctx, "apply configuration", err))
+		fail(s.InternalError(ctx, "apply configuration", err))
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")

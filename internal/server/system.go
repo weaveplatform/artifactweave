@@ -28,10 +28,10 @@ const versionMediaType = "application/vnd.org.jfrog.artifactory.system.Version+j
 // spec; the composite strict server (composites.go) adds the security and
 // system partials and the generated stubs.
 type artifactoryService struct {
+	// Kit is the item kit every service shares; newArtifactoryService
+	// builds it, and a literal without one panics on its first kit call.
+	*Kit
 	cfg Config
-	// signWarn throttles the log line for a failing download-redirect
-	// signer; nil, in services built only to reach the store, logs each.
-	signWarn *throttle
 	// folderSlots holds a token for each folder archive download running;
 	// nil, in services built only to reach the store, limits nothing.
 	folderSlots chan struct{}

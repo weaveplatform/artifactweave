@@ -61,7 +61,7 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 		{"repodata/repomd.xml", manifest},
 		{primaryPath, primary},
 	} {
-		q, err := rpmSourceRequest(source.Request{
+		q, err := RPMSourceRequest(source.Request{
 			Repo:     repo.Config{PackageType: repo.RPM},
 			Resource: source.Resource{Path: tc.path, Method: http.MethodGet},
 		})
@@ -105,7 +105,7 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 			})
 		}
 		q.Resource.Query = "download=1"
-		if _, err := rpmSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
+		if _, err := RPMSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
 			t.Errorf("%s: metadata query allowed: %v", tc.path, err)
 		}
 	}
@@ -114,7 +114,7 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 		t,
 		"migration/artifacts/ecosystem/rpm/testdata/artifactweave-alpha-1.0-1.fc42.noarch.rpm",
 	)
-	q, err := rpmSourceRequest(source.Request{Resource: source.Resource{
+	q, err := RPMSourceRequest(source.Request{Resource: source.Resource{
 		Path: "pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm", Method: http.MethodGet,
 	}})
 	if err != nil || q.Resource.Validate == nil {
@@ -136,7 +136,7 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 		t.Fatal("corrupt upstream RPM accepted")
 	}
 	q.Resource.Query = "download=1"
-	if _, err := rpmSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
+	if _, err := RPMSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
 		t.Errorf("RPM package query allowed: %v", err)
 	}
 }
@@ -158,11 +158,11 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 		}
 	}
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs}}
+	svc := rpmAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}
 	for _, tc := range []struct {
 		key      string
 		expected error
@@ -285,7 +285,7 @@ func TestAccRPMVirtualSigningRejectsMissingAndInvalidKeys(t *testing.T) {
 func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 	w := newItemWorld(t, false)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,7 +319,7 @@ func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 			},
 		),
 	}
-	svc := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources}}
+	svc := rpmAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
 	packages, err := svc.rpmMemberPackages(t.Context(), w.db, remote, "", p, acc)
 	if err != nil || len(packages) != 1 ||
 		packages[0].Path != "pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm" {
@@ -418,7 +418,7 @@ func TestAccRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 			func(t *testing.T) {
 				w := newItemWorld(t, false)
 				p := kernel.Principal{Name: "admin", Admin: true}
-				acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
+				acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -447,9 +447,7 @@ func TestAccRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 						},
 					),
 				}
-				svc := artifactoryService{
-					cfg: Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources},
-				}
+				svc := rpmAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
 				remote := *repo.Defaults(&repo.Config{
 					Key: "rpm-remote", Class: repo.Remote, PackageType: repo.RPM, URL: "https://up.example",
 				})
@@ -480,7 +478,7 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 	correctSHA := fmt.Sprintf("%x", sha256.Sum256(body))
 	w := newItemWorld(t, false)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -509,9 +507,9 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 			},
 		),
 	}
-	svc := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources}}
-	request := itemRequest{path: path}
-	serve := func(s artifactoryService, wantSHA string) *httptest.ResponseRecorder {
+	svc := rpmAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
+	request := ItemRequest{Path: path}
+	serve := func(s rpmAPI, wantSHA string) *httptest.ResponseRecorder {
 		t.Helper()
 		r := httptest.NewRequest(http.MethodGet, "/artifactory/rpm-virtual/"+path, nil)
 		response := httptest.NewRecorder()
@@ -535,7 +533,7 @@ func TestAccRPMVirtualRemotePackagePinsIndexedSHA(t *testing.T) {
 	if res := serve(svc, correctSHA); res.Code != http.StatusBadGateway {
 		t.Errorf("cached RPM with wrong index SHA returned %d", res.Code)
 	}
-	svc.cfg.RemoteSources = nil
+	svc.RemoteSources = nil
 	if res := serve(svc, correctSHA); res.Code != http.StatusNotFound {
 		t.Errorf("virtual remote without a source returned %d", res.Code)
 	}
@@ -578,11 +576,11 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 	manifest, primary, primaryPath := rpmUpstreamFixture(t)
 	seed("repodata/repomd.xml", manifest)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs}}
+	svc := rpmAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}
 	if _, err := svc.rpmMemberPackages(
 		t.Context(),
 		w.db,

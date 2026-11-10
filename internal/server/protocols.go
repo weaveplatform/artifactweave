@@ -18,17 +18,17 @@ import (
 func (s artifactoryService) protocolOptions() pkgroute.Options {
 	return pkgroute.Options{
 		Store: s.cfg.Store,
-		Items: func() *item.Service { return s.items(s.cfg.Store) },
+		Items: func() *item.Service { return s.Items(s.cfg.Store) },
 		ServeItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {
 			p, _ := kernel.FromContext(r.Context())
-			s.serveFile(w, r, s.cfg.Store, found{repo: c, item: it}, p)
+			s.ServeFile(w, r, s.cfg.Store, Found{Repo: c, Item: it}, p)
 		},
 		DeployItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, rest string) {
 			s.deployEscapedItem(w, r, url.PathEscape(c.Key)+"/"+rest)
 		},
-		ItemError: s.itemError,
+		ItemError: s.ItemError,
 		Created: func(w http.ResponseWriter, r *http.Request, it types.Item) {
-			httpkit.WriteJSON(w, http.StatusCreated, itemCreated(r.Context(), it))
+			httpkit.WriteJSON(w, http.StatusCreated, ItemCreated(r.Context(), it))
 		},
 		Fault: func(r *http.Request, err error) { httpkit.NoteCause(r.Context(), err) },
 	}

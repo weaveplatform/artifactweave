@@ -67,11 +67,11 @@ func TestUnitDebianSnapshotRejectsUnboundMetadata(t *testing.T) {
 				put(index, tc.index)
 			}
 			p := kernel.Principal{Name: "admin", Admin: true}
-			acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
+			acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = (artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs}}).
+			_, err = newArtifactoryService(Config{Store: w.db, Blobs: w.blobs}).
 				debianSnapshotFiles(t.Context(), w.db, c, "stable", p, acc)
 			if err == nil || !strings.Contains(err.Error(), tc.expectedError) {
 				t.Fatalf("unbound snapshot metadata: %v, want %q", err, tc.expectedError)

@@ -31,29 +31,29 @@ const buildsPath = "/artifactory/api/build"
 // buildAccess answers the build service's permission questions from the
 // request's evaluator: the build resource on the build-info repository,
 // and the artifact resource on an artifact's item.
-type buildAccess struct{ access }
+type buildAccess struct{ Access }
 
 func (b buildAccess) Build(repoKey, path string, folder bool, want types.Actions) bool {
 	t := accessapi.Repo{Key: repoKey, Class: string(repo.Local)}
 	if folder {
-		return b.d.AllowsFolder(types.ResourceBuild, t, path, want)
+		return b.Decider.AllowsFolder(types.ResourceBuild, t, path, want)
 	}
-	return b.d.Allows(types.ResourceBuild, t, path, want)
+	return b.Decider.Allows(types.ResourceBuild, t, path, want)
 }
 
 func (b buildAccess) Item(c repo.Config, path string, want types.Actions) bool {
-	return b.file(c, path, want)
+	return b.File(c, path, want)
 }
 
 // buildCaller returns the build service, the caller and its permissions.
 func (s artifactoryService) buildCaller(
 	ctx context.Context,
 ) (*build.Service, kernel.Principal, buildAccess, error) {
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, kernel.Principal{}, buildAccess{}, err
 	}
-	p, a, err := s.itemCaller(ctx, st)
+	p, a, err := s.ItemCaller(ctx, st)
 	return s.builds(st), p, buildAccess{a}, err
 }
 
@@ -74,13 +74,13 @@ func (s artifactoryService) buildError(
 			strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": "),
 		)
 	case errors.Is(err, build.ErrNoRepository):
-		return notFoundRepo(types.BuildInfoRepo(build.ProjectKey(project)))
+		return NotFoundRepo(types.BuildInfoRepo(build.ProjectKey(project)))
 	case errors.Is(err, build.ErrConflict):
 		return apierror.New(http.StatusConflict, err.Error())
 	case errors.Is(err, build.ErrNotFound):
 		return apierror.New(http.StatusNotFound, missing)
 	}
-	return s.itemError(ctx, "builds", err)
+	return s.ItemError(ctx, "builds", err)
 }
 
 func noBuild(name string) string { return "No build was found for build name: " + name }
@@ -163,7 +163,7 @@ func (s artifactoryService) UploadBuild(
 		return nil, s.buildError(ctx, p, project, "", err)
 	}
 	if pub.Retention != nil {
-		s.log().WarnContext(ctx, "build retention", "request_id", httpkit.RequestIDFrom(ctx),
+		s.Log().WarnContext(ctx, "build retention", "request_id", httpkit.RequestIDFrom(ctx),
 			"build", pub.Run.Name, "error", pub.Retention)
 	}
 	return artgen.UploadBuild204Response{
@@ -412,7 +412,7 @@ func (s artifactoryService) GetBuildArtifacts(
 	}
 	project, ok := buildInfoProject(req.BuildRepo)
 	if !ok {
-		return nil, notFoundRepo(req.BuildRepo)
+		return nil, NotFoundRepo(req.BuildRepo)
 	}
 	items, err := svc.Artifacts(ctx, project, req.BuildName, req.BuildNumber, a)
 	if err != nil {
@@ -600,7 +600,7 @@ func (s artifactoryService) ControlBuildRetention(
 	bg := context.WithoutCancel(ctx)
 	go func() {
 		if _, err := svc.Discard(bg, d, a); err != nil {
-			s.log().ErrorContext(bg, "build retention", "request_id", httpkit.RequestIDFrom(bg),
+			s.Log().ErrorContext(bg, "build retention", "request_id", httpkit.RequestIDFrom(bg),
 				"build", d.Name, "error", err)
 		}
 	}()

@@ -156,11 +156,11 @@ type p2ReadResult struct {
 }
 
 //nolint:gocyclo // This bounded read handles cached, streamed, and archive-backed P2 resources.
-func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
-	pathName string, external *url.URL, archiveEntry string, p kernel.Principal, acc access,
+func (s p2Items) p2Read(r *http.Request, c repo.Config, cached bool,
+	pathName string, external *url.URL, archiveEntry string, p kernel.Principal, acc Access,
 	expected ...types.Checksums,
 ) (p2ReadResult, error) {
-	if s.cfg.RemoteSources == nil {
+	if s.RemoteSources == nil {
 		return p2ReadResult{}, source.ErrUnavailable
 	}
 	rootArchive := false
@@ -178,7 +178,7 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 	q := source.Request{
 		Repo:      c,
 		Subject:   accessapi.SubjectOf(p),
-		Access:    acc.d,
+		Access:    acc.Decider,
 		Project:   c.ProjectKey,
 		CacheOnly: cached,
 		Resource: source.Resource{
@@ -193,7 +193,7 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 	}
 	var err error
 	if archiveEntry == "" {
-		q, err = p2SourceRequest(q)
+		q, err = P2SourceRequest(q)
 		if err != nil {
 			return p2ReadResult{}, err
 		}
@@ -235,7 +235,7 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 		}
 		q.Resource.Variant += "-external-v1"
 	}
-	result, err := s.cfg.RemoteSources.Read(r.Context(), q)
+	result, err := s.RemoteSources.Read(r.Context(), q)
 	if err != nil {
 		return p2ReadResult{}, fmt.Errorf("read p2 source: %w", err)
 	}
@@ -256,7 +256,7 @@ func (s artifactoryService) p2Read(r *http.Request, c repo.Config, cached bool,
 	case result.Stream != nil:
 		reader = result.Stream.Body
 	case result.Item != nil:
-		reader, _, err = s.cfg.Blobs.Open(r.Context(), result.Item.Actual.SHA256)
+		reader, _, err = s.Blobs.Open(r.Context(), result.Item.Actual.SHA256)
 	default:
 		err = source.ErrInvalidResult
 	}
@@ -310,8 +310,8 @@ func p2CheckBytes(body []byte, want types.Checksums) error {
 	return nil
 }
 
-func (s artifactoryService) p2ArtifactChecksums(r *http.Request, c repo.Config,
-	cached bool, synthetic string, site *url.URL, resource string, p kernel.Principal, acc access,
+func (s p2Items) p2ArtifactChecksums(r *http.Request, c repo.Config,
+	cached bool, synthetic string, site *url.URL, resource string, p kernel.Principal, acc Access,
 ) (types.Checksums, error) {
 	parent := strings.TrimSuffix(synthetic, "/"+resource)
 	for _, candidate := range []string{"artifacts.xml.xz", "artifacts.jar", "artifacts.xml"} {
@@ -381,8 +381,8 @@ func p2ExternalParts(name string) ([]string, string, error) {
 	return parts[1:i], resource, nil
 }
 
-func (s artifactoryService) p2ResolveExternal(r *http.Request, c repo.Config, cached bool,
-	name string, p kernel.Principal, acc access,
+func (s p2Items) p2ResolveExternal(r *http.Request, c repo.Config, cached bool,
+	name string, p kernel.Principal, acc Access,
 ) (*url.URL, error) {
 	tokens, resource, err := p2ExternalParts(name)
 	if err != nil {
@@ -457,16 +457,16 @@ func (s artifactoryService) p2ResolveExternal(r *http.Request, c repo.Config, ca
 	return base, nil
 }
 
-func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
-	c repo.Config, cached bool, req itemRequest, p kernel.Principal, acc access,
+func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
+	c repo.Config, cached bool, req ItemRequest, p kernel.Principal, acc Access,
 ) {
-	if !acc.file(c, req.path, types.ActionRead) {
+	if !acc.File(c, req.Path, types.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	var target *url.URL
 	var err error
-	name := req.path
+	name := req.Path
 	if strings.HasPrefix(name, p2ExternalPrefix+"/") {
 		target, err = s.p2ResolveExternal(r, c, cached, name, p, acc)
 		if err != nil {
@@ -478,7 +478,7 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 	if target != nil {
 		_, filename, err = p2ExternalParts(name)
 		if err != nil {
-			httpkit.WriteErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, ItemNotFound())
 			return
 		}
 	}
@@ -488,7 +488,7 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 		var err error
 		external, archiveEntry, err = p2ChildResourceURL(target, filename)
 		if err != nil {
-			httpkit.WriteErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, ItemNotFound())
 			return
 		}
 	}
@@ -547,9 +547,9 @@ func (s artifactoryService) serveP2CompositeChild(w http.ResponseWriter, r *http
 	if p2CompositeName(filename) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 	}
-	sw := &statusWriter{ResponseWriter: w}
+	sw := &StatusWriter{ResponseWriter: w}
 	http.ServeContent(sw, r, filename, time.Time{}, bytes.NewReader(body))
-	if sw.complete(r) && result.used != nil {
+	if sw.Complete(r) && result.used != nil {
 		_ = result.used(r.Context())
 	}
 }

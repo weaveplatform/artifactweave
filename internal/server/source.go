@@ -35,35 +35,35 @@ import (
 
 // getRemoteItem returns false for existing folder/archive browsing, which remains
 // cache-only. Native adapters and virtual member fetching require their own opt-in.
-func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Config,
-	req itemRequest, p kernel.Principal, acc access,
+func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Config,
+	req ItemRequest, p kernel.Principal, acc Access,
 ) bool {
 	ctx := r.Context()
-	if strings.HasSuffix(req.key, types.CacheSuffix) && maven.Serves(c.PackageType) &&
-		!maven.IsMetadata(req.path) {
+	if strings.HasSuffix(req.Key, types.CacheSuffix) && maven.Serves(c.PackageType) &&
+		!maven.IsMetadata(req.Path) {
 		return false
 	}
-	existing, err := s.cfg.Store.Items().Get(ctx, c.Key, true, req.path)
+	existing, err := s.Store.Items().Get(ctx, c.Key, true, req.Path)
 	if err == nil && existing.Folder {
 		return false
 	}
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
-		httpkit.WriteErr(w, r, s.itemError(ctx, "cached item", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "cached item", err))
 		return true
 	}
-	if errors.Is(err, store.ErrNotFound) && strings.Contains(req.path, "!/") {
+	if errors.Is(err, store.ErrNotFound) && strings.Contains(req.Path, "!/") {
 		return false
 	}
-	resource := remoteResource(r, req.path)
+	resource := RemoteResource(r, req.Path)
 	sidecar := ""
-	if artifact, alg, ok := item.Sidecar(req.path); ok && errors.Is(err, store.ErrNotFound) {
+	if artifact, alg, ok := item.Sidecar(req.Path); ok && errors.Is(err, store.ErrNotFound) {
 		// A checksum cannot disclose a file the caller cannot read. Cold SHA-256
 		// retrieval is an explicit transient operation; other cold sidecars stay404.
-		if !acc.file(c, artifact, types.ActionRead) {
-			httpkit.WriteErr(w, r, itemNotFound())
+		if !acc.File(c, artifact, types.ActionRead) {
+			httpkit.WriteErr(w, r, ItemNotFound())
 			return true
 		}
-		cached, getErr := s.cfg.Store.Items().Get(ctx, c.Key, true, artifact)
+		cached, getErr := s.Store.Items().Get(ctx, c.Key, true, artifact)
 		switch {
 		case maven.Serves(c.PackageType):
 			sidecar = string(alg)
@@ -77,18 +77,18 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 			c.RetrieveSha256FromServer != nil && *c.RetrieveSha256FromServer:
 			resource.ChecksumOnly = true
 		default:
-			httpkit.WriteErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, ItemNotFound())
 			return true
 		}
 	}
 	query := source.Request{
 		Repo:      c,
 		Subject:   accessapi.SubjectOf(p),
-		Access:    acc.d,
+		Access:    acc.Decider,
 		Resource:  resource,
 		Matrix:    req.matrix(),
 		Project:   c.ProjectKey,
-		CacheOnly: strings.HasSuffix(req.key, types.CacheSuffix),
+		CacheOnly: strings.HasSuffix(req.Key, types.CacheSuffix),
 	}
 	query, err = s.formatRemoteSourceRequest(ctx, query, acc)
 	if err != nil {
@@ -96,77 +96,77 @@ func (s artifactoryService) getRemoteItem(w http.ResponseWriter, r *http.Request
 		return true
 	}
 	resource = query.Resource
-	result, err := s.cfg.RemoteSources.Read(ctx, query)
+	result, err := s.RemoteSources.Read(ctx, query)
 	if err != nil {
 		httpkit.WriteErr(
 			w,
 			r,
-			s.itemError(ctx, "read source", pkgroute.SourceError(err, p.Anonymous)),
+			s.ItemError(ctx, "read source", pkgroute.SourceError(err, p.Anonymous)),
 		)
 		return true
 	}
 	if result.Stream != nil {
-		s.serveRemoteStream(w, r, result, c, req, resource, sidecar, p.Anonymous)
+		s.ServeRemoteStream(w, r, result, c, req, resource, sidecar, p.Anonymous)
 		return true
 	}
 	check := req
-	check.path = resource.Path
-	ok, matchErr := matchesMatrix(ctx, s.cfg.Store, *result.Item, check)
+	check.Path = resource.Path
+	ok, matchErr := matchesMatrix(ctx, s.Store, *result.Item, check)
 	switch {
 	case matchErr != nil:
-		httpkit.WriteErr(w, r, s.internalError(ctx, "item properties", matchErr))
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "item properties", matchErr))
 	case !ok:
-		httpkit.WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, ItemNotFound())
 	default:
-		if !s.remoteDeliveryAllowed(w, r, result, p.Anonymous) {
+		if !s.RemoteDeliveryAllowed(w, r, result, p.Anonymous) {
 			return true
 		}
 		if sidecar != "" {
-			sw := &statusWriter{ResponseWriter: w}
+			sw := &StatusWriter{ResponseWriter: w}
 			s.serveRemoteChecksum(
 				sw,
 				r,
 				item.ServedChecksum(c, *result.Item, item.Algorithm(sidecar)),
 				result.Item.Modified,
 			)
-			if sw.complete(r) && result.Used != nil {
+			if sw.Complete(r) && result.Used != nil {
 				_ = result.Used(ctx)
 			}
 		} else {
-			s.serveFile(w, r, s.cfg.Store, found{repo: c, item: *result.Item, used: result.Used}, p)
+			s.ServeFile(w, r, s.Store, Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 		}
 	}
 	return true
 }
 
-func (s artifactoryService) formatRemoteSourceRequest(
-	ctx context.Context, q source.Request, acc access,
+func (s *Kit) formatRemoteSourceRequest(
+	ctx context.Context, q source.Request, acc Access,
 ) (source.Request, error) {
 	if maven.Serves(q.Repo.PackageType) {
 		return s.mavenSourceRequest(ctx, q, acc)
 	}
 	if alpine.Serves(q.Repo.PackageType) {
-		return alpineSourceRequest(q)
+		return AlpineSourceRequest(q)
 	}
 	if cran.Serves(q.Repo.PackageType) {
-		return cranSourceRequest(q)
+		return CranSourceRequest(q)
 	}
 	if debian.Serves(q.Repo.PackageType) {
-		return debianSourceRequest(q)
+		return DebianSourceRequest(q)
 	}
 	if rpm.Serves(q.Repo.PackageType) {
-		return rpmSourceRequest(q)
+		return RPMSourceRequest(q)
 	}
 	if opkg.Serves(q.Repo.PackageType) {
-		return opkgSourceRequest(q)
+		return OpkgSourceRequest(q)
 	}
 	if q.Repo.PackageType == repo.P2 {
-		return p2SourceRequest(q)
+		return P2SourceRequest(q)
 	}
 	return q, nil
 }
 
-func p2SourceRequest(q source.Request) (source.Request, error) {
+func P2SourceRequest(q source.Request) (source.Request, error) {
 	name := q.Resource.Path
 	kind := p2.Classify(name)
 	if kind == p2.KindInvalid {
@@ -203,12 +203,12 @@ func p2SourceRequest(q source.Request) (source.Request, error) {
 	return q, nil
 }
 
-func (s artifactoryService) serveRemoteStream(
+func (s *Kit) ServeRemoteStream(
 	w http.ResponseWriter,
 	r *http.Request,
 	result source.Result,
 	c repo.Config,
-	req itemRequest,
+	req ItemRequest,
 	resource source.Resource,
 	sidecar string,
 	anonymous bool,
@@ -217,10 +217,10 @@ func (s artifactoryService) serveRemoteStream(
 
 	if !req.matrix().Matches(nil) {
 		_ = result.Stream.Body.Close()
-		httpkit.WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
-	if !s.remoteDeliveryAllowed(w, r, result, anonymous) {
+	if !s.RemoteDeliveryAllowed(w, r, result, anonymous) {
 		return
 	}
 	if sidecar != "" {
@@ -233,9 +233,9 @@ func (s artifactoryService) serveRemoteStream(
 			size := map[string]int{"md5": 32, "sha1": 40, "sha256": 64, "sha512": 128}[sidecar]
 			checksum = strings.Repeat("0", size)
 		}
-		sw := &statusWriter{ResponseWriter: w}
+		sw := &StatusWriter{ResponseWriter: w}
 		s.serveRemoteChecksum(sw, r, checksum, result.Stream.Modified)
-		if sw.complete(r) && result.Used != nil {
+		if sw.Complete(r) && result.Used != nil {
 			_ = result.Used(ctx)
 		}
 		return
@@ -254,17 +254,17 @@ func (s artifactoryService) serveRemoteStream(
 		result.Stream.Checksums = types.Checksums{}
 		result.Stream.ContentRange = ""
 	}
-	sw := &statusWriter{ResponseWriter: w}
+	sw := &StatusWriter{ResponseWriter: w}
 	if err := pkgroute.ServeStream(sw, r, result.Stream); err != nil {
 		httpkit.NoteCause(ctx, err)
 		panic(http.ErrAbortHandler)
 	}
-	if sw.complete(r) && result.Used != nil {
+	if sw.Complete(r) && result.Used != nil {
 		_ = result.Used(ctx)
 	}
 }
 
-func (s artifactoryService) remoteDeliveryAllowed(
+func (s *Kit) RemoteDeliveryAllowed(
 	w http.ResponseWriter,
 	r *http.Request,
 	result source.Result,
@@ -282,7 +282,7 @@ func (s artifactoryService) remoteDeliveryAllowed(
 	return true
 }
 
-func remoteResource(r *http.Request, path string) source.Resource {
+func RemoteResource(r *http.Request, path string) source.Resource {
 	escapedKey, _, _ := strings.Cut(strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/"), "/")
 	resource := pkgroute.Resource(
 		r,
@@ -305,7 +305,7 @@ func remoteResource(r *http.Request, path string) source.Resource {
 	return resource
 }
 
-func alpineSourceRequest(q source.Request) (source.Request, error) {
+func AlpineSourceRequest(q source.Request) (source.Request, error) {
 	path := q.Resource.Path
 	if q.Resource.Query != "" &&
 		(strings.HasSuffix(path, ".apk") || strings.HasSuffix(path, "/"+alpine.IndexName)) {
@@ -361,10 +361,10 @@ func alpineSourceRequest(q source.Request) (source.Request, error) {
 	return q, nil
 }
 
-// debianSourceRequest admits remote package bytes only after the same bounded
+// DebianSourceRequest admits remote package bytes only after the same bounded
 // parser used for local uploads has checked them. A .dsc is verified before it
 // can enter the cache; the Sources index additionally checks its parts.
-func debianSourceRequest(q source.Request) (source.Request, error) {
+func DebianSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
 	switch {
 	case debian.ReleaseMetadataPath(p):
@@ -464,7 +464,7 @@ func debianSourceRequest(q source.Request) (source.Request, error) {
 	return q, nil
 }
 
-func cranSourceRequest(q source.Request) (source.Request, error) {
+func CranSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
 	if feed, _, ok := cran.IndexPath(p); ok {
 		if q.Resource.Query != "" {
@@ -520,7 +520,7 @@ func cranSourceRequest(q source.Request) (source.Request, error) {
 	return q, nil
 }
 
-func opkgSourceRequest(q source.Request) (source.Request, error) {
+func OpkgSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
 	if q.Resource.Query != "" && (opkg.IsIndex(p) || strings.HasSuffix(p, ".ipk")) {
 		return q, source.ErrInvalidRequest
@@ -586,7 +586,7 @@ func opkgSourceRequest(q source.Request) (source.Request, error) {
 	return q, nil
 }
 
-func rpmSourceRequest(q source.Request) (source.Request, error) {
+func RPMSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
 	if q.Resource.Query != "" && (strings.HasSuffix(p, ".rpm") ||
 		strings.Contains(p, "repodata/")) {
@@ -596,7 +596,7 @@ func rpmSourceRequest(q source.Request) (source.Request, error) {
 		q.Resource.Variant = "rpm-package-v1"
 		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
 			if _, err := rpm.ReadPackage(ctx, r, size, p); err != nil {
-				return rpmSourceIntegrity()
+				return RPMSourceIntegrity()
 			}
 			return nil
 		}
@@ -615,14 +615,14 @@ func rpmSourceRequest(q source.Request) (source.Request, error) {
 			_ source.MetadataResponse,
 		) error {
 			if size <= 0 || size > 36<<20 {
-				return rpmSourceIntegrity()
+				return RPMSourceIntegrity()
 			}
 			body, err := io.ReadAll(io.LimitReader(r, 36<<20+1))
 			if err != nil || int64(len(body)) != size {
-				return rpmSourceIntegrity()
+				return RPMSourceIntegrity()
 			}
 			if _, _, err := rpm.DecodeRepomd(body, root); err != nil {
-				return rpmSourceIntegrity()
+				return RPMSourceIntegrity()
 			}
 			return nil
 		}
@@ -633,14 +633,14 @@ func rpmSourceRequest(q source.Request) (source.Request, error) {
 			_ source.MetadataResponse,
 		) error {
 			if size <= 0 || size > 36<<20 {
-				return rpmSourceIntegrity()
+				return RPMSourceIntegrity()
 			}
 			body, err := io.ReadAll(io.LimitReader(r, 36<<20+1))
 			if err != nil || int64(len(body)) != size {
-				return rpmSourceIntegrity()
+				return RPMSourceIntegrity()
 			}
 			if _, err := rpm.DecodePrimary(body, root, want); err != nil {
-				return rpmSourceIntegrity()
+				return RPMSourceIntegrity()
 			}
 			return nil
 		}
@@ -648,7 +648,7 @@ func rpmSourceRequest(q source.Request) (source.Request, error) {
 	return q, nil
 }
 
-func rpmSourceIntegrity() error {
+func RPMSourceIntegrity() error {
 	return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.FailureKindIntegrity}
 }
 
@@ -704,14 +704,14 @@ func (r seekReaderAt) ReadAt(p []byte, offset int64) (int, error) {
 	return n, nil
 }
 
-func (s artifactoryService) serveRemoteChecksum(
+func (s *Kit) serveRemoteChecksum(
 	w http.ResponseWriter,
 	r *http.Request,
 	value string,
 	modified time.Time,
 ) {
 	if value == "" {
-		httpkit.WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
@@ -720,25 +720,25 @@ func (s artifactoryService) serveRemoteChecksum(
 
 // Cache alias downloads have no source lookup token. Touch only entries naming
 // these exact stored bytes; an invalidated token cannot revive an old generation.
-func (s artifactoryService) recordCacheUse(ctx context.Context, f found) {
-	if f.used != nil {
-		_ = f.used(ctx)
+func (s *Kit) recordCacheUse(ctx context.Context, f Found) {
+	if f.Used != nil {
+		_ = f.Used(ctx)
 		return
 	}
-	if f.repo.Class != repo.Remote || !f.item.Cached {
+	if f.Repo.Class != repo.Remote || !f.Item.Cached {
 		return
 	}
 	page := store.Page{}
 	for {
-		entries, next, err := s.cfg.Store.RemoteCache().
-			List(ctx, f.repo.Key, f.item.FullPath(), page)
+		entries, next, err := s.Store.RemoteCache().
+			List(ctx, f.Repo.Key, f.Item.FullPath(), page)
 		if err != nil {
 			return
 		}
 		for _, entry := range entries {
-			if entry.ItemID == f.item.ID && entry.Token.Key.Path == f.item.FullPath() &&
-				entry.Blob.Checksums == f.item.Actual {
-				_ = s.cfg.Store.RemoteCache().Touch(ctx, entry.Token, time.Now().UTC())
+			if entry.ItemID == f.Item.ID && entry.Token.Key.Path == f.Item.FullPath() &&
+				entry.Blob.Checksums == f.Item.Actual {
+				_ = s.Store.RemoteCache().Touch(ctx, entry.Token, time.Now().UTC())
 			}
 		}
 		if next == "" {
@@ -750,7 +750,7 @@ func (s artifactoryService) recordCacheUse(ctx context.Context, f found) {
 
 // Match checksum uploads: a hex digest, optionally followed by a filename.
 // The digest describes an uncached artifact; this validates syntax, not its bytes.
-func (s artifactoryService) serveColdChecksum(
+func (s *Kit) serveColdChecksum(
 	w http.ResponseWriter,
 	r *http.Request,
 	stream *source.Stream,
@@ -773,18 +773,18 @@ func (s artifactoryService) serveColdChecksum(
 	s.serveRemoteChecksum(w, r, sums.SHA256, stream.Modified)
 }
 
-func (s artifactoryService) mavenSourceRequest(
+func (s *Kit) mavenSourceRequest(
 	ctx context.Context,
 	q source.Request,
-	acc access,
+	acc Access,
 ) (source.Request, error) {
-	if !acc.file(q.Repo, q.Resource.Path, types.ActionRead) {
+	if !acc.File(q.Repo, q.Resource.Path, types.ActionRead) {
 		return q, source.ErrDenied
 	}
 	if err := generic.CheckDownload(q.Repo, q.Resource.Path, false); err != nil {
 		return q, fmt.Errorf("resolve maven source: %w", err)
 	}
-	items := s.items(s.cfg.Store)
+	items := s.Items(s.Store)
 	if _, err := items.Resolve(
 		ctx,
 		q.Repo,
@@ -793,7 +793,7 @@ func (s artifactoryService) mavenSourceRequest(
 		return q, fmt.Errorf("resolve maven source: %w", err)
 	}
 	if !q.CacheOnly {
-		resolved, err := maven.ResolveMavenSource(ctx, s.cfg.RemoteSources, items, q)
+		resolved, err := maven.ResolveMavenSource(ctx, s.RemoteSources, items, q)
 		if err != nil {
 			return q, fmt.Errorf("resolve maven source: %w", err)
 		}

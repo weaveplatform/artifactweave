@@ -40,22 +40,26 @@ type cranCandidate struct {
 	pkg  cran.Package
 }
 
-func (s artifactoryService) tryCranItem(
-	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p kernel.Principal, acc access,
+// cranAPI serves CRAN's indexes and packages over the item kit.
+type cranAPI struct{ *Kit }
+
+func tryCranItem(
+	k *Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	cached bool, req ItemRequest, p kernel.Principal, acc Access,
 ) bool {
-	if !cran.Serves(c.PackageType) || req.isFolder {
+	s := cranAPI{k}
+	if !cran.Serves(c.PackageType) || req.IsFolder {
 		return false
 	}
-	if strings.HasSuffix(req.path, "/PACKAGES.rds") {
-		httpkit.WriteErr(w, r, itemNotFound()) // R falls back to PACKAGES.gz.
+	if strings.HasSuffix(req.Path, "/PACKAGES.rds") {
+		httpkit.WriteErr(w, r, ItemNotFound()) // R falls back to PACKAGES.gz.
 		return true
 	}
-	if _, _, ok := cran.IndexPath(req.path); ok {
+	if _, _, ok := cran.IndexPath(req.Path); ok {
 		s.serveCranIndex(w, r, st, c, cached, req, p, acc)
 		return true
 	}
-	if cran.IsPackage(req.path) {
+	if cran.IsPackage(req.Path) {
 		if c.Class == repo.Virtual || c.Class == repo.Remote {
 			s.serveCranPackage(w, r, st, c, cached, req, p, acc)
 			return true
@@ -65,19 +69,19 @@ func (s artifactoryService) tryCranItem(
 	return false
 }
 
-func (s artifactoryService) serveCranIndex(
+func (s cranAPI) serveCranIndex(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p kernel.Principal, acc access,
+	cached bool, req ItemRequest, p kernel.Principal, acc Access,
 ) {
 	ctx := r.Context()
-	feed, name, ok := cran.IndexPath(req.path)
-	if !ok || len(req.props) != 0 || r.URL.RawQuery != "" ||
+	feed, name, ok := cran.IndexPath(req.Path)
+	if !ok || len(req.Props) != 0 || r.URL.RawQuery != "" ||
 		cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
-	if !acc.folder(c, feed, types.ActionRead) || !acc.file(c, req.path, types.ActionRead) ||
-		generic.CheckDownload(c, req.path, false) != nil {
+	if !acc.Folder(c, feed, types.ActionRead) || !acc.File(c, req.Path, types.ActionRead) ||
+		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -85,10 +89,10 @@ func (s artifactoryService) serveCranIndex(
 	var err error
 	var used func(context.Context) error
 	if c.Class == repo.Virtual {
-		candidates, err = s.cranCandidates(ctx, st, c, req.path, p, acc, map[string]bool{})
+		candidates, err = s.cranCandidates(ctx, st, c, req.Path, p, acc, map[string]bool{})
 	} else {
 		var view cranIndexView
-		view, err = s.cranMemberIndex(ctx, st, c, cached, req.path, p, acc)
+		view, err = s.cranMemberIndex(ctx, st, c, cached, req.Path, p, acc)
 		if err == nil && view.revalidate != nil {
 			err = view.revalidate(ctx)
 		}
@@ -110,7 +114,7 @@ func (s artifactoryService) serveCranIndex(
 		httpkit.WriteErr(
 			w,
 			r,
-			s.itemError(ctx, "CRAN index", pkgroute.SourceError(err, p.Anonymous)),
+			s.ItemError(ctx, "CRAN index", pkgroute.SourceError(err, p.Anonymous)),
 		)
 		return
 	}
@@ -120,7 +124,7 @@ func (s artifactoryService) serveCranIndex(
 	}
 	generated, err := cran.EncodeIndex(packages, feed)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.internalError(ctx, "CRAN index", err))
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "CRAN index", err))
 		return
 	}
 	body := generated[name]
@@ -129,18 +133,18 @@ func (s artifactoryService) serveCranIndex(
 		w.Header().Set("Content-Type", "application/gzip")
 	}
 	w.Header().Set("Cache-Control", "private, no-store")
-	sw := &statusWriter{ResponseWriter: w}
+	sw := &StatusWriter{ResponseWriter: w}
 	http.ServeContent(sw, r, name, time.Time{}, bytes.NewReader(body))
-	if sw.complete(r) && used != nil {
+	if sw.Complete(r) && used != nil {
 		_ = used(ctx)
 	}
 }
 
 func cranPackageReadable(
-	ctx context.Context, c repo.Config, p string, acc access,
+	ctx context.Context, c repo.Config, p string, acc Access,
 	check func(context.Context, string) error,
 ) (bool, error) {
-	if !acc.file(c, p, types.ActionRead) || generic.CheckDownload(c, p, false) != nil {
+	if !acc.File(c, p, types.ActionRead) || generic.CheckDownload(c, p, false) != nil {
 		return false, nil
 	}
 	if check != nil {
@@ -154,28 +158,28 @@ func cranPackageReadable(
 	return true, nil
 }
 
-func (s artifactoryService) cranMemberIndex(
+func (s cranAPI) cranMemberIndex(
 	ctx context.Context, st store.Store, c repo.Config, cached bool, indexPath string,
-	p kernel.Principal, acc access,
+	p kernel.Principal, acc Access,
 ) (cranIndexView, error) {
 	view := cranIndexView{repo: c}
 	var body []byte
 	var err error
 	if c.Class == repo.Remote {
-		if s.cfg.RemoteSources == nil {
+		if s.RemoteSources == nil {
 			return view, fmt.Errorf("cran: remote index source: %w",
 				pkgroute.SourceError(source.ErrUnavailable, p.Anonymous))
 		}
 		query := source.Request{
-			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
+			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
 			CacheOnly: cached,
 			Resource:  source.Resource{Path: indexPath, Method: http.MethodGet},
 		}
-		query, err = cranSourceRequest(query)
+		query, err = CranSourceRequest(query)
 		if err != nil {
 			return view, err
 		}
-		result, err := s.cfg.RemoteSources.Read(ctx, query)
+		result, err := s.RemoteSources.Read(ctx, query)
 		if err != nil {
 			return view, fmt.Errorf(
 				"cran: remote index: %w",
@@ -203,7 +207,7 @@ func (s artifactoryService) cranMemberIndex(
 		if c.Class != repo.Local && c.Class != repo.Federated || cached {
 			return view, store.ErrNotFound
 		}
-		if err := s.await(ctx, st, cran.KindIndex, c.Key); err != nil {
+		if err := s.Await(ctx, st, cran.KindIndex, c.Key); err != nil {
 			return view, fmt.Errorf("cran: refresh index: %w", err)
 		}
 		it, getErr := st.Items().Get(ctx, c.Key, false, indexPath)
@@ -236,8 +240,8 @@ func (s artifactoryService) cranMemberIndex(
 	return view, nil
 }
 
-func (s artifactoryService) readCranBlob(ctx context.Context, sha string) ([]byte, error) {
-	rc, _, err := s.cfg.Blobs.Open(ctx, sha)
+func (s cranAPI) readCranBlob(ctx context.Context, sha string) ([]byte, error) {
+	rc, _, err := s.Blobs.Open(ctx, sha)
 	if err != nil {
 		return nil, fmt.Errorf("cran: open blob: %w", err)
 	}
@@ -249,9 +253,9 @@ func (s artifactoryService) readCranBlob(ctx context.Context, sha string) ([]byt
 	return body, nil
 }
 
-func (s artifactoryService) cranCandidates(
+func (s cranAPI) cranCandidates(
 	ctx context.Context, st store.Store, c repo.Config, indexPath string,
-	p kernel.Principal, acc access, seen map[string]bool,
+	p kernel.Principal, acc Access, seen map[string]bool,
 ) ([]cranCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
 		return nil, errCranVirtualCycle
@@ -272,8 +276,8 @@ func (s artifactoryService) cranCandidates(
 			return nil, fmt.Errorf("%w: %s", errCranMemberType, key)
 		}
 		feed, _, _ := cran.IndexPath(indexPath)
-		if !acc.folder(member, feed, types.ActionRead) ||
-			!acc.file(member, indexPath, types.ActionRead) ||
+		if !acc.Folder(member, feed, types.ActionRead) ||
+			!acc.File(member, indexPath, types.ActionRead) ||
 			generic.CheckDownload(member, indexPath, false) != nil {
 			continue
 		}
@@ -313,7 +317,7 @@ func (s artifactoryService) cranCandidates(
 		}
 		for _, entry := range entries {
 			if selected[entry.pkg.Name] ||
-				!acc.file(c, entry.pkg.Path, types.ActionRead) ||
+				!acc.File(c, entry.pkg.Path, types.ActionRead) ||
 				generic.CheckDownload(c, entry.pkg.Path, false) != nil {
 				continue
 			}
@@ -324,20 +328,20 @@ func (s artifactoryService) cranCandidates(
 	return out, nil
 }
 
-func (s artifactoryService) serveCranPackage(
+func (s cranAPI) serveCranPackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p kernel.Principal, acc access,
+	cached bool, req ItemRequest, p kernel.Principal, acc Access,
 ) {
-	if len(req.props) != 0 || r.URL.RawQuery != "" || cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, itemNotFound())
+	if len(req.Props) != 0 || r.URL.RawQuery != "" || cached && c.Class != repo.Remote {
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
-	if !acc.file(c, req.path, types.ActionRead) ||
-		generic.CheckDownload(c, req.path, false) != nil {
+	if !acc.File(c, req.Path, types.ActionRead) ||
+		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
-	feed, _, _, _ := cran.PackagePath(req.path)
+	feed, _, _, _ := cran.PackagePath(req.Path)
 	indexPath := feed + "/" + cran.PackagesName
 	var candidates []cranCandidate
 	var err error
@@ -356,70 +360,70 @@ func (s artifactoryService) serveCranPackage(
 		}
 	}
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(r.Context(), "CRAN package index",
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "CRAN package index",
 			pkgroute.SourceError(err, p.Anonymous)))
 		return
 	}
 	for _, candidate := range candidates {
-		if candidate.pkg.Path != req.path {
+		if candidate.pkg.Path != req.Path {
 			continue
 		}
 		if candidate.repo.Class == repo.Remote {
 			s.serveRemoteCranPackage(w, r, candidate.repo, cached, req, candidate.pkg, p, acc)
 			return
 		}
-		it, getErr := st.Items().Get(r.Context(), candidate.repo.Key, false, req.path)
+		it, getErr := st.Items().Get(r.Context(), candidate.repo.Key, false, req.Path)
 		if getErr != nil {
-			httpkit.WriteErr(w, r, s.itemError(r.Context(), "CRAN member package", getErr))
+			httpkit.WriteErr(w, r, s.ItemError(r.Context(), "CRAN member package", getErr))
 			return
 		}
 		if it.Folder {
-			httpkit.WriteErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, ItemNotFound())
 			return
 		}
-		s.serveFile(w, r, st, found{repo: candidate.repo, item: it}, p)
+		s.ServeFile(w, r, st, Found{Repo: candidate.repo, Item: it}, p)
 		return
 	}
-	httpkit.WriteErr(w, r, itemNotFound())
+	httpkit.WriteErr(w, r, ItemNotFound())
 }
 
-func (s artifactoryService) serveRemoteCranPackage(
+func (s cranAPI) serveRemoteCranPackage(
 	w http.ResponseWriter, r *http.Request, c repo.Config, cached bool,
-	req itemRequest, expected cran.Package, p kernel.Principal, acc access,
+	req ItemRequest, expected cran.Package, p kernel.Principal, acc Access,
 ) {
 	query := source.Request{
-		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
+		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
 		CacheOnly: cached,
 		Resource: source.Resource{
-			Kind: source.ResourceKindArtifact, Path: req.path, Method: r.Method,
+			Kind: source.ResourceKindArtifact, Path: req.Path, Method: r.Method,
 			Checksums: types.Checksums{MD5: expected.MD5},
 		},
 	}
-	query, err := cranSourceRequest(query)
+	query, err := CranSourceRequest(query)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(r.Context(), "CRAN source", err))
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "CRAN source", err))
 		return
 	}
-	result, err := s.cfg.RemoteSources.Read(r.Context(), query)
+	result, err := s.RemoteSources.Read(r.Context(), query)
 	if err != nil {
 		httpkit.WriteErr(
 			w,
 			r,
-			s.itemError(r.Context(), "CRAN source", pkgroute.SourceError(err, p.Anonymous)),
+			s.ItemError(r.Context(), "CRAN source", pkgroute.SourceError(err, p.Anonymous)),
 		)
 		return
 	}
 	if result.Stream != nil {
-		s.serveRemoteStream(w, r, result, c, req, query.Resource, "", p.Anonymous)
+		s.ServeRemoteStream(w, r, result, c, req, query.Resource, "", p.Anonymous)
 		return
 	}
-	if !s.remoteDeliveryAllowed(w, r, result, p.Anonymous) {
+	if !s.RemoteDeliveryAllowed(w, r, result, p.Anonymous) {
 		return
 	}
 	if result.Item == nil || expected.MD5 != "" && result.Item.Actual.MD5 != expected.MD5 {
 		httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
 		return
 	}
-	s.serveFile(w, r, s.cfg.Store,
-		found{repo: c, item: *result.Item, used: result.Used}, p)
+	s.ServeFile(w, r, s.Store,
+		Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }

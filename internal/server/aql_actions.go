@@ -36,7 +36,7 @@ func (s artifactoryService) aqlAction(
 	}
 	if !p.Admin {
 		d, _ := accessapi.DeciderFrom(ctx)
-		acc, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
+		acc, err := AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
 		if err != nil {
 			return nil, err
 		}
@@ -48,7 +48,7 @@ func (s artifactoryService) aqlAction(
 			kept = append(kept, h)
 		}
 	}
-	items := s.items(st)
+	items := s.Items(st)
 	switch {
 	case q.Action == aql.UpdateProperties:
 		return kept, updateProperties(ctx, st, items, configs, q, kept)

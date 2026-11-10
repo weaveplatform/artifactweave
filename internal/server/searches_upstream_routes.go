@@ -79,7 +79,7 @@ func (u *upstreamSearch) visitRoute(key string, route searchRoute, nodes *int) {
 		}
 		return
 	}
-	if u.ls.layouts[key] == nil || !u.r.acc.visible(c) {
+	if u.ls.layouts[key] == nil || !u.r.acc.Visible(c) {
 		return
 	}
 	u.routes[key] = append(u.routes[key], route)
@@ -112,7 +112,7 @@ func (u *upstreamSearch) disclose(key, full string, folder bool, cached ...bool)
 	if u.routeKey(key, full, folder, cached...) == "" ||
 		!repo.PatternsOf(c).
 			Accepts(full, folder) ||
-		!u.r.acc.item(c, full, folder, types.ActionRead) {
+		!u.r.acc.Item(c, full, folder, types.ActionRead) {
 		return false
 	}
 	u.disclosures = append(
@@ -182,7 +182,7 @@ func (u *upstreamSearch) checkDisclosures(ctx context.Context) error {
 		}
 		if !allows(
 			types.ResourceArtifact,
-			target(u.r.configs[entry.key]),
+			Target(u.r.configs[entry.key]),
 			entry.path,
 			types.ActionRead,
 		) ||

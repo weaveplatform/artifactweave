@@ -26,55 +26,60 @@ const debianIndexLimit = 64 << 20
 
 var errDebianIndexTooLarge = errors.New("server: debian Packages index exceeds limit")
 
+// debianAPI serves Debian's indexes and virtual repositories over the item
+// kit.
+type debianAPI struct{ *Kit }
+
 // tryDebianItem ensures a Packages index is never returned to a caller who
 // cannot read every package it advertises. The ordinary item route cannot
 // make that guarantee for a cached or virtual metadata file.
-func (s artifactoryService) tryDebianItem(
-	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p kernel.Principal, acc access,
+func tryDebianItem(
+	k *Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	cached bool, req ItemRequest, p kernel.Principal, acc Access,
 ) bool {
-	if !debian.Serves(c.PackageType) || req.isFolder {
+	s := debianAPI{k}
+	if !debian.Serves(c.PackageType) || req.IsFolder {
 		return false
 	}
-	if c.Class == repo.Virtual && strings.HasPrefix(req.path, "dists/") {
-		_, byHash := debian.ByHashMetadataPath(req.path)
-		if debian.ReleaseMetadataPath(req.path) ||
-			debian.PackagesIndexPath(req.path) || byHash {
+	if c.Class == repo.Virtual && strings.HasPrefix(req.Path, "dists/") {
+		_, byHash := debian.ByHashMetadataPath(req.Path)
+		if debian.ReleaseMetadataPath(req.Path) ||
+			debian.PackagesIndexPath(req.Path) || byHash {
 			s.serveVirtualDebianMetadata(w, r, st, c, req, p, acc)
 		} else {
-			httpkit.WriteErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, ItemNotFound())
 		}
 		return true
 	}
-	if c.Class == repo.Virtual && debian.ValidBinaryPath(req.path) {
+	if c.Class == repo.Virtual && debian.ValidBinaryPath(req.Path) {
 		s.serveVirtualDebianPackage(w, r, st, c, req, p, acc)
 		return true
 	}
-	_, byHash := debian.ByHashMetadataPath(req.path)
-	if !debian.PackagesIndexPath(req.path) && !debian.SourcesIndexPath(req.path) && !byHash {
+	_, byHash := debian.ByHashMetadataPath(req.Path)
+	if !debian.PackagesIndexPath(req.Path) && !debian.SourcesIndexPath(req.Path) && !byHash {
 		return false
 	}
 	s.serveDebianIndex(w, r, st, c, cached, req, p, acc)
 	return true
 }
 
-func (s artifactoryService) serveDebianIndex(
+func (s debianAPI) serveDebianIndex(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	cached bool, req itemRequest, p kernel.Principal, acc access,
+	cached bool, req ItemRequest, p kernel.Principal, acc Access,
 ) {
 	ctx := r.Context()
-	if len(req.props) != 0 || r.URL.RawQuery != "" {
-		httpkit.WriteErr(w, r, itemNotFound())
+	if len(req.Props) != 0 || r.URL.RawQuery != "" {
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
-	if !acc.folder(c, req.path, types.ActionRead) ||
-		!acc.file(c, req.path, types.ActionRead) ||
-		generic.CheckDownload(c, req.path, false) != nil {
+	if !acc.Folder(c, req.Path, types.ActionRead) ||
+		!acc.File(c, req.Path, types.ActionRead) ||
+		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	if cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
 	var body []byte
@@ -84,7 +89,7 @@ func (s artifactoryService) serveDebianIndex(
 	switch c.Class {
 	case repo.Local, repo.Federated:
 		var it types.Item
-		it, err = st.Items().Get(ctx, c.Key, false, req.path)
+		it, err = st.Items().Get(ctx, c.Key, false, req.Path)
 		if err == nil && it.Folder {
 			err = store.ErrNotFound
 		}
@@ -92,21 +97,21 @@ func (s artifactoryService) serveDebianIndex(
 			body, err = s.readDebianBlob(ctx, it.Actual.SHA256)
 		}
 	case repo.Remote:
-		if s.cfg.RemoteSources == nil {
+		if s.RemoteSources == nil {
 			err = source.ErrUnavailable
 			break
 		}
 		query := source.Request{
-			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
+			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
 			CacheOnly: cached,
-			Resource:  source.Resource{Path: req.path, Method: r.Method},
+			Resource:  source.Resource{Path: req.Path, Method: r.Method},
 		}
-		query, err = debianSourceRequest(query)
+		query, err = DebianSourceRequest(query)
 		if err != nil {
 			break
 		}
 		var result source.Result
-		result, err = s.cfg.RemoteSources.Read(ctx, query)
+		result, err = s.RemoteSources.Read(ctx, query)
 		if err != nil {
 			err = pkgroute.SourceError(err, p.Anonymous)
 			break
@@ -125,24 +130,24 @@ func (s artifactoryService) serveDebianIndex(
 		err = store.ErrNotFound
 	}
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(ctx, "Debian Packages index", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian Packages index", err))
 		return
 	}
 	if len(body) > debianIndexLimit {
 		httpkit.WriteErr(
 			w,
 			r,
-			s.internalError(ctx, "Debian Packages index", errDebianIndexTooLarge),
+			s.InternalError(ctx, "Debian Packages index", errDebianIndexTooLarge),
 		)
 		return
 	}
-	paths, err := debianIndexPaths(req.path, body)
+	paths, err := debianIndexPaths(req.Path, body)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.internalError(ctx, "Debian index", err))
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "Debian index", err))
 		return
 	}
 	for _, path := range paths {
-		if !acc.file(c, path, types.ActionRead) ||
+		if !acc.File(c, path, types.ActionRead) ||
 			generic.CheckDownload(c, path, false) != nil {
 			httpkit.WriteErr(w, r, httpkit.Denied(p))
 			return
@@ -152,7 +157,7 @@ func (s artifactoryService) serveDebianIndex(
 				if errors.Is(err, source.ErrDenied) {
 					httpkit.WriteErr(w, r, httpkit.Denied(p))
 				} else {
-					httpkit.WriteErr(w, r, s.itemError(ctx, "Debian package read authority", err))
+					httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian package read authority", err))
 				}
 				return
 			}
@@ -160,9 +165,9 @@ func (s artifactoryService) serveDebianIndex(
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "private, no-store")
-	sw := &statusWriter{ResponseWriter: w}
-	http.ServeContent(sw, r, req.path, time.Time{}, bytes.NewReader(body))
-	if sw.complete(r) && used != nil {
+	sw := &StatusWriter{ResponseWriter: w}
+	http.ServeContent(sw, r, req.Path, time.Time{}, bytes.NewReader(body))
+	if sw.Complete(r) && used != nil {
 		_ = used(ctx)
 	}
 }
@@ -190,8 +195,8 @@ func debianIndexPaths(path string, body []byte) ([]string, error) {
 	return paths, nil
 }
 
-func (s artifactoryService) readDebianBlob(ctx context.Context, sha string) ([]byte, error) {
-	r, _, err := s.cfg.Blobs.Open(ctx, sha)
+func (s debianAPI) readDebianBlob(ctx context.Context, sha string) ([]byte, error) {
+	r, _, err := s.Blobs.Open(ctx, sha)
 	if err != nil {
 		return nil, fmt.Errorf("debian: blob open: %w", err)
 	}

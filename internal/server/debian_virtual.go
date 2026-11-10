@@ -39,40 +39,40 @@ type debianVirtualView struct {
 // serveVirtualDebianMetadata composes an apt view from ordered member
 // Packages files. Its Release is signed with the virtual repository's key,
 // and every advertised Filename resolves through the same member order.
-func (s artifactoryService) serveVirtualDebianMetadata(
+func (s debianAPI) serveVirtualDebianMetadata(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	req itemRequest, p kernel.Principal, acc access,
+	req ItemRequest, p kernel.Principal, acc Access,
 ) {
-	if len(req.props) != 0 || r.URL.RawQuery != "" ||
-		!acc.folder(c, req.path, types.ActionRead) ||
-		!acc.file(c, req.path, types.ActionRead) ||
-		generic.CheckDownload(c, req.path, false) != nil {
+	if len(req.Props) != 0 || r.URL.RawQuery != "" ||
+		!acc.Folder(c, req.Path, types.ActionRead) ||
+		!acc.File(c, req.Path, types.ActionRead) ||
+		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
-	parts := strings.Split(req.path, "/")
+	parts := strings.Split(req.Path, "/")
 	if len(parts) < 3 {
-		httpkit.WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
 	view, err := s.buildVirtualDebianView(r.Context(), st, c, parts[1], p, acc)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(r.Context(), "Debian virtual index", err))
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian virtual index", err))
 		return
 	}
-	body, ok := view.files[req.path]
+	body, ok := view.files[req.Path]
 	if !ok {
-		httpkit.WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Cache-Control", "private, no-store")
-	http.ServeContent(w, r, req.path, time.Time{}, bytes.NewReader(body))
+	http.ServeContent(w, r, req.Path, time.Time{}, bytes.NewReader(body))
 }
 
-func (s artifactoryService) buildVirtualDebianView(
+func (s debianAPI) buildVirtualDebianView(
 	ctx context.Context, st store.Store, c repo.Config, distribution string,
-	p kernel.Principal, acc access,
+	p kernel.Principal, acc Access,
 ) (debianVirtualView, error) {
 	if len(c.Repositories) == 0 || len(c.Repositories) > 128 {
 		return debianVirtualView{}, store.ErrNotFound
@@ -146,7 +146,7 @@ func (s artifactoryService) buildVirtualDebianView(
 	base := "dists/" + distribution + "/"
 	files[base+"Release"] = release
 	if c.KeyPair != "" {
-		pair, err := s.cfg.Access.Keys.Keypair(ctx, c.KeyPair)
+		pair, err := s.Access.Keys.Keypair(ctx, c.KeyPair)
 		if err != nil {
 			return debianVirtualView{}, fmt.Errorf("debian virtual signing key: %w", err)
 		}
@@ -171,9 +171,9 @@ func mapKeys(set map[string]bool) []string {
 	return out
 }
 
-func (s artifactoryService) addDebianMemberIndexes(
+func (s debianAPI) addDebianMemberIndexes(
 	ctx context.Context, st store.Store, virtual, member repo.Config, distribution string,
-	p kernel.Principal, acc access,
+	p kernel.Principal, acc Access,
 	indexes map[string][]debian.PackageRecord, selected map[string]map[string]bool,
 ) error {
 	releasePath := "dists/" + distribution + "/Release"
@@ -210,8 +210,8 @@ func (s artifactoryService) addDebianMemberIndexes(
 		}
 		for _, row := range rows {
 			if selected[base][row.Filename] ||
-				!acc.file(member, row.Filename, types.ActionRead) ||
-				!acc.file(virtual, row.Filename, types.ActionRead) ||
+				!acc.File(member, row.Filename, types.ActionRead) ||
+				!acc.File(virtual, row.Filename, types.ActionRead) ||
 				generic.CheckDownload(member, row.Filename, false) != nil ||
 				generic.CheckDownload(virtual, row.Filename, false) != nil {
 				continue
@@ -230,14 +230,14 @@ func (s artifactoryService) addDebianMemberIndexes(
 	return nil
 }
 
-func (s artifactoryService) serveVirtualDebianPackage(
+func (s debianAPI) serveVirtualDebianPackage(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
-	req itemRequest, p kernel.Principal, acc access,
+	req ItemRequest, p kernel.Principal, acc Access,
 ) {
 	ctx := r.Context()
-	if len(req.props) != 0 || r.URL.RawQuery != "" ||
-		!acc.file(c, req.path, types.ActionRead) ||
-		generic.CheckDownload(c, req.path, false) != nil {
+	if len(req.Props) != 0 || r.URL.RawQuery != "" ||
+		!acc.File(c, req.Path, types.ActionRead) ||
+		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -247,7 +247,7 @@ func (s artifactoryService) serveVirtualDebianPackage(
 			continue
 		}
 		if err != nil {
-			httpkit.WriteErr(w, r, s.itemError(ctx, "Debian virtual member", err))
+			httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian virtual member", err))
 			return
 		}
 		if member.PackageType != repo.Debian || member.Class == repo.Virtual ||
@@ -255,12 +255,12 @@ func (s artifactoryService) serveVirtualDebianPackage(
 			httpkit.WriteErr(
 				w,
 				r,
-				s.itemError(ctx, "Debian virtual member", errDebianVirtualMemberType),
+				s.ItemError(ctx, "Debian virtual member", errDebianVirtualMemberType),
 			)
 			return
 		}
-		if !acc.file(member, req.path, types.ActionRead) ||
-			generic.CheckDownload(member, req.path, false) != nil {
+		if !acc.File(member, req.Path, types.ActionRead) ||
+			generic.CheckDownload(member, req.Path, false) != nil {
 			continue
 		}
 		if member.Class == repo.Remote {
@@ -269,99 +269,99 @@ func (s artifactoryService) serveVirtualDebianPackage(
 			}
 			continue
 		}
-		it, err := st.Items().Get(ctx, member.Key, false, req.path)
+		it, err := st.Items().Get(ctx, member.Key, false, req.Path)
 		if errors.Is(err, store.ErrNotFound) {
 			continue
 		}
 		if err != nil {
-			httpkit.WriteErr(w, r, s.itemError(ctx, "Debian virtual package", err))
+			httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian virtual package", err))
 			return
 		}
 		if !it.Folder {
-			s.serveFile(w, r, st, found{repo: member, item: it}, p)
+			s.ServeFile(w, r, st, Found{Repo: member, Item: it}, p)
 			return
 		}
 	}
-	httpkit.WriteErr(w, r, itemNotFound())
+	httpkit.WriteErr(w, r, ItemNotFound())
 }
 
 // serveRemoteVirtualDebianPackage returns false only when a member lacks the
 // path, allowing ordered fallback. Integrity, permissions and upstream faults
 // are terminal so the virtual path never disguises a failed selected member.
-func (s artifactoryService) serveRemoteVirtualDebianPackage(
-	w http.ResponseWriter, r *http.Request, member repo.Config, req itemRequest,
-	p kernel.Principal, acc access,
+func (s debianAPI) serveRemoteVirtualDebianPackage(
+	w http.ResponseWriter, r *http.Request, member repo.Config, req ItemRequest,
+	p kernel.Principal, acc Access,
 ) bool {
-	if s.cfg.RemoteSources == nil {
-		httpkit.WriteErr(w, r, s.itemError(r.Context(), "Debian virtual source",
+	if s.RemoteSources == nil {
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian virtual source",
 			pkgroute.SourceError(source.ErrUnavailable, p.Anonymous)))
 		return true
 	}
 	q := source.Request{
-		Repo: member, Subject: accessapi.SubjectOf(p), Access: acc.d,
-		Project: member.ProjectKey, Resource: remoteResource(r, req.path),
+		Repo: member, Subject: accessapi.SubjectOf(p), Access: acc.Decider,
+		Project: member.ProjectKey, Resource: RemoteResource(r, req.Path),
 	}
-	q, err := debianSourceRequest(q)
+	q, err := DebianSourceRequest(q)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(r.Context(), "Debian virtual package", err))
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian virtual package", err))
 		return true
 	}
-	result, err := s.cfg.RemoteSources.Read(r.Context(), q)
+	result, err := s.RemoteSources.Read(r.Context(), q)
 	if errors.Is(err, store.ErrNotFound) {
 		return false
 	}
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(r.Context(), "Debian virtual source",
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian virtual source",
 			pkgroute.SourceError(err, p.Anonymous)))
 		return true
 	}
 	if result.Stream != nil {
-		s.serveRemoteStream(w, r, result, member, req, q.Resource, "", p.Anonymous)
+		s.ServeRemoteStream(w, r, result, member, req, q.Resource, "", p.Anonymous)
 		return true
 	}
-	if !s.remoteDeliveryAllowed(w, r, result, p.Anonymous) {
+	if !s.RemoteDeliveryAllowed(w, r, result, p.Anonymous) {
 		return true
 	}
 	if result.Item == nil {
 		httpkit.WriteErr(
 			w,
 			r,
-			s.internalError(r.Context(), "Debian virtual source", source.ErrInvalidResult),
+			s.InternalError(r.Context(), "Debian virtual source", source.ErrInvalidResult),
 		)
 		return true
 	}
-	s.serveFile(w, r, s.cfg.Store,
-		found{repo: member, item: *result.Item, used: result.Used}, p)
+	s.ServeFile(w, r, s.Store,
+		Found{Repo: member, Item: *result.Item, Used: result.Used}, p)
 	return true
 }
 
 // debianMemberBytes reads only an authorized, validated member representation.
 // Remote metadata uses source.Policy so the selected cache variant retains
 // upstream freshness and redirect constraints.
-func (s artifactoryService) debianMemberBytes(
+func (s debianAPI) debianMemberBytes(
 	ctx context.Context, st store.Store, member repo.Config, path string,
-	p kernel.Principal, acc access,
+	p kernel.Principal, acc Access,
 ) ([]byte, func(context.Context, string) error, error) {
-	if !acc.file(member, path, types.ActionRead) ||
+	if !acc.File(member, path, types.ActionRead) ||
 		generic.CheckDownload(member, path, false) != nil {
 		return nil, nil, source.ErrDenied
 	}
 	if member.Class == repo.Remote {
-		if s.cfg.RemoteSources == nil {
+		if s.RemoteSources == nil {
 			return nil, nil, source.ErrUnavailable
 		}
 		q := source.Request{
-			Repo: member, Subject: accessapi.SubjectOf(p), Access: acc.d,
+			Repo: member, Subject: accessapi.SubjectOf(p), Access: acc.Decider,
 			Project: member.ProjectKey,
 			Resource: source.Resource{
 				Path: path, EscapedPath: httpkit.EscapePath(path), Method: http.MethodGet,
 			},
 		}
-		q, err := debianSourceRequest(q)
+		q, err := DebianSourceRequest(q)
 		if err != nil {
 			return nil, nil, err
 		}
-		result, err := s.cfg.RemoteSources.Read(ctx, q)
+		result, err := s.RemoteSources.Read(ctx, q)
 		if err != nil {
 			if errors.Is(err, store.ErrNotFound) || errors.Is(err, source.ErrDenied) {
 				return nil, nil, fmt.Errorf("debian member source: %w", err)

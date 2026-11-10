@@ -17,7 +17,7 @@ import (
 
 func TestUnitP2SourceAdmission(t *testing.T) {
 	for _, name := range []string{"p2.index", "content.jar", "artifacts.jar", "content.xml.xz", "artifacts.xml.xz"} {
-		q, err := p2SourceRequest(
+		q, err := P2SourceRequest(
 			source.Request{Resource: source.Resource{Path: name, Method: http.MethodGet}},
 		)
 		if err != nil || q.Resource.Kind != source.ResourceKindMetadata ||
@@ -50,7 +50,7 @@ func TestUnitP2SourceAdmission(t *testing.T) {
 		{"content.jar", "download=1", "", source.ErrInvalidRequest},
 		{"plugins/org.example_1.0.jar", "", "bytes=0-10", source.ErrInvalidRequest},
 	} {
-		_, err := p2SourceRequest(
+		_, err := P2SourceRequest(
 			source.Request{
 				Resource: source.Resource{Path: tc.path, Query: tc.query, Range: tc.rangeHeader},
 			},
@@ -60,7 +60,7 @@ func TestUnitP2SourceAdmission(t *testing.T) {
 		}
 	}
 	plugin := "org.eclipse.glsp.layout.source_2.7.0.jar"
-	q, err := p2SourceRequest(source.Request{
+	q, err := P2SourceRequest(source.Request{
 		Resource: source.Resource{
 			Kind:   source.ResourceKindArtifact,
 			Path:   "plugins/" + plugin,
@@ -123,7 +123,7 @@ func TestUnitP2VirtualFailsClosedWhenMemberStoreFails(t *testing.T) {
 		t.Context(),
 		st,
 		c,
-		access{d},
+		Access{d},
 		map[string]bool{},
 	); !errors.Is(
 		err,

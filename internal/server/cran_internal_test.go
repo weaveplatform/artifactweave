@@ -25,7 +25,7 @@ func TestUnitCRANSourceValidatesPublishedBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	q, err := cranSourceRequest(source.Request{Resource: source.Resource{
+	q, err := CranSourceRequest(source.Request{Resource: source.Resource{
 		Path: "src/contrib/PACKAGES", Method: http.MethodGet,
 	}})
 	if err != nil || q.Resource.ValidateMetadata == nil || !q.Resource.PermissionFolder ||
@@ -51,10 +51,10 @@ func TestUnitCRANSourceValidatesPublishedBytes(t *testing.T) {
 		})
 	}
 	q.Resource.Query = "malformed=1"
-	if _, err := cranSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
+	if _, err := CranSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
 		t.Fatalf("index query admitted: %v", err)
 	}
-	pkg, err := cranSourceRequest(source.Request{Resource: source.Resource{
+	pkg, err := CranSourceRequest(source.Request{Resource: source.Resource{
 		Path: "src/contrib/assertthat_0.2.1.tar.gz", Method: http.MethodGet,
 	}})
 	if err != nil || pkg.Resource.Validate == nil || pkg.Resource.Variant != "cran-package-v1" {
@@ -80,7 +80,7 @@ func TestUnitCRANSourceValidatesPublishedBytes(t *testing.T) {
 		"src/contrib/PACKAGES.rds", "src/contrib/../secret.tar.gz",
 		"bin/windows/contrib/latest/demo_1.0.zip",
 	} {
-		if _, err := cranSourceRequest(
+		if _, err := CranSourceRequest(
 			source.Request{Resource: source.Resource{Path: p}},
 		); !errors.Is(
 			err,
@@ -105,11 +105,11 @@ func TestUnitCRANVirtualRejectsCyclesAndWrongMembers(t *testing.T) {
 		}
 	}
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs}}
+	svc := cranAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}
 	for _, tc := range []struct {
 		key      string
 		expected error

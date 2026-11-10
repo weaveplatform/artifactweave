@@ -7,7 +7,9 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	ml "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/machinelearning"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 func machineLearningPrivate(c repo.Config, p string) bool {
@@ -21,15 +23,13 @@ func machineLearningPrivate(c repo.Config, p string) bool {
 	return ml.Private(p)
 }
 
-func (artifactoryService) tryMachineLearningItem(
-	w http.ResponseWriter,
-	r *http.Request,
-	c repo.Config,
-	req itemRequest,
+func tryMachineLearningItem(
+	_ *Kit, w http.ResponseWriter, r *http.Request, _ store.Store, c repo.Config,
+	_ bool, req ItemRequest, _ kernel.Principal, _ Access,
 ) bool {
-	if !machineLearningPrivate(c, req.path) {
+	if !machineLearningPrivate(c, req.Path) {
 		return false
 	}
-	httpkit.WriteErr(w, r, itemNotFound())
+	httpkit.WriteErr(w, r, ItemNotFound())
 	return true
 }

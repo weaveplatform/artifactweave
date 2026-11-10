@@ -17,6 +17,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/internal/descriptor"
 	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
 	accesshttp "github.com/weaveplatform/artifactweave/migration/access/adapters/http"
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
@@ -363,14 +364,14 @@ func newRegistry(cfg Config, artSvc artifactoryService) *dockerhttp.Registry {
 		// when the repository says so (decision 0029), and counted.
 		ServeBlob: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {
 			p, _ := kernel.FromContext(r.Context())
-			artSvc.serveFile(w, r, cfg.Store, found{repo: c, item: it}, p)
+			artSvc.ServeFile(w, r, cfg.Store, Found{Repo: c, Item: it}, p)
 		},
 		// A manifest at or above the minimum size redirects too, as on 7.x
 		// (RTFACT-29705), carrying its media type to the object store.
 		RedirectManifest: func(
 			w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item, mediaType string,
 		) bool {
-			return artSvc.redirectManifest(w, r, cfg.Store, found{repo: c, item: it}, mediaType)
+			return artSvc.RedirectManifest(w, r, cfg.Store, Found{Repo: c, Item: it}, mediaType)
 		},
 		Tokens:   cfg.Access.Tokens,
 		Identity: cfg.Access.Identity,
@@ -427,6 +428,71 @@ func accessUnset(a accessapi.API) bool {
 		a.Projects == nil && a.Grants == nil && a.AnonymousAccess == nil
 }
 
+// overlays are the format routes an item GET tries before the generic
+// lookup, in their dispatch order (itemkit.Deps.Overlays).
+var overlays = []Overlay{
+	tryAgentMarketplaceItem,
+	tryAlpineItem,
+	tryCondaItem,
+	tryMachineLearningItem,
+	tryChefItem,
+	tryCranItem,
+	tryDebianItem,
+	tryRPMItem,
+	tryOpkgItem,
+	tryP2Item,
+}
+
+// privateItem reports the paths that only a format's own protocol serves
+// (itemkit.Deps.Private): Hugging Face's Xet and Conda's shards, the
+// machine learning formats' private files and Chef's metadata.
+func privateItem(c repo.Config, p string) bool {
+	return protocolPrivateItem(c, p) || machineLearningPrivate(c, p) || chefMetadataItem(c, p)
+}
+
+// newKit returns the item kit over cfg, with the router's overlays and
+// private predicate. The descriptor stays behind DownloadRedirectMinSize:
+// the artifacts module may not import the configuration module's core.
+func newKit(cfg Config) *Kit {
+	d := Deps{
+		Store:                          cfg.Store,
+		Blobs:                          cfg.Blobs,
+		Keys:                           cfg.Keys,
+		Redirect:                       cfg.Redirect,
+		RemoteSources:                  cfg.RemoteSources,
+		RegistrySources:                cfg.RegistrySources,
+		RemoteHTTP:                     cfg.RemoteHTTP,
+		Work:                           cfg.Work,
+		Formats:                        cfg.Formats,
+		FormatSettings:                 cfg.FormatSettings,
+		Access:                         cfg.Access,
+		EnforceIdenticalChecksumDeploy: cfg.EnforceIdenticalChecksumDeploy,
+		Logger:                         cfg.Logger,
+		Overlays:                       overlays,
+		Private:                        privateItem,
+	}
+	if cfg.Store != nil {
+		d.DownloadRedirectMinSize = func(ctx context.Context) (int64, bool, error) {
+			return descriptor.DownloadRedirectMinSize(ctx, cfg.Store.Configs())
+		}
+	}
+	return NewKit(d)
+}
+
+// newArtifactoryService returns the artifacts service over cfg with its own
+// item kit. Every service is built here: a literal without a kit compiles
+// and then panics on its first kit call.
+func newArtifactoryService(cfg Config) artifactoryService {
+	return artifactoryService{
+		Kit: newKit(cfg),
+		cfg: cfg,
+		folderSlots: make(
+			chan struct{},
+			cmp.Or(cfg.FolderDownloadMaxConcurrent, defaultFolderSlots),
+		),
+	}
+}
+
 // managementBodyLimit bounds JSON management requests. 64 MiB covers the
 // largest documented payloads (batch repository creation, build-info) with
 // room to spare; artifact uploads never pass through it.
@@ -440,14 +506,7 @@ func New(cfg Config) http.Handler {
 		logger = slog.Default()
 	}
 	r := chi.NewRouter()
-	artSvc := artifactoryService{
-		cfg:      cfg,
-		signWarn: newThrottle(signWarnEvery),
-		folderSlots: make(
-			chan struct{},
-			cmp.Or(cfg.FolderDownloadMaxConcurrent, defaultFolderSlots),
-		),
-	}
+	artSvc := newArtifactoryService(cfg)
 	sysAPI := systemAPI{cfg: cfg, instanceID: new(atomic.Pointer[string])}
 	accessHTTP := accesshttp.New(accesshttp.Deps{
 		API:           cfg.Access,
@@ -551,7 +610,7 @@ func New(cfg Config) http.Handler {
 	terraformbackendhttp.Register(
 		r,
 		terraformbackendhttp.Options{
-			Items:        artSvc.items(cfg.Store),
+			Items:        artSvc.Items(cfg.Store),
 			Keys:         cfg.Keys,
 			Fault:        func(r *http.Request, err error) { httpkit.NoteCause(r.Context(), err) },
 			Authorizer:   cfg.Access.Authorizer,

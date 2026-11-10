@@ -30,10 +30,10 @@ func (s artifactoryService) MoveCranArchives(
 	if !s.cfg.CranArchiveMoverEnabled {
 		return nil, apierror.New(http.StatusNotFound, "CRAN archive migration is disabled")
 	}
-	st, c, by, err := s.operationRepo(ctx, repo.Cran, reindexOp{
-		isAdminOnly: true,
-		classes:     []repo.Class{repo.Local, repo.Federated},
-		refused:     "Repository '%s' must be a local or federated CRAN repository",
+	st, c, by, err := s.OperationRepo(ctx, repo.Cran, ReindexOp{
+		IsAdminOnly: true,
+		Classes:     []repo.Class{repo.Local, repo.Federated},
+		Refused:     "Repository '%s' must be a local or federated CRAN repository",
 	}, req.RepoKey)
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func (s artifactoryService) MoveCranArchives(
 		)
 	}
 	if err != nil {
-		return nil, s.itemError(ctx, "move CRAN archives", err)
+		return nil, s.ItemError(ctx, "move CRAN archives", err)
 	}
 	return artgen.MoveCranArchives200JSONResponse{"moved": moved}, nil
 }
@@ -62,7 +62,7 @@ func (s artifactoryService) moveCranArchives(
 	c repo.Config,
 	by string,
 ) (int, error) {
-	svc := s.items(st)
+	svc := s.Items(st)
 	page := store.Page{Limit: store.MaxLimit}
 	moved := 0
 	for {

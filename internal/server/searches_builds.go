@@ -51,7 +51,7 @@ func (s artifactoryService) SearchDependency(
 	}
 	refs, err := r.st.Builds().FindDependencies(ctx, types.Checksums{SHA1: sha1})
 	if err != nil {
-		return nil, s.internalError(ctx, "dependency search", err)
+		return nil, s.InternalError(ctx, "dependency search", err)
 	}
 	a, limit := buildAccess{r.acc}, r.capped(0)
 	seen := map[[3]string]bool{}
@@ -148,7 +148,7 @@ func (s artifactoryService) SearchBuildArtifacts(
 	}
 	items, err := svc.SearchArtifacts(ctx, b, in, a)
 	if err != nil {
-		return nil, s.internalError(ctx, "build artifacts search", err)
+		return nil, s.InternalError(ctx, "build artifacts search", err)
 	}
 	limit := r.capped(0)
 	entries := []map[string]any{}
@@ -162,7 +162,7 @@ func (s artifactoryService) SearchBuildArtifacts(
 			continue
 		}
 		entries = append(entries, map[string]any{
-			"downloadUri": downloadURI(ctx, it.ReportedRepoKey(), full),
+			"downloadUri": DownloadURI(ctx, it.ReportedRepoKey(), full),
 		})
 		if len(entries) == limit {
 			break

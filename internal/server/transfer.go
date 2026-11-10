@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -42,31 +41,9 @@ func (s artifactoryService) registerTransferRoutes(r chi.Router) {
 		r.Get(p, s.downloadFolderArchive)
 	}
 	for _, p := range httpkit.ChiPatterns("/artifactory/{repoKey}/{archivePath}!/{entryPath}") {
-		r.Get(p, s.getItem)
-		r.Head(p, s.getItem)
+		r.Get(p, s.GetItem)
+		r.Head(p, s.GetItem)
 	}
-}
-
-// splitRepoPath splits an escaped "<repo>/<path>" into the key and the
-// unescaped path; folder reports a trailing slash.
-func splitRepoPath(escaped string) (key, p string, folder bool, err error) {
-	folder = strings.HasSuffix(escaped, "/")
-	segs := strings.Split(strings.Trim(escaped, "/"), "/")
-	for i, seg := range segs {
-		if segs[i], err = url.PathUnescape(seg); err != nil {
-			return "", "", false, httpkit.BadRequestf("malformed path: %v", err)
-		}
-	}
-	key, p = segs[0], strings.Join(segs[1:], "/")
-	if key == "" {
-		return "", "", false, httpkit.BadRequestf("a repository key is required")
-	}
-	if p != "" {
-		if _, _, _, err := types.SplitItemPath(p); err != nil {
-			return "", "", false, httpkit.BadRequestf("malformed path %q", p)
-		}
-	}
-	return key, p, folder, nil
 }
 
 // flag01 reads a 0/1 query parameter (true and false are accepted too).
@@ -97,7 +74,7 @@ func (s artifactoryService) moveItem(w http.ResponseWriter, r *http.Request) {
 // messages, even when items failed.
 func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, move bool) {
 	ctx := r.Context()
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
@@ -106,7 +83,7 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 	if move {
 		verb = "move"
 	}
-	srcKey, srcPath, _, err := splitRepoPath(
+	srcKey, srcPath, _, err := SplitRepoPath(
 		strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/api/"+verb+"/"))
 	if err != nil {
 		refuseTransfer(w, err.Error())
@@ -133,23 +110,23 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 		refuseTransfer(w, err.Error())
 		return
 	}
-	p, acc, err := s.itemCaller(ctx, st)
+	p, acc, err := s.ItemCaller(ctx, st)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	from, cached, err := resolveRepo(ctx, st, srcKey)
+	from, cached, err := ResolveRepo(ctx, st, srcKey)
 	var missing *apierror.Error
 	switch {
 	case errors.As(err, &missing) && missing.Status == http.StatusNotFound:
 		refuseTransfer(w, missing.Message)
 		return
 	case err != nil:
-		httpkit.WriteErr(w, r, s.itemError(ctx, "resolve source repository", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve source repository", err))
 		return
 	}
-	if !acc.file(from, srcPath, types.ActionRead) ||
-		(move && !acc.file(from, srcPath, types.ActionDelete)) {
+	if !acc.File(from, srcPath, types.ActionRead) ||
+		(move && !acc.File(from, srcPath, types.ActionDelete)) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -169,7 +146,7 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 		refuseTransfer(w, fmt.Sprintf("The target repository '%s' does not exist", toKey))
 		return
 	case err != nil:
-		httpkit.WriteErr(w, r, s.internalError(ctx, "get target repository", err))
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "get target repository", err))
 		return
 	case target.Class != repo.Local && target.Class != repo.Federated:
 		refuseTransfer(
@@ -184,11 +161,11 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 	if into || toPath == "" {
 		dest = path.Join(toPath, path.Base(srcPath))
 	}
-	if !acc.file(target, dest, types.ActionWrite) {
+	if !acc.File(target, dest, types.ActionWrite) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
-	svc, src := s.items(st), item.Target{Repo: from, Cached: cached, Path: srcPath}
+	svc, src := s.Items(st), item.Target{Repo: from, Cached: cached, Path: srcPath}
 	canOverwrite, err := s.overwriteRight(ctx, st, acc, p, landing{
 		src: src, target: target, dest: dest, shouldMove: move,
 	})
@@ -211,7 +188,7 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 		refuseTransfer(w, fmt.Sprintf("The source %s:%s does not exist", srcKey, srcPath))
 		return
 	case err != nil:
-		httpkit.WriteErr(w, r, s.itemError(ctx, verb, err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, verb, err))
 		return
 	}
 	writeTransfer(w, http.StatusOK, res.Messages)
@@ -237,31 +214,31 @@ type landing struct {
 func (s artifactoryService) overwriteRight(
 	ctx context.Context,
 	st store.Store,
-	acc access,
+	acc Access,
 	p kernel.Principal,
 	l landing,
 ) (bool, error) {
-	moves, err := s.items(st).SidecarsBeside(ctx, l.src, l.dest)
+	moves, err := s.Items(st).SidecarsBeside(ctx, l.src, l.dest)
 	if err != nil {
-		return false, s.itemError(ctx, "sidecars", err)
+		return false, s.ItemError(ctx, "sidecars", err)
 	}
 	want := types.ActionRead
 	if l.shouldMove {
 		want |= types.ActionDelete
 	}
-	overwrite := acc.file(l.target, l.dest, types.ActionDelete)
+	overwrite := acc.File(l.target, l.dest, types.ActionDelete)
 	for _, m := range moves {
-		if !acc.file(l.src.Repo, m.From, want) || !acc.file(l.target, m.To, types.ActionWrite) {
+		if !acc.File(l.src.Repo, m.From, want) || !acc.File(l.target, m.To, types.ActionWrite) {
 			return false, httpkit.Denied(p)
 		}
-		if acc.file(l.target, m.To, types.ActionDelete) {
+		if acc.File(l.target, m.To, types.ActionDelete) {
 			continue
 		}
 		_, err := st.Items().Get(ctx, l.target.Key, false, m.To)
 		switch {
 		case errors.Is(err, store.ErrNotFound):
 		case err != nil:
-			return false, s.itemError(ctx, "get sidecar target", err)
+			return false, s.ItemError(ctx, "get sidecar target", err)
 		default:
 			overwrite = false
 		}
@@ -309,12 +286,12 @@ const defaultFolderSlots = 10
 // other check as 6.20's FolderDownloadServiceImpl orders them.
 func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	key, p, _, err := splitRepoPath(
+	key, p, _, err := SplitRepoPath(
 		strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/api/archive/download/"))
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -330,17 +307,17 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	caller, acc, err := s.itemCaller(ctx, st)
+	caller, acc, err := s.ItemCaller(ctx, st)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	c, cached, err := resolveRepo(ctx, st, key)
+	c, cached, err := ResolveRepo(ctx, st, key)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(ctx, "resolve repository", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve repository", err))
 		return
 	}
-	if !acc.folder(c, p, types.ActionRead) {
+	if !acc.Folder(c, p, types.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(caller))
 		return
 	}
@@ -351,7 +328,7 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 	}
 	fd, err := item.FolderDownload(ctx, st)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.internalError(ctx, "folder download setting", err))
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "folder download setting", err))
 		return
 	}
 	if !fd.Enabled || (caller.Anonymous && !fd.EnabledForAnonymous) {
@@ -359,9 +336,9 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 		return
 	}
 	t := item.Target{Repo: c, Cached: cached || c.Class == repo.Remote, Path: p}
-	tree, err := s.items(st).Tree(ctx, t)
+	tree, err := s.Items(st).Tree(ctx, t)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(ctx, "list folder", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "list folder", err))
 		return
 	}
 	if len(tree) > 0 && p != "" && !tree[0].Folder {
@@ -374,7 +351,7 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 		// Files the caller may not read are left out of the archive.
 		if !it.Folder && !protocolPrivateItem(c, it.FullPath()) &&
 			!machineLearningPrivate(c, it.FullPath()) && !chefMetadataItem(c, it.FullPath()) &&
-			acc.file(c, it.FullPath(), types.ActionRead) {
+			acc.File(c, it.FullPath(), types.ActionRead) {
 			files = append(files, it)
 			total += it.Size
 		}
@@ -398,9 +375,9 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 	w.Header().Set("Content-Type", kind.ContentType())
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", name+kind.Ext()))
 	w.WriteHeader(http.StatusOK)
-	if err := s.items(st).ArchiveFiles(ctx, files, p, kind, sums, w); err != nil {
+	if err := s.Items(st).ArchiveFiles(ctx, files, p, kind, sums, w); err != nil {
 		// The status is sent; the client sees a truncated archive.
-		_ = s.internalError(ctx, "stream folder archive", err)
+		_ = s.InternalError(ctx, "stream folder archive", err)
 	}
 }
 
@@ -422,39 +399,5 @@ func (s artifactoryService) takeFolderSlot() bool {
 func (s artifactoryService) releaseFolderSlot() {
 	if s.folderSlots != nil {
 		<-s.folderSlots
-	}
-}
-
-// getArchiveEntry serves one entry of an archive file: the part of an item
-// path after "!/" (decision 0002).
-func (s artifactoryService) getArchiveEntry(
-	w http.ResponseWriter,
-	r *http.Request,
-	st store.Store,
-	f found,
-	entry string,
-) {
-	ctx := r.Context()
-	if f.item.Folder {
-		httpkit.WriteErr(w, r, itemNotFound())
-		return
-	}
-	err := s.items(st).ArchiveEntry(ctx, f.item, entry, func(size int64, rd io.Reader) error {
-		h := w.Header()
-		h.Set("Content-Type", item.MimeType(entry))
-		h.Set("Content-Length", strconv.FormatInt(size, 10))
-		h.Set("X-Artifactory-Filename", path.Base(entry))
-		w.WriteHeader(http.StatusOK)
-		if r.Method == http.MethodHead {
-			return nil
-		}
-		_, err := io.Copy(w, rd)
-		return err //nolint:wrapcheck // the status is sent; only logged
-	})
-	switch {
-	case errors.Is(err, item.ErrNotFound):
-		httpkit.WriteErr(w, r, itemNotFound())
-	case err != nil:
-		_ = s.internalError(ctx, "archive entry", err)
 	}
 }

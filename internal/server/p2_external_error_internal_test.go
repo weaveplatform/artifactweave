@@ -26,7 +26,7 @@ func TestUnitP2ReadFailsClosedAtSourceAndDeliveryFences(t *testing.T) {
 	})
 	w := newItemWorld(t, false)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func TestUnitP2ReadFailsClosedAtSourceAndDeliveryFences(t *testing.T) {
 		"/artifactory/p2-read-errors/compositeContent.xml",
 		nil,
 	)
-	s := artifactoryService{}
+	s := p2Items{newKit(Config{})}
 	if _, err := s.p2Read(
 		r,
 		c,
@@ -51,7 +51,7 @@ func TestUnitP2ReadFailsClosedAtSourceAndDeliveryFences(t *testing.T) {
 	) {
 		t.Fatalf("missing source admitted: %v", err)
 	}
-	s.cfg.RemoteSources = &source.Service{
+	s.RemoteSources = &source.Service{
 		Resolve: sourceIdentity, HTTP: sourceBackend(
 			func(context.Context, source.Request, source.Permit) (source.Result, error) {
 				return source.Result{}, source.ErrUnavailable
@@ -72,7 +72,7 @@ func TestUnitP2ReadFailsClosedAtSourceAndDeliveryFences(t *testing.T) {
 	) {
 		t.Fatalf("source fault exposed content: %v", err)
 	}
-	s.cfg.RemoteSources = &source.Service{
+	s.RemoteSources = &source.Service{
 		Resolve: sourceIdentity, HTTP: sourceBackend(
 			func(context.Context, source.Request, source.Permit) (source.Result, error) {
 				return source.Result{}, nil
@@ -126,7 +126,7 @@ func TestUnitP2ReadFailsClosedAtSourceAndDeliveryFences(t *testing.T) {
 	}
 	var checks int
 	stream := &sourceBody{Reader: bytes.NewReader([]byte(p2ExternalComposite))}
-	s.cfg.RemoteSources = &source.Service{
+	s.RemoteSources = &source.Service{
 		Resolve: sourceIdentity,
 		Revalidate: func(context.Context, source.Request, source.Permit) error {
 			checks++
@@ -167,7 +167,7 @@ func TestUnitP2ReadCachedMetadataUsesItsStoredBytes(t *testing.T) {
 	})
 	w := newItemWorld(t, false)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,10 +185,10 @@ func TestUnitP2ReadCachedMetadataUsesItsStoredBytes(t *testing.T) {
 			}}, nil
 		},
 	)
-	s := artifactoryService{cfg: Config{
+	s := p2Items{newKit(Config{
 		Blobs:         w.blobs,
 		RemoteSources: &source.Service{Resolve: sourceIdentity, Cache: backend},
-	}}
+	})}
 	r := httptest.NewRequest(
 		http.MethodGet,
 		"/artifactory/p2-cached-read/compositeContent.xml",
@@ -211,14 +211,14 @@ func TestUnitP2ReadBoundsStreamAndExtractsOnlyValidArchives(t *testing.T) {
 	})
 	w := newItemWorld(t, false)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	r := httptest.NewRequest(http.MethodGet, "/artifactory/p2-bounded-read/content.jar", nil)
 	longMetadata := bytes.Repeat([]byte("x"), p2.MaxMetadata+1)
 	streamBody := longMetadata
-	s := artifactoryService{cfg: Config{RemoteSources: &source.Service{
+	s := p2Items{newKit(Config{RemoteSources: &source.Service{
 		Resolve: sourceIdentity,
 		HTTP: sourceBackend(
 			func(context.Context, source.Request, source.Permit) (source.Result, error) {
@@ -228,7 +228,7 @@ func TestUnitP2ReadBoundsStreamAndExtractsOnlyValidArchives(t *testing.T) {
 				}}, nil
 			},
 		),
-	}}}
+	}})}
 	if _, err := s.p2Read(
 		r,
 		c,
@@ -259,7 +259,7 @@ func TestUnitP2ArchiveEntryValidationFailsBeforePublication(t *testing.T) {
 	})
 	w := newItemWorld(t, false)
 	p := kernel.Principal{Name: "admin", Admin: true}
-	acc, err := accessFor(t.Context(), authorizerOver(w.db), p, nil)
+	acc, err := AccessFor(t.Context(), authorizerOver(w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +279,7 @@ func TestUnitP2ArchiveEntryValidationFailsBeforePublication(t *testing.T) {
 		{"not a zip", []byte("bad archive"), int64(len("bad archive"))},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := artifactoryService{cfg: Config{RemoteSources: &source.Service{
+			s := p2Items{newKit(Config{RemoteSources: &source.Service{
 				Resolve: sourceIdentity,
 				HTTP: sourceBackend(
 					func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
@@ -296,7 +296,7 @@ func TestUnitP2ArchiveEntryValidationFailsBeforePublication(t *testing.T) {
 						return source.Result{}, nil
 					},
 				),
-			}}}
+			}})}
 			if _, err := s.p2Read(r, c, false, "__p2_ext/opaque/compositeContent.xml",
 				target, "compositeContent.xml", p, acc); err == nil {
 				t.Fatal("invalid archive entry admitted")

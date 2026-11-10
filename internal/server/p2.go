@@ -28,28 +28,33 @@ import (
 
 var errP2VirtualCycle = errors.New("server: p2 virtual repository cycle")
 
+// p2Items serves P2's virtual and composite repositories over the item
+// kit.
+type p2Items struct{ *Kit }
+
 // tryP2Item reserves the update-site wire paths before generic item routing.
 // Remote reads still cross the common source policy and cache boundary.
-func (s artifactoryService) tryP2Item(w http.ResponseWriter, r *http.Request,
-	st store.Store, c repo.Config, cached bool, req itemRequest,
-	p kernel.Principal, acc access,
+func tryP2Item(
+	k *Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
+	cached bool, req ItemRequest, p kernel.Principal, acc Access,
 ) bool {
+	s := p2Items{k}
 	if c.PackageType != repo.P2 {
 		return false
 	}
-	if req.isFolder || len(req.props) != 0 || r.URL.RawQuery != "" {
-		httpkit.WriteErr(w, r, itemNotFound())
+	if req.IsFolder || len(req.Props) != 0 || r.URL.RawQuery != "" {
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return true
 	}
 	if c.Class == repo.Virtual {
 		s.serveP2Virtual(w, r, st, c, req, p, acc)
 		return true
 	}
-	if c.Class != repo.Remote || p2.Classify(req.path) == p2.KindInvalid {
-		httpkit.WriteErr(w, r, itemNotFound())
+	if c.Class != repo.Remote || p2.Classify(req.Path) == p2.KindInvalid {
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return true
 	}
-	if strings.HasPrefix(req.path, "__p2_ext/") || p2CompositeName(req.path) {
+	if strings.HasPrefix(req.Path, "__p2_ext/") || p2CompositeName(req.Path) {
 		s.serveP2CompositeChild(w, r, c, cached, req, p, acc)
 		return true
 	}
@@ -74,24 +79,24 @@ func p2ArchiveURL(raw string) (string, bool) {
 	return archive, true
 }
 
-func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Request,
-	c repo.Config, cached bool, req itemRequest, p kernel.Principal, acc access,
+func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
+	c repo.Config, cached bool, req ItemRequest, p kernel.Principal, acc Access,
 	archiveURL string,
 ) {
-	if !acc.file(c, req.path, types.ActionRead) ||
-		generic.CheckDownload(c, req.path, false) != nil {
+	if !acc.File(c, req.Path, types.ActionRead) ||
+		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
-	if s.cfg.RemoteSources == nil {
+	if s.RemoteSources == nil {
 		httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrUnavailable, p.Anonymous))
 		return
 	}
 	q := source.Request{
-		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d,
+		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider,
 		Project: c.ProjectKey, CacheOnly: cached,
 		Resource: source.Resource{
-			Kind: source.ResourceKindArtifact, Path: req.path, Method: http.MethodGet,
+			Kind: source.ResourceKindArtifact, Path: req.Path, Method: http.MethodGet,
 			ExternalURL: archiveURL, Variant: "p2-site-archive-v1",
 			Validate: func(_ context.Context, src io.ReadSeeker, size int64) error {
 				if size <= 0 || size > p2.MaxArtifact {
@@ -107,7 +112,7 @@ func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Reques
 						Kind:   source.FailureKindIntegrity,
 					}
 				}
-				if _, err := p2.ExtractArchive(body, req.path); err != nil {
+				if _, err := p2.ExtractArchive(body, req.Path); err != nil {
 					return &source.HTTPError{
 						Status: http.StatusBadGateway,
 						Kind:   source.FailureKindIntegrity,
@@ -117,12 +122,12 @@ func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Reques
 			},
 		},
 	}
-	result, err := s.cfg.RemoteSources.Read(r.Context(), q)
+	result, err := s.RemoteSources.Read(r.Context(), q)
 	if err != nil {
 		httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 		return
 	}
-	if !s.remoteDeliveryAllowed(w, r, result, p.Anonymous) {
+	if !s.RemoteDeliveryAllowed(w, r, result, p.Anonymous) {
 		return
 	}
 	var site []byte
@@ -132,7 +137,7 @@ func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Reques
 		site, err = io.ReadAll(io.LimitReader(result.Stream.Body, p2.MaxArtifact+1))
 	case result.Item != nil:
 		var reader io.ReadCloser
-		reader, _, err = s.cfg.Blobs.Open(r.Context(), result.Item.Actual.SHA256)
+		reader, _, err = s.Blobs.Open(r.Context(), result.Item.Actual.SHA256)
 		if err == nil {
 			defer func() { _ = reader.Close() }()
 			site, err = io.ReadAll(io.LimitReader(reader, p2.MaxArtifact+1))
@@ -144,47 +149,47 @@ func (s artifactoryService) serveP2Archive(w http.ResponseWriter, r *http.Reques
 		httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
 		return
 	}
-	body, err := p2.ExtractArchive(site, req.path)
+	body, err := p2.ExtractArchive(site, req.Path)
 	if err != nil {
 		httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
 		return
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Cache-Control", "private, no-store")
-	sw := &statusWriter{ResponseWriter: w}
-	http.ServeContent(sw, r, path.Base(req.path), time.Time{}, bytes.NewReader(body))
-	if sw.complete(r) && result.Used != nil {
+	sw := &StatusWriter{ResponseWriter: w}
+	http.ServeContent(sw, r, path.Base(req.Path), time.Time{}, bytes.NewReader(body))
+	if sw.Complete(r) && result.Used != nil {
 		_ = result.Used(r.Context())
 	}
 }
 
-func (s artifactoryService) serveP2Virtual(w http.ResponseWriter, r *http.Request,
-	st store.Store, c repo.Config, req itemRequest, p kernel.Principal, acc access,
+func (s p2Items) serveP2Virtual(w http.ResponseWriter, r *http.Request,
+	st store.Store, c repo.Config, req ItemRequest, p kernel.Principal, acc Access,
 ) {
-	if !acc.folder(c, req.path, types.ActionRead) ||
-		!acc.file(c, req.path, types.ActionRead) ||
-		generic.CheckDownload(c, req.path, false) != nil {
+	if !acc.Folder(c, req.Path, types.ActionRead) ||
+		!acc.File(c, req.Path, types.ActionRead) ||
+		generic.CheckDownload(c, req.Path, false) != nil {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	members, err := p2Members(r.Context(), st, c, acc, map[string]bool{})
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(r.Context(), "P2 virtual members", err))
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "P2 virtual members", err))
 		return
 	}
-	if strings.HasPrefix(req.path, "__p2/") {
-		parts := strings.SplitN(strings.TrimPrefix(req.path, "__p2/"), "/", 2)
+	if strings.HasPrefix(req.Path, "__p2/") {
+		parts := strings.SplitN(strings.TrimPrefix(req.Path, "__p2/"), "/", 2)
 		if len(parts) != 2 || p2.Classify(parts[1]) == p2.KindInvalid {
-			httpkit.WriteErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, ItemNotFound())
 			return
 		}
 		i, parseErr := strconv.Atoi(parts[0])
 		if parseErr != nil || i < 0 || i >= len(members) || strconv.Itoa(i) != parts[0] {
-			httpkit.WriteErr(w, r, itemNotFound())
+			httpkit.WriteErr(w, r, ItemNotFound())
 			return
 		}
 		member := members[i]
-		if !acc.file(member, parts[1], types.ActionRead) ||
+		if !acc.File(member, parts[1], types.ActionRead) ||
 			generic.CheckDownload(member, parts[1], false) != nil {
 			httpkit.WriteErr(w, r, httpkit.Denied(p))
 			return
@@ -197,11 +202,11 @@ func (s artifactoryService) serveP2Virtual(w http.ResponseWriter, r *http.Reques
 		uri.Path = "/artifactory/" + member.Key + "/" + parts[1]
 		uri.RawPath = ""
 		clone.URL = &uri
-		s.getItem(w, clone)
+		s.GetItem(w, clone)
 		return
 	}
 	var body []byte
-	switch req.path {
+	switch req.Path {
 	case "p2.index":
 		body = []byte(
 			"version=1\nmetadata.repository.factory.order=compositeContent.xml,\\!\nartifact.repository.factory.order=compositeArtifacts.xml,\\!\n",
@@ -211,22 +216,22 @@ func (s artifactoryService) serveP2Virtual(w http.ResponseWriter, r *http.Reques
 	case "compositeArtifacts.xml":
 		body = p2Composite("artifact", members)
 	default:
-		httpkit.WriteErr(w, r, itemNotFound())
+		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
 	w.Header().Set("Cache-Control", "private, no-store")
-	if req.path == "p2.index" {
+	if req.Path == "p2.index" {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	} else {
 		w.Header().Set("Content-Type", "application/xml")
 	}
-	http.ServeContent(w, r, req.path, time.Time{}, bytes.NewReader(body))
+	http.ServeContent(w, r, req.Path, time.Time{}, bytes.NewReader(body))
 }
 
 // p2Members keeps the virtual order and removes members a caller cannot
 // traverse. Only a P2 remote or a local Maven/Generic update site can supply
 // native metadata. A nested P2 virtual is permitted if its graph is acyclic.
-func p2Members(ctx context.Context, st store.Store, c repo.Config, acc access,
+func p2Members(ctx context.Context, st store.Store, c repo.Config, acc Access,
 	visited map[string]bool,
 ) ([]repo.Config, error) {
 	if visited[c.Key] {
@@ -243,7 +248,7 @@ func p2Members(ctx context.Context, st store.Store, c repo.Config, acc access,
 		if err != nil {
 			return nil, fmt.Errorf("p2 member %s: %w", key, err)
 		}
-		if !acc.folder(m, "", types.ActionRead) {
+		if !acc.Folder(m, "", types.ActionRead) {
 			continue
 		}
 		switch {

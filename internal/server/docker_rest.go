@@ -27,17 +27,17 @@ func (s artifactoryService) DeleteDockerTag(
 	ctx context.Context,
 	req artgen.DeleteDockerTagRequestObject,
 ) (artgen.DeleteDockerTagResponseObject, error) {
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
-	p, acc, err := s.itemCaller(ctx, st)
+	p, acc, err := s.ItemCaller(ctx, st)
 	if err != nil {
 		return nil, err
 	}
 	c, err := dockerRepo(ctx, st, req.RepoKey)
 	if err != nil {
-		return nil, s.itemError(ctx, "resolve repository", err)
+		return nil, s.ItemError(ctx, "resolve repository", err)
 	}
 	var name, tag string
 	if req.Body != nil {
@@ -50,7 +50,7 @@ func (s artifactoryService) DeleteDockerTag(
 		return nil, httpkit.BadRequestf("invalid image name '%s'", name)
 	case !layout.ValidTag(tag):
 		return nil, httpkit.BadRequestf("invalid tag '%s'", tag)
-	case !acc.file(c, name+"/", types.ActionDelete):
+	case !acc.File(c, name+"/", types.ActionDelete):
 		return nil, httpkit.Denied(p)
 	}
 	missing := apierror.New(http.StatusNotFound,
@@ -64,7 +64,7 @@ func (s artifactoryService) DeleteDockerTag(
 	case errors.Is(err, store.ErrNotFound):
 		return nil, missing
 	case err != nil:
-		return nil, s.internalError(ctx, "delete docker tag", err)
+		return nil, s.InternalError(ctx, "delete docker tag", err)
 	}
 	return artgen.DeleteDockerTag200TextResponse(
 		fmt.Sprintf("Deleted tag '%s' of image '%s' in '%s'.", tag, name, c.Key)), nil
@@ -79,11 +79,11 @@ func (s artifactoryService) PromoteDockerImage(
 	ctx context.Context,
 	req artgen.PromoteDockerImageRequestObject,
 ) (artgen.PromoteDockerImageResponseObject, error) {
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
-	p, acc, err := s.itemCaller(ctx, st)
+	p, acc, err := s.ItemCaller(ctx, st)
 	if err != nil {
 		return nil, err
 	}
@@ -93,11 +93,11 @@ func (s artifactoryService) PromoteDockerImage(
 	}
 	from, err := promotionRepo(ctx, st, req.RepoKey)
 	if err != nil {
-		return nil, s.itemError(ctx, "resolve source repository", err)
+		return nil, s.ItemError(ctx, "resolve source repository", err)
 	}
 	to, err := promotionRepo(ctx, st, args.targetRepo)
 	if err != nil {
-		return nil, s.itemError(ctx, "resolve target repository", err)
+		return nil, s.ItemError(ctx, "resolve target repository", err)
 	}
 	if to.PackageType != from.PackageType {
 		return nil, httpkit.BadRequestf(
@@ -112,7 +112,7 @@ func (s artifactoryService) PromoteDockerImage(
 	if !args.shouldCopy {
 		read |= types.ActionDelete
 	}
-	if !acc.file(from, args.name+"/", read) || !acc.file(to, args.toName+"/", types.ActionWrite) {
+	if !acc.File(from, args.name+"/", read) || !acc.File(to, args.toName+"/", types.ActionWrite) {
 		return nil, httpkit.Denied(p)
 	}
 	svc := s.registry(st)
@@ -129,7 +129,7 @@ func (s artifactoryService) PromoteDockerImage(
 	case errors.Is(err, registry.ErrSamePlace):
 		return nil, httpkit.BadRequestf("the image would be promoted onto itself")
 	case err != nil:
-		return nil, s.internalError(ctx, "docker promotion", err)
+		return nil, s.InternalError(ctx, "docker promotion", err)
 	}
 	return artgen.PromoteDockerImage200TextResponse(fmt.Sprintf(
 		"Promoted %d tag(s) of '%s' from '%s' to '%s/%s'.",
@@ -180,7 +180,7 @@ func (s artifactoryService) promotionTags(
 	svc *registry.Service,
 	pr registry.Promotion,
 	args promotion,
-	acc access,
+	acc Access,
 	p kernel.Principal,
 ) ([]registry.Rename, error) {
 	tags, err := svc.PromotedTags(ctx, pr.From, args.tag)
@@ -192,20 +192,20 @@ func (s artifactoryService) promotionTags(
 		return nil, apierror.New(http.StatusNotFound, fmt.Sprintf(
 			"Tag '%s' of image '%s' does not exist in '%s'", args.tag, args.name, pr.From.Repo.Key))
 	case err != nil:
-		return nil, s.internalError(ctx, "docker promotion tags", err)
+		return nil, s.InternalError(ctx, "docker promotion tags", err)
 	}
 	renames := make([]registry.Rename, 0, len(tags))
 	for _, t := range tags {
 		r := registry.Rename{From: t, To: orDefault(args.toTag, t)}
 		manifest, err := svc.TagManifest(ctx, pr.From, t)
 		if err != nil {
-			return nil, s.internalError(ctx, "docker promotion source", err)
+			return nil, s.InternalError(ctx, "docker promotion source", err)
 		}
 		replaces, err := svc.Replaces(ctx, pr.To, r.To, manifest.Actual.SHA256)
 		if err != nil {
-			return nil, s.internalError(ctx, "docker promotion target", err)
+			return nil, s.InternalError(ctx, "docker promotion target", err)
 		}
-		if replaces && !acc.file(pr.To.Repo, pr.To.Name+"/", types.ActionDelete) {
+		if replaces && !acc.File(pr.To.Repo, pr.To.Name+"/", types.ActionDelete) {
 			return nil, httpkit.Denied(p)
 		}
 		renames = append(renames, r)
@@ -219,17 +219,17 @@ func (s artifactoryService) FindParentManifestLists(
 	ctx context.Context,
 	req artgen.FindParentManifestListsRequestObject,
 ) (artgen.FindParentManifestListsResponseObject, error) {
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
-	p, acc, err := s.itemCaller(ctx, st)
+	p, acc, err := s.ItemCaller(ctx, st)
 	if err != nil {
 		return nil, err
 	}
 	c, err := dockerRepo(ctx, st, req.RepoKey)
 	if err != nil {
-		return nil, s.itemError(ctx, "resolve repository", err)
+		return nil, s.ItemError(ctx, "resolve repository", err)
 	}
 	var name, tag string
 	if req.Body != nil {
@@ -242,7 +242,7 @@ func (s artifactoryService) FindParentManifestLists(
 		return nil, httpkit.BadRequestf("invalid image name '%s'", name)
 	case !layout.ValidTag(tag):
 		return nil, httpkit.BadRequestf("invalid tag '%s'", tag)
-	case !acc.file(c, name+"/", types.ActionRead):
+	case !acc.File(c, name+"/", types.ActionRead):
 		return nil, httpkit.Denied(p)
 	}
 	parents, err := s.registry(st).ParentManifests(ctx,
@@ -252,7 +252,7 @@ func (s artifactoryService) FindParentManifestLists(
 		return nil, apierror.New(http.StatusNotFound,
 			fmt.Sprintf("Tag '%s' of image '%s' does not exist in '%s'", tag, name, c.Key))
 	case err != nil:
-		return nil, s.internalError(ctx, "docker parent manifests", err)
+		return nil, s.InternalError(ctx, "docker parent manifests", err)
 	}
 	//nolint:tagliatelle // the generated response's field names, JFrog's own
 	type entry = struct {
@@ -276,7 +276,7 @@ func promotionRepo(ctx context.Context, st store.Store, key string) (repo.Config
 	case err != nil:
 		return c, err //nolint:wrapcheck // the lookup names itself
 	case c.Key == "":
-		return c, notFoundRepo(key)
+		return c, NotFoundRepo(key)
 	case !served:
 		return c, httpkit.BadRequestf("'%s' is not a Docker, OCI or Helm OCI repository", c.Key)
 	case c.Class != repo.Local && c.Class != repo.Federated:
@@ -308,7 +308,7 @@ func dockerRepo(ctx context.Context, st store.Store, key string) (repo.Config, e
 	case err != nil:
 		return c, err //nolint:wrapcheck // the lookup names itself
 	case !found:
-		return c, notFoundRepo(key)
+		return c, NotFoundRepo(key)
 	case c.Class == repo.Remote || c.Class == repo.Virtual:
 		return c, apierror.New(http.StatusMethodNotAllowed, fmt.Sprintf(
 			"%s is a %s repository, which the registry does not serve yet", c.Key, c.Class))

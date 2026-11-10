@@ -117,7 +117,7 @@ func (s artifactoryService) npmCredential(ctx context.Context) (npmhttp.Credenti
 	}
 	secret, err := s.cfg.Access.Tokens.EncryptedPassword(ctx, p.Name)
 	if err != nil {
-		return npmhttp.Credential{}, s.internalError(ctx, "npm encrypted password", err)
+		return npmhttp.Credential{}, s.InternalError(ctx, "npm encrypted password", err)
 	}
 	return npmhttp.Credential{User: p.Name, Password: secret}, nil
 }
@@ -146,14 +146,14 @@ func (s artifactoryService) GetNpmScopeAuth(
 	if err != nil {
 		return nil, err
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
-	rc, cached, err := resolveRepo(ctx, st, req.RepoKey)
+	rc, cached, err := ResolveRepo(ctx, st, req.RepoKey)
 	switch {
 	case err != nil:
-		return nil, s.itemError(ctx, "resolve repository", err)
+		return nil, s.ItemError(ctx, "resolve repository", err)
 	case cached || rc.PackageType != repo.NPM:
 		return nil, httpkit.BadRequestf("Repository '%s' is not an npm repository", req.RepoKey)
 	}

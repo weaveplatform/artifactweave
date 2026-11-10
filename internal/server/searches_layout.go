@@ -15,7 +15,6 @@ import (
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -99,7 +98,7 @@ func (r *searchRun) layoutScope(
 			case errors.Is(err, layout.ErrPattern):
 				l = nil
 			case err != nil:
-				return out, r.s.internalError(ctx, "search layout", err)
+				return out, r.s.InternalError(ctx, "search layout", err)
 			case !l.Has(layout.TokenOrg) || !l.Has(layout.TokenModule) ||
 				!l.Has(layout.TokenBaseRev):
 				l = nil
@@ -215,11 +214,6 @@ func wildcard(p *string) *regexp.Regexp {
 
 func matches(re *regexp.Regexp, s string) bool { return re == nil || re.MatchString(s) }
 
-// downloadURI is the URL an item downloads from under the key key.
-func downloadURI(ctx context.Context, key, fullPath string) string {
-	return baseurl.From(ctx) + "/artifactory/" + key + "/" + httpkit.EscapePath(fullPath)
-}
-
 // SearchGavc answers the GAVC search: the files whose layout coordinates
 // match each of g, a, v and c given. With specific, a virtual key in repos
 // searches its members, and each result names the download URL under the
@@ -309,7 +303,7 @@ func (s artifactoryService) SearchGavc(
 			key = upstream.routeKey(f.Item.RepoKey, f.Item.FullPath(), false, f.Item.Cached)
 		}
 		e := map[string]any{
-			"downloadUri": downloadURI(ctx, key, f.Item.FullPath()),
+			"downloadUri": DownloadURI(ctx, key, f.Item.FullPath()),
 			"ext":         f.Ext, "version": f.Version(),
 		}
 		if f.Classifier != "" {

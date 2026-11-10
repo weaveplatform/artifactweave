@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/descriptor"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
@@ -53,23 +52,19 @@ type Redirect struct {
 // answered locally, is the caller's: it only matters when there is a
 // redirect to avoid, because a streamed file goes through ServeContent,
 // which applies the same rules.
-func (s artifactoryService) route(
-	r *http.Request,
-	st store.Store,
-	f found,
-) (blob.Signer, blob.Via, bool) {
-	download, cdn := f.repo.DownloadRedirect.Bool(), f.repo.CDNRedirect.Bool()
+func (s *Kit) route(r *http.Request, f Found) (blob.Signer, blob.Via, bool) {
+	download, cdn := f.Repo.DownloadRedirect.Bool(), f.Repo.CDNRedirect.Bool()
 	choice := r.Header.Get(redirectChoice)
-	signer, signs := s.cfg.Blobs.(blob.Signer)
+	signer, signs := s.Blobs.(blob.Signer)
 	switch {
 	case !download && !cdn, // 2: the repository does not redirect
 		strings.EqualFold(choice, "None"), // 4: the client asks to stream
 		!signs:                            // local disk signs nothing
 		return nil, 0, false
-	case f.item.Size < s.minRedirectSize(r.Context(), st):
+	case f.Item.Size < s.minRedirectSize(r.Context()):
 		return nil, 0, false // 3: too small to be worth a round trip
 	case !strings.EqualFold(choice, "S3") && signer.Signs(blob.ViaCDN) &&
-		(s.cfg.Redirect.CDNMaxSize <= 0 || f.item.Size <= s.cfg.Redirect.CDNMaxSize):
+		(s.Redirect.CDNMaxSize <= 0 || f.Item.Size <= s.Redirect.CDNMaxSize):
 		// 5: either flag is enough for the CDN, as on self-hosted
 		// Artifactory, where CloudFront is part of direct download. A file
 		// over the CDN's limit goes on to the object store behind it.
@@ -85,14 +80,17 @@ func (s artifactoryService) route(
 // download.redirect.min_size otherwise. It is read on each redirect, after
 // the cheaper rules, so a PATCH takes effect at once on every instance
 // sharing the store. A store that cannot answer leaves the configured size.
-func (s artifactoryService) minRedirectSize(ctx context.Context, st store.Store) int64 {
-	n, ok, err := descriptor.DownloadRedirectMinSize(ctx, st.Configs())
+func (s *Kit) minRedirectSize(ctx context.Context) int64 {
+	if s.DownloadRedirectMinSize == nil {
+		return s.Redirect.MinSize
+	}
+	n, ok, err := s.DownloadRedirectMinSize(ctx)
 	if err != nil {
-		s.log().WarnContext(ctx, "download redirect: reading the minimum size",
+		s.Log().WarnContext(ctx, "download redirect: reading the minimum size",
 			"request_id", httpkit.RequestIDFrom(ctx), "error", err)
 	}
 	if !ok {
-		return s.cfg.Redirect.MinSize
+		return s.Redirect.MinSize
 	}
 	return n
 }
@@ -103,27 +101,27 @@ func (s artifactoryService) minRedirectSize(ctx context.Context, st store.Store)
 // redirects and requiring 200, before it downloads any file over 5,120,000
 // bytes, and a URL signed for GET answers that HEAD with 403 on S3 and GCS,
 // which failed the download. ServeContent answers HEAD locally instead.
-func (s artifactoryService) redirect(
+func (s *Kit) redirect(
 	w http.ResponseWriter,
 	r *http.Request,
 	st store.Store,
-	f found,
+	f Found,
 	p kernel.Principal,
 ) bool {
-	return s.redirectAs(w, r, st, f, p, f.item.MimeType, true)
+	return s.redirectAs(w, r, st, f, p, f.Item.MimeType, true)
 }
 
-// redirectManifest is redirect for a registry manifest GET, whose media
+// RedirectManifest is redirect for a registry manifest GET, whose media
 // type is the one it was pushed with: the object store answers with it as
 // Content-Type, which Docker's and the OCI clients parse the body by, and
 // which go-containerregistry compares byte for byte. A manifest the
 // registry streams is not counted as a download, so a redirected one is not
 // either.
-func (s artifactoryService) redirectManifest(
+func (s *Kit) RedirectManifest(
 	w http.ResponseWriter,
 	r *http.Request,
 	st store.Store,
-	f found,
+	f Found,
 	mediaType string,
 ) bool {
 	p, _ := kernel.FromContext(r.Context())
@@ -132,11 +130,11 @@ func (s artifactoryService) redirectManifest(
 
 // redirectAs is redirect with the media type the signed URL answers with,
 // and whether the download is counted.
-func (s artifactoryService) redirectAs(
+func (s *Kit) redirectAs(
 	w http.ResponseWriter,
 	r *http.Request,
 	st store.Store,
-	f found,
+	f Found,
 	p kernel.Principal,
 	contentType string,
 	count bool,
@@ -144,11 +142,11 @@ func (s artifactoryService) redirectAs(
 	if r.Method != http.MethodGet {
 		return false
 	}
-	signer, via, ok := s.route(r, st, f)
+	signer, via, ok := s.route(r, f)
 	if !ok {
 		return false
 	}
-	it := f.item
+	it := f.Item
 	// The object store would judge If-None-Match against its own ETag, never
 	// the sha1 this response carries, so a revalidating client would fetch
 	// the whole file again. The item's validators decide here instead.
@@ -157,11 +155,11 @@ func (s artifactoryService) redirectAs(
 	}
 	ctx := r.Context()
 	u, err := signer.SignURL(ctx, it.Actual.SHA256, blob.SignOptions{
-		Via: via, TTL: cmp.Or(s.cfg.Redirect.TTL, DefaultRedirectTTL),
+		Via: via, TTL: cmp.Or(s.Redirect.TTL, DefaultRedirectTTL),
 		Filename: it.Name, ContentType: contentType,
 	})
 	if err != nil {
-		s.signFailed(ctx, f.repo.Key, via, err)
+		s.signFailed(ctx, f.Repo.Key, via, err)
 		return false
 	}
 	// The 302 has no body, so the headers describing the artifact's body go;
@@ -192,7 +190,7 @@ func (s artifactoryService) redirectAs(
 // signFailed logs a signing failure, at most once per signWarnEvery with a
 // count of the failures held back, so a misconfigured store is visible
 // without a line per download.
-func (s artifactoryService) signFailed(
+func (s *Kit) signFailed(
 	ctx context.Context,
 	repoKey string,
 	via blob.Via,
@@ -202,7 +200,7 @@ func (s artifactoryService) signFailed(
 	if !ok {
 		return
 	}
-	s.log().WarnContext(ctx, "download redirect: signing failed, streaming instead",
+	s.Log().WarnContext(ctx, "download redirect: signing failed, streaming instead",
 		"repo", repoKey, "via", via.String(), "request_id", httpkit.RequestIDFrom(ctx), "error", err,
 		"held_back", held)
 }
@@ -263,10 +261,10 @@ func countsDownload(r *http.Request, status int) bool {
 // recordDownload updates the item's statistics and its package version's
 // last download (decision 0018). Best effort: a failed count must not fail
 // the download.
-func recordDownload(ctx context.Context, st store.Store, f found, p kernel.Principal) {
+func recordDownload(ctx context.Context, st store.Store, f Found, p kernel.Principal) {
 	at := time.Now().UTC()
-	_ = st.Items().RecordDownload(ctx, f.item.ID, store.Download{By: p.Name, At: at})
-	_ = pkgindex.RecordDownload(ctx, st, f.item.ID, at)
+	_ = st.Items().RecordDownload(ctx, f.Item.ID, store.Download{By: p.Name, At: at})
+	_ = pkgindex.RecordDownload(ctx, st, f.Item.ID, at)
 }
 
 // throttle lets one event through per interval and counts the ones it holds

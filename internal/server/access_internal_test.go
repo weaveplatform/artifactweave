@@ -28,13 +28,19 @@ func TestUnitAccessForEvaluatesWithoutDecider(t *testing.T) {
 		return nil, errBoom
 	}}
 	given := &accessapitest.Decider{Admin: true}
-	acc, err := accessFor(ctx, scripted, kernel.Principal{Name: "ann"}, given)
-	if err != nil || acc.d != given || asked {
-		t.Errorf("with a decider: %v, %v, evaluated %t; want the decider kept", acc.d, err, asked)
+	acc, err := AccessFor(ctx, scripted, kernel.Principal{Name: "ann"}, given)
+	if err != nil || acc.Decider != given || asked {
+		t.Errorf(
+			"with a decider: %v, %v, evaluated %t; want the decider kept",
+			acc.Decider,
+			err,
+			asked,
+		)
 	}
-	acc, err = accessFor(ctx, scripted, kernel.Principal{Name: "ann"}, nil)
-	if acc.d != nil || !errors.Is(err, errBoom) || err.Error() != "evaluate permissions: boom" {
-		t.Errorf("without a decider: %v, %v; want For's error as it is", acc.d, err)
+	acc, err = AccessFor(ctx, scripted, kernel.Principal{Name: "ann"}, nil)
+	if acc.Decider != nil || !errors.Is(err, errBoom) ||
+		err.Error() != "evaluate permissions: boom" {
+		t.Errorf("without a decider: %v, %v; want For's error as it is", acc.Decider, err)
 	}
 
 	st := inmem.New()
@@ -52,11 +58,11 @@ func TestUnitAccessForEvaluatesWithoutDecider(t *testing.T) {
 	}
 	reads := func() bool {
 		t.Helper()
-		acc, err := accessFor(ctx, authorizerOver(st), kernel.Anonymous, nil)
+		acc, err := AccessFor(ctx, authorizerOver(st), kernel.Anonymous, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		return acc.file(c, "a.txt", types.ActionRead)
+		return acc.File(c, "a.txt", types.ActionRead)
 	}
 	if reads() {
 		t.Error("anonymous reads while the anonymous access setting was never written")

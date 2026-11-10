@@ -103,7 +103,7 @@ func (s artifactoryService) latestVersionByProperties(w http.ResponseWriter, req
 		for _, h := range hits {
 			if h.Properties.Has(versionProperty, best) {
 				artifacts = append(artifacts, map[string]any{
-					"uri": downloadURI(ctx, h.Item.ReportedRepoKey(), h.Item.FullPath()),
+					"uri": DownloadURI(ctx, h.Item.ReportedRepoKey(), h.Item.FullPath()),
 				})
 			}
 		}

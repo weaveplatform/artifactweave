@@ -42,7 +42,7 @@ func (t *resolutionTrace) stepf(format string, args ...any) {
 
 // stepf records a resolution step of a traced download. The storage API
 // looks items up with no download at all, so d may be nil.
-func (d *download) stepf(format string, args ...any) {
+func (d *Download) stepf(format string, args ...any) {
 	if d != nil {
 		d.trace.stepf(format, args...)
 	}
@@ -66,19 +66,19 @@ func traceRepoPath(c repo.Config, cached bool, p string) string {
 // own answer. Nothing is served, redirected or counted as a download.
 // Artifactory's header also names the servlet thread; Go serves requests
 // without named threads, so that line is left out.
-func (s artifactoryService) traceItem(w http.ResponseWriter, r *http.Request) {
+func (s *Kit) traceItem(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	req, err := parseItemPath(r)
+	req, err := ParseItemPath(r)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	p, acc, err := s.itemCaller(ctx, st)
+	p, acc, err := s.ItemCaller(ctx, st)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
@@ -103,7 +103,7 @@ func (s artifactoryService) traceItem(w http.ResponseWriter, r *http.Request) {
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "Request ID: %s\n", httpkit.RequestIDFrom(ctx))
-	fmt.Fprintf(&b, "Repo Path ID: %s:%s\n", req.key, req.path)
+	fmt.Fprintf(&b, "Repo Path ID: %s:%s\n", req.Key, req.Path)
 	fmt.Fprintf(&b, "Method Name: %s\n", r.Method)
 	fmt.Fprintf(&b, "User: %s\n", p.Name)
 	fmt.Fprintf(&b, "Time: %s\n", start.Format(traceTime))
@@ -124,98 +124,98 @@ func (s artifactoryService) traceItem(w http.ResponseWriter, r *http.Request) {
 // item. It follows getItem's checks in getItem's order, so a caller learns
 // from the trace only what the download itself would tell it: a repository
 // is described only once the caller may read it.
-func (s artifactoryService) traceDownload(
+func (s *Kit) traceDownload(
 	ctx context.Context,
 	st store.Store,
 	r *http.Request,
-	req itemRequest,
+	req ItemRequest,
 	p kernel.Principal,
-	acc access,
+	acc Access,
 	t *resolutionTrace,
 ) error {
 	method := r.Method
-	c, cached, err := resolveRepo(ctx, st, req.key)
+	c, cached, err := ResolveRepo(ctx, st, req.Key)
 	if err != nil {
-		return s.itemError(ctx, "resolve repository", err)
+		return s.ItemError(ctx, "resolve repository", err)
 	}
-	if !acc.folder(c, req.path, types.ActionRead) {
+	if !acc.Folder(c, req.Path, types.ActionRead) {
 		return httpkit.Denied(p)
 	}
 	kind := string(c.Class)
 	if cached {
 		kind = "cache"
 	}
-	t.stepf("Retrieving info from %s repository '%s' type %s", kind, req.key, c.PackageType)
-	if req.path == "" {
+	t.stepf("Retrieving info from %s repository '%s' type %s", kind, req.Key, c.PackageType)
+	if req.Path == "" {
 		if err := generic.CheckDownload(c, "", true); err != nil {
-			return s.itemError(ctx, "download check", err)
+			return s.ItemError(ctx, "download check", err)
 		}
 		t.stepf("Identified requested resource as a folder")
 		return nil
 	}
-	if c.Class == repo.Remote && c.PackageType == repo.Generic && !cached && !req.isFolder &&
-		s.cfg.RemoteSources != nil &&
-		!strings.Contains(req.path, "!/") {
-		_, _, sidecar := item.Sidecar(req.path)
-		cachedItem, lookupErr := st.Items().Get(ctx, c.Key, true, req.path)
+	if c.Class == repo.Remote && c.PackageType == repo.Generic && !cached && !req.IsFolder &&
+		s.RemoteSources != nil &&
+		!strings.Contains(req.Path, "!/") {
+		_, _, sidecar := item.Sidecar(req.Path)
+		cachedItem, lookupErr := st.Items().Get(ctx, c.Key, true, req.Path)
 		if !sidecar && (lookupErr != nil || !cachedItem.Folder) {
 			t.stepf("Resolving remote source with current read authorization")
-			result, readErr := s.cfg.RemoteSources.Read(ctx, source.Request{
+			result, readErr := s.RemoteSources.Read(ctx, source.Request{
 				Repo:     c,
 				Subject:  accessapi.SubjectOf(p),
-				Access:   acc.d,
-				Resource: remoteResource(r, req.path),
+				Access:   acc.Decider,
+				Resource: RemoteResource(r, req.Path),
 				Matrix:   req.matrix(),
 				Project:  c.ProjectKey,
 			})
 			if readErr != nil {
-				return s.itemError(ctx, "trace source", pkgroute.SourceError(readErr, p.Anonymous))
+				return s.ItemError(ctx, "trace source", pkgroute.SourceError(readErr, p.Anonymous))
 			}
 			if result.Stream != nil {
 				_ = result.Stream.Body.Close()
 				if !req.matrix().Matches(nil) {
-					return itemNotFound()
+					return ItemNotFound()
 				}
 				t.stepf("Returning validated transient resource")
 			} else {
 				matches, matchErr := matchesMatrix(ctx, st, *result.Item, req)
 				if matchErr != nil {
-					return s.internalError(ctx, "trace properties", matchErr)
+					return s.InternalError(ctx, "trace properties", matchErr)
 				}
 				if !matches {
-					return itemNotFound()
+					return ItemNotFound()
 				}
-				t.stepf("Returning found resource from %s", traceRepoPath(c, true, req.path))
+				t.stepf("Returning found resource from %s", traceRepoPath(c, true, req.Path))
 			}
 			traceResponding(method, t)
 			return nil
 		}
 	}
-	dl := newDownload(req.path, req.isFolder, req.matrix(), s.items(st).Resolve)
+	dl := newDownload(req.Path, req.IsFolder, req.matrix(), s.Items(st).Resolve)
 	dl.trace = t
-	f, err := lookup(ctx, st, c, cached, req.path, acc, dl, map[string]bool{})
+	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, map[string]bool{})
 	if errors.Is(err, store.ErrNotFound) {
-		return s.traceContained(ctx, st, method, c, cached, req.path, p, acc, dl)
+		return s.traceContained(ctx, st, method, c, cached, req.Path, p, acc, dl)
 	}
 	if err != nil {
-		return s.itemError(ctx, "lookup item", err)
+		return s.ItemError(ctx, "lookup item", err)
 	}
-	if !acc.item(f.repo, f.item.FullPath(), f.item.Folder, types.ActionRead) {
+	if !acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, types.ActionRead) {
 		return httpkit.Denied(p)
 	}
 	t.stepf(
 		"Returning found resource from %s",
-		traceRepoPath(f.repo, f.item.Cached, f.item.FullPath()),
+		traceRepoPath(f.Repo, f.Item.Cached, f.Item.FullPath()),
 	)
-	ok, err := matchesMatrix(ctx, st, f.item, req)
+	ok, err := matchesMatrix(ctx, st, f.Item, req)
 	if err != nil {
-		return s.internalError(ctx, "item properties", err)
+		return s.InternalError(ctx, "item properties", err)
 	}
 	if !ok {
 		t.stepf("Request query properties don't match those that annotate the artifact")
-		return itemNotFound()
+		return ItemNotFound()
 	}
-	if f.item.Folder {
+	if f.Item.Folder {
 		t.stepf("Identified requested resource as a folder")
 		return nil
 	}
@@ -227,7 +227,7 @@ func (s artifactoryService) traceDownload(
 // traceContained traces a path no item holds: an entry inside an archive
 // ("<archive>!/<entry>") or a checksum file, which getItem serves from the
 // file they name, or else a 404.
-func (s artifactoryService) traceContained(
+func (s *Kit) traceContained(
 	ctx context.Context,
 	st store.Store,
 	method string,
@@ -235,49 +235,49 @@ func (s artifactoryService) traceContained(
 	cached bool,
 	p string,
 	caller kernel.Principal,
-	acc access,
-	dl *download,
+	acc Access,
+	dl *Download,
 ) error {
 	if archive, entry, ok := strings.Cut(p, "!/"); ok {
 		dl.stepf("Requested resource is contained within an archive")
-		a, err := lookup(ctx, st, c, cached, archive, acc, dl, map[string]bool{})
+		a, err := Lookup(ctx, st, c, cached, archive, acc, dl, map[string]bool{})
 		if err != nil {
-			return itemNotFound()
+			return ItemNotFound()
 		}
-		if !acc.file(a.repo, a.item.FullPath(), types.ActionRead) {
+		if !acc.File(a.Repo, a.Item.FullPath(), types.ActionRead) {
 			return httpkit.Denied(caller)
 		}
-		if a.item.Folder {
-			return itemNotFound()
+		if a.Item.Folder {
+			return ItemNotFound()
 		}
 		// The entry is looked for but not read: a trace serves nothing.
-		err = s.items(st).ArchiveEntry(ctx, a.item, entry,
+		err = s.Items(st).ArchiveEntry(ctx, a.Item, entry,
 			func(int64, io.Reader) error { return nil })
 		if errors.Is(err, item.ErrNotFound) {
-			return itemNotFound()
+			return ItemNotFound()
 		}
 		if err != nil {
 			return fmt.Errorf("archive entry: %w", err)
 		}
 		dl.stepf("Returning found resource from %s",
-			traceRepoPath(a.repo, a.item.Cached, a.item.FullPath()))
+			traceRepoPath(a.Repo, a.Item.Cached, a.Item.FullPath()))
 		traceResponding(method, dl.trace)
 		return nil
 	}
 	artifact, alg, ok := item.Sidecar(p)
 	if !ok {
-		return itemNotFound()
+		return ItemNotFound()
 	}
 	dl.stepf("Request is for a checksum")
-	f, err := lookup(ctx, st, c, cached, artifact, acc, dl, map[string]bool{})
+	f, err := Lookup(ctx, st, c, cached, artifact, acc, dl, map[string]bool{})
 	// A file the caller may not read has no visible checksum either.
-	if err != nil || f.item.Folder || alg.Of(f.item.Actual) == "" ||
-		!acc.file(f.repo, f.item.FullPath(), types.ActionRead) {
-		return itemNotFound()
+	if err != nil || f.Item.Folder || alg.Of(f.Item.Actual) == "" ||
+		!acc.File(f.Repo, f.Item.FullPath(), types.ActionRead) {
+		return ItemNotFound()
 	}
 	dl.stepf(
 		"Returning found resource from %s",
-		traceRepoPath(f.repo, f.item.Cached, f.item.FullPath()),
+		traceRepoPath(f.Repo, f.Item.Cached, f.Item.FullPath()),
 	)
 	dl.stepf("Responding to checksum request")
 	return nil

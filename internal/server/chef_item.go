@@ -7,21 +7,21 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	cheffmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/chef"
+	"github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Cached metadata describes versions outside an individual caller's permission
 // patterns. Only the native API filters and rewrites those documents.
-func (artifactoryService) tryChefItem(
-	w http.ResponseWriter,
-	r *http.Request,
-	c repo.Config,
-	req itemRequest,
+func tryChefItem(
+	_ *Kit, w http.ResponseWriter, r *http.Request, _ store.Store, c repo.Config,
+	_ bool, req ItemRequest, _ kernel.Principal, _ Access,
 ) bool {
-	if !chefMetadataItem(c, req.path) {
+	if !chefMetadataItem(c, req.Path) {
 		return false
 	}
-	httpkit.WriteErr(w, r, itemNotFound())
+	httpkit.WriteErr(w, r, ItemNotFound())
 	return true
 }
 

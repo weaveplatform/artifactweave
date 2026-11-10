@@ -70,7 +70,7 @@ func TestAccAppendIdempotencyRecheckDeadline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := artifactoryService{cfg: withAccess(Config{Store: w.db, Blobs: w.blobs, Auth: badAuth})}
+	svc := newArtifactoryService(withAccess(Config{Store: w.db, Blobs: w.blobs, Auth: badAuth}))
 	err = svc.appendOnce(
 		t.Context(),
 		svc.builds(w.db),
@@ -106,7 +106,7 @@ func TestAccAppendIdempotencyReplayEvaluatesCurrentPermissions(t *testing.T) {
 		t.Fatalf("request decider: %v", err)
 	}
 	ctx := accessapi.WithCaller(t.Context(), p, decider)
-	svc := artifactoryService{cfg: withAccess(Config{Store: w.db, Blobs: w.blobs, Auth: a})}
+	svc := newArtifactoryService(withAccess(Config{Store: w.db, Blobs: w.blobs, Auth: a}))
 	appendOnce := func() error {
 		return svc.appendOnce(
 			ctx,

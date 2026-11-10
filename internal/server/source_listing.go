@@ -18,21 +18,21 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 )
 
-func (s artifactoryService) getRemoteFolder(w http.ResponseWriter, r *http.Request,
-	c repo.Config, cached bool, req itemRequest, p kernel.Principal, acc access,
+func (s *Kit) getRemoteFolder(w http.ResponseWriter, r *http.Request,
+	c repo.Config, cached bool, req ItemRequest, p kernel.Principal, acc Access,
 ) bool {
 	if c.Class != repo.Remote || cached || !c.ListRemoteFolderItems.Bool() ||
-		(req.path != "" && !req.isFolder) {
+		(req.Path != "" && !req.IsFolder) {
 		return false
 	}
-	listing, err := remote.ListFolder(r.Context(), s.cfg.RemoteSources, source.Request{
-		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.d, Project: c.ProjectKey,
-	}, req.path, &remote.ListingBudget{})
+	listing, err := remote.ListFolder(r.Context(), s.RemoteSources, source.Request{
+		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
+	}, req.Path, &remote.ListingBudget{})
 	if err != nil {
 		httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 		return true
 	}
-	title := html.EscapeString(path.Join(c.Key, req.path))
+	title := html.EscapeString(path.Join(c.Key, req.Path))
 	var body strings.Builder
 	fmt.Fprintf(
 		&body,

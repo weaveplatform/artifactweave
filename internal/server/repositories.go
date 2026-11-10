@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"maps"
 	"net/http"
 	"slices"
@@ -140,34 +139,6 @@ func isRepositoryUpdate(path string) bool {
 	return ok && key != "" && !strings.Contains(key, "/")
 }
 
-// content returns the store. A router built without one (tests of the
-// routing alone) answers like an unimplemented operation.
-func (s artifactoryService) content() (store.Store, error) {
-	if s.cfg.Store == nil {
-		return nil, apierror.ErrNotImplemented
-	}
-	return s.cfg.Store, nil
-}
-
-// internalError logs err and returns a 500 that names nothing internal.
-func (s artifactoryService) internalError(ctx context.Context, op string, err error) error {
-	s.log().ErrorContext(ctx, op, "request_id", httpkit.RequestIDFrom(ctx), "error", err)
-	return apierror.New(http.StatusInternalServerError, "internal error")
-}
-
-// log is the configured logger, or slog's default for handlers built
-// without one in tests.
-func (s artifactoryService) log() *slog.Logger {
-	if s.cfg.Logger == nil {
-		return slog.Default()
-	}
-	return s.cfg.Logger
-}
-
-func notFoundRepo(key string) error {
-	return apierror.New(http.StatusNotFound, fmt.Sprintf("Repository '%s' does not exist", key))
-}
-
 // readerFor returns the principal of a read and what it may read.
 func (s artifactoryService) readerFor(
 	ctx context.Context,
@@ -178,27 +149,18 @@ func (s artifactoryService) readerFor(
 		return p, nil, err
 	}
 	d, _ := accessapi.DeciderFrom(ctx)
-	acc, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
+	acc, err := AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
-		return p, nil, s.internalError(ctx, "repository read rights", err)
+		return p, nil, s.InternalError(ctx, "repository read rights", err)
 	}
-	return p, acc.visible, nil
-}
-
-// view is the configuration a reader receives: everything but secrets for
-// an admin, the public subset for anyone else.
-func view(p kernel.Principal, c repo.Config) repo.Config {
-	if p.Admin {
-		return repo.Masked(c)
-	}
-	return repo.Public(c)
+	return p, acc.Visible, nil
 }
 
 func (s artifactoryService) GetRepositoriesByTypeAndProject(
 	ctx context.Context,
 	req artgen.GetRepositoriesByTypeAndProjectRequestObject,
 ) (artgen.GetRepositoriesByTypeAndProjectResponseObject, error) {
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +180,7 @@ func (s artifactoryService) GetRepositoriesByTypeAndProject(
 	}
 	all, err := st.Repos().List(ctx, f)
 	if err != nil {
-		return nil, s.internalError(ctx, "list repositories", err)
+		return nil, s.InternalError(ctx, "list repositories", err)
 	}
 	base := baseurl.From(ctx)
 	out := artgen.GetRepositoriesByTypeAndProject200JSONResponse{}
@@ -259,13 +221,13 @@ func (s artifactoryService) GetAllRepositoryConfigurations(
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
 	all, err := st.Repos().List(ctx, store.RepoFilter{})
 	if err != nil {
-		return nil, s.internalError(ctx, "list repositories", err)
+		return nil, s.InternalError(ctx, "list repositories", err)
 	}
 	packageTypes := commaSet(req.Params.PackageType)
 	classes := commaSet(req.Params.RepoType)
@@ -326,7 +288,7 @@ func (s artifactoryService) CheckIfRepositoryExists(
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +307,7 @@ func (s artifactoryService) CheckIfRepositoryExists(
 	}
 	all, err := st.Repos().List(ctx, f)
 	if err != nil {
-		return nil, s.internalError(ctx, "list repositories", err)
+		return nil, s.InternalError(ctx, "list repositories", err)
 	}
 	// matchingRepoTypes lists the classes checked ("types used", JFrog's
 	// description), not the ones found.
@@ -374,7 +336,7 @@ func (s artifactoryService) readOne(
 	ctx context.Context,
 	key string,
 ) (kernel.Principal, repo.Config, error) {
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return kernel.Principal{}, repo.Config{}, err
 	}
@@ -385,13 +347,13 @@ func (s artifactoryService) readOne(
 	c, err := st.Repos().Get(ctx, key)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		return p, repo.Config{}, notFoundRepo(key)
+		return p, repo.Config{}, NotFoundRepo(key)
 	case err != nil:
-		return p, repo.Config{}, s.internalError(ctx, "get repository", err)
+		return p, repo.Config{}, s.InternalError(ctx, "get repository", err)
 	case !can(c):
 		return p, repo.Config{}, httpkit.Denied(p)
 	}
-	return p, view(p, c), nil
+	return p, View(p, c), nil
 }
 
 func (s artifactoryService) GetRepositoryConfiguration(
@@ -474,7 +436,7 @@ func (s artifactoryService) GetRemoteRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.GetRemoteRepositoryConfigurationRequestObject,
 ) (artgen.GetRemoteRepositoryConfigurationResponseObject, error) {
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
@@ -492,17 +454,17 @@ func (s artifactoryService) GetRemoteRepositoryConfiguration(
 		return nil, apierror.New(http.StatusNotFound,
 			fmt.Sprintf("Remote repository '%s' does not exist", key))
 	case err != nil:
-		return nil, s.internalError(ctx, "get repository", err)
+		return nil, s.InternalError(ctx, "get repository", err)
 	case !p.Admin && (c.ShareConfiguration == nil || !*c.ShareConfiguration):
 		return nil, httpkit.Denied(p)
 	}
 	doc, err := json.Marshal(repo.Masked(c))
 	if err != nil {
-		return nil, s.internalError(ctx, "encode repository", err)
+		return nil, s.InternalError(ctx, "encode repository", err)
 	}
 	var fields map[string]any
 	if err := json.Unmarshal(doc, &fields); err != nil {
-		return nil, s.internalError(ctx, "encode repository", err)
+		return nil, s.InternalError(ctx, "encode repository", err)
 	}
 	if !p.Admin {
 		maps.DeleteFunc(
@@ -538,7 +500,7 @@ func (s artifactoryService) GetBatchOfRepositoriesByName(
 	ctx context.Context,
 	req artgen.GetBatchOfRepositoriesByNameRequestObject,
 ) (artgen.GetBatchOfRepositoriesByNameResponseObject, error) {
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
@@ -571,9 +533,9 @@ func (s artifactoryService) GetBatchOfRepositoriesByName(
 		case errors.Is(err, store.ErrNotFound):
 			continue
 		case err != nil:
-			return nil, s.internalError(ctx, "get repository", err)
+			return nil, s.InternalError(ctx, "get repository", err)
 		case can(c):
-			out[key] = view(p, c)
+			out[key] = View(p, c)
 		}
 	}
 	return out, nil
@@ -607,7 +569,7 @@ func (s artifactoryService) CreateRepository(
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
@@ -626,7 +588,7 @@ func (s artifactoryService) CreateRepository(
 	c.Key = string(req.RepoKey)
 	existing, err := st.Repos().List(ctx, store.RepoFilter{})
 	if err != nil {
-		return nil, s.internalError(ctx, "list repositories", err)
+		return nil, s.InternalError(ctx, "list repositories", err)
 	}
 	if c, err = repos.PrepareCreate(c, existing); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
@@ -644,7 +606,7 @@ func (s artifactoryService) CreateRepository(
 	case errors.Is(err, store.ErrConflict):
 		return nil, httpkit.BadRequestf(msgKeyExists)
 	case err != nil:
-		return nil, s.internalError(ctx, "create repository", err)
+		return nil, s.InternalError(ctx, "create repository", err)
 	}
 	return artgen.CreateRepository200TextResponse(
 		fmt.Sprintf("Successfully created repository '%s'", c.Key),
@@ -658,7 +620,7 @@ func (s artifactoryService) CreateMultipleRepositories(
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
@@ -674,7 +636,7 @@ func (s artifactoryService) CreateMultipleRepositories(
 	}
 	known, err := st.Repos().List(ctx, store.RepoFilter{})
 	if err != nil {
-		return nil, s.internalError(ctx, "list repositories", err)
+		return nil, s.InternalError(ctx, "list repositories", err)
 	}
 	// Everything is validated before anything is created, so a bad entry
 	// leaves the batch unapplied.
@@ -720,7 +682,7 @@ func (s artifactoryService) CreateMultipleRepositories(
 	case errors.Is(err, store.ErrConflict):
 		return nil, apierror.New(http.StatusConflict, msgKeyExists)
 	case err != nil:
-		return nil, s.internalError(ctx, "create repositories", err)
+		return nil, s.InternalError(ctx, "create repositories", err)
 	}
 	lines := make([]string, len(prepared))
 	for i, c := range prepared {
@@ -761,7 +723,7 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
@@ -769,9 +731,9 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 	stored, err := st.Repos().Get(ctx, key)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		return nil, notFoundRepo(key)
+		return nil, NotFoundRepo(key)
 	case err != nil:
-		return nil, s.internalError(ctx, "get repository", err)
+		return nil, s.InternalError(ctx, "get repository", err)
 	}
 	body, err := updateBody(ctx, requestConfig(
 		req.JSONBody,
@@ -781,7 +743,7 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 		req.ApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody,
 	))
 	if err != nil {
-		return nil, s.internalError(ctx, "read update", err)
+		return nil, s.InternalError(ctx, "read update", err)
 	}
 	var patch map[string]json.RawMessage
 	if err := json.Unmarshal(body, &patch); err != nil || patch == nil {
@@ -795,7 +757,7 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 		return nil, err
 	}
 	if err := s.writeUpdates(ctx, st, []repo.Config{stored}, []repo.Config{updated}); err != nil {
-		return nil, s.internalError(ctx, "update repository", err)
+		return nil, s.InternalError(ctx, "update repository", err)
 	}
 	return artgen.UpdateRepositoryConfiguration200TextResponse(
 		fmt.Sprintf("Successfully updated repository '%s'", key),
@@ -821,7 +783,7 @@ func (s artifactoryService) writeUpdates(
 				return fmt.Errorf("update %s: %w", c.Key, err)
 			}
 			if repos.OwesReindex(stored[i], c) {
-				if err := s.queue(ctx, st, format.KindReindex, c.Key, by); err != nil {
+				if err := s.Queue(ctx, st, format.KindReindex, c.Key, by); err != nil {
 					return err
 				}
 			}
@@ -853,7 +815,7 @@ func (s artifactoryService) checkReferences(
 	}
 	known, err := st.Repos().List(ctx, store.RepoFilter{})
 	if err != nil {
-		return s.internalError(ctx, "list repositories", err)
+		return s.InternalError(ctx, "list repositories", err)
 	}
 	if err := repos.CheckMembers(*c, known); err != nil {
 		return fmt.Errorf("repositories: %w", err)
@@ -868,7 +830,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
@@ -880,7 +842,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 		req.ApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody,
 	))
 	if err != nil {
-		return nil, s.internalError(ctx, "read update", err)
+		return nil, s.InternalError(ctx, "read update", err)
 	}
 	var patches []map[string]json.RawMessage
 	if err := json.Unmarshal(body, &patches); err != nil {
@@ -902,9 +864,9 @@ func (s artifactoryService) UpdateMultipleRepositories(
 		stored, err := st.Repos().Get(ctx, key)
 		switch {
 		case errors.Is(err, store.ErrNotFound):
-			return nil, notFoundRepo(key)
+			return nil, NotFoundRepo(key)
 		case err != nil:
-			return nil, s.internalError(ctx, "get repository", err)
+			return nil, s.InternalError(ctx, "get repository", err)
 		}
 		c, err := repos.Merge(stored, patch)
 		if err != nil {
@@ -917,7 +879,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 		updated = append(updated, c)
 	}
 	if err := s.writeUpdates(ctx, st, before, updated); err != nil {
-		return nil, s.internalError(ctx, "update repositories", err)
+		return nil, s.InternalError(ctx, "update repositories", err)
 	}
 	return artgen.UpdateMultipleRepositories200JSONResponse(
 		fmt.Sprintf("Successfully updated %d repositories", len(updated)),
@@ -986,7 +948,7 @@ func (s artifactoryService) DeleteRepository(
 		}
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
@@ -999,7 +961,7 @@ func (s artifactoryService) DeleteRepository(
 	files, found, err := repos.Remove(ctx, st, key, admin.Name)
 	switch {
 	case err != nil:
-		_ = s.internalError(ctx, "delete repository", err)
+		_ = s.InternalError(ctx, "delete repository", err)
 		return artgen.DeleteRepository500JSONResponse(
 			failed(key, fmt.Sprintf("Cannot delete repository: '%s'. See the server log.", key)),
 		), nil
@@ -1024,7 +986,7 @@ func (s artifactoryService) DeleteRepositories(
 		}
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
@@ -1053,7 +1015,7 @@ func (s artifactoryService) DeleteRepositories(
 		files, found, err := repos.Remove(ctx, st, key, admin.Name)
 		switch {
 		case err != nil:
-			_ = s.internalError(ctx, "delete repository", err)
+			_ = s.InternalError(ctx, "delete repository", err)
 			failures++
 			_ = item.FromRemoveRepositoryFailureReport(failed(key,
 				fmt.Sprintf("Cannot delete repository: '%s'. See the server log.", key)))

@@ -60,7 +60,7 @@ func (u *upstreamSearch) request(key string) source.Request {
 	return source.Request{
 		Repo:    c,
 		Subject: accessapi.SubjectOf(u.r.p),
-		Access:  u.r.acc.d,
+		Access:  u.r.acc.Decider,
 		Project: c.ProjectKey,
 	}
 }
@@ -204,7 +204,7 @@ func searchValues(g, a string) layout.Values {
 func (u *upstreamSearch) allowed(key, full string, folder bool) bool {
 	c := u.r.configs[key]
 	return u.routeKey(key, full, folder) != "" && repo.PatternsOf(c).Accepts(full, folder) &&
-		u.r.acc.item(c, full, folder, types.ActionRead)
+		u.r.acc.Item(c, full, folder, types.ActionRead)
 }
 
 // Current JFrog documents specific=true for remote GAVC, while older callers

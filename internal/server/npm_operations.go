@@ -29,14 +29,14 @@ func (s artifactoryService) npmOperation(
 	ctx context.Context,
 	key string,
 ) (store.Store, repo.Config, string, error) {
-	return s.operationRepo(ctx, repo.NPM, reindexOps[repo.NPM], key)
+	return s.OperationRepo(ctx, repo.NPM, ReindexOps[repo.NPM], key)
 }
 
 func (s artifactoryService) CalculateNpmRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateNpmRepositoryMetadataRequestObject,
 ) (artgen.CalculateNpmRepositoryMetadataResponseObject, error) {
-	msg, err := s.reindex(ctx, repo.NPM, req.RepoKey, "", false)
+	msg, err := s.Reindex(ctx, repo.NPM, req.RepoKey, "", false)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (s artifactoryService) MigrateNpmRepositoryToStrictLayout(
 	if err != nil {
 		return nil, err
 	}
-	if err := s.enqueue(ctx, st, npmfmt.KindConvert, c.Key, by); err != nil {
+	if err := s.Enqueue(ctx, st, npmfmt.KindConvert, c.Key, by); err != nil {
 		return nil, err
 	}
 	return artgen.MigrateNpmRepositoryToStrictLayout202Response{}, nil
@@ -74,9 +74,9 @@ func (s artifactoryService) ResumeNpmRepositoryMigration(
 	case errors.Is(err, store.ErrNotFound) || err == nil && it.State != types.WorkParked:
 		return nil, httpkit.BadRequestf("Repository '%s' has no failed conversion to resume", c.Key)
 	case err != nil:
-		return nil, s.internalError(ctx, "npm conversion", err)
+		return nil, s.InternalError(ctx, "npm conversion", err)
 	}
-	if err := s.enqueue(ctx, st, npmfmt.KindConvert, c.Key, by); err != nil {
+	if err := s.Enqueue(ctx, st, npmfmt.KindConvert, c.Key, by); err != nil {
 		return nil, err
 	}
 	return artgen.ResumeNpmRepositoryMigration202Response{}, nil

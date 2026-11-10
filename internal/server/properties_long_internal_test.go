@@ -170,7 +170,7 @@ func testLongPropertyKeys(t *testing.T, db store.Store) {
 	}
 
 	// A long key that reached a store would still answer 400.
-	err = artifactoryService{}.itemError(ctx, "set properties",
+	err = newArtifactoryService(Config{}).ItemError(ctx, "set properties",
 		fmt.Errorf("%w: %w", store.ErrInvalid, types.ErrPropertyKeyTooLong))
 	var api *apierror.Error
 	if !errors.As(err, &api) || api.Status != http.StatusBadRequest {

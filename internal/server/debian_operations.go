@@ -24,24 +24,24 @@ func (s artifactoryService) CalculateDebianRepositoryMetadata(
 	writeProps := req.Params.WriteProps == nil ||
 		*req.Params.WriteProps == artgen.CalculateDebianRepositoryMetadataParamsWritePropsN1
 	if writeProps {
-		msg, err := s.reindex(ctx, repo.Debian, req.RepoKey, "", !async)
+		msg, err := s.Reindex(ctx, repo.Debian, req.RepoKey, "", !async)
 		if err != nil {
 			return nil, err
 		}
 		return artgen.CalculateDebianRepositoryMetadata200TextResponse(msg), nil
 	}
-	st, c, by, err := s.operationRepo(ctx, repo.Debian, reindexOps[repo.Debian], req.RepoKey)
+	st, c, by, err := s.OperationRepo(ctx, repo.Debian, ReindexOps[repo.Debian], req.RepoKey)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.enqueue(ctx, st, debian.KindReindexNoProps, c.Key, by); err != nil {
+	if err := s.Enqueue(ctx, st, debian.KindReindexNoProps, c.Key, by); err != nil {
 		return nil, err
 	}
 	if !async {
-		if err := s.await(ctx, st, debian.KindReindexNoProps, c.Key); err != nil {
-			return nil, s.itemError(ctx, "Debian reindex", err)
+		if err := s.Await(ctx, st, debian.KindReindexNoProps, c.Key); err != nil {
+			return nil, s.ItemError(ctx, "Debian reindex", err)
 		}
 	}
 	return artgen.CalculateDebianRepositoryMetadata200TextResponse(
-		fmt.Sprintf(reindexOps[repo.Debian].answer, c.Key)), nil
+		fmt.Sprintf(ReindexOps[repo.Debian].Answer, c.Key)), nil
 }

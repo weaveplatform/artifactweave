@@ -22,7 +22,7 @@ func TestAccDebianRemoteSourceRejectsInvalidPackages(t *testing.T) {
 		{"pool/alpha_1.0_amd64_0.deb", "alpha_1.0_amd64_0.deb"},
 		{"pool/alpha_1.0-1.dsc", "alpha_1.0-1.dsc"},
 	} {
-		q, err := debianSourceRequest(source.Request{
+		q, err := DebianSourceRequest(source.Request{
 			Repo:     repo.Config{PackageType: repo.Debian},
 			Resource: source.Resource{Path: tc.path, Method: http.MethodGet},
 		})
@@ -46,7 +46,7 @@ func TestAccDebianRemoteSourceRejectsInvalidPackages(t *testing.T) {
 		}
 	}
 	for _, p := range []string{"../outside.deb", "pool/bad name.deb", "pool/../bad.dsc"} {
-		_, err := debianSourceRequest(source.Request{
+		_, err := DebianSourceRequest(source.Request{
 			Repo:     repo.Config{PackageType: repo.Debian},
 			Resource: source.Resource{Path: p, Method: http.MethodGet},
 		})
@@ -64,7 +64,7 @@ func TestAccDebianRemoteMetadataIsFetchableAndVerified(t *testing.T) {
 		"dists/stable/main/binary-amd64/Packages.gz",
 		"dists/stable/main/binary-amd64/by-hash/SHA256/" + strings.Repeat("a", 64),
 	} {
-		q, err := debianSourceRequest(source.Request{
+		q, err := DebianSourceRequest(source.Request{
 			Repo:     repo.Config{PackageType: repo.Debian},
 			Resource: source.Resource{Path: path, Method: http.MethodGet},
 		})
@@ -74,7 +74,7 @@ func TestAccDebianRemoteMetadataIsFetchableAndVerified(t *testing.T) {
 		}
 	}
 	path := "dists/stable/main/binary-amd64/by-hash/SHA256/" + strings.Repeat("a", 64)
-	q, err := debianSourceRequest(source.Request{
+	q, err := DebianSourceRequest(source.Request{
 		Repo:     repo.Config{PackageType: repo.Debian},
 		Resource: source.Resource{Path: path, Method: http.MethodGet},
 	})

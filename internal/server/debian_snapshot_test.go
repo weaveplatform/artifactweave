@@ -89,7 +89,7 @@ func TestUnitDebianSnapshotRequiresValidRepositoriesAndPermissions(t *testing.T)
 			if tc.user != "" {
 				p = kernel.Principal{Name: tc.user}
 			}
-			acc, err := accessFor(ctx, authorizerOver(st), p, nil)
+			acc, err := AccessFor(ctx, authorizerOver(st), p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -144,7 +144,7 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 				t.Fatal(err)
 			}
 			p := kernel.Principal{Name: "admin", Admin: true}
-			acc, err := accessFor(ctx, authorizerOver(st), p, nil)
+			acc, err := AccessFor(ctx, authorizerOver(st), p, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -154,7 +154,7 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 				Tag:          "first",
 				Distribution: tc.distribution,
 			}
-			err = (artifactoryService{cfg: Config{Store: st}}).createDebianSnapshot(
+			err = newArtifactoryService(Config{Store: st}).createDebianSnapshot(
 				ctx, st, job, p, acc,
 			)
 			if (err != nil) != tc.expectedErr {

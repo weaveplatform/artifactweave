@@ -23,7 +23,7 @@ import (
 type vcsAccess struct {
 	repo        repo.Config
 	principal   kernel.Principal
-	access      access
+	access      Access
 	isCacheOnly bool
 }
 
@@ -34,16 +34,16 @@ func (s artifactoryService) vcsRepository(
 	if !vcshttp.ValidProject(owner, name) {
 		return vcsAccess{}, apierror.New(http.StatusBadRequest, "invalid VCS repository path")
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return vcsAccess{}, err
 	}
-	c, cacheOnly, err := resolveRepo(ctx, st, key)
+	c, cacheOnly, err := ResolveRepo(ctx, st, key)
 	if err != nil {
-		return vcsAccess{}, s.itemError(ctx, "VCS repository", err)
+		return vcsAccess{}, s.ItemError(ctx, "VCS repository", err)
 	}
 	if c.PackageType != repo.VCS || c.Class != repo.Remote {
-		return vcsAccess{}, notFoundRepo(key)
+		return vcsAccess{}, NotFoundRepo(key)
 	}
 	switch c.VCSGitProvider {
 	case "",
@@ -61,11 +61,11 @@ func (s artifactoryService) vcsRepository(
 			"VCS provider adapter unavailable",
 		)
 	}
-	p, acc, err := s.itemCaller(ctx, st)
+	p, acc, err := s.ItemCaller(ctx, st)
 	if err != nil {
 		return vcsAccess{}, err
 	}
-	if !acc.folder(c, owner+"/"+name, types.ActionRead) {
+	if !acc.Folder(c, owner+"/"+name, types.ActionRead) {
 		return vcsAccess{}, fmt.Errorf(
 			"vcs repository read denied: %w",
 			pkgroute.SourceError(source.ErrDenied, p.Anonymous),
@@ -85,13 +85,13 @@ func (s artifactoryService) vcsRead(
 	result, err := s.cfg.RemoteSources.Read(ctx, source.Request{
 		Repo:      a.repo,
 		Subject:   accessapi.SubjectOf(a.principal),
-		Access:    a.access.d,
+		Access:    a.access.Decider,
 		Resource:  resource,
 		Project:   a.repo.ProjectKey,
 		CacheOnly: a.isCacheOnly,
 	})
 	if err != nil {
-		return source.Result{}, s.itemError(
+		return source.Result{}, s.ItemError(
 			ctx,
 			"VCS source",
 			pkgroute.SourceError(err, a.principal.Anonymous),
@@ -116,7 +116,7 @@ func (s artifactoryService) vcsResultBytes(
 		var err error
 		body, _, err = s.cfg.Blobs.Open(ctx, result.Item.Actual.SHA256)
 		if err != nil {
-			return nil, s.internalError(ctx, "VCS cached blob", err)
+			return nil, s.InternalError(ctx, "VCS cached blob", err)
 		}
 	default:
 		return nil, source.ErrInvalidResult
@@ -166,7 +166,7 @@ func (s artifactoryService) vcsRefs(
 		if ref.Branch {
 			kind = "heads"
 		}
-		if a.access.file(a.repo, owner+"/"+name+"/refs/"+kind+"/"+ref.Name, types.ActionRead) {
+		if a.access.File(a.repo, owner+"/"+name+"/refs/"+kind+"/"+ref.Name, types.ActionRead) {
 			filtered = append(filtered, ref)
 		}
 	}
@@ -206,7 +206,7 @@ func (s artifactoryService) vcsReadRefs(
 	}
 	data, err := s.vcsResultBytes(ctx, result, vcshttp.MaxRefsBytes)
 	if err != nil {
-		return nil, s.itemError(ctx, "VCS references", err)
+		return nil, s.ItemError(ctx, "VCS references", err)
 	}
 	refs, err := endpoint.Parse(data)
 	if err != nil {

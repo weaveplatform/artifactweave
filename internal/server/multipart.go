@@ -73,7 +73,7 @@ func (s artifactoryService) multipartError(r *http.Request, op string, err error
 	case errors.Is(err, multipart.ErrState):
 		return apierror.New(http.StatusConflict, err.Error())
 	}
-	return s.internalError(r.Context(), op, err)
+	return s.InternalError(r.Context(), op, err)
 }
 
 // bearer returns the upload token the CLI sends as a Bearer token, or "".
@@ -94,12 +94,12 @@ func (s artifactoryService) createMultipart(w http.ResponseWriter, r *http.Reque
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	p, acc, err := s.itemCaller(ctx, st)
+	p, acc, err := s.ItemCaller(ctx, st)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
@@ -115,15 +115,15 @@ func (s artifactoryService) createMultipart(w http.ResponseWriter, r *http.Reque
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("malformed path %q", repoPath))
 		return
 	}
-	c, cached, err := resolveRepo(ctx, st, q.Get("repoKey"))
+	c, cached, err := ResolveRepo(ctx, st, q.Get("repoKey"))
 	if err == nil {
-		c, err = deployTarget(ctx, st, c, cached)
+		c, err = DeployTarget(ctx, st, c, cached)
 	}
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(ctx, "resolve deploy target", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve deploy target", err))
 		return
 	}
-	if !acc.file(c, repoPath, types.ActionWrite) {
+	if !acc.File(c, repoPath, types.ActionWrite) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}

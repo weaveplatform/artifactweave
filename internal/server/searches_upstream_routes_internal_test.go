@@ -14,7 +14,7 @@ import (
 // refused; one that discloses nothing has nothing to recheck.
 func TestUnitSearchUpstreamDisclosuresWithoutAuthenticator(t *testing.T) {
 	u := &upstreamSearch{r: &searchRun{
-		s: artifactoryService{cfg: withAccess(Config{Store: inmem.New()})},
+		s: newArtifactoryService(withAccess(Config{Store: inmem.New()})),
 		p: kernel.Principal{Name: "admin", Password: true},
 	}}
 	if err := u.checkDisclosures(t.Context()); err != nil {

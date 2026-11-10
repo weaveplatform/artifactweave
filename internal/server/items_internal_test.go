@@ -22,12 +22,12 @@ func TestAccServeFilePreservesProtocolDisposition(t *testing.T) {
 	deployed := w.do("PUT", "/artifactory/libs-local/org/app/app-1.0.jar", "admin", "jar bytes")
 	wantStatus(t, deployed, http.StatusCreated)
 	it := w.item("libs-local", false, "org/app/app-1.0.jar")
-	s := artifactoryService{cfg: Config{Store: w.db, Blobs: w.blobs}}
-	f := found{repo: repo.Config{Key: "libs-local", Class: repo.Local}, item: it}
+	s := newArtifactoryService(Config{Store: w.db, Blobs: w.blobs})
+	f := Found{Repo: repo.Config{Key: "libs-local", Class: repo.Local}, Item: it}
 	r := httptest.NewRequest(http.MethodGet, "/native/download", nil)
 	rec := httptest.NewRecorder()
 	rec.Header().Set("Content-Disposition", `attachment; filename="plugin-com-weave-fixture.jar"`)
-	s.serveFile(rec, r, w.db, f, kernel.Principal{Name: "reader"})
+	s.ServeFile(rec, r, w.db, f, kernel.Principal{Name: "reader"})
 	wantStatus(t, rec, http.StatusOK)
 	got := rec.Header().Get("Content-Disposition")
 	if got != `attachment; filename="plugin-com-weave-fixture.jar"` {
@@ -37,7 +37,7 @@ func TestAccServeFilePreservesProtocolDisposition(t *testing.T) {
 		t.Fatalf("body %q", got)
 	}
 	ordinary := httptest.NewRecorder()
-	s.serveFile(ordinary, r, w.db, f, kernel.Principal{Name: "reader"})
+	s.ServeFile(ordinary, r, w.db, f, kernel.Principal{Name: "reader"})
 	wantStatus(t, ordinary, http.StatusOK)
 	if got := ordinary.Header().Get("Content-Disposition"); got != blob.Disposition(it.Name) {
 		t.Fatalf("default disposition %q, want %q", got, blob.Disposition(it.Name))
@@ -68,7 +68,7 @@ func TestAccReadsContent(t *testing.T) {
 	for n := range store.MaxLimit {
 		put("gone", fmt.Sprintf("f%d.bin", n))
 	}
-	acc, err := accessFor(
+	acc, err := AccessFor(
 		ctx,
 		authorizerOver(db),
 		kernel.Principal{Name: "admin", Admin: true},
@@ -77,18 +77,18 @@ func TestAccReadsContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := readsContent(ctx, db, acc, sum); ok || err != nil {
+	if ok, err := readsContent(ctx, db, acc, sum, privateItem); ok || err != nil {
 		t.Fatalf("files of a deleted repository: %v %v", ok, err)
 	}
 	put("libs-local", "late.bin")
-	if ok, err := readsContent(ctx, db, acc, sum); !ok || err != nil {
+	if ok, err := readsContent(ctx, db, acc, sum, privateItem); !ok || err != nil {
 		t.Fatalf("a readable file on the second page: %v %v", ok, err)
 	}
 	for name, st := range map[string]store.Store{
 		"find": buildSearchFaults{Store: db, fail: "find"},
 		"repo": faultyStore{Store: db, fail: map[string]bool{"get": true}},
 	} {
-		if _, err := readsContent(ctx, st, acc, sum); !errors.Is(err, errBoom) {
+		if _, err := readsContent(ctx, st, acc, sum, privateItem); !errors.Is(err, errBoom) {
 			t.Errorf("%s failing: %v", name, err)
 		}
 	}
@@ -120,29 +120,29 @@ func TestAccMatrixParameterDecoding(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			req, err := parseEscapedItemPath(c.escaped)
+			req, err := ParseEscapedItemPath(c.escaped)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(req.props) != len(c.expected) {
-				t.Fatalf("props = %v, want %v", req.props, c.expected)
+			if len(req.Props) != len(c.expected) {
+				t.Fatalf("props = %v, want %v", req.Props, c.expected)
 			}
 			for k, v := range c.expected {
-				if !slices.Equal(req.props[k], v) {
-					t.Errorf("%s = %q, want %q", k, req.props[k], v)
+				if !slices.Equal(req.Props[k], v) {
+					t.Errorf("%s = %q, want %q", k, req.Props[k], v)
 				}
 			}
 			for _, k := range c.mandatory {
-				if !req.mandatory[k] {
+				if !req.Mandatory[k] {
 					t.Errorf("%s is not mandatory", k)
 				}
 			}
-			if req.path != "a.txt" {
-				t.Errorf("path = %q", req.path)
+			if req.Path != "a.txt" {
+				t.Errorf("path = %q", req.Path)
 			}
 		})
 	}
-	if _, err := parseEscapedItemPath("libs/a.txt;k=%zz"); err == nil {
+	if _, err := ParseEscapedItemPath("libs/a.txt;k=%zz"); err == nil {
 		t.Error("a malformed escape was accepted")
 	}
 }

@@ -62,7 +62,7 @@ func (s artifactoryService) vcsOpenResult(
 		var err error
 		body, _, err = s.cfg.Blobs.Open(ctx, result.Item.Actual.SHA256)
 		if err != nil {
-			return nil, 0, s.internalError(ctx, "VCS cached archive", err)
+			return nil, 0, s.InternalError(ctx, "VCS cached archive", err)
 		}
 		size = result.Item.Size
 	default:
@@ -141,7 +141,7 @@ func (s artifactoryService) vcsArchive(
 		}
 	}
 	permissionPath := owner + "/" + name + "/refs/" + kind + "/" + ref
-	if !a.access.file(a.repo, permissionPath, types.ActionRead) {
+	if !a.access.File(a.repo, permissionPath, types.ActionRead) {
 		return nil, 0, fmt.Errorf(
 			"vcs archive read denied: %w",
 			pkgroute.SourceError(source.ErrDenied, a.principal.Anonymous),
@@ -199,13 +199,13 @@ func (s artifactoryService) vcsMatchCachedProperties(
 		}
 		return notFound
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return err
 	}
 	props, err := st.Items().Properties(ctx, result.Item.ID)
 	if err != nil {
-		return s.internalError(ctx, "VCS cached properties", err)
+		return s.InternalError(ctx, "VCS cached properties", err)
 	}
 	for key, value := range filter {
 		found := false
@@ -453,7 +453,7 @@ func (s artifactoryService) vcsFile(
 	if err != nil {
 		return nil, 0, err
 	}
-	if !a.access.file(a.repo, owner+"/"+name+"/refs/"+kind+"/"+ref+"/"+filename, types.ActionRead) {
+	if !a.access.File(a.repo, owner+"/"+name+"/refs/"+kind+"/"+ref+"/"+filename, types.ActionRead) {
 		return nil, 0, fmt.Errorf(
 			"vcs file read denied: %w",
 			pkgroute.SourceError(source.ErrDenied, a.principal.Anonymous),

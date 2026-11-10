@@ -57,35 +57,35 @@ func (s artifactoryService) uploadCran(
 	feed, suffix string,
 ) {
 	ctx := r.Context()
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	p, acc, err := s.itemCaller(ctx, st)
+	p, acc, err := s.ItemCaller(ctx, st)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	c, cached, err := resolveRepo(ctx, st, chi.URLParam(r, "repoKey"))
+	c, cached, err := ResolveRepo(ctx, st, chi.URLParam(r, "repoKey"))
 	if err == nil {
-		c, err = deployTarget(ctx, st, c, cached)
+		c, err = DeployTarget(ctx, st, c, cached)
 	}
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(ctx, "resolve CRAN upload repository", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve CRAN upload repository", err))
 		return
 	}
 	if c.PackageType != repo.Cran {
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("repository is not a CRAN repository"))
 		return
 	}
-	if !acc.folder(c, feed, types.ActionWrite) {
+	if !acc.Folder(c, feed, types.ActionWrite) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	tmp, err := os.CreateTemp("", "artifactweave-cran-upload-*")
 	if err != nil {
-		httpkit.WriteErr(w, r, s.internalError(ctx, "spool CRAN upload", err))
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "spool CRAN upload", err))
 		return
 	}
 	defer func() { _ = os.Remove(tmp.Name()); _ = tmp.Close() }()
@@ -99,7 +99,7 @@ func (s artifactoryService) uploadCran(
 		return
 	}
 	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
-		httpkit.WriteErr(w, r, s.internalError(ctx, "rewind CRAN upload", err))
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "rewind CRAN upload", err))
 		return
 	}
 	pkg, err := cran.ReadUploaded(ctx, tmp, size, feed, suffix)
@@ -107,29 +107,29 @@ func (s artifactoryService) uploadCran(
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("invalid CRAN package archive"))
 		return
 	}
-	if !acc.file(c, pkg.Path, types.ActionWrite) {
+	if !acc.File(c, pkg.Path, types.ActionWrite) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
-		httpkit.WriteErr(w, r, s.internalError(ctx, "rewind CRAN package", err))
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "rewind CRAN package", err))
 		return
 	}
-	svc := s.items(st)
+	svc := s.Items(st)
 	it, err := svc.Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: pkg.Path}, Body: tmp,
 		Declared: pkgroute.DeclaredChecksums(r.Header), By: p.Name,
-		CanOverwritePath:   func(full string) bool { return acc.file(c, full, types.ActionDelete) },
-		OverwriteIdentical: s.mayBeIdentical(false),
+		CanOverwritePath:   func(full string) bool { return acc.File(c, full, types.ActionDelete) },
+		OverwriteIdentical: s.MayBeIdentical(false),
 	})
 	if errors.Is(err, cran.ErrPackage) {
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("invalid CRAN package archive"))
 		return
 	}
 	if err != nil {
-		httpkit.WriteErr(w, r, s.itemError(ctx, "deploy CRAN package", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "deploy CRAN package", err))
 		return
 	}
-	w.Header().Set("Location", downloadURI(ctx, it.ReportedRepoKey(), it.FullPath()))
-	httpkit.WriteJSON(w, http.StatusCreated, itemCreated(ctx, it))
+	w.Header().Set("Location", DownloadURI(ctx, it.ReportedRepoKey(), it.FullPath()))
+	httpkit.WriteJSON(w, http.StatusCreated, ItemCreated(ctx, it))
 }

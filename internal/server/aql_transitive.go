@@ -195,7 +195,7 @@ func transitiveVisible(
 	if it.Folder {
 		allows = d.AllowsFolder
 	}
-	if !allows(types.ResourceArtifact, target(m.config), it.FullPath(), types.ActionRead) {
+	if !allows(types.ResourceArtifact, Target(m.config), it.FullPath(), types.ActionRead) {
 		return false
 	}
 	if p.Admin {
@@ -332,7 +332,7 @@ func (s artifactoryService) transitiveCollect(
 		if member.config.Class != repo.Remote || !member.canSearch {
 			continue
 		}
-		if !d.AllowsFolder(types.ResourceArtifact, target(member.config), "", types.ActionRead) {
+		if !d.AllowsFolder(types.ResourceArtifact, Target(member.config), "", types.ActionRead) {
 			continue
 		}
 		if member.config.ContentSynchronisation == nil ||

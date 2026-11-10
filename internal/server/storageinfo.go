@@ -30,28 +30,28 @@ func (s artifactoryService) GetStorageSummaryInfo(
 	if err != nil {
 		return nil, err //nolint:wrapcheck // an apierror value
 	}
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		return nil, err
 	}
 	d, _ := accessapi.DeciderFrom(ctx)
-	a, err := accessFor(ctx, s.cfg.Access.Authorizer, p, d)
+	a, err := AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
 	if err != nil {
-		return nil, s.internalError(ctx, "storage summary access", err)
+		return nil, s.InternalError(ctx, "storage summary access", err)
 	}
-	if !a.d.System("info/storage", types.ScopeRead) {
+	if !a.Decider.System("info/storage", types.ScopeRead) {
 		return nil, kernel.ErrForbidden
 	}
 	sum, err := usage.Summarize(ctx, st, s.cfg.BlobLocation)
 	if err != nil {
-		return nil, s.internalError(ctx, "storage summary", err)
+		return nil, s.InternalError(ctx, "storage summary", err)
 	}
 	if s.cfg.Mirrors == nil {
 		return artgen.GetStorageSummaryInfo200JSONResponse(storageSummary(sum)), nil
 	}
 	mirrors, err := s.cfg.Mirrors.Status(ctx)
 	if err != nil {
-		return nil, s.internalError(ctx, "mirror status", err)
+		return nil, s.InternalError(ctx, "mirror status", err)
 	}
 	return summaryWithMirrors{storageSummary(sum), mirrorSummaries(mirrors)}, nil
 }

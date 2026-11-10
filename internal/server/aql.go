@@ -56,7 +56,7 @@ const aqlTrimmed = "AQL query reached the search hard limit, results are trimmed
 // properties.update run here too (aqlAction).
 func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	st, err := s.content()
+	st, err := s.Content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
@@ -85,7 +85,7 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	// At debug level the queries clients send are kept: the acceptance
 	// suite captures the JFrog CLI's from here as
 	// migration/artifacts/core/aql fixtures.
-	s.log().
+	s.Log().
 		DebugContext(ctx, "aql query", "request_id", httpkit.RequestIDFrom(ctx), "query", string(body))
 	q, err := aql.Parse(string(body))
 	if err != nil {
@@ -97,7 +97,7 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	}
 	configs, err := repoConfigs(ctx, st)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.internalError(ctx, "aql repositories", err))
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "aql repositories", err))
 		return
 	}
 	q.Resolve(aqlRepositories(configs))
@@ -142,12 +142,12 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case q.Action != aql.Find:
 		if hits, err = s.aqlAction(ctx, st, p, q, configs, hits); err != nil {
-			httpkit.WriteErr(w, r, s.internalError(ctx, q.Action.String(), err))
+			httpkit.WriteErr(w, r, s.InternalError(ctx, q.Action.String(), err))
 			return
 		}
 	case !p.Admin:
 		if hits, err = readable(ctx, s.cfg.Access.Authorizer, p, configs, hits); err != nil {
-			httpkit.WriteErr(w, r, s.internalError(ctx, "aql permissions", err))
+			httpkit.WriteErr(w, r, s.InternalError(ctx, "aql permissions", err))
 			return
 		}
 		if scaled && len(hits) > q.Limit {
@@ -209,7 +209,7 @@ func (s artifactoryService) aqlFailure(
 	case errors.Is(err, aql.ErrInvalid):
 		return apierror.New(http.StatusBadRequest, err.Error())
 	}
-	return s.internalError(ctx, op, err)
+	return s.InternalError(ctx, op, err)
 }
 
 // nesting is how the rows of related domains render for p: everything for
@@ -228,7 +228,7 @@ func nesting(
 		return n, nil
 	}
 	d, _ := accessapi.DeciderFrom(ctx)
-	acc, err := accessFor(ctx, az, p, d)
+	acc, err := AccessFor(ctx, az, p, d)
 	if err != nil {
 		return n, err
 	}
@@ -325,7 +325,7 @@ func readable(
 	hits []aql.Hit,
 ) ([]aql.Hit, error) {
 	d, _ := accessapi.DeciderFrom(ctx)
-	acc, err := accessFor(ctx, az, p, d)
+	acc, err := AccessFor(ctx, az, p, d)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func readable(
 // rows keeps the hits the caller may read, and also act on with want when
 // it names any action, that their repository's include and exclude patterns
 // accept.
-func (a access) rows(
+func (a Access) rows(
 	configs map[string]repo.Config,
 	hits []aql.Hit,
 	want types.Actions,
@@ -353,8 +353,8 @@ func (a access) rows(
 			patterns[c.Key] = pat
 		}
 		full := h.Item.FullPath()
-		if pat.Accepts(full, h.Item.Folder) && a.item(c, full, h.Item.Folder, types.ActionRead) &&
-			(want == 0 || a.file(c, full, want)) {
+		if pat.Accepts(full, h.Item.Folder) && a.Item(c, full, h.Item.Folder, types.ActionRead) &&
+			(want == 0 || a.File(c, full, want)) {
 			out = append(out, h)
 		}
 	}

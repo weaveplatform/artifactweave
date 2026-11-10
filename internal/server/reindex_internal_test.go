@@ -281,7 +281,7 @@ func TestAccReindexFaults(t *testing.T) {
 		if st != nil {
 			cfg.Store = st
 		}
-		return artifactoryService{cfg: withAccess(cfg)}
+		return newArtifactoryService(withAccess(cfg))
 	}
 	status := func(err error) int {
 		var e *apierror.Error
@@ -290,11 +290,11 @@ func TestAccReindexFaults(t *testing.T) {
 		}
 		return e.Status
 	}
-	if _, err := on(nil).reindex(ctx, repo.NuGet, "nuget-local", "", false); status(err) !=
+	if _, err := on(nil).Reindex(ctx, repo.NuGet, "nuget-local", "", false); status(err) !=
 		http.StatusNotImplemented {
 		t.Errorf("no store: %v", err)
 	}
-	if _, err := on(db).reindex(ctx, repo.NuGet, "nuget-local", "", false); status(err) !=
+	if _, err := on(db).Reindex(ctx, repo.NuGet, "nuget-local", "", false); status(err) !=
 		http.StatusUnauthorized {
 		t.Errorf("no caller: %v", err)
 	}
@@ -304,12 +304,12 @@ func TestAccReindexFaults(t *testing.T) {
 		call func(artifactoryService) error
 	}{
 		{"settings", func(s artifactoryService) error {
-			_, err := s.reindex(kernel.WithPrincipal(ctx, kernel.Principal{Name: "deployer"}),
+			_, err := s.Reindex(kernel.WithPrincipal(ctx, kernel.Principal{Name: "deployer"}),
 				repo.NuGet, "nuget-local", "", false)
 			return err
 		}},
 		{"enqueue", func(s artifactoryService) error {
-			_, err := s.reindex(admin, repo.NuGet, "nuget-local", "", false)
+			_, err := s.Reindex(admin, repo.NuGet, "nuget-local", "", false)
 			return err
 		}},
 		{"enqueue", func(s artifactoryService) error {

@@ -149,7 +149,7 @@ func TestUnitPatchConfigurationAnonymousAccess(t *testing.T) {
 // built without a store.
 func TestAccPatchConfigurationBody(t *testing.T) {
 	w := newRepoWorld(t)
-	svc := artifactoryService{cfg: Config{Store: w.db}}
+	svc := newArtifactoryService(Config{Store: w.db})
 	admin := kernel.WithPrincipal(
 		context.Background(),
 		kernel.Principal{Name: "admin", Admin: true},
@@ -165,7 +165,7 @@ func TestAccPatchConfigurationBody(t *testing.T) {
 		"unreadable": {svc, func(http.ResponseWriter) io.ReadCloser {
 			return io.NopCloser(failingReader{})
 		}, http.StatusBadRequest},
-		"no store": {artifactoryService{}, func(http.ResponseWriter) io.ReadCloser {
+		"no store": {newArtifactoryService(Config{}), func(http.ResponseWriter) io.ReadCloser {
 			return io.NopCloser(strings.NewReader("a: b"))
 		}, http.StatusNotImplemented},
 	} {
