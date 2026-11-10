@@ -23,6 +23,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
 	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/access/core/token"
+	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
@@ -107,7 +108,7 @@ type Config struct {
 	// answers just the system endpoints and the stubs.
 	Auth *authn.Authenticator
 	// Mirrors administers the blob mirrors; nil when no tier is a mirror.
-	Mirrors Mirrors
+	Mirrors artifactshttp.Mirrors
 	// RemoteStatus serves artifactweave-only, administrator-only diagnostics.
 	RemoteStatus func(context.Context, string, string) (smart.SmartStatus, error)
 	// Multipart serves the JFrog CLI's multipart upload protocol; nil
@@ -146,10 +147,10 @@ type Config struct {
 	FolderDownloadMaxConcurrent int
 	// AQL bounds AQL searches; the zero value has no cap. Its MaxResults
 	// caps the GET searches too.
-	AQL AQLLimits
+	AQL artifactshttp.AQLLimits
 	// Search limits what the GET searches return; the zero value limits
 	// nothing.
-	Search SearchLimits
+	Search artifactshttp.SearchLimits
 	// DockerSubdomainMatch turns on the Docker subdomain method
 	// (docker.subdomain_match): <repo>.<BaseURL host>/v2/... addresses repo.
 	DockerSubdomainMatch bool
@@ -300,9 +301,9 @@ func withConfiguration(cfg Config) Config {
 var overlays = []itemkit.Overlay{
 	tryAgentMarketplaceItem,
 	tryAlpineItem,
-	TryCondaItem,
-	TryMachineLearningItem,
-	TryChefItem,
+	artifactshttp.TryCondaItem,
+	artifactshttp.TryMachineLearningItem,
+	artifactshttp.TryChefItem,
 	tryCranItem,
 	tryDebianItem,
 	tryRPMItem,
@@ -329,7 +330,7 @@ func kitDeps(cfg Config) itemkit.Deps {
 		EnforceIdenticalChecksumDeploy: cfg.EnforceIdenticalChecksumDeploy,
 		Logger:                         cfg.Logger,
 		Overlays:                       overlays,
-		Private:                        PrivateItem,
+		Private:                        artifactshttp.PrivateItem,
 	}
 	if cfg.Configuration.System != nil {
 		d.DownloadRedirectMinSize = cfg.Configuration.System.DownloadRedirectMinSize
@@ -342,8 +343,8 @@ func kitDeps(cfg Config) itemkit.Deps {
 func newKit(cfg Config) *itemkit.Kit { return itemkit.New(kitDeps(cfg)) }
 
 // artifactsDeps returns the artifacts handlers' dependencies from cfg.
-func artifactsDeps(cfg Config) Deps {
-	return Deps{
+func artifactsDeps(cfg Config) artifactshttp.Deps {
+	return artifactshttp.Deps{
 		Deps:                        kitDeps(cfg),
 		RemoteHTTP:                  cfg.RemoteHTTP,
 		RemoteStatus:                cfg.RemoteStatus,
@@ -363,8 +364,8 @@ func artifactsDeps(cfg Config) Deps {
 
 // newArtifactoryAPI returns the artifacts partial over cfg, whose item kit
 // New hands to the ecosystem partials as well.
-func newArtifactoryAPI(cfg Config) ArtifactoryAPI {
-	return NewArtifactoryAPI(artifactsDeps(cfg))
+func newArtifactoryAPI(cfg Config) artifactshttp.ArtifactoryAPI {
+	return artifactshttp.NewArtifactoryAPI(artifactsDeps(cfg))
 }
 
 // New returns the fully wired handler.
@@ -401,7 +402,7 @@ func New(cfg Config) http.Handler {
 		Repositories:  repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects),
 	})
 	// The artifacts repositories collection, and access's key pairs.
-	slashes := SlashCollections()
+	slashes := artifactshttp.SlashCollections()
 	maps.Copy(slashes, accesshttp.SlashCollections())
 	// The registry exists before the middleware, whose challenge it writes.
 	registry := newRegistry(cfg, kit)
@@ -417,7 +418,7 @@ func New(cfg Config) http.Handler {
 		middleware.NormalizeContentType(keepContentType),
 		middleware.CollectionSlash(slashes),
 		accesshttp.PlusAsSpace,
-		IdempotencyRoutes,
+		artifactshttp.IdempotencyRoutes,
 		accesshttp.APIRecoveryContext,
 	)
 	limits := newLimitOptions(cfg.RequestLimits)
@@ -425,7 +426,7 @@ func New(cfg Config) http.Handler {
 	if cfg.RequestLimits != nil {
 		r.Use(limiter.limitIngress(limits))
 	}
-	mounted := append(Protocols(artifactsDeps(cfg)), cfg.Protocols...)
+	mounted := append(artifactshttp.Protocols(artifactsDeps(cfg)), cfg.Protocols...)
 	if cfg.Auth != nil {
 		r.Use(
 			accesshttp.Authenticate(
@@ -670,7 +671,7 @@ func newAuthnOptions(
 	return accesshttp.AuthnOptions{
 		Auth:               a,
 		Store:              st,
-		SelfAuthenticated:  SelfAuthenticated(),
+		SelfAuthenticated:  artifactshttp.SelfAuthenticated(),
 		Skip:               append([]func(*http.Request) bool{npmUserRequest}, skip...),
 		RegistryPath:       dockerhttp.IsRegistryPath,
 		ChallengeAnonymous: dockerhttp.ChallengesAnonymous,
@@ -748,10 +749,13 @@ func requestDetails(o detailOptions) func(http.Handler) http.Handler {
 func newDetailOptions() detailOptions {
 	access := accesshttp.DetailRules()
 	return detailOptions{
-		SearchQuery: []func(*http.Request) bool{KeepsSearchQuery},
+		SearchQuery: []func(*http.Request) bool{artifactshttp.KeepsSearchQuery},
 		Rewrite:     access.Rewrite,
 		RawBody: append(
-			[]func(*http.Request) bool{KeepsRepositoryBody, KeepsBuildBody},
+			[]func(*http.Request) bool{
+				artifactshttp.KeepsRepositoryBody,
+				artifactshttp.KeepsBuildBody,
+			},
 			access.RawBody...,
 		),
 	}

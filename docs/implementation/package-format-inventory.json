@@ -449,7 +449,7 @@
       "owner_issue": 759,
       "evidence": "test/acceptance/features/rpm.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/rpm-repositories",
-      "route_file": "internal/server/items.go",
+      "route_file": "migration/artifacts/adapters/http/items.go",
       "p9c": true
     },
     {
@@ -577,7 +577,7 @@
       "owner_issue": 0,
       "evidence": "test/acceptance/features/round_trip.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/repository-support-for-package-clients",
-      "route_file": "internal/server/items.go",
+      "route_file": "migration/artifacts/adapters/http/items.go",
       "p9c": false
     },
     {
@@ -609,7 +609,7 @@
       "owner_issue": 773,
       "evidence": "test/acceptance/features/p2.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/p2-repositories",
-      "route_file": "internal/server/items.go",
+      "route_file": "migration/artifacts/adapters/http/items.go",
       "p9c": true
     },
     {
@@ -705,7 +705,7 @@
       "owner_issue": 0,
       "evidence": "",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
-      "route_file": "internal/server/items.go",
+      "route_file": "migration/artifacts/adapters/http/items.go",
       "p9c": false,
       "owner_phase": "P15/P24"
     },

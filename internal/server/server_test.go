@@ -13,6 +13,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
+	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/middleware"
@@ -553,7 +555,7 @@ var p8Paths = []struct {
 
 // mounted returns the built-in protocol named name, if it is mounted.
 func mounted(name string) (pkgroute.Protocol, bool) {
-	for _, proto := range Protocols(Deps{}) {
+	for _, proto := range artifactshttp.Protocols(artifactshttp.Deps{}) {
 		if proto.Name == name {
 			return proto, true
 		}
@@ -675,7 +677,7 @@ func TestAccRequestDetailsReadFailure(t *testing.T) {
 		// The path rule is unexported in the artifacts handlers, so the
 		// table reaches it through their predicate, which applies it to a
 		// POST.
-		got := KeepsRepositoryBody(httptest.NewRequest(http.MethodPost, path, nil))
+		got := artifactshttp.KeepsRepositoryBody(httptest.NewRequest(http.MethodPost, path, nil))
 		if got != want {
 			t.Errorf("%s: %v", path, got)
 		}

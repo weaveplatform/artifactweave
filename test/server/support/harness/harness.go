@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/server"
+	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
@@ -24,14 +25,14 @@ type Tune = func(*Config)
 // Mirrors is the type of Config.Mirrors, the blob mirrors whose state the
 // storage summary reports and whose repair an administrator starts. A suite
 // implements it to choose what the router sees.
-type Mirrors = server.Mirrors
+type Mirrors = artifactshttp.Mirrors
 
 // MirrorStatus is one tier's mirror in what Mirrors reports.
-type MirrorStatus = server.MirrorStatus
+type MirrorStatus = artifactshttp.MirrorStatus
 
 // SearchLimits is the type of Config.Search, the result caps of the GET
 // searches.
-type SearchLimits = server.SearchLimits
+type SearchLimits = artifactshttp.SearchLimits
 
 // DefaultRedirectTTL is how long a signed download URL stays valid when
 // Config.Redirect sets no TTL.

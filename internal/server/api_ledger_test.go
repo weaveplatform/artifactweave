@@ -437,7 +437,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	}
 	if strings.HasPrefix(path, "/artifactory/api/build") {
 		return "build", "build names/numbers/runs retain complete legacy collections; store keysets may be collected; append/replay and run detail are singular", []string{
-			"internal/server/builds.go",
+			"migration/artifacts/adapters/http/builds.go",
 			"migration/artifacts/core/build/build.go",
 			"migration/artifacts/adapters/sql/builds.go",
 			"internal/server/builds_status_test.go",
@@ -446,7 +446,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	if strings.HasPrefix(path, "/artifactory/api/repositories") ||
 		strings.HasPrefix(path, "/artifactory/api/v2/repositories") {
 		return "repository", "legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size", []string{
-			"internal/server/repositories.go",
+			"migration/artifacts/adapters/http/repositories.go",
 			"migration/artifacts/core/repos/repos.go",
 			"migration/artifacts/adapters/sql/content.go",
 		}
@@ -454,8 +454,8 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	if strings.HasPrefix(path, "/artifactory/api/search/") ||
 		strings.HasPrefix(path, "/artifactory/api/versions/") {
 		return "search", "AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise", []string{
-			"internal/server/searches.go",
-			"internal/server/aql.go",
+			"migration/artifacts/adapters/http/searches.go",
+			"migration/artifacts/adapters/http/aql.go",
 			"migration/artifacts/adapters/sql/content_items.go",
 			"docs/research/decisions/0012-search-and-aql.md",
 		}
@@ -474,8 +474,8 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	}
 	return "content-and-configuration", "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim", []string{
 		"internal/server/server.go",
-		"internal/server/items.go",
-		"internal/server/storage.go",
+		"migration/artifacts/adapters/http/items.go",
+		"migration/artifacts/adapters/http/storage.go",
 		"migration/artifacts/adapters/sql/content_items.go",
 		"migration/access/adapters/sql/projects.go",
 	}
