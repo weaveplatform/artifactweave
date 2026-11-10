@@ -42,8 +42,8 @@ type artifactoryServer struct {
 	*configurationhttp.SystemAPI
 	*artifactshttp.ArtifactoryAPI
 	*vcshttp.VCSAPI
-	*npmAPI
-	*dockerAPI
+	*NPMAPI
+	*DockerAPI
 	*debianhttp.DebianAPI
 	*cranhttp.CranAPI
 	*rpmhttp.RPMAPI

@@ -11,10 +11,14 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
-// chefAPI serves Chef's reindex route over the item kit.
-type chefAPI struct{ *itemkit.Kit }
+// ChefAPI serves Chef's reindex route over the item kit.
+type ChefAPI struct{ *itemkit.Kit }
 
-func (s chefAPI) registerChefReindex(r chi.Router) {
+// RegisterChefReindex mounts Chef's reindex, POST
+// /artifactory/api/chef/{repoKey}/reindex, on r. It refuses any query with
+// 400, runs the item kit's Reindex for Chef and answers its text once the
+// reindex has run; it writes errors in the artifactory profile.
+func (s ChefAPI) RegisterChefReindex(r chi.Router) {
 	r.Post("/artifactory/api/chef/{repoKey}/reindex", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.RawQuery != "" {
 			apierror.Write(

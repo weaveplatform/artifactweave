@@ -243,8 +243,8 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	specOf := map[string]string{
 		"ArtifactoryAPI": "artifactory",
 		"VCSAPI":         "artifactory",
-		"npmAPI":         "artifactory",
-		"dockerAPI":      "artifactory",
+		"NPMAPI":         "artifactory",
+		"DockerAPI":      "artifactory",
 		"DebianAPI":      "artifactory",
 		"CranAPI":        "artifactory",
 		"RPMAPI":         "artifactory",

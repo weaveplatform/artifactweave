@@ -41,15 +41,15 @@ func npmUserPath(escaped string) bool {
 	return ok && key != "" && strings.HasPrefix(after, "-/user/")
 }
 
-// npmUserRequest is npmUserPath of r's escaped path, the skip
+// NPMUserRequest is npmUserPath of r's escaped path, the skip
 // accesshttp.Authenticate asks first.
-func npmUserRequest(r *http.Request) bool { return npmUserPath(r.URL.EscapedPath()) }
+func NPMUserRequest(r *http.Request) bool { return npmUserPath(r.URL.EscapedPath()) }
 
-// npmOperation reports whether path is one of the JFrog operations that
+// NPMOperation reports whether path is one of the JFrog operations that
 // answer npm's configuration, which answer errors in the Artifactory
 // envelope, {"errors":[...]}, as 7.x does (RTFACT-30181), where the
 // registry beside them answers npm's.
-func npmOperation(path string) bool {
+func NPMOperation(path string) bool {
 	rest, ok := strings.CutPrefix(path, npmAPIPrefix)
 	if !ok {
 		return false
@@ -58,11 +58,11 @@ func npmOperation(path string) bool {
 	return rest == "auth" || len(segs) == 3 && segs[0] != "" && segs[1] == "auth" && segs[2] != ""
 }
 
-// npmLoggedPath is path as the access log records it: the token a
+// NPMLoggedPath is path as the access log records it: the token a
 // logout's path names is a credential, which must not reach the log. A
 // token that cannot be revoked outlives the logout, and the log outlives
 // both. Any other path comes back unchanged.
-func npmLoggedPath(path string) string {
+func NPMLoggedPath(path string) string {
 	const marker = "/-/user/token/"
 	if i := strings.Index(path, marker); i >= 0 && strings.HasPrefix(path, npmAPIPrefix) {
 		return path[:i+len(marker)] + "[redacted]"
@@ -72,12 +72,12 @@ func npmLoggedPath(path string) string {
 
 type npmCredentialKey struct{}
 
-// keepNPMCredential keeps, for the npm configuration operations alone, the
+// KeepNPMCredential keeps, for the npm configuration operations alone, the
 // token a request authenticated with, which they write into .npmrc as it
 // came. Nothing else needs the raw token, so no other request carries it
 // further than the middleware.
-func keepNPMCredential(ctx context.Context, r *http.Request, p kernel.Principal) context.Context {
-	if p.TokenID == "" || !npmOperation(r.URL.Path) {
+func KeepNPMCredential(ctx context.Context, r *http.Request, p kernel.Principal) context.Context {
+	if p.TokenID == "" || !NPMOperation(r.URL.Path) {
 		return ctx
 	}
 	var c npmhttp.Credential
@@ -98,7 +98,7 @@ func keepNPMCredential(ctx context.Context, r *http.Request, p kernel.Principal)
 // gets that token back, as it sent it, Basic or Bearer; it is the
 // credential the caller already holds, so nothing new is handed out.
 // [I] What 7.x answers a token caller is undocumented (#216).
-func (s npmAPI) npmCredential(ctx context.Context) (npmhttp.Credential, error) {
+func (s NPMAPI) npmCredential(ctx context.Context) (npmhttp.Credential, error) {
 	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return npmhttp.Credential{}, err //nolint:wrapcheck // an apierror value
@@ -124,7 +124,7 @@ func (s npmAPI) npmCredential(ctx context.Context) (npmhttp.Credential, error) {
 }
 
 // GetNpmAuth answers .npmrc lines that authenticate npm as the caller.
-func (s npmAPI) GetNpmAuth(
+func (s NPMAPI) GetNpmAuth(
 	ctx context.Context,
 	_ artgen.GetNpmAuthRequestObject,
 ) (artgen.GetNpmAuthResponseObject, error) {
@@ -139,7 +139,7 @@ func (s npmAPI) GetNpmAuth(
 // repository and authenticate npm to it as the caller. Any npm repository
 // may be named, whatever its class. The scope comes without its @ (R25 4);
 // one sent with it is taken as meant.
-func (s npmAPI) GetNpmScopeAuth(
+func (s NPMAPI) GetNpmScopeAuth(
 	ctx context.Context,
 	req artgen.GetNpmScopeAuthRequestObject,
 ) (artgen.GetNpmScopeAuthResponseObject, error) {

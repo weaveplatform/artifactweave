@@ -20,7 +20,7 @@ var errorProfileRules = []httpkit.ProfileRule{
 	{Match: pathPrefix("/xray/"), Profile: apierror.ProfileXray},
 	{
 		Match: func(path string) bool {
-			return npmOperation(path) || isNPMReindex(path) ||
+			return NPMOperation(path) || IsNPMReindex(path) ||
 				terraformhttp.IsTerraformReindex(path)
 		},
 		Profile: apierror.ProfileArtifactory,

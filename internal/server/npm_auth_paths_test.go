@@ -28,7 +28,7 @@ func TestAccNPMInternalPaths(t *testing.T) {
 		"/artifactory/api/npm/npm-local/auth/a/b":  false,
 		"/artifactory/api/go/auth":                 false,
 	} {
-		if got := npmOperation(path); got != want {
+		if got := NPMOperation(path); got != want {
 			t.Errorf("npmOperation(%s) = %v", path, got)
 		}
 	}
@@ -37,7 +37,7 @@ func TestAccNPMInternalPaths(t *testing.T) {
 		"/artifactory/api/npm/r/-/whoami":            "/artifactory/api/npm/r/-/whoami",
 		"/artifactory/r/-/user/token/secret":         "/artifactory/r/-/user/token/secret",
 	} {
-		if got := npmLoggedPath(path); got != want {
+		if got := NPMLoggedPath(path); got != want {
 			t.Errorf("npmLoggedPath(%s) = %s", path, got)
 		}
 	}

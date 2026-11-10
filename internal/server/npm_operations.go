@@ -14,10 +14,10 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// npmAPI is the npm ecosystem's partial strict server: the repository
+// NPMAPI is the npm ecosystem's partial strict server: the repository
 // metadata and strict-layout operations and the npm auth documents, over
 // the item kit.
-type npmAPI struct{ *itemkit.Kit }
+type NPMAPI struct{ *itemkit.Kit }
 
 // The JFrog operations on an npm local repository's index: the reindex and
 // the strict-layout conversion with its resume (decision 0034). Each needs
@@ -32,14 +32,18 @@ type npmAPI struct{ *itemkit.Kit }
 // npmOperation resolves the repository an npm operation names and checks
 // it as the reindex does: 404 when there is none, 401 or 403 to a caller
 // without Manage on it, and 400 for a repository that is no npm local one.
-func (s npmAPI) npmOperation(
+func (s NPMAPI) npmOperation(
 	ctx context.Context,
 	key string,
 ) (store.Store, repo.Config, string, error) {
 	return s.OperationRepo(ctx, repo.NPM, itemkit.ReindexOps[repo.NPM], key)
 }
 
-func (s npmAPI) CalculateNpmRepositoryMetadata(
+// CalculateNpmRepositoryMetadata queues the reindex of an npm local
+// repository's index, the item kit's Reindex that every format shares, and
+// answers 7.x's text once the work is queued. It refuses as npmOperation
+// does.
+func (s NPMAPI) CalculateNpmRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateNpmRepositoryMetadataRequestObject,
 ) (artgen.CalculateNpmRepositoryMetadataResponseObject, error) {
@@ -50,7 +54,11 @@ func (s npmAPI) CalculateNpmRepositoryMetadata(
 	return artgen.CalculateNpmRepositoryMetadata200TextResponse(msg), nil
 }
 
-func (s npmAPI) MigrateNpmRepositoryToStrictLayout(
+// MigrateNpmRepositoryToStrictLayout queues the npm format's conversion of
+// a local repository to the strict layout (npmfmt.KindConvert), keyed by
+// the repository, and answers 202 once it is queued. It refuses as
+// npmOperation does.
+func (s NPMAPI) MigrateNpmRepositoryToStrictLayout(
 	ctx context.Context,
 	req artgen.MigrateNpmRepositoryToStrictLayoutRequestObject,
 ) (artgen.MigrateNpmRepositoryToStrictLayoutResponseObject, error) {
@@ -68,7 +76,7 @@ func (s npmAPI) MigrateNpmRepositoryToStrictLayout(
 // parked once its retries ran out. A conversion cannot be cancelled, so
 // that is the only one to resume; any other answers 400. [I] 7.x's answer
 // then is unknown (#216).
-func (s npmAPI) ResumeNpmRepositoryMigration(
+func (s NPMAPI) ResumeNpmRepositoryMigration(
 	ctx context.Context,
 	req artgen.ResumeNpmRepositoryMigrationRequestObject,
 ) (artgen.ResumeNpmRepositoryMigrationResponseObject, error) {
@@ -89,13 +97,13 @@ func (s npmAPI) ResumeNpmRepositoryMigration(
 	return artgen.ResumeNpmRepositoryMigration202Response{}, nil
 }
 
-// isNPMReindex reports whether path is the JFrog reindex operation beside
+// IsNPMReindex reports whether path is the JFrog reindex operation beside
 // an npm registry, which answers in Artifactory's envelope, as the JFrog
 // operations there do on 7.x (RTFACT-30181), where the registry answers in
 // npm's. Only POST is the operation: to a GET, "reindex" is a package, and
 // a refusal the server answers before routing gives its npm client
 // Artifactory's envelope.
-func isNPMReindex(path string) bool {
+func IsNPMReindex(path string) bool {
 	rest, ok := strings.CutPrefix(path, "/artifactory/api/npm/")
 	if !ok {
 		return false

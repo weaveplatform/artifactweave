@@ -15,14 +15,14 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// registerAgentMarketplaceRoutes serves the agent plugin marketplace
+// RegisterAgentMarketplaceRoutes serves the agent plugin marketplace
 // documents. HEAD shares the GET handler, as on the item paths.
-func (s agentPluginItems) registerAgentMarketplaceRoutes(r chi.Router) {
+func (s AgentPluginItems) RegisterAgentMarketplaceRoutes(r chi.Router) {
 	r.Get("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
 	r.Head("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
 }
 
-func (s agentPluginItems) getAgentMarketplace(w http.ResponseWriter, r *http.Request) {
+func (s AgentPluginItems) getAgentMarketplace(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.Content()
 	if err != nil {
@@ -48,15 +48,21 @@ func (s agentPluginItems) getAgentMarketplace(w http.ResponseWriter, r *http.Req
 	s.serveAgentMarketplace(w, r, st, c, name, p, acc)
 }
 
-// agentPluginItems serves the agent plugin marketplace documents over the
+// AgentPluginItems serves the agent plugin marketplace documents over the
 // item kit.
-type agentPluginItems struct{ *itemkit.Kit }
+type AgentPluginItems struct{ *itemkit.Kit }
 
-func tryAgentMarketplaceItem(
+// TryAgentMarketplaceItem is the item kit's overlay for the agent plugin
+// marketplace documents. In a local agent plugins repository, a request for
+// a reserved marketplace name without properties is answered here: a
+// marketplace serves the plugins the caller may read, and a reserved name
+// that is no marketplace answers 404. It answers false, leaving the request
+// to the overlays after it and the generic lookup, for anything else.
+func TryAgentMarketplaceItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
-	s := agentPluginItems{k}
+	s := AgentPluginItems{k}
 	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local || cached ||
 		req.IsFolder || len(req.Props) != 0 || !agentplugins.IsReservedMarketplace(req.Path) {
 		return false
@@ -69,7 +75,7 @@ func tryAgentMarketplaceItem(
 	return true
 }
 
-func (s agentPluginItems) serveAgentMarketplace(
+func (s AgentPluginItems) serveAgentMarketplace(
 	w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	name string, p kernel.Principal, acc itemkit.Access,
 ) {

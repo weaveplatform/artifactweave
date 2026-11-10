@@ -305,7 +305,7 @@ func withConfiguration(cfg Config) Config {
 // overlays are the format routes an item GET tries before the generic
 // lookup, in their dispatch order (itemkit.Deps.Overlays).
 var overlays = []itemkit.Overlay{
-	tryAgentMarketplaceItem,
+	TryAgentMarketplaceItem,
 	alpinehttp.TryAlpineItem,
 	artifactshttp.TryCondaItem,
 	artifactshttp.TryMachineLearningItem,
@@ -387,8 +387,8 @@ func New(cfg Config) http.Handler {
 	// the whole spec share one set of overlays and one redirect throttle.
 	kit := artAPI.Kit
 	vcsOps := vcshttp.VCSAPI{Kit: kit}
-	npmOps := npmAPI{kit}
-	dockerOps := dockerAPI{kit}
+	npmOps := NPMAPI{kit}
+	dockerOps := DockerAPI{kit}
 	debianOps := debianhttp.DebianAPI{Kit: kit}
 	cranOps := cranhttp.CranAPI{Kit: kit, ArchiveMoverEnabled: cfg.CranArchiveMoverEnabled}
 	rpmOps := rpmhttp.RPMAPI{Kit: kit}
@@ -494,7 +494,7 @@ func New(cfg Config) http.Handler {
 	// so it replaces the 501 stub registered under that pattern rather than
 	// sitting beside it (decision 0002).
 	artAPI.RegisterItemRoutes(r)
-	agentPluginItems{kit}.registerAgentMarketplaceRoutes(r)
+	AgentPluginItems{kit}.RegisterAgentMarketplaceRoutes(r)
 	cranOps.RegisterCranRoutes(r)
 	artAPI.RegisterTransferRoutes(r)
 	debianOps.RegisterDebianSnapshotRoutes(r)
@@ -503,7 +503,7 @@ func New(cfg Config) http.Handler {
 	artAPI.RegisterMultipartRoutes(r)
 	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).Group(accessHTTP.RegisterRoutes)
 	artAPI.RegisterSearchRoutes(r)
-	mavenAPI{kit}.registerMavenRoutes(r)
+	MavenAPI{kit}.RegisterMavenRoutes(r)
 	// GitLab subgroup owners span path segments; the generated VCS routes
 	// handle the ordinary one-segment forms.
 	r.Get("/artifactory/api/vcs/*", vcsOps.VCSNested)
@@ -551,8 +551,8 @@ func New(cfg Config) http.Handler {
 				SystemAPI:      sysAPI,
 				ArtifactoryAPI: &artAPI,
 				VCSAPI:         &vcsOps,
-				npmAPI:         &npmOps,
-				dockerAPI:      &dockerOps,
+				NPMAPI:         &npmOps,
+				DockerAPI:      &dockerOps,
 				DebianAPI:      &debianOps,
 				CranAPI:        &cranOps,
 				RPMAPI:         &rpmOps,
@@ -645,9 +645,9 @@ func New(cfg Config) http.Handler {
 		)
 	})
 
-	pypiAPI{kit}.registerPypiMetadataRoutes(r, artAPI.ProtocolOptions())
-	puppetAPI{kit}.registerPuppetMetadataRoutes(r, artAPI.ProtocolOptions())
-	chefAPI{kit}.registerChefReindex(r)
+	PypiAPI{kit}.RegisterPypiMetadataRoutes(r, artAPI.ProtocolOptions())
+	PuppetAPI{kit}.RegisterPuppetMetadataRoutes(r, artAPI.ProtocolOptions())
+	ChefAPI{kit}.RegisterChefReindex(r)
 
 	// Last, so every real handler above has already claimed its pattern.
 	registerHandwrittenStubs(r, logger)
@@ -668,7 +668,7 @@ func keepContentType(r *http.Request) bool {
 // the credentials that LuaRocks's upload paths and npm's logout paths name
 // replaced. Each redactor leaves a path outside its protocol unchanged.
 func redactLoggedPath(path string) string {
-	return npmLoggedPath(luarockshttp.RedactAPIKey(path))
+	return NPMLoggedPath(luarockshttp.RedactAPIKey(path))
 }
 
 // newAuthnOptions returns Authenticate's options as the router composes
@@ -688,11 +688,11 @@ func newAuthnOptions(
 		Auth:               a,
 		Store:              st,
 		SelfAuthenticated:  artifactshttp.SelfAuthenticated(),
-		Skip:               append([]func(*http.Request) bool{npmUserRequest}, skip...),
+		Skip:               append([]func(*http.Request) bool{NPMUserRequest}, skip...),
 		RegistryPath:       dockerhttp.IsRegistryPath,
 		ChallengeAnonymous: dockerhttp.ChallengesAnonymous,
 		CredentialKeepers: []func(context.Context, *http.Request, kernel.Principal) context.Context{
-			keepNPMCredential,
+			KeepNPMCredential,
 		},
 		PublicRoutes: public,
 	}

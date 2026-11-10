@@ -14,14 +14,20 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
-// puppetAPI serves Puppet's Forge operations and reindex over the item kit.
-type puppetAPI struct{ *itemkit.Kit }
+// PuppetAPI serves Puppet's Forge operations and reindex over the item kit.
+type PuppetAPI struct{ *itemkit.Kit }
 
+// RegisterPuppetMetadataRoutes mounts Puppet's Forge v3 module and release
+// operations under /artifactory/api/puppet/{repoKey}, served by the Puppet
+// protocol, and the Puppet reindex, POST
+// /artifactory/api/puppet/{repoKey}/reindex, on r. The reindex refuses any
+// query with 400 and answers its text once the reindex has run; it writes
+// errors in the artifactory profile.
 // Generated Forge operations share the native protocol's authorization,
 // metadata validation and delivery checks, just as Warehouse operations do.
 // o are the item routes' options (ProtocolOptions), as the protocol's own
 // mount takes them.
-func (s puppetAPI) registerPuppetMetadataRoutes(r chi.Router, o pkgroute.Options) {
+func (s PuppetAPI) RegisterPuppetMetadataRoutes(r chi.Router, o pkgroute.Options) {
 	protocol := chi.NewRouter()
 	pkgroute.Mount(
 		protocol,
