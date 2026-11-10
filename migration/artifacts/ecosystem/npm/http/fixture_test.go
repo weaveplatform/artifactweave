@@ -25,7 +25,7 @@ import (
 var errBoom = errors.New("boom")
 
 // p8Types are the package types reindexRecorder stands in for. The literal
-// is the root's (internal/server/status_reindex_test.go).
+// is the root's (migration/app/status_reindex_test.go).
 var p8Types = []repo.PackageType{repo.PyPI, repo.NuGet, repo.Helm, repo.Terraform}
 
 // Config is the part of the router's configuration that the tests here

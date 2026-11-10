@@ -1,7 +1,6 @@
 {
   "version": 2,
   "packages": {
-    "internal/server": "shared",
     "migration/access/adapters/http": "shared",
     "migration/app": "shared",
     "migration/artifacts/adapters/http": "shared",
@@ -81,27 +80,45 @@
     "test/server/configuration": "shared"
   },
   "shared_files": {
-    "internal/server": [
+    "migration/access/adapters/http": [
+      "access_identity_internal_test.go",
+      "authn_middleware_test.go",
+      "fixture_test.go",
+      "keypairs_internal_test.go",
+      "permissions_fault_test.go",
+      "roles_internal_test.go",
+      "tokens_internal_test.go"
+    ],
+    "migration/app": [
       "access_api_test.go",
       "access_identity_status_test.go",
+      "access_test.go",
       "api_ledger_test.go",
       "api_restrictions_parts_test.go",
+      "bootstrap_test.go",
       "builds_status_test.go",
       "error_profiles_p8_test.go",
       "fixtures_test.go",
       "format_tables_test.go",
+      "hash_test.go",
       "helm_fixture_test.go",
+      "limits_test.go",
       "matrix_pkgtest_test.go",
       "matrix_reindex_test.go",
       "matrix_test.go",
+      "modules_test.go",
       "npm_fixture_test.go",
       "oidc_status_test.go",
       "permissions_status_test.go",
+      "platform_test.go",
       "registry_shared_test.go",
       "reindex_internal_test.go",
-      "request_limits_test.go",
+      "run_test.go",
+      "runtime_test.go",
       "searches_routes_test.go",
+      "seed_test.go",
       "server_test.go",
+      "serverlog_test.go",
       "spec_contract_test.go",
       "spec_test.go",
       "status_chef_test.go",
@@ -117,26 +134,6 @@
       "tokens_fixture_test.go",
       "tokens_status_test.go",
       "vcs_tables_test.go"
-    ],
-    "migration/access/adapters/http": [
-      "access_identity_internal_test.go",
-      "authn_middleware_test.go",
-      "fixture_test.go",
-      "keypairs_internal_test.go",
-      "permissions_fault_test.go",
-      "roles_internal_test.go",
-      "tokens_internal_test.go"
-    ],
-    "migration/app": [
-      "access_test.go",
-      "bootstrap_test.go",
-      "hash_test.go",
-      "modules_test.go",
-      "platform_test.go",
-      "run_test.go",
-      "runtime_test.go",
-      "seed_test.go",
-      "serverlog_test.go"
     ],
     "migration/artifacts/adapters/http": [
       "aql_related_test.go",
@@ -246,22 +243,22 @@
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "cargo": [
-      "internal/server/spec_test.go"
+      "migration/app/spec_test.go"
     ],
     "chef": [
-      "internal/server/status_chef_test.go"
+      "migration/app/status_chef_test.go"
     ],
     "composer": [
-      "internal/server/server_test.go"
+      "migration/app/server_test.go"
     ],
     "cran": [
-      "internal/server/status_cran_archive_test.go"
+      "migration/app/status_cran_archive_test.go"
     ],
     "docker": [
-      "internal/server/registry_shared_test.go"
+      "migration/app/registry_shared_test.go"
     ],
     "helm": [
-      "internal/server/reindex_internal_test.go",
+      "migration/app/reindex_internal_test.go",
       "test/server/artifacts/reindex_test.go",
       "test/server/artifacts/sidecar_rights_test.go"
     ],
@@ -269,13 +266,13 @@
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "huggingface": [
-      "internal/server/status_huggingface_xet_test.go"
+      "migration/app/status_huggingface_xet_test.go"
     ],
     "luarocks": [
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "machinelearning": [
-      "internal/server/status_machinelearning_test.go"
+      "migration/app/status_machinelearning_test.go"
     ],
     "maven": [
       "test/server/artifacts/searches_upstream_mapped_test.go",
@@ -285,19 +282,19 @@
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "nix": [
-      "internal/server/status_nix_test.go"
+      "migration/app/status_nix_test.go"
     ],
     "npm": [
-      "internal/server/error_profiles_p8_test.go"
+      "migration/app/error_profiles_p8_test.go"
     ],
     "nuget": [
       "test/server/artifacts/repositories_test.go"
     ],
     "puppet": [
-      "internal/server/status_puppet_test.go"
+      "migration/app/status_puppet_test.go"
     ],
     "pypi": [
-      "internal/server/reindex_internal_test.go",
+      "migration/app/reindex_internal_test.go",
       "test/server/artifacts/reindex_test.go"
     ],
     "terraform": [
@@ -306,7 +303,7 @@
       "test/server/artifacts/storage_list_test.go"
     ],
     "vcs": [
-      "internal/server/vcs_tables_test.go"
+      "migration/app/vcs_tables_test.go"
     ]
   }
 }

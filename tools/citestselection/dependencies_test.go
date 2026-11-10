@@ -109,7 +109,7 @@ func TestUnitImportGraphIncludesStagedPackages(t *testing.T) {
 		imports("npmhttp", "migration/artifacts/ecosystem/npm"))
 	write("internal/artifacts/ecosystem/npm/npm.go",
 		imports("npm", "migration/artifacts/ecosystem/npm"))
-	write("internal/server/server.go", imports("server", "migration/artifacts/ecosystem/npm/http"))
+	write("migration/app/router.go", imports("server", "migration/artifacts/ecosystem/npm/http"))
 	write("migration/app/run.go", imports("app", "internal/server"))
 	write("cmd/artifactweave/main.go", imports("main", "migration/app"))
 	write("migration/artifacts/ecosystem/pypi/pypi.go", imports("pypi"))

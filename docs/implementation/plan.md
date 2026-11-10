@@ -471,7 +471,7 @@ Decisions: [0003](../research/decisions/0003-repository-model.md),
 **Exit criteria**
 - `jf rt u/dl/s/cp/mv/del/sp` round-trip a tree, including a checksum-deploy hit for a file over 10 KiB and a split download. Met: `round_trip.feature` (#51).
 - Moved to P4 (#69): `artifactory_local_generic_repository` and `artifactory_item_properties` apply, plan clean, destroy. The provider authenticates only with a Bearer access token, which P4 issues. Met in P4 (#69).
-- The status-code table test covers every route in this phase. Met: the guard in `internal/server/status_test.go` fails while an implemented route has no row.
+- The status-code table test covers every route in this phase. Met: the guard in `migration/app/status_test.go` fails while an implemented route has no row.
 
 ## P4: Identity and authorization
 

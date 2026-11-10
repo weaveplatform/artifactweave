@@ -20,7 +20,7 @@
 //
 // # Inputs
 //
-//   - Driving: the server (internal/server/server.go), which mounts
+//   - Driving: the server (migration/app/router.go), which mounts
 //     Protocol through the router kit (pkgroute) at
 //     /artifactory/api/jetbrainsplugins/{repoKey} for repositories of
 //     package type jetbrainsplugins, with the remote source service.

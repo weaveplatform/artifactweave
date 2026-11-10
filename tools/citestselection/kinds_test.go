@@ -14,7 +14,7 @@ func TestUnitSelectKindsKeepsMixedPackagesAndBuildTaggedTests(t *testing.T) {
 	for path, source := range map[string]string{
 		// The format plan below reads the repository's own inventory, which
 		// lists this root file as a Cargo dependency.
-		"internal/server/spec_test.go": `package server
+		"migration/app/spec_test.go": `package server
 func TestUnitRead() {}
 func TestAccPublish() {}
 func TestAccess() {}

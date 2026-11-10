@@ -209,7 +209,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		"go.mod": "module " + modulePath + "\n",
 		// Each allowlisted root uses its entry; a file under test/ is a
 		// test even without the _test.go suffix.
-		"internal/server/server_test.go":  file(authenticator, tokens),
+		"migration/app/server_test.go":    file(authenticator, tokens),
 		"migration/app/run_test.go":       file(tokens),
 		"test/server/access/auth_test.go": file(authenticator),
 		"test/server/support/assemble.go": file(tokens),

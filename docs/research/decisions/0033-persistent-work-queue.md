@@ -228,6 +228,6 @@ These assignments describe planned work, not current runtime support.
   npm's queued reindex and conversion, a conversion that fails and is parked, and its resume.
 - `migration/artifacts/core/item/work_test.go`: the reindex kinds, through any format, of a
   whole repository and of a path. `test/server/artifacts/reindex_test.go` and
-  `internal/server/reindex_internal_test.go`: each P8 reindex operation's permission, classes,
+  `migration/app/reindex_internal_test.go`: each P8 reindex operation's permission, classes,
   timing and answer through a test-only format, and its 501 without one;
   `status_reindex_test.go` and `matrix_reindex_test.go`: their rows.

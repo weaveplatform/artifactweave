@@ -335,7 +335,7 @@ The inferred point is on [#216](https://github.com/weaveplatform/artifactweave/i
 ## Verification
 
 - A route × principal matrix test over every operation with admin, a scoped user, a group
-  member, a project member, a narrowed token and anonymous. `internal/server/matrix_test.go`
+  member, a project member, a narrowed token and anonymous. `migration/app/matrix_test.go`
   (#84) covers every implemented route with all of these but project members, who arrive in
   P11. Each row states who may make its request from this model, and a guard fails while an
   implemented route has no row.

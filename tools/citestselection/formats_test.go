@@ -34,7 +34,7 @@ func TestUnitAffectedPlanChoosesOnlyOwnedChanges(t *testing.T) {
 		{"deployment template", []change{{status: "M", path: "deploy/platform/SCENARIO-TEMPLATE.md"}}, "deployment", ""},
 		{"fixture readme", []change{{status: "M", path: "test/acceptance/testdata/upstreams/README.md"}}, "full", ""},
 		{"shared auth", []change{{status: "M", path: "migration/access/core/authn/auth.go"}}, "full", ""},
-		{"shared server", []change{{status: "M", path: "internal/server/server.go"}}, "full", ""},
+		{"shared server", []change{{status: "M", path: "migration/app/router.go"}}, "full", ""},
 		{"shared fixture", []change{{status: "M", path: "test/server/support/support.go"}}, "full", ""},
 		{"new server test", []change{{status: "A", path: "test/server/artifacts/npm/new_test.go"}}, "full", ""},
 		{"unknown root test", []change{{status: "M", path: "internal/server/unknown_test.go"}}, "full", ""},
