@@ -1,4 +1,4 @@
-package app
+package docker_test
 
 import (
 	"crypto/sha256"
@@ -10,13 +10,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 func registryWorld(t *testing.T) *remoteWorld {
@@ -24,14 +24,14 @@ func registryWorld(t *testing.T) *remoteWorld {
 	w := newRemoteWorld(t)
 	w.c.PackageType = repo.Docker
 	w.update()
-	w.h = server.New(
-		server.Config{
+	w.h = harness.Router(
+		harness.Config{
 			Store:           w.rt.Store,
 			Blobs:           w.rt.Blobs,
 			Auth:            w.rt.Auth,
 			Tokens:          w.rt.Tokens,
 			Keys:            w.rt.Keys,
-			RegistrySources: w.rt.modules.artifacts.RegistrySources(),
+			RegistrySources: w.rt.Artifacts.RegistrySources(),
 			Logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
 		},
 	)

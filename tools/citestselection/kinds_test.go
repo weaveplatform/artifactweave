@@ -222,22 +222,22 @@ func TestUnitAffectedFormatSelectsOwnedMixedPackageEntries(t *testing.T) {
 			t.Errorf("unrelated shared suite selected: %+v", entry)
 		}
 	}
-	if sharedEntries == 0 || !slices.Contains(selection.Acc, "./test/server/artifacts/maven") ||
-		!slices.Contains(selection.Acc, "./migration/app") {
+	if sharedEntries == 0 || !slices.Contains(selection.Acc, "./test/server/artifacts/maven") {
 		t.Fatalf("Maven acceptance dependencies omitted: %+v", selection)
 	}
-	appEntries := 0
+	// The Maven remote suite left the application package for Maven's own
+	// package (TST-07), so the plan runs it there and no application test.
+	remoteEntries := 0
 	for _, entry := range selection.Selected {
-		if entry.Package != "./migration/app" {
-			continue
-		}
-		appEntries++
-		if entry.Source != "migration/app/maven_remote_test.go" {
+		switch {
+		case entry.Package == "./migration/app":
 			t.Errorf("unrelated app suite selected: %+v", entry)
+		case entry.Source == "test/server/artifacts/maven/maven_remote_test.go":
+			remoteEntries++
 		}
 	}
-	if appEntries == 0 {
-		t.Fatal("Maven app acceptance tests were omitted")
+	if remoteEntries == 0 {
+		t.Fatal("Maven remote acceptance tests were omitted")
 	}
 }
 
@@ -255,9 +255,12 @@ func TestUnitFormatAppDependenciesSelectOnlyOwnedFiles(t *testing.T) {
 			candidate := proposeAffected([]change{{
 				status: "M", path: "internal/format/" + owner + "/handler.go",
 			}})
-			if candidate.profile != "format" ||
-				!slices.Contains(candidate.units, "./migration/app") {
-				t.Fatalf("app owner omitted: %+v", candidate)
+			// The suite left the application package for the owner's own
+			// package (TST-07), which the plan runs whole, without app.
+			pkg := "./test/server/artifacts/" + owner
+			if candidate.profile != "format" || !slices.Contains(candidate.units, pkg) ||
+				slices.Contains(candidate.units, "./migration/app") {
+				t.Fatalf("owned package omitted or app selected: %+v", candidate)
 			}
 			selection, err := scanKinds(root, plan{profile: "format", candidate: candidate})
 			if err != nil {
@@ -265,16 +268,19 @@ func TestUnitFormatAppDependenciesSelectOnlyOwnedFiles(t *testing.T) {
 			}
 			found := false
 			for _, entry := range selection.Selected {
-				if entry.Package != "./migration/app" {
+				if entry.Package == "./migration/app" {
+					t.Errorf("unowned app test selected: %+v", entry)
+				}
+				if entry.Source != "test/server/artifacts/"+owner+"/"+file {
 					continue
 				}
-				if entry.Source != "migration/app/"+file || entry.Kind != "acceptance" {
-					t.Errorf("unowned app test selected: %+v", entry)
+				if entry.Kind != "acceptance" {
+					t.Errorf("owned remote test is not acceptance: %+v", entry)
 				}
 				found = true
 			}
 			if !found {
-				t.Fatalf("owned app test %s omitted", file)
+				t.Fatalf("owned remote test %s omitted", file)
 			}
 		})
 	}

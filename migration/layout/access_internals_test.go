@@ -54,8 +54,11 @@ var accessInternalsAllowlist = []accessAllowance{
 	// The server root holds the access handlers and the router: TST-04 to
 	// TST-06 move its suites out, and WEB-22 deletes it.
 	{"internal/server/*_test.go", "TST-04, TST-05, TST-06, WEB-22"},
-	// The composition root builds the authenticator and the token service.
-	{"migration/app/*_test.go", "TST-07"},
+	// The composition root builds the authenticator and the token service,
+	// and its own tests set the password hash cost, check the seeded
+	// principals and issue a token with them. TST-07 moved the remote suites
+	// out; no ticket removes these.
+	{"migration/app/*_test.go", "none: app's own tests"},
 	// The server-assembly harnesses fill server.Config.Auth and Tokens until
 	// WEB-22 composes the router from the access module.
 	{"test/server/**", "WEB-22"},

@@ -1,4 +1,4 @@
-package app
+package puppet_test
 
 import (
 	"crypto/sha256"

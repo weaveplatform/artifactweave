@@ -1,4 +1,4 @@
-package app
+package conan_test
 
 import (
 	"archive/tar"

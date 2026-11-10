@@ -1,4 +1,4 @@
-package app
+package nuget_test
 
 import (
 	"archive/zip"

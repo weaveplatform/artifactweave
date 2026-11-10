@@ -1,4 +1,4 @@
-package app
+package maven_test
 
 import (
 	"archive/zip"
@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
@@ -24,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 func newMavenRemoteWorld(t *testing.T) *remoteWorld {
@@ -417,7 +417,7 @@ func TestAccMavenCompanionSurvivesRuntimeRestart(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Bootstrap.AdminPassword = "pw"
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	rt, err := OpenRuntime(t.Context(), cfg, log, RuntimeOptions{})
+	rt, err := openRuntime(t.Context(), cfg, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -440,13 +440,13 @@ func TestAccMavenCompanionSurvivesRuntimeRestart(t *testing.T) {
 		},
 	)
 	up.Set("/"+p+".jar", fakeupstream.Resource{Body: sourceJAR(t, "durable")})
-	rt.modules.artifacts.MavenEager().Close()
-	h := server.New(
-		server.Config{
+	rt.Artifacts.MavenEager().Close()
+	h := harness.Router(
+		harness.Config{
 			Store:         rt.Store,
 			Blobs:         rt.Blobs,
 			Auth:          rt.Auth,
-			RemoteSources: rt.modules.artifacts.RemoteSources(),
+			RemoteSources: rt.Artifacts.RemoteSources(),
 			Logger:        log,
 		},
 	)
@@ -471,7 +471,7 @@ func TestAccMavenCompanionSurvivesRuntimeRestart(t *testing.T) {
 	if err = rt.Close(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	rt, err = OpenRuntime(t.Context(), cfg, log, RuntimeOptions{})
+	rt, err = openRuntime(t.Context(), cfg, log)
 	if err != nil {
 		t.Fatal(err)
 	}

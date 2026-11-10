@@ -60,16 +60,19 @@
     "test/server/artifacts/debian": "debian",
     "test/server/artifacts/docker": "docker",
     "test/server/artifacts/gems": "gems",
+    "test/server/artifacts/generic": "shared",
     "test/server/artifacts/golang": "golang",
     "test/server/artifacts/helm": "helm",
     "test/server/artifacts/helmoci": "helmoci",
     "test/server/artifacts/hex": "hex",
     "test/server/artifacts/huggingface": "huggingface",
     "test/server/artifacts/maven": "maven",
+    "test/server/artifacts/nix": "nix",
     "test/server/artifacts/npm": "npm",
     "test/server/artifacts/nuget": "nuget",
     "test/server/artifacts/opkg": "opkg",
     "test/server/artifacts/p2": "p2",
+    "test/server/artifacts/puppet": "puppet",
     "test/server/artifacts/pypi": "pypi",
     "test/server/artifacts/rpm": "rpm",
     "test/server/artifacts/terraform": "terraform",
@@ -128,20 +131,9 @@
     "migration/app": [
       "access_test.go",
       "bootstrap_test.go",
-      "conan_client_test.go",
-      "conan_remote_test.go",
-      "conda_remote_test.go",
       "hash_test.go",
-      "mapped_remote_test.go",
-      "maven_remote_test.go",
       "modules_test.go",
-      "nix_remote_test.go",
-      "nuget_reindex_test.go",
       "platform_test.go",
-      "puppet_remote_test.go",
-      "registry_remote_fault_test.go",
-      "registry_remote_test.go",
-      "remote_test.go",
       "run_test.go",
       "runtime_test.go",
       "seed_test.go",
@@ -263,15 +255,11 @@
     "composer": [
       "internal/server/server_test.go"
     ],
-    "conda": [
-      "migration/app/conda_remote_test.go"
-    ],
     "cran": [
       "internal/server/status_cran_archive_test.go"
     ],
     "docker": [
-      "internal/server/registry_shared_test.go",
-      "migration/app/registry_remote_test.go"
+      "internal/server/registry_shared_test.go"
     ],
     "helm": [
       "internal/server/reindex_internal_test.go",
@@ -291,7 +279,6 @@
       "internal/server/status_machinelearning_test.go"
     ],
     "maven": [
-      "migration/app/maven_remote_test.go",
       "test/server/artifacts/searches_upstream_mapped_test.go",
       "test/server/artifacts/searches_upstream_test.go"
     ],
@@ -299,19 +286,16 @@
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "nix": [
-      "internal/server/status_nix_test.go",
-      "migration/app/nix_remote_test.go"
+      "internal/server/status_nix_test.go"
     ],
     "npm": [
       "internal/server/error_profiles_p8_test.go"
     ],
     "nuget": [
-      "migration/app/nuget_reindex_test.go",
       "test/server/artifacts/repositories_test.go"
     ],
     "puppet": [
-      "internal/server/status_puppet_test.go",
-      "migration/app/puppet_remote_test.go"
+      "internal/server/status_puppet_test.go"
     ],
     "pypi": [
       "internal/server/reindex_internal_test.go",

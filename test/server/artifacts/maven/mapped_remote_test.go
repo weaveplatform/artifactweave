@@ -1,4 +1,4 @@
-package app
+package maven_test
 
 import (
 	"context"
@@ -134,7 +134,7 @@ func TestAccMappedRootRuntimePublicationAndDeliveryFences(t *testing.T) {
 					var err error
 					got, err = remote.ListMappedFolder(
 						ctx,
-						w.rt.modules.artifacts.RemoteSources(),
+						w.rt.Artifacts.RemoteSources(),
 						q,
 						d,
 						scope,
@@ -173,7 +173,7 @@ func TestAccMappedRootRuntimePublicationAndDeliveryFences(t *testing.T) {
 				before := len(w.up.Requests())
 				if _, err = remote.ListMappedFolder(
 					ctx,
-					w.rt.modules.artifacts.RemoteSources(),
+					w.rt.Artifacts.RemoteSources(),
 					q,
 					d,
 					scope,

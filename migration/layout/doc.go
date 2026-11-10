@@ -82,7 +82,8 @@
 //     test support, or the legacy internal/auth and internal/auth/token,
 //     which hold only bridges. Only the server root, migration/app and the
 //     test/server harnesses may import the authenticator, the token service
-//     and the roles service, until TST-04 to TST-07 and WEB-22 remove the
-//     reason, and an allowlist entry that no file uses fails; the second
-//     proves each rule can fail.
+//     and the roles service: the server root and the harnesses until TST-04
+//     to TST-06 and WEB-22 remove the reason, app's own tests for good. An
+//     allowlist entry that no file uses fails; the second proves each rule
+//     can fail.
 package layout

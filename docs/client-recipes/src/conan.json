@@ -56,7 +56,7 @@
       ]
     },
     {
-      "path": "migration/app/conan_client_test.go",
+      "path": "test/server/artifacts/conan/conan_client_remote_test.go",
       "contains": [
         "TestAccConanRemoteClient",
         "\"download\", \"hello/1.0\", \"-r\", \"proxy\""

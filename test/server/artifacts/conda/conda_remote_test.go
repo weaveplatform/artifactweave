@@ -1,4 +1,4 @@
-package app
+package conda_test
 
 import (
 	"bytes"
@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	condafmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/conda"
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 func newCondaRemoteWorld(t *testing.T) (*remoteWorld, map[string][]byte, string) {
@@ -26,15 +26,15 @@ func newCondaRemoteWorld(t *testing.T) (*remoteWorld, map[string][]byte, string)
 	w := newRemoteWorld(t)
 	w.c = *repo.Defaults(&repo.Config{Key: w.c.Key, Class: repo.Remote, PackageType: repo.Conda, URL: w.up.URL})
 	w.update()
-	w.h = server.New(
-		server.Config{
+	w.h = harness.Router(
+		harness.Config{
 			Store:          w.rt.Store,
 			Blobs:          w.rt.Blobs,
 			Auth:           w.rt.Auth,
 			Tokens:         w.rt.Tokens,
 			Keys:           w.rt.Keys,
-			RemoteSources:  w.rt.modules.artifacts.RemoteSources(),
-			RemoteHTTP:     w.rt.modules.artifacts.RemoteHTTP(),
+			RemoteSources:  w.rt.Artifacts.RemoteSources(),
+			RemoteHTTP:     w.rt.Artifacts.RemoteHTTP(),
 			Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 			FormatSettings: ecosystem.Settings{Conda: condafmt.Settings{ShardsEnabled: true}},
 		},

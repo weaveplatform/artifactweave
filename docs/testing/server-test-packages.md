@@ -28,7 +28,11 @@ root `internal/server` tests (`NewItemWorld`, with `Do`, `Item` and
 `RepoFile`, which resolves a root-relative fixture path. Because the harness
 imports `internal/server`, `test/server/support` must never import it, and the
 root tests keep their in-package `newItemWorld`, which must build the same
-world.
+world. For the suites that left `migration/app`, the harness opens the
+application runtime as serve does (`App`, over `AppConfig` and `AppOptions`)
+and builds their remote world over it (`NewRemoteWorld`, with `Request` and
+`Update`); because it imports `migration/app`, app's in-package tests must
+never import it.
 
 Two fixtures under `test/server/support` build a world that more than one
 suite shares. `test/server/support/registryfixture` assembles the full server
@@ -88,7 +92,12 @@ repositories and their refusals; `test/server/artifacts/huggingface` owns the
 Xet routes and runs the pinned Hub client when it is installed;
 `test/server/artifacts/vcs` owns the VCS REST routes, the legacy providers and
 file delivery and runs `curl` when it is present; `test/server/artifacts/opkg`
-and `rpm` own the signing of virtual feeds and metadata. Where such a suite's
+and `rpm` own the signing of virtual feeds and metadata;
+`test/server/artifacts/nix` and `puppet` own those formats' remote routes, and
+`test/server/artifacts/generic` the generic remote repository's downloads,
+sidecars, authorization, restart identity and signed delivery. These and the
+remote suites of Conan, Conda, Maven, NuGet and Docker left `migration/app`,
+and run over the application runtime that the harness opens. Where such a suite's
 tests call unexported server code, those tests stay in the root as
 `<name>_internal_test.go`. Run each independently with:
 
@@ -120,6 +129,9 @@ go test ./test/server/artifacts/opkg
 go test ./test/server/artifacts/p2
 go test ./test/server/artifacts/rpm
 go test ./test/server/artifacts/vcs
+go test ./test/server/artifacts/nix
+go test ./test/server/artifacts/puppet
+go test ./test/server/artifacts/generic
 ```
 
 `go test ./test/server/artifacts/...` runs the management API suite and every

@@ -100,8 +100,8 @@
 //     parsing, permission errors, remote metadata checks and archive
 //     safety.
 //
-// The routes are also tested end to end from test/server/artifacts/conan
-// (conan_test.go, and conan_client_test.go with the pinned Conan 2 and
-// Conan 1 clients, which make conan-accept runs) and from migration/app
-// (conan_client_test.go and conan_remote_test.go).
+// The routes are also tested end to end from test/server/artifacts/conan:
+// conan_test.go; conan_client_test.go and conan_client_remote_test.go with
+// the pinned Conan 2 and Conan 1 clients, which make conan-accept runs; and
+// conan_remote_test.go.
 package conanhttp

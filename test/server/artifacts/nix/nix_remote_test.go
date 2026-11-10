@@ -1,4 +1,4 @@
-package app
+package nix_test
 
 import (
 	"bytes"

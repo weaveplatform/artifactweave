@@ -1,4 +1,4 @@
-package app
+package generic_test
 
 import (
 	"context"
@@ -16,115 +16,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/server"
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
-
-// remotePolicyKeySetting is the internal setting that holds the remote
-// policy key without a master key; it must match the artifacts module's
-// name, which no configuration descriptor may expose.
-const remotePolicyKeySetting = "remote.internal_policy_key"
-
-type remoteWorld struct {
-	t  *testing.T
-	rt *Runtime
-	h  http.Handler
-	up *fakeupstream.Server
-	c  repo.Config
-}
-
-func newRemoteWorld(t *testing.T) *remoteWorld {
-	t.Helper()
-	cfg := testConfig(t)
-	cfg.Bootstrap.AdminPassword = "pw"
-	rt, err := OpenRuntime(
-		t.Context(),
-		cfg,
-		slog.New(slog.NewTextHandler(io.Discard, nil)),
-		RuntimeOptions{},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := rt.Close(context.Background()); err != nil {
-			t.Error(err)
-		}
-	})
-	up := fakeupstream.New(t, fakeupstream.Options{})
-	c := *repo.Defaults(&repo.Config{Key: "remote", Class: repo.Remote, PackageType: repo.Generic, URL: up.URL})
-	if err = rt.Store.Repos().Create(t.Context(), c); err != nil {
-		t.Fatal(err)
-	}
-	hash, err := authn.HashPasswordWith(authHash, "pw")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{"reader", "denied"} {
-		if err = rt.Store.Users().
-			Create(t.Context(), types.User{Name: name, PasswordHash: hash}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err = rt.Store.Permissions().
-		Create(t.Context(), types.Permission{Name: "remote-read", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"reader": types.ActionRead}},
-				Targets: map[string]types.Target{"remote": {}},
-			},
-		}}); err != nil {
-		t.Fatal(err)
-	}
-	h := server.New(
-		server.Config{
-			Store:         rt.Store,
-			Blobs:         rt.Blobs,
-			Auth:          rt.Auth,
-			Tokens:        rt.Tokens,
-			Keys:          rt.Keys,
-			RemoteSources: rt.modules.artifacts.RemoteSources(),
-			RemoteHTTP:    rt.modules.artifacts.RemoteHTTP(),
-			Logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
-		},
-	)
-	return &remoteWorld{t: t, rt: rt, h: h, up: up, c: c}
-}
-
-func (w *remoteWorld) request(
-	method, path, user, body string,
-	headers ...string,
-) *httptest.ResponseRecorder {
-	w.t.Helper()
-	r := httptest.NewRequest(method, path, strings.NewReader(body))
-	if user != "" {
-		r.SetBasicAuth(user, "pw")
-	}
-	for i := 0; i < len(headers); i += 2 {
-		r.Header.Set(headers[i], headers[i+1])
-	}
-	rec := httptest.NewRecorder()
-	w.h.ServeHTTP(rec, r)
-	return rec
-}
-
-func remoteStatus(t *testing.T, r *httptest.ResponseRecorder, code int) {
-	t.Helper()
-	if r.Code != code {
-		t.Fatalf("status %d want %d: %s", r.Code, code, r.Body)
-	}
-}
-
-func (w *remoteWorld) update() {
-	w.t.Helper()
-	if err := w.rt.Store.Repos().Update(w.t.Context(), w.c); err != nil {
-		w.t.Fatal(err)
-	}
-}
 
 func TestAccGenericRemoteDownloadLifecycle(t *testing.T) {
 	w := newRemoteWorld(t)
@@ -413,7 +311,7 @@ func TestAccGenericRemoteDefaultRestartKeepsCacheIdentity(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Bootstrap.AdminPassword = "pw"
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	rt, err := OpenRuntime(t.Context(), cfg, log, RuntimeOptions{})
+	rt, err := openRuntime(t.Context(), cfg, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -429,12 +327,12 @@ func TestAccGenericRemoteDefaultRestartKeepsCacheIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	get := func() *httptest.ResponseRecorder {
-		h := server.New(
-			server.Config{
+		h := harness.Router(
+			harness.Config{
 				Store:         rt.Store,
 				Blobs:         rt.Blobs,
 				Auth:          rt.Auth,
-				RemoteSources: rt.modules.artifacts.RemoteSources(),
+				RemoteSources: rt.Artifacts.RemoteSources(),
 				Logger:        log,
 			},
 		)
@@ -452,7 +350,7 @@ func TestAccGenericRemoteDefaultRestartKeepsCacheIdentity(t *testing.T) {
 	if err = rt.Close(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	rt, err = OpenRuntime(t.Context(), cfg, log, RuntimeOptions{})
+	rt, err = openRuntime(t.Context(), cfg, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -469,10 +367,10 @@ func TestAccGenericRemoteDefaultRestartKeepsCacheIdentity(t *testing.T) {
 	// No public configuration descriptor exposes the private internal setting.
 	r := httptest.NewRequest("GET", "/artifactory/api/system/configuration", nil)
 	r.SetBasicAuth("admin", "pw")
-	h := server.New(server.Config{Store: rt.Store, Auth: rt.Auth, Logger: log})
+	h := harness.Router(harness.Config{Store: rt.Store, Auth: rt.Auth, Logger: log})
 	out := httptest.NewRecorder()
 	h.ServeHTTP(out, r)
-	if strings.Contains(out.Body.String(), remotePolicyKeySetting) {
+	if strings.Contains(out.Body.String(), "remote.internal_policy_key") {
 		t.Fatal("internal key exposed")
 	}
 }
@@ -509,12 +407,12 @@ func TestAccGenericRemoteColdAndWarmSignedDelivery(t *testing.T) {
 	})
 	edge := httptest.NewServer(router)
 	defer edge.Close()
-	w.h = server.New(
-		server.Config{
+	w.h = harness.Router(
+		harness.Config{
 			Store:         w.rt.Store,
 			Blobs:         remoteSignedBlobs{Store: w.rt.Blobs, edge: edge.URL},
 			Auth:          w.rt.Auth,
-			RemoteSources: w.rt.modules.artifacts.RemoteSources(),
+			RemoteSources: w.rt.Artifacts.RemoteSources(),
 			Logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
 		},
 	)

@@ -75,10 +75,12 @@ When a test file leaves a shared directory such as `internal/server`:
 | LuaRocks | `migration/artifacts/ecosystem/luarocks/http` |
 | Maven | `test/server/artifacts/maven` |
 | NIM model | `migration/artifacts/ecosystem/nimmodel/http` |
+| Nix | `migration/artifacts/ecosystem/nix/http`, `test/server/artifacts/nix` |
 | npm | `migration/artifacts/ecosystem/npm/http`, `test/server/artifacts/npm` |
 | NuGet | `migration/artifacts/ecosystem/nuget/http`, `test/server/artifacts/nuget` |
 | Opkg | `migration/artifacts/ecosystem/opkg/http`, `test/server/artifacts/opkg` |
 | P2 | `migration/artifacts/ecosystem/p2/http`, `test/server/artifacts/p2` |
+| Puppet | `migration/artifacts/ecosystem/puppet/http`, `test/server/artifacts/puppet` |
 | PyPI | `migration/artifacts/ecosystem/pypi/http`, `test/server/artifacts/pypi` |
 | RPM | `migration/artifacts/ecosystem/rpm/http`, `test/server/artifacts/rpm` |
 | Dart pub | `migration/artifacts/ecosystem/pub/http` |
@@ -87,7 +89,7 @@ When a test file leaves a shared directory such as `internal/server`:
 | Terraform registry | `migration/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
 | Terraform backend | `migration/artifacts/ecosystem/terraformbackend/http`, `test/server/artifacts/terraformbackend` |
 | VCS | `migration/artifacts/ecosystem/vcs/http`, `test/server/artifacts/vcs` |
-| Shared | `internal/server`, `migration/artifacts/adapters/http/pkgroute`, `test/server/access`, `test/server/artifacts`, `test/server/configuration` |
+| Shared | `internal/server`, `migration/artifacts/adapters/http/pkgroute`, `test/server/access`, `test/server/artifacts`, `test/server/artifacts/generic`, `test/server/configuration` |
 
 `test/server/support` and the packages under it (`harness`, `agentcommon` and
 `registryfixture`) contain fixtures and helpers, not test suites. A change
@@ -128,15 +130,18 @@ reverse dependencies. Unknown ownership selects full qualification.
 
 ## Application acceptance dependencies
 
-Some native format tests live in the mixed `migration/app` package because they
-exercise application startup, remote cache and source policy through a running
-server. The inventory lists every `migration/app` test file under `shared_files`,
-and `format_dependencies` maps the format-specific ones to format owners as
-`migration/app/<file>` paths. A narrow format PR selects only the mapped app files
-and runs their `TestAcc` entries in the Go acceptance lane. The current map covers
-the Conda, Docker registry, Maven, Nix and Puppet remote tests and the NuGet
-reindex tests. New format app tests must be added to the map after ownership
-review; an app test change itself selects full CI until then.
+The format tests that exercise application startup, the remote cache and the
+source policy through a running server no longer live in the mixed `migration/app`
+package. They run from their ecosystems' packages under
+`test/server/artifacts/<type>`, which open the application runtime through
+`harness.App` and `harness.RemoteWorld`, so no `migration/app` file maps to a
+format any more: the Conan, Conda, Docker registry, Maven (with the mapped remote
+tests), Nix and Puppet remote suites and the NuGet reindex suite run with the rest
+of their owner's package, the Conan, Maven mapping and registry fault suites on
+narrow Conan, Maven and Docker PRs too. The generic remote suite in
+`test/server/artifacts/generic` is shared, since `generic` is no selector owner,
+and runs in the full profile only. The inventory still lists every `migration/app`
+test file under `shared_files`, so a change to one selects full CI.
 
 ## Comparison and local timings
 

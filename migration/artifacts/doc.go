@@ -116,6 +116,6 @@
 //     path's error, a failed start that opens nothing and leaves the policy
 //     key and its lease as they were, and the remote reads' fences refusing
 //     a read that no longer stands.
-//   - app's tests start the module through OpenRuntime, and its remote
-//     suites read remote content through it.
+//   - app's tests start the module through OpenRuntime, and the remote
+//     suites under test/server/artifacts read remote content through it.
 package artifacts

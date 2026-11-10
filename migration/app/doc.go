@@ -9,7 +9,8 @@
 // builds the access, artifacts and configuration modules over them in
 // buildModules, has the artifacts module open its remote sources, and hands
 // everything to the server root, which builds the router. It may import any
-// package, and only cmd/artifactweave imports it.
+// package, and only cmd/artifactweave and the server test harness
+// (test/server/support/harness) import it.
 //
 // # Inputs
 //
@@ -34,6 +35,9 @@
 //     OpenStore, the configured metadata store.
 //   - InitialPasswordFile: the file under the data directory where the first
 //     start writes a generated admin password.
+//   - Runtime, RuntimeOptions and OpenRuntime: what serve holds open, with
+//     the costs it is opened with, exported so that the server test harness
+//     builds the router over the stores and modules serve uses.
 //
 // # Invariants
 //
@@ -66,8 +70,9 @@
 //     (app is the composition root and may import any package).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 746 to 805 (the composition root).
-//   - https://github.com/weaveplatform/artifactweave/issues/1092 and
-//     https://github.com/weaveplatform/artifactweave/issues/1094
+//   - https://github.com/weaveplatform/artifactweave/issues/1092,
+//     https://github.com/weaveplatform/artifactweave/issues/1094 and
+//     https://github.com/weaveplatform/artifactweave/issues/1096
 //
 // # Status
 //
@@ -77,7 +82,8 @@
 // job: run.go serves, platform.go opens what the modules share, modules.go
 // builds the modules, bootstrap.go and seed.go prepare the first start,
 // runtime.go holds the runtime and serverlog.go the HTTP server's error log.
-// The router follows in WEB-22.
+// TST-07 exported the runtime and moved the remote suites to
+// test/server/artifacts. The router follows in WEB-22.
 //
 // # Testing
 //
@@ -87,8 +93,8 @@
 // Migrate, RotateKeys, the blob tiers and their mirrors; modules_test.go
 // buildModules and the token service; seed_test.go and bootstrap_test.go
 // the first start and config apply; serverlog_test.go the HTTP server's
-// error log; the *_remote_test.go suites remote repositories through the
-// composed runtime. make conan-accept runs conan_client_test.go.
-// hash_test.go lowers the password hashing cost and the token key size for
-// all of them.
+// error log. hash_test.go lowers the password hashing cost and the token key
+// size for all of them. The suites that read remote content through the
+// composed runtime run from test/server/artifacts/<type>, over the harness's
+// App and RemoteWorld.
 package app

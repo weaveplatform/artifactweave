@@ -104,7 +104,7 @@ the service and router through injected backends: permission/pattern/path refusa
 before work, explicit intent, representation validation, generation/revocation races,
 safe protocol errors, stream ownership, local/federated preservation, cache/virtual
 isolation and an unrelated store write completing while a fetch is blocked. These prove the boundary, not a production
-fetcher by themselves. `migration/app/remote_test.go` and the generic remote acceptance
+fetcher by themselves. `test/server/artifacts/generic/remote_test.go` and the generic remote acceptance
 feature additionally prove production wiring, native curl/JFrog CLI downloads, restart
 identity, signed delivery, cache visibility and revocation before publication.
 

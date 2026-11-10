@@ -47,7 +47,7 @@ repositories after clearing each client cache. The Linux acceptance job
 installs both exact versions and runs `make conan-accept`, which writes
 `cover-conan` Go coverage data into the same gate as unit and feature
 coverage. `TestAccConanRemoteClient`
-in `migration/app/conan_client_test.go` also downloads each client's published
+in `test/server/artifacts/conan/conan_client_remote_test.go` also downloads each client's published
 recipe and binary package through a remote cache backed by the production
 source policy. Local and remote/virtual protocol, uncommitted revision and
 generic-upload boundary tests are in
@@ -55,7 +55,7 @@ generic-upload boundary tests are in
 tests for paths, manifests, metadata and archive safety live in
 `migration/artifacts/ecosystem/conan` and
 `migration/artifacts/ecosystem/conan/http`. The production source/cache test
-in `migration/app/conan_remote_test.go` covers remote fetch, cache-only reads,
+in `test/server/artifacts/conan/conan_remote_test.go` covers remote fetch, cache-only reads,
 offline reads, integrity failures, cache exclusion and same-origin redirects.
 
 The protocol and class map follow the [JFrog Conan repository guide](https://docs.jfrog.com/artifactory/docs/conan-repositories)

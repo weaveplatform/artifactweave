@@ -18,13 +18,21 @@
 //     for a v3 remote's upstream.
 //   - support.NuGetRoutes, the route inventory, and the NuGet package and PDB
 //     fixtures.
+//   - The application runtime and the production router from
+//     test/server/support/harness, through the harness's remote world under
+//     the name the tests had in migration/app (fixture_test.go,
+//     newRemoteWorld): the generic remote repository remote over a fake
+//     upstream, the users reader and denied and the remote-read permission,
+//     beside which the tests retype the remote or add the repositories they
+//     need.
 //
 // # Outputs
 //
 //   - TestAccNuGetRouteTablesCoverImplemented fails while a route of
 //     support.NuGetRoutes has no status row or no principal row.
 //   - TestAcc results for API keys, forced authentication, client writes,
-//     reindex, the v3 remote and the symbol server's lifecycle.
+//     reindex, the v3 remote and the symbol server's lifecycle, and for the
+//     remote reindex API over a cached remote (nuget_reindex_test.go).
 //
 // # References
 //
@@ -35,5 +43,6 @@
 //
 // # Status
 //
-// Implemented P8; P9b moved the tests here from internal/server (issue 673).
+// Implemented P8; P9b moved the tests here from internal/server (issue 673),
+// and P9d the remote reindex suite from migration/app (TST-07, issue 1096).
 package nuget
