@@ -56,7 +56,7 @@ type limitOptions struct {
 
 // limitIngress admits each request to the process's concurrency and
 // authentication limits before authentication runs.
-func (s artifactoryService) limitIngress(o limitOptions) func(http.Handler) http.Handler {
+func (s artifactoryAPI) limitIngress(o limitOptions) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if o.Health(r) {
@@ -102,7 +102,7 @@ func (s artifactoryService) limitIngress(o limitOptions) func(http.Handler) http
 
 // limitPrincipal admits an authenticated request to its principal's
 // budget and, for an expensive one, to the expensive lane.
-func (s artifactoryService) limitPrincipal(o limitOptions) func(http.Handler) http.Handler {
+func (s artifactoryAPI) limitPrincipal(o limitOptions) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if o.Health(r) || o.Recovery(r) {
@@ -175,7 +175,7 @@ func expensiveRequest(r *http.Request) bool {
 // Resource quotas are charged only for existing resources visible to this
 // authenticated principal. Invented query/path labels cannot allocate counters
 // or exhaust another account's repository quota.
-func (s artifactoryService) budgetResources(
+func (s artifactoryAPI) budgetResources(
 	r *http.Request,
 	p kernel.Principal,
 	scope *apilimit.Scope,

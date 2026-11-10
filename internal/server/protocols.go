@@ -16,7 +16,7 @@ import (
 // protocolOptions gives the router kit the item routes' download, deploy
 // and error mapping, so a protocol's files are redirected, counted, hooked
 // and refused as theirs are.
-func (s artifactoryService) protocolOptions() pkgroute.Options {
+func (s artifactoryAPI) protocolOptions() pkgroute.Options {
 	return pkgroute.Options{
 		Store: s.cfg.Store,
 		Items: func() *item.Service { return s.Items(s.cfg.Store) },

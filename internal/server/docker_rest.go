@@ -19,12 +19,18 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// dockerAPI is the Docker ecosystem's partial strict server: the JFrog REST
+// operations under a repository's Docker API path (tag delete, promotion and
+// parent manifest lists), over the item kit. The registry protocol itself is
+// dockerhttp's.
+type dockerAPI struct{ *itemkit.Kit }
+
 // DeleteDockerTag is the multi-architecture tag delete, the JFrog REST
 // operation under a repository's Docker API path (decision 0031): the tag
 // folder goes, with a list's platform manifests nothing else in the image
 // references. It answers in the Artifactory envelope, as the other JFrog
 // operations there do.
-func (s artifactoryService) DeleteDockerTag(
+func (s dockerAPI) DeleteDockerTag(
 	ctx context.Context,
 	req artgen.DeleteDockerTagRequestObject,
 ) (artgen.DeleteDockerTagResponseObject, error) {
@@ -76,7 +82,7 @@ func (s artifactoryService) DeleteDockerTag(
 // same or another name and tag (decision 0031). It answers in the
 // Artifactory envelope, with plain text on success as Artifactory does;
 // jf rt docker-promote checks only the status.
-func (s artifactoryService) PromoteDockerImage(
+func (s dockerAPI) PromoteDockerImage(
 	ctx context.Context,
 	req artgen.PromoteDockerImageRequestObject,
 ) (artgen.PromoteDockerImageResponseObject, error) {
@@ -176,7 +182,7 @@ func promotionArgs(b *artgen.PromoteDockerImageJSONRequestBody) (promotion, erro
 // promotionTags lists the tags a promotion takes, each with the tag it
 // lands as, and refuses one that would replace a different manifest at the
 // target without Delete there, which a push over a tag needs too (DV-035).
-func (s artifactoryService) promotionTags(
+func (s dockerAPI) promotionTags(
 	ctx context.Context,
 	svc *registry.Service,
 	pr registry.Promotion,
@@ -216,7 +222,7 @@ func (s artifactoryService) promotionTags(
 
 // FindParentManifestLists answers which manifest lists and image indexes of
 // an image name the manifest a tag holds (decision 0031).
-func (s artifactoryService) FindParentManifestLists(
+func (s dockerAPI) FindParentManifestLists(
 	ctx context.Context,
 	req artgen.FindParentManifestListsRequestObject,
 ) (artgen.FindParentManifestListsResponseObject, error) {
@@ -316,4 +322,14 @@ func dockerRepo(ctx context.Context, st store.Store, key string) (repo.Config, e
 	default:
 		return c, nil
 	}
+}
+
+// registry returns the service that writes items on behalf of Docker
+// promotion, with the same format hooks, and settings, as items.
+func (s dockerAPI) registry(st store.Store) *registry.Service {
+	svc := &registry.Service{Store: st, Blobs: s.Blobs, Formats: s.Format}
+	if s.Work != nil {
+		svc.Work = s.Work
+	}
+	return svc
 }

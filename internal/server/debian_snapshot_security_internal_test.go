@@ -72,7 +72,7 @@ func TestUnitDebianSnapshotRejectsUnboundMetadata(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = newArtifactoryService(Config{Store: w.db, Blobs: w.blobs}).
+			_, err = debianAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}.
 				debianSnapshotFiles(t.Context(), w.db, c, "stable", p, acc)
 			if err == nil || !strings.Contains(err.Error(), tc.expectedError) {
 				t.Fatalf("unbound snapshot metadata: %v, want %q", err, tc.expectedError)

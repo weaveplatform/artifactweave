@@ -23,7 +23,7 @@ import (
 // GetStorageSummaryInfo answers the storage summary to an administrator or
 // to a token scoped system:info/storage:r, as 7.x's getstoragesummaryinfo
 // page allows. It is computed on every request, so it never lags writes.
-func (s artifactoryService) GetStorageSummaryInfo(
+func (s artifactoryAPI) GetStorageSummaryInfo(
 	ctx context.Context,
 	_ artgen.GetStorageSummaryInfoRequestObject,
 ) (artgen.GetStorageSummaryInfoResponseObject, error) {
@@ -61,7 +61,7 @@ func (s artifactoryService) GetStorageSummaryInfo(
 // as Artifactory's optimize starts its sharding repair (7.104.5). Admin
 // only. The acknowledgement texts are artifactweave's: the spec documents
 // only a plain-text body.
-func (s artifactoryService) OptimizeSystemStorage(
+func (s artifactoryAPI) OptimizeSystemStorage(
 	ctx context.Context,
 	_ artgen.OptimizeSystemStorageRequestObject,
 ) (artgen.OptimizeSystemStorageResponseObject, error) {
@@ -141,7 +141,7 @@ func replicaTallies(counts []store.ReplicaCount) map[string]wire.ReplicaTally {
 
 // RefreshStorageSummaryInfo acknowledges a recalculation. The summary is
 // computed on every request, so there is nothing to wait for.
-func (artifactoryService) RefreshStorageSummaryInfo(
+func (artifactoryAPI) RefreshStorageSummaryInfo(
 	ctx context.Context,
 	_ artgen.RefreshStorageSummaryInfoRequestObject,
 ) (artgen.RefreshStorageSummaryInfoResponseObject, error) {

@@ -253,7 +253,7 @@ func TestAccSearchAQLTimeout(t *testing.T) {
 	}
 	// The nesting of related rows fails the same ways: on the timeout, and
 	// on an include that reaches too many related rows.
-	s := newArtifactoryService(Config{})
+	s := newArtifactoryAPI(Config{})
 	ctx := context.Background()
 	var api *apierror.Error
 	late := context.DeadlineExceeded

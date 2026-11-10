@@ -98,7 +98,7 @@ func appendReplayRequest(
 	}, nil
 }
 
-func (s artifactoryService) appendOnce(
+func (s artifactoryAPI) appendOnce(
 	ctx context.Context,
 	svc *build.Service,
 	p kernel.Principal,

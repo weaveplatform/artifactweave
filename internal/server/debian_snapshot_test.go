@@ -155,7 +155,7 @@ func TestUnitDebianSnapshotPreservesCompletedAndClaimedTags(t *testing.T) {
 				Tag:          "first",
 				Distribution: tc.distribution,
 			}
-			err = newArtifactoryService(Config{Store: st}).createDebianSnapshot(
+			err = debianAPI{newKit(Config{Store: st})}.createDebianSnapshot(
 				ctx, st, job, p, acc,
 			)
 			if (err != nil) != tc.expectedErr {

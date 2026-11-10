@@ -16,7 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
@@ -26,12 +25,13 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// registerItemRoutes serves the item paths (decision 0002). They are
-// registered under exactly the patterns registerHandwrittenStubs derives from
-// the spec, so they replace its 501 stubs rather than sitting beside them.
-// HEAD is not in the spec; it shares the GET handler. Item routes are outside
-// the management body limit: an upload is streamed, however large.
-func (s artifactoryService) registerItemRoutes(r chi.Router) {
+// registerItemRoutes serves the item paths (decision 0002) and the AQL
+// search. They are registered under exactly the patterns
+// registerHandwrittenStubs derives from the spec, so they replace its 501
+// stubs rather than sitting beside them. HEAD is not in the spec; it shares
+// the GET handler. Item routes are outside the management body limit: an
+// upload is streamed, however large.
+func (s artifactoryAPI) registerItemRoutes(r chi.Router) {
 	for _, p := range httpkit.ChiPatterns("/artifactory/{repoKey}/{filePath}") {
 		r.Put(p, s.deployItem)
 		r.Get(p, s.GetItem)
@@ -39,18 +39,11 @@ func (s artifactoryService) registerItemRoutes(r chi.Router) {
 		r.Delete(p, s.deleteItem)
 	}
 	r.Post("/artifactory/api/search/aql", s.searchAQL)
-	r.Get("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
-	r.Head("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
-	r.Post("/artifactory/api/cran/{repoKey}/sources", s.uploadCranSource)
-	r.Post("/artifactory/api/cran/{repoKey}/binaries", s.uploadCranBinary)
-	s.registerTransferRoutes(r)
-	s.registerDebianSnapshotRoutes(r)
 }
 
-// builds and registry return the services that write items on behalf of
-// builds and Docker promotion, with the same format hooks, and settings,
-// as items.
-func (s artifactoryService) builds(st store.Store) *build.Service {
+// builds returns the service that writes items on behalf of builds, with
+// the same format hooks, and settings, as items.
+func (s artifactoryAPI) builds(st store.Store) *build.Service {
 	svc := &build.Service{
 		Store: st, Blobs: s.cfg.Blobs, Formats: s.Format,
 		AllowDuplicateEntries: s.cfg.AllowDuplicateBuildEntries,
@@ -61,23 +54,15 @@ func (s artifactoryService) builds(st store.Store) *build.Service {
 	return svc
 }
 
-func (s artifactoryService) registry(st store.Store) *registry.Service {
-	svc := &registry.Service{Store: st, Blobs: s.cfg.Blobs, Formats: s.Format}
-	if s.cfg.Work != nil {
-		svc.Work = s.cfg.Work
-	}
-	return svc
-}
-
 // deployItem answers PUT on an item path: a file, a folder (trailing slash),
 // a checksum deploy, or a checksum sidecar for an existing file.
-func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) deployItem(w http.ResponseWriter, r *http.Request) {
 	s.deployEscapedItem(w, r, strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/"))
 }
 
 // deployEscapedItem also serves package APIs that expose ordinary item PUTs.
 // Keeping the original request preserves its error envelope and base URL.
-func (s artifactoryService) deployEscapedItem(
+func (s artifactoryAPI) deployEscapedItem(
 	w http.ResponseWriter,
 	r *http.Request,
 	escaped string,
@@ -196,7 +181,7 @@ func answered(w http.ResponseWriter, err error) bool {
 	return true
 }
 
-func (artifactoryService) deployRequest(
+func (artifactoryAPI) deployRequest(
 	r *http.Request,
 	t item.Target,
 	req itemkit.ItemRequest,
@@ -214,7 +199,7 @@ func (artifactoryService) deployRequest(
 // fileDeploy is the deploy of one file. The format may store it under
 // another name (Maven's unique snapshots), and replacing a file there needs
 // the right to delete it, as at the path sent.
-func (s artifactoryService) fileDeploy(
+func (s artifactoryAPI) fileDeploy(
 	r *http.Request,
 	t item.Target,
 	req itemkit.ItemRequest,
@@ -232,7 +217,7 @@ func (s artifactoryService) fileDeploy(
 // file out of a repository it cannot read into one it can write. The
 // exception is token, the checksum token of the caller's own finished
 // multipart upload of the content, which no item holds until this deploy.
-func (s artifactoryService) reusable(
+func (s artifactoryAPI) reusable(
 	st store.Store,
 	p kernel.Principal,
 	acc itemkit.Access,
@@ -293,7 +278,7 @@ func readsContent(
 	}
 }
 
-func (artifactoryService) isFile(
+func (artifactoryAPI) isFile(
 	ctx context.Context,
 	st store.Store,
 	c repo.Config,
@@ -305,7 +290,7 @@ func (artifactoryService) isFile(
 
 // recordChecksum stores a checksum sidecar upload (Maven sends one after
 // each file) as the file's original checksum.
-func (s artifactoryService) recordChecksum(
+func (s artifactoryAPI) recordChecksum(
 	w http.ResponseWriter,
 	r *http.Request,
 	svc *item.Service,
@@ -338,7 +323,7 @@ func (s artifactoryService) recordChecksum(
 
 // deleteItem answers DELETE on an item path: the item and everything below
 // it, into the trash can for local repositories.
-func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) deleteItem(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.Content()
 	if err != nil {
@@ -402,7 +387,7 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 
 // GetUploadsConfig tells the JFrog CLI whether to upload large files in
 // parts (migration/artifacts/core/multipart) or in one request (research 09).
-func (s artifactoryService) GetUploadsConfig(
+func (s artifactoryAPI) GetUploadsConfig(
 	context.Context,
 	artgen.GetUploadsConfigRequestObject,
 ) (artgen.GetUploadsConfigResponseObject, error) {

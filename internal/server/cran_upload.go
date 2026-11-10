@@ -23,11 +23,18 @@ import (
 // inspect the body before the item service commits it under its canonical path.
 const cranUploadLimit = 512 << 20
 
-func (s artifactoryService) uploadCranSource(w http.ResponseWriter, r *http.Request) {
+// registerCranRoutes serves CRAN's native source and binary package
+// uploads.
+func (s cranAPI) registerCranRoutes(r chi.Router) {
+	r.Post("/artifactory/api/cran/{repoKey}/sources", s.uploadCranSource)
+	r.Post("/artifactory/api/cran/{repoKey}/binaries", s.uploadCranBinary)
+}
+
+func (s cranAPI) uploadCranSource(w http.ResponseWriter, r *http.Request) {
 	s.uploadCran(w, r, "src/contrib", ".tar.gz")
 }
 
-func (s artifactoryService) uploadCranBinary(w http.ResponseWriter, r *http.Request) {
+func (s cranAPI) uploadCranBinary(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	distribution := q.Get("distribution")
 	version := q.Get("rVersion")
@@ -52,7 +59,7 @@ func (s artifactoryService) uploadCranBinary(w http.ResponseWriter, r *http.Requ
 	s.uploadCran(w, r, feed, suffix)
 }
 
-func (s artifactoryService) uploadCran(
+func (s cranAPI) uploadCran(
 	w http.ResponseWriter,
 	r *http.Request,
 	feed, suffix string,

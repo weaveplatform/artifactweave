@@ -15,11 +15,11 @@ func TestAccConfiguredCollector(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := newArtifactoryService(Config{Store: db, GC: c})
+	s := newArtifactoryAPI(Config{Store: db, GC: c})
 	if got, err := s.collector(); err != nil || got != c {
 		t.Fatalf("collector %p, %v", got, err)
 	}
-	if _, err := newArtifactoryService(Config{}).collector(); err == nil {
+	if _, err := newArtifactoryAPI(Config{}).collector(); err == nil {
 		t.Fatal("no store, no collector")
 	}
 }

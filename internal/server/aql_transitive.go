@@ -40,7 +40,7 @@ type transitiveSearch struct {
 	revalidate func(context.Context) error
 }
 
-func (s artifactoryService) searchTransitiveAQL(
+func (s artifactoryAPI) searchTransitiveAQL(
 	w http.ResponseWriter,
 	r *http.Request,
 	st store.Store,
@@ -74,7 +74,7 @@ func (s artifactoryService) searchTransitiveAQL(
 	writeAQLBytes(w, body)
 }
 
-func (s artifactoryService) transitiveAQL(
+func (s artifactoryAPI) transitiveAQL(
 	ctx context.Context,
 	r *http.Request,
 	st store.Store,
@@ -166,7 +166,7 @@ func (s artifactoryService) transitiveAQL(
 	}, nil
 }
 
-func (s artifactoryService) transitivePrincipal(
+func (s artifactoryAPI) transitivePrincipal(
 	ctx context.Context,
 	p kernel.Principal,
 ) (kernel.Principal, accessapi.Decider, error) {
@@ -318,7 +318,7 @@ func transitiveError(err error) error {
 	}
 }
 
-func (s artifactoryService) transitiveCollect(
+func (s artifactoryAPI) transitiveCollect(
 	ctx context.Context,
 	st store.Store,
 	p kernel.Principal,
@@ -404,7 +404,7 @@ func checkTransitivePaths(
 	return nil
 }
 
-func (s artifactoryService) fenceTransitive(
+func (s artifactoryAPI) fenceTransitive(
 	ctx context.Context,
 	st store.Store,
 	p kernel.Principal,

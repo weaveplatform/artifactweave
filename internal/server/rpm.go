@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
+	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -38,8 +40,9 @@ type rpmCandidate struct {
 	pkg  rpm.Package
 }
 
-// rpmAPI serves the RPM virtual repositories' metadata and packages over
-// the item kit.
+// rpmAPI is the RPM ecosystem's partial strict server: the YUM metadata
+// operation, and the item overlay that serves the RPM virtual repositories'
+// metadata and packages, over the item kit.
 type rpmAPI struct{ *itemkit.Kit }
 
 func tryRPMItem(
@@ -419,4 +422,74 @@ func boundedRPMMetadata(r io.Reader) ([]byte, error) {
 		return nil, errRPMMetadataTooLarge
 	}
 	return body, nil
+}
+
+// CalculateYumRepositoryMetadata rebuilds hosted repodata from stored RPMs,
+// or verifies a virtual repository's current composed metadata view.
+func (s rpmAPI) CalculateYumRepositoryMetadata(
+	ctx context.Context,
+	req artgen.CalculateYumRepositoryMetadataRequestObject,
+) (artgen.CalculateYumRepositoryMetadataResponseObject, error) {
+	st, c, _, err := s.OperationRepo(ctx, repo.RPM, itemkit.ReindexOps[repo.RPM], req.RepoKey)
+	if err != nil {
+		return nil, err
+	}
+	if c.Class == repo.Virtual {
+		root, err := yumVirtualRoot(req.Params.Path)
+		if err != nil {
+			return nil, err
+		}
+		p, err := httpkit.Principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		d, _ := accessapi.DeciderFrom(ctx)
+		acc, err := itemkit.AccessFor(ctx, s.Access.Authorizer, p, d)
+		if err != nil {
+			return nil, s.InternalError(ctx, "RPM virtual rights", err)
+		}
+		candidates, err := s.rpmCandidates(ctx, st, c, root, p, acc, map[string]bool{})
+		if err != nil {
+			return nil, s.ItemError(ctx, "RPM virtual calculation", err)
+		}
+		packages := make([]rpm.Package, 0, len(candidates))
+		for _, candidate := range candidates {
+			packages = append(packages, candidate.pkg)
+		}
+		meta, err := rpm.EncodeMetadata(packages, root, time.Unix(0, 0))
+		if err != nil {
+			return nil, s.InternalError(ctx, "RPM virtual metadata", err)
+		}
+		if err := signVirtualRPM(ctx, s.Access.Keys, c, meta.Files); err != nil {
+			return nil, s.InternalError(ctx, "RPM virtual metadata signing", err)
+		}
+		return artgen.CalculateYumRepositoryMetadata200TextResponse(
+			fmt.Sprintf("YUM metadata for virtual repository %s was calculated.", c.Key)), nil
+	}
+	if req.Params.Path != nil && *req.Params.Path != "" {
+		return nil, httpkit.BadRequestf(
+			"RPM metadata path calculation is only valid on a virtual repository",
+		)
+	}
+	msg, err := s.Reindex(
+		ctx,
+		repo.RPM,
+		req.RepoKey,
+		"",
+		req.Params.Async == nil || !*req.Params.Async,
+	)
+	return artgen.CalculateYumRepositoryMetadata200TextResponse(msg), err
+}
+
+func yumVirtualRoot(value *string) (string, error) {
+	if value == nil || *value == "" || *value == "repodata" {
+		return "", nil
+	}
+	p := strings.TrimSuffix(*value, "/")
+	if path.Clean(p) != p || strings.HasPrefix(p, "/") || !strings.HasSuffix(p, "/repodata") {
+		return "", httpkit.BadRequestf(
+			"YUM path must name a repository-relative repodata directory",
+		)
+	}
+	return strings.TrimSuffix(p, "repodata"), nil
 }

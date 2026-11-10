@@ -23,7 +23,7 @@ func TestAccServeFilePreservesProtocolDisposition(t *testing.T) {
 	deployed := w.do("PUT", "/artifactory/libs-local/org/app/app-1.0.jar", "admin", "jar bytes")
 	wantStatus(t, deployed, http.StatusCreated)
 	it := w.item("libs-local", false, "org/app/app-1.0.jar")
-	s := newArtifactoryService(Config{Store: w.db, Blobs: w.blobs})
+	s := newArtifactoryAPI(Config{Store: w.db, Blobs: w.blobs})
 	f := itemkit.Found{Repo: repo.Config{Key: "libs-local", Class: repo.Local}, Item: it}
 	r := httptest.NewRequest(http.MethodGet, "/native/download", nil)
 	rec := httptest.NewRecorder()

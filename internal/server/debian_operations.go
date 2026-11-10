@@ -14,7 +14,7 @@ import (
 // CalculateDebianRepositoryMetadata rebuilds a local apt view. The REST
 // contract defaults to a synchronous calculation and writes item properties
 // unless writeProps=0; both paths retain Manage permission checks.
-func (s artifactoryService) CalculateDebianRepositoryMetadata(
+func (s debianAPI) CalculateDebianRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateDebianRepositoryMetadataRequestObject,
 ) (artgen.CalculateDebianRepositoryMetadataResponseObject, error) {

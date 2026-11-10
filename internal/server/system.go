@@ -25,12 +25,16 @@ import (
 // document; clients that send it in Accept get it back.
 const versionMediaType = "application/vnd.org.jfrog.artifactory.system.Version+json"
 
-// artifactoryService implements the artifacts operations of the artifactory
-// spec; the composite strict server (composites.go) adds the security and
-// system partials and the generated stubs.
-type artifactoryService struct {
-	// Kit is the item kit every service shares; newArtifactoryService
-	// builds it, and a literal without one panics on its first kit call.
+// artifactoryAPI is the artifacts module's partial strict server: the
+// repository, build, search, trash, storage summary and reindex operations
+// of the artifactory spec, and the handwritten item, transfer, storage and
+// search routes. Handlers of an ecosystem without a partial of its own,
+// such as the agent marketplace, stay here until their files move. The
+// composite strict server (composites.go) adds the other partials and the
+// generated stubs.
+type artifactoryAPI struct {
+	// Kit is the item kit every partial shares; newArtifactoryAPI builds
+	// it, and a literal without one panics on its first kit call.
 	*itemkit.Kit
 	cfg Config
 	// folderSlots holds a token for each folder archive download running;

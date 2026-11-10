@@ -42,7 +42,7 @@ type peerAQLRow struct {
 	} `json:"properties"`
 }
 
-func (s artifactoryService) transitivePeer(
+func (s artifactoryAPI) transitivePeer(
 	ctx context.Context,
 	p kernel.Principal,
 	c repo.Config,

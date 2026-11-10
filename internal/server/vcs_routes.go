@@ -21,6 +21,11 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// vcsAPI is the VCS ecosystem's partial strict server: the branch, tag and
+// ref listings and the archive and file downloads of a VCS remote
+// repository, and the route for GitLab subgroup owners, over the item kit.
+type vcsAPI struct{ *itemkit.Kit }
+
 type vcsAccess struct {
 	repo        repo.Config
 	principal   kernel.Principal
@@ -28,7 +33,7 @@ type vcsAccess struct {
 	isCacheOnly bool
 }
 
-func (s artifactoryService) vcsRepository(
+func (s vcsAPI) vcsRepository(
 	ctx context.Context,
 	key, owner, name string,
 ) (vcsAccess, error) {
@@ -75,15 +80,15 @@ func (s artifactoryService) vcsRepository(
 	return vcsAccess{repo: c, principal: p, access: acc, isCacheOnly: cacheOnly}, nil
 }
 
-func (s artifactoryService) vcsRead(
+func (s vcsAPI) vcsRead(
 	ctx context.Context,
 	a vcsAccess,
 	resource source.Resource,
 ) (source.Result, error) {
-	if s.cfg.RemoteSources == nil {
+	if s.RemoteSources == nil {
 		return source.Result{}, apierror.ErrNotImplemented
 	}
-	result, err := s.cfg.RemoteSources.Read(ctx, source.Request{
+	result, err := s.RemoteSources.Read(ctx, source.Request{
 		Repo:      a.repo,
 		Subject:   accessapi.SubjectOf(a.principal),
 		Access:    a.access.Decider,
@@ -101,7 +106,7 @@ func (s artifactoryService) vcsRead(
 	return result, nil
 }
 
-func (s artifactoryService) vcsResultBytes(
+func (s vcsAPI) vcsResultBytes(
 	ctx context.Context,
 	result source.Result,
 	limit int64,
@@ -111,11 +116,11 @@ func (s artifactoryService) vcsResultBytes(
 	case result.Stream != nil:
 		body = result.Stream.Body
 	case result.Item != nil:
-		if s.cfg.Blobs == nil {
+		if s.Blobs == nil {
 			return nil, apierror.ErrNotImplemented
 		}
 		var err error
-		body, _, err = s.cfg.Blobs.Open(ctx, result.Item.Actual.SHA256)
+		body, _, err = s.Blobs.Open(ctx, result.Item.Actual.SHA256)
 		if err != nil {
 			return nil, s.InternalError(ctx, "VCS cached blob", err)
 		}
@@ -138,7 +143,7 @@ func (s artifactoryService) vcsResultBytes(
 	return data, nil
 }
 
-func (s artifactoryService) vcsRefs(
+func (s vcsAPI) vcsRefs(
 	ctx context.Context,
 	key, owner, name string,
 ) ([]vcshttp.Ref, vcsAccess, error) {
@@ -174,7 +179,7 @@ func (s artifactoryService) vcsRefs(
 	return filtered, a, nil
 }
 
-func (s artifactoryService) vcsReadRefs(
+func (s vcsAPI) vcsReadRefs(
 	ctx context.Context, a vcsAccess, owner, name string, endpoint vcshttp.RefEndpoint,
 ) ([]vcshttp.Ref, error) {
 	resource := source.Resource{
@@ -250,7 +255,7 @@ func (r vcsListResponse) VisitGetVcsBranchesResponse(w http.ResponseWriter) erro
 	return r.write(w)
 }
 
-func (s artifactoryService) GetVcsTags(
+func (s vcsAPI) GetVcsTags(
 	ctx context.Context,
 	req artgen.GetVcsTagsRequestObject,
 ) (artgen.GetVcsTagsResponseObject, error) {
@@ -267,7 +272,7 @@ func (s artifactoryService) GetVcsTags(
 	return out, nil
 }
 
-func (s artifactoryService) GetVcsBranches(
+func (s vcsAPI) GetVcsBranches(
 	ctx context.Context,
 	req artgen.GetVcsBranchesRequestObject,
 ) (artgen.GetVcsBranchesResponseObject, error) {
@@ -284,7 +289,7 @@ func (s artifactoryService) GetVcsBranches(
 	return out, nil
 }
 
-func (s artifactoryService) GetVcsRefs(
+func (s vcsAPI) GetVcsRefs(
 	ctx context.Context,
 	req artgen.GetVcsRefsRequestObject,
 ) (artgen.GetVcsRefsResponseObject, error) {

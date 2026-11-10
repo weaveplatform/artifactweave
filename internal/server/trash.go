@@ -38,7 +38,7 @@ const restoredMessage = "Successfully restored trash items"
 // segment, and answer that case with the same functions), the trash can's
 // storage listing under its auto-trashcan key, and zap. The patterns are the
 // ones registerHandwrittenStubs derives, so they replace its stubs.
-func (s artifactoryService) registerTrashRoutes(r chi.Router) {
+func (s artifactoryAPI) registerTrashRoutes(r chi.Router) {
 	r.Delete("/artifactory/api/trash/clean/*", s.cleanTrashPath)
 	r.Post("/artifactory/api/trash/restore/*", s.restoreTrashPath)
 	r.Get(storagePrefix+trash.Repository, s.trashStorage)
@@ -48,7 +48,7 @@ func (s artifactoryService) registerTrashRoutes(r chi.Router) {
 	}
 }
 
-func (s artifactoryService) trashService(st store.Store) *trash.Service {
+func (s artifactoryAPI) trashService(st store.Store) *trash.Service {
 	return &trash.Service{Store: st, Items: s.Items(st)}
 }
 
@@ -64,7 +64,7 @@ func trashRefusalf(p kernel.Principal, format string, a ...any) error {
 
 // EmptyTrashCan purges every trashed item. Admin only; the blobs are
 // reclaimed by the next garbage collection.
-func (s artifactoryService) EmptyTrashCan(
+func (s artifactoryAPI) EmptyTrashCan(
 	ctx context.Context,
 	_ artgen.EmptyTrashCanRequestObject,
 ) (artgen.EmptyTrashCanResponseObject, error) {
@@ -86,7 +86,7 @@ func (s artifactoryService) EmptyTrashCan(
 }
 
 // DeleteItemFromTrashCan is the one-segment form of the clean route.
-func (s artifactoryService) DeleteItemFromTrashCan(
+func (s artifactoryAPI) DeleteItemFromTrashCan(
 	ctx context.Context,
 	req artgen.DeleteItemFromTrashCanRequestObject,
 ) (artgen.DeleteItemFromTrashCanResponseObject, error) {
@@ -96,7 +96,7 @@ func (s artifactoryService) DeleteItemFromTrashCan(
 	return artgen.DeleteItemFromTrashCan204Response{}, nil
 }
 
-func (s artifactoryService) cleanTrashPath(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) cleanTrashPath(w http.ResponseWriter, r *http.Request) {
 	rp := strings.TrimPrefix(r.URL.Path, "/artifactory/api/trash/clean/")
 	if err := s.cleanTrash(r.Context(), rp); err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -109,7 +109,7 @@ func (s artifactoryService) cleanTrashPath(w http.ResponseWriter, r *http.Reques
 // manage on the original repository; once that repository is gone only an
 // admin can. Cleaning a path with nothing trashed succeeds: what the caller
 // wanted gone is gone.
-func (s artifactoryService) cleanTrash(ctx context.Context, repoPath string) error {
+func (s artifactoryAPI) cleanTrash(ctx context.Context, repoPath string) error {
 	st, err := s.Content()
 	if err != nil {
 		return err
@@ -140,7 +140,7 @@ func (s artifactoryService) cleanTrash(ctx context.Context, repoPath string) err
 }
 
 // RestoreItemFromTrashCan is the one-segment form of the restore route.
-func (s artifactoryService) RestoreItemFromTrashCan(
+func (s artifactoryAPI) RestoreItemFromTrashCan(
 	ctx context.Context,
 	req artgen.RestoreItemFromTrashCanRequestObject,
 ) (artgen.RestoreItemFromTrashCanResponseObject, error) {
@@ -155,7 +155,7 @@ func (s artifactoryService) RestoreItemFromTrashCan(
 	return artgen.RestoreItemFromTrashCan202TextResponse(restoredMessage), nil
 }
 
-func (s artifactoryService) restoreTrashPath(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) restoreTrashPath(w http.ResponseWriter, r *http.Request) {
 	from := strings.TrimPrefix(r.URL.Path, "/artifactory/api/trash/restore/")
 	q := r.URL.Query()
 	var size *int
@@ -189,7 +189,7 @@ func (s artifactoryService) restoreTrashPath(w http.ResponseWriter, r *http.Requ
 // and read them (#380). The check at from refuses before the trash is read,
 // so a refusal never tells the caller whether anything is trashed there.
 // Once the original repository is gone only an admin can restore from it.
-func (s artifactoryService) restoreTrash(
+func (s artifactoryAPI) restoreTrash(
 	ctx context.Context,
 	from, to string,
 	size *int,
@@ -325,7 +325,7 @@ func cutRepoPath(rp string) (key, rest string) {
 // can was off (RTDEV-97807, SaaS 7.170.0). The check runs before the caller's
 // rights are weighed, as a repository that does not exist answers 404 before
 // them. What the trash can holds is kept, for restore, clean and empty.
-func (s artifactoryService) trashStorage(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) trashStorage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.Content()
 	if err != nil {
@@ -591,7 +591,7 @@ func (v trashView) lastModified(ctx context.Context, n trash.Node) (string, any,
 // repository, which has no configuration left to judge a permission by, as
 // for clean and restore. Anonymous is refused even holding deploy, an
 // inferred choice: the listing names who deleted each item.
-func (s artifactoryService) trashSight(
+func (s artifactoryAPI) trashSight(
 	ctx context.Context,
 	st store.Store,
 	key, rest string,
@@ -677,7 +677,7 @@ func trashProperties(e types.TrashEntry) types.Properties {
 // RunGarbageCollection runs a pass and answers when it is done. Admin only.
 // A pass another instance is running counts as done: it collects the same
 // store.
-func (s artifactoryService) RunGarbageCollection(
+func (s artifactoryAPI) RunGarbageCollection(
 	ctx context.Context,
 	_ artgen.RunGarbageCollectionRequestObject,
 ) (artgen.RunGarbageCollectionResponseObject, error) {
@@ -694,7 +694,7 @@ func (s artifactoryService) RunGarbageCollection(
 	return artgen.RunGarbageCollection200Response{}, nil
 }
 
-func (s artifactoryService) collector() (*gc.Collector, error) {
+func (s artifactoryAPI) collector() (*gc.Collector, error) {
 	if s.cfg.GC != nil {
 		return s.cfg.GC, nil
 	}
@@ -712,7 +712,7 @@ func (s artifactoryService) collector() (*gc.Collector, error) {
 // zapCache marks a remote cache's items at a path as expired. The path must
 // use the <key>-cache alias; the caller needs delete or manage on the remote
 // repository.
-func (s artifactoryService) zapCache(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) zapCache(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.Content()
 	if err != nil {

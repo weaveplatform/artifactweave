@@ -15,7 +15,7 @@ import (
 // patchConfiguration is PATCH /api/system/configuration: the YAML descriptor
 // as a patch (decision 0009). It is hand-written because the body is YAML,
 // which the generated strict servers do not decode.
-func (s artifactoryService) patchConfiguration(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) patchConfiguration(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	fail := func(err error) { httpkit.WriteErr(w, r, err) }
 	if err := httpkit.AdminOnly(ctx); err != nil {

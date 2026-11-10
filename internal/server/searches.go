@@ -126,7 +126,7 @@ func results(entries []map[string]any) map[string]any {
 // searchRun is one GET search: the caller, what it may read, and the
 // repositories as they stand, as configured and as repo criteria resolve.
 type searchRun struct {
-	s       artifactoryService
+	s       artifactoryAPI
 	st      store.Store
 	p       kernel.Principal
 	acc     itemkit.Access
@@ -137,7 +137,7 @@ type searchRun struct {
 
 // newSearch starts a search. named refuses anonymous callers with 401, for
 // the searches JFrog documents as needing a non-anonymous user.
-func (s artifactoryService) newSearch(ctx context.Context, named bool) (*searchRun, error) {
+func (s artifactoryAPI) newSearch(ctx context.Context, named bool) (*searchRun, error) {
 	st, err := s.Content()
 	if err != nil {
 		return nil, err
@@ -400,7 +400,7 @@ func (r *searchRun) uriSearch(
 // SearchArtifact answers the quick search: files whose name contains name,
 // in local repositories and remote caches. Like AQL's $match, which it
 // compiles to, the match is case-sensitive.
-func (s artifactoryService) SearchArtifact(
+func (s artifactoryAPI) SearchArtifact(
 	ctx context.Context,
 	req artgen.SearchArtifactRequestObject,
 ) (artgen.SearchArtifactResponseObject, error) {
@@ -422,7 +422,7 @@ func (s artifactoryService) SearchArtifact(
 // carrying every property the query names, with any of its comma-separated
 // values or with any value at all when it has none. A value with * or ?
 // matches as a wildcard pattern.
-func (s artifactoryService) SearchProperty(
+func (s artifactoryAPI) SearchProperty(
 	ctx context.Context,
 	req artgen.SearchPropertyRequestObject,
 ) (artgen.SearchPropertyResponseObject, error) {
@@ -502,7 +502,7 @@ var checksumHex = map[string]*regexp.Regexp{
 // SearchChecksum answers the checksum search: files whose content has every
 // checksum given, in local repositories, remote caches and virtual
 // repositories' members.
-func (s artifactoryService) SearchChecksum(
+func (s artifactoryAPI) SearchChecksum(
 	ctx context.Context,
 	req artgen.SearchChecksumRequestObject,
 ) (artgen.SearchChecksumResponseObject, error) {
@@ -541,7 +541,7 @@ func (s artifactoryService) SearchChecksum(
 // of the type asked for was not declared by the uploading client, or was
 // declared and differs from the computed one. AQL cannot compare two
 // fields, so the files in scope are read and compared here.
-func (s artifactoryService) SearchBadChecksum(
+func (s artifactoryAPI) SearchBadChecksum(
 	ctx context.Context,
 	req artgen.SearchBadChecksumRequestObject,
 ) (artgen.SearchBadChecksumResponseObject, error) {
@@ -602,7 +602,7 @@ func millis(ms *int64) *time.Time {
 // SearchCreation answers the creation search: files created in [from, to],
 // in local repositories and remote caches. A repos key naming no
 // repository the caller may see is the documented 404.
-func (s artifactoryService) SearchCreation(
+func (s artifactoryAPI) SearchCreation(
 	ctx context.Context,
 	req artgen.SearchCreationRequestObject,
 ) (artgen.SearchCreationResponseObject, error) {
@@ -638,7 +638,7 @@ var dateFields = []string{"created", "lastModified", "lastDownloaded"}
 // SearchDates answers the dates search: files for which any of the named
 // date fields lies in [from, to], in local repositories and remote caches,
 // each with the named fields it has.
-func (s artifactoryService) SearchDates(
+func (s artifactoryAPI) SearchDates(
 	ctx context.Context,
 	req artgen.SearchDatesRequestObject,
 ) (artgen.SearchDatesResponseObject, error) {
@@ -744,7 +744,7 @@ func instantParam(name, v string) (time.Time, error) {
 // SearchUsage answers the usage search: files created before createdBefore
 // (notUsedSince by default) and not downloaded since notUsedSince, never
 // downloaded included, in local repositories and remote caches.
-func (s artifactoryService) SearchUsage(
+func (s artifactoryAPI) SearchUsage(
 	ctx context.Context,
 	req artgen.SearchUsageRequestObject,
 ) (artgen.SearchUsageResponseObject, error) {
@@ -786,7 +786,7 @@ func (s artifactoryService) SearchUsage(
 // keep the search bounded, and so is a trailing /, which Ant reads as **.
 // A key that names no such repository the caller may see finds nothing,
 // as an unknown repos key does in the other searches.
-func (s artifactoryService) SearchPattern(
+func (s artifactoryAPI) SearchPattern(
 	ctx context.Context,
 	req artgen.SearchPatternRequestObject,
 ) (artgen.SearchPatternResponseObject, error) {

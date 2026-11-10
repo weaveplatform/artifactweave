@@ -15,7 +15,7 @@ import (
 
 // Generated Forge operations share the native protocol's authorization,
 // metadata validation and delivery checks, just as Warehouse operations do.
-func (s artifactoryService) registerPuppetMetadataRoutes(r chi.Router) {
+func (s artifactoryAPI) registerPuppetMetadataRoutes(r chi.Router) {
 	protocol := chi.NewRouter()
 	pkgroute.Mount(
 		protocol,

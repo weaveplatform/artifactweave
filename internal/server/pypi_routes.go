@@ -12,7 +12,7 @@ import (
 
 // Warehouse GET operations share the protocol's delivery fences and source
 // selection. Register after generated routes, retaining their declared paths.
-func (s artifactoryService) registerPypiMetadataRoutes(r chi.Router) {
+func (s artifactoryAPI) registerPypiMetadataRoutes(r chi.Router) {
 	protocol := chi.NewRouter()
 	pkgroute.Mount(
 		protocol,

@@ -38,7 +38,7 @@ func TestUnitStoragePermissionsRenderGrants(t *testing.T) {
 		return users, map[string]accessapi.Actions{"readers": types.ActionRead}, nil
 	}}
 	v := storageView{
-		s:   newArtifactoryService(Config{Access: accessapi.API{Grants: grants}}),
+		s:   newArtifactoryAPI(Config{Access: accessapi.API{Grants: grants}}),
 		key: "libs",
 	}
 	item := types.Item{RepoKey: "libs", Path: "dir", Name: "a.txt"}

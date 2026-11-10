@@ -55,7 +55,7 @@ const aqlTrimmed = "AQL query reached the search hard limit, results are trimmed
 // and name, and their rows are limited to what the caller may read and the
 // repository's include and exclude patterns accept. items.delete and
 // properties.update run here too (aqlAction).
-func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) searchAQL(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.Content()
 	if err != nil {
@@ -183,7 +183,7 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 // deadline cancels the statement in the database through the context. It
 // covers the reads only: an action's deletes and updates, once started,
 // run to the end rather than stop half done.
-func (s artifactoryService) aqlTimeout(r *http.Request) time.Duration {
+func (s artifactoryAPI) aqlTimeout(r *http.Request) time.Duration {
 	if stream, _ := strconv.ParseBool(r.Header.Get("stream")); stream {
 		return s.cfg.AQL.StreamTimeout
 	}
@@ -195,7 +195,7 @@ func (s artifactoryService) aqlTimeout(r *http.Request) time.Duration {
 // says, 400 for an include that reaches too many related rows, and
 // otherwise the internal error op names. A client that went away has
 // cancelled ctx, the request's context, which tells it from the timeout.
-func (s artifactoryService) aqlFailure(
+func (s artifactoryAPI) aqlFailure(
 	ctx context.Context,
 	deadline error,
 	timeout time.Duration,
@@ -402,7 +402,7 @@ func reach(configs map[string]repo.Config, key string, reached map[string]bool) 
 	}
 }
 
-func (s artifactoryService) dispatchAlternateAQL(
+func (s artifactoryAPI) dispatchAlternateAQL(
 	w http.ResponseWriter,
 	r *http.Request,
 	st store.Store,

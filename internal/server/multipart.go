@@ -42,7 +42,7 @@ var selfAuthenticated = map[string]bool{
 	"POST " + uploadsAbort:    true,
 }
 
-func (s artifactoryService) registerMultipartRoutes(r chi.Router) {
+func (s artifactoryAPI) registerMultipartRoutes(r chi.Router) {
 	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsCreate, s.createMultipart)
 	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsURLPart, s.multipartPartURL)
 	// A part is up to 5 GiB: no management body limit.
@@ -52,7 +52,7 @@ func (s artifactoryService) registerMultipartRoutes(r chi.Router) {
 	r.With(middleware.BodyLimit(managementBodyLimit)).Post(uploadsAbort, s.abortMultipart)
 }
 
-func (s artifactoryService) multipartService() (*multipart.Service, error) {
+func (s artifactoryAPI) multipartService() (*multipart.Service, error) {
 	// 501, as for an operation not built: config already answers supported
 	// false, so the CLI never gets here without a blob store.
 	if s.cfg.Multipart == nil {
@@ -62,7 +62,7 @@ func (s artifactoryService) multipartService() (*multipart.Service, error) {
 }
 
 // multipartError maps the service's errors onto statuses.
-func (s artifactoryService) multipartError(r *http.Request, op string, err error) error {
+func (s artifactoryAPI) multipartError(r *http.Request, op string, err error) error {
 	var api *apierror.Error
 	switch {
 	case errors.As(err, &api):
@@ -88,7 +88,7 @@ func bearer(r *http.Request) string {
 
 // createMultipart answers create: the caller needs deploy rights on the
 // repository, decided as for a deploy.
-func (s artifactoryService) createMultipart(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) createMultipart(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	mp, err := s.multipartService()
 	if err != nil {
@@ -136,7 +136,7 @@ func (s artifactoryService) createMultipart(w http.ResponseWriter, r *http.Reque
 	httpkit.WriteJSON(w, http.StatusOK, map[string]string{"token": token})
 }
 
-func (s artifactoryService) multipartPartURL(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) multipartPartURL(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -155,7 +155,7 @@ func (s artifactoryService) multipartPartURL(w http.ResponseWriter, r *http.Requ
 	httpkit.WriteJSON(w, http.StatusOK, map[string]string{"url": baseurl.From(r.Context()) + ref})
 }
 
-func (s artifactoryService) putMultipartPart(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) putMultipartPart(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -180,7 +180,7 @@ func (s artifactoryService) putMultipartPart(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s artifactoryService) completeMultipart(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) completeMultipart(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -193,7 +193,7 @@ func (s artifactoryService) completeMultipart(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func (s artifactoryService) multipartStatus(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) multipartStatus(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -207,7 +207,7 @@ func (s artifactoryService) multipartStatus(w http.ResponseWriter, r *http.Reque
 	httpkit.WriteJSON(w, http.StatusOK, st)
 }
 
-func (s artifactoryService) abortMultipart(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) abortMultipart(w http.ResponseWriter, r *http.Request) {
 	mp, err := s.multipartService()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)

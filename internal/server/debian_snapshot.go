@@ -45,7 +45,7 @@ type debianSnapshotRequest struct {
 
 // CreateDebianSnapshot captures metadata only. The persistent queue handles
 // async=1 and gives the synchronous operation the same atomic work identity.
-func (s artifactoryService) CreateDebianSnapshot(
+func (s debianAPI) CreateDebianSnapshot(
 	ctx context.Context, req artgen.CreateDebianSnapshotRequestObject,
 ) (artgen.CreateDebianSnapshotResponseObject, error) {
 	if req.Body == nil || !debianSnapshotSegment.MatchString(req.Body.Tag) ||
@@ -63,7 +63,7 @@ func (s artifactoryService) CreateDebianSnapshot(
 		return nil, err
 	}
 	d, _ := accessapi.DeciderFrom(ctx)
-	acc, err := itemkit.AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
+	acc, err := itemkit.AccessFor(ctx, s.Access.Authorizer, p, d)
 	if err != nil {
 		return nil, s.InternalError(ctx, "Debian snapshot access", err)
 	}
@@ -78,7 +78,7 @@ func (s artifactoryService) CreateDebianSnapshot(
 	if err := claimDebianSnapshot(ctx, st, job, p); err != nil {
 		return nil, s.ItemError(ctx, "Debian snapshot claim", err)
 	}
-	if s.cfg.Work == nil {
+	if s.Work == nil {
 		if err := s.createDebianSnapshot(ctx, st, job, p, acc); err != nil {
 			return nil, s.ItemError(ctx, "Debian snapshot", err)
 		}
@@ -91,12 +91,12 @@ func (s artifactoryService) CreateDebianSnapshot(
 		if len(key) > store.MaxWorkKey {
 			return nil, httpkit.BadRequestf("Debian snapshot key is too long")
 		}
-		if err := s.cfg.Work.Enqueue(ctx, debianSnapshotKind, key, payload); err != nil {
+		if err := s.Work.Enqueue(ctx, debianSnapshotKind, key, payload); err != nil {
 			return nil, s.InternalError(ctx, "Debian snapshot queue", err)
 		}
 		if req.Params.Async == nil ||
 			*req.Params.Async == artgen.CreateDebianSnapshotParamsAsyncN0 {
-			if err := s.cfg.Work.EnsureFresh(ctx, debianSnapshotKind, key); err != nil {
+			if err := s.Work.EnsureFresh(ctx, debianSnapshotKind, key); err != nil {
 				return nil, s.ItemError(ctx, "Debian snapshot", err)
 			}
 		}
@@ -194,7 +194,7 @@ func snapshotSourceClass(c repo.Class) bool {
 // attempt, including retries after a restart.
 func RegisterDebianSnapshotWork(q *work.Queue, cfg Config) error {
 	cfg = withAccess(cfg)
-	s := newArtifactoryService(cfg)
+	s := debianAPI{newKit(cfg)}
 	err := q.Handle(debianSnapshotKind, func(ctx context.Context, it types.WorkItem) error {
 		var job debianSnapshotRequest
 		if err := json.Unmarshal(it.Payload, &job); err != nil ||
@@ -229,7 +229,7 @@ func RegisterDebianSnapshotWork(q *work.Queue, cfg Config) error {
 	return nil
 }
 
-func (s artifactoryService) createDebianSnapshot(
+func (s debianAPI) createDebianSnapshot(
 	ctx context.Context, st store.Store, job debianSnapshotRequest,
 	p kernel.Principal, acc itemkit.Access,
 ) error {
@@ -299,16 +299,16 @@ func (s artifactoryService) createDebianSnapshot(
 	return nil
 }
 
-func (s artifactoryService) debianSnapshotFiles(
+func (s debianAPI) debianSnapshotFiles(
 	ctx context.Context, st store.Store, c repo.Config, distribution string,
 	p kernel.Principal, acc itemkit.Access,
 ) (map[string][]byte, error) {
 	if c.Class == repo.Virtual {
-		view, err := debianAPI{s.Kit}.buildVirtualDebianView(ctx, st, c, distribution, p, acc)
+		view, err := s.buildVirtualDebianView(ctx, st, c, distribution, p, acc)
 		return view.files, err
 	}
 	base := "dists/" + distribution + "/"
-	release, _, err := debianAPI{s.Kit}.debianMemberBytes(ctx, st, c, base+"Release", p, acc)
+	release, _, err := s.debianMemberBytes(ctx, st, c, base+"Release", p, acc)
 	if err != nil {
 		return nil, fmt.Errorf("snapshot Release: %w", err)
 	}
@@ -322,7 +322,7 @@ func (s artifactoryService) debianSnapshotFiles(
 		if ref.Size > debianIndexLimit || total+ref.Size > 512<<20 {
 			return nil, httpkit.BadRequestf("Debian snapshot metadata exceeds limit")
 		}
-		body, checkRead, err := debianAPI{s.Kit}.debianMemberBytes(ctx, st, c, ref.Path, p, acc)
+		body, checkRead, err := s.debianMemberBytes(ctx, st, c, ref.Path, p, acc)
 		if err != nil {
 			return nil, fmt.Errorf("snapshot index %s: %w", ref.Path, err)
 		}
@@ -355,7 +355,7 @@ func (s artifactoryService) debianSnapshotFiles(
 		}
 	}
 	for _, suffix := range []string{"InRelease", "Release.gpg"} {
-		body, _, err := debianAPI{s.Kit}.debianMemberBytes(ctx, st, c, base+suffix, p, acc)
+		body, _, err := s.debianMemberBytes(ctx, st, c, base+suffix, p, acc)
 		if errors.Is(err, store.ErrNotFound) {
 			continue
 		}
@@ -369,7 +369,7 @@ func (s artifactoryService) debianSnapshotFiles(
 
 // Debian snapshots have a separate client root. Metadata lives in the target
 // repository; packages continue to resolve from the recorded source.
-func (s artifactoryService) registerDebianSnapshotRoutes(r chi.Router) {
+func (s debianAPI) registerDebianSnapshotRoutes(r chi.Router) {
 	for _, method := range []string{http.MethodGet, http.MethodHead} {
 		r.MethodFunc(
 			method,
@@ -379,7 +379,7 @@ func (s artifactoryService) registerDebianSnapshotRoutes(r chi.Router) {
 	}
 }
 
-func (s artifactoryService) getDebianSnapshot(w http.ResponseWriter, r *http.Request) {
+func (s debianAPI) getDebianSnapshot(w http.ResponseWriter, r *http.Request) {
 	st, err := s.Content()
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -449,7 +449,7 @@ func (s artifactoryService) getDebianSnapshot(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusFound)
 }
 
-func (s artifactoryService) checkDebianSnapshotIndex(
+func (s debianAPI) checkDebianSnapshotIndex(
 	ctx context.Context, rel string, it types.Item, sourceRepo repo.Config,
 	p kernel.Principal, acc itemkit.Access,
 ) error {
@@ -457,7 +457,7 @@ func (s artifactoryService) checkDebianSnapshotIndex(
 	if !debian.PackagesIndexPath(rel) && !debian.SourcesIndexPath(rel) && !byHash {
 		return nil
 	}
-	body, err := debianAPI{s.Kit}.readDebianBlob(ctx, it.Actual.SHA256)
+	body, err := s.readDebianBlob(ctx, it.Actual.SHA256)
 	if err != nil {
 		return err
 	}

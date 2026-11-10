@@ -10,7 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
 )
 
-func (s artifactoryService) registerChefReindex(r chi.Router) {
+func (s artifactoryAPI) registerChefReindex(r chi.Router) {
 	r.Post("/artifactory/api/chef/{repoKey}/reindex", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.RawQuery != "" {
 			apierror.Write(

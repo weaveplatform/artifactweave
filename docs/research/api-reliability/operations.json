@@ -955,7 +955,7 @@
     "operation_id": "deleteBuilds",
     "state": "implemented",
     "contract": "Deletes the listed runs of a build, or every run, optionally with their artifacts. Needs delete permission on the build.",
-    "handler": "internal/server/builds.go: artifactoryService.deleteBuilds",
+    "handler": "internal/server/builds.go: artifactoryAPI.deleteBuilds",
     "direct_calls": [
       "s.buildCaller",
       "s.buildError",
@@ -1264,7 +1264,7 @@
     "operation_id": "deleteDockerTag",
     "state": "implemented",
     "contract": "Deletes a tag of a Docker, OCI or Helm OCI image, including a multi-architecture tag. The tag folder is removed, and when it holds a manifest list or image index, so are the descriptive `\u003ctag\u003e-\u003cos\u003e-\u003carchitecture\u003e` tags its push added that still hold their platform manifests, and the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay. A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the error envelope, as for every REST operation under the Docker API path.",
-    "handler": "internal/server/docker_rest.go: artifactoryService.DeleteDockerTag",
+    "handler": "internal/server/docker_rest.go: dockerAPI.DeleteDockerTag",
     "direct_calls": [
       "acc.File",
       "apierror.New",
@@ -1488,7 +1488,7 @@
     "operation_id": "deleteRepository",
     "state": "implemented",
     "contract": "Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.",
-    "handler": "internal/server/repositories.go: artifactoryService.DeleteRepository",
+    "handler": "internal/server/repositories.go: artifactoryAPI.DeleteRepository",
     "direct_calls": [
       "artgen.DeleteRepository200JSONResponse",
       "artgen.DeleteRepository400JSONResponse",
@@ -1738,7 +1738,7 @@
   {
     "route": "DELETE /artifactory/api/storage/{repoKey}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.deleteProperties-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.deleteProperties-fm",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1757,7 +1757,7 @@
   {
     "route": "DELETE /artifactory/api/storage/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.deleteProperties-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.deleteProperties-fm",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1939,7 +1939,7 @@
   {
     "route": "DELETE /artifactory/api/trash/clean/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.cleanTrashPath-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.cleanTrashPath-fm",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -1961,7 +1961,7 @@
     "operation_id": "deleteItemFromTrashCan",
     "state": "implemented",
     "contract": "Removes one trashed item, or a whole trashed folder, so it can no longer be restored. Allowed for admins, project admins of the owning project and callers with Manage or Delete permission on the original repository. Answers 204 with no body.",
-    "handler": "internal/server/trash.go: artifactoryService.DeleteItemFromTrashCan",
+    "handler": "internal/server/trash.go: artifactoryAPI.DeleteItemFromTrashCan",
     "direct_calls": [
       "s.cleanTrash"
     ],
@@ -2027,7 +2027,7 @@
     "operation_id": "deleteRepositories",
     "state": "implemented",
     "contract": "Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.",
-    "handler": "internal/server/repositories.go: artifactoryService.DeleteRepositories",
+    "handler": "internal/server/repositories.go: artifactoryAPI.DeleteRepositories",
     "direct_calls": [
       "artgen.DeleteRepositories200JSONResponse",
       "artgen.DeleteRepositories207JSONResponse",
@@ -2141,7 +2141,7 @@
   {
     "route": "DELETE /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.deleteItem-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.deleteItem-fm",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -2160,7 +2160,7 @@
   {
     "route": "DELETE /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/{filePath}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.deleteItem-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.deleteItem-fm",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -3962,7 +3962,7 @@
   {
     "route": "GET /artifactory/api/agentplugins/{repoKey}/{marketplace}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.getAgentMarketplace-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.getAgentMarketplace-fm",
     "review_family": "native-agentplugins",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -4038,7 +4038,7 @@
   {
     "route": "GET /artifactory/api/archive/download/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.downloadFolderArchive-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.downloadFolderArchive-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -4247,7 +4247,7 @@
   {
     "route": "GET /artifactory/api/artifactweave/remote-status/{repoKey}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.smartStatus-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.smartStatus-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -4383,7 +4383,7 @@
     "operation_id": "getAllBuilds",
     "state": "implemented",
     "contract": "Lists every build name the caller may read, with the start time of each build's most recent run.",
-    "handler": "internal/server/builds.go: artifactoryService.GetAllBuilds",
+    "handler": "internal/server/builds.go: artifactoryAPI.GetAllBuilds",
     "direct_calls": [
       "build.FormatStarted",
       "httpkit.Deref",
@@ -4415,7 +4415,7 @@
     "operation_id": "getBuildRuns",
     "state": "implemented",
     "contract": "Lists the runs of one build. Needs read permission on the build.",
-    "handler": "internal/server/builds.go: artifactoryService.GetBuildRuns",
+    "handler": "internal/server/builds.go: artifactoryAPI.GetBuildRuns",
     "direct_calls": [
       "build.FormatStarted",
       "httpkit.Deref",
@@ -4447,7 +4447,7 @@
     "operation_id": "getBuildInfo",
     "state": "implemented",
     "contract": "Returns one run's build-info document. Needs read permission on the build.",
-    "handler": "internal/server/builds.go: artifactoryService.GetBuildInfo",
+    "handler": "internal/server/builds.go: artifactoryAPI.GetBuildInfo",
     "direct_calls": [
       "apierror.New",
       "b.Started.Before",
@@ -4484,7 +4484,7 @@
     "operation_id": "getBuildArtifacts",
     "state": "implemented",
     "contract": "Lists where each artifact of a run is stored. Needs read permission on the build.",
-    "handler": "internal/server/builds.go: artifactoryService.GetBuildArtifacts",
+    "handler": "internal/server/builds.go: artifactoryAPI.GetBuildArtifacts",
     "direct_calls": [
       "httpkit.PtrTo",
       "it.ReportedRepoKey",
@@ -5152,7 +5152,7 @@
     "operation_id": "moveCranArchives",
     "state": "implemented",
     "contract": "Relocates legacy source archives from src/contrib/Archive/package/version/file to src/contrib/Archive/package/file in a local or federated CRAN repository. Requires an administrator and cran.archive_mover_enabled (off by default). Existing destinations are never overwritten. All moves commit together; a repeated request succeeds with zero moves. The response reports the number of archives relocated by this request in the moved field.",
-    "handler": "internal/server/cran_archive.go: artifactoryService.moveCranArchives",
+    "handler": "internal/server/cran_archive.go: cranAPI.moveCranArchives",
     "direct_calls": [
       "cran.LegacyArchiveTarget",
       "ctx.Err",
@@ -5197,7 +5197,7 @@
   {
     "route": "GET /artifactory/api/deb/{repoKey}/snapshots/{tag}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.getDebianSnapshot-fm",
+    "handler": "internal/server/server.go: internal/server.debianAPI.getDebianSnapshot-fm",
     "review_family": "native-deb",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6343,7 +6343,7 @@
     "operation_id": "getNpmAuth",
     "state": "implemented",
     "contract": "Returns .npmrc lines that authenticate npm to this server as the caller. A caller that sent its user name and password with Basic gets `_auth = \u003cbase64 of user:encrypted password\u003e`, where the encrypted password is the value `GET /api/security/encryptedPassword` returns; the password itself is never returned. A caller that sent an access or reference token gets that same token back: as `_auth = \u003cbase64 of user:token\u003e` when it sent the token as a Basic password, and as `_authToken = \u003ctoken\u003e` when it sent it as a Bearer token or in `X-JFrog-Art-Api`. No other line is sent. Needs an authenticated caller. Errors use the `{\"errors\":[{\"status\",\"message\"}]}` envelope.",
-    "handler": "internal/server/npm_auth.go: artifactoryService.GetNpmAuth",
+    "handler": "internal/server/npm_auth.go: npmAPI.GetNpmAuth",
     "direct_calls": [
       "artgen.GetNpmAuth200TextResponse",
       "npmhttp.AuthLines",
@@ -6465,7 +6465,7 @@
     "operation_id": "getNpmScopeAuth",
     "state": "implemented",
     "contract": "Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line is `@\u003cscope\u003e:registry=\u003cregistry URL\u003e`, where the registry URL is `\u003cbase\u003e/artifactory/api/npm/\u003crepoKey\u003e/`. The credential lines follow, each keyed to that URL without its scheme (`//\u003chost\u003e/artifactory/api/npm/\u003crepoKey\u003e/:`), so npm sends them to this registry only. A caller that sent Basic credentials gets `_password=\u003cbase64\u003e` and `username=\u003cuser\u003e`, where the base64 is of its encrypted password, the value `GET /api/security/encryptedPassword` returns, or of the token it sent as its password; the password itself is never returned. A caller that sent a token as a Bearer token or in `X-JFrog-Art-Api` gets `_authToken=\u003ctoken\u003e` with that same token. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Errors use the `{\"errors\":[{\"status\",\"message\"}]}` envelope. Because this operation owns GET \u003cregistry\u003e/auth/\u003cscope\u003e, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected.",
-    "handler": "internal/server/npm_auth.go: artifactoryService.GetNpmScopeAuth",
+    "handler": "internal/server/npm_auth.go: npmAPI.GetNpmScopeAuth",
     "direct_calls": [
       "artgen.GetNpmScopeAuth200TextResponse",
       "baseurl.From",
@@ -6971,7 +6971,7 @@
   {
     "route": "GET /artifactory/api/pypi/{repoKey}/pypi/{package}/json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pypi_routes.go: internal/server.artifactoryService.registerPypiMetadataRoutes.func1",
+    "handler": "internal/server/pypi_routes.go: internal/server.artifactoryAPI.registerPypiMetadataRoutes.func1",
     "review_family": "native-pypi",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -6990,7 +6990,7 @@
   {
     "route": "GET /artifactory/api/pypi/{repoKey}/pypi/{package}/{version}/json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/pypi_routes.go: internal/server.artifactoryService.registerPypiMetadataRoutes.func1",
+    "handler": "internal/server/pypi_routes.go: internal/server.artifactoryAPI.registerPypiMetadataRoutes.func1",
     "review_family": "native-pypi",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -7201,7 +7201,7 @@
     "operation_id": "getRepositoriesByTypeAndProject",
     "state": "implemented",
     "contract": "Returns minimal details for every repository the caller may see, optionally filtered by class, package type and project. Admins, and tokens scoped artifact:*:r or system:info:r, see every repository; other callers see the repositories they can read. The type value is lower case here but upper case in the response. Remote caches are never listed.",
-    "handler": "internal/server/repositories.go: artifactoryService.GetRepositoriesByTypeAndProject",
+    "handler": "internal/server/repositories.go: artifactoryAPI.GetRepositoriesByTypeAndProject",
     "direct_calls": [
       "artgen.GetRepositoriesByTypeAndProject200ApplicationVndOrgJfrogArtifactoryRepositoriesRepositoryDetailsListPlusJSONResponse",
       "baseurl.From",
@@ -7240,7 +7240,7 @@
     "operation_id": "getAllRepositoryConfigurations",
     "state": "partial: handler enforces the contract's limitations",
     "contract": "Returns the configuration of every repository grouped by class, each with the fields that apply to its package type, as the v2 read gives them, so a generic repository has no Maven or Docker fields. Secrets are masked. Admin only. The groups are always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not supported.",
-    "handler": "internal/server/repositories.go: artifactoryService.GetAllRepositoryConfigurations",
+    "handler": "internal/server/repositories.go: artifactoryAPI.GetAllRepositoryConfigurations",
     "direct_calls": [
       "artgen.GetAllRepositoryConfigurations200ApplicationVndOrgJfrogArtifactoryRepositoriesRepositoryConfigurationsListPlusJSONResponse",
       "classes.has",
@@ -7285,7 +7285,7 @@
     "operation_id": "checkIfRepositoryExists",
     "state": "implemented",
     "contract": "Reports whether at least one repository of the given classes exists, optionally within one project. Admin only.",
-    "handler": "internal/server/repositories.go: artifactoryService.CheckIfRepositoryExists",
+    "handler": "internal/server/repositories.go: artifactoryAPI.CheckIfRepositoryExists",
     "direct_calls": [
       "httpkit.AdminOnly",
       "s.Content",
@@ -7317,7 +7317,7 @@
     "operation_id": "getRemoteRepositoryConfiguration",
     "state": "implemented",
     "contract": "Returns the sanitised configuration of a remote repository that has shareConfiguration enabled. Deprecated in favour of the ordinary read. Non-admin callers get the sanitised view only.",
-    "handler": "internal/server/repositories.go: artifactoryService.GetRemoteRepositoryConfiguration",
+    "handler": "internal/server/repositories.go: artifactoryAPI.GetRemoteRepositoryConfiguration",
     "direct_calls": [
       "apierror.New",
       "errors.Is",
@@ -7354,7 +7354,7 @@
     "operation_id": "getRepositoryConfiguration",
     "state": "implemented",
     "contract": "Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.",
-    "handler": "internal/server/repositories.go: artifactoryService.GetRepositoryConfiguration",
+    "handler": "internal/server/repositories.go: artifactoryAPI.GetRepositoryConfiguration",
     "direct_calls": [
       "s.readOne"
     ],
@@ -7520,7 +7520,7 @@
     "operation_id": "searchArtifact",
     "state": "partial: handler enforces the contract's limitations",
     "contract": "Finds files whose name contains the given text. Only local repositories and remote caches are searched; a virtual repository key in repos is ignored. Anonymous callers may search when anonymous access is enabled. Each result is a file info URI unless X-Result-Detail asks for more.",
-    "handler": "internal/server/searches.go: artifactoryService.SearchArtifact",
+    "handler": "internal/server/searches.go: artifactoryAPI.SearchArtifact",
     "direct_calls": [
       "httpkit.BadRequestf",
       "r.repoScope",
@@ -7551,7 +7551,7 @@
     "operation_id": "searchBadChecksum",
     "state": "implemented",
     "contract": "Finds items whose checksum declared by the uploading client differs from the computed one, or was never declared. The search covers local repositories, remote caches and virtual repositories and returns at most 10,000 results. Anonymous callers may search when anonymous access is enabled.",
-    "handler": "internal/server/searches.go: artifactoryService.SearchBadChecksum",
+    "handler": "internal/server/searches.go: artifactoryAPI.SearchBadChecksum",
     "direct_calls": [
       "httpkit.BadRequestf",
       "r.capped",
@@ -7584,7 +7584,7 @@
     "operation_id": "searchChecksum",
     "state": "implemented",
     "contract": "Finds items whose content has the given checksum. Exactly one of md5, sha1 or sha256 should be given; when several are given all must match. The search covers local repositories, remote caches and virtual repositories. Anonymous callers may search when anonymous access is enabled.",
-    "handler": "internal/server/searches.go: artifactoryService.SearchChecksum",
+    "handler": "internal/server/searches.go: artifactoryAPI.SearchChecksum",
     "direct_calls": [
       "expression.MatchString",
       "httpkit.BadRequestf",
@@ -7617,7 +7617,7 @@
     "operation_id": "searchCreation",
     "state": "implemented",
     "contract": "Finds items created between two instants. Only local repositories and remote caches are searched. A named user is required; anonymous callers receive 401.",
-    "handler": "internal/server/searches.go: artifactoryService.SearchCreation",
+    "handler": "internal/server/searches.go: artifactoryAPI.SearchCreation",
     "direct_calls": [
       "httpkit.FormatTime",
       "itemkit.NotFoundRepo",
@@ -7654,7 +7654,7 @@
     "operation_id": "searchDates",
     "state": "implemented",
     "contract": "Finds items for which at least one of the requested date fields falls inside the window. Only local repositories and remote caches are searched. A named user is required. The fields named in dateFields are the ones returned on each result.",
-    "handler": "internal/server/searches.go: artifactoryService.SearchDates",
+    "handler": "internal/server/searches.go: artifactoryAPI.SearchDates",
     "direct_calls": [
       "httpkit.BadRequestf",
       "r.collect",
@@ -7692,7 +7692,7 @@
     "operation_id": "searchDependency",
     "state": "implemented",
     "contract": "Finds the build runs whose recorded dependencies include the artifact with the given SHA-1, among the runs the caller may read, in the order they were published. A build number with several runs is listed once. Anonymous callers may search when anonymous access is enabled.",
-    "handler": "internal/server/searches_builds.go: artifactoryService.SearchDependency",
+    "handler": "internal/server/searches_builds.go: artifactoryAPI.SearchDependency",
     "direct_calls": [
       "a.Build",
       "expression.DocumentItem",
@@ -7730,7 +7730,7 @@
     "operation_id": "searchGavc",
     "state": "implemented",
     "contract": "Finds files by Maven coordinates read through each repository's layout, in repositories whose layout defines the organisation, module and base revision tokens, as the Maven, Gradle, Ivy and sbt layouts do. A file's version is its base revision with any folder integration revision, such as 1.0-SNAPSHOT. At least one coordinate is required. Without specific the search covers local repositories and remote caches and returns file info URIs; with specific=true repos may also name virtual repositories, searched through their members, and each entry carries the download URL under the key the search named, with the extracted ext, version and classifier. With exact g and a, specific=true also discovers upstream files through bounded listings without downloading binaries. The compatibility remote=0 override disables discovery; remote=1 requires specific=true and exact coordinates. Explicit cache aliases never discover. Anonymous callers may search when anonymous access is enabled.",
-    "handler": "internal/server/searches_layout.go: artifactoryService.SearchGavc",
+    "handler": "internal/server/searches_layout.go: artifactoryAPI.SearchGavc",
     "direct_calls": [
       "co.Version",
       "d.include",
@@ -7778,7 +7778,7 @@
     "operation_id": "searchLatestVersion",
     "state": "implemented",
     "contract": "Returns the latest version of a module as plain text, using the repository layout to extract versions and the Mercury version ordering to compare them; integration versions are given by file version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ? returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the latest integration version of that module version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 also consults authoritative upstream metadata or bounded listings. Non-Maven layouts require listRemoteFolderItems. The response is the bare version string, not JSON. Returns 404 when the module has no versions, no release, or no matching version. Anonymous callers may search when anonymous access is enabled.",
-    "handler": "internal/server/searches_layout.go: artifactoryService.SearchLatestVersion",
+    "handler": "internal/server/searches_layout.go: artifactoryAPI.SearchLatestVersion",
     "direct_calls": [
       "apierror.New",
       "artgen.SearchLatestVersion200TextResponse",
@@ -7830,7 +7830,7 @@
     "operation_id": "searchPattern",
     "state": "implemented",
     "contract": "Lists files matching an Ant-style path pattern inside one repository. The pattern is prefixed with the repository key and a colon; ** is rejected to keep the search bounded. A named user is required.",
-    "handler": "internal/server/searches.go: artifactoryService.SearchPattern",
+    "handler": "internal/server/searches.go: artifactoryAPI.SearchPattern",
     "direct_calls": [
       "ant.Match",
       "antpath.CompilePattern",
@@ -7873,7 +7873,7 @@
     "operation_id": "searchProperty",
     "state": "implemented",
     "contract": "Finds items by property values. Every query parameter except repos is read as a property key with a comma-separated list of values; a key without a value matches any value. The search covers local repositories, remote caches and virtual repositories. Anonymous callers may search when anonymous access is enabled.",
-    "handler": "internal/server/searches.go: artifactoryService.SearchProperty",
+    "handler": "internal/server/searches.go: artifactoryAPI.SearchProperty",
     "direct_calls": [
       "httpkit.RawSearchQuery",
       "r.repoScope",
@@ -7904,7 +7904,7 @@
     "operation_id": "searchUsage",
     "state": "implemented",
     "contract": "Finds items that have not been downloaded since an instant, which is the raw material for retention decisions. Only items created before createdBefore, or before notUsedSince when it is omitted, are considered. Only local repositories and remote caches are searched. A named user is required.",
-    "handler": "internal/server/searches.go: artifactoryService.SearchUsage",
+    "handler": "internal/server/searches.go: artifactoryAPI.SearchUsage",
     "direct_calls": [
       "r.collect",
       "r.repoScope",
@@ -7938,7 +7938,7 @@
     "operation_id": "searchVersions",
     "state": "implemented",
     "contract": "Lists every version of a module found through the repository layout, newest first in the Mercury version ordering. Without v both release and integration versions are returned, a folder of unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches; any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 also consults authoritative upstream metadata or bounded listings. Non-Maven layouts require listRemoteFolderItems. Returns 404 when there is no version to list. Anonymous callers may search when anonymous access is enabled.",
-    "handler": "internal/server/searches_layout.go: artifactoryService.SearchVersions",
+    "handler": "internal/server/searches_layout.go: artifactoryAPI.SearchVersions",
     "direct_calls": [
       "apierror.New",
       "httpkit.Deref",
@@ -8662,7 +8662,7 @@
   {
     "route": "GET /artifactory/api/storage/auto-trashcan",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.trashStorage-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.trashStorage-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -8681,7 +8681,7 @@
   {
     "route": "GET /artifactory/api/storage/auto-trashcan/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.trashStorage-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.trashStorage-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -8700,7 +8700,7 @@
   {
     "route": "GET /artifactory/api/storage/{repoKey}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.getStorage-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.getStorage-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -8719,7 +8719,7 @@
   {
     "route": "GET /artifactory/api/storage/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.getStorage-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.getStorage-fm",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -8767,7 +8767,7 @@
     "operation_id": "getStorageSummaryInfo",
     "state": "implemented",
     "contract": "Returns the storage usage snapshot, computed on every request. Requires an administrator or a token whose scope includes `system:info/storage:r`.",
-    "handler": "internal/server/storageinfo.go: artifactoryService.GetStorageSummaryInfo",
+    "handler": "internal/server/storageinfo.go: artifactoryAPI.GetStorageSummaryInfo",
     "direct_calls": [
       "a.Decider.System",
       "accessapi.DeciderFrom",
@@ -9636,7 +9636,7 @@
     "operation_id": "getUploadsConfig",
     "state": "implemented",
     "contract": "Reports whether multipart upload is available. With `supported` true a file is uploaded in parts through create, urlPart, complete and status; with false it is deployed in one request.",
-    "handler": "internal/server/items.go: artifactoryService.GetUploadsConfig",
+    "handler": "internal/server/items.go: artifactoryAPI.GetUploadsConfig",
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9678,7 +9678,7 @@
     "operation_id": "getBatchOfRepositoriesByName",
     "state": "implemented",
     "contract": "Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field; other callers receive the public subset. At most 100 names per call.",
-    "handler": "internal/server/repositories.go: artifactoryService.GetBatchOfRepositoriesByName",
+    "handler": "internal/server/repositories.go: artifactoryAPI.GetBatchOfRepositoriesByName",
     "direct_calls": [
       "errors.Is",
       "httpkit.BadRequestf",
@@ -9711,7 +9711,7 @@
     "operation_id": "getRepositoryConfigurationV2",
     "state": "implemented",
     "contract": "Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.",
-    "handler": "internal/server/repositories.go: artifactoryService.GetRepositoryConfigurationV2",
+    "handler": "internal/server/repositories.go: artifactoryAPI.GetRepositoryConfigurationV2",
     "direct_calls": [
       "artgen.GetRepositoryConfigurationV2200ApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONResponse",
       "artgen.GetRepositoryConfigurationV2200ApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONResponse",
@@ -9949,7 +9949,7 @@
   {
     "route": "GET /artifactory/api/vcs/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.vcsNested-fm",
+    "handler": "internal/server/server.go: internal/server.vcsAPI.vcsNested-fm",
     "review_family": "native-vcs",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -9971,7 +9971,7 @@
     "operation_id": "getVcsBranches",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_routes.go: artifactoryService.GetVcsBranches",
+    "handler": "internal/server/vcs_routes.go: vcsAPI.GetVcsBranches",
     "direct_calls": [
       "s.vcsRefs"
     ],
@@ -9999,7 +9999,7 @@
     "operation_id": "downloadVcsBranchAlternative",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: artifactoryService.DownloadVcsBranchAlternative",
+    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsBranchAlternative",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10024,7 +10024,7 @@
     "operation_id": "downloadVcsBranchFromSubgroupRepository",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: artifactoryService.DownloadVcsBranchFromSubgroupRepository",
+    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsBranchFromSubgroupRepository",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10049,7 +10049,7 @@
     "operation_id": "downloadVcsBranch",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: artifactoryService.DownloadVcsBranch",
+    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsBranch",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10074,7 +10074,7 @@
     "operation_id": "downloadFileWithinVcsBranchAlternative",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: artifactoryService.DownloadFileWithinVcsBranchAlternative",
+    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadFileWithinVcsBranchAlternative",
     "direct_calls": [
       "s.vcsFile"
     ],
@@ -10099,7 +10099,7 @@
     "operation_id": "downloadFileInVcsBranchInSubgroupRepository",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: artifactoryService.DownloadFileInVcsBranchInSubgroupRepository",
+    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadFileInVcsBranchInSubgroupRepository",
     "direct_calls": [
       "s.vcsFile"
     ],
@@ -10124,7 +10124,7 @@
     "operation_id": "downloadFileWithinVcsBranch",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: artifactoryService.DownloadFileWithinVcsBranch",
+    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadFileWithinVcsBranch",
     "direct_calls": [
       "s.vcsFile"
     ],
@@ -10149,7 +10149,7 @@
     "operation_id": "downloadVcsCommit",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: artifactoryService.DownloadVcsCommit",
+    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsCommit",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10174,7 +10174,7 @@
     "operation_id": "downloadVcsRelease",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: artifactoryService.DownloadVcsRelease",
+    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsRelease",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10199,7 +10199,7 @@
     "operation_id": "downloadVcsTagFromSubgroupRepository",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: artifactoryService.DownloadVcsTagFromSubgroupRepository",
+    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsTagFromSubgroupRepository",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10224,7 +10224,7 @@
     "operation_id": "downloadVcsTag",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: artifactoryService.DownloadVcsTag",
+    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsTag",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10249,7 +10249,7 @@
     "operation_id": "downloadVcsTagAlternative",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: artifactoryService.DownloadVcsTagAlternative",
+    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadVcsTagAlternative",
     "direct_calls": [
       "s.vcsArchive"
     ],
@@ -10274,7 +10274,7 @@
     "operation_id": "downloadFileInVcsTagInSubgroupRepository",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: artifactoryService.DownloadFileInVcsTagInSubgroupRepository",
+    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadFileInVcsTagInSubgroupRepository",
     "direct_calls": [
       "s.vcsFile"
     ],
@@ -10299,7 +10299,7 @@
     "operation_id": "downloadFileWithinVcsTag",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: artifactoryService.DownloadFileWithinVcsTag",
+    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadFileWithinVcsTag",
     "direct_calls": [
       "s.vcsFile"
     ],
@@ -10324,7 +10324,7 @@
     "operation_id": "downloadFileWithinVcsTagAlternative",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_download.go: artifactoryService.DownloadFileWithinVcsTagAlternative",
+    "handler": "internal/server/vcs_download.go: vcsAPI.DownloadFileWithinVcsTagAlternative",
     "direct_calls": [
       "s.vcsFile"
     ],
@@ -10349,7 +10349,7 @@
     "operation_id": "getVcsRefs",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_routes.go: artifactoryService.GetVcsRefs",
+    "handler": "internal/server/vcs_routes.go: vcsAPI.GetVcsRefs",
     "direct_calls": [
       "artgen.GetVcsRefs200JSONResponse",
       "b.String",
@@ -10377,7 +10377,7 @@
     "operation_id": "getVcsTags",
     "state": "implemented",
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
-    "handler": "internal/server/vcs_routes.go: artifactoryService.GetVcsTags",
+    "handler": "internal/server/vcs_routes.go: vcsAPI.GetVcsTags",
     "direct_calls": [
       "s.vcsRefs"
     ],
@@ -10402,7 +10402,7 @@
   {
     "route": "GET /artifactory/api/versions/{repo}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.latestVersionByProperties-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.latestVersionByProperties-fm",
     "review_family": "search",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -11794,7 +11794,7 @@
   {
     "route": "HEAD /artifactory/api/agentplugins/{repoKey}/{marketplace}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.getAgentMarketplace-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.getAgentMarketplace-fm",
     "review_family": "native-agentplugins",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -12212,7 +12212,7 @@
   {
     "route": "HEAD /artifactory/api/deb/{repoKey}/snapshots/{tag}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.getDebianSnapshot-fm",
+    "handler": "internal/server/server.go: internal/server.debianAPI.getDebianSnapshot-fm",
     "review_family": "native-deb",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
@@ -13915,7 +13915,7 @@
   {
     "route": "PATCH /artifactory/api/metadata/{repoKey}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.patchMetadata-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.patchMetadata-fm",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -13934,7 +13934,7 @@
   {
     "route": "PATCH /artifactory/api/metadata/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.patchMetadata-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.patchMetadata-fm",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -15180,7 +15180,7 @@
     "operation_id": "appendBuild",
     "state": "implemented",
     "contract": "Adds modules to an existing run and stores the extended document. Needs deploy and delete permission on the build.",
-    "handler": "internal/server/builds.go: artifactoryService.AppendBuild",
+    "handler": "internal/server/builds.go: artifactoryAPI.AppendBuild",
     "direct_calls": [
       "httpkit.Deref",
       "httpkit.RawBody",
@@ -15209,7 +15209,7 @@
     "operation_id": "deleteBuildsMultiple",
     "state": "implemented",
     "contract": "Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.",
-    "handler": "internal/server/builds.go: artifactoryService.DeleteBuildsMultiple",
+    "handler": "internal/server/builds.go: artifactoryAPI.DeleteBuildsMultiple",
     "direct_calls": [
       "artgen.DeleteBuildsMultiple200TextResponse",
       "httpkit.Deref",
@@ -15236,7 +15236,7 @@
     "operation_id": "promoteBuild",
     "state": "implemented",
     "contract": "Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The body may use the vendor media type or application/json.",
-    "handler": "internal/server/builds.go: artifactoryService.PromoteBuild",
+    "handler": "internal/server/builds.go: artifactoryAPI.PromoteBuild",
     "direct_calls": [
       "apierror.New",
       "artgen.PromoteBuild200JSONResponse",
@@ -15276,7 +15276,7 @@
     "operation_id": "renameBuild",
     "state": "implemented",
     "contract": "Renames every run of a build. Needs deploy and delete permission on the build.",
-    "handler": "internal/server/builds.go: artifactoryService.RenameBuild",
+    "handler": "internal/server/builds.go: artifactoryAPI.RenameBuild",
     "direct_calls": [
       "apierror.New",
       "artgen.RenameBuild200TextResponse",
@@ -15307,7 +15307,7 @@
     "operation_id": "controlBuildRetention",
     "state": "implemented",
     "contract": "Discards the runs of a build that the settings do not keep, with their documents and, when asked, their artifacts. Needs delete permission on the build.",
-    "handler": "internal/server/builds.go: artifactoryService.ControlBuildRetention",
+    "handler": "internal/server/builds.go: artifactoryAPI.ControlBuildRetention",
     "direct_calls": [
       "context.WithoutCancel",
       "expression.Retention",
@@ -15410,7 +15410,7 @@
   {
     "route": "POST /artifactory/api/chef/{repoKey}/reindex",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/chef_routes.go: internal/server.artifactoryService.registerChefReindex.func1",
+    "handler": "internal/server/chef_routes.go: internal/server.artifactoryAPI.registerChefReindex.func1",
     "review_family": "native-chef",
     "effects": "resource mutation/action; see served contract and handler calls; index rebuild/possibly queued work; queue coalescing is not a replay guarantee",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -15681,7 +15681,7 @@
   {
     "route": "POST /artifactory/api/copy/{srcRepoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.copyItem-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.copyItem-fm",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -15742,7 +15742,7 @@
   {
     "route": "POST /artifactory/api/cran/{repoKey}/binaries",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.uploadCranBinary-fm",
+    "handler": "internal/server/server.go: internal/server.cranAPI.uploadCranBinary-fm",
     "review_family": "native-cran",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -15761,7 +15761,7 @@
   {
     "route": "POST /artifactory/api/cran/{repoKey}/sources",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.uploadCranSource-fm",
+    "handler": "internal/server/server.go: internal/server.cranAPI.uploadCranSource-fm",
     "review_family": "native-cran",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -15817,7 +15817,7 @@
     "operation_id": "createDebianSnapshot",
     "state": "implemented",
     "contract": "Captures signed Debian metadata for one distribution from a local, remote, virtual or federated repository in a local Debian target. Package files remain in the source repository. The snapshot client root is /artifactory/api/deb/{targetRepo}/snapshots/{tag}.",
-    "handler": "internal/server/debian_snapshot.go: artifactoryService.createDebianSnapshot",
+    "handler": "internal/server/debian_snapshot.go: debianAPI.createDebianSnapshot",
     "direct_calls": [
       "acc.File",
       "apierror.New",
@@ -16241,7 +16241,7 @@
     "operation_id": "calculateHelmChartIndex",
     "state": "implemented",
     "contract": "Queues a rebuild of the chart metadata index of a local or federated Helm repository. Chart archives are indexed; provenance files remain sidecars and are not index entries. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.",
-    "handler": "internal/server/reindex.go: artifactoryService.CalculateHelmChartIndex",
+    "handler": "internal/server/reindex.go: artifactoryAPI.CalculateHelmChartIndex",
     "direct_calls": [
       "artgen.CalculateHelmChartIndex200TextResponse",
       "s.Reindex"
@@ -16778,7 +16778,7 @@
   {
     "route": "POST /artifactory/api/maven/calculateMetadata/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.calculateMavenMetadata-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.calculateMavenMetadata-fm",
     "review_family": "native-maven",
     "effects": "resource mutation/action; see served contract and handler calls; index rebuild/possibly queued work; queue coalescing is not a replay guarantee",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16819,7 +16819,7 @@
   {
     "route": "POST /artifactory/api/maven/generatePom/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.generateMavenPom-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.generateMavenPom-fm",
     "review_family": "native-maven",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16877,7 +16877,7 @@
   {
     "route": "POST /artifactory/api/move/{srcRepoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.moveItem-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.moveItem-fm",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -16943,7 +16943,7 @@
     "operation_id": "calculateNpmRepositoryMetadata",
     "state": "implemented",
     "contract": "Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations, latest among them; a package none of whose tarballs carries latest gets it on the version that ranks highest, a release above every pre-release and then the higher SemVer, written as that tarball's npm.disttag=latest. Packuments and version manifests are then served from the rebuilt index. Package metadata is derived from the index, so a reindex rewrites index entries and properties, never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue under the repository's key and runs in the background; the 200, whose text is \"Recalculating index for npm repository \u003crepoKey\u003e scheduled to run\", says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.",
-    "handler": "internal/server/npm_operations.go: artifactoryService.CalculateNpmRepositoryMetadata",
+    "handler": "internal/server/npm_operations.go: npmAPI.CalculateNpmRepositoryMetadata",
     "direct_calls": [
       "artgen.CalculateNpmRepositoryMetadata200TextResponse",
       "s.Reindex"
@@ -17055,7 +17055,7 @@
   {
     "route": "POST /artifactory/api/puppet/{repoKey}/reindex",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/puppet_routes.go: internal/server.artifactoryService.registerPuppetMetadataRoutes.func2",
+    "handler": "internal/server/puppet_routes.go: internal/server.artifactoryAPI.registerPuppetMetadataRoutes.func2",
     "review_family": "native-puppet",
     "effects": "resource mutation/action; see served contract and handler calls; index rebuild/possibly queued work; queue coalescing is not a replay guarantee",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -17115,7 +17115,7 @@
     "operation_id": "calculatePypiRepositoryMetadata",
     "state": "implemented",
     "contract": "Rebuilds the package metadata index from distribution files in a local or federated PyPI repository. Requires Manage on the repository. With async=true the work is queued and the response returns immediately; with async=false or no async parameter, the response waits for the queued work to finish. Both modes return 200 with a plain-text acknowledgement. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.",
-    "handler": "internal/server/reindex.go: artifactoryService.CalculatePypiRepositoryMetadata",
+    "handler": "internal/server/reindex.go: artifactoryAPI.CalculatePypiRepositoryMetadata",
     "direct_calls": [
       "artgen.CalculatePypiRepositoryMetadata200TextResponse",
       "s.Reindex"
@@ -17250,7 +17250,7 @@
     "operation_id": "updateRepositoryConfiguration",
     "state": "implemented",
     "contract": "Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.",
-    "handler": "internal/server/repositories.go: artifactoryService.UpdateRepositoryConfiguration",
+    "handler": "internal/server/repositories.go: artifactoryAPI.UpdateRepositoryConfiguration",
     "direct_calls": [
       "artgen.UpdateRepositoryConfiguration200TextResponse",
       "errors.Is",
@@ -17484,7 +17484,7 @@
     "operation_id": "searchBuildArtifacts",
     "state": "implemented",
     "contract": "Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and either its number (or LATEST) or the status of its latest promotion; giving neither or both is a 400. repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Requires a named user, so anonymous callers get 401. Returns 404 when no file is found, whether the run is missing or the filters leave nothing.",
-    "handler": "internal/server/searches_builds.go: artifactoryService.SearchBuildArtifacts",
+    "handler": "internal/server/searches_builds.go: artifactoryAPI.SearchBuildArtifacts",
     "direct_calls": [
       "apierror.New",
       "httpkit.BadRequestf",
@@ -18032,7 +18032,7 @@
     "operation_id": "refreshStorageSummaryInfo",
     "state": "implemented",
     "contract": "Acknowledges a recalculation of the storage summary with 202. The summary is computed on every request, so there is nothing to recalculate. Admin only.",
-    "handler": "internal/server/storageinfo.go: artifactoryService.RefreshStorageSummaryInfo",
+    "handler": "internal/server/storageinfo.go: artifactoryAPI.RefreshStorageSummaryInfo",
     "direct_calls": [
       "artgen.RefreshStorageSummaryInfo202TextResponse",
       "httpkit.AdminOnly"
@@ -18305,7 +18305,7 @@
     "operation_id": "runGarbageCollection",
     "state": "implemented",
     "contract": "Deletes trash can items whose retention has expired, while the trash can is enabled, and then removes blobs no item references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes; the scheduled pass uses the same code.",
-    "handler": "internal/server/trash.go: artifactoryService.RunGarbageCollection",
+    "handler": "internal/server/trash.go: artifactoryAPI.RunGarbageCollection",
     "direct_calls": [
       "c.Run",
       "httpkit.AdminOnly",
@@ -18333,7 +18333,7 @@
     "operation_id": "optimizeSystemStorage",
     "state": "implemented",
     "contract": "Starts a repair pass on every blob mirror (decision 0028). Admin only. Returns a plain-text acknowledgement.",
-    "handler": "internal/server/storageinfo.go: artifactoryService.OptimizeSystemStorage",
+    "handler": "internal/server/storageinfo.go: artifactoryAPI.OptimizeSystemStorage",
     "direct_calls": [
       "artgen.OptimizeSystemStorage200TextResponse",
       "httpkit.AdminOnly",
@@ -18564,7 +18564,7 @@
     "operation_id": "calculateTerraformIndex",
     "state": "implemented",
     "contract": "Queues a rebuild of the package metadata index of a local or federated Terraform repository. The terraformType selects module or provider packages. Requires an administrator. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. Other package types, remote repositories, remote caches and virtual repositories are rejected with 400.",
-    "handler": "internal/server/reindex.go: artifactoryService.CalculateTerraformIndex",
+    "handler": "internal/server/reindex.go: artifactoryAPI.CalculateTerraformIndex",
     "direct_calls": [
       "artgen.CalculateTerraformIndex200TextResponse",
       "s.Reindex"
@@ -18590,7 +18590,7 @@
     "operation_id": "emptyTrashCan",
     "state": "implemented",
     "contract": "Permanently removes every trashed item. Admin only. Answers 202 because the deletion runs in the background; blobs are reclaimed by the next garbage collection pass.",
-    "handler": "internal/server/trash.go: artifactoryService.EmptyTrashCan",
+    "handler": "internal/server/trash.go: artifactoryAPI.EmptyTrashCan",
     "direct_calls": [
       "httpkit.Principal",
       "s.Content",
@@ -18616,7 +18616,7 @@
   {
     "route": "POST /artifactory/api/trash/restore/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.restoreTrashPath-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.restoreTrashPath-fm",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -18638,7 +18638,7 @@
     "operation_id": "restoreItemFromTrashCan",
     "state": "implemented",
     "contract": "Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers that hold Manage permission on the destination and also Delete or Manage permission on the original repository, both at fromPath and at the original path of every item restored. If any item below fromPath is not covered, nothing is restored and the answer is 400. Only an admin can restore items whose original repository no longer exists. The destination must be an existing local or federated repository, otherwise the answer is 400; a restore never creates one, so the content of a deleted repository is restored into a repository created for it first. Answers 202 with the plain-text message Successfully restored trash items.",
-    "handler": "internal/server/trash.go: artifactoryService.RestoreItemFromTrashCan",
+    "handler": "internal/server/trash.go: artifactoryAPI.RestoreItemFromTrashCan",
     "direct_calls": [
       "artgen.RestoreItemFromTrashCan202TextResponse",
       "s.restoreTrash"
@@ -18756,7 +18756,7 @@
     "operation_id": "migrateNpmRepositoryToStrictLayout",
     "state": "implemented",
     "contract": "Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with \"Enforce strict layout\" on, so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, with its properties, and indexed there. A tarball without a readable package.json is left where it is, and so is one whose canonical path already holds the same content, which needs no move. A tarball whose canonical path holds anything else, or whose move the repository refuses, as its release and snapshot handling may, is left where it is too, and the conversion fails naming it, after moving every other tarball; the queue retries a failed conversion and parks it once its retries run out, for resume to queue again. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. Answers 202 with no body.",
-    "handler": "internal/server/npm_operations.go: artifactoryService.MigrateNpmRepositoryToStrictLayout",
+    "handler": "internal/server/npm_operations.go: npmAPI.MigrateNpmRepositoryToStrictLayout",
     "direct_calls": [
       "s.Enqueue",
       "s.npmOperation"
@@ -18782,7 +18782,7 @@
     "operation_id": "resumeNpmRepositoryMigration",
     "state": "implemented",
     "contract": "Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. A conversion cannot be cancelled, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. Answers 202 with no body.",
-    "handler": "internal/server/npm_operations.go: artifactoryService.ResumeNpmRepositoryMigration",
+    "handler": "internal/server/npm_operations.go: npmAPI.ResumeNpmRepositoryMigration",
     "direct_calls": [
       "errors.Is",
       "httpkit.BadRequestf",
@@ -18964,7 +18964,7 @@
     "operation_id": "updateMultipleRepositories",
     "state": "implemented",
     "contract": "Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.",
-    "handler": "internal/server/repositories.go: artifactoryService.UpdateMultipleRepositories",
+    "handler": "internal/server/repositories.go: artifactoryAPI.UpdateMultipleRepositories",
     "direct_calls": [
       "artgen.UpdateMultipleRepositories200JSONResponse",
       "errors.Is",
@@ -19111,7 +19111,7 @@
   {
     "route": "POST /artifactory/api/zap/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.zapCache-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.zapCache-fm",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
@@ -20612,7 +20612,7 @@
     "operation_id": "uploadBuild",
     "state": "implemented",
     "contract": "Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.",
-    "handler": "internal/server/builds.go: artifactoryService.UploadBuild",
+    "handler": "internal/server/builds.go: artifactoryAPI.UploadBuild",
     "direct_calls": [
       "httpkit.Deref",
       "httpkit.RawBody",
@@ -21448,7 +21448,7 @@
     "operation_id": "createRepository",
     "state": "implemented",
     "contract": "Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.",
-    "handler": "internal/server/repositories.go: artifactoryService.CreateRepository",
+    "handler": "internal/server/repositories.go: artifactoryAPI.CreateRepository",
     "direct_calls": [
       "artgen.CreateRepository200TextResponse",
       "errors.Is",
@@ -21724,7 +21724,7 @@
   {
     "route": "PUT /artifactory/api/storage/{repoKey}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.setProperties-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.setProperties-fm",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21743,7 +21743,7 @@
   {
     "route": "PUT /artifactory/api/storage/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.setProperties-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.setProperties-fm",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -21929,7 +21929,7 @@
     "operation_id": "createMultipleRepositories",
     "state": "implemented",
     "contract": "Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.",
-    "handler": "internal/server/repositories.go: artifactoryService.CreateMultipleRepositories",
+    "handler": "internal/server/repositories.go: artifactoryAPI.CreateMultipleRepositories",
     "direct_calls": [
       "apierror.New",
       "artgen.CreateMultipleRepositories201TextResponse",
@@ -22001,7 +22001,7 @@
   {
     "route": "PUT /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.deployItem-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.deployItem-fm",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
@@ -22020,7 +22020,7 @@
   {
     "route": "PUT /artifactory/{repoKey:(?:[^a/][^/]*|a(?:[^p/][^/]*)?|ap(?:[^i/][^/]*)?|api[^/]+)}/{filePath}",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/server/server.go: internal/server.artifactoryService.deployItem-fm",
+    "handler": "internal/server/server.go: internal/server.artifactoryAPI.deployItem-fm",
     "review_family": "content-and-configuration",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",

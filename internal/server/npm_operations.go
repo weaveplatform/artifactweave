@@ -14,6 +14,11 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
+// npmAPI is the npm ecosystem's partial strict server: the repository
+// metadata and strict-layout operations and the npm auth documents, over
+// the item kit.
+type npmAPI struct{ *itemkit.Kit }
+
 // The JFrog operations on an npm local repository's index: the reindex and
 // the strict-layout conversion with its resume (decision 0034). Each needs
 // Manage on the repository ("From version 4.8 only requires the set of
@@ -26,14 +31,14 @@ import (
 // npmOperation resolves the repository an npm operation names and checks
 // it as the reindex does: 404 when there is none, 401 or 403 to a caller
 // without Manage on it, and 400 for a repository that is no npm local one.
-func (s artifactoryService) npmOperation(
+func (s npmAPI) npmOperation(
 	ctx context.Context,
 	key string,
 ) (store.Store, repo.Config, string, error) {
 	return s.OperationRepo(ctx, repo.NPM, itemkit.ReindexOps[repo.NPM], key)
 }
 
-func (s artifactoryService) CalculateNpmRepositoryMetadata(
+func (s npmAPI) CalculateNpmRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateNpmRepositoryMetadataRequestObject,
 ) (artgen.CalculateNpmRepositoryMetadataResponseObject, error) {
@@ -44,7 +49,7 @@ func (s artifactoryService) CalculateNpmRepositoryMetadata(
 	return artgen.CalculateNpmRepositoryMetadata200TextResponse(msg), nil
 }
 
-func (s artifactoryService) MigrateNpmRepositoryToStrictLayout(
+func (s npmAPI) MigrateNpmRepositoryToStrictLayout(
 	ctx context.Context,
 	req artgen.MigrateNpmRepositoryToStrictLayoutRequestObject,
 ) (artgen.MigrateNpmRepositoryToStrictLayoutResponseObject, error) {
@@ -62,7 +67,7 @@ func (s artifactoryService) MigrateNpmRepositoryToStrictLayout(
 // parked once its retries ran out. A conversion cannot be cancelled, so
 // that is the only one to resume; any other answers 400. [I] 7.x's answer
 // then is unknown (#216).
-func (s artifactoryService) ResumeNpmRepositoryMigration(
+func (s npmAPI) ResumeNpmRepositoryMigration(
 	ctx context.Context,
 	req artgen.ResumeNpmRepositoryMigrationRequestObject,
 ) (artgen.ResumeNpmRepositoryMigrationResponseObject, error) {

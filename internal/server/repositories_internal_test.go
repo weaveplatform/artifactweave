@@ -27,7 +27,7 @@ func TestAccRepositoriesWithoutStore(t *testing.T) {
 		}
 	}
 	ctx := kernel.WithPrincipal(context.Background(), kernel.Principal{Name: "admin", Admin: true})
-	svc := newArtifactoryService(Config{})
+	svc := newArtifactoryAPI(Config{})
 	if _, err := svc.Content(); err == nil {
 		t.Fatal("content without a store")
 	}
@@ -80,7 +80,7 @@ func TestAccHandlersCalledDirectly(t *testing.T) {
 		Create(ctx, *repo.Defaults(&repo.Config{Key: "a", Class: repo.Local})); err != nil {
 		t.Fatal(err)
 	}
-	svc := newArtifactoryService(Config{Store: db})
+	svc := newArtifactoryAPI(Config{Store: db})
 	if _, err := svc.GetRepositoriesByTypeAndProject(
 		ctx,
 		artgen.GetRepositoriesByTypeAndProjectRequestObject{},

@@ -27,8 +27,9 @@ const debianIndexLimit = 64 << 20
 
 var errDebianIndexTooLarge = errors.New("server: debian Packages index exceeds limit")
 
-// debianAPI serves Debian's indexes and virtual repositories over the item
-// kit.
+// debianAPI is the Debian ecosystem's partial strict server: the metadata
+// and snapshot operations, the snapshot routes, and the item overlay that
+// serves Debian's indexes and virtual repositories, over the item kit.
 type debianAPI struct{ *itemkit.Kit }
 
 // tryDebianItem ensures a Packages index is never returned to a caller who

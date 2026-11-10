@@ -19,17 +19,28 @@ import (
 // operation sit at the same depth, which makes the method ambiguous and
 // fails the assertion below: the intended guard against a duplicate
 // implementation. A partial never embeds the stubs or another partial, and
-// state a partial embeds (accessState) defines no method named after an
-// operation, or it would collide with the stub at depth 2.
+// state a partial embeds (accessState, itemkit.Kit) defines no method named
+// after an operation, or it would collide with the stub at depth 2.
 
 // artifactoryStubs holds the artifactory spec's generated stubs.
 type artifactoryStubs struct{ artgen.UnimplementedStrict }
 
-// artifactoryServer is the artifactory spec's strict server.
+// artifactoryServer is the artifactory spec's strict server: the access
+// module's security operations, the system operations, the artifacts
+// module's operations, and those of each ecosystem that owns some (VCS,
+// npm, Docker, Debian, CRAN and RPM). Every artifacts and ecosystem partial
+// embeds the same item kit, whose methods sit at depth 2 beside the stubs
+// and are named after no operation.
 type artifactoryServer struct {
 	*accesshttp.SecurityAPI
 	*systemAPI
-	*artifactoryService
+	*artifactoryAPI
+	*vcsAPI
+	*npmAPI
+	*dockerAPI
+	*debianAPI
+	*cranAPI
+	*rpmAPI
 	artifactoryStubs
 }
 

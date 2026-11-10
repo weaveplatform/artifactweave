@@ -141,7 +141,7 @@ func isRepositoryUpdate(path string) bool {
 }
 
 // readerFor returns the principal of a read and what it may read.
-func (s artifactoryService) readerFor(
+func (s artifactoryAPI) readerFor(
 	ctx context.Context,
 	st store.Store,
 ) (kernel.Principal, func(repo.Config) bool, error) {
@@ -157,7 +157,7 @@ func (s artifactoryService) readerFor(
 	return p, acc.Visible, nil
 }
 
-func (s artifactoryService) GetRepositoriesByTypeAndProject(
+func (s artifactoryAPI) GetRepositoriesByTypeAndProject(
 	ctx context.Context,
 	req artgen.GetRepositoriesByTypeAndProjectRequestObject,
 ) (artgen.GetRepositoriesByTypeAndProjectResponseObject, error) {
@@ -215,7 +215,7 @@ func (s artifactoryService) GetRepositoriesByTypeAndProject(
 	return out, nil
 }
 
-func (s artifactoryService) GetAllRepositoryConfigurations(
+func (s artifactoryAPI) GetAllRepositoryConfigurations(
 	ctx context.Context,
 	req artgen.GetAllRepositoryConfigurationsRequestObject,
 ) (artgen.GetAllRepositoryConfigurationsResponseObject, error) {
@@ -282,7 +282,7 @@ func commaSet(v *string) set {
 
 func (s set) has(v string) bool { return len(s) == 0 || s[strings.ToLower(v)] }
 
-func (s artifactoryService) CheckIfRepositoryExists(
+func (s artifactoryAPI) CheckIfRepositoryExists(
 	ctx context.Context,
 	req artgen.CheckIfRepositoryExistsRequestObject,
 ) (artgen.CheckIfRepositoryExistsResponseObject, error) {
@@ -333,7 +333,7 @@ func (s artifactoryService) CheckIfRepositoryExists(
 }
 
 // readOne returns the configuration of key as p may see it.
-func (s artifactoryService) readOne(
+func (s artifactoryAPI) readOne(
 	ctx context.Context,
 	key string,
 ) (kernel.Principal, repo.Config, error) {
@@ -357,7 +357,7 @@ func (s artifactoryService) readOne(
 	return p, itemkit.View(p, c), nil
 }
 
-func (s artifactoryService) GetRepositoryConfiguration(
+func (s artifactoryAPI) GetRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.GetRepositoryConfigurationRequestObject,
 ) (artgen.GetRepositoryConfigurationResponseObject, error) {
@@ -368,7 +368,7 @@ func (s artifactoryService) GetRepositoryConfiguration(
 	return configResponse(ctx, c), nil
 }
 
-func (s artifactoryService) GetRepositoryConfigurationV2(
+func (s artifactoryAPI) GetRepositoryConfigurationV2(
 	ctx context.Context,
 	req artgen.GetRepositoryConfigurationV2RequestObject,
 ) (artgen.GetRepositoryConfigurationV2ResponseObject, error) {
@@ -433,7 +433,7 @@ var sharedFields = []string{
 	"remoteRepoLayoutRef", "includesPattern", "excludesPattern",
 }
 
-func (s artifactoryService) GetRemoteRepositoryConfiguration(
+func (s artifactoryAPI) GetRemoteRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.GetRemoteRepositoryConfigurationRequestObject,
 ) (artgen.GetRemoteRepositoryConfigurationResponseObject, error) {
@@ -497,7 +497,7 @@ func (r sharedRemoteResponse) VisitGetRemoteRepositoryConfigurationResponse(
 	return json.NewEncoder(w).Encode(r.fields) //nolint:wrapcheck // the strict server logs it
 }
 
-func (s artifactoryService) GetBatchOfRepositoriesByName(
+func (s artifactoryAPI) GetBatchOfRepositoriesByName(
 	ctx context.Context,
 	req artgen.GetBatchOfRepositoriesByNameRequestObject,
 ) (artgen.GetBatchOfRepositoriesByNameResponseObject, error) {
@@ -563,7 +563,7 @@ func requestConfigs(bodies ...*[]repo.Config) []repo.Config {
 	return nil
 }
 
-func (s artifactoryService) CreateRepository(
+func (s artifactoryAPI) CreateRepository(
 	ctx context.Context,
 	req artgen.CreateRepositoryRequestObject,
 ) (artgen.CreateRepositoryResponseObject, error) {
@@ -614,7 +614,7 @@ func (s artifactoryService) CreateRepository(
 	), nil
 }
 
-func (s artifactoryService) CreateMultipleRepositories(
+func (s artifactoryAPI) CreateMultipleRepositories(
 	ctx context.Context,
 	req artgen.CreateMultipleRepositoriesRequestObject,
 ) (artgen.CreateMultipleRepositoriesResponseObject, error) {
@@ -717,7 +717,7 @@ func updateBody(ctx context.Context, decoded any) ([]byte, error) {
 	return b, nil
 }
 
-func (s artifactoryService) UpdateRepositoryConfiguration(
+func (s artifactoryAPI) UpdateRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.UpdateRepositoryConfigurationRequestObject,
 ) (artgen.UpdateRepositoryConfigurationResponseObject, error) {
@@ -769,7 +769,7 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 // same index, in one transaction, with the reindex an update owes its
 // repository (repos.OwesReindex), which is then asked for exactly when the
 // update commits.
-func (s artifactoryService) writeUpdates(
+func (s artifactoryAPI) writeUpdates(
 	ctx context.Context,
 	st store.Store,
 	stored, updated []repo.Config,
@@ -800,7 +800,7 @@ func (s artifactoryService) writeUpdates(
 // checkReferences rejects an updated configuration whose signing key
 // pairs, environments or (for a virtual repository) members do not exist,
 // and rewrites its environments to their stored spelling.
-func (s artifactoryService) checkReferences(
+func (s artifactoryAPI) checkReferences(
 	ctx context.Context,
 	st store.Store,
 	c *repo.Config,
@@ -824,7 +824,7 @@ func (s artifactoryService) checkReferences(
 	return nil
 }
 
-func (s artifactoryService) UpdateMultipleRepositories(
+func (s artifactoryAPI) UpdateMultipleRepositories(
 	ctx context.Context,
 	req artgen.UpdateMultipleRepositoriesRequestObject,
 ) (artgen.UpdateMultipleRepositoriesResponseObject, error) {
@@ -933,7 +933,7 @@ func failFast403(msg string) artgen.DeleteRepositories403JSONResponse {
 	return artgen.DeleteRepositories403JSONResponse(body)
 }
 
-func (s artifactoryService) DeleteRepository(
+func (s artifactoryAPI) DeleteRepository(
 	ctx context.Context,
 	req artgen.DeleteRepositoryRequestObject,
 ) (artgen.DeleteRepositoryResponseObject, error) {
@@ -975,7 +975,7 @@ func (s artifactoryService) DeleteRepository(
 	return artgen.DeleteRepository200JSONResponse(removed(key, files)), nil
 }
 
-func (s artifactoryService) DeleteRepositories(
+func (s artifactoryAPI) DeleteRepositories(
 	ctx context.Context,
 	req artgen.DeleteRepositoriesRequestObject,
 ) (artgen.DeleteRepositoriesResponseObject, error) {

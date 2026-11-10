@@ -344,7 +344,7 @@ func npmAccounts(cfg Config) npmhttp.Accounts {
 // interface, which would leave the token endpoint registered with nothing to
 // sign: cfg.Access holds nil interfaces, never typed nils, and a nil
 // interface converts to a nil one, so they are assigned as they are.
-func newRegistry(cfg Config, artSvc artifactoryService) *dockerhttp.Registry {
+func newRegistry(cfg Config, kit *itemkit.Kit) *dockerhttp.Registry {
 	o := dockerhttp.Options{
 		Sources:        cfg.RegistrySources,
 		Store:          cfg.Store,
@@ -365,14 +365,14 @@ func newRegistry(cfg Config, artSvc artifactoryService) *dockerhttp.Registry {
 		// when the repository says so (decision 0029), and counted.
 		ServeBlob: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {
 			p, _ := kernel.FromContext(r.Context())
-			artSvc.ServeFile(w, r, cfg.Store, itemkit.Found{Repo: c, Item: it}, p)
+			kit.ServeFile(w, r, cfg.Store, itemkit.Found{Repo: c, Item: it}, p)
 		},
 		// A manifest at or above the minimum size redirects too, as on 7.x
 		// (RTFACT-29705), carrying its media type to the object store.
 		RedirectManifest: func(
 			w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item, mediaType string,
 		) bool {
-			return artSvc.RedirectManifest(
+			return kit.RedirectManifest(
 				w,
 				r,
 				cfg.Store,
@@ -486,11 +486,12 @@ func newKit(cfg Config) *itemkit.Kit {
 	return itemkit.New(d)
 }
 
-// newArtifactoryService returns the artifacts service over cfg with its own
-// item kit. Every service is built here: a literal without a kit compiles
-// and then panics on its first kit call.
-func newArtifactoryService(cfg Config) artifactoryService {
-	return artifactoryService{
+// newArtifactoryAPI returns the artifacts partial over cfg with its own item
+// kit, which New hands to the ecosystem partials as well. Every artifacts
+// partial is built here: a literal without a kit compiles and then panics
+// on its first kit call.
+func newArtifactoryAPI(cfg Config) artifactoryAPI {
+	return artifactoryAPI{
 		Kit: newKit(cfg),
 		cfg: cfg,
 		folderSlots: make(
@@ -513,7 +514,16 @@ func New(cfg Config) http.Handler {
 		logger = slog.Default()
 	}
 	r := chi.NewRouter()
-	artSvc := newArtifactoryService(cfg)
+	artAPI := newArtifactoryAPI(cfg)
+	// Every partial embeds the kit newArtifactoryAPI built, so the routes of
+	// the whole spec share one set of overlays and one redirect throttle.
+	kit := artAPI.Kit
+	vcsOps := vcsAPI{kit}
+	npmOps := npmAPI{kit}
+	dockerOps := dockerAPI{kit}
+	debianOps := debianAPI{kit}
+	cranOps := cranAPI{Kit: kit, archiveMoverEnabled: cfg.CranArchiveMoverEnabled}
+	rpmOps := rpmAPI{kit}
 	sysAPI := systemAPI{cfg: cfg, instanceID: new(atomic.Pointer[string])}
 	accessHTTP := accesshttp.New(accesshttp.Deps{
 		API:           cfg.Access,
@@ -534,7 +544,7 @@ func New(cfg Config) http.Handler {
 	slashes := maps.Clone(slashCollections)
 	maps.Copy(slashes, accesshttp.SlashCollections())
 	// The registry exists before the middleware, whose challenge it writes.
-	registry := newRegistry(cfg, artSvc)
+	registry := newRegistry(cfg, kit)
 	r.Use(
 		httpkit.ErrorProfiles(errorProfileRules),
 		middleware.RequestID,
@@ -552,7 +562,7 @@ func New(cfg Config) http.Handler {
 	)
 	limits := newLimitOptions(cfg.RequestLimits)
 	if cfg.RequestLimits != nil {
-		r.Use(artSvc.limitIngress(limits))
+		r.Use(artAPI.limitIngress(limits))
 	}
 	mounted := make([]pkgroute.Protocol, 0, len(protocols)+len(cfg.Protocols))
 	for _, p := range protocols {
@@ -579,9 +589,9 @@ func New(cfg Config) http.Handler {
 		r.Use(accessHTTP.CheckAPIRestriction(healthRequest, writeLimitError))
 	}
 	if cfg.RequestLimits != nil {
-		r.Use(artSvc.limitPrincipal(limits))
+		r.Use(artAPI.limitPrincipal(limits))
 	}
-	r.Use(artSvc.helmPartialReindex)
+	r.Use(artAPI.helmPartialReindex)
 	r.NotFound(notFound)
 	r.MethodNotAllowed(methodNotAllowed)
 
@@ -600,24 +610,34 @@ func New(cfg Config) http.Handler {
 	r.Get("/router/api/v1/system/readiness", sysAPI.readiness(systemAPI.probeArtifactory))
 	r.Get("/router/api/v1/system/liveness", liveness)
 	r.Get("/router/api/v1/system/health", sysAPI.routerHealth)
-	r.Get("/artifactory/api/artifactweave/remote-status/{repoKey}", artSvc.smartStatus)
+	r.Get("/artifactory/api/artifactweave/remote-status/{repoKey}", artAPI.smartStatus)
 	r.With(middleware.BodyLimit(managementBodyLimit)).
-		Patch("/artifactory/api/system/configuration", artSvc.patchConfiguration)
-	artSvc.registerItemRoutes(r)
-	artSvc.registerStorageRoutes(r)
-	artSvc.registerTrashRoutes(r)
-	artSvc.registerMultipartRoutes(r)
+		Patch("/artifactory/api/system/configuration", artAPI.patchConfiguration)
+	// The item routes and the handwritten routes beside them keep their
+	// original order (item paths, AQL, agent marketplace, CRAN uploads,
+	// transfer, Debian snapshots), and all run before
+	// registerHandwrittenStubs: each claims the pattern the spec derives,
+	// so it replaces the 501 stub registered under that pattern rather than
+	// sitting beside it (decision 0002).
+	artAPI.registerItemRoutes(r)
+	artAPI.registerAgentMarketplaceRoutes(r)
+	cranOps.registerCranRoutes(r)
+	artAPI.registerTransferRoutes(r)
+	debianOps.registerDebianSnapshotRoutes(r)
+	artAPI.registerStorageRoutes(r)
+	artAPI.registerTrashRoutes(r)
+	artAPI.registerMultipartRoutes(r)
 	r.With(middleware.BodyLimit(managementBodyLimit)).Group(accessHTTP.RegisterRoutes)
-	artSvc.registerSearchRoutes(r)
-	artSvc.registerMavenRoutes(r)
+	artAPI.registerSearchRoutes(r)
+	artAPI.registerMavenRoutes(r)
 	// GitLab subgroup owners span path segments; the generated VCS routes
 	// handle the ordinary one-segment forms.
-	r.Get("/artifactory/api/vcs/*", artSvc.vcsNested)
+	r.Get("/artifactory/api/vcs/*", vcsOps.vcsNested)
 	registry.Register(r)
 	terraformbackendhttp.Register(
 		r,
 		terraformbackendhttp.Options{
-			Items:        artSvc.Items(cfg.Store),
+			Items:        artAPI.Items(cfg.Store),
 			Keys:         cfg.Keys,
 			Fault:        func(r *http.Request, err error) { httpkit.NoteCause(r.Context(), err) },
 			Authorizer:   cfg.Access.Authorizer,
@@ -626,7 +646,7 @@ func New(cfg Config) http.Handler {
 		},
 	)
 	for _, p := range mounted {
-		pkgroute.Mount(r, artSvc.protocolOptions(), p)
+		pkgroute.Mount(r, artAPI.protocolOptions(), p)
 	}
 
 	// Products artifactweave does not implement. 501 names the product;
@@ -650,9 +670,15 @@ func New(cfg Config) http.Handler {
 		}
 		artgen.HandlerWithOptions(
 			artgen.NewStrictHandlerWithOptions(artifactoryServer{
-				SecurityAPI:        accessHTTP.Security,
-				systemAPI:          &sysAPI,
-				artifactoryService: &artSvc,
+				SecurityAPI:    accessHTTP.Security,
+				systemAPI:      &sysAPI,
+				artifactoryAPI: &artAPI,
+				vcsAPI:         &vcsOps,
+				npmAPI:         &npmOps,
+				dockerAPI:      &dockerOps,
+				debianAPI:      &debianOps,
+				cranAPI:        &cranOps,
+				rpmAPI:         &rpmOps,
 			}, nil, strictOpts),
 			artgen.ChiServerOptions{
 				BaseURL:          "/artifactory",
@@ -742,9 +768,9 @@ func New(cfg Config) http.Handler {
 		)
 	})
 
-	artSvc.registerPypiMetadataRoutes(r)
-	artSvc.registerPuppetMetadataRoutes(r)
-	artSvc.registerChefReindex(r)
+	artAPI.registerPypiMetadataRoutes(r)
+	artAPI.registerPuppetMetadataRoutes(r)
+	artAPI.registerChefReindex(r)
 
 	// Last, so every real handler above has already claimed its pattern.
 	registerHandwrittenStubs(r, logger)

@@ -56,7 +56,7 @@ func noProperties() error {
 // derives from the spec, replacing their 501 stubs. The bare /{repoKey}
 // form adds the repository root, which the spec addresses with an empty
 // item path.
-func (s artifactoryService) registerStorageRoutes(r chi.Router) {
+func (s artifactoryAPI) registerStorageRoutes(r chi.Router) {
 	for _, p := range append(httpkit.ChiPatterns(storagePrefix+"{repoKey}/{itemPath}"), storagePrefix+"{repoKey}") {
 		r.Get(p, s.getStorage)
 		r.Put(p, s.setProperties)
@@ -138,7 +138,7 @@ func storageMode(q url.Values) (string, error) {
 // storageView is one storage request: the repository as the client named
 // it, the resolved configuration, and what the caller may do.
 type storageView struct {
-	s        artifactoryService
+	s        artifactoryAPI
 	st       store.Store
 	key      string
 	path     string
@@ -263,7 +263,7 @@ func (v storageView) below(ctx context.Context, folder string, deep bool) ([]typ
 
 // getStorage answers GET /api/storage/{repo}/{path}: file or folder info,
 // or the view one mode parameter selects.
-func (s artifactoryService) getStorage(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	v, p, q, err := s.storageRequest(r, storagePrefix)
 	if err != nil {
@@ -336,7 +336,7 @@ func (s artifactoryService) getStorage(w http.ResponseWriter, r *http.Request) {
 
 // storageRequest parses a storage or metadata request and resolves its
 // repository and caller.
-func (s artifactoryService) storageRequest(
+func (s artifactoryAPI) storageRequest(
 	r *http.Request,
 	prefix string,
 ) (storageView, kernel.Principal, url.Values, error) {
@@ -664,7 +664,7 @@ type propertyEdit struct {
 }
 
 // setProperties answers PUT /api/storage/{repo}/{path}?properties=k=v;k2=v2.
-func (s artifactoryService) setProperties(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) setProperties(w http.ResponseWriter, r *http.Request) {
 	s.editProperties(w, r, storagePrefix, "recursive", func(q url.Values) (propertyEdit, error) {
 		props, err := parseProperties(q.Get("properties"))
 		return propertyEdit{set: props}, err
@@ -676,7 +676,7 @@ func (s artifactoryService) setProperties(w http.ResponseWriter, r *http.Request
 // jf rt delete-props accepts only 204: the CLI tolerates the "No properties
 // could be found" 404 when it reads properties, never on a delete
 // (research 09).
-func (s artifactoryService) deleteProperties(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) deleteProperties(w http.ResponseWriter, r *http.Request) {
 	s.editProperties(w, r, storagePrefix, "recursive", func(q url.Values) (propertyEdit, error) {
 		var keys []string
 		for _, k := range pkgroute.SplitValues(q.Get("properties")) {
@@ -697,7 +697,7 @@ func (s artifactoryService) deleteProperties(w http.ResponseWriter, r *http.Requ
 // key; stats is merged into a file's download statistics. Either may be left
 // out, not both. The edit is always applied in one transaction, so
 // atomicProperties=0 behaves like 1.
-func (s artifactoryService) patchMetadata(w http.ResponseWriter, r *http.Request) {
+func (s artifactoryAPI) patchMetadata(w http.ResponseWriter, r *http.Request) {
 	s.editProperties(
 		w,
 		r,
@@ -715,7 +715,7 @@ func (s artifactoryService) patchMetadata(w http.ResponseWriter, r *http.Request
 // remote caches hold editable properties. The repository root is edited too:
 // its record is made by the first edit that sets a key, and an edit that only
 // removes keys from a root without one has nothing to remove.
-func (s artifactoryService) editProperties(
+func (s artifactoryAPI) editProperties(
 	w http.ResponseWriter,
 	r *http.Request,
 	prefix, recursiveParam string,
@@ -814,7 +814,7 @@ func (s artifactoryService) editProperties(
 // the root its record, made first when create is set. ok is false for a root
 // without a record, which the edit passes over; the item returned is then
 // the root, so a recursive edit still reaches everything below it.
-func (s artifactoryService) editTarget(
+func (s artifactoryAPI) editTarget(
 	ctx context.Context,
 	v storageView,
 	cached, create bool,

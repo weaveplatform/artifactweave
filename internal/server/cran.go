@@ -41,14 +41,21 @@ type cranCandidate struct {
 	pkg  cran.Package
 }
 
-// cranAPI serves CRAN's indexes and packages over the item kit.
-type cranAPI struct{ *itemkit.Kit }
+// cranAPI is the CRAN ecosystem's partial strict server: the archive
+// migration operation, the source and binary upload routes, and the item
+// overlay that serves CRAN's indexes and packages, over the item kit.
+type cranAPI struct {
+	*itemkit.Kit
+	// archiveMoverEnabled is Config.CranArchiveMoverEnabled: while it is
+	// off, MoveCranArchives answers 404, as the legacy mover is opt-in.
+	archiveMoverEnabled bool
+}
 
 func tryCranItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st store.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
-	s := cranAPI{k}
+	s := cranAPI{Kit: k}
 	if !cran.Serves(c.PackageType) || req.IsFolder {
 		return false
 	}

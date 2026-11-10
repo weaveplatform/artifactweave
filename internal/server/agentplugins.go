@@ -15,7 +15,14 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func (s artifactoryService) getAgentMarketplace(w http.ResponseWriter, r *http.Request) {
+// registerAgentMarketplaceRoutes serves the agent plugin marketplace
+// documents. HEAD shares the GET handler, as on the item paths.
+func (s artifactoryAPI) registerAgentMarketplaceRoutes(r chi.Router) {
+	r.Get("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
+	r.Head("/artifactory/api/agentplugins/{repoKey}/{marketplace}", s.getAgentMarketplace)
+}
+
+func (s artifactoryAPI) getAgentMarketplace(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.Content()
 	if err != nil {

@@ -233,10 +233,16 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	// The artifactory spec's operations are split over partials
 	// (composites.go); each receiver keys its handlers by its spec.
 	specOf := map[string]string{
-		"artifactoryService": "artifactory",
-		"SecurityAPI":        "artifactory",
-		"systemAPI":          "artifactory",
-		"AccessService":      "access",
+		"artifactoryAPI": "artifactory",
+		"vcsAPI":         "artifactory",
+		"npmAPI":         "artifactory",
+		"dockerAPI":      "artifactory",
+		"debianAPI":      "artifactory",
+		"cranAPI":        "artifactory",
+		"rpmAPI":         "artifactory",
+		"SecurityAPI":    "artifactory",
+		"systemAPI":      "artifactory",
+		"AccessService":  "access",
 	}
 	out := map[string]apiReviewHandler{}
 	for _, file := range files {
