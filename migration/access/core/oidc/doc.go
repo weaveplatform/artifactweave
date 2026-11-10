@@ -12,9 +12,8 @@
 // adapter serves the provider, mapping and exchange operations through
 // Service; no other module calls it. A subject token is verified through
 // core/idtoken and the access token issued through core/token. The package
-// imports the standard library, the kernel, platform/configdoc, the
-// module's core/idtoken and core/token, and pkg/types for scopes and the
-// configuration document kinds.
+// imports the standard library, the kernel, platform/configdoc and the
+// module's core/idtoken and core/token.
 //
 // # Inputs
 //

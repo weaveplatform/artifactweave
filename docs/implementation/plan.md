@@ -218,7 +218,7 @@ Decisions: [0001](../research/decisions/0001-mirror-the-jfrog-api-surface.md),
 4. `migration/app/config`: strict app YAML, flag > env > file precedence, unknown keys rejected, `config validate`.
 5. `migration/app/router.go`: chi router, request id, slog access log, recovery, body limits, the per-surface errors table, the base-URL resolver middleware, content-type normalisation for `+json` vendor types and `application/yaml`.
 6. `api/*.openapi.yaml` skeletons with `GET /artifactory/api/system/{ping,version,license}`, `GET /artifactory/api/v1/system/{readiness,liveness}`, `GET /access/api/v1/system/{ping,version}`, `GET /router/api/v1/system/health`, `POST /artifactory/api/system/usage`, `POST /jfconnect/api/v1/backoffice/metrics/log`; `make generate` and the drift check; `TestAccOpenAPIFieldDescriptions`; `TestAccHandwrittenRoutesNotGenerated`.
-7. `internal/layout` import-tier test.
+7. `migration/layout` import-tier test.
 8. `test/acceptance` skeleton: godog, `-cover` binary, pinned tool binaries (`jf`, `terraform`), the Linux `acceptance` job added to the coverage and gate `needs`; `test/terraform` with a pre-populated provider mirror.
 9. `docs/security/threat-model.md` skeleton (done), `docs/operations/*` skeletons (done).
 10. Parity oracle: `migration/devtools/specoracle` and `tools/specoracle` cache JFrog's embedded OpenAPI blocks under the gitignored `.specoracle/`, compare them with `api/*.openapi.yaml`, and `TestAccSpecParity` holds `api/parity-baseline.json` as the accepted-gap list; the `parity` CI job runs it ([research 01](../research/01-jfrog-api-landscape.md#parity-oracle)).
@@ -264,7 +264,7 @@ features before any store is written.
    states presence, defaults, server ownership and create/update rules; these are the
    behavioural contract the handlers implement. Families outside P1's initial schema
    boundary received only 501/404 stubs; their delivery is now owned by P13–P41.
-5. ~~`pkg/types` with `x-go-type` bindings for every entity~~ **Moved to P2 task 1
+5. ~~Domain types with `x-go-type` bindings for every entity~~ **Moved to P2 task 1
    (correction, 2026-10-13).** Binding every wire schema to a domain type contradicts
    [decision 0020](../research/decisions/0020-domain-model.md), which keeps one internal
    representation per entity with converters to the legacy, Access and YAML wire
@@ -368,12 +368,12 @@ Decisions: [0004](../research/decisions/0004-storage-sql-metadata-and-blobs.md),
 [0017](../research/decisions/0017-sealed-columns-and-master-key.md).
 
 **Tasks**
-0. `pkg/types`: the internal domain types for every entity in
-   [research 15](../research/15-data-model.md) section 2, with converters to and from
+0. Domain types (each module's `core/model`): the internal domain types for every entity
+   in [research 15](../research/15-data-model.md) section 2, with converters to and from
    the generated wire models (`migration/platform/gen`) and table-driven round-trip tests
    per wire form (legacy, Access, YAML descriptor). Written and reviewed before task 1
    so the store contracts are expressed in these types.
-1. `pkg/store` contracts (`Repos`, `Items`, `Properties`, `Stats`, `Principals`, `Groups`, `Permissions`, `Tokens`, `Projects`, `Webhooks`, `Policies`, `Runs`, `Packages`) with `Tx`, sentinel errors and keyset cursors; `migration/app/adapters/inmem`.
+1. Store contracts in each module's `core/port` (`Repos`, `Items`, `Properties`, `Stats`, `Principals`, `Groups`, `Permissions`, `Tokens`, `Projects`, `Webhooks`, `Policies`, `Runs`, `Packages`) with `Tx`, sentinel errors and keyset cursors; `migration/app/adapters/inmem`.
 2. `migration/app/adapters/sql` dialect layer; `sqlite` (modernc, WAL, single writer) and `postgres` (pgx stdlib); embedded migrations; `artifactweave migrate up|down|version`.
 3. `migration/platform/blob` contract: `BeginUpload / Append / Commit(digest) / Abort`, `Open` returning `io.ReadSeekCloser`, `PresignGet`, `Delete`, `Stat`; `fs` backend (temp dir per upload id, rename on commit) and `s3` backend (multipart upload id persisted through the store, path-style option for MinIO); checksum index by sha256, sha1 and md5.
 4. `migration/platform/crypt`: keyring, sealed columns with purpose and row AAD, `artifactweave keys rotate`.
@@ -385,10 +385,10 @@ Decisions: [0004](../research/decisions/0004-storage-sql-metadata-and-blobs.md),
 - A sealed value round-trips and is unreadable with the wrong key.
 
 **Outcome (2026-10-13): done.**
-- `pkg/store`: one interface per concern (content, identity, operations, peers and federation,
-  enterprise products) over the `pkg/types` domain types, with `Tx`, `AfterCommit`, sentinel
-  errors and keyset cursors; `store.Normalise` defines what a stored value reads back as (UTC
-  microseconds, millisecond durations).
+- Store contracts (each module's `core/port`): one interface per concern (content, identity,
+  operations, peers and federation, enterprise products) over the domain types (each module's
+  `core/model`), with `Tx`, `AfterCommit`, sentinel errors and keyset cursors; `kernel.Normalise`
+  defines what a stored value reads back as (UTC microseconds, millisecond durations).
 - `migration/app/adapters/inmem` (reference), `migration/app/adapters/sql` with `sqlite` (modernc, WAL,
   immediate transactions; file and in-memory) and `postgres` (pgx); 71 tables, identical in both
   dialects. Differences from research 15's table list are recorded in its section 4.1.

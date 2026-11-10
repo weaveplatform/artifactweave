@@ -63,9 +63,7 @@
 //     (the sealed private key). Decision 0024:
 //     docs/research/decisions/0024-cold-storage-tier.md ("Namespace").
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Narrowing"; "Type-alias bridges": the shared types and the metadata
-//     store keep aliases of the identity, its values and the port while
-//     their users move).
+//     ("Narrowing").
 //   - Research 15: docs/research/15-data-model.md, line 700 (the instance
 //     table).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
@@ -102,8 +100,5 @@
 // store's in-memory, SQLite and PostgreSQL stores. The composition root's
 // TestAccRuntimeTokens creates the identity on a first start and keeps it
 // across a restart, and its TestAccOpenTokensWithoutIdentity checks that the
-// token service does not start when the identity cannot be read back. The
-// tests beside the shared types' and the metadata store's bridges fail if an
-// alias of the identity, the validator, its sentinel, the protocol version
-// or the port becomes a declared copy.
+// token service does not start when the identity cannot be read back.
 package instance

@@ -30,12 +30,13 @@ of those contracts. This dated inventory is not a closed set. Under
 and P21–P40 add the required entities, migrations and converters, including GraphQL
 and external integration contracts. Existing tables alone do not prove a service works.
 
-- **One internal representation per entity.** Each entity has one Go type in `pkg/types`
-  (domain) that carries every field any wire form needs, in the type the server reasons
-  with (booleans as `bool`, sizes as `int64`, times as `time.Time`). Wire forms live only
-  in `migration/kernel/wire` and are produced and consumed by converters; no handler or
-  store touches a wire struct directly. `migration/artifacts/api/repo` is the existing
-  instance of this rule for repositories and stays the model for that entity.
+- **One internal representation per entity.** Each entity has one Go type in the
+  `core/model` package of the module that owns it (domain) that carries every field any
+  wire form needs, in the type the server reasons with (booleans as `bool`, sizes as
+  `int64`, times as `time.Time`). Wire forms live only in `migration/kernel/wire` and are
+  produced and consumed by converters; no handler or store touches a wire struct directly.
+  `migration/artifacts/api/repo` is the existing instance of this rule for repositories
+  and stays the model for that entity.
 - **Wire quirks are preserved by the converters, never by the domain.** Booleans
   accepted as strings, `size` as a decimal string, `lastDownloaded` as epoch
   milliseconds in one projection and ISO time in another, kebab-case keys in the legacy
@@ -111,7 +112,7 @@ Alternatives considered:
 
 - The parity oracle (`make parity`) compares our specs with the cached definitions per
   operation; a shrinking baseline shows the wire forms converging.
-- `TestSpecMatchesGoTypes`-style contract tests for the existing `pkg/types` model: a fully populated domain
+- `TestSpecMatchesGoTypes`-style contract tests for the existing domain model: a fully populated domain
   value round-trips through every wire converter and validates against the matching
   schema in `api/*.openapi.yaml`, so a field added in one place and not the others fails
   CI.

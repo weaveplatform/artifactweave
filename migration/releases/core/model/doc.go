@@ -10,8 +10,7 @@
 // them. The package imports the standard library and the kernel (the
 // checksums of a bundle artifact). SigningKey, the key bundles are signed
 // with, is not here: it is one of the access module's key records, which
-// STO-10 moves. The shared types alias every name here (their
-// bridge_releases.go) until PRO-02 deletes the bridge.
+// STO-10 moves.
 //
 // # Inputs
 //
@@ -41,7 +40,7 @@
 //
 //   - Decision 0023: docs/research/decisions/0023-release-bundles-and-distribution.md.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Persistence", "Type-alias bridges").
+//     ("Persistence").
 //   - Research 16: docs/research/16-enterprise-products.md. Research 17:
 //     docs/research/17-undocumented-shapes.md (bundle states and job
 //     statuses). Research 15: docs/research/15-data-model.md, lines 709 to

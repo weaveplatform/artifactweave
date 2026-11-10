@@ -60,11 +60,7 @@
 //     byte-identical: "store: not found", "store: conflict", "store: invalid
 //     cursor", "store: invalid record", "invalid item path" and "invalid
 //     token scope".
-//   - Sentinels are compared by identity through errors.Is. Until the
-//     migration's bridges are deleted
-//     (https://github.com/weaveplatform/artifactweave/issues/1101), the
-//     legacy names are these same values, not copies, so a check under either
-//     name matches an error wrapped under the other.
+//   - Sentinels are compared by identity through errors.Is.
 //   - RootPath is "." because AQL reports root items that way and the item
 //     table stores them the same way, so a root listing and a nested listing
 //     are one query (decision 0004).
@@ -104,8 +100,8 @@
 //
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Persistence" (what the kernel holds and imports), "Composition and
-//     HTTP" (the per-request decider bound through PrincipalBinding), "Names
-//     the migration introduces" and "Type-alias bridges".
+//     HTTP" (the per-request decider bound through PrincipalBinding) and
+//     "Names the migration introduces".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     "Full package tree", lines 118 to 125, and "Summary", dependency rule
 //     4 (lines 40 to 41).

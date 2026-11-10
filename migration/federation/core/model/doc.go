@@ -13,8 +13,7 @@
 // artifacts/api/repo (a repository's class and its federation members),
 // platform/outbox (the clock a Stamp carries) and retention/api (the status
 // a full-sync run reports), each another module's api or the platform, as
-// decision 0044's dependency rules allow. The shared types alias every name
-// here (their bridge_federation.go) until PRO-02 deletes the bridge.
+// decision 0044's dependency rules allow.
 //
 // # Inputs
 //
@@ -63,7 +62,7 @@
 //     (Access Federation targets, platform federations, topologies and peer
 //     statuses).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Dependency rules", "Type-alias bridges").
+//     ("Dependency rules").
 //   - Research 16: docs/research/16-enterprise-products.md. Research 15:
 //     docs/research/15-data-model.md, lines 689 and 690 (replications),
 //     lines 701 and 702 (peers and pairing nonces), lines 707 and 708

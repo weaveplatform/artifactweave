@@ -85,8 +85,7 @@
 //   - Decision 0004: docs/research/decisions/0004-storage-sql-metadata-and-blobs.md
 //     (the blob index, whose reference counts decide deferred deletes).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Narrowing", and "Type-alias bridges": the metadata store and the
-//     shared types keep aliases of the replica rows while their users move).
+//     ("Narrowing").
 //   - Research 18: docs/research/18-cloud-blob-storage.md, section 3
 //     (Artifactory's sharding).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
@@ -142,7 +141,5 @@
 // blob and replica index that answers as the artifacts module's in-memory
 // indexes do, since platform code, tests included, never imports a module.
 // The artifacts contract runs the real indexes on the in-memory, SQLite and
-// PostgreSQL stores, and the tests beside the metadata store's and the
-// shared types' bridges fail if an alias of the replica rows becomes a
-// declared copy.
+// PostgreSQL stores.
 package mirror

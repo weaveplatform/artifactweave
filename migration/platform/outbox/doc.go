@@ -59,9 +59,8 @@
 //     positions and failed fetches; "Conflict rule": the clock time and the
 //     origin), with Kulkarni et al., "Logical Physical Clocks", 2014.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Dependency rules", rule 5: a module's api may import platform/outbox;
-//     "Type-alias bridges": the shared types and the metadata store keep
-//     aliases of the clock, the values and the port while their users move).
+//     ("Dependency rules", rule 5: a module's api may import
+//     platform/outbox).
 //   - Research 15: docs/research/15-data-model.md, lines 703 to 706 (the
 //     outbox, peer cursor, applied marker and failed fetch tables) and line
 //     763 (the clock's two columns).
@@ -98,8 +97,6 @@
 // cursor replacement and deletion, applied positions per origin, failed fetch
 // counting and clearing, and cancelled contexts) runs on the platform's
 // in-memory and SQLite stores and on the metadata store's in-memory, SQLite
-// and PostgreSQL stores. The shared types' TestUnitStamp orders stamps
-// through Compare, and the tests beside the shared types' and the metadata
-// store's bridges fail if an alias of the clock, a value, the parser, its
-// sentinel or the port becomes a declared copy.
+// and PostgreSQL stores. The federation model's TestUnitStamp orders stamps
+// through Compare.
 package outbox

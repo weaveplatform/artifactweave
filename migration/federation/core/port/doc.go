@@ -14,8 +14,7 @@
 // the change it records (decision 0021), so these stores run inside the
 // shared unit of work rather than one of their own. The outbox itself, the
 // peers' cursors and the instance identity are platform ports
-// (platform/outbox and platform/instance). The metadata store aliases every
-// name here (its bridge_federation.go) until PRO-02 deletes the bridge.
+// (platform/outbox and platform/instance).
 //
 // # Inputs
 //
@@ -58,8 +57,8 @@
 //   - Decision 0025: docs/research/decisions/0025-platform-federation-and-topology.md.
 //   - Decision 0017: docs/research/decisions/0017-sealed-columns-and-master-key.md.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Persistence", "Type-alias bridges" and "Names the migration
-//     introduces", which lists Store).
+//     ("Persistence" and "Names the migration introduces", which lists
+//     Store).
 //   - Research 15: docs/research/15-data-model.md, lines 689 and 690, 701 and
 //     702, 707 and 708, and 719 to 721 (the tables behind these ports).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,

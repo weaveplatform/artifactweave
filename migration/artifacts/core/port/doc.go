@@ -12,9 +12,7 @@
 // every artifacts accessor to them and satisfy Store too. The ports take
 // and return the module's core/model values, repository configurations
 // (artifacts/api/repo), AQL queries and hits (core/aql), kernel.Page, the
-// platform's blob row and the mirror's replica rows. The metadata store
-// aliases every name here but Store (its bridge_artifacts_port.go) until
-// PRO-02 deletes the bridge.
+// platform's blob row and the mirror's replica rows.
 //
 // # Inputs
 //
@@ -78,8 +76,8 @@
 //   - Decision 0024: docs/research/decisions/0024-cold-storage-tier.md.
 //   - Decision 0028: docs/research/decisions/0028-blob-mirroring.md.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Persistence", "Type-alias bridges" and "Names the migration
-//     introduces", which lists Store).
+//     ("Persistence" and "Names the migration introduces", which lists
+//     Store).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 189 to 192 (the artifacts module's core/port/store.go), lines
 //     577 and 578 (each module owns its store ports), line 601 (the

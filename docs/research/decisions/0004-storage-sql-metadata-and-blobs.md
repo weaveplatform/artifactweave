@@ -21,9 +21,10 @@ chunks and as the CLI's multipart protocol.
 
 ## Decision
 
-**Metadata.** Store contracts in `pkg/store` with narrow interfaces per concern (repos,
-items, properties, stats, package index, users, groups, permissions, tokens, policies,
-webhooks, projects, builds) composed into `Store` with `Tx`. `internal/sqlstore` follows
+**Metadata.** Store contracts with narrow interfaces per concern (repos, items, properties,
+stats, package index, users, groups, permissions, tokens, policies, webhooks, projects,
+builds), each in the `core/port` package of the module that owns the concern, over one unit
+of work (`Tx`). The SQL stores run on `migration/platform/sql/dialect`, which follows
 hostweave's `sqlcommon` pattern with two dialects: SQLite (`modernc.org/sqlite`, CGO-free,
 WAL, one writer connection; the default) and PostgreSQL (`pgx/v5/stdlib`). Embedded
 migrations per dialect. An in-memory store exists for unit tests.

@@ -8,8 +8,7 @@
 // and return them, and the cleanup, archive and restore services of P11 and
 // P16 will build on them. A run's status is the retention api's RunStatus,
 // which federation's full-sync runs report too. The package imports the
-// standard library and retention/api. The shared types alias every name
-// here (their bridge_retention.go) until PRO-02 deletes the bridge.
+// standard library and retention/api.
 //
 // # Inputs
 //
@@ -40,7 +39,7 @@
 //   - Decision 0024: docs/research/decisions/0024-cold-storage-tier.md
 //     (archive policies, executions and restores).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Persistence", "Type-alias bridges").
+//     ("Persistence").
 //   - Research 07: docs/research/07-webhooks-retention-projects.md. Research
 //     16: docs/research/16-enterprise-products.md (cold storage). Research
 //     15: docs/research/15-data-model.md, lines 687 and 688 (the cleanup

@@ -12,8 +12,7 @@
 // else access persists is here (decision 0044, "Ownership of shared
 // models"). The package imports the standard library, its own module's api
 // (that vocabulary), the kernel (token values and scopes) and kernel/wire
-// (JFrog's wire structs). The shared types alias every name here (their
-// bridge_access_model.go) until PRO-02 deletes the bridge.
+// (JFrog's wire structs).
 //
 // # Inputs
 //
@@ -74,7 +73,7 @@
 //   - Decision 0020: docs/research/decisions/0020-domain-model.md (one
 //     internal value per entity, converted to and from the wire forms).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Ownership of shared models", "Type-alias bridges").
+//     ("Ownership of shared models").
 //   - Research 05: docs/research/05-platform-identity-and-security-apis.md.
 //     Research 07: docs/research/07-webhooks-retention-projects.md (projects
 //     and roles).

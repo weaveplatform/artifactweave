@@ -8,9 +8,7 @@
 // Store; STO-15 moves those implementations into the module's adapters. The
 // ports take and return the module's core/model values and kernel.Page,
 // and join the unit of work of platform/tx. The target layout also puts
-// the runtime's Sandbox port here, which arrives with P17. The metadata
-// store aliases every name here (its bridge_workers.go) until PRO-02
-// deletes the bridge.
+// the runtime's Sandbox port here, which arrives with P17.
 //
 // # Inputs
 //
@@ -42,8 +40,8 @@
 //   - Decision 0026: docs/research/decisions/0026-workers-runtime.md.
 //   - Decision 0017: docs/research/decisions/0017-sealed-columns-and-master-key.md.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Persistence", "Type-alias bridges" and "Names the migration
-//     introduces", which lists Store).
+//     ("Persistence" and "Names the migration introduces", which lists
+//     Store).
 //   - Research 15: docs/research/15-data-model.md, lines 722 to 725 (the
 //     workers tables).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,

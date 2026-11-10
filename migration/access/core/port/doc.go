@@ -10,8 +10,7 @@
 // permission, token, key, project and API restriction accessors to those
 // adapters, so both satisfy Store. The ports take and return the module's
 // core/model values, its api's key pairs, certificates and resource types,
-// and kernel.Page. The metadata store aliases every name here (its
-// bridge_access_port.go) until PRO-02 deletes the bridge.
+// and kernel.Page.
 //
 // # Inputs
 //
@@ -59,8 +58,8 @@
 //   - Decision 0013: docs/research/decisions/0013-projects-and-environments.md.
 //   - Decision 0017: docs/research/decisions/0017-sealed-columns-and-master-key.md.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Persistence", "Type-alias bridges" and "Names the migration
-//     introduces", which lists Store).
+//     ("Persistence" and "Names the migration introduces", which lists
+//     Store).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 272 to 276 (the access module's core/port/store.go), lines 296
 //     and 297 (its sql, inmem and storetest adapters), lines 577 and 578

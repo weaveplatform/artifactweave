@@ -73,9 +73,8 @@
 //     defaults and its failure modes; "Temporary restrictions and
 //     administrative recovery": the recovery reserve).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Narrowing"; "Type-alias bridges": the metadata store keeps aliases of
-//     the port and its values while their users move; platform/apilimit is
-//     one of the new packages the target layout does not name).
+//     ("Narrowing"; platform/apilimit is one of the new packages the target
+//     layout does not name).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 127 (the platform tree, which does not list this package) and
 //     lines 40 and 41 (the platform imports no module and no gateway).
@@ -110,7 +109,5 @@
 // RequestBudgetBoundedPruning subtests of platform/store/storetest) runs on
 // the platform's in-memory and SQLite stores and on the metadata store's
 // in-memory, SQLite and PostgreSQL stores, the router's request limit tests
-// (app/limits_test.go) run against this package, and the test beside the
-// metadata store's bridge fails if an alias of the port or its values
-// becomes a declared copy.
+// (app/limits_test.go) run against this package.
 package apilimit

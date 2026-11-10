@@ -10,8 +10,7 @@
 // a filter selects on). WorkerFilter matches paths with a matcher of its
 // own rather than the federation model's PatternFilter, because a module
 // imports another only through that module's api (decision 0044, dependency
-// rule 6). The shared types alias every name here (their bridge_workers.go)
-// until PRO-02 deletes the bridge.
+// rule 6).
 //
 // # Inputs
 //
@@ -42,7 +41,7 @@
 //
 //   - Decision 0026: docs/research/decisions/0026-workers-runtime.md.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Dependency rules", "Type-alias bridges").
+//     ("Dependency rules").
 //   - Research 16: docs/research/16-enterprise-products.md. Research 15:
 //     docs/research/15-data-model.md, lines 722 to 725 (the workers tables)
 //     and line 768 (the executions table as built).

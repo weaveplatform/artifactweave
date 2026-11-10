@@ -91,9 +91,7 @@
 //     line 75 (the queue's OpenTelemetry meter, with no-op defaults and
 //     recorder tests).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Narrowing"; "Type-alias bridges": the metadata store and the shared
-//     types keep aliases of the port and the rows while their users move;
-//     the meter scope, set once to the final path).
+//     ("Narrowing"; the meter scope, set once to the final path).
 //   - Research 15: docs/research/15-data-model.md, lines 697 and 698 (the
 //     leases and work_items tables).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
@@ -136,7 +134,5 @@
 // validation, lifecycle, coalescing, fencing, failures, LeaseKey,
 // transactions and concurrency; and the Leases subtest) run on the
 // platform's in-memory and SQLite stores and on the metadata store's
-// in-memory, SQLite and PostgreSQL stores. The tests beside the store's and
-// the shared types' bridges fail if an alias of the port or the rows becomes
-// a declared copy.
+// in-memory, SQLite and PostgreSQL stores.
 package work

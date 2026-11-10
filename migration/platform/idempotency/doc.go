@@ -61,9 +61,7 @@
 //     tests that keep it).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
 //     ("Package placement and names": platform/idempotency is one of the new
-//     packages the target layout does not name; "Type-alias bridges": the
-//     metadata store keeps aliases of the port and its values while their
-//     users move).
+//     packages the target layout does not name).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 40 and 41 (the platform imports no module and no gateway) and
 //     line 727 (platform/events' idempotency.go, consumer-side event dedupe,
@@ -95,7 +93,5 @@
 // process inside the receipt transaction, and the PostgreSQL store's
 // TestAccReplayPruneDoesNotDeleteRenewal keeps a renewed receipt that a
 // concurrent prune had selected. The build service's AppendOnce tests and the
-// HTTP boundary's idempotency tests run through the port, and the test beside
-// the metadata store's bridge fails if an alias of the port, its values or
-// its sentinel becomes a declared copy.
+// HTTP boundary's idempotency tests run through the port.
 package idempotency

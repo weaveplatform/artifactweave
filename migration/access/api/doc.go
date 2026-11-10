@@ -84,10 +84,7 @@
 //
 //   - Error texts are observable in API responses and logs, so they stay
 //     byte-identical: "unknown permission action" and "token: token is not
-//     revocable". Until the migration's bridges are deleted
-//     (https://github.com/weaveplatform/artifactweave/issues/1101), the
-//     legacy names of ErrUnknownAction and ErrNotRevocable are these same
-//     values, so errors.Is matches under either name.
+//     revocable".
 //   - Actions marshals to the list of its Access names, such as
 //     ["READ","WRITE"], which stored permission documents hold; the JSON
 //     stays byte-identical.
@@ -118,8 +115,8 @@
 //
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Public types and published api surface", "Composition and HTTP" (the
-//     per-request decider bound through kernel.PrincipalBinding),
-//     "Type-alias bridges" and "Names the migration introduces".
+//     per-request decider bound through kernel.PrincipalBinding) and "Names
+//     the migration introduces".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     "Full package tree", lines 258 to 272, and "Access and identity",
 //     lines 529 to 574 ("Authorizer.For ... once per operation" at line

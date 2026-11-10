@@ -10,8 +10,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/workers/core/model"
 )
 
-// t0 is the fixed instant of the domain tests in pkg/types, which keep their
-// own copy (domain_shared_test.go).
 var t0 = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
 
 func TestUnitWorkers(t *testing.T) {

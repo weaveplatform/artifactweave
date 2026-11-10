@@ -84,8 +84,7 @@
 //     docs/research/15-data-model.md; research 18:
 //     docs/research/18-cloud-blob-storage.md.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Narrowing", and "Type-alias bridges": the metadata store keeps
-//     aliases of Upload and UploadStore while their users move).
+//     ("Narrowing").
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 149 (platform/blob/session) and line 1049 (the mapping row).
 //   - Plan: docs/implementation/plan.md#p2-stores,

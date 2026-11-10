@@ -8,8 +8,7 @@
 // notifications module, core layer, entity values. The module's store port
 // takes and returns them, and P11's webhook catalogue, criteria, signing and
 // delivery will build on them. The package imports only the standard
-// library. The shared types alias every name here (their
-// bridge_notifications.go) until PRO-02 deletes the bridge.
+// library.
 //
 // # Inputs
 //
@@ -40,7 +39,7 @@
 //   - Decision 0017: docs/research/decisions/0017-sealed-columns-and-master-key.md
 //     (the sealed handler secrets).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Persistence" and "Type-alias bridges").
+//     ("Persistence").
 //   - Research 07: docs/research/07-webhooks-retention-projects.md (the
 //     domains and their event types). Research 15:
 //     docs/research/15-data-model.md, lines 684 to 686 (the webhook tables)

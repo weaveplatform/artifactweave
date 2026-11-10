@@ -70,9 +70,7 @@
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
 //     ("Ownership of shared models" and "Shared stores in the platform": why
 //     the port is here and not in the configuration module; "Layout
-//     fencing"; "Type-alias bridges": the shared types and the metadata
-//     store keep aliases of the kinds, the document and the port while their
-//     users move).
+//     fencing").
 //   - Research 15: docs/research/15-data-model.md, line 759 (one table of
 //     documents and one of secrets, in place of a table per family).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
@@ -106,8 +104,5 @@
 // back). The metadata store's in-memory, SQLite and PostgreSQL stores run
 // the Configs subtest too, and their RemoteLayoutFences subtest (which
 // layout writes fence which remote repositories, and a delete that is rolled
-// back fences nothing) proves the composition's watch. The tests beside the
-// shared types' and the metadata store's bridges fail if a kind's alias
-// changes its type or string, or if an alias of the document, its kind type
-// or the port becomes a declared copy.
+// back fences nothing) proves the composition's watch.
 package configdoc

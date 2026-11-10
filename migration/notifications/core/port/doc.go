@@ -7,9 +7,7 @@
 // and in-memory stores implement WebhookStore, and the metadata store
 // satisfies Store; STO-14 moves those implementations into the module's
 // adapters. The ports take and return the module's core/model values and
-// kernel.Page, and join the unit of work of platform/tx. The metadata store
-// aliases every name here (its bridge_notifications.go) until PRO-02
-// deletes the bridge.
+// kernel.Page, and join the unit of work of platform/tx.
 //
 // # Inputs
 //
@@ -37,8 +35,8 @@
 //   - Decision 0011: docs/research/decisions/0011-webhooks.md.
 //   - Decision 0017: docs/research/decisions/0017-sealed-columns-and-master-key.md.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Persistence", "Type-alias bridges" and "Names the migration
-//     introduces", which lists Store).
+//     ("Persistence" and "Names the migration introduces", which lists
+//     Store).
 //   - Research 15: docs/research/15-data-model.md, lines 684 to 686 (the
 //     webhook tables).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,

@@ -54,9 +54,7 @@
 //     ("Metadata": store contracts with a narrow interface per concern).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
 //     ("Ownership of shared models" and "Shared stores in the platform": why
-//     the port is here and not in the configuration module; "Type-alias
-//     bridges": the shared types and the metadata store keep aliases of the
-//     keys and the port while their users move).
+//     the port is here and not in the configuration module).
 //   - Research 15: docs/research/15-data-model.md, line 696 (the settings
 //     table).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
@@ -90,8 +88,5 @@
 // kernel.ErrNotFound, Put replaces a value, a value that cannot be encoded
 // and a decode into the wrong type fail, and Keys lists the stored keys in
 // order) runs on the platform's in-memory and SQLite stores and on the
-// metadata store's in-memory, SQLite and PostgreSQL stores. The tests beside
-// the shared types' and the metadata store's bridges fail if a key's alias
-// changes its type or string, or if the port's alias becomes a declared
-// copy.
+// metadata store's in-memory, SQLite and PostgreSQL stores.
 package settings

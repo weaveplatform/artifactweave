@@ -13,8 +13,7 @@
 // executions only: the archived items and the cold blob and replica indexes
 // are the artifacts module's records, which the metadata store reaches
 // through accessors of their own (decision 0044, "Ownership of shared
-// models"). The metadata store aliases every name here (its
-// bridge_retention.go) until PRO-02 deletes the bridge.
+// models").
 //
 // # Inputs
 //
@@ -47,8 +46,8 @@
 //     (archive policies and executions are retention's records; the cold
 //     indexes reuse the artifacts index code).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Ownership of shared models", "Type-alias bridges" and "Names the
-//     migration introduces", which lists Store).
+//     ("Ownership of shared models" and "Names the migration introduces",
+//     which lists Store).
 //   - Research 15: docs/research/15-data-model.md, lines 687 and 688 (the
 //     cleanup tables) and lines 715 and 716 (the archive tables).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,

@@ -114,9 +114,7 @@
 //   - Research 18 and 19: docs/research/18-cloud-blob-storage.md and
 //     docs/research/19-cdn-and-download-redirect.md.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
-//     "Dependency rules": the platform imports no module; "Type-alias
-//     bridges": the shared types keep aliases of the blob row while its
-//     users move.
+//     "Dependency rules": the platform imports no module.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 146 to 151 (platform/blob and its subpackages) and line 1049
 //     (the mapping row).
@@ -158,6 +156,5 @@
 //
 // Every backend runs the blobtest contract: fs, s3, gcs, azure and mirror.
 // The metadata store's blob index contract runs on its in-memory, SQLite and
-// PostgreSQL stores, and the test beside the shared types' bridge fails if
-// an alias of the blob row becomes a declared copy.
+// PostgreSQL stores.
 package blob

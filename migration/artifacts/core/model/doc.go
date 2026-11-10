@@ -14,8 +14,6 @@
 // "Persistence"). The package imports the standard library,
 // artifacts/api/repo (the package types), the kernel (checksums and item
 // paths) and platform/blob (the blob row a raw remote cache entry owns).
-// The shared types alias every name here (their bridge_artifacts_model.go)
-// until PRO-02 deletes the bridge.
 //
 // # Inputs
 //
@@ -80,7 +78,7 @@
 //   - Decision 0036: docs/research/decisions/0036-maven.md (the Mercury
 //     order).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
-//     ("Persistence", "Type-alias bridges").
+//     ("Persistence").
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 187 and 188 (the artifacts module's core/model) and line 1058
 //     (the shared types split into each module's core/model).

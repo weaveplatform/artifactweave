@@ -12,10 +12,8 @@
 // cache rows as RemoteCacheRecords: its RemoteCache accessor returns
 // NewRemoteCache over them, and its LayoutWatch calls FenceLayoutSources.
 // The target layout does not name this package; decision 0044 places it.
-// The metadata store bridges RemoteCacheRecords, NewRemoteCache and
-// FenceLayoutSources (pkg/store/bridge_artifacts_storekit.go) until PRO-02
-// deletes the bridges. The package imports the standard library, the
-// kernel, the platform's tx package and the module's core and api only.
+// The package imports the standard library, the kernel, the platform's tx
+// package and the module's core and api only.
 //
 // # Inputs
 //
@@ -51,8 +49,8 @@
 //     the one its old blob held, in the write's unit of work, so garbage
 //     collection never removes content that a cache entry still names
 //     (decision 0010).
-//   - The error texts are those pkg/store used before the module owned the
-//     code.
+//   - The error texts are those the metadata store used before the module
+//     owned the code.
 //
 // # References
 //
@@ -65,8 +63,8 @@
 //     registers; "Names the migration introduces", which lists Stores).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 601 to 613 (the artifacts adapters, which do not name this
-//     package) and line 1055 (pkg/store split into module ports and
-//     adapters).
+//     package) and line 1055 (the metadata store split into module ports
+//     and adapters).
 //   - Plan: docs/implementation/plan.md#p9-remote-repositories and
 //     #p9d-modular-monolith-migration, epic STO
 //     (https://github.com/weaveplatform/artifactweave/issues/939).

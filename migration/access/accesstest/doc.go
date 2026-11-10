@@ -113,8 +113,6 @@
 //     kit.Verify(ctx, raw), and kit.Verify(ctx, issued.AccessToken).
 //   - authn.HashPasswordWith(cheap, pw): accesstest.HashPassword(t, pw).
 //   - authn.ErrLoginSuspended: accesstest.ErrLoginSuspended.
-//   - The internal/auth bridges Principal, Anonymous, WithPrincipal,
-//     FromContext and the six sentinels: their kernel names.
 //   - authz.Subject, authz.Repo, token.Request, token.RegistryRequest and
 //     token.Issued: accessapi.Subject, accessapi.Repo,
 //     accessapi.TokenRequest, accessapi.RegistryTokenRequest and

@@ -27,7 +27,8 @@ import (
 // The permission APIs (issue #82): the v1 and v2 permission targets under
 // /artifactory and the Access v2 permissions under /access are three views
 // of one stored permission (decision 0006). Each converts its wire form with
-// pkg/types and calls the permission service, which validates and stores.
+// the access model's converters and calls the permission service, which
+// validates and stores.
 
 const (
 	permV1Path     = "/artifactory/api/security/permissions/"
