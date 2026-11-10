@@ -39,7 +39,7 @@ var configFiles = []string{
 	"test/acceptance/features/*.feature",
 	"docs/implementation/package-format-inventory.json",
 	"docs/client-recipes/src/*.json",
-	"**/migrations/*.sql",
+	"**/migrations/**/*.sql",
 }
 
 // historyFiles are the documents that keep the paths they were written with:
