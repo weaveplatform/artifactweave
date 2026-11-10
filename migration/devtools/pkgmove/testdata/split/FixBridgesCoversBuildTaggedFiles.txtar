@@ -24,7 +24,7 @@ go $GOVERSION
     "final_root": "internal",
     "packages": [
         {"from":"internal/plat","action":"move","to":"platform/plat","ticket":"PLT-90"},
-        {"from":"pkg/store","action":"split","ticket":"PLT-01"}
+        {"from":"internal/store","action":"split","ticket":"PLT-01"}
     ],
     "files": [],
     "placeholders": []
@@ -40,7 +40,7 @@ var ErrNotFound = errors.New("store: not found")
 
 // Page is a page request.
 type Page struct{ Limit int }
--- pkg/store/bridge_kernel.go --
+-- internal/store/bridge_kernel.go --
 // Bridge (P9d): declared in migration/kernel; PRO-02 deletes it.
 
 package store
@@ -50,10 +50,10 @@ import "github.com/weaveplatform/artifactweave/migration/kernel"
 var ErrNotFound = kernel.ErrNotFound
 
 type Page = kernel.Page
--- pkg/store/store.go --
+-- internal/store/store.go --
 // Package store stores records.
 package store
--- pkg/store/store_plan9.go --
+-- internal/store/store_plan9.go --
 package store
 
 // Plan9 pages on Plan 9.
@@ -64,28 +64,28 @@ package plat
 -- internal/plat/plat_windows.go --
 package plat
 
-import "github.com/weaveplatform/artifactweave/pkg/store"
+import "github.com/weaveplatform/artifactweave/internal/store"
 
 // Size is the page size.
 func Size() store.Page { return store.Page{Limit: 1} }
 -- internal/plat/plat_darwin.go --
 package plat
 
-import "github.com/weaveplatform/artifactweave/pkg/store"
+import "github.com/weaveplatform/artifactweave/internal/store"
 
 // Size is the page size.
 func Size() error { return store.ErrNotFound }
 -- internal/plat/plat_linux.go --
 package plat
 
-import "github.com/weaveplatform/artifactweave/pkg/store"
+import "github.com/weaveplatform/artifactweave/internal/store"
 
 // Size is the page size.
 func Size() store.Page { return store.Page{Limit: 2} }
 -- internal/plat/plat_freebsd.go --
 package plat
 
-import "github.com/weaveplatform/artifactweave/pkg/store"
+import "github.com/weaveplatform/artifactweave/internal/store"
 
 // Size is the page size.
 func Size() store.Page { return store.Page{Limit: 3} }
@@ -97,7 +97,7 @@ package plat
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/internal/store"
 )
 
 func TestAccEndToEnd(t *testing.T) { _ = store.Page{} }
@@ -106,7 +106,7 @@ func TestAccEndToEnd(t *testing.T) { _ = store.Page{} }
 
 package main
 
-import "github.com/weaveplatform/artifactweave/pkg/store"
+import "github.com/weaveplatform/artifactweave/internal/store"
 
 func main() { _ = store.Page{} }
 -- want/plan --
@@ -116,7 +116,7 @@ func main() { _ = store.Page{} }
   rewrite internal/plat/plat_windows.go: 1 import, 2 qualifiers, 1 removed unused import
 internal/plat/gen.go:7: no load compiles this file (GOOS linux, darwin and windows, -tags=e2e), so fix leaves its use of store.Page; rewrite it by hand
 internal/plat/plat_freebsd.go:6: no load compiles this file (GOOS linux, darwin and windows, -tags=e2e), so fix leaves its use of store.Page; rewrite it by hand
-pkg/store/store_plan9.go:4: no load compiles this file (GOOS linux, darwin and windows, -tags=e2e), so fix leaves its use of Page; rewrite it by hand
+internal/store/store_plan9.go:4: no load compiles this file (GOOS linux, darwin and windows, -tags=e2e), so fix leaves its use of Page; rewrite it by hand
 run make fmt (format the rewritten files)
 -- want/plat_windows.go --
 package plat

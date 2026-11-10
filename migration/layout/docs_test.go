@@ -576,10 +576,7 @@ func TestUnitPackageDocsRejectsNonConformingPackages(t *testing.T) {
 			change: both(set("nested/go.mod", "module example.com/nested\n"), set("nested/x/x.go", "package x\n")),
 		},
 		{name: "testdata is skipped", change: set("migration/devtools/lib/testdata/x/x.go", "package x\n")},
-		{
-			name:   "legacy roots are skipped",
-			change: both(set("internal/x/x.go", "package x\n"), set("pkg/store/x/x.go", "package x\n")),
-		},
+		{name: "legacy roots are skipped", change: set("internal/x/x.go", "package x\n")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			files := maps.Clone(conforming)

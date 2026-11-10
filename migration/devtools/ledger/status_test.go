@@ -164,7 +164,7 @@ func TestUnitStatusReportsEntriesInLedgerOrder(t *testing.T) {
 		"internal/web/testdata/npm/package.json",
 		"migration/artifacts/ecosystem/npm/http/npm.go",
 		"migration/artifacts/ecosystem/registry.go",
-		"internal/layout/layout_test.go",
+		"internal/oldlayout/layout_test.go",
 		"internal/a/a.go",
 		"internal/b/b.go",
 		"test/server/support/fake/fake.go",

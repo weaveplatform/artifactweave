@@ -33,7 +33,7 @@ go $GOVERSION
     "final_root": "internal",
     "packages": [
         {"from":"internal/alpha","action":"move","to":"app","ticket":"WEB-18"},
-        {"from":"pkg/store","action":"split","ticket":"PLT-01"}
+        {"from":"internal/store","action":"split","ticket":"PLT-01"}
     ],
     "files": [],
     "placeholders": []
@@ -97,7 +97,7 @@ func Same[A, B any](a, b A) A {
 	_ = b
 	return a
 }
--- pkg/store/bridge_kernel.go --
+-- internal/store/bridge_kernel.go --
 // Bridge (P9d): declared in migration/kernel; PRO-02 deletes it.
 
 package store
@@ -142,14 +142,14 @@ func Trim[T any](rows []T, limit int) []T { return kernel.Trim[T](rows, limit) }
 func Pick[A, B any](a A, b B) (B, A) { return kernel.Pick[A](a, b) }
 
 func Same[A, B any](a, b A) A { return kernel.Same[A, A](a, b) }
--- pkg/store/store.go --
+-- internal/store/store.go --
 // Package store stores records.
 package store
 -- internal/alpha/alpha.go --
 // Package alpha uses every bridge.
 package alpha
 
-import "github.com/weaveplatform/artifactweave/pkg/store"
+import "github.com/weaveplatform/artifactweave/internal/store"
 
 // App uses them.
 func App() []any {
@@ -188,8 +188,8 @@ report only: nothing changed
 package alpha
 
 import (
+	"github.com/weaveplatform/artifactweave/internal/store"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // App uses them.

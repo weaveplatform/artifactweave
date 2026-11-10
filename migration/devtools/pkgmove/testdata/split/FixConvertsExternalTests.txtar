@@ -5,7 +5,7 @@
 # import, and each unexported name the test uses is listed for an
 # export_test.go shim (rule 14 of #935).
 ok move -ticket PLT-14
-cp want/bridge_kernel.go internal/auth/bridge_kernel.go
+cp want/bridge_kernel.go internal/old/auth/bridge_kernel.go
 commit
 go build ./...
 fail fix -ticket PLT-14 -report-only
@@ -32,21 +32,21 @@ go $GOVERSION
     "staging_root": "migration",
     "final_root": "internal",
     "packages": [
-        {"from":"internal/auth","action":"split","ticket":"PLT-13"}
+        {"from":"internal/old/auth","action":"split","ticket":"PLT-13"}
     ],
     "files": [
-        {"from":"internal/auth/token.go","action":"move","to":"kernel","ticket":"PLT-14"},
-        {"from":"internal/auth/token_test.go","action":"move","to":"kernel","ticket":"PLT-14"}
+        {"from":"internal/old/auth/token.go","action":"move","to":"kernel","ticket":"PLT-14"},
+        {"from":"internal/old/auth/token_test.go","action":"move","to":"kernel","ticket":"PLT-14"}
     ],
     "placeholders": []
 }
--- internal/auth/auth.go --
+-- internal/old/auth/auth.go --
 // Package auth logs users in.
 package auth
 
 // Login logs user in.
 func Login(user string) Token { return Parse(user) }
--- internal/auth/token.go --
+-- internal/old/auth/token.go --
 package auth
 
 // Token is a token.
@@ -56,7 +56,7 @@ const secret = "s"
 
 // Parse parses a token.
 func Parse(s string) Token { return Token(s + secret) }
--- internal/auth/token_test.go --
+-- internal/old/auth/token_test.go --
 package auth
 
 import "testing"
@@ -81,7 +81,7 @@ type Token = kernel.Token
 var Parse = kernel.Parse
 -- want/cycle --
   rewrite migration/kernel/token_test.go: 1 import, 1 qualifier
-migration/kernel/token_test.go:6: importing internal/auth closes an import cycle (migration/kernel -> internal/auth -> migration/kernel); break it by hand, with a bridge or with an external test (fix -external)
+migration/kernel/token_test.go:6: importing internal/old/auth closes an import cycle (migration/kernel -> internal/old/auth -> migration/kernel); break it by hand, with a bridge or with an external test (fix -external)
 report only: nothing changed
 -- want/converted --
   rewrite migration/kernel/token_test.go: 2 imports, 4 qualifiers, 1 package clause
@@ -93,7 +93,7 @@ package kernel_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/old/auth"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 

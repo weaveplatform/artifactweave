@@ -31,7 +31,7 @@ func sample() *Ledger {
 				From: "internal/formatregistry", Action: ActionMove, To: "artifacts/ecosystem",
 				Rename: map[string]string{"formats.go": "registry.go"}, Ticket: "ART-05",
 			},
-			{From: "internal/layout", Action: ActionDelete, Ticket: "PRO-02"},
+			{From: "internal/oldlayout", Action: ActionDelete, Ticket: "PRO-02"},
 			{From: "internal/a", Action: ActionMerge, To: "platform/ab", Ticket: "PLT-03"},
 			{From: "internal/b", Action: ActionMerge, To: "platform/ab", Ticket: "PLT-03"},
 			{
@@ -134,7 +134,7 @@ func TestUnitTranslate(t *testing.T) {
 		{module + "/internal/a", module + "/migration/platform/ab", ActionMerge, true},
 		{module + "/internal/fakeserver", module + "/test/server/support/fake", ActionMove, true},
 		{module + "/internal/web", "", ActionSplit, true},
-		{module + "/internal/layout", "", ActionDelete, true},
+		{module + "/internal/oldlayout", "", ActionDelete, true},
 		{module + "/internal/nothing", "", "", false},
 		{module + "/migration/artifacts/ecosystem", "", "", false},
 		{"internal/web/xyz", "", "", false},

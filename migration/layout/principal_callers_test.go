@@ -29,8 +29,6 @@ const withPrincipal = "WithPrincipal"
 // itemkit.AccessFor quietly evaluates its permissions again for every
 // question.
 var withPrincipalSites = []string{
-	// The bridge's alias of kernel.WithPrincipal, which PRO-02 deletes.
-	"internal/auth/bridge_kernel.go",
 	// WithCaller, which binds the decider straight after.
 	root + "/access/api/context.go",
 	// The remote reindex stores the caller it has just rechecked without a
@@ -56,7 +54,7 @@ func TestUnitWithPrincipalCallers(t *testing.T) {
 import (
 	"context"
 
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/web/auth"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
@@ -71,7 +69,6 @@ func v(ctx context.Context, p kernel.Principal) {
 	_ = f`)
 	conforming := map[string]string{
 		"go.mod":                          "module github.com/weaveplatform/artifactweave\n",
-		"internal/auth/bridge_kernel.go":  uses,
 		"migration/access/api/context.go": uses,
 		"migration/artifacts/adapters/http/itemkit/reindex.go": uses,
 		"internal/web/handler_test.go":                         uses,
@@ -99,7 +96,7 @@ func WithPrincipal(ctx context.Context, p any) context.Context { return ctx }
 	}{
 		{name: "conforming"},
 		{
-			name: "call through the bridge",
+			name: "call through a legacy package",
 			src:  file(`	_ = auth.WithPrincipal(ctx, p)`),
 			want: v + ":11: names WithPrincipal; " + withPrincipalRule,
 		},
@@ -126,10 +123,10 @@ func WithPrincipal(ctx context.Context, p any) context.Context { return ctx }
 			want: v + ":11: names WithPrincipal",
 		},
 		{
-			name: "unqualified call in internal/auth",
-			file: "internal/auth/x.go",
+			name: "unqualified call in a legacy package",
+			file: "internal/web/auth/x.go",
 			src:  file(`	_ = WithPrincipal(ctx, p)`),
-			want: "internal/auth/x.go:11: names WithPrincipal",
+			want: "internal/web/auth/x.go:11: names WithPrincipal",
 		},
 		{
 			name: "unqualified call elsewhere in the kernel",

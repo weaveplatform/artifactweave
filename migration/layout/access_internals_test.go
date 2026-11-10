@@ -16,14 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
 )
 
-// accessInternals are the legacy packages of access that no test outside
-// access may import. ACC-12 moved the authenticator and the token service
-// out of them, leaving only the bridges to the kernel and access/api until
-// PRO-02; a test that imports a bridge would compile against a path that
-// is about to go, so it names the kernel or access/api itself. Staged
-// access core is judged by its path instead (accessInternal).
-var accessInternals = []string{"internal/auth", "internal/auth/token"}
-
 // allowlistedInternals are the access internals that an allowlisted file may
 // import: the authenticator and the token service, which the composition
 // root and the server harnesses wire into the router themselves, and the
@@ -148,12 +140,10 @@ func insideAccess(l *ledger.Ledger, dir string) bool {
 }
 
 // accessInternal reports whether imported, a path relative to the
-// repository root, is an access internal: one of accessInternals, or a
-// package of staged access core other than test support, whose name ends
-// in test, as idtokentest's does.
+// repository root, is an access internal: a package of staged access core
+// other than test support, whose name ends in test, as idtokentest's does.
 func accessInternal(imported string) bool {
-	return slices.Contains(accessInternals, imported) ||
-		under(imported, root+"/access/core") && !strings.HasSuffix(path.Base(imported), "test")
+	return under(imported, root+"/access/core") && !strings.HasSuffix(path.Base(imported), "test")
 }
 
 // matches reports whether the file at rel, relative to the repository root,
@@ -194,7 +184,7 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 				Action: ledger.ActionMove,
 				To:     "artifacts/ecosystem/npm/http",
 			},
-			{From: "internal/auth", Action: ledger.ActionMove, To: "access/core/authn"},
+			{From: "internal/web/auth", Action: ledger.ActionMove, To: "access/core/authn"},
 		},
 	}
 	allow := []accessAllowance{
@@ -204,7 +194,6 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 	}
 	evaluator := root + "/access/core/authz"
 	authenticator, tokens := allowlistedInternals[0], allowlistedInternals[1]
-	legacy := accessInternals[0]
 	conforming := map[string]string{
 		"go.mod": "module " + modulePath + "\n",
 		// Each allowlisted root uses its entry; a file under test/ is a
@@ -214,9 +203,9 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 		"test/server/access/auth_test.go": file(authenticator),
 		"test/server/support/assemble.go": file(tokens),
 		// Access's own tests: staged, and in legacy packages whose entries
-		// move them into access, the bridges' among them.
+		// move them into access.
 		root + "/access/core/authn/authn_test.go":    file(evaluator, authenticator),
-		"internal/auth/bridge_kernel_test.go":        file(evaluator, authenticator, legacy),
+		"internal/web/auth/auth_test.go":             file(evaluator, authenticator),
 		"internal/service/accounts/accounts_test.go": file(evaluator, tokens),
 		// The published contracts and access test support, staged and legacy.
 		"internal/web/xyz/npm_test.go": file(
@@ -259,17 +248,6 @@ func TestUnitAccessInternalsRuleDetectsViolations(t *testing.T) {
 			name: "protocol test importing the token service",
 			src:  file(tokens),
 			want: protocol + " imports " + tokens,
-		},
-		{
-			name: "protocol test importing a legacy access package",
-			src:  file(legacy),
-			want: protocol + " imports " + legacy,
-		},
-		{
-			name: "root test importing a legacy access package",
-			file: "internal/web/x_test.go",
-			src:  file(accessInternals[1]),
-			want: "internal/web/x_test.go imports " + accessInternals[1],
 		},
 		{
 			name: "staged artifacts test importing access core",

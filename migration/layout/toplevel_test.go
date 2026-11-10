@@ -32,8 +32,6 @@ func TestUnitTopLevelDirectories(t *testing.T) {
 		"pkg/README.md",
 		"pkg/client/artifactory/doc.go",
 		"pkg/containertest/doc.go",
-		"pkg/store/store.go",
-		"pkg/types/fixture/doc.go",
 	}
 	for _, tc := range []struct {
 		name string

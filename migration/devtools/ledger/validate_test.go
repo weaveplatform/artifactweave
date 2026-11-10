@@ -105,7 +105,7 @@ func TestUnitValidateRejectsInvalidEntries(t *testing.T) {
 
 		{
 			"repeated package from", func(l *Ledger) { l.Packages = append(l.Packages, l.Packages[3]) },
-			`from "internal/layout" appears in 2 entries`,
+			`from "internal/oldlayout" appears in 2 entries`,
 		},
 		{"file from repeats a package from", func(l *Ledger) {
 			l.Files = append(l.Files, File{From: "internal/web/xyz", Action: ActionDelete, Ticket: "ECO-06"})

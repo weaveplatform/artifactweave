@@ -406,10 +406,10 @@ func TestUnitImportRulesDetectViolations(t *testing.T) {
 		{3, "pkg/client/artifactory", "pkg/client/access", code, 3, allow},
 		{3, "pkg/client/artifactory", "kernel", code, 3, violation},
 		{3, "pkg/client/artifactory", "api", code, 3, violation},
-		{3, "pkg/client/artifactory", "pkg/types", code, 3, violation},
+		{3, "pkg/client/artifactory", "internal/oldtypes", code, 3, violation},
 
 		{4, "pkg/containertest", "platform/blob", code, 4, violation},
-		{4, "pkg/containertest", "pkg/store", code, 4, violation},
+		{4, "pkg/containertest", "internal/oldstore", code, 4, violation},
 		{4, "pkg/containertest", "pkg/client/artifactory", code, none, allow},
 
 		{5, "app", "artifacts/adapters/sql", code, 5, allow},
@@ -541,20 +541,21 @@ func TestUnitImportRulesDetectViolations(t *testing.T) {
 		}
 		return dir
 	}
+	// Every path is made up: pkgmove rewrites a real legacy path in this data
+	// once its package moves.
 	l := &ledger.Ledger{
 		Module:      modulePath,
 		StagingRoot: root,
 		Packages: []ledger.Package{
-			{From: "internal/auth/token", Action: ledger.ActionMove, To: "access/core/token"},
+			{From: "internal/accounts/token", Action: ledger.ActionMove, To: "access/core/token"},
 			{
 				From: "internal/fixture", Action: ledger.ActionMove, To: "test/fixture",
 				Scope: ledger.ScopeRepo,
 			},
-			{From: "internal/layout", Action: ledger.ActionDelete},
-			// Made up: pkgmove rewrites a real legacy path in this data once its
-			// package moves. pkg/client may import its target.
+			{From: "internal/oldlayout", Action: ledger.ActionDelete},
+			{From: "internal/oldtypes", Action: ledger.ActionSplit},
+			// pkg/client may import its target.
 			{From: "internal/repomodel", Action: ledger.ActionMove, To: "artifacts/api/repo"},
-			{From: "pkg/types", Action: ledger.ActionSplit},
 		},
 	}
 	const m = modulePath + "/"
@@ -563,14 +564,15 @@ func TestUnitImportRulesDetectViolations(t *testing.T) {
 		const item = "migration/artifacts/core/item/item.go"
 		dir := tree(t, map[string]string{
 			// Its own module once judged as the target, so allowed.
-			"migration/access/core/user/user.go": src(m + "internal/auth/token"),
+			"migration/access/core/user/user.go": src(m + "internal/accounts/token"),
 			item: src(
 				"fmt", "example.com/elsewhere", m+"migration/artifacts/core/port",
-				m+"migration/artifacts/adapters/sql", m+"internal/auth/token", m+"internal/fixture",
-				m+"pkg/types", m+"internal/layout", m+"internal/unmapped",
+				m+"migration/artifacts/adapters/sql", m+"internal/accounts/token",
+				m+"internal/fixture", m+"internal/oldtypes", m+"internal/oldlayout",
+				m+"internal/unmapped",
 			),
 			"migration/artifacts/core/item/item_test.go": src(
-				m+"migration/artifacts/core/item", m+"internal/fixture", m+"pkg/types",
+				m+"migration/artifacts/core/item", m+"internal/fixture", m+"internal/oldtypes",
 			),
 			// Each import below would break a row if the walk reached it.
 			"migration/kernel/testdata/x.go": src(m + "migration/app"),
@@ -579,25 +581,28 @@ func TestUnitImportRulesDetectViolations(t *testing.T) {
 			"migration/kernel/nested/x.go":   src(m + "migration/app"),
 			// A legacy file, made up outside every ledger entry so that no
 			// move rewrites it.
-			"internal/web/router.go":             src(m + "test/server/support"),
-			"pkg/client/artifactory/client.go":   src(m+"internal/repomodel", m+"pkg/types"),
+			"internal/web/router.go": src(m + "test/server/support"),
+			"pkg/client/artifactory/client.go": src(
+				m+"internal/repomodel",
+				m+"internal/oldtypes",
+			),
 			"pkg/containertest/containertest.go": src(m + "migration/platform/blob"),
 		})
 		violation := func(file, shown string, row int) string {
 			return fmt.Sprintf("%s imports %s (row %d: %s)", file, shown, row, rows[row].text)
 		}
 		wantViolations := []string{
-			violation(item, "internal/auth/token, judged as migration/access/core/token", 11),
+			violation(item, "internal/accounts/token, judged as migration/access/core/token", 11),
 			violation(item, "internal/fixture, judged as test/fixture", 2),
-			item + " imports internal/layout (legacy package marked delete)",
+			item + " imports internal/oldlayout (legacy package marked delete)",
 			item + " imports internal/unmapped (legacy package with no ledger entry)",
 			violation(item, "migration/artifacts/adapters/sql", 12),
-			violation("pkg/client/artifactory/client.go", "pkg/types", 3),
+			violation("pkg/client/artifactory/client.go", "internal/oldtypes", 3),
 			violation("pkg/containertest/containertest.go", "migration/platform/blob", 4),
 		}
 		wantSplits := []string{
-			item + " imports pkg/types (legacy package marked split; allowed until it is emptied)",
-			"migration/artifacts/core/item/item_test.go imports pkg/types " +
+			item + " imports internal/oldtypes (legacy package marked split; allowed until it is emptied)",
+			"migration/artifacts/core/item/item_test.go imports internal/oldtypes " +
 				"(legacy package marked split; allowed until it is emptied)",
 		}
 		violations, splits := checkImports(dir, l)

@@ -148,8 +148,8 @@ func TestUnitLedgerCheckDetectsViolations(t *testing.T) {
 		},
 		{name: "not canonical", files: files, raw: "indent", want: "not in canonical form"},
 		{
-			name: "legacy directory without an entry", files: append(slices.Clone(files), "pkg/store/x/x.go"),
-			want: "pkg/store/x: legacy package directory has no ledger entry",
+			name: "legacy directory without an entry", files: append(slices.Clone(files), "internal/x/x.go"),
+			want: "internal/x: legacy package directory has no ledger entry",
 		},
 		{
 			name: "broken package", files: []string{"internal/a/README.md", "migration/platform/b/doc.go"},

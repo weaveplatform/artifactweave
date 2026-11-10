@@ -31,9 +31,8 @@ var principalInternals = []string{"IsTokenAuthenticated", "PasswordRevision", "T
 const sharedInternal = "PasswordRevision"
 
 // principalPackages are the packages whose Principal a qualified literal type
-// names: the kernel and the bridge to it that internal/auth keeps until the
-// bridges go.
-var principalPackages = []string{modulePath + "/internal/auth", modulePath + "/" + root + "/kernel"}
+// names: the kernel.
+var principalPackages = []string{modulePath + "/" + root + "/kernel"}
 
 // internalsRule ends every problem: what is allowed, and where the reason is.
 const internalsRule = "only access and the kernel may read or set it (kernel.Principal)"
@@ -49,7 +48,7 @@ func TestUnitPrincipalInternals(t *testing.T) {
 		return `package v
 
 import (
-	"github.com/weaveplatform/artifactweave/internal/auth"
+	auth "github.com/weaveplatform/artifactweave/migration/kernel"
 	"github.com/weaveplatform/artifactweave/migration/kernel"
 )
 
@@ -67,7 +66,7 @@ func v(p auth.Principal, ref kernel.CredentialReference, r [32]byte) {
 		"migration/kernel/principal.go":    uses,
 		"migration/kernel/sub/sub_test.go": uses,
 		"migration/access/core/authn/a.go": uses,
-		"internal/auth/testdata/x.go":      uses,
+		"internal/web/testdata/x.go":       uses,
 		"internal/nested/go.mod":           "module example.com/nested\n",
 		"internal/nested/n.go":             uses,
 		".worktrees/copy/internal/x/x.go":  uses,
@@ -151,16 +150,16 @@ func v(p auth.Principal, ref kernel.CredentialReference, r [32]byte) {
 			want: v + ":12: sets PasswordRevision in a Principal literal",
 		},
 		{
-			name: "file in internal/auth, which holds only bridges",
-			file: "internal/auth/principal.go",
+			name: "file in a legacy auth package",
+			file: "internal/web/auth/principal.go",
 			src:  file(`	_ = p.TokenSubject`),
-			want: "internal/auth/principal.go:11: selects TokenSubject",
+			want: "internal/web/auth/principal.go:11: selects TokenSubject",
 		},
 		{
-			name: "subpackage of internal/auth",
-			file: "internal/auth/token/token.go",
+			name: "subpackage of a legacy auth package",
+			file: "internal/web/auth/token/token.go",
 			src:  file(`	_ = p.TokenSubject`),
-			want: "internal/auth/token/token.go:11: selects TokenSubject",
+			want: "internal/web/auth/token/token.go:11: selects TokenSubject",
 		},
 		{
 			name: "unparsable file",
@@ -226,8 +225,7 @@ func checkPrincipalInternals(dir string) []string {
 
 // ownsPrincipalInternals reports whether the Go file at rel, a path relative
 // to the repository root, belongs to access or the kernel: any file under
-// the staged kernel and access trees. The legacy internal/auth holds only
-// bridges, which name none of the fields.
+// the staged kernel and access trees.
 func ownsPrincipalInternals(rel string) bool {
 	return strings.HasPrefix(rel, root+"/kernel/") || strings.HasPrefix(rel, root+"/access/")
 }
