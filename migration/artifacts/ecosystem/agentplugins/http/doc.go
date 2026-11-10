@@ -76,8 +76,13 @@
 //
 // # Testing
 //
-// The package has no tests of its own, as the root file had none. The
-// route suite test/server/artifacts/agentplugins drives the marketplace
+// agentplugins_test.go serves the marketplace files over a kittest world
+// (fixture_test.go) through a chi router that mounts the item kit's GET
+// and HEAD, with TryAgentMarketplaceItem as the only overlay, and
+// RegisterAgentMarketplaceRoutes, with fake deciders: what each caller may
+// read at both paths, HEAD, the requests left to the generic lookup, the
+// refusals, and the failures of the store, the caller and the rendering.
+// The route suite test/server/artifacts/agentplugins drives the marketplace
 // files through the router, the format's marketplace_test.go covers the
 // rendering and its permission filter, and the @agentplugins acceptance
 // scenarios (test/acceptance/features/agent_plugins.feature and

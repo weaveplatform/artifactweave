@@ -80,10 +80,14 @@
 //
 // # Testing
 //
-// The package has no tests of its own, as the root file had none. The
-// route suite test/server/artifacts/maven (maven_rest_test.go, and the
-// status and matrix tables) drives both operations through the router;
-// the format's rest_test.go covers CalculateMetadata and GeneratePOM; and
-// the @maven acceptance partition (test/acceptance/features/maven.feature)
-// calls them as a client does.
+// maven_test.go calls both operations over a kittest world
+// (fixture_test.go) through a chi router on which RegisterMavenRoutes
+// mounts them, with fake deciders: the metadata queued with and without
+// noneRecursive, the actions each operation needs, Artifactory's refusals,
+// the POM written, kept or refused, and the failures of the store, the
+// blob store and the caller. The route suite test/server/artifacts/maven
+// (maven_rest_test.go, and the status and matrix tables) drives both
+// operations through the router; the format's rest_test.go covers
+// CalculateMetadata and GeneratePOM; and the @maven acceptance partition
+// (test/acceptance/features/maven.feature) calls them as a client does.
 package mavenhttp
