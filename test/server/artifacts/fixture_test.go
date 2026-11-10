@@ -31,6 +31,7 @@ import (
 	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
+	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
 	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob"
 	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
@@ -207,8 +208,13 @@ const (
 	restoredMessage = "Successfully restored trash items"
 	traceTime       = "2006-01-02T15:04:05.000Z07:00"
 	repoBatchLimit  = 100
-	searchPage      = 1000
 )
+
+// searchPage is how many rows the search core reads at a time.
+// TestAccSearchPages seeds one more file than that, so it reads the core's
+// own size: a copy would let the page size change under it and the test
+// stop crossing a page.
+const searchPage = search.SearchPage
 
 const (
 	uploadsCreate   = "/artifactory/api/v1/uploads/create"
