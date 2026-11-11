@@ -109,7 +109,9 @@
 //     ProjectRepoKey) and TestUnitSigningKeyJSON (a signing key's secrets
 //     stay out of its JSON).
 //
-// The metadata store's identity, token, key and project contract subtests
-// store and read these values on its in-memory, SQLite and PostgreSQL
-// stores.
+// The module's contract suite, internal/access/adapters/storetest.Run, stores
+// and reads these values in its identity, token, key and project subtests;
+// the access adapters run it in memory and on SQLite, and the metadata
+// store's contract in app/storetest runs it on its in-memory, SQLite and
+// PostgreSQL stores.
 package model

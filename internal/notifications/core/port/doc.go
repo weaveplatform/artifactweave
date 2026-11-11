@@ -3,11 +3,12 @@
 //
 // # Role
 //
-// notifications module, core layer, store ports. The metadata store's SQL
-// and in-memory stores implement WebhookStore, and the metadata store
-// satisfies Store; STO-14 moves those implementations into the module's
-// adapters. The ports take and return the module's core/model values and
-// kernel.Page, and join the unit of work of platform/tx.
+// notifications module, core layer, store ports. The module's adapters
+// implement WebhookStore and Store: adapters/sql over the shared SQL unit of
+// work and adapters/inmem over a shared memtx.Store, both held to the
+// contract in adapters/storetest. The ports take and return the module's
+// core/model values and kernel.Page, and join the unit of work of
+// platform/tx.
 //
 // # Inputs
 //
