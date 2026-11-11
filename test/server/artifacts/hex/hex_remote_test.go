@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	hexfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/hex"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/keymaterial"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
@@ -574,6 +576,203 @@ func TestUnitHexVirtualRemoteMembers(t *testing.T) {
 	if got.Code != http.StatusServiceUnavailable ||
 		!strings.Contains(got.Body.String(), "upstream Hex public key is missing or invalid") {
 		t.Fatalf("remote member without a valid upstream key: %d %s", got.Code, got.Body)
+	}
+}
+
+// TestUnitHexVirtualPassesOverMissingAndUnreadableMembers: a virtual
+// repository passes over a remote member whose upstream lacks the package,
+// before or after a remote or a local member that holds it, and over a
+// member the caller may not read, without asking that member's upstream,
+// on packages/NAME, names, versions and the tarball (decision 0008).
+func TestUnitHexVirtualPassesOverMissingAndUnreadableMembers(t *testing.T) {
+	keys := testKeys()
+	upstream, err := keymaterial.RSAPrivateKey(keys.private, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	archives := map[string][]byte{
+		"decimal": mustReadHexFixture(t),
+		"ecto":    repopath.Read(t, "internal/artifacts/ecosystem/hex/testdata/ecto-3.12.5.tar"),
+	}
+	releases := map[string]string{}
+	bodies := map[string][]byte{}
+	var registries []hexfmt.RegistryPackage
+	for _, name := range []string{"decimal", "ecto"} {
+		release, err := hexfmt.InspectTarball(bytes.NewReader(archives[name]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		releases[name] = release.Version
+		reg := hexfmt.RegistryPackage{
+			Name: name, Repository: "hexpm", Releases: []hexfmt.Package{release},
+		}
+		registries = append(registries, reg)
+		if bodies["packages/"+name], err = hexfmt.EncodePackage(reg, upstream); err != nil {
+			t.Fatal(err)
+		}
+		bodies["tarballs/"+name+"-"+release.Version+".tar"] = archives[name]
+	}
+	if bodies["versions"], err = hexfmt.EncodeVersions("hexpm", registries, upstream); err != nil {
+		t.Fatal(err)
+	}
+	reads := map[string]int{}
+	backend := hexSource(
+		func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+			reads[q.Repo.Key]++
+			body, ok := bodies[q.Resource.Path]
+			if !ok || q.Repo.Key == "hex-missing" {
+				return source.Result{}, kernel.ErrNotFound
+			}
+			return source.Result{Stream: &source.Stream{
+				Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
+				Representation: source.Representation{Size: int64(len(body))},
+			}}, nil
+		},
+	)
+	w := newItemWorld(t, false, func(c *Config) {
+		c.RemoteSources = &source.Service{
+			HTTP: backend,
+			Resolve: func(_ context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
+				return artmodel.SourceIdentity{
+					Kind: artmodel.ExternalHTTP, Repository: artmodel.RepositoryIncarnation(c.Key),
+					ID: "upstream", Generation: "rev-1",
+				}, nil
+			},
+		}
+	})
+	if err := w.db.Keys().CreateKeypair(t.Context(), api.Keypair{
+		Name: "hex-key", Type: api.KeypairRSA, PrivateKey: keys.private, PublicKey: keys.public,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	virtuals := map[string][]string{
+		"hex-v-missing-first": {"hex-missing", "hex-r"},
+		"hex-v-missing-last":  {"hex-r", "hex-missing"},
+		"hex-v-local-second":  {"hex-missing", "hex-local"},
+		"hex-v-local-first":   {"hex-local", "hex-missing"},
+		"hex-v-partial":       {"hex-local", "hex-r"},
+		"hex-v-partial-flip":  {"hex-r", "hex-local"},
+	}
+	configs := []repo.Config{
+		{Key: "hex-local", Class: repo.Local, PrimaryKeyPairRef: "hex-key"},
+		{Key: "hex-missing", Class: repo.Remote},
+		{Key: "hex-r", Class: repo.Remote},
+	}
+	for key, members := range virtuals {
+		configs = append(configs, repo.Config{
+			Key: key, Class: repo.Virtual, Repositories: members, KeyPair: "hex-key",
+		})
+	}
+	for _, c := range configs {
+		c.PackageType = repo.Hex
+		if c.Class == repo.Remote {
+			c.URL, c.HexPublicKey = "https://up.example/", keys.public
+		}
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if put := w.do(http.MethodPut, "/artifactory/hex-local/tarballs/decimal-2.0.0.tar",
+		"admin", string(archives["decimal"])); put.Code != http.StatusCreated {
+		t.Fatalf("deploy Decimal %d: %s", put.Code, put.Body)
+	}
+	if err := w.db.Users().
+		Create(t.Context(), accesstest.User{Name: "partial", PasswordHash: cheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "hex-virtual-and-local",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
+				"hex-v-partial":      {Include: []string{"**"}},
+				"hex-v-partial-flip": {Include: []string{"**"}},
+				"hex-local":          {Include: []string{"**"}},
+			},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	public, err := hexfmt.ParsePublicKey(keys.public)
+	if err != nil {
+		t.Fatal(err)
+	}
+	both, local := []string{"decimal", "ecto"}, []string{"decimal"}
+	for _, tc := range []struct {
+		virtual, as string
+		// listed are the packages the caller gets through the virtual: Ecto
+		// only from the remote member hex-r, Decimal from either.
+		listed []string
+	}{
+		{"hex-v-missing-first", "reader", both},
+		{"hex-v-missing-last", "reader", both},
+		{"hex-v-local-second", "reader", local},
+		{"hex-v-local-first", "reader", local},
+		{"hex-v-partial", "partial", local},
+		{"hex-v-partial-flip", "partial", local},
+		{"hex-v-partial", "reader", both},
+	} {
+		t.Run(tc.virtual+" as "+tc.as, func(t *testing.T) {
+			base := "/artifactory/api/hex/" + tc.virtual + "/"
+			missingReads, remoteReads := reads["hex-missing"], reads["hex-r"]
+			for _, name := range both {
+				pkg := w.do(http.MethodGet, base+"packages/"+name, tc.as, "")
+				archive := w.do(http.MethodGet,
+					base+"tarballs/"+name+"-"+releases[name]+".tar", tc.as, "")
+				if !slices.Contains(tc.listed, name) {
+					if pkg.Code != http.StatusNotFound ||
+						!strings.Contains(pkg.Body.String(), "Hex package not found") {
+						t.Errorf("packages/%s: %d %s", name, pkg.Code, pkg.Body)
+					}
+					if archive.Code != http.StatusNotFound ||
+						!strings.Contains(archive.Body.String(), "Hex tarball not found") {
+						t.Errorf("%s tarball: %d %s", name, archive.Code, archive.Body)
+					}
+					continue
+				}
+				reg, err := hexfmt.DecodePackage(pkg.Body.Bytes(), public)
+				if pkg.Code != http.StatusOK || err != nil || reg.Name != name ||
+					reg.Repository != tc.virtual || len(reg.Releases) != 1 ||
+					reg.Releases[0].Version != releases[name] {
+					t.Errorf("packages/%s: %d %s, %+v %v", name, pkg.Code, pkg.Body, reg, err)
+				}
+				if archive.Code != http.StatusOK ||
+					!bytes.Equal(archive.Body.Bytes(), archives[name]) {
+					t.Errorf("%s tarball: %d, %d bytes", name, archive.Code, archive.Body.Len())
+				}
+			}
+			names := w.do(http.MethodGet, base+"names", tc.as, "")
+			gotRepo, gotNames, err := hexfmt.DecodeNames(names.Body.Bytes(), public)
+			if names.Code != http.StatusOK || err != nil || gotRepo != tc.virtual ||
+				!slices.Equal(gotNames, tc.listed) {
+				t.Errorf("names: %d %s, %q %q %v", names.Code, names.Body, gotRepo, gotNames, err)
+			}
+			index := w.do(http.MethodGet, base+"versions", tc.as, "")
+			gotRepo, packages, err := hexfmt.DecodeVersions(index.Body.Bytes(), public)
+			var gotPackages []string
+			for _, p := range packages {
+				if len(p.Releases) != 1 || p.Releases[0].Version != releases[p.Name] {
+					t.Errorf("versions lists %s at %+v", p.Name, p.Releases)
+				}
+				gotPackages = append(gotPackages, p.Name)
+			}
+			if index.Code != http.StatusOK || err != nil || gotRepo != tc.virtual ||
+				!slices.Equal(gotPackages, tc.listed) {
+				t.Errorf("versions: %d %s, %q %q %v",
+					index.Code, index.Body, gotRepo, gotPackages, err)
+			}
+			// The member that lacks the package was asked and passed over,
+			// not skipped unasked; the member the caller may not read was
+			// never asked.
+			if slices.Contains(virtuals[tc.virtual], "hex-missing") &&
+				reads["hex-missing"] == missingReads {
+				t.Error("the member whose upstream lacks the package was never asked")
+			}
+			if tc.as == "partial" && reads["hex-r"] != remoteReads {
+				t.Errorf("the member the caller may not read was asked %d times",
+					reads["hex-r"]-remoteReads)
+			}
+		})
 	}
 }
 

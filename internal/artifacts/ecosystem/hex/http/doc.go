@@ -37,7 +37,8 @@
 //   - Answers: the public key as PEM; names, versions and packages/NAME,
 //     signed; and tarballs: a local repository's stored item, a remote's
 //     upstream tarball once it matches its signed release, or the first
-//     member of a virtual repository, in order, that holds it.
+//     member of a virtual repository, in order, that the caller may read
+//     and that holds it.
 //
 // # Invariants
 //
@@ -59,6 +60,9 @@
 //     destination.
 //   - A virtual repository's members are distinct Hex local or remote
 //     repositories, and the first member that holds a version supplies it.
+//     A member the caller may not read, or one that lacks the resource
+//     (a remote whose upstream answers 404 included), is passed over; any
+//     other member failure fails the request.
 //   - Statuses and error texts stay byte-identical.
 //
 // # References
@@ -66,7 +70,9 @@
 //   - Decision 0032: docs/research/decisions/0032-package-format-handlers.md
 //     (the router kit and format handlers); decision 0007:
 //     docs/research/decisions/0007-remote-repositories.md (remote
-//     repositories).
+//     repositories); decision 0008:
+//     docs/research/decisions/0008-virtual-repositories.md (virtual
+//     resolution).
 //   - docs/implementation/hex-client.md (connecting Mix, the signing keys,
 //     and the remote's checks of upstream signatures and checksums).
 //   - JFrog Hex repositories:
@@ -80,8 +86,9 @@
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
 //   - https://github.com/weaveplatform/artifactweave/issues/767,
-//     https://github.com/weaveplatform/artifactweave/issues/1037 and
-//     https://github.com/weaveplatform/artifactweave/issues/1089
+//     https://github.com/weaveplatform/artifactweave/issues/1037,
+//     https://github.com/weaveplatform/artifactweave/issues/1089 and
+//     https://github.com/weaveplatform/artifactweave/issues/1205
 //
 // # Status
 //
@@ -91,6 +98,11 @@
 // # Testing
 //
 //   - hex_test.go: the tarball path grammar, the rewriting of same-registry
-//     dependencies, advisory compaction, and the remote tarball checks at
-//     the protocol boundary and in the source validator.
+//     dependencies, advisory compaction, which member failures a virtual
+//     repository passes over, and the remote tarball checks at the protocol
+//     boundary and in the source validator.
+//
+// The server-assembly suites in test/server/artifacts/hex drive these
+// routes through the whole router, virtual members and permissions
+// included.
 package hexhttp

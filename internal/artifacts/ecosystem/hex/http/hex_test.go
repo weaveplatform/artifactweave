@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	hexfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/hex"
@@ -89,6 +91,26 @@ func TestUnitCompactAdvisoriesExcludesDeniedReleaseMetadata(t *testing.T) {
 	}
 	if len(reg.Advisories) != 2 || reg.Releases[0].AdvisoryIndexes[0] != 1 {
 		t.Fatal("filter mutated original signed registry metadata")
+	}
+}
+
+func TestUnitVirtualMemberMissingOnlyWhenItLacksTheResource(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"local item not found", fmt.Errorf("hex: item: %w", kernel.ErrNotFound), true},
+		{"remote upstream 404", fmt.Errorf("hex: read remote metadata: %w",
+			pkgroute.SourceError(kernel.ErrNotFound, false)), true},
+		{"refusal", pkgroute.SourceError(source.ErrDenied, false), false},
+		{"upstream unavailable", pkgroute.SourceError(source.ErrUnavailable, false), false},
+		{"invalid upstream resource", upstreamFailure(), false},
+		{"no error", nil, false},
+	} {
+		if got := missing(tc.err); got != tc.want {
+			t.Errorf("%s: missing = %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }
 
