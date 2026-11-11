@@ -261,7 +261,7 @@ func (h handler) tarball(w http.ResponseWriter, r *http.Request, path string) {
 				// The remote adapter resolves and validates the artifact against
 				// its upstream signed registry before delivery.
 				result, err := h.remoteResult(mr, path)
-				if errors.Is(err, kernel.ErrNotFound) {
+				if missing(err) {
 					continue
 				}
 				if err != nil {
@@ -272,7 +272,7 @@ func (h handler) tarball(w http.ResponseWriter, r *http.Request, path string) {
 				return
 			}
 			found, err := h.k.Item(mr, path)
-			if errors.Is(err, kernel.ErrNotFound) {
+			if missing(err) {
 				continue
 			}
 			if err != nil {
@@ -331,8 +331,15 @@ func (h handler) virtualPackages(
 	}
 	out := map[string]hexfmt.RegistryPackage{}
 	for _, mr := range members {
+		// The folder must match remoteMetadata's PermissionPath: a remote
+		// member's registry read refuses the whole request when the caller
+		// may not read below it. Every release a member lists lives there,
+		// so passing over such a member hides nothing the caller may read.
+		if !h.k.CanFolder(mr, "tarballs", accessapi.ActionRead) {
+			continue
+		}
 		entries, err := h.packages(mr, path)
-		if errors.Is(err, kernel.ErrNotFound) {
+		if missing(err) {
 			continue
 		}
 		if err != nil {
@@ -371,6 +378,16 @@ func (h handler) virtualPackages(
 		out[name] = compactAdvisories(entry)
 	}
 	return out, nil
+}
+
+// missing reports whether a virtual member failed only for lacking the
+// resource, which passes resolution on to the next member (decision 0008).
+// A remote member's read has already been mapped by pkgroute.SourceError,
+// so its upstream 404 arrives as an *apierror.Error, not kernel.ErrNotFound.
+func missing(err error) bool {
+	var response *apierror.Error
+	return errors.Is(err, kernel.ErrNotFound) ||
+		errors.As(err, &response) && response.Status == http.StatusNotFound
 }
 
 // A package proxied into this repository must keep same-registry dependencies
