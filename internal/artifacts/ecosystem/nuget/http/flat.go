@@ -42,6 +42,9 @@ type flatContainerVersions struct {
 // "no such package" (IgnoreNotFounds); a caller who may read nothing of it
 // gets the same, so the answer says nothing about what it may not read.
 func (h handler) flatVersions(w http.ResponseWriter, r *http.Request, id string) {
+	if h.blackedOut(w, r) {
+		return
+	}
 	p, ok, err := h.load(r, id)
 	switch {
 	case err != nil:
@@ -61,7 +64,10 @@ func (h handler) flatVersions(w http.ResponseWriter, r *http.Request, id string)
 // flatFile serves a version's .nupkg through the item routes' download,
 // or its .nuspec as the package holds it, to a caller who may read the
 // .nupkg. A version that is not there, or a file name that is neither,
-// answers 404.
+// answers 404. The .nuspec is an entry of the .nupkg, so the .nupkg's
+// download policy refuses it too, naming the .nupkg, as decision 0032
+// checks an archive entry at its archive. [I] Which path 7.x names is not
+// known (#216).
 func (h handler) flatFile(w http.ResponseWriter, r *http.Request, id, ver, file string) {
 	key, ok := versionKey(ver)
 	if !ok {
@@ -81,8 +87,18 @@ func (h handler) flatFile(w http.ResponseWriter, r *http.Request, id, ver, file 
 		h.k.Error(w, r, notFound(r))
 	case isPackage:
 		h.k.ServeItem(w, r, v.meta.Path)
-	case h.k.Require(w, r, v.meta.Path, api.ActionRead):
+	case h.k.Require(w, r, v.meta.Path, api.ActionRead) && h.allowed(w, r, v.meta.Path):
 		w.Header().Set("Content-Type", "application/xml")
 		_, _ = io.WriteString(w, v.meta.Nuspec)
 	}
+}
+
+// allowed applies the download policy to path, having answered its
+// refusal.
+func (h handler) allowed(w http.ResponseWriter, r *http.Request, path string) bool {
+	if err := h.k.CheckDownload(r, path); err != nil {
+		h.k.Error(w, r, err)
+		return false
+	}
+	return true
 }

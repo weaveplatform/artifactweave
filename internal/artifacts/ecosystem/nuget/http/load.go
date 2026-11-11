@@ -39,6 +39,32 @@ func (p pkg) only(keep func(nugetfmt.Metadata) bool) pkg {
 	return out
 }
 
+// blackedOut answers the blackout's 404 to a read of a package's version
+// list, registration or v2 entries, which a client reads to resolve and
+// install, and reports whether it did. JFrog's docs have a blacked-out
+// repository ignored when resolving and serve no download from it. These
+// are built from the index, at no path 7.x is known to keep them at, so
+// the refusal names the request's own path and the patterns never refuse
+// them: a version whose .nupkg they reject stays listed (RTFACT-6205,
+// RTFACT-8218). A caller who may read nothing in the repository is not
+// told it is blacked out (DV-057) and gets the 404 every such read gives
+// it. Search keeps its answer, as 6.20's searchers do not check the
+// blackout (decision 0032). [I] 7.x's answer is not known (#216).
+func (h handler) blackedOut(w http.ResponseWriter, r *http.Request) bool {
+	if !h.k.CanFolder(r, "", api.ActionRead) {
+		return false
+	}
+	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
+	if err == nil {
+		err = h.k.CheckBlackedOut(r, p.String())
+	}
+	if err != nil {
+		h.k.Error(w, r, err)
+		return true
+	}
+	return false
+}
+
 // find is the version whose index key is key, the normalised version
 // lower-cased.
 func (p pkg) find(key string) (version, bool) {
