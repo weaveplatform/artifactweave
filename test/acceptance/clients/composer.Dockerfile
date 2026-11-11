@@ -1,6 +1,6 @@
 # Client pins: Composer 2.11.1; Composer 1.10.28 local compatibility.
 # The legacy Composer lane verifies local compatibility during JFrog's support window.
-FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 RUN apk add --no-cache php83 php83-phar php83-mbstring php83-openssl php83-curl php83-zip php83-iconv curl unzip ca-certificates && \
     curl -fsSL https://getcomposer.org/download/2.11.1/composer.phar -o /usr/local/bin/composer2.phar && \
     echo '6f1b891e1d4927d62740276c540fb490e47689e19e102c49e8da849794882f8c  /usr/local/bin/composer2.phar' | sha256sum -c - && \
