@@ -61,8 +61,13 @@ def fully_generated_paths(catalog):
 
 
 def allowed_changes(files, catalog):
+    # Dependabot's docker entry for / moves the image bases in the root
+    # Dockerfiles. No reference is generated from them, so they are inputs
+    # only. Without them here, its PRs would fail this check, which the
+    # auto-merge job and the open-PR refresh both run, and never merge.
     allowed = generated_paths(catalog) | {p["path"] for p in catalog["pins"].values()} | {
-        "go.mod", "go.sum", ".github/golangci-lint-version", ".github/deps-refresh.pins"}
+        "go.mod", "go.sum", ".github/golangci-lint-version", ".github/deps-refresh.pins",
+        "Dockerfile", "Dockerfile.release"}
     for change in files:
         name = change["filename"]
         safe_path(ROOT, name)

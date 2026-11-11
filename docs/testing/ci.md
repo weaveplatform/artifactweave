@@ -1298,6 +1298,23 @@ attestation, and cosign signs the image by digest with the same keyless workflow
 the checksum file. The job has `packages: write` for the push. The root `Dockerfile` still
 builds from source for `make docker` and acceptance.
 
+Dependabot's `docker` entry for `/` (`.github/dependabot.yml`) keeps both files' bases
+current: the root `Dockerfile`'s golang build stage and distroless runtime, and
+`Dockerfile.release`'s distroless base. One PR moves the distroless digest in both files, and
+since it changes `Dockerfile.release`, the `check` job below builds the release images on the
+new base. `auto-merge.yml` merges these PRs once the gate passes. The build stage's tag names
+the full Go release, such as `golang:1.27.4-bookworm`, pinned by the digest of its multi-arch
+index, because Dependabot proposes no tag more precise than the current one: from
+`golang:1.27-bookworm` it could only move the digest. `TestUnitDockerfileGoNotBehindToolchain`
+(`internal/platform/buildinfo`) fails when that release is older than the Go the unit tests
+run on, which in CI is the release `setup-go` resolves from `go.mod`, so the image cannot
+fall behind the standard library CI tests and scans (#1208). When it fails, merge
+Dependabot's open PR for `/`, or move the stage by hand to the newer release's tag and the
+index digest that `docker buildx imagetools inspect golang:<version>-bookworm` prints. A
+`deps-refresh.yml` PR that raises the `go` directive to a new minor fails the same test until
+the stage reaches that minor, which it must first: the golang image sets
+`GOTOOLCHAIN=local`, so it could not build the module.
+
 Release-please owns the version, the changelog and the release; GoReleaser only appends
 artifacts, so a failed build leaves the release intact and can be re-run from the Actions
 tab without re-tagging.
