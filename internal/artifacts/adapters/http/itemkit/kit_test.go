@@ -2,6 +2,8 @@ package itemkit_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
@@ -337,6 +340,219 @@ func TestUnitDeployTargetResolvesVirtualRepositories(t *testing.T) {
 			t.Errorf("%s: %s, %v; want %s", tc.name, got.Key, err, tc.target)
 		case tc.target == "" && (!errors.As(err, &api) || api.Status != http.StatusMethodNotAllowed):
 			t.Errorf("%s: %v; want 405", tc.name, err)
+		}
+	}
+}
+
+// TestUnitGetItemAndTraceRefuseWhatTheyCannotServe: without a caller a
+// download and its trace answer 401; without a store the trace answers 501,
+// and a path that is not an item path 400; a file whose content the blob
+// store no longer holds answers 500, and the trace of an entry in such an
+// archive ends on that 500.
+func TestUnitGetItemAndTraceRefuseWhatTheyCannotServe(t *testing.T) {
+	w := kittest.New(t, inmem.New())
+	k := w.Kit(itemkit.Deps{Logger: slog.New(slog.DiscardHandler)})
+	for _, name := range []string{"lost.txt", "lost.zip"} {
+		it := w.Put(t, w.Local, false, name, []byte("content of "+name))
+		if err := w.Blobs.Delete(t.Context(), it.Actual.SHA256); err != nil {
+			t.Fatal(err)
+		}
+	}
+	anonymous := func(target string) *http.Request {
+		return httptest.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
+	}
+	for _, tc := range []struct {
+		name   string
+		k      *itemkit.Kit
+		r      *http.Request
+		status int
+	}{
+		{"download without a caller", k, anonymous("/artifactory/libs-local/a.txt"), 401},
+		{"trace without a caller", k, anonymous("/artifactory/libs-local/a.txt?trace"), 401},
+		{
+			"trace without a store",
+			itemkit.New(itemkit.Deps{}),
+			kittest.Request(t, http.MethodGet, "/artifactory/libs-local/a.txt?trace"),
+			http.StatusNotImplemented,
+		},
+		{
+			"trace of a path with a dot-dot segment",
+			k,
+			kittest.Request(t, http.MethodGet, "/artifactory/libs-local/a/../b.txt?trace"),
+			http.StatusBadRequest,
+		},
+		{
+			"file without its content",
+			k,
+			kittest.Request(t, http.MethodGet, "/artifactory/libs-local/lost.txt"),
+			http.StatusInternalServerError,
+		},
+	} {
+		rec := httptest.NewRecorder()
+		tc.k.GetItem(rec, tc.r)
+		if rec.Code != tc.status {
+			t.Errorf("%s: %d %s; want %d", tc.name, rec.Code, rec.Body, tc.status)
+		}
+	}
+	rec := httptest.NewRecorder()
+	k.GetItem(
+		rec,
+		kittest.Request(t, http.MethodGet, "/artifactory/libs-local/lost.zip!/a.txt?trace"),
+	)
+	if rec.Code != http.StatusOK || !strings.HasSuffix(rec.Body.String(),
+		" Sending a response with the status '500' and the message 'internal error'\n") {
+		t.Errorf("trace of an entry in a lost archive: %d %q", rec.Code, rec.Body)
+	}
+}
+
+// TestUnitStatusWriterCountsWhatItWrites: a body written before any status
+// counts as a 200, through Write or ReadFrom; it is complete when no length
+// was declared or when the declared length was written; and Unwrap reaches
+// the writer underneath.
+func TestUnitStatusWriterCountsWhatItWrites(t *testing.T) {
+	get := httptest.NewRequest(http.MethodGet, "/artifactory/libs-local/a.txt", nil)
+	written := httptest.NewRecorder()
+	byWrite := &itemkit.StatusWriter{ResponseWriter: written}
+	if _, err := byWrite.Write([]byte("abc")); err != nil {
+		t.Fatal(err)
+	}
+	if !byWrite.Complete(get) || written.Code != http.StatusOK || written.Body.String() != "abc" ||
+		byWrite.Unwrap() != written {
+		t.Errorf("Write: complete %t, %d %q", byWrite.Complete(get), written.Code, written.Body)
+	}
+	copied := httptest.NewRecorder()
+	copied.Header().Set("Content-Length", "4")
+	byCopy := &itemkit.StatusWriter{ResponseWriter: copied}
+	if _, err := byCopy.ReadFrom(strings.NewReader("abc")); err != nil {
+		t.Fatal(err)
+	}
+	if byCopy.Complete(get) || copied.Code != http.StatusOK {
+		t.Errorf("ReadFrom short of its length: complete %t, %d", byCopy.Complete(get), copied.Code)
+	}
+	if _, err := byCopy.ReadFrom(strings.NewReader("d")); err != nil {
+		t.Fatal(err)
+	}
+	if !byCopy.Complete(get) || copied.Body.String() != "abcd" {
+		t.Errorf("ReadFrom of its length: complete %t, %q", byCopy.Complete(get), copied.Body)
+	}
+}
+
+// TestUnitDebianSourceRequestValidatesRemoteMetadata: a Release file, a
+// by-hash index and a Packages or Sources index are requested as metadata
+// whose validator refuses, as a 502 integrity failure, an empty Release file
+// or by-hash index, an index of unknown size, a body short of its size and
+// contents that do not parse or do not match their hash, and accepts an
+// empty Packages or Sources index; a query on a Release file is refused, and
+// a by-hash or index path apt never asks for is not found.
+func TestUnitDebianSourceRequestValidatesRemoteMetadata(t *testing.T) {
+	request := func(p, query string) (source.Request, error) {
+		return itemkit.DebianSourceRequest(source.Request{
+			Resource: source.Resource{Path: p, Query: query},
+		})
+	}
+	if _, err := request("dists/stable/Release", "x=1"); !errors.Is(err, source.ErrInvalidRequest) {
+		t.Errorf("query on a Release file: %v; want ErrInvalidRequest", err)
+	}
+	for _, p := range []string{
+		"dists/stable/main/binary-amd64/by-hash/SHA256/abc",
+		"dists/stable/Packages",
+	} {
+		if _, err := request(p, ""); !errors.Is(err, kernel.ErrNotFound) {
+			t.Errorf("%s: %v; want ErrNotFound", p, err)
+		}
+	}
+	const armor = "-----BEGIN PGP SIGNATURE-----\nabc\n-----END PGP SIGNATURE-----\n"
+	const release, packages = "dists/stable/Release.gpg", "dists/stable/main/binary-amd64/Packages"
+	sum := sha256.Sum256([]byte("index"))
+	byHash := "dists/stable/main/binary-amd64/by-hash/SHA256/" + hex.EncodeToString(sum[:])
+	for _, tc := range []struct {
+		name, path, variant, body string
+		size                      int64
+		valid                     bool
+	}{
+		{"empty signature", release, "debian-release-v1", "", 0, false},
+		{"signature short of its size", release, "debian-release-v1", armor, int64(len(armor)) + 1, false},
+		{"unarmored signature", release, "debian-release-v1", "signature", 9, false},
+		{"signature", release, "debian-release-v1", armor, int64(len(armor)), true},
+		{"empty by-hash index", byHash, "debian-by-hash-v1", "", 0, false},
+		{"by-hash index of other content", byHash, "debian-by-hash-v1", "other", 5, false},
+		{"by-hash index", byHash, "debian-by-hash-v1", "index", 5, true},
+		{"Packages of unknown size", packages, "debian-packages-v2", "", -1, false},
+		{"Packages short of its size", packages, "debian-packages-v2", "x", 2, false},
+		{"unterminated Packages stanza", packages, "debian-packages-v2", "Package: a", 10, false},
+		{"empty Packages", packages, "debian-packages-v2", "", 0, true},
+		{"empty Sources", "dists/stable/main/source/Sources", "debian-sources-v2", "", 0, true},
+	} {
+		q, err := request(tc.path, "")
+		if err != nil || q.Resource.Kind != source.ResourceKindMetadata ||
+			q.Resource.Variant != tc.variant || q.Resource.ValidateMetadata == nil {
+			t.Errorf("%s: %+v, %v", tc.name, q.Resource, err)
+			continue
+		}
+		err = q.Resource.ValidateMetadata(t.Context(), strings.NewReader(tc.body), tc.size,
+			source.MetadataResponse{})
+		var failure *source.HTTPError
+		switch {
+		case tc.valid && err != nil:
+			t.Errorf("%s: %v; want valid", tc.name, err)
+		case !tc.valid && (!errors.As(err, &failure) || failure.Status != http.StatusBadGateway ||
+			failure.Kind != source.FailureKindIntegrity):
+			t.Errorf("%s: %v; want a 502 integrity failure", tc.name, err)
+		}
+	}
+}
+
+// TestUnitSourceRequestsCheckAlpineAndPassOtherPaths: a query on an Alpine
+// package is refused, and the APKINDEX and package validators refuse, as a
+// 502 integrity failure, a body of no or the wrong size and one that does not
+// parse; CRAN and RPM pass a path they do not validate through unchanged.
+func TestUnitSourceRequestsCheckAlpineAndPassOtherPaths(t *testing.T) {
+	const pkg, index = "v3.20/main/x86_64/hello-1.0-r0.apk", "v3.20/main/x86_64/APKINDEX.tar.gz"
+	alpineRequest := func(p, query string) (source.Request, error) {
+		return itemkit.AlpineSourceRequest(source.Request{
+			Resource: source.Resource{Path: p, Query: query},
+		})
+	}
+	if _, err := alpineRequest(pkg, "x=1"); !errors.Is(err, source.ErrInvalidRequest) {
+		t.Errorf("query on an Alpine package: %v; want ErrInvalidRequest", err)
+	}
+	integrity := func(name string, err error) {
+		t.Helper()
+		var failure *source.HTTPError
+		if !errors.As(err, &failure) || failure.Status != http.StatusBadGateway ||
+			failure.Kind != source.FailureKindIntegrity {
+			t.Errorf("%s: %v; want a 502 integrity failure", name, err)
+		}
+	}
+	q, err := alpineRequest(index, "")
+	if err != nil || q.Resource.Kind != source.ResourceKindMetadata ||
+		q.Resource.Variant != "alpine-index-v2" || q.Resource.ValidateMetadata == nil {
+		t.Fatalf("APKINDEX: %+v, %v", q.Resource, err)
+	}
+	for _, tc := range []struct {
+		name, body string
+		size       int64
+	}{
+		{"empty APKINDEX", "", 0},
+		{"APKINDEX short of its size", "x", 2},
+		{"APKINDEX that is not an archive", "index", 5},
+	} {
+		integrity(tc.name, q.Resource.ValidateMetadata(t.Context(), strings.NewReader(tc.body),
+			tc.size, source.MetadataResponse{}))
+	}
+	q, err = alpineRequest(pkg, "")
+	if err != nil || q.Resource.Variant != "alpine-package-v2" || q.Resource.Validate == nil {
+		t.Fatalf("Alpine package: %+v, %v", q.Resource, err)
+	}
+	integrity("package that is not an APK", q.Resource.Validate(t.Context(),
+		strings.NewReader("package"), 7))
+	for name, sourceRequest := range map[string]func(source.Request) (source.Request, error){
+		"CRAN": itemkit.CranSourceRequest, "RPM": itemkit.RPMSourceRequest,
+	} {
+		in := source.Request{Resource: source.Resource{Path: "docs/README.txt", Query: "x=1"}}
+		if out, err := sourceRequest(in); err != nil || out.Resource.Path != in.Resource.Path ||
+			out.Resource.Query != in.Resource.Query || out.Resource.Variant != "" {
+			t.Errorf("%s pass-through: %+v, %v", name, out.Resource, err)
 		}
 	}
 }
