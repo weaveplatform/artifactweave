@@ -43,7 +43,8 @@ func (f *fixture) requestUserAgent(path, agent string) *httptest.ResponseRecorde
 func wantRefusal(t *testing.T, label string, got *httptest.ResponseRecorder, message string) {
 	t.Helper()
 	want := `{"errors":[{"message":"` + message + `","status":404}]}` + "\n"
-	if got.Code != http.StatusNotFound || got.Body.String() != want || got.Header().Get("ETag") != "" {
+	if got.Code != http.StatusNotFound || got.Body.String() != want ||
+		got.Header().Get("ETag") != "" {
 		t.Errorf("%s: %d %q (ETag %q), want 404 %q", label, got.Code, got.Body,
 			got.Header().Get("ETag"), want)
 	}
@@ -80,8 +81,15 @@ func TestAccDownloadPolicyOfAHostedRepository(t *testing.T) {
 		on, off := true, false
 		f.patch("php", func(c *repo.Config) { c.BlackedOut = &on })
 		for _, agent := range []string{"Composer/2.7.0", "Composer/1.10.0"} {
-			wantRefusal(t, string(class)+" root "+agent,
-				f.requestUserAgent(base+"/packages.json", agent), blackedOut("php", "packages.json"))
+			wantRefusal(
+				t,
+				string(class)+" root "+agent,
+				f.requestUserAgent(
+					base+"/packages.json",
+					agent,
+				),
+				blackedOut("php", "packages.json"),
+			)
 		}
 		wantRefusal(t, string(class)+" p2", f.request("GET", base+"/p2/acme/widget.json"),
 			blackedOut("php", "p2/acme/widget.json"))
@@ -103,7 +111,12 @@ func TestAccDownloadPolicyOfAHostedRepository(t *testing.T) {
 		}
 		if got := f.requestUserAgent(base+"/packages.json", "Composer/1.10.0"); got.Code != 200 ||
 			!strings.Contains(got.Body.String(), `"1.0.0"`) {
-			t.Errorf("%s Composer 1 catalog with an excluded archive: %d %s", class, got.Code, got.Body)
+			t.Errorf(
+				"%s Composer 1 catalog with an excluded archive: %d %s",
+				class,
+				got.Code,
+				got.Body,
+			)
 		}
 		wantRefusal(t, string(class)+" excluded dist",
 			f.request("GET", base+"/dist/acme/widget/1.0.0.zip"), rejected("php", excluded))
@@ -171,8 +184,12 @@ func TestAccDownloadPolicyThroughAVirtualRepository(t *testing.T) {
 	f.patch("la", func(c *repo.Config) { c.ExcludesPattern = new(string) })
 	f.patch("lb", func(c *repo.Config) { c.ExcludesPattern = new(string) })
 	f.patch("v", func(c *repo.Config) { c.ExcludesPattern = &excluded })
-	wantRefusal(t, "virtual excludes the archive", f.request("GET", base+"/dist/acme/widget/1.0.0.zip"),
-		"No repository found to serve the request for v:acme/widget/1.0.0.zip")
+	wantRefusal(
+		t,
+		"virtual excludes the archive",
+		f.request("GET", base+"/dist/acme/widget/1.0.0.zip"),
+		"No repository found to serve the request for v:acme/widget/1.0.0.zip",
+	)
 	excluded = "p2/**"
 	f.patch("v", func(c *repo.Config) { c.ExcludesPattern = &excluded })
 	p2("virtual pattern on p2", fromA)
@@ -230,7 +247,12 @@ func TestAccDownloadPolicyOfARemoteRepository(t *testing.T) {
 		"/p2/acme/widget.json":        "p2/acme/widget.json",
 		"/dist/acme/widget/1.0.0.zip": "acme/widget/1.0.0.zip",
 	} {
-		wantRefusal(t, "blacked out "+path, f.request("GET", base+path), blackedOut("remote", checked))
+		wantRefusal(
+			t,
+			"blacked out "+path,
+			f.request("GET", base+path),
+			blackedOut("remote", checked),
+		)
 	}
 	if len(b.calls) != 0 {
 		t.Errorf("a blacked-out remote was read: %v", b.calls)

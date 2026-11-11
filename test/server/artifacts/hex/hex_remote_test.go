@@ -1082,19 +1082,34 @@ func TestUnitHexDownloadPolicyOfRemoteRepositories(t *testing.T) {
 	}
 	hexListing(t, "virtual past a blacked-out remote", "packages/decimal",
 		get("hex-v", "packages/decimal"), keys.public, "2.0.0")
-	if got := get("hex-v", tarball); got.Code != http.StatusOK || !bytes.Equal(got.Body.Bytes(), fixture) {
+	if got := get(
+		"hex-v",
+		tarball,
+	); got.Code != http.StatusOK ||
+		!bytes.Equal(got.Body.Bytes(), fixture) {
 		t.Errorf("tarball past a blacked-out remote: %d %s", got.Code, got.Body)
 	}
 	patchHexRepo(t, w, "hex-r", func(c *repo.Config) {
 		c.BlackedOut, c.ExcludesPattern = new(false), new(sibling)
 	})
-	hexListing(t, "excluded tarball's package", "packages/decimal", get("hex-r", "packages/decimal"),
-		keys.public, "2.0.0", "2.0.1")
+	hexListing(
+		t,
+		"excluded tarball's package",
+		"packages/decimal",
+		get("hex-r", "packages/decimal"),
+		keys.public,
+		"2.0.0",
+		"2.0.1",
+	)
 	if got := get("hex-r", "versions"); got.Code != http.StatusOK {
 		t.Errorf("excluded tarball's versions: %d %s", got.Code, got.Body)
 	}
 	hexRefusal(t, "excluded tarball", get("hex-r", sibling), hexRejected("hex-r", sibling))
-	if got := get("hex-r", tarball); got.Code != http.StatusOK || !bytes.Equal(got.Body.Bytes(), fixture) {
+	if got := get(
+		"hex-r",
+		tarball,
+	); got.Code != http.StatusOK ||
+		!bytes.Equal(got.Body.Bytes(), fixture) {
 		t.Errorf("sibling of an excluded tarball: %d %s", got.Code, got.Body)
 	}
 	hexListing(t, "virtual over an excluded tarball", "packages/decimal",
@@ -1115,7 +1130,11 @@ func TestUnitHexDownloadPolicyOfRemoteRepositories(t *testing.T) {
 	listed := hexListing(t, "legacy release whose tarball is excluded", "packages/decimal",
 		get("hex-r", "packages/decimal"), keys.public, "2.0.0", "2.0.1")
 	if len(listed) == 2 && listed[0].OuterChecksum != ([32]byte{}) || reads[tarball] != fetched {
-		t.Errorf("excluded legacy tarball read %d times to complete %+v", reads[tarball]-fetched, listed)
+		t.Errorf(
+			"excluded legacy tarball read %d times to complete %+v",
+			reads[tarball]-fetched,
+			listed,
+		)
 	}
 	patchHexRepo(t, w, "hex-r", func(c *repo.Config) { c.ExcludesPattern = new("") })
 	patchHexRepo(t, w, "hex-v", func(c *repo.Config) { c.ExcludesPattern = new(tarball) })
@@ -1136,21 +1155,35 @@ func TestUnitHexDownloadPolicyOfRemoteRepositories(t *testing.T) {
 	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "hex-no-tarballs",
 		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
-			Actions: accesstest.Grants{Users: map[string]api.Actions{"no-tarballs": api.ActionRead}},
-			Targets: map[string]accesstest.Target{"hex-r": {Include: []string{"tarballs/none.tar"}}},
+			Actions: accesstest.Grants{
+				Users: map[string]api.Actions{"no-tarballs": api.ActionRead},
+			},
+			Targets: map[string]accesstest.Target{
+				"hex-r": {Include: []string{"tarballs/none.tar"}},
+			},
 		}},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	before := calls
 	got := w.do(http.MethodGet, "/artifactory/api/hex/hex-r/packages/decimal", "no-tarballs", "")
-	if got.Code != http.StatusNotFound || !strings.Contains(got.Body.String(), "Hex package not found") {
+	if got.Code != http.StatusNotFound ||
+		!strings.Contains(got.Body.String(), "Hex package not found") {
 		t.Fatalf("no readable tarball: %d %s", got.Code, got.Body)
 	}
 	message := hexBlackedOut("hex-r", "packages/decimal")
 	refuseFrom, refusal = calls+(calls-before), format.Rejectf(http.StatusNotFound, "%s", message)
-	hexRefusal(t, "refused at revalidation",
-		w.do(http.MethodGet, "/artifactory/api/hex/hex-r/packages/decimal", "no-tarballs", ""), message)
+	hexRefusal(
+		t,
+		"refused at revalidation",
+		w.do(
+			http.MethodGet,
+			"/artifactory/api/hex/hex-r/packages/decimal",
+			"no-tarballs",
+			"",
+		),
+		message,
+	)
 }
 
 func mustReadHexFixture(t *testing.T) []byte {

@@ -30,7 +30,13 @@ func (f *fixture) patch(key string, change func(*repo.Config)) {
 
 // wantPubError fails unless rec is the pub error document with status and
 // message, and nothing else.
-func wantPubError(t *testing.T, label string, rec *httptest.ResponseRecorder, status int, message string) {
+func wantPubError(
+	t *testing.T,
+	label string,
+	rec *httptest.ResponseRecorder,
+	status int,
+	message string,
+) {
 	t.Helper()
 	want := `{"error":{"code":"` + map[int]string{
 		http.StatusNotFound: "NOT_FOUND", http.StatusForbidden: "FORBIDDEN",
@@ -87,16 +93,31 @@ func TestUnitDownloadPolicyRefusesTheVersionsDocumentAtItsStoredPath(t *testing.
 					blackedOut("pub-local", document))
 			}
 		}
-		wantPubError(t, string(class)+" blacked-out archive", f.do(http.MethodGet, file, "admin", "", nil),
-			http.StatusNotFound, blackedOut("pub-local", "hello_pub/hello_pub-1.0.0.tar.gz"))
+		wantPubError(
+			t,
+			string(class)+" blacked-out archive",
+			f.do(http.MethodGet, file, "admin", "", nil),
+			http.StatusNotFound,
+			blackedOut("pub-local", "hello_pub/hello_pub-1.0.0.tar.gz"),
+		)
 		wantPubError(t, string(class)+" blacked-out, unreadable",
 			f.do(http.MethodGet, versions, "nothing", "", nil), http.StatusForbidden, "Forbidden")
 		excluded := ".pub/**"
 		f.patch(f.c.Key, func(c *repo.Config) { c.BlackedOut, c.ExcludesPattern = &off, &excluded })
-		wantPubError(t, string(class)+" excluded versions", f.do(http.MethodGet, versions, "admin", "", nil),
-			http.StatusNotFound, rejected("pub-local", document))
-		wantPubError(t, string(class)+" excluded version", f.do(http.MethodGet, version, "admin", "", nil),
-			http.StatusNotFound, rejected("pub-local", document))
+		wantPubError(
+			t,
+			string(class)+" excluded versions",
+			f.do(http.MethodGet, versions, "admin", "", nil),
+			http.StatusNotFound,
+			rejected("pub-local", document),
+		)
+		wantPubError(
+			t,
+			string(class)+" excluded version",
+			f.do(http.MethodGet, version, "admin", "", nil),
+			http.StatusNotFound,
+			rejected("pub-local", document),
+		)
 		if rec := f.do(http.MethodGet, file, "admin", "", nil); rec.Code != http.StatusOK ||
 			!bytes.Equal(rec.Body.Bytes(), data) {
 			t.Errorf("%s archive beside an excluded document: %d %s", class, rec.Code, rec.Body)
@@ -108,8 +129,13 @@ func TestUnitDownloadPolicyRefusesTheVersionsDocumentAtItsStoredPath(t *testing.
 		) {
 			t.Errorf("%s versions with an excluded archive: %v", class, listed)
 		}
-		wantPubError(t, string(class)+" excluded archive", f.do(http.MethodGet, file, "admin", "", nil),
-			http.StatusNotFound, rejected("pub-local", "hello_pub/hello_pub-1.0.0.tar.gz"))
+		wantPubError(
+			t,
+			string(class)+" excluded archive",
+			f.do(http.MethodGet, file, "admin", "", nil),
+			http.StatusNotFound,
+			rejected("pub-local", "hello_pub/hello_pub-1.0.0.tar.gz"),
+		)
 		excluded = ""
 		f.patch(f.c.Key, func(c *repo.Config) { c.ExcludesPattern = &excluded })
 		if _, listed := f.versionsOf(f.c.Key, "hello_pub", "admin"); len(listed) != 2 {
@@ -165,8 +191,13 @@ func TestUnitDownloadPolicyThroughAVirtualRepository(t *testing.T) {
 		t.Errorf("first member's archive excluded: archive %d %s", rec.Code, rec.Body)
 	}
 	f.patch("pub-b", func(c *repo.Config) { c.ExcludesPattern = &excluded })
-	wantPubError(t, "every member excludes the archive", f.do(http.MethodGet, file, "admin", "", nil),
-		http.StatusNotFound, "version not found")
+	wantPubError(
+		t,
+		"every member excludes the archive",
+		f.do(http.MethodGet, file, "admin", "", nil),
+		http.StatusNotFound,
+		"version not found",
+	)
 	excluded = ".pub/**"
 	f.patch("pub-a", func(c *repo.Config) { c.ExcludesPattern = &excluded })
 	f.patch("pub-b", func(c *repo.Config) { c.ExcludesPattern = new(string) })
@@ -180,8 +211,13 @@ func TestUnitDownloadPolicyThroughAVirtualRepository(t *testing.T) {
 	}
 	f.patch("pub-a", func(c *repo.Config) { c.ExcludesPattern = new(string) })
 	f.patch(f.c.Key, func(c *repo.Config) { c.ExcludesPattern = &excluded })
-	wantPubError(t, "virtual excludes the document", f.do(http.MethodGet, versions, "admin", "", nil),
-		http.StatusNotFound, "No repository found to serve the request for pub-local:.pub/hello_pub.json")
+	wantPubError(
+		t,
+		"virtual excludes the document",
+		f.do(http.MethodGet, versions, "admin", "", nil),
+		http.StatusNotFound,
+		"No repository found to serve the request for pub-local:.pub/hello_pub.json",
+	)
 	if rec := f.do(http.MethodGet, file, "admin", "", nil); rec.Code != http.StatusOK ||
 		!bytes.Equal(rec.Body.Bytes(), fromA) {
 		t.Errorf("virtual excludes the document: archive %d %s", rec.Code, rec.Body)
@@ -275,7 +311,13 @@ func TestUnitDownloadPolicyOfARemoteRepository(t *testing.T) {
 	if len(doc.Versions) != 1 || doc.Versions[0].Pubspec["description"] != "from b" {
 		t.Errorf("blacked-out remote member: versions %+v", doc.Versions)
 	}
-	rec := v.do(http.MethodGet, base+"/packages/visible_pub/versions/1.0.0.tar.gz", "admin", "", nil)
+	rec := v.do(
+		http.MethodGet,
+		base+"/packages/visible_pub/versions/1.0.0.tar.gz",
+		"admin",
+		"",
+		nil,
+	)
 	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), fromB) {
 		t.Errorf("blacked-out remote member: archive %d %s", rec.Code, rec.Body)
 	}

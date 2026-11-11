@@ -69,7 +69,14 @@ func TestAccDownloadPolicy(t *testing.T) {
 			404, refusedInfo(pre, "v1.0.0-rc.1"),
 		},
 		{"list kept", "", v + "list", "reader", http.StatusOK, "v1.0.0"},
-		{"mod kept", "", v + "v1.0.0.mod", "reader", http.StatusOK, "=served " + lib + "/@v/v1.0.0.mod"},
+		{
+			"mod kept",
+			"",
+			v + "v1.0.0.mod",
+			"reader",
+			http.StatusOK,
+			"=served " + lib + "/@v/v1.0.0.mod",
+		},
 		// Read permission comes first: the .mod a synthesised .info needs.
 		{"excluded, unreadable", "", v + "v1.0.0.info", "infos", http.StatusForbidden, ""},
 	})
@@ -97,7 +104,14 @@ func TestAccDownloadPolicy(t *testing.T) {
 			"synthesised info refused", "", v + "v1.0.0.info", "reader", http.StatusNotFound,
 			blackedOutMessage(lib + "/@v/v1.0.0.info"),
 		},
-		{"list refused", "", v + "list", "reader", http.StatusNotFound, blackedOutMessage(lib + "/@v/list")},
+		{
+			"list refused",
+			"",
+			v + "list",
+			"reader",
+			http.StatusNotFound,
+			blackedOutMessage(lib + "/@v/list"),
+		},
 		{
 			"latest refused", "", base + local + "/" + lib + "/@latest", "reader",
 			http.StatusNotFound, blackedOutMessage(lib + "/@latest"),

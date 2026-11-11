@@ -518,7 +518,14 @@ func TestUnitHexDownloadPolicyOfLocalAndVirtualRepositories(t *testing.T) {
 	if got := get("hex-a", "public_key"); got.Code != http.StatusOK {
 		t.Errorf("blacked out public_key: %d %s", got.Code, got.Body)
 	}
-	hexListing(t, "virtual past a blacked-out member, names", "names", get("hex-v", "names"), keys.public, "ecto")
+	hexListing(
+		t,
+		"virtual past a blacked-out member, names",
+		"names",
+		get("hex-v", "names"),
+		keys.public,
+		"ecto",
+	)
 	if got := get("hex-v", "packages/decimal"); got.Code != http.StatusNotFound ||
 		!strings.Contains(got.Body.String(), "Hex package not found") {
 		t.Errorf("virtual past a blacked-out member, package: %d %s", got.Code, got.Body)
@@ -526,15 +533,42 @@ func TestUnitHexDownloadPolicyOfLocalAndVirtualRepositories(t *testing.T) {
 	patchHexRepo(t, w, "hex-a", func(c *repo.Config) {
 		c.BlackedOut, c.ExcludesPattern = new(false), new(tarball)
 	})
-	hexListing(t, "excluded tarball's package", "packages/decimal", get("hex-a", "packages/decimal"), keys.public, "2.0.0")
-	hexListing(t, "excluded tarball's names", "names", get("hex-a", "names"), keys.public, "decimal")
+	hexListing(
+		t,
+		"excluded tarball's package",
+		"packages/decimal",
+		get("hex-a", "packages/decimal"),
+		keys.public,
+		"2.0.0",
+	)
+	hexListing(
+		t,
+		"excluded tarball's names",
+		"names",
+		get("hex-a", "names"),
+		keys.public,
+		"decimal",
+	)
 	hexRefusal(t, "excluded tarball", get("hex-a", tarball), hexRejected("hex-a", tarball))
-	hexListing(t, "virtual over an excluded tarball", "packages/decimal", get("hex-v", "packages/decimal"),
-		keys.public, "2.0.0")
+	hexListing(
+		t,
+		"virtual over an excluded tarball",
+		"packages/decimal",
+		get("hex-v", "packages/decimal"),
+		keys.public,
+		"2.0.0",
+	)
 	patchHexRepo(t, w, "hex-a", func(c *repo.Config) { c.ExcludesPattern = new("packages/**") })
 	hexRefusal(t, "excluded package", get("hex-a", "packages/decimal"),
 		hexRejected("hex-a", "packages/decimal"))
-	hexListing(t, "names beside an excluded package", "names", get("hex-a", "names"), keys.public, "decimal")
+	hexListing(
+		t,
+		"names beside an excluded package",
+		"names",
+		get("hex-a", "names"),
+		keys.public,
+		"decimal",
+	)
 	if got := get("hex-a", "versions"); got.Code != http.StatusOK {
 		t.Errorf("versions beside an excluded package: %d %s", got.Code, got.Body)
 	}

@@ -86,7 +86,12 @@ func TestAccDownloadPolicyOfAHostedRepository(t *testing.T) {
 			f := newFixture(t, class)
 			for _, v := range []string{"1.0.0", "1.1.0"} {
 				body := publishBody(t, "hello_cargo", v, archive(t, "hello_cargo", v))
-				if got := f.do(http.MethodPut, policyBase+"api/v1/crates/new", "admin", body); got.Code != 200 {
+				if got := f.do(
+					http.MethodPut,
+					policyBase+"api/v1/crates/new",
+					"admin",
+					body,
+				); got.Code != 200 {
 					t.Fatalf("publish %s: %d %s", v, got.Code, got.Body)
 				}
 			}
@@ -95,12 +100,22 @@ func TestAccDownloadPolicyOfAHostedRepository(t *testing.T) {
 			}
 			blackout := true
 			f.patch(func(c *repo.Config) { c.BlackedOut = &blackout })
-			wantRefusal(t, "blacked out config", get("index/config.json", "admin"), blackedOut("config.json"))
+			wantRefusal(
+				t,
+				"blacked out config",
+				get("index/config.json", "admin"),
+				blackedOut("config.json"),
+			)
 			wantRefusal(t, "blacked out index", get(policyIndex, "admin"), blackedOut(policyIndex))
 			wantRefusal(t, "blacked out versions", get("api/v1/crates/hello_cargo", "admin"),
 				blackedOut("api/v1/crates/hello_cargo"))
 			wantRefusal(t, "blacked out crate", get(policyFirst, "admin"), blackedOut(policyCrate))
-			if got := f.do(http.MethodHead, policyBase+policyIndex, "admin", nil); got.Code != 404 ||
+			if got := f.do(
+				http.MethodHead,
+				policyBase+policyIndex,
+				"admin",
+				nil,
+			); got.Code != 404 ||
 				got.Header().Get("Cache-Control") != "" {
 				t.Errorf("blacked out index HEAD: %d %v", got.Code, got.Header())
 			}
@@ -109,13 +124,23 @@ func TestAccDownloadPolicyOfAHostedRepository(t *testing.T) {
 				t.Errorf("blacked out index, no permission: %d %s", got.Code, got.Body)
 			}
 			want := `{"errors":[{"detail":"Cargo crate read denied"}]}` + "\n"
-			if got := get("api/v1/crates/hello_cargo", "nobody"); got.Code != 403 || got.Body.String() != want {
+			if got := get(
+				"api/v1/crates/hello_cargo",
+				"nobody",
+			); got.Code != 403 ||
+				got.Body.String() != want {
 				t.Errorf("blacked out versions, no permission: %d %s", got.Code, got.Body)
 			}
 			blackout = false
 			excluded := policyCrate
 			f.patch(func(c *repo.Config) { c.BlackedOut, c.ExcludesPattern = &blackout, &excluded })
-			wantOK(t, "excluded crate's index", get(policyIndex, "admin"), `"vers":"1.0.0"`, `"vers":"1.1.0"`)
+			wantOK(
+				t,
+				"excluded crate's index",
+				get(policyIndex, "admin"),
+				`"vers":"1.0.0"`,
+				`"vers":"1.1.0"`,
+			)
 			wantOK(t, "excluded crate's versions", get("api/v1/crates/hello_cargo", "admin"),
 				`"vers":"1.0.0"`, `"vers":"1.1.0"`)
 			wantRefusal(t, "excluded crate", get(policyFirst, "admin"), rejected(policyCrate))
@@ -126,11 +151,20 @@ func TestAccDownloadPolicyOfAHostedRepository(t *testing.T) {
 			wantOK(t, "config beside an excluded index", get("index/config.json", "admin"))
 			// The patterns do not refuse the versions API: where 7.x would
 			// keep it is not documented.
-			wantOK(t, "versions beside an excluded index", get("api/v1/crates/hello_cargo", "admin"))
+			wantOK(
+				t,
+				"versions beside an excluded index",
+				get("api/v1/crates/hello_cargo", "admin"),
+			)
 			wantOK(t, "crate beside an excluded index", get(policyFirst, "admin"))
 			excluded = "config.json"
 			f.patch(func(c *repo.Config) { c.ExcludesPattern = &excluded })
-			wantRefusal(t, "excluded config", get("index/config.json", "admin"), rejected("config.json"))
+			wantRefusal(
+				t,
+				"excluded config",
+				get("index/config.json", "admin"),
+				rejected("config.json"),
+			)
 			wantOK(t, "index beside an excluded config", get(policyIndex, "admin"))
 		})
 	}
@@ -189,8 +223,10 @@ func policyRemote(t *testing.T) (*fixture, *fakeupstream.Server, *deliveryHook) 
 	for _, v := range []string{"1.0.0", "1.1.0"} {
 		crate := archive(t, "hello_cargo", v)
 		sum := sha256.Sum256(crate)
-		lines.WriteString(`{"name":"hello_cargo","vers":"` + v + `","deps":[],"features":{},"cksum":"` +
-			hex.EncodeToString(sum[:]) + `","yanked":false}` + "\n")
+		lines.WriteString(
+			`{"name":"hello_cargo","vers":"` + v + `","deps":[],"features":{},"cksum":"` +
+				hex.EncodeToString(sum[:]) + `","yanked":false}` + "\n",
+		)
 		up.Set("/cargo/crates/hello_cargo/"+v+"/download", fakeupstream.Resource{Body: crate})
 	}
 	up.Set("/cargo/config.json",
@@ -212,7 +248,12 @@ func TestAccDownloadPolicyOfARemoteRepository(t *testing.T) {
 	}
 	blackout := true
 	f.patch(func(c *repo.Config) { c.BlackedOut = &blackout })
-	wantRefusal(t, "blacked out config", get("index/config.json", "admin"), blackedOut("config.json"))
+	wantRefusal(
+		t,
+		"blacked out config",
+		get("index/config.json", "admin"),
+		blackedOut("config.json"),
+	)
 	wantRefusal(t, "blacked out index", get(policyIndex, "admin"), blackedOut(policyIndex))
 	wantRefusal(t, "blacked out crate", get(policyFirst, "admin"), blackedOut(policyCrate))
 	if got := get(policyIndex, "nobody"); got.Code != http.StatusForbidden {
@@ -226,7 +267,13 @@ func TestAccDownloadPolicyOfARemoteRepository(t *testing.T) {
 	blackout = false
 	excluded := policyCrate
 	f.patch(func(c *repo.Config) { c.BlackedOut, c.ExcludesPattern = &blackout, &excluded })
-	wantOK(t, "excluded crate's index", get(policyIndex, "admin"), `"vers":"1.0.0"`, `"vers":"1.1.0"`)
+	wantOK(
+		t,
+		"excluded crate's index",
+		get(policyIndex, "admin"),
+		`"vers":"1.0.0"`,
+		`"vers":"1.1.0"`,
+	)
 	wantRefusal(t, "excluded crate", get(policyFirst, "admin"), rejected(policyCrate))
 	wantOK(t, "other crate", get(policySecond, "admin"))
 	excluded = "index/**"

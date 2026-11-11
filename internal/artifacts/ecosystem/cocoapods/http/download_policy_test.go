@@ -121,7 +121,10 @@ func TestUnitDownloadPolicyRefusesLocalCDNDocumentsAtTheirStoredPath(t *testing.
 		t.Errorf("blacked out, unreadable: %d %s", resp.Code, resp.Body)
 	}
 	excluded := ".pod/**"
-	f.patch("pods-local", func(c *repo.Config) { c.BlackedOut, c.ExcludesPattern = &off, &excluded })
+	f.patch(
+		"pods-local",
+		func(c *repo.Config) { c.BlackedOut, c.ExcludesPattern = &off, &excluded },
+	)
 	for _, path := range documents {
 		wantRefusal(t, "excluded "+path, f.get("pods-local", path),
 			rejected("pods-local", ".pod/cdn/"+path))
@@ -186,7 +189,10 @@ func TestUnitDownloadPolicyThroughAVirtualRepository(t *testing.T) {
 		resp.Body.String() != "LocalPod\n" {
 		t.Errorf("first member blacked out, index: %d %q", resp.Code, resp.Body)
 	}
-	if resp := f.get("pods-locals", podfmt.SpecPath("OnlyFirst", "1.0.0")); resp.Code != http.StatusNotFound {
+	if resp := f.get(
+		"pods-locals",
+		podfmt.SpecPath("OnlyFirst", "1.0.0"),
+	); resp.Code != http.StatusNotFound {
 		t.Errorf("first member blacked out, its spec: %d %s", resp.Code, resp.Body)
 	}
 	f.patch("pods-local", func(c *repo.Config) { c.BlackedOut = &off })
@@ -213,8 +219,15 @@ func TestUnitDownloadPolicyThroughAVirtualRepository(t *testing.T) {
 	served("virtual excludes the documents", archive, "first archive")
 	excluded = "LocalPod/**"
 	f.patch("pods-locals", func(c *repo.Config) { c.ExcludesPattern = &excluded })
-	wantRefusal(t, "virtual excludes the archive", f.get("pods-locals", archive),
-		"No repository found to serve the request for pods-locals:"+podfmt.Path("LocalPod", "1.0.0"))
+	wantRefusal(
+		t,
+		"virtual excludes the archive",
+		f.get("pods-locals", archive),
+		"No repository found to serve the request for pods-locals:"+podfmt.Path(
+			"LocalPod",
+			"1.0.0",
+		),
+	)
 	served("virtual excludes the archive", podfmt.ShardFile("LocalPod"), "LocalPod/1.0.0")
 }
 
@@ -251,7 +264,10 @@ func TestUnitDownloadPolicyOfARemoteRepository(t *testing.T) {
 		t.Errorf("blacked-out remote member's archive: %d %s", resp.Code, resp.Body)
 	}
 	excluded := ".pod/**"
-	f.patch("pods-remote", func(c *repo.Config) { c.BlackedOut, c.ExcludesPattern = &off, &excluded })
+	f.patch(
+		"pods-remote",
+		func(c *repo.Config) { c.BlackedOut, c.ExcludesPattern = &off, &excluded },
+	)
 	wantRefusal(t, "remote excludes its documents", f.get("pods-remote", spec),
 		rejected("pods-remote", ".pod/cdn/"+spec))
 	// 7.x caches a CDN remote's documents under .pod/cdn/, so a pattern
