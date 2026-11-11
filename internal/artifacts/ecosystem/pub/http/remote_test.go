@@ -1,10 +1,18 @@
 package pubhttp
 
 import (
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
+
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 )
 
 const metadataBase = "https://pub.example/api/packages/widget_pub"
@@ -64,5 +72,31 @@ func TestUnitWithinRegistryRequiresDescendantURL(t *testing.T) {
 				t.Fatalf("withinRegistry(%q) = %q, %t", tc.url, path, ok)
 			}
 		})
+	}
+}
+
+func TestUnitVirtualSourceHasNoSingleItemLookup(t *testing.T) {
+	_, err := virtualSource{}.Item(t.Context(), nil, repo.Config{}, "widget_pub")
+	if !errors.Is(err, source.ErrUnsupported) {
+		t.Fatalf("virtual item lookup: %v", err)
+	}
+}
+
+// A remote release always carries the read check and revalidation of the
+// metadata that listed it; one without either is refused, not fetched.
+func TestUnitRemoteArchiveRefusesReleaseWithoutMetadataAuthority(t *testing.T) {
+	h := handler{k: pkgroute.Mount(chi.NewRouter(), pkgroute.Options{}, Protocol(Options{}))}
+	allowed := func(context.Context, string) error { return nil }
+	current := func(context.Context) error { return nil }
+	for name, rel := range map[string]release{
+		"no read check":   {revalidate: current},
+		"no revalidation": {checkRead: allowed},
+	} {
+		rel.remoteURL = "https://pub.example/packages/widget_pub/versions/1.2.3.tar.gz"
+		rec := httptest.NewRecorder()
+		h.remoteArchive(rec, httptest.NewRequest(http.MethodGet, "/", nil), rel)
+		if rec.Code != http.StatusBadGateway {
+			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
+		}
 	}
 }
