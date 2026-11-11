@@ -755,14 +755,14 @@ decided:
 | Research table | As built | Why |
 |---|---|---|
 | `groups` | `user_groups` | `GROUPS` is a keyword in SQLite |
-| `roles`, `project_roles` | one `roles` table keyed by `(project_key, name)`, `''` for global roles | one `types.Role` with an optional project |
-| `oidc_configs`, `oidc_identity_mappings`, `ldap_settings`, `ldap_group_settings`, `saml_settings`, `vault_configs`, `descriptor_*` | `config_documents (kind, key)` and `config_secrets (kind, key, name)` | none of these documents is queried by field; `types.ConfigDocument` with `ConfigKind` names the families, secrets stay sealed in their own table |
+| `roles`, `project_roles` | one `roles` table keyed by `(project_key, name)`, `''` for global roles | one `model.Role` (`internal/access/core/model`) with an optional project |
+| `oidc_configs`, `oidc_identity_mappings`, `ldap_settings`, `ldap_group_settings`, `saml_settings`, `vault_configs`, `descriptor_*` | `config_documents (kind, key)` and `config_secrets (kind, key, name)` | none of these documents is queried by field; `configdoc.ConfigDocument` with `ConfigKind` names the families, secrets stay sealed in their own table |
 | `bundle_retention` | `bundle_keeps` and `bundle_audits` | keep marks go with the bundle version, the audit trail must outlive it |
 | (none) | `bundle_exports`, `trusted_keys`, `outbox_sequences`, `peer_use_cases` | export records (research 16), trusted bundle keys (`/api/security/keys/trusted`), race-free per-stream sequence allocation that pruning never resets, and an indexed use-case filter |
-| `peers (id PK, instance_id UNIQUE)` | keyed by `instance_id`; other tables name the column `peer` | `types.Peer` has no other identity |
-| `outbox.hlc_time` | `hlc_wall`, `hlc_logical` | `types.HLC` has two parts |
+| `peers (id PK, instance_id UNIQUE)` | keyed by `instance_id`; other tables name the column `peer` | `model.Peer` (`internal/federation/core/model`) has no other identity |
+| `outbox.hlc_time` | `hlc_wall`, `hlc_logical` | `outbox.HLC` has two parts |
 | `items` | adds `original_sha256`; `type` is `file` or `folder` | `Item.Original` carries all three digests; AQL spells the types that way |
-| `uploads (backend_handle)` | `backend`, opaque `state`, `updated_at` | the S3 backend persists its multipart session through `store.UploadStore` (`s3.StoreStates`) and the reaper ages sessions by last update |
+| `uploads (backend_handle)` | `backend`, opaque `state`, `updated_at` | the S3 backend persists its multipart session through `session.UploadStore` (`s3.StoreStates`) and the reaper ages sessions by last update |
 | `tokens (token_hash, refresh_hash, reference_hash)` | `access_digest`, `refresh_digest`, `reference_digest`, unique and NULL when unset; `issued_at` never NULL | NULLs sort differently on the two engines and the token list pages by `(issued_at, id)` |
 | `webhooks`, `project_repositories` | add `description`, `debug`, `created_at`, `updated_at`; `environments` document and `updated_at` | fields of `WebhookSubscription` and `RepositoryAssignment` |
 | `worker_executions (payload, result, logs)` | binary columns; `trigger_kind`, `filter_doc` renamed | non-UTF-8 bytes must round-trip; `trigger` and `filter` are SQL keywords |

@@ -159,8 +159,8 @@ Artifactory uses two different tests:
   `mercury` comparator (`VersionComparators.getVersionComparator("mercury")`).
   `mvn.metadataVersionsComparatorFqn` and `mvn.metadataSnapshotComparatorFqn` can replace the
   version and snapshot comparators (`ConstantValues`).
-- **[S]** artifactweave has the Mercury order as `types.CompareMercury` (`pkg/types/version.go`)
-  and uses it for the P5 version searches, but `types.ComparatorFor` gives the Maven family
+- **[S]** artifactweave has the Mercury order as `model.CompareMercury`
+  (`internal/artifacts/core/model/version.go`) and uses it for the P5 version searches, but `model.ComparatorFor` gives the Maven family
   `CompareMaven`, Maven's `ComparableVersion` (research 24, fact 2.9).
 
 ## 2. Snapshots

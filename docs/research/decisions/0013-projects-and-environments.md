@@ -49,8 +49,8 @@ a repository's `environments` field follows Artifactory's project rule.
 
 **Global roles and environments** (`/access/api/v1/roles`, `/access/api/v1/environments`,
 issue #77, `internal/access/core/roles`):
-- **Built-ins:** their defaults are defined in code (`types.BuiltinGlobalRoles`,
-  `types.BuiltinEnvironments`).
+- **Built-ins:** their defaults are defined in code (`model.BuiltinGlobalRoles`
+  in `internal/access/core/model`, `api.BuiltinEnvironments` in `internal/access/api`).
   - The roles are "Project Admin" (`ADMIN`, the whole global vocabulary on DEV and PROD)
     and Developer, Contributor, Viewer, Release Manager and Security Manager
     (`PREDEFINED`). Application Admin and ML roles are not implemented. P25 owns
@@ -90,7 +90,7 @@ issue #77, `internal/access/core/roles`):
   - Deleting a role removes it from every project membership; a membership left with no
     role is removed.
 - **Reading a role for the permission evaluator:** `roles.Service.Role`, then
-  `types.RoleActions`.
+  `model.RoleActions`.
 
 ## Rationale
 

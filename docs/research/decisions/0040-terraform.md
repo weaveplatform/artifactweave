@@ -303,7 +303,7 @@ This sets the Terraform part of decision 0018:
 | Version | the version without `v`, made when its zip is stored | the version, made when its first file is stored |
 | Files | the zip | the packages, `SHA256SUMS`, the signature and the manifest |
 | Per-file metadata | none | for a package: `os`, `arch` and its `h1:` hash |
-| Order | `CompareSemver` (`types.ComparatorFor(repo.Terraform)`) | the same |
+| Order | `CompareSemver` (`model.ComparatorFor(repo.Terraform)`) | the same |
 | Derived work | none; answers are computed on read | none |
 
 ### Reindex

@@ -117,7 +117,7 @@ This sets the Go part of decision 0018:
 - **Package:** the module path, as stored, keyed by its repository.
 - **Version:** the version string, created when its first file is stored.
 - **Files:** the version's `.zip`, `.mod` and `.info`.
-- **Order:** `CompareSemver` (`types.ComparatorFor(repo.Go)`). It drops build metadata, so
+- **Order:** `CompareSemver` (`model.ComparatorFor(repo.Go)`). It drops build metadata, so
   `+incompatible` does not affect order; a module path admits either `vN.x.y` with its
   `/vN` suffix or `vN.x.y+incompatible` without one, never both, so no two versions
   compare equal. `@latest` selects with its own rule above.

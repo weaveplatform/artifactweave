@@ -364,7 +364,7 @@ the package search. A claim no 7.x source shows is **[I]** and on the live-compa
 | No Helm format exists: `formats.For(repo.Helm)` is the generic handler, which keeps no index | [S] `internal/format/formats/formats.go` |
 | `POST /api/helm/{repoKey}/reindex` is generated and answers 501 until the format is a `Reindexer`, then needs an administrator and runs before it answers; #516 moves it to Manage and the queue | [S] `internal/artifacts/adapters/http/reindex.go` (`CalculateHelmChartIndex`), `internal/artifacts/adapters/http/itemkit/reindex.go` (`Reindex`) |
 | `pkg/repo.Config` has `forceMetadataNameVersion` and `forceNonDuplicateChart`, `false` by default on local and federated repositories, and the v2 read keeps them for `helm` only; nothing stops an update from changing them | [S] `pkg/repo/repo.go`, `defaults.go`, `views.go` |
-| `types.ComparatorFor(repo.Helm)` is `CompareSemver`, and Helm OCI's is push order | [S] `pkg/types/version.go` |
+| `model.ComparatorFor(repo.Helm)` is `CompareSemver`, and Helm OCI's is push order | [S] `internal/artifacts/core/model/version.go` |
 | `format.SidecarOwner` means that uploads named as checksum sidecars (`.sha1` and the like) are checksums of their file; only Maven implements it | [S] `internal/format/format.go` (`SidecarOwner`) |
 | `item.MimeType` gives `.tgz` `application/x-gzip` and has no entry for `.yaml` or `.prov` | [S] `internal/service/item/item.go` |
 | The base URL resolver already names Helm chart URLs among its users, and honours `X-JFrog-Override-Base-Url` | [S] `internal/server/baseurl/baseurl.go` |

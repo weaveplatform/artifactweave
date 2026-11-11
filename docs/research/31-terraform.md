@@ -565,7 +565,7 @@ binary's actual discovery document rather than constructing its service URLs.
 - **[S]** `POST /api/terraform/{repoKey}/reindex` is served (`internal/artifacts/adapters/http/reindex.go:228`).
 - **[S]** No Terraform format exists: `format.For` answers the generic handler, which keeps
   no index, and nothing is served at `/.well-known/terraform.json`.
-- **[S]** `types.ComparatorFor(repo.Terraform)` is `CompareSemver` (`pkg/types/version.go:48`).
+- **[S]** `model.ComparatorFor(repo.Terraform)` is `CompareSemver` (`internal/artifacts/core/model/version.go:48`).
 
 ## 13. Corrections to earlier research
 

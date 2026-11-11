@@ -84,9 +84,9 @@ this is not an assertion that every future code path has been audited.
 
 A source-path review on merged `02b1710c` found no concrete blocking defect in the
 reviewed remote transport, source/cache, mapped discovery, transitive AQL, NuGet v2
-or Terraform provider paths. [`security.go`](../../internal/remote/security.go) pins
+or Terraform provider paths. [`security.go`](https://github.com/weaveplatform/artifactweave/blob/ec4592a513985e4986f60b060984e40c3347be73/internal/remote/security.go) pins
 DNS answers per outbound hop; the client validates redirects and scopes credential
-headers. [`source.go`](../../internal/source/source.go) checks authorization before
+headers. [`source.go`](https://github.com/weaveplatform/artifactweave/blob/ec4592a513985e4986f60b060984e40c3347be73/internal/source/source.go) checks authorization before
 network work, and the item cache checks bytes and current authority in its
 publication transaction. Mapped listing and transitive AQL recheck canonical
 permissions before disclosure. Representative regressions include

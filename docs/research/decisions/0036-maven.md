@@ -31,7 +31,7 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
 - **Files:** every file the layout places in that version: the POM or Ivy descriptor, the
   artifacts and classifiers, and every unique build. Derived `maven-metadata.xml` files are
   not version files.
-- **Order:** `types.CompareMercury` for all four types, which `types.ComparatorFor` returns
+- **Order:** `model.CompareMercury` for all four types, which `model.ComparatorFor` returns
   instead of `CompareMaven`.
 - **Per-version metadata:** what `Inspect` reads from the POM before the write transaction:
   `packaging` and `name`, for plugin metadata.

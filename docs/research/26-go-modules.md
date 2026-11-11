@@ -295,7 +295,7 @@ historical evidence, not the current implementation status.
   through `apierror.ProfileText`, which writes `text/plain; charset=utf-8` and the message
   (`apierror.go:99-103`).
 - **[S]** `pkg/repo/packagetypes.go:54` gives Go the `go-default` layout.
-- **[S]** `types.ComparatorFor(repo.Go)` (`pkg/types/version.go:46-58`) is `CompareSemver`.
+- **[S]** `model.ComparatorFor(repo.Go)` (`internal/artifacts/core/model/version.go:46-58`) is `CompareSemver`.
   It trims a leading `v`, compares up to three numbers and the pre-release, and drops build
   metadata, so `+incompatible` does not affect order. It orders pseudo-versions by their
   pre-release text, not by the time they encode.
