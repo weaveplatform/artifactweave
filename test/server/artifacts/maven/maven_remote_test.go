@@ -286,7 +286,12 @@ func TestAccMavenRemoteRefusedMetadataCountsAsAbsent(t *testing.T) {
 	dir := "org/acme/app/1.1-SNAPSHOT/"
 	nonunique := sourceJAR(t, "nonunique")
 	mavenSource(w, dir+"app-1.1-SNAPSHOT.jar", nonunique, "application/java-archive")
-	mavenSource(w, dir+"app-1.1-20261021.120000-1.jar", sourceJAR(t, "unique"), "application/java-archive")
+	mavenSource(
+		w,
+		dir+"app-1.1-20261021.120000-1.jar",
+		sourceJAR(t, "unique"),
+		"application/java-archive",
+	)
 	mavenSource(
 		w,
 		dir+"maven-metadata.xml",
@@ -315,7 +320,13 @@ func TestAccMavenRemoteRefusedMetadataCountsAsAbsent(t *testing.T) {
 	if !strings.Contains(res.Body.String(), "include/exclude pattern") {
 		t.Fatal("metadata not refused by the patterns", res.Body)
 	}
-	if n := w.up.Count("GET", "/"+dir+"maven-metadata.xml") + w.up.Count("GET", "/org/acme/app/maven-metadata.xml"); n != 0 {
+	if n := w.up.Count(
+		"GET",
+		"/"+dir+"maven-metadata.xml",
+	) + w.up.Count(
+		"GET",
+		"/org/acme/app/maven-metadata.xml",
+	); n != 0 {
 		t.Fatal("refused metadata reached upstream", w.up.Requests())
 	}
 	// Metadata the upstream lacks still answers 404 without asking for the
@@ -324,7 +335,8 @@ func TestAccMavenRemoteRefusedMetadataCountsAsAbsent(t *testing.T) {
 	w.update()
 	missing := "org/acme/none/[RELEASE]/none-[RELEASE].jar"
 	remoteStatus(t, w.request("GET", "/artifactory/remote/"+missing, "reader", ""), 404)
-	if w.up.Count("", "/org/acme/none/maven-metadata.xml") == 0 || w.up.Count("", "/"+missing) != 0 {
+	if w.up.Count("", "/org/acme/none/maven-metadata.xml") == 0 ||
+		w.up.Count("", "/"+missing) != 0 {
 		t.Fatal("token path fetched without metadata", w.up.Requests())
 	}
 }

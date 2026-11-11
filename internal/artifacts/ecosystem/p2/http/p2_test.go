@@ -151,7 +151,8 @@ func TestUnitP2VirtualLeavesOutBlackedOutMembers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	d, err := accesstest.Over(t, w.db).Decide(t.Context(), accessapi.Subject{Name: "admin", Admin: true}, false)
+	d, err := accesstest.Over(t, w.db).
+		Decide(t.Context(), accessapi.Subject{Name: "admin", Admin: true}, false)
 	if err != nil {
 		t.Fatal(err)
 	}

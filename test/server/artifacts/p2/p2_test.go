@@ -511,7 +511,12 @@ func TestAccP2DownloadPolicy(t *testing.T) {
 		configs[c.Key] = c
 	}
 	for name, body := range map[string][]byte{"p2.index": index, "content.jar": content} {
-		if res := w.do(http.MethodPut, "/artifactory/p2-local/"+name, "admin", string(body)); res.Code != http.StatusCreated {
+		if res := w.do(
+			http.MethodPut,
+			"/artifactory/p2-local/"+name,
+			"admin",
+			string(body),
+		); res.Code != http.StatusCreated {
 			t.Fatalf("publish %s: %d %s", name, res.Code, res.Body)
 		}
 	}
@@ -562,9 +567,18 @@ func TestAccP2DownloadPolicy(t *testing.T) {
 	}
 	served("/artifactory/p2-virtual/__p2/1/content.jar", content)
 
-	patch("p2-virtual", func(c *repo.Config) { c.ExcludesPattern = new("**/*.xml,**/*.index,**/*.jar") })
-	refused("/artifactory/p2-virtual/compositeContent.xml", fmt.Sprintf(virtual, "compositeContent.xml"))
-	refused("/artifactory/p2-virtual/__p2/0/content.jar", fmt.Sprintf(virtual, "__p2/0/content.jar"))
+	patch(
+		"p2-virtual",
+		func(c *repo.Config) { c.ExcludesPattern = new("**/*.xml,**/*.index,**/*.jar") },
+	)
+	refused(
+		"/artifactory/p2-virtual/compositeContent.xml",
+		fmt.Sprintf(virtual, "compositeContent.xml"),
+	)
+	refused(
+		"/artifactory/p2-virtual/__p2/0/content.jar",
+		fmt.Sprintf(virtual, "__p2/0/content.jar"),
+	)
 	served("/artifactory/p2-virtual/p2.index", nil)
 	served("/artifactory/p2-virtual/__p2/0/p2.index", index)
 

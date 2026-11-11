@@ -138,7 +138,13 @@ func findBlob(t *testing.T, db item.Store) {
 		!slices.Equal(paths, want) {
 		t.Errorf("copies: %v %v, want %v", paths, err, want)
 	}
-	if copies, err := layout.FindBlobs(ctx, db.Items(), "docker-local", "a_b.c", sum("absent")); err != nil ||
+	if copies, err := layout.FindBlobs(
+		ctx,
+		db.Items(),
+		"docker-local",
+		"a_b.c",
+		sum("absent"),
+	); err != nil ||
 		len(copies) != 0 {
 		t.Errorf("copies of an absent blob: %v %v", copies, err)
 	}
