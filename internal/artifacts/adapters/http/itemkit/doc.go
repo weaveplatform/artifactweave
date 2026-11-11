@@ -60,8 +60,13 @@
 //     never reuse. Trash and transfer test the format predicates themselves,
 //     because each format relocates and archives its private paths by its
 //     own rule.
-//   - Items are looked up, downloaded and deployed as before the kit was
-//     split out: the same routes, statuses, error texts and log lines.
+//   - Item lookups, downloads and deploys keep their routes, statuses,
+//     error texts and log lines, which clients and log readers rely on. An
+//     archive entry whose archive's blob is lost or cannot be read answers
+//     500 "internal error", as a file whose blob is lost does, and logs the
+//     failure; once the entry's 200 is sent, a failure is only logged. An
+//     entry the archive lacks, or one of a file that is no archive or a
+//     corrupt one, answers 404.
 //
 // # References
 //

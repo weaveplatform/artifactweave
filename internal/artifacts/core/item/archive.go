@@ -259,7 +259,7 @@ func (s *Service) validateEntries(
 		}
 		return nil
 	})
-	return folders, err //nolint:wrapcheck // archive's ErrUnusable or ours from the walk
+	return folders, err //nolint:wrapcheck // archive's ErrUnusable or failed read, or ours from the walk
 }
 
 // uploadEntries stores the content of every file entry in the blob store,
@@ -281,7 +281,7 @@ func (s *Service) uploadEntries(
 		}
 		r, err := e.Open()
 		if err != nil {
-			return fmt.Errorf("%w: %s: %w", ErrBadArchive, e.Name, err)
+			return e.Wrap(err)
 		}
 		lr := &io.LimitedReader{R: r, N: budget + 1}
 		u, err := s.Blobs.BeginUpload(ctx)
@@ -290,7 +290,7 @@ func (s *Service) uploadEntries(
 		}
 		if _, err := u.Append(ctx, lr); err != nil {
 			_ = u.Abort(context.WithoutCancel(ctx))
-			return fmt.Errorf("%w: %s: %w", ErrBadArchive, e.Name, err)
+			return e.Wrap(err)
 		}
 		if lr.N == 0 {
 			_ = u.Abort(context.WithoutCancel(ctx))
@@ -305,7 +305,7 @@ func (s *Service) uploadEntries(
 		files = append(files, explodeFile{path: join(dir, rel), info: info})
 		return nil
 	})
-	return files, err //nolint:wrapcheck // archive's ErrUnusable or ours from the walk
+	return files, err //nolint:wrapcheck // archive's ErrUnusable or failed read, or ours from the walk
 }
 
 // spool copies body to a temporary file, refusing more than MaxExplodeBytes,
@@ -350,8 +350,10 @@ func digestsOf(info blob.Info) kernel.Checksums {
 }
 
 // ArchiveEntry finds the entry at entry inside the archive file it and
-// calls serve with its size and content. ErrNotFound when the file is not an
-// archive or has no such entry.
+// calls serve with its size and content, returning serve's error.
+// ErrNotFound when the file is not an archive, is a corrupt one or has no
+// such entry; when a read of the file's blob fails, the error is that
+// read's.
 func (s *Service) ArchiveEntry(
 	ctx context.Context,
 	it model.Item,
@@ -368,10 +370,20 @@ func (s *Service) ArchiveEntry(
 	}
 	defer func() { _ = content.Close() }()
 	ra := archive.ReaderAt(content)
-	kind := archive.KindOf(ra, it.Name)
+	// archive.KindOf sniffs whatever its read returned, so a blob that cannot
+	// be read would pass for a file that is no archive. The read stops at
+	// the blob's size: past it, archive.ReaderAt over a store without
+	// ReadAt reports io.ErrUnexpectedEOF rather than io.EOF.
+	head := make([]byte, min(archive.SniffLen, info.Size))
+	n, err := ra.ReadAt(head, 0)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("item: read %s: %w", it.FullPath(), err)
+	}
+	kind := archive.Sniff(head[:n], it.Name)
 	if kind == NotArchive {
 		return ErrNotFound
 	}
+	var served error
 	err = archive.Walk(ra, info.Size, kind, func(e archive.Entry) error {
 		name, err := archive.Clean(e.Name)
 		if err != nil || name != want || e.Dir || !e.Regular {
@@ -379,23 +391,21 @@ func (s *Service) ArchiveEntry(
 		}
 		r, err := e.Open()
 		if err != nil {
-			return fmt.Errorf("%w: %s: %w", ErrBadArchive, e.Name, err)
+			return e.Wrap(err)
 		}
 		if c, ok := r.(io.Closer); ok {
 			defer func() { _ = c.Close() }()
 		}
-		if err := serve(e.Size, r); err != nil {
-			return err
-		}
+		served = serve(e.Size, r)
 		return errFound
 	})
 	switch {
 	case errors.Is(err, errFound):
-		return nil
+		return served
 	case err == nil, errors.Is(err, ErrBadArchive):
 		return ErrNotFound
 	}
-	return err //nolint:wrapcheck // serve's own error
+	return fmt.Errorf("item: read %s: %w", it.FullPath(), err)
 }
 
 // ArchiveFiles writes files to w as one archive of kind, each named by its

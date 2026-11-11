@@ -5,10 +5,14 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"encoding/binary"
 	"errors"
+	"fmt"
+	"hash/crc32"
 	"io"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/weaveplatform/artifactweave/internal/platform/archive"
 )
@@ -198,6 +202,129 @@ func TestUnitWalk(t *testing.T) {
 	}
 }
 
+var (
+	errRead    = errors.New("read failed")
+	errPastEnd = errors.New("read past the end")
+)
+
+// broken is content every read of which fails with err.
+type broken struct{ err error }
+
+func (b broken) ReadAt([]byte, int64) (int, error) { return 0, b.err }
+
+// breakable reads ra until broken is set, then fails every read with
+// errRead.
+type breakable struct {
+	ra     io.ReaderAt
+	broken bool
+}
+
+func (b *breakable) ReadAt(p []byte, off int64) (int, error) {
+	if b.broken {
+		return 0, errRead
+	}
+	return b.ra.ReadAt(p, off)
+}
+
+// strict fails a read that reaches past its content with errPastEnd, as a
+// store asked for bytes it does not hold may, where bytes.Reader reports
+// io.EOF.
+type strict []byte
+
+func (s strict) ReadAt(p []byte, off int64) (int, error) {
+	if off < 0 || off+int64(len(p)) > int64(len(s)) {
+		return 0, errPastEnd
+	}
+	return copy(p, s[off:]), nil
+}
+
+// A read that fails is no unusable archive: Walk, Scan and ReadFile return
+// the read's own error for every kind, a store's io.ErrUnexpectedEOF for a
+// read it cut short included.
+func TestUnitWalkReadFailures(t *testing.T) {
+	short := fmt.Errorf("store: %w", io.ErrUnexpectedEOF)
+	for kind, body := range kinds(t, entry{name: "a.txt", body: "a"}) {
+		size := int64(len(body))
+		for _, failure := range []error{errRead, short} {
+			ra := broken{failure}
+			got := map[string]error{
+				"Walk": archive.Walk(ra, size, kind, func(archive.Entry) error { return nil }),
+				"Scan": archive.Scan(ra, size, kind, archive.DefaultLimits,
+					func(archive.Entry) error { return nil }),
+			}
+			_, _, got["ReadFile"] = archive.ReadFile(ra, size, kind, archive.DefaultLimits,
+				func(string) bool { return true })
+			for name, err := range got {
+				if !errors.Is(err, failure) || errors.Is(err, archive.ErrUnusable) {
+					t.Errorf("%v %s failing with %v: %v", kind, name, failure, err)
+				}
+			}
+		}
+	}
+}
+
+// An entry whose read fails once the walk has listed it returns the read's
+// error from ReadEntry, and Wrap returns that error for it too.
+func TestUnitReadEntryReadFailure(t *testing.T) {
+	built := kinds(t, entry{name: "a.txt", body: "a"})
+	for _, kind := range []archive.Kind{archive.KindZip, archive.KindTar} {
+		ra := &breakable{ra: bytes.NewReader(built[kind])}
+		err := archive.Walk(ra, int64(len(built[kind])), kind, func(e archive.Entry) error {
+			ra.broken = true
+			if _, err := archive.ReadEntry(e, archive.DefaultLimits); !errors.Is(err, errRead) ||
+				errors.Is(err, archive.ErrUnusable) {
+				t.Errorf("%v ReadEntry: %v", kind, err)
+			}
+			return e.Wrap(errOpen)
+		})
+		if !errors.Is(err, errRead) || errors.Is(err, archive.ErrUnusable) {
+			t.Errorf("%v Wrap: %v", kind, err)
+		}
+	}
+}
+
+// Content the parsers refuse stays ErrUnusable whatever error they refuse
+// it with: an empty tar.gz (io.EOF), a corrupt deflate stream
+// (flate.CorruptInputError), a tar.gz cut short or a zip directory that
+// lists fewer entries than it claims (io.ErrUnexpectedEOF), and an entry
+// whose offset lies past the end of content that a store reads strictly.
+func TestUnitWalkCorruptArchives(t *testing.T) {
+	tgz := tarOf(t, true, entry{name: "a.txt", body: "a"})
+	flipped := bytes.Clone(tgz)
+	for i := 10; i < len(flipped)-8; i++ { // the deflate stream, between gzip's header and trailer
+		flipped[i] ^= 0xff
+	}
+	short := zipOf(t, entry{name: "a.txt", body: "a"})
+	end := bytes.LastIndex(short, []byte("PK\x05\x06"))
+	binary.LittleEndian.PutUint16(short[end+10:], 2) // the directory's entry count
+	for name, c := range map[string]struct {
+		body []byte
+		kind archive.Kind
+	}{
+		"empty tar.gz":        {nil, archive.KindTarGz},
+		"corrupt deflate":     {flipped, archive.KindTarGz},
+		"tar.gz cut short":    {tgz[:len(tgz)/2], archive.KindTarGz},
+		"zip directory short": {short, archive.KindZip},
+	} {
+		err := archive.Walk(strict(c.body), int64(len(c.body)), c.kind,
+			func(archive.Entry) error { return nil })
+		if !errors.Is(err, archive.ErrUnusable) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	past := zipOf(t, entry{name: "a.txt", body: "a"})
+	dir := bytes.Index(past, []byte("PK\x01\x02"))
+	binary.LittleEndian.PutUint32(past[dir+42:], 1<<30) // the entry's local header offset
+	read := func(e archive.Entry) error {
+		_, err := archive.ReadEntry(e, archive.DefaultLimits)
+		return err
+	}
+	err := archive.Walk(strict(past), int64(len(past)), archive.KindZip, read)
+	if !errors.Is(err, archive.ErrUnusable) || errors.Is(err, errPastEnd) {
+		t.Errorf("an entry past the end: %v", err)
+	}
+}
+
 // seeker hides a reader's ReadAt, as an object store's content reader
 // lacks one.
 type seeker struct{ io.ReadSeeker }
@@ -329,11 +456,59 @@ func TestUnitScanTar(t *testing.T) {
 		func(archive.Entry) error { return nil }); !errors.Is(err, archive.ErrUnusable) {
 		t.Fatalf("not tar: %v", err)
 	}
+	// An error the stream gives is the caller's to judge, between a header
+	// and inside an entry alike.
+	if err := archive.ScanTar(iotest.ErrReader(errRead), archive.DefaultLimits,
+		func(archive.Entry) error { return nil }); !errors.Is(err, errRead) ||
+		errors.Is(err, archive.ErrUnusable) {
+		t.Fatalf("a failing stream: %v", err)
+	}
+	header := io.MultiReader(bytes.NewReader(body[:512]), iotest.ErrReader(errRead))
+	if err := archive.ScanTar(header, archive.DefaultLimits, func(e archive.Entry) error {
+		_, err := archive.ReadEntry(e, archive.DefaultLimits)
+		return err
+	}); !errors.Is(err, errRead) || errors.Is(err, archive.ErrUnusable) {
+		t.Fatalf("an entry the stream fails: %v", err)
+	}
 }
 
 var errOpen = errors.New("open failed")
 
-// An entry that cannot be opened or read is unusable.
+// An entry of a walk that cannot be opened or read for what it holds is
+// unusable, and the refusal names it: here an unknown compression method
+// and a CRC-32 that does not match.
+func TestUnitReadEntryCorrupt(t *testing.T) {
+	for want, h := range map[error]*zip.FileHeader{
+		zip.ErrAlgorithm: {Name: "a.txt", Method: 99},
+		zip.ErrChecksum:  {Name: "a.txt", Method: zip.Store, CRC32: crc32.ChecksumIEEE([]byte("a")) ^ 1},
+	} {
+		h.CompressedSize64, h.UncompressedSize64 = 1, 1
+		var buf bytes.Buffer
+		zw := zip.NewWriter(&buf)
+		w, err := zw.CreateRaw(h)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.WriteString(w, "a"); err != nil {
+			t.Fatal(err)
+		}
+		if err := zw.Close(); err != nil {
+			t.Fatal(err)
+		}
+		err = archive.Walk(bytes.NewReader(buf.Bytes()), int64(buf.Len()), archive.KindZip,
+			func(e archive.Entry) error {
+				_, err := archive.ReadEntry(e, archive.DefaultLimits)
+				return err
+			})
+		if !errors.Is(err, archive.ErrUnusable) || !errors.Is(err, want) ||
+			err.Error() != "archive: unusable archive: a.txt: "+want.Error() {
+			t.Errorf("%v: %v", want, err)
+		}
+	}
+}
+
+// An entry a caller made, which reads no archive, is unusable when it
+// cannot be opened or read.
 func TestUnitReadEntryFailures(t *testing.T) {
 	for name, open := range map[string]func() (io.Reader, error){
 		"open": func() (io.Reader, error) { return nil, errOpen },

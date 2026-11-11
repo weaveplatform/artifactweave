@@ -16,7 +16,8 @@ import (
 )
 
 // ErrUnusable is content that is not a usable archive: an unknown or
-// corrupt format, an entry escaping its folder, or a limit exceeded.
+// corrupt format, an entry escaping its folder, or a limit exceeded. A read
+// of the content that fails is none of these.
 var ErrUnusable = errors.New("archive: unusable archive")
 
 // ErrNotFound is an archive with no entry the caller asked for.
@@ -103,7 +104,9 @@ func Sniff(head []byte, name string) Kind {
 	return KindNone
 }
 
-// KindOf sniffs the kind of the content in ra, named name.
+// KindOf sniffs the kind of the content in ra, named name, from whatever
+// its read returns, ignoring the read's error: a read that fails can leave
+// the name alone to tell the kind.
 func KindOf(ra io.ReaderAt, name string) Kind {
 	head := make([]byte, SniffLen)
 	n, _ := ra.ReadAt(head, 0)
@@ -123,10 +126,27 @@ type Entry struct {
 	// Open reads the entry. A tar entry's reader is valid only until the
 	// walk moves on.
 	Open func() (io.Reader, error)
+	// src is the content of the walk that gave the entry; nil for an entry
+	// a caller made.
+	src *source
+}
+
+// Wrap returns err, which opening or reading e gave, as the walk reports
+// errors: a failed read of the archive's content as the read gave it, and
+// anything else, an entry that is corrupt or passes a limit, as
+// ErrUnusable naming e. An entry a caller made reads no archive, so its
+// errors are all ErrUnusable.
+func (e Entry) Wrap(err error) error {
+	if failed := e.src.failure(); failed != nil {
+		return failed
+	}
+	return fmt.Errorf("%w: %s: %w", ErrUnusable, e.Name, err)
 }
 
 // Walk calls fn for every entry of the archive in ra, in archive order,
-// until fn returns an error, which Walk returns.
+// until fn returns an error, which Walk returns. Content that is no
+// archive of kind is ErrUnusable; a read of ra that fails returns its own
+// error.
 func Walk(ra io.ReaderAt, size int64, kind Kind, fn func(Entry) error) error {
 	return walk(ra, size, kind, nil, fn)
 }
@@ -140,17 +160,24 @@ func walk(
 	wrap func(io.Reader) io.Reader,
 	fn func(Entry) error,
 ) error {
+	src := &source{ra: ra}
+	// Reads stop at size, so an offset a corrupt archive gives past its end
+	// meets the end of the content. A store asked for bytes it does not hold
+	// may fail the read instead, and the corrupt archive would pass for a
+	// failed read.
+	content := io.NewSectionReader(src, 0, size)
 	switch kind {
 	case KindZip:
-		zr, err := zip.NewReader(ra, size)
+		zr, err := zip.NewReader(content, size)
 		if err != nil {
-			return fmt.Errorf("%w: %w", ErrUnusable, err)
+			return src.refuse(err)
 		}
 		for _, f := range zr.File {
 			e := Entry{
 				Name: f.Name, Dir: f.FileInfo().IsDir(), Regular: f.Mode().IsRegular(),
 				Size: int64(min(f.UncompressedSize64, 1<<62)), //nolint:gosec // capped
 				Open: func() (io.Reader, error) { return f.Open() },
+				src:  src,
 			}
 			if err := fn(e); err != nil {
 				return err
@@ -158,11 +185,11 @@ func walk(
 		}
 		return nil
 	case KindTar, KindTarGz:
-		var r io.Reader = io.NewSectionReader(ra, 0, size)
+		var r io.Reader = content
 		if kind == KindTarGz {
 			gz, err := gzip.NewReader(r)
 			if err != nil {
-				return fmt.Errorf("%w: %w", ErrUnusable, err)
+				return src.refuse(err)
 			}
 			defer func() { _ = gz.Close() }()
 			r = gz
@@ -170,13 +197,13 @@ func walk(
 		if wrap != nil {
 			r = wrap(r)
 		}
-		return walkTar(r, fn)
+		return walkTar(r, src, fn)
 	}
 	return fmt.Errorf("%w: not a zip, tar or tar.gz archive", ErrUnusable)
 }
 
-// walkTar calls fn for every entry of the tar stream r.
-func walkTar(r io.Reader, fn func(Entry) error) error {
+// walkTar calls fn for every entry of the tar stream r, which reads src.
+func walkTar(r io.Reader, src *source, fn func(Entry) error) error {
 	tr := tar.NewReader(r)
 	for {
 		h, err := tr.Next()
@@ -184,17 +211,79 @@ func walkTar(r io.Reader, fn func(Entry) error) error {
 			return nil
 		}
 		if err != nil {
-			return fmt.Errorf("%w: %w", ErrUnusable, err)
+			return src.refuse(err)
 		}
 		e := Entry{
 			Name: h.Name, Dir: h.Typeflag == tar.TypeDir,
 			Regular: h.Typeflag == tar.TypeReg, Size: h.Size,
 			Open: func() (io.Reader, error) { return tr, nil },
+			src:  src,
 		}
 		if err := fn(e); err != nil {
 			return err
 		}
 	}
+}
+
+// source is the content a walk reads, through ReadAt or, for ScanTar,
+// Read. It keeps the first error a read gave other than io.EOF, and that
+// decides what a parser's error means. The parsers pass a failed read on
+// as they got it, and no list of their own errors tells the rest from it:
+// they report a corrupt archive with errors such as
+// flate.CorruptInputError, or io.EOF for an empty tar.gz, and
+// io.ErrUnexpectedEOF is their word for content that ends early but S3's
+// for a read it cut short.
+type source struct {
+	ra io.ReaderAt
+	r  io.Reader
+
+	// mu guards failed: io.ReaderAt lets a caller read two zip entries at
+	// once.
+	mu     sync.Mutex
+	failed error
+}
+
+func (s *source) ReadAt(p []byte, off int64) (int, error) {
+	n, err := s.ra.ReadAt(p, off)
+	s.keep(err)
+	return n, err //nolint:wrapcheck // io.ReaderAt contract
+}
+
+func (s *source) Read(p []byte) (int, error) {
+	n, err := s.r.Read(p)
+	s.keep(err)
+	return n, err //nolint:wrapcheck // io.Reader contract
+}
+
+func (s *source) keep(err error) {
+	if err == nil || errors.Is(err, io.EOF) {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.failed == nil {
+		s.failed = err
+	}
+}
+
+// failure is the first read of s that failed, nil when none did or s is
+// nil.
+func (s *source) failure() error {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.failed
+}
+
+// refuse is err, which a parser of s returned, as the walk reports it: the
+// failed read, when a read failed, and otherwise ErrUnusable.
+func (s *source) refuse(err error) error {
+	if failed := s.failure(); failed != nil {
+		return failed
+	}
+	return fmt.Errorf("%w: %w", ErrUnusable, err)
 }
 
 // Clean makes an entry name a relative path, refusing names that would
@@ -278,10 +367,13 @@ func Scan(ra io.ReaderAt, size int64, kind Kind, lim Limits, fn func(Entry) erro
 // ScanTar is Scan over a tar stream the caller decompressed, for a
 // compression the sniffer does not tell, such as a PyPI sdist's tar.bz2:
 // lim's Inflated counts the bytes r yields, so a bomb in that compression
-// stops at the budget too.
+// stops at the budget too. An error r gives returns as r gave it, its
+// decompressor's included: the caller, which decompresses, tells a corrupt
+// stream from a failed read.
 func ScanTar(r io.Reader, lim Limits, fn func(Entry) error) error {
+	src := &source{r: r}
 	budget := &countingReader{left: lim.Inflated}
-	return walkTar(budget.wrap(r), counted(lim, fn))
+	return walkTar(budget.wrap(src), src, counted(lim, fn))
 }
 
 // counted is fn failing with ErrUnusable once a walk passes lim's Entries.
@@ -297,17 +389,18 @@ func counted(lim Limits, fn func(Entry) error) func(Entry) error {
 }
 
 // ReadEntry reads e whole, refusing content past lim.File with ErrUnusable.
+// When e cannot be opened or read, it returns Wrap's error.
 func ReadEntry(e Entry, lim Limits) ([]byte, error) {
 	r, err := e.Open()
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s: %w", ErrUnusable, e.Name, err)
+		return nil, e.Wrap(err)
 	}
 	if c, ok := r.(io.Closer); ok {
 		defer func() { _ = c.Close() }()
 	}
 	b, err := io.ReadAll(io.LimitReader(r, lim.File+1))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s: %w", ErrUnusable, e.Name, err)
+		return nil, e.Wrap(err)
 	}
 	if int64(len(b)) > lim.File {
 		return nil, fmt.Errorf("%w: %s exceeds %d bytes", ErrUnusable, e.Name, lim.File)
@@ -318,7 +411,7 @@ func ReadEntry(e Entry, lim Limits) ([]byte, error) {
 // ReadFile returns the first regular file of the archive in ra whose
 // cleaned name want accepts, with that name. ErrNotFound when no file
 // matches; ErrUnusable when the content is no archive of kind or a limit is
-// passed first.
+// passed first; a read of ra that fails returns its own error.
 func ReadFile(
 	ra io.ReaderAt,
 	size int64,
