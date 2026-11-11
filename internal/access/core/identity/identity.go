@@ -13,7 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
-	platformsettings "github.com/weaveplatform/artifactweave/internal/platform/settings"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
 
 // ErrInvalid reports a request the caller must change: a missing or
@@ -39,7 +39,7 @@ type Store interface {
 	// Settings returns the settings store, which holds the user lock,
 	// password expiration and password policies. Its calls join the
 	// transaction the context carries.
-	Settings() platformsettings.SettingsStore
+	Settings() settings.SettingsStore
 }
 
 // Service manages users, groups and the account policies.
@@ -679,7 +679,7 @@ func (s *Service) SetLockPolicy(ctx context.Context, p model.UserLockPolicy) err
 	}
 	return s.tx(ctx, func(ctx context.Context) error {
 		if err := s.Store.Settings().
-			Put(ctx, platformsettings.SettingUserLockPolicy, p); err != nil {
+			Put(ctx, settings.SettingUserLockPolicy, p); err != nil {
 			return err //nolint:wrapcheck // a store error
 		}
 		if !p.Enabled {
@@ -703,7 +703,7 @@ func (s *Service) SetExpirationPolicy(
 		return p, invalidf("passwordMaxAge must be at least 1 day")
 	}
 	if err := s.Store.Settings().
-		Put(ctx, platformsettings.SettingPasswordExpirationPolicy, p); err != nil {
+		Put(ctx, settings.SettingPasswordExpirationPolicy, p); err != nil {
 		return p, err //nolint:wrapcheck // a store error
 	}
 	return p, nil
@@ -724,16 +724,16 @@ type AccessLockPolicy struct {
 // AccessLockPolicy returns the Access view of the policies, mapped as JFrog
 // documents: enabled with loginAttempts is attempts, disabled is 0.
 func (s *Service) AccessLockPolicy(ctx context.Context) (AccessLockPolicy, error) {
-	settings := s.Store.Settings()
-	lock, err := authn.LockPolicy(ctx, settings)
+	store := s.Store.Settings()
+	lock, err := authn.LockPolicy(ctx, store)
 	if err != nil {
 		return AccessLockPolicy{}, err //nolint:wrapcheck // already wrapped
 	}
-	expiry, err := authn.ExpirationPolicy(ctx, settings)
+	expiry, err := authn.ExpirationPolicy(ctx, store)
 	if err != nil {
 		return AccessLockPolicy{}, err //nolint:wrapcheck // already wrapped
 	}
-	access, err := authn.AccessLockSettings(ctx, settings)
+	access, err := authn.AccessLockSettings(ctx, store)
 	if err != nil {
 		return AccessLockPolicy{}, err //nolint:wrapcheck // already wrapped
 	}
@@ -764,12 +764,12 @@ func (s *Service) SetAccessLockPolicy(
 		return p, invalidf("passwordExpiryDays must not be negative")
 	}
 	return p, s.tx(ctx, func(ctx context.Context) error {
-		settings := s.Store.Settings()
-		lock, err := authn.LockPolicy(ctx, settings)
+		store := s.Store.Settings()
+		lock, err := authn.LockPolicy(ctx, store)
 		if err != nil {
 			return err //nolint:wrapcheck // already wrapped
 		}
-		expiry, err := authn.ExpirationPolicy(ctx, settings)
+		expiry, err := authn.ExpirationPolicy(ctx, store)
 		if err != nil {
 			return err //nolint:wrapcheck // already wrapped
 		}
@@ -783,11 +783,11 @@ func (s *Service) SetAccessLockPolicy(
 			key string
 			v   any
 		}{
-			{platformsettings.SettingUserLockPolicy, lock},
-			{platformsettings.SettingPasswordExpirationPolicy, expiry},
-			{platformsettings.SettingAccessLockSettings, p.AccessLockSettings},
+			{settings.SettingUserLockPolicy, lock},
+			{settings.SettingPasswordExpirationPolicy, expiry},
+			{settings.SettingAccessLockSettings, p.AccessLockSettings},
 		} {
-			if err := settings.Put(ctx, w.key, w.v); err != nil {
+			if err := store.Put(ctx, w.key, w.v); err != nil {
 				return err //nolint:wrapcheck // a store error
 			}
 		}
