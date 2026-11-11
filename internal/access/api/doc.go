@@ -142,11 +142,11 @@
 //
 // # Status
 //
-// Implemented P4 to P9c and staged in P9d: the vocabulary, Keypair,
+// Implemented P4 to P9c and moved here in P9d: the vocabulary, Keypair,
 // Certificate, Subject, Repo, the token shapes and SubjectOf. Added in P9d:
 // the contracts Authenticator, Authorizer, Decider, Tokens, Keys, Identity,
-// Restrictions, Projects, Grants and AnonymousAccess, the Settings value,
-// the API aggregate, and the context accessors WithCaller, WithDecider and
+// Restrictions, Projects, Grants and AnonymousAccess, the Settings value, the
+// API aggregate, and the context accessors WithCaller, WithDecider and
 // DeciderFrom. The target layout's hooks.go, with the token gate (P17), and
 // events.go, with the access events (P11), are not created yet.
 //

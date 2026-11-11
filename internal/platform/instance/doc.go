@@ -81,8 +81,8 @@
 // Implemented P2: InstanceIdentity, ValidateInstanceID, ProtocolVersion and
 // InstanceStore, with the metadata store's SQL and in-memory stores (pull
 // request 3). P4: the identity is created on first start, so that the token
-// service can derive its issuer (issue 74, pull request 95). Staged in P9d:
-// EnsureInstance and Store are declared here.
+// service can derive its issuer (issue 74, pull request 95). Moved here in
+// P9d: EnsureInstance and Store are declared here.
 //
 // # Testing
 //

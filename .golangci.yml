@@ -74,8 +74,8 @@ linters:
       max-func-lines: 40
     revive:
       # Only these two rules run: a rules list replaces revive's defaults.
-      # The stuttering check is off because the migration renames nothing, and
-      # checkPublicInterface stays off (decision 0044).
+      # The stuttering check is off because P9d moved packages without renaming
+      # identifiers, and checkPublicInterface stays off (decision 0044).
       # TestUnitLintScopeListsEveryLinter (internal/layout) pins this list.
       rules:
         - name: exported

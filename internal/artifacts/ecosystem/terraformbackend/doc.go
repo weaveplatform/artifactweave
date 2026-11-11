@@ -90,7 +90,7 @@
 //
 // # Status
 //
-// Implemented P8 (Terraform backend local repositories). Staged in P9d.
+// Implemented P8 (Terraform backend local repositories). Moved here in P9d.
 //
 // # Testing
 //

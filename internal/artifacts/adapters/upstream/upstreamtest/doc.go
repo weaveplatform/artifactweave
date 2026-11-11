@@ -32,7 +32,7 @@
 //
 // # Status
 //
-// Implemented P9 (the pool and resolver it builds). Staged in P9d.
+// Implemented P9 (the pool and resolver it builds). Moved here in P9d.
 //
 // # Testing
 //

@@ -106,8 +106,8 @@
 //
 // Implemented P0 to P9c: the model, its JSON round trip and validation in P0
 // and P1, then the fields, defaults and package types of each ecosystem from
-// P3 to P9c. RepoPatterns, PatternsOf and ResolveKey added in P9d. Staged in
-// P9d.
+// P3 to P9c. RepoPatterns, PatternsOf and ResolveKey added in P9d. Moved here
+// in P9d.
 //
 // # Testing
 //

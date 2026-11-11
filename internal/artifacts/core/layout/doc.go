@@ -94,8 +94,8 @@
 // Bundled and Lookup, in P0; Has and Prefixes for the layout searches in P5;
 // Coordinates, Read and VersionTokens, the bundled layouts checked against
 // 7.x with Lookup dropping undocumented tokens, Translate and ErrUnbuildable
-// in P7; FolderPrefixes and RemotePath for remote discovery in P9. Staged in
-// P9d, where Checker was added.
+// in P7; FolderPrefixes and RemotePath for remote discovery in P9. Moved here
+// in P9d, where Checker was added.
 //
 // # Testing
 //

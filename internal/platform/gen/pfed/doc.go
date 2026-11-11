@@ -83,7 +83,7 @@
 // the 7.x envelope fix (#480) made the code of its error body the integer
 // status. The server's pfed service embeds UnimplementedStrict and
 // implements nothing, so every operation answers 501 until P14 builds
-// platform federation. Staged in P9d.
+// platform federation. Moved here in P9d.
 //
 // # Testing
 //

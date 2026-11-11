@@ -137,7 +137,7 @@
 // # Status
 //
 // Implemented P6, with Helm OCI chart metadata in P8 and remote retrieval
-// in P9. Staged in P9d. A reindex of a remote repository still reads the
+// in P9. Moved here in P9d. A reindex of a remote repository still reads the
 // repository's own items, not the cache its hooks index (decision 0018), so
 // the format contract suite runs Docker without its cache scenario.
 //

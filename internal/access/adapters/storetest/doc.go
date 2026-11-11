@@ -56,7 +56,7 @@
 // Implemented P2: the identity, token, key and project cases, in the
 // metadata store's contract (pull request 3). The identity listing and API
 // restriction cases came with retry safety and bounded API execution (pull
-// request 905). Staged in P9d: Factory and Run.
+// request 905). Moved here in P9d, which added Factory and Run.
 //
 // # Testing
 //

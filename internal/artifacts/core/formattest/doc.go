@@ -123,8 +123,8 @@
 // (https://github.com/weaveplatform/artifactweave/issues/361). P8 added
 // Format.RepoWork and File.SidecarOf
 // (https://github.com/weaveplatform/artifactweave/issues/533), and
-// Format.Local for Terraform's terraformType. Staged in P9d, which narrowed
-// the backends and the world to the item service's store
+// Format.Local for Terraform's terraformType. Moved here in P9d, which
+// narrowed the backends and the world to the item service's store
 // (https://github.com/weaveplatform/artifactweave/issues/1088), and Run takes
 // its backends from its caller instead of opening them, so that artifacts
 // core never imports app

@@ -75,8 +75,9 @@
 // Implemented P2: the settings, lease, configuration document, instance,
 // outbox and upload cases, in the metadata store's contract (pull request
 // 3). P7: the work queue cases (issue 297, pull request 299). P9c: the
-// replay and request budget cases (issue 890, pull request 905). Staged in
-// P9d: Store, Factory, Run, RunWithoutWatches and ConfigWatches.
+// replay and request budget cases (issue 890, pull request 905). Moved here
+// in P9d, which added Store, Factory, Run, RunWithoutWatches and
+// ConfigWatches.
 //
 // # Testing
 //

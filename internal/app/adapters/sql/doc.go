@@ -93,7 +93,7 @@
 //
 // Implemented P2: the metadata store on SQLite and PostgreSQL, with Reseal
 // (pull request 3); later phases added a store for each entity they
-// introduced. Staged in P9d: each module's stores split into its own
+// introduced. Moved here in P9d: each module's stores split into its own
 // adapter (issues 1056 to 1062), leaving this package the composition over
 // them, which issue 1098 moved under app.
 //

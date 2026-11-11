@@ -109,15 +109,15 @@
 //
 // # Status
 //
-// Implemented P0 to P9c. Staged in P9d (WEB-18); WEB-19 added the module
-// settings, WEB-20 the module constructors, which took over the remote
-// wiring and the garbage collection loop, and WEB-21 gave each file one
-// job: run.go serves, platform.go opens what the modules share, modules.go
-// builds the modules, bootstrap.go and seed.go prepare the first start,
-// runtime.go holds the runtime and serverlog.go the HTTP server's error log.
-// TST-07 exported the runtime and moved the remote suites to
-// test/server/artifacts. WEB-22 brought the router here: router.go builds
-// it and limits.go holds the request limits.
+// Implemented P0 to P9c. Moved here in P9d (WEB-18); WEB-19 added the module
+// settings, WEB-20 the module constructors, which took over the remote wiring
+// and the garbage collection loop, and WEB-21 gave each file one job: run.go
+// serves, platform.go opens what the modules share, modules.go builds the
+// modules, bootstrap.go and seed.go prepare the first start, runtime.go holds
+// the runtime and serverlog.go the HTTP server's error log. TST-07 exported
+// the runtime and moved the remote suites to test/server/artifacts. WEB-22
+// brought the router here: router.go builds it and limits.go holds the
+// request limits.
 //
 // # Testing
 //

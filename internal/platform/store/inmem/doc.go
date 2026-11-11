@@ -80,8 +80,8 @@
 // the persistent work queue (issue 297, pull request 299). P9: layout writes
 // fence the remote repositories that use the layout (pull request 680).
 // P9c: the replay and request budget stores (issue 890, pull request 905).
-// Staged in P9d: Store and New, with the watches in place of the layout
-// fence.
+// Moved here in P9d, which added Store and New, with the watches in place of
+// the layout fence.
 //
 // # Testing
 //

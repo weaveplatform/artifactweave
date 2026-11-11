@@ -70,8 +70,8 @@
 //
 // Implemented P2: the PostgreSQL store's open over pgx with the pool settings
 // and the unique-violation test (pull request 3). The error texts took a
-// lower-case "dsn" with the naming conventions (pull request 882). Staged in
-// P9d: the migrations left for each module's stream, and Dialect gained
+// lower-case "dsn" with the naming conventions (pull request 882). Moved here
+// in P9d: the migrations left for each module's stream, and Dialect gained
 // Columns (issue 994); the driver left the composite store's open for this
 // package, with OpenDB and its Options (issue 995).
 //

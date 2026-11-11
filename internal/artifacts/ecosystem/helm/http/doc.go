@@ -77,7 +77,7 @@
 //
 // # Status
 //
-// Implemented P8, with remote retrieval in P9. Staged in P9d.
+// Implemented P8, with remote retrieval in P9. Moved here in P9d.
 //
 // # Testing
 //

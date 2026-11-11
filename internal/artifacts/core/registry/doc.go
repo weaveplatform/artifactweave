@@ -74,8 +74,8 @@
 // # Status
 //
 // Implemented P6 to P9c: the registry's uploads, manifests, tags,
-// promotion and retention in P6, and Helm OCI through them in P8. Staged in
-// P9d.
+// promotion and retention in P6, and Helm OCI through them in P8. Moved here
+// in P9d.
 //
 // # Testing
 //

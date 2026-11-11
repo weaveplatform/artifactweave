@@ -75,8 +75,8 @@ func TestUnitFixtureReadsAreRootRelative(t *testing.T) {
 
 // checkFixtureReads returns, sorted, every depth-relative path in the _test.go
 // files of the repository at root, walked with repopath.SkipDir, and every
-// entry of exempt that excused nothing. tools/ is not walked: it stays where
-// it is through the migration, so its paths never need rewriting.
+// entry of exempt that excused nothing. tools/ is not walked: P9d left it in
+// place, so its relative paths never needed rewriting.
 func checkFixtureReads(root string, exempt map[exemption]string) []string {
 	var problems []string
 	used := map[exemption]bool{}

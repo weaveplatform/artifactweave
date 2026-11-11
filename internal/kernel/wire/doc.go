@@ -70,7 +70,7 @@
 // forms with the domain model in P2 (#3), which the security APIs use from
 // P4; the blob mirror summary in P2b (#66, #87); the multipart upload
 // status in P3 (#91); the proxy descriptor (#645) and the Smart Remote
-// statistics (#675) in P9. Staged in P9d.
+// statistics (#675) in P9. Moved here in P9d.
 //
 // # Testing
 //

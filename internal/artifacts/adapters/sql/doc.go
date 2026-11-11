@@ -112,7 +112,8 @@
 // and build search (pull request 206), the remote cache (pull request 646),
 // sealed header values (pull request 656), layout fencing (pull request
 // 680), Git LFS locks (pull request 849) and Bower registrations (pull
-// request 912). Staged in P9d: Store, New, LayoutWatch and Module.
+// request 912). Moved here in P9d, which added Store, New, LayoutWatch and
+// Module.
 //
 // # Testing
 //

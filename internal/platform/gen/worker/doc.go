@@ -83,8 +83,8 @@
 // baseline commit of phases P0 to P2. Since then only descriptions have
 // changed, in the rewording of the served contract (#434). The server's
 // worker service embeds UnimplementedStrict and implements nothing, so
-// every operation answers 501 until P17 builds the Workers runtime. Staged
-// in P9d.
+// every operation answers 501 until P17 builds the Workers runtime. Moved
+// here in P9d.
 //
 // # Testing
 //

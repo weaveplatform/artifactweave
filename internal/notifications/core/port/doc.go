@@ -53,7 +53,7 @@
 // # Status
 //
 // Implemented P2: WebhookStore, with the metadata store's in-memory, SQLite
-// and PostgreSQL stores (pull request 3). Staged in P9d, where Store is
+// and PostgreSQL stores (pull request 3). Moved here in P9d, where Store is
 // declared. The webhook services that call it arrive with P11.
 //
 // # Testing

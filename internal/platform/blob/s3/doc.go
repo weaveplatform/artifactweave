@@ -136,7 +136,7 @@
 // and media type (issue 119), added CloudFront URLs through a cdn.Signer
 // (issue 120) and the real-cloud conformance run (issue 128). On 2026-10-16
 // must-not-exist writes replaced the HeadObject before each write (issue
-// 255, pull request 312). Staged in P9d.
+// 255, pull request 312). Moved here in P9d.
 //
 // # Testing
 //

@@ -83,7 +83,7 @@
 // Since then only descriptions have changed, in the rewording of the
 // served contract (#434). The server's grid service embeds
 // UnimplementedStrict and implements nothing, so every operation answers
-// 501 until P14 builds topology. Staged in P9d.
+// 501 until P14 builds topology. Moved here in P9d.
 //
 // # Testing
 //

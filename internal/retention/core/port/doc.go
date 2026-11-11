@@ -65,9 +65,9 @@
 // # Status
 //
 // Implemented P2: CleanupStore and ArchiveStore, with the metadata store's
-// in-memory, SQLite and PostgreSQL stores (pull request 3). Staged in P9d,
-// where ArchiveStore gave its archived-item methods and the cold indexes to
-// accessors of their own and Store is declared. The services that call the
+// in-memory, SQLite and PostgreSQL stores (pull request 3). Moved here in
+// P9d, where ArchiveStore gave its archived-item methods and the cold indexes
+// to accessors of their own and Store is declared. The services that call the
 // ports arrive with P11 (cleanup) and P16 (the cold-storage tier).
 //
 // # Testing

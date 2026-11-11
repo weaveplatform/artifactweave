@@ -63,8 +63,8 @@
 // Implemented P0, from the repository template: make build stamps the
 // package, and the version command and the revision of the system version
 // read it. The image build has stamped it since #73, and the release build
-// since #507, which brought the release binaries of P18 forward. Staged in
-// P9d.
+// since #507, which brought the release binaries of P18 forward. Moved here
+// in P9d.
 //
 // # Testing
 //

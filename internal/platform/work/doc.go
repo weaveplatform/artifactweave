@@ -111,8 +111,8 @@
 // kinds, HandleEvery and RunDue, for maxUniqueSnapshots (pull request 512).
 // P8: a pass holds an item it meets again until the pass ends (issue 576,
 // pull request 577). P9: ErrPermanent, for the Maven remotes' durable
-// companion work (pull request 657). Staged in P9d: New takes Store, and the
-// meter scope is the final path.
+// companion work (pull request 657). Moved here in P9d: New takes Store, and
+// the meter scope is the final path.
 //
 // # Testing
 //

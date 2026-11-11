@@ -89,7 +89,7 @@
 // isolation work let CONNECT tunnel to plain HTTP fixtures too
 // (https://github.com/weaveplatform/artifactweave/issues/618). P9c added
 // Resource.Method, for the POST of a Git fetch
-// (https://github.com/weaveplatform/artifactweave/issues/771). Staged in
+// (https://github.com/weaveplatform/artifactweave/issues/771). Moved here in
 // P9d, beneath the transport that
 // https://github.com/weaveplatform/artifactweave/issues/1026 moved into the
 // parent directory.

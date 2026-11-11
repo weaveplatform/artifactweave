@@ -20,8 +20,8 @@ import (
 )
 
 // docHeadings is the order of the headings in a doc.go. Testing comes last,
-// where the first doc.go files of the migration put it. An optional heading
-// may be left out; no other heading is allowed.
+// where the first doc.go files put it. An optional heading may be left out;
+// no other heading is allowed.
 var docHeadings = []string{
 	"Role",
 	"Inputs",

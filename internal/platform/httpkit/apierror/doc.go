@@ -96,7 +96,7 @@
 // Later phases added the profiles and fields of their surfaces: the
 // Terraform backend (P8, #558), NoChallenge and RetryAfterSeconds for remote
 // sources (P9, #616), APM (P9b, #692), and the Swift registry and Dart pub
-// (P9c, #766 and #765). Staged in P9d.
+// (P9c, #766 and #765). Moved here in P9d.
 //
 // # Testing
 //

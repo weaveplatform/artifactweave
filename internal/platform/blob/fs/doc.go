@@ -73,7 +73,7 @@
 // Implemented P2. P8 made a commit on Windows keep a blob that another
 // session had already published rather than replace it under a reader (pull
 // request 601), and P9c made reads on Windows retry the sharing violation of
-// a concurrent publication (pull request 812). Staged in P9d.
+// a concurrent publication (pull request 812). Moved here in P9d.
 //
 // # Testing
 //

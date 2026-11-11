@@ -143,7 +143,7 @@
 // # Status
 //
 // Implemented P8, with remote retrieval, the remote v2 feed and symbols
-// included, in P9. Staged in P9d. Roadmap: virtual.go (P10), the Merger
+// included, in P9. Moved here in P9d. Roadmap: virtual.go (P10), the Merger
 // that merges NuGet registrations for virtual repositories.
 //
 // # Testing

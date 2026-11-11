@@ -142,7 +142,7 @@
 // with build scopes added in P5; the request principal and its 401 and 403
 // errors in P3; token identities and the password expiry and account lock
 // errors in P4; registry grants in P6; the credential references in P9. The
-// API restriction error came with decision 0043. Staged in P9d.
+// API restriction error came with decision 0043. Moved here in P9d.
 //
 // # Testing
 //

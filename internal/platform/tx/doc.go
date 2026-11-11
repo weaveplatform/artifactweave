@@ -69,7 +69,7 @@
 //
 // Implemented P2: Tx and AfterCommit as methods of the metadata store, with
 // its in-memory, SQLite and PostgreSQL units of work (pull request 3).
-// Staged in P9d: the contract is declared here, and every module's port
+// Moved here in P9d: the contract is declared here, and every module's port
 // Store embeds it.
 //
 // # Testing

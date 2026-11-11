@@ -75,8 +75,8 @@
 //
 // Implemented with decision 0043 (issue 890, pull request 905) and released
 // in v0.2.0, the P9c release: the replay port in the metadata store, with its
-// SQL and in-memory stores, and protected build appends. Staged in P9d: the
-// port and its values are declared here.
+// SQL and in-memory stores, and protected build appends. Moved here in P9d:
+// the port and its values are declared here.
 //
 // # Testing
 //

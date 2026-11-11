@@ -102,7 +102,7 @@
 // a deleted repository's content
 // (https://github.com/weaveplatform/artifactweave/issues/504). P8 restores
 // the sidecars a format keeps with a file
-// (https://github.com/weaveplatform/artifactweave/issues/533). Staged in
+// (https://github.com/weaveplatform/artifactweave/issues/533). Moved here in
 // P9d, which narrowed the service's store to Store
 // (https://github.com/weaveplatform/artifactweave/issues/1088).
 //

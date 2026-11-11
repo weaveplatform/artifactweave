@@ -68,7 +68,7 @@
 //
 // Implemented P8: Disconnect, ErrDisconnected and Blobs came with the
 // router kit's multipart uploads and the NuGet API key (issue 532, pull
-// request 580). Staged in P9d.
+// request 580). Moved here in P9d.
 //
 // # Testing
 //

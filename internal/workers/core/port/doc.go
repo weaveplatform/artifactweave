@@ -57,7 +57,7 @@
 // # Status
 //
 // Implemented P2: WorkerStore, with the metadata store's in-memory, SQLite
-// and PostgreSQL stores (pull request 3). Staged in P9d, where Store is
+// and PostgreSQL stores (pull request 3). Moved here in P9d, where Store is
 // declared. The runtime that calls the port arrives with P17.
 //
 // # Testing

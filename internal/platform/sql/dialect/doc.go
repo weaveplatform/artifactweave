@@ -148,7 +148,7 @@
 // handle and its helpers, sealed columns included (pull request 3). In the
 // v0.1.0 release InsertIgnore gained the form without a conflict target, for
 // the property tables, whose unique indexes differ between the dialects
-// (issue 338, pull request 339). Staged in P9d: the scanner helpers were
+// (issue 338, pull request 339). Moved here in P9d: the scanner helpers were
 // gathered into one file (issue 959, pull request 1122), and the layer leaves
 // the SQL stores' shared package for this one, exported for the module SQL
 // adapters (issue 992). The reseal engine joins the keyring here, and each

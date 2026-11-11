@@ -60,7 +60,7 @@
 // # Status
 //
 // Implemented P2: the release bundle and distribution values among the
-// shared domain types (pull request 3). Staged in P9d. The behaviour that
+// shared domain types (pull request 3). Moved here in P9d. The behaviour that
 // uses them arrives with P15.
 //
 // # Testing

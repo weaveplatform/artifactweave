@@ -84,7 +84,7 @@
 // 163), of remote and virtual keys (issue 68) and of the GET searches, the
 // build seeds and cases (issue 167), and the --build shapes the CLI sends
 // (issue 171). Its follow-ups added RelatedCases (issues 410 and 494) and
-// the every-property includes (issue 506). Staged in P9d.
+// the every-property includes (issue 506). Moved here in P9d.
 //
 // # Testing
 //

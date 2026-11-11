@@ -80,7 +80,7 @@
 // binary provider chain names
 // (https://github.com/weaveplatform/artifactweave/issues/390), and
 // NoFilesystem for an object store
-// (https://github.com/weaveplatform/artifactweave/issues/461). Staged in
+// (https://github.com/weaveplatform/artifactweave/issues/461). Moved here in
 // P9d, which narrowed Summarize's store to Store
 // (https://github.com/weaveplatform/artifactweave/issues/1088).
 //

@@ -98,7 +98,7 @@
 // 193), the Mercury order (pull request 233), the property limits (pull
 // request 348), download matrices (pull request 355), source identities and
 // the remote cache (pull requests 644 and 646), Git LFS locks (pull request
-// 849) and Bower registrations (pull request 912). Staged in P9d.
+// 849) and Bower registrations (pull request 912). Moved here in P9d.
 //
 // # Testing
 //

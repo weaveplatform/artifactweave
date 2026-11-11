@@ -129,8 +129,9 @@
 // # Status
 //
 // Implemented P9c, which delivered the plan's P33 group (issues #782 to
-// #788). Staged in P9d (ECO-20), which made the server root's VCS handlers
-// the VCS partial strict server (WEB-08) and moved them here (WEB-16).
+// #788). Moved here in P9d (ECO-20), which made the server root's VCS
+// handlers the VCS partial strict server (WEB-08) and moved them here
+// (WEB-16).
 //
 // # Testing
 //

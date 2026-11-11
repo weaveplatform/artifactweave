@@ -58,7 +58,7 @@
 //
 // # Status
 //
-// Implemented P4 with the native permission evaluator. Staged in P9d.
+// Implemented P4 with the native permission evaluator. Moved here in P9d.
 //
 // # Testing
 //

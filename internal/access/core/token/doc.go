@@ -79,7 +79,7 @@
 // registry (pull requests 246 and 305), and later changes aligned expiry,
 // revocation and transient users with 7.x (pull requests 449 and 486). API
 // restrictions on issuance and refresh came with retry safety and bounded
-// API execution (pull request 905). Staged in P9d, where New takes Store.
+// API execution (pull request 905). Moved here in P9d, where New takes Store.
 //
 // # Testing
 //

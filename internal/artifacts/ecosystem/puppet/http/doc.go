@@ -99,8 +99,8 @@
 // # Status
 //
 // Implemented P9c, which delivered the plan's P33 group (issues #782 to
-// #788). Staged in P9d, which also moved the server root's Forge registrar
-// and reindex route here (WEB-17).
+// #788). Moved here in P9d, which also moved the server root's Forge
+// registrar and reindex route here (WEB-17).
 //
 // # Testing
 //

@@ -70,6 +70,6 @@
 //
 // # Status
 //
-// Implemented P0 to P9c: each phase added the keys of what it built. Staged
-// in P9d (WEB-18) unchanged; WEB-19 added the module settings accessors.
+// Implemented P0 to P9c: each phase added the keys of what it built. Moved
+// here in P9d (WEB-18) unchanged; WEB-19 added the module settings accessors.
 package config

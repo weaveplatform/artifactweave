@@ -75,7 +75,8 @@
 // to the actions it holds (pull request 435), aligned the admin scope with
 // 7.x (pull request 449), refused a MANAGE holder's changes to its own
 // entries (pull request 459) and added the Manage Resources role (pull
-// request 470). Staged in P9d: AsAPI and FromAPI (pull request 1127).
+// request 470). Moved here in P9d, which added AsAPI and FromAPI (pull
+// request 1127).
 //
 // # Testing
 //

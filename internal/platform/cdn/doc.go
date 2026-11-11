@@ -99,7 +99,7 @@
 // Implemented P4b: the CloudFront signer, the time windows and ParseDomain
 // (issue 120), the Cloud CDN signer (issue 121), FrontDoor and Window (issue
 // 122), and CloudFrontMaxSize, which keeps a file over CloudFront's
-// cacheable size off the edge (issue 402). Staged in P9d.
+// cacheable size off the edge (issue 402). Moved here in P9d.
 //
 // # Testing
 //

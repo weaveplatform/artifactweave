@@ -154,7 +154,7 @@
 // the presigned GET with blob.Signer, whose storage URLs carry the file name
 // and media type, and added CanSign (issue 119), the cache of URLs signed
 // over the network with SignsOverNetwork (issue 147) and Cloud CDN URLs
-// through a cdn.Signer (issue 121). Staged in P9d.
+// through a cdn.Signer (issue 121). Moved here in P9d.
 //
 // # Testing
 //

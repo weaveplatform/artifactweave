@@ -79,8 +79,8 @@
 // layouts, with null deletes, for PATCH /api/system/configuration and
 // `config apply`. Later phases added the downloadRedirectConfig section
 // (decision 0029), the security section's anonymous access switch and the
-// bootstrap descriptor. Staged in P9d behind configuration/api. Planned for
-// P12: the XML descriptor and the remaining YAML sections.
+// bootstrap descriptor. Moved here in P9d behind configuration/api. Planned
+// for P12: the XML descriptor and the remaining YAML sections.
 //
 // # Testing
 //

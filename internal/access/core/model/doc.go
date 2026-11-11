@@ -92,7 +92,7 @@
 // their wire conversions (pull request 3). P4 added the global roles and
 // environments (pull request 93) and the encrypted-password token purpose
 // (pull request 108), and AccessLockSettings came with the Access user lock
-// policy endpoints (pull request 242). Staged in P9d.
+// policy endpoints (pull request 242). Moved here in P9d.
 //
 // # Testing
 //

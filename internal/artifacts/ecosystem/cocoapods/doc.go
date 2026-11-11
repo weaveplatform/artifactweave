@@ -90,7 +90,7 @@
 // # Status
 //
 // Implemented P9c, which delivered the plan's P31 group (issues #770 to
-// #775). Staged in P9d.
+// #775). Moved here in P9d.
 //
 // # Testing
 //

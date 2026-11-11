@@ -566,9 +566,9 @@ func (q *Queue) WaitIdle(ctx context.Context) error {
 	}
 }
 
-// meterName is the queue's OpenTelemetry instrumentation scope: the path this
-// package has after promotion, set once in P9d so dashboards and alert rules
-// that select on the scope change once, not again at promotion.
+// meterName is the queue's OpenTelemetry instrumentation scope, this
+// package's import path. P9d set it once, to this path, so dashboards and
+// alert rules that select on the scope changed once (decision 0044).
 const meterName = "github.com/weaveplatform/artifactweave/internal/platform/work"
 
 // instrument registers the queue's metrics: items by kind and state, the

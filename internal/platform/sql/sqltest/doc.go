@@ -101,9 +101,9 @@
 // # Status
 //
 // Implemented P2: the PostgreSQL server that the contract runs share, and
-// Reset (pull request 3). Staged in P9d: RunModule, OpenSQLite, ScratchDSN,
-// Reset over any modules and the fault-test helpers (issue 996), and Schema
-// and SchemaGolden (issues 960 and 1098).
+// Reset (pull request 3). Moved here in P9d: RunModule, OpenSQLite,
+// ScratchDSN, Reset over any modules and the fault-test helpers (issue 996),
+// and Schema and SchemaGolden (issues 960 and 1098).
 //
 // # Testing
 //

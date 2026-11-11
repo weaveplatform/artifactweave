@@ -93,8 +93,8 @@
 // # Status
 //
 // Implemented P8 (Helm local repositories), with remote repositories in P9.
-// Staged in P9d. Roadmap: virtual.go (P10), the Merger that merges the Helm
-// index.yaml for virtual repositories.
+// Moved here in P9d. Roadmap: virtual.go (P10), the Merger that merges the
+// Helm index.yaml for virtual repositories.
 //
 // # Testing
 //

@@ -97,7 +97,7 @@
 // work that outlives its request: Current (pull request 648),
 // CurrentRegistry (pull request 664) and RestoreDownload (pull request 674);
 // API restrictions came with retry safety and bounded API execution (pull
-// request 905). Staged in P9d, where the seed creates the build-info
+// request 905). Moved here in P9d, where the seed creates the build-info
 // repository through the artifacts module's Repositories.
 //
 // # Testing

@@ -85,7 +85,7 @@
 //
 // # Status
 //
-// Implemented P3 to P9c. Staged in P9d. Roadmap: gate.go (P17), events.go
+// Implemented P3 to P9c. Moved here in P9d. Roadmap: gate.go (P17), events.go
 // (P11).
 //
 // # Testing

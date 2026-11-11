@@ -78,7 +78,7 @@
 // request 62) and SettingBootstrapDescriptor with the descriptor apply
 // (issue 50, pull request 59). SettingAccessLockSettings came with the
 // Access user lock policy endpoints (pull request 242), released in v0.1.0.
-// Staged in P9d.
+// Moved here in P9d.
 //
 // # Testing
 //

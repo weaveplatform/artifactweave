@@ -82,7 +82,7 @@
 // Implemented P0: the base URL resolver middleware of plan task 5. Two fixes
 // followed: the first entry of each comma-separated X-Forwarded-* header
 // (#249), and the configured base URL ahead of the forwarded headers, as in
-// Artifactory (#313). Staged in P9d.
+// Artifactory (#313). Moved here in P9d.
 //
 // # Testing
 //

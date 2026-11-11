@@ -84,7 +84,7 @@
 //
 // # Status
 //
-// Implemented P9. Staged in P9d, which narrowed the resolver's store to
+// Implemented P9. Moved here in P9d, which narrowed the resolver's store to
 // ResolverStore (https://github.com/weaveplatform/artifactweave/issues/1091).
 //
 // # Testing

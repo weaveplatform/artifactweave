@@ -93,7 +93,7 @@
 //
 // Implemented P5 (the GET searches, their limits and the layout searches)
 // and P9 (the upstream search, #213), as the server root's search handlers.
-// Staged in P9d, which cut the logic out of the handlers into this package.
+// Added in P9d, which cut the logic out of the handlers into this package.
 //
 // # Testing
 //

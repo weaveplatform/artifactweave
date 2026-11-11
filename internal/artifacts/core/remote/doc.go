@@ -78,7 +78,7 @@
 //
 // # Status
 //
-// Implemented P9. Staged in P9d, which narrowed Policy.Store to Store
+// Implemented P9. Moved here in P9d, which narrowed Policy.Store to Store
 // (https://github.com/weaveplatform/artifactweave/issues/1091).
 //
 // # Testing

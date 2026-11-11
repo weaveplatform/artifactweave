@@ -76,7 +76,7 @@
 // KeyStore and ProjectStore, with the metadata store's in-memory, SQLite
 // and PostgreSQL stores (pull request 3). The identity listings and
 // APIRestrictionStore came with retry safety and bounded API execution
-// (pull request 905). Staged in P9d, where Store is declared.
+// (pull request 905). Moved here in P9d, where Store is declared.
 //
 // # Testing
 //

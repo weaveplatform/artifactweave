@@ -89,7 +89,7 @@
 // permissions, tokens, roles, environments, OIDC, token and security
 // configuration and version operations; the others answer 501, such as
 // projects (P11), LDAP (P12), federation (P14), SAML (P21) and SCIM (P22).
-// Staged in P9d.
+// Moved here in P9d.
 //
 // # Testing
 //

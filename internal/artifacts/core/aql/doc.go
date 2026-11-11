@@ -121,7 +121,7 @@
 // messages to 7.x's and added the includes of related domains (issue 410),
 // of their properties and statistics (issue 494) and of every property
 // (issue 506). P9 added the transitive search of a Smart Remote (issue
-// 636). Staged in P9d. Roadmap: the local search logic that runs these
+// 636). Moved here in P9d. Roadmap: the local search logic that runs these
 // queries moves to artifacts/core/search
 // (https://github.com/weaveplatform/artifactweave/issues/1079).
 //

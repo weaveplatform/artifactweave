@@ -111,7 +111,7 @@
 // keys rotate command, and the masking helpers. P8 added Derive, first for
 // the signed download URLs of the Terraform registry; the Terraform state
 // backend, remote repositories (P9) and Hugging Face (P9c) derive keys with
-// it too. Staged in P9d.
+// it too. Moved here in P9d.
 //
 // # Testing
 //

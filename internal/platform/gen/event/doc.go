@@ -80,7 +80,7 @@
 // only descriptions have changed, in the 7.x API audit (#430) and the
 // rewording of the served contract (#434). The server's event service
 // embeds UnimplementedStrict and implements nothing, so every operation
-// answers 501 until P11 builds webhooks. Staged in P9d.
+// answers 501 until P11 builds webhooks. Moved here in P9d.
 //
 // # Testing
 //

@@ -134,7 +134,7 @@
 // the blob row its garbage-collection states (issue 64). P4b replaced the
 // presigner with the signing capability of download and CDN redirects:
 // Signer, Via, SignOptions, Disposition and ErrCannotSign (issue 119). P7
-// made SHA-512 a digest of every upload (issue 296). Staged in P9d.
+// made SHA-512 a digest of every upload (issue 296). Moved here in P9d.
 //
 // # Testing
 //

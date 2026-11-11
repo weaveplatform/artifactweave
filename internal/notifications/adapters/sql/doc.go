@@ -62,8 +62,8 @@
 // # Status
 //
 // Implemented P2: the webhook store with its sealed secrets, as the
-// metadata store's (pull request 3). Staged in P9d: Store, New and Module.
-// The webhook services that call it arrive with P11.
+// metadata store's (pull request 3). Moved here in P9d, which added Store,
+// New and Module. The webhook services that call it arrive with P11.
 //
 // # Testing
 //

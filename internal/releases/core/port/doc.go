@@ -62,9 +62,9 @@
 // # Status
 //
 // Implemented P2: BundleStore and DistributionStore, with the metadata
-// store's in-memory, SQLite and PostgreSQL stores (pull request 3). Staged
-// in P9d, where Store is declared. The services that call the ports arrive
-// with P15.
+// store's in-memory, SQLite and PostgreSQL stores (pull request 3). Moved
+// here in P9d, where Store is declared. The services that call the ports
+// arrive with P15.
 //
 // # Testing
 //

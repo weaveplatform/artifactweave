@@ -73,7 +73,8 @@
 // # Status
 //
 // Implemented P9: the remote cache, as the metadata store's (pull request
-// 646), and layout fencing (pull request 680). Staged in P9d: Stores.
+// 646), and layout fencing (pull request 680). Moved here in P9d, which added
+// Stores.
 //
 // # Testing
 //
