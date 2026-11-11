@@ -422,6 +422,21 @@ it has one, and rewrites its Status in the same change; `TestUnitLedgerComplete`
 `TestUnitPackageDocs` fail otherwise. A placeholder is judged by its own directory;
 subdirectories do not count.
 
+Some items the target document marks for a later phase get no placeholder:
+
+- generated packages for a future spec (`platform/gen/peer`, `pkg/client/peer` and the
+  like), which `make generate` creates with the spec;
+- `governance/adapters` subpackages, `operations/api` and `estate/api`, which the target
+  document does not name (`operations` and `estate` are flat);
+- `platform/outbox/outboxtest`, which the target document lists without a phase; the
+  outbox store's contract cases are in `platform/store/storetest`;
+- file-level items (`api/hooks.go` P17, `api/events.go` P11, `core/item/gate.go` P17,
+  `<type>/virtual.go` P10, `configuration/api/config.go` P12), which the owning
+  package's doc.go Status names.
+
+Directories that the migration moved code into, such as `configuration/core/descriptor`
+and the P9c ecosystem slices, are move targets, not placeholders.
+
 ### Dependency rules
 
 `TestUnitImportTiers` checks every import of a staged package; the first matching rule
