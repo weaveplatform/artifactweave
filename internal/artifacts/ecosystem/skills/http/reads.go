@@ -104,17 +104,21 @@ func (h handler) visible(r *http.Request, slug string) (skill, error) {
 	return s, nil
 }
 
-// resolvable answers the blackout's 404 for the reads a client resolves a
-// skill's version from (detail, versions, version and resolve; the JFrog
-// CLI's install resolves its version from the list of versions): 7.x
-// ignores a blacked-out repository when it resolves, and where it keeps a
-// skill's index is not documented, so the refusal names the skill's folder
-// and comes before the index is read. The list and search keep their
-// answers, as 6.20's searchers check permissions and patterns but not the
-// blackout, and patterns rejecting a version's bundle leave it listed: only
-// the bundle's download and its files refuse.
-func (h handler) resolvable(w http.ResponseWriter, r *http.Request, slug string) bool {
-	if err := h.k.CheckBlackedOut(r, slug); err != nil {
+// notBlackedOut answers the blackout's 404, naming path, before a read
+// computes anything from the skill index, and reports whether the read may
+// go on. 7.x ignores a blacked-out repository when it resolves, and where
+// it keeps a skill's index is not documented, so the reads a client
+// resolves a skill's version from (detail, versions, version and resolve;
+// the JFrog CLI's install resolves its version from the list of versions)
+// refuse at the skill's folder. A download refuses before the index is
+// read too, whether its version exists or not, as the item routes refuse a
+// missing path (6.20 checks the download policy before it looks a path
+// up). The list and search keep their answers, as 6.20's searchers check
+// permissions and patterns but not the blackout, and patterns rejecting a
+// version's bundle leave it listed: only the bundle's download and its
+// files refuse.
+func (h handler) notBlackedOut(w http.ResponseWriter, r *http.Request, path string) bool {
+	if err := h.k.CheckBlackedOut(r, path); err != nil {
 		h.k.Error(w, r, err)
 		return false
 	}
@@ -122,14 +126,15 @@ func (h handler) resolvable(w http.ResponseWriter, r *http.Request, slug string)
 }
 
 // selected finds the version a read names, after the caller's read
-// permission on the skill's folder; resolution is set for the version
-// route, whose answer is resolution metadata, and not for a download, whose
-// refusal names the bundle's own path.
+// permission on the skill's folder. A blacked-out repository is refused
+// first, at blackout, when that is not empty: the skill's folder for the
+// version route's resolution metadata, and for a download the path its
+// refusal names. A file of a version's bundle passes none, so that its
+// refusal names the bundle's path, after the index is read.
 func (h handler) selected(
 	w http.ResponseWriter,
 	r *http.Request,
-	slug, version string,
-	resolution bool,
+	slug, version, blackout string,
 ) (skillVersion, bool) {
 	if !h.authenticated(w, r) {
 		return skillVersion{}, false
@@ -141,7 +146,7 @@ func (h handler) selected(
 	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
 		return skillVersion{}, false
 	}
-	if resolution && !h.resolvable(w, r, slug) {
+	if blackout != "" && !h.notBlackedOut(w, r, blackout) {
 		return skillVersion{}, false
 	}
 	s, err := h.visible(r, slug)
@@ -328,7 +333,7 @@ func (h handler) detail(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badQuery("invalid skill slug"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, slug, api.ActionRead) || !h.resolvable(w, r, slug) {
+	if !h.k.RequireFolder(w, r, slug, api.ActionRead) || !h.notBlackedOut(w, r, slug) {
 		return
 	}
 	s, err := h.visible(r, slug)
@@ -357,7 +362,7 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badQuery("invalid skill slug"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, slug, api.ActionRead) || !h.resolvable(w, r, slug) {
+	if !h.k.RequireFolder(w, r, slug, api.ActionRead) || !h.notBlackedOut(w, r, slug) {
 		return
 	}
 	s, err := h.visible(r, slug)
@@ -398,7 +403,7 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request) {
 
 func (h handler) version(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
-	v, ok := h.selected(w, r, slug, chi.URLParam(r, "version"), true)
+	v, ok := h.selected(w, r, slug, chi.URLParam(r, "version"), slug)
 	if !ok {
 		return
 	}
@@ -501,7 +506,7 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badQuery("invalid skill slug"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, slug, api.ActionRead) || !h.resolvable(w, r, slug) {
+	if !h.k.RequireFolder(w, r, slug, api.ActionRead) || !h.notBlackedOut(w, r, slug) {
 		return
 	}
 	s, err := h.visible(r, slug)
@@ -521,8 +526,16 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) download(w http.ResponseWriter, r *http.Request) {
-	slug := r.URL.Query().Get("slug")
-	v, ok := h.selected(w, r, slug, r.URL.Query().Get("version"), false)
+	slug, version := r.URL.Query().Get("slug"), r.URL.Query().Get("version")
+	// A named version's refusal names its bundle, as the refusal of a
+	// stored one does; latest is resolved from the index, which a
+	// blacked-out repository does not read, so its refusal names the
+	// skill's folder, as resolve's does.
+	blackout := skillsfmt.Path(slug, version)
+	if version == "" || version == "latest" {
+		blackout = slug
+	}
+	v, ok := h.selected(w, r, slug, version, blackout)
 	if !ok {
 		return
 	}
@@ -531,7 +544,7 @@ func (h handler) download(w http.ResponseWriter, r *http.Request) {
 
 func (h handler) singleFile(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
-	v, ok := h.selected(w, r, slug, r.URL.Query().Get("version"), false)
+	v, ok := h.selected(w, r, slug, r.URL.Query().Get("version"), "")
 	if !ok {
 		return
 	}

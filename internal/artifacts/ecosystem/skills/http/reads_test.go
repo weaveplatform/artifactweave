@@ -8,9 +8,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -391,10 +394,12 @@ func TestAccSingleFileStoredBlobFaults(t *testing.T) {
 // reject with the item routes' 404 and message, for an administrator too.
 // A blacked-out repository's detail, versions, version and resolve, which
 // a client resolves a version from, answer the blackout's 404 naming the
-// skill's folder. The list and search keep their answers, a version whose
-// bundle the patterns reject stays listed, the scan status still answers
-// for the stored bundle, and discovery stays anonymous. A caller who may
-// not read the skill learns nothing of how the repository is set.
+// skill's folder, and its downloads refuse before the index is read, so a
+// version or skill that does not exist is refused alike. The list and
+// search keep their answers, a version whose bundle the patterns reject
+// stays listed, the scan status still answers for the stored bundle, and
+// discovery stays anonymous. A caller who may not read the skill learns
+// nothing of how the repository is set.
 func TestAccSkillsDownloadPolicy(t *testing.T) {
 	f := newFixture(t)
 	published(t, f, "alpha", "1.0.0")
@@ -417,7 +422,32 @@ func TestAccSkillsDownloadPolicy(t *testing.T) {
 			t.Errorf("%s %s: %d %s, want %d with %q", as, path, r.Code, r.Body, status, body)
 		}
 	}
+	// failed checks the whole answer of a refused read: its status, the
+	// message in Artifactory's envelope and no header but the envelope's
+	// type, so that nothing of a served bundle leaks into a refusal.
+	failed := func(as, path string, status int, message string) {
+		t.Helper()
+		r := f.read(as, path)
+		body := `{"errors":[{"message":"` + message + `","status":` +
+			strconv.Itoa(status) + "}]}\n"
+		if r.Code != status || r.Body.String() != body || !maps.EqualFunc(
+			r.Header(), http.Header{"Content-Type": {"application/json"}}, slices.Equal) {
+			t.Errorf("%s %s: %d %v %s, want %d %s", as, path, r.Code, r.Header(), r.Body,
+				status, body)
+		}
+	}
 	bundle := "/api/v1/download?slug=alpha&version=2.0.0"
+	// downloads maps each download a blacked-out repository refuses before
+	// the index is read to the path its refusal names: a named version's
+	// bundle, stored or not, and the skill's folder for latest, which only
+	// the index could resolve.
+	downloads := map[string]string{
+		bundle: "alpha/2.0.0/alpha-2.0.0.zip",
+		"/api/v1/download?slug=alpha&version=9.9.9":    "alpha/9.9.9/alpha-9.9.9.zip",
+		"/api/v1/download?slug=missing&version=1.0.0":  "missing/1.0.0/missing-1.0.0.zip",
+		"/api/v1/download?slug=alpha&version=latest":   "alpha",
+		"/api/v1/download?slug=missing&version=latest": "missing",
+	}
 	file := "/api/v1/skills/alpha/file?version=2.0.0&path=src%2Frun.js"
 	resolution := []string{
 		"/api/v1/skills/alpha", "/api/v1/skills/alpha/versions",
@@ -460,7 +490,9 @@ func TestAccSkillsDownloadPolicy(t *testing.T) {
 			"'skills-local:" + path + "'."
 	}
 	for _, as := range []string{"admin", "reader"} {
-		answers(as, bundle, http.StatusNotFound, blackedOut("alpha/2.0.0/alpha-2.0.0.zip"))
+		for path, named := range downloads {
+			failed(as, path, http.StatusNotFound, blackedOut(named))
+		}
 		answers(as, file, http.StatusNotFound, blackedOut("alpha/2.0.0/alpha-2.0.0.zip"))
 		for _, path := range resolution {
 			answers(as, path, http.StatusNotFound, blackedOut("alpha"))
@@ -472,7 +504,10 @@ func TestAccSkillsDownloadPolicy(t *testing.T) {
 	}
 	kept()
 	// Read permission first (DV-057).
-	for _, path := range append([]string{bundle, file}, resolution...) {
+	for path := range downloads {
+		failed("nobody", path, http.StatusForbidden, "Forbidden")
+	}
+	for _, path := range append([]string{file}, resolution...) {
 		r := f.read("nobody", path)
 		if r.Code != http.StatusForbidden || strings.Contains(r.Body.String(), "blacked out") {
 			t.Errorf("nobody %s: %d %s, want 403 without the setting", path, r.Code, r.Body)
@@ -481,8 +516,18 @@ func TestAccSkillsDownloadPolicy(t *testing.T) {
 
 	patch(func(c *repo.Config) { c.BlackedOut = new(false) })
 	answers("reader", bundle, http.StatusOK, "PK")
+	answers("reader", "/api/v1/download?slug=alpha&version=latest", http.StatusOK, "PK")
 	answers("reader", file, http.StatusOK, "run 2.0.0")
 	for _, path := range resolution {
 		answers("reader", path, http.StatusOK, "2.0.0")
+	}
+	// Without the blackout the index answers for a version or skill it
+	// does not hold.
+	for _, path := range []string{
+		"/api/v1/download?slug=alpha&version=9.9.9",
+		"/api/v1/download?slug=missing&version=1.0.0",
+		"/api/v1/download?slug=missing&version=latest",
+	} {
+		failed("reader", path, http.StatusNotFound, "Could not find resource")
 	}
 }
