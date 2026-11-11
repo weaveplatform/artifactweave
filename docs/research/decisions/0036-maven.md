@@ -191,6 +191,22 @@ never `maven-metadata.xml`.
   `maven-1-default` or `sbt-default`, the tokens resolve nothing and the path is looked up
   as it is: "Both [folderItegRev] and [fileItegRev] have to be defined in the repository
   layout" (Retrieve Artifact, research 27 section 8).
+- **A file the repository's patterns reject takes no part** (amended 2026-11-11, #1251).
+  `[RELEASE]` and `[INTEGRATION]` resolve among the files the include and exclude patterns
+  accept, as a `-SNAPSHOT` name already did. A token whose newest release is excluded
+  resolves to the newest accepted one. With none accepted, the token's own path is looked up
+  and not found. JFrog documents an excluded artifact as "not resolved from that repository"
+  (Local Repositories). 6.20's `ReleaseVersionsRetriever` filtered by the layout alone and
+  served the excluded release, so #216 asks what a live 7.x does. Read permission is left to
+  the check of the resolved path, as 6.20 leaves it, so a newest release the caller may not
+  read is refused rather than passed over.
+- **A remote repository's `maven-metadata.xml` that its own blackout or patterns refuse
+  counts as absent** when it would resolve a path against the upstream (#1251). A
+  non-unique snapshot name or a token is fetched as asked, and the file's own check decides.
+  6.20's `RemoteLatestMavenVersionResolver` takes any answer but 200 as no metadata
+  (`tryDownloadingMavenMetadata`); #216 asks what 7.x does. The metadata itself stays
+  refused. Metadata the upstream lacks still answers 404 for a token without that fetch,
+  where 6.20 asks the upstream: the download policy does not decide that difference.
 
 **`calculateMetadata`** (`POST /api/maven/calculateMetadata/{repoKey}/{folderPath}`, amended
 2026-10-19, #282):

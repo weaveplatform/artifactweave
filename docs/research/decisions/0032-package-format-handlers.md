@@ -137,10 +137,28 @@ Where the policy applies:
   also leave out children the patterns reject, the member's and the virtual repository's
   (`TreeBrowsingCriteriaBuilder.applyRepoIncludeExclude`,
   `RepositoryBrowsingServiceImpl.virtualRepoAccepts`).
-- Docker manifest and blob pulls: a blacked-out repository answers `NAME_UNKNOWN`, as a push
-  does, and a manifest or blob the patterns reject answers `MANIFEST_UNKNOWN` or
-  `BLOB_UNKNOWN`, as a missing one does. The Docker addon is not open source, so these codes
-  are inferred (research 24, 5.5).
+- Docker, OCI and Helm OCI pulls under `/v2` (amended for #1251). A refusal answers 404 with
+  the policy's message in Artifactory's envelope, `{"errors":[{"status":404,"message":...}]}`,
+  under no registry code, for local and remote repositories alike. The Docker client printed
+  `unknown: <message>` for 7.x's pattern refusal (RTFACT-27234), so 7.x sent no
+  `MANIFEST_UNKNOWN`. The Docker addon is not open source, so the exact body is inferred
+  (research 24, 5.5 and 5.6).
+  - The blackout is checked before the lookup and names the file the pull reads:
+    `<image>/<tag>/manifest.json` for a tag, `<image>/sha256:<hex>/manifest.json` for a
+    digest and `<image>/_uploads/sha256__<hex>` for a blob, the paths a remote repository
+    checks (inferred).
+  - The patterns are checked on the copy a pull serves, and a blob is served from any copy in
+    the image the patterns accept (RTFACT-30134). A missing manifest or blob keeps
+    `MANIFEST_UNKNOWN` or `BLOB_UNKNOWN`.
+  - `_catalog` leaves out images whose folder the patterns reject (RTFACT-26524). Tags lists
+    and referrers keep what the patterns reject: RTFACT-27234 is an open request to filter
+    tags. A blacked-out repository refuses an image's tags list and referrers, naming
+    `<repo>:<image>` as a blacked-out remote does (inferred), since helm resolves unversioned
+    or ranged charts from the tags list and cosign and notation find signatures through the
+    referrers. Its catalog still lists every image, as a native search does.
+  - A cross-repository mount from a source that is blacked out, or whose patterns accept no
+    copy of the blob, opens an upload session (202), as for a source the caller may not read
+    (inferred).
 - The storage API's file list (`?list`) of a blacked-out repository
   (`ArtifactResource.writeStreamingFileList` maps `BlackedOutException` to 404).
 - The read paths of later formats, which find items through the same download lookup or call
