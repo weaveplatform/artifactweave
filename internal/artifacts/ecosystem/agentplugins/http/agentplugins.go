@@ -80,16 +80,24 @@ func (s AgentPluginItems) serveAgentMarketplace(
 	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	name string, p kernel.Principal, acc itemkit.Access,
 ) {
-	if err := generic.CheckDownload(c, name, false); err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "download check", err))
-		return
-	}
+	// The read permission first, so a caller who may not read the
+	// repository learns nothing of how it is set (DV-057); then the
+	// policy at the file's own path, where 7.x stores it.
 	if !acc.Folder(c, "", api.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
+	if err := generic.CheckDownload(c, name, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "download check", err))
+		return
+	}
+	// 7.x rebuilds the marketplace on upload, listing each plugin's latest
+	// version, and serves the stored file, so patterns rejecting that
+	// version's ZIP leave it listed and refuse only the ZIP's download.
+	// The caller's read permission still picks the version, as rendering
+	// per reader does.
 	data, err := agentplugins.Marketplace(r.Context(), st, c.Key, name, func(path string) bool {
-		return acc.File(c, path, api.ActionRead) && generic.CheckDownload(c, path, false) == nil
+		return acc.File(c, path, api.ActionRead)
 	})
 	if err != nil {
 		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "agent plugin marketplace", err))

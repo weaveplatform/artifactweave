@@ -40,9 +40,14 @@
 //
 // # Invariants
 //
-//   - A marketplace lists each plugin's latest version that the caller may
-//     read and the download policy allows, and needs Read on the
-//     repository itself.
+//   - A marketplace needs Read on the repository itself, checked before
+//     the download policy at the file's own name, so a caller who may not
+//     read the repository learns nothing of how it is set (DV-057): then a
+//     blacked-out repository, or patterns rejecting the name, answer 404
+//     with the item routes' message. It lists each plugin's latest version
+//     that the caller may read. Patterns rejecting that version's ZIP leave
+//     it listed, as 7.x's stored marketplace lists each plugin's latest
+//     version, and refuse only the ZIP's download.
 //   - The files are JSON, private and never stored by a shared cache
 //     (Cache-Control: private, no-store); HEAD answers the headers alone.
 //   - Only a local Agent Plugins repository has marketplace files; any

@@ -59,12 +59,14 @@ func listed(t *testing.T, rec *httptest.ResponseRecorder) []string {
 // TestAccAgentPluginsMarketplaceListsWhatTheCallerMayRead: a marketplace
 // file is rendered for each request, the same at its API path and at the
 // repository root. It lists each plugin's latest version that the caller
-// may read and that the repository's patterns let anyone download, of the
-// harness the file names.
+// may read, of the harness the file names. A version whose ZIP the
+// repository's patterns reject stays listed, as 7.x's stored marketplace
+// lists each plugin's latest version, rather than giving way to an older
+// one; only the ZIP's download refuses.
 func TestAccAgentPluginsMarketplaceListsWhatTheCallerMayRead(t *testing.T) {
 	w := newItemWorld(t)
 	local := pluginsRepo(pluginsLocal, repo.Local)
-	local.ExcludesPattern = new("secret/**")
+	local.ExcludesPattern = new("secret/**,alpha/2.0.0/**")
 	w.repos(local)
 	w.plugin("alpha", "1.0.0", "claude")
 	w.plugin("alpha", "2.0.0", "claude")
@@ -90,12 +92,15 @@ func TestAccAgentPluginsMarketplaceListsWhatTheCallerMayRead(t *testing.T) {
 		as   *caller
 		want []string
 	}{
-		{"marketplace.json", admin, []string{"alpha@2.0.0", "beta@1.0.0", "hidden@1.0.0"}},
-		{"claude-marketplace.json", admin, []string{"alpha@2.0.0", "hidden@1.0.0"}},
+		{
+			"marketplace.json", admin,
+			[]string{"alpha@2.0.0", "beta@1.0.0", "hidden@1.0.0", "secret@1.0.0"},
+		},
+		{"claude-marketplace.json", admin, []string{"alpha@2.0.0", "hidden@1.0.0", "secret@1.0.0"}},
 		{"cursor-marketplace.json", admin, []string{"beta@1.0.0"}},
 		{"codex-marketplace.json", admin, []string{}},
-		{"marketplace.json", reader, []string{"alpha@1.0.0", "beta@1.0.0"}},
-		{"claude-marketplace.json", reader, []string{"alpha@1.0.0"}},
+		{"marketplace.json", reader, []string{"alpha@1.0.0", "beta@1.0.0", "secret@1.0.0"}},
+		{"claude-marketplace.json", reader, []string{"alpha@1.0.0", "secret@1.0.0"}},
 	} {
 		for _, target := range []string{
 			apiPath(pluginsLocal, tc.file), itemPath(pluginsLocal, tc.file),
@@ -108,6 +113,9 @@ func TestAccAgentPluginsMarketplaceListsWhatTheCallerMayRead(t *testing.T) {
 			})
 		}
 	}
+	wantError(t, w.do(http.MethodGet, itemPath(pluginsLocal, "alpha/2.0.0/alpha-2.0.0.zip"), admin),
+		http.StatusNotFound, "The repository 'plugins-local' rejected the artifact "+
+			"'plugins-local:alpha/2.0.0/alpha-2.0.0.zip' due to its include/exclude pattern settings.")
 }
 
 // TestAccAgentPluginsMarketplaceHeadAnswersTheHeadersAlone: HEAD shares the
@@ -257,9 +265,9 @@ func TestUnitAgentPluginsOverlayDeclinesACacheAlias(t *testing.T) {
 
 // TestAccAgentPluginsMarketplaceRefusesBeforeRendering: a marketplace file
 // is refused, at both paths, in a blacked-out repository and where the
-// repository's patterns exclude it, before the caller's permissions are
-// asked, as Artifactory refuses a download; a caller who may not read the
-// repository is then refused, and the anonymous user challenged.
+// repository's patterns exclude it, before it is rendered. A caller who may
+// not read the repository is refused first, and the anonymous user
+// challenged, so neither learns how the repository is set (DV-057).
 func TestAccAgentPluginsMarketplaceRefusesBeforeRendering(t *testing.T) {
 	w := newItemWorld(t)
 	dark := pluginsRepo("plugins-dark", repo.Local)
@@ -284,7 +292,15 @@ func TestAccAgentPluginsMarketplaceRefusesBeforeRendering(t *testing.T) {
 		{"blacked-out repository", "plugins-dark", admin, http.StatusNotFound, blackedOut},
 		{
 			"blacked-out repository, to a caller who may not read it", "plugins-dark", user,
-			http.StatusNotFound, blackedOut,
+			http.StatusForbidden, "Forbidden",
+		},
+		{
+			"blacked-out repository, to an anonymous user who may not read it", "plugins-dark",
+			anonymous, http.StatusUnauthorized, "Authentication is required",
+		},
+		{
+			"excluded by the patterns, to a caller who may not read it", "plugins-closed", user,
+			http.StatusForbidden, "Forbidden",
 		},
 		{"excluded by the patterns", "plugins-closed", admin, http.StatusNotFound, excluded},
 		{
