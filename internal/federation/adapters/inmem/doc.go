@@ -62,10 +62,10 @@
 // # Status
 //
 // Implemented P2: the replication, peer, federation and platform federation
-// stores, as the metadata store's (pull request 3). Staged in P9d: Store and
-// New. The services that call them arrive with P11 (replication), P13 (peer
-// trust and federated repositories) and P14 (platform federation and
-// topology).
+// stores, as the metadata store's (pull request 3). Moved here in P9d, which
+// added Store and New. The services that call them arrive with P11
+// (replication), P13 (peer trust and federated repositories) and P14
+// (platform federation and topology).
 //
 // # Testing
 //

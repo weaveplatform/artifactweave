@@ -46,7 +46,7 @@
 //
 // # Status
 //
-// Implemented P2 (pull request 3). Staged in P9d: the pool comes from the
+// Implemented P2 (pull request 3). Moved here in P9d: the pool comes from the
 // platform/sql/sqlite driver (issue 995), and the package moved under app
 // (issue 1098).
 //

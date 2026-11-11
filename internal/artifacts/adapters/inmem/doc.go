@@ -88,7 +88,7 @@
 // (pull request 30). Later phases added the build store (pull request 193),
 // the remote cache (pull request 646), layout fencing (pull request 680),
 // Git LFS locks (pull request 849) and Bower registrations (pull request
-// 912). Staged in P9d: Store, New and LayoutWatch.
+// 912). Moved here in P9d, which added Store, New and LayoutWatch.
 //
 // # Testing
 //

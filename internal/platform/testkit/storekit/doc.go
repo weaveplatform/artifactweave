@@ -63,7 +63,7 @@
 // # Status
 //
 // Implemented P2: the helpers came with the metadata store's contract suite
-// (pull request 3). Staged in P9d: exported for the module suites (issue
+// (pull request 3). Moved here in P9d: exported for the module suites (issue
 // 996).
 //
 // # Testing

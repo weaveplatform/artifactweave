@@ -86,7 +86,7 @@
 // npm's options. P8 added PyPI, NuGet, Helm, Terraform and the Terraform
 // backend, with the settings of PyPI, Helm and the Terraform backend; P9b
 // and P9c added the formats they implemented, and P9c conda's settings.
-// Staged in P9d. Roadmap: the slices move below this directory with their
+// Moved here in P9d. Roadmap: the slices move below this directory with their
 // ECO tickets, the artifacts settings are built from Settings
 // (https://github.com/weaveplatform/artifactweave/issues/1093), and the
 // module constructor wires the registry

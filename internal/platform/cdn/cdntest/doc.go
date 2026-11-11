@@ -83,7 +83,7 @@
 //
 // Implemented P4b: the edge with the CloudFront validator (issue 120), the
 // CloudCDN validator (issue 121) and the Front Door edge with its cache
-// (issue 122). Staged in P9d.
+// (issue 122). Moved here in P9d.
 //
 // # Testing
 //

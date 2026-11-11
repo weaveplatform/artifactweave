@@ -63,7 +63,7 @@
 // (pull request 105), the encrypted password tied to the password (pull
 // request 108), the Access user lock policy (pull request 242), the legacy
 // password endpoints (pull request 466) and login suspension, filters and
-// limits (pull request 470). Staged in P9d, where Service takes Store.
+// limits (pull request 470). Moved here in P9d, where Service takes Store.
 //
 // # Testing
 //

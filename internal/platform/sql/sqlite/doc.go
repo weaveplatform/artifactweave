@@ -71,10 +71,10 @@
 //
 // Implemented P2: the SQLite store's open with WAL, the busy timeout and
 // IMMEDIATE transactions, the in-memory database on one connection and the
-// unique-violation test (pull request 3). Staged in P9d: the migrations left
-// for each module's stream, and Dialect gained Columns (issue 994); the driver
-// left the composite store's open for this package, with OpenDB and its
-// Options (issue 995).
+// unique-violation test (pull request 3). Moved here in P9d: the migrations
+// left for each module's stream, and Dialect gained Columns (issue 994); the
+// driver left the composite store's open for this package, with OpenDB and
+// its Options (issue 995).
 //
 // # Testing
 //

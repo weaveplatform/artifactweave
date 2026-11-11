@@ -4,11 +4,12 @@
 //
 // # Role
 //
-// releases module, core layer, store ports. The metadata store's SQL and
-// in-memory stores implement BundleStore and DistributionStore, and the
-// metadata store satisfies Store; STO-15 moves those implementations into
-// the module's adapters. The ports take and return the module's core/model
-// values and kernel.Page, and join the unit of work of platform/tx.
+// releases module, core layer, store ports. The module's adapters implement
+// BundleStore, DistributionStore and Store: adapters/sql over the shared SQL
+// unit of work and adapters/inmem over a shared memtx.Store, both held to the
+// contract in adapters/storetest. The ports take and return the module's
+// core/model values and kernel.Page, and join the unit of work of
+// platform/tx.
 //
 // # Inputs
 //
@@ -62,9 +63,9 @@
 // # Status
 //
 // Implemented P2: BundleStore and DistributionStore, with the metadata
-// store's in-memory, SQLite and PostgreSQL stores (pull request 3). Staged
-// in P9d, where Store is declared. The services that call the ports arrive
-// with P15.
+// store's in-memory, SQLite and PostgreSQL stores (pull request 3). Moved
+// here in P9d, where Store is declared. The services that call the ports
+// arrive with P15.
 //
 // # Testing
 //

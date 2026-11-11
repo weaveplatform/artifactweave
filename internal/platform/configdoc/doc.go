@@ -87,8 +87,8 @@
 // Implemented P2: ConfigKind with its sixteen kinds, ConfigDocument and
 // ConfigStore, with the secrets sealed apart from the documents (pull
 // request 3). P9: layout writes fence the remote repositories that use the
-// layout (pull request 680). Staged in P9d: Watch, through which the config
-// stores call that fence.
+// layout (pull request 680). Moved here in P9d: Watch, through which the
+// config stores call that fence.
 //
 // # Testing
 //

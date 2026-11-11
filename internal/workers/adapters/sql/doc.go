@@ -61,8 +61,8 @@
 // # Status
 //
 // Implemented P2: the worker store with its sealed secrets, as the metadata
-// store's (pull request 3). Staged in P9d: Store, New and Module. The
-// runtime that calls it arrives with P17.
+// store's (pull request 3). Moved here in P9d, which added Store, New and
+// Module. The runtime that calls it arrives with P17.
 //
 // # Testing
 //

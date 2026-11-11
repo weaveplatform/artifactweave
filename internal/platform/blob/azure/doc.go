@@ -178,7 +178,7 @@
 // 4,000 MiB, the most the real service accepts. P4b replaced the presigned
 // GET with blob.Signer, whose read SASs carry the file name and media type,
 // together with CanSign (issue 119), and added Front Door URLs, a window's
-// SAS on the endpoint (issue 122). Staged in P9d.
+// SAS on the endpoint (issue 122). Moved here in P9d.
 //
 // # Testing
 //

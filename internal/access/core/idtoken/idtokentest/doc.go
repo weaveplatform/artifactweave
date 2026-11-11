@@ -38,6 +38,6 @@
 //
 // # Status
 //
-// Implemented P4 with the OIDC token exchange (pull request 145). Staged in
-// P9d.
+// Implemented P4 with the OIDC token exchange (pull request 145). Moved here
+// in P9d.
 package idtokentest

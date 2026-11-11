@@ -99,7 +99,7 @@
 // Implemented P2: Upload and UploadStore, with Stale for the stale-upload
 // reaper that garbage collection runs from P3 (pull request 3). P2b: the
 // shared session layer, with Session, Store, Memory and InUploads under
-// per-store backend names (issue 8, pull request 30). Staged in P9d.
+// per-store backend names (issue 8, pull request 30). Moved here in P9d.
 //
 // # Testing
 //

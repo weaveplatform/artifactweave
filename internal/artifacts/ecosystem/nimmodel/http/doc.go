@@ -92,7 +92,7 @@
 // Implemented P9b: NVIDIA's documented paths, qualified against a
 // controlled fixture. The Artifactory wire shape, the other .jfrog cache
 // files and the remaining Nimmodel.* properties stay inferred for P19's
-// comparison (#216). Staged in P9d.
+// comparison (#216). Moved here in P9d.
 //
 // # Testing
 //

@@ -80,7 +80,7 @@
 // # Status
 //
 // Implemented P9c, for the CocoaPods source archives of issue 771 and the
-// Vagrant boxes of issue 785. Staged in P9d.
+// Vagrant boxes of issue 785. Moved here in P9d.
 //
 // # Testing
 //

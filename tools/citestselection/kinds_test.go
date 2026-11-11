@@ -287,7 +287,7 @@ func TestUnitFormatAppDependenciesSelectOnlyOwnedFiles(t *testing.T) {
 	}
 }
 
-func TestUnitScanKindsIncludesMigrationAndToleratesMissingRoots(t *testing.T) {
+func TestUnitScanKindsToleratesMissingRoots(t *testing.T) {
 	root := t.TempDir()
 	write := func(path, source string) {
 		t.Helper()

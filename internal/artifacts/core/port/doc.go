@@ -99,7 +99,7 @@
 // request 30). Later phases added BuildStore (pull request 193), the
 // property key checks (pull request 348), RemoteCacheStore (pull request
 // 646), GitLFSLockStore (pull request 849) and BowerRegistrationStore (pull
-// request 912). Staged in P9d, which declares ArchivedItemStore and Store.
+// request 912). Moved here in P9d, which added ArchivedItemStore and Store.
 //
 // # Testing
 //

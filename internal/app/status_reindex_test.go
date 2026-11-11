@@ -22,7 +22,8 @@ import (
 // reach them now through reindexFake, which stands in for each format until
 // it lands. A format that lands as a Reindexer then answers the same rows
 // itself, and adds its operation to reindexStatusPart's generated, since
-// the stub test no longer holds it to 501.
+// the stub test no longer holds it to 501. The RPM and Debian metadata
+// calculations answer from their own formats.
 
 const (
 	reindexPyPI      = "POST /artifactory/api/pypi/{repoKey}/reindex"
@@ -30,6 +31,8 @@ const (
 	reindexHelm      = "POST /artifactory/api/helm/{repoKey}/reindex"
 	reindexHelmPath  = "POST /artifactory/api/helm/{repoKey}/{pathForPartialReindex}/reindex"
 	reindexTerraform = "POST /artifactory/api/terraform/{repoKey}/reindex"
+	reindexYum       = "POST /artifactory/api/yum/{repoKey}"
+	reindexDebian    = "POST /artifactory/api/deb/reindex/{repoKey}"
 )
 
 // p8Types are the package types whose reindex operations P8 serves.
@@ -67,6 +70,18 @@ var reindexRepos = []repo.Config{
 		Key: "reindex-terraform", Class: repo.Local, PackageType: repo.Terraform,
 		TerraformType: repo.TerraformModule,
 	},
+	{Key: "reindex-rpm", Class: repo.Local, PackageType: repo.RPM},
+	{
+		Key:         "reindex-rpm-remote",
+		Class:       repo.Remote,
+		PackageType: repo.RPM,
+		URL:         "https://up.example",
+	},
+	{
+		Key: "reindex-rpm-virtual", Class: repo.Virtual, PackageType: repo.RPM,
+		Repositories: []string{"reindex-rpm"},
+	},
+	{Key: "reindex-debian", Class: repo.Local, PackageType: repo.Debian},
 }
 
 // reindexFake is the format of a P8 package type until its own lands: the
@@ -115,19 +130,24 @@ func createReindexRepos(t *testing.T, st *inmem.Store) {
 	}
 }
 
-// reindexStatusPart is the P8 reindex operations' share of the status
+// reindexStatusPart is the reindex operations' share of the status
 // table. reindexer holds Manage on their repositories and nothing else,
 // which every operation but Terraform's needs.
 var reindexStatusPart = statusPart{
 	// The partial reindex is matched before routing (HelmPartialReindex).
 	handwritten: map[string]bool{reindexHelmPath: true},
-	generated:   map[string]bool{reindexPyPI: true, reindexHelm: true, reindexTerraform: true},
+	generated: map[string]bool{
+		reindexPyPI: true, reindexHelm: true, reindexTerraform: true,
+		reindexYum: true, reindexDebian: true,
+	},
 	rows: func() []statusCase {
 		const (
 			pypi      = "/artifactory/api/pypi/"
 			nuget     = "/artifactory/api/nuget/"
 			helm      = "/artifactory/api/helm/"
 			terraform = "/artifactory/api/terraform/"
+			yum       = "/artifactory/api/yum/"
+			deb       = "/artifactory/api/deb/reindex/"
 			manager   = "reindexer:pw"
 		)
 		return []statusCase{
@@ -191,6 +211,29 @@ var reindexStatusPart = statusPart{
 			{reindexTerraform, terraform + "reindex-terraform/reindex", "", "", 401},
 			{reindexTerraform, terraform + "missing/reindex", "admin", "", 404},
 			{reindexTerraform, terraform + "reindex-helm/reindex", "admin", "", 400},
+
+			// Synchronous unless async=true. A virtual repository's
+			// calculation composes its members' metadata; a remote
+			// repository's is not served yet.
+			{reindexYum, yum + "reindex-rpm", "admin", "", 200},
+			{reindexYum, yum + "reindex-rpm?async=true", manager, "", 200},
+			{reindexYum, yum + "reindex-rpm", "user", "", 403},
+			{reindexYum, yum + "reindex-rpm", "", "", 401},
+			{reindexYum, yum + "missing", "admin", "", 404},
+			{reindexYum, yum + "reindex-helm", "admin", "", 400},
+			{reindexYum, yum + "reindex-rpm?path=x/repodata", "admin", "", 400},
+			{reindexYum, yum + "reindex-rpm-virtual", manager, "", 200},
+			{reindexYum, yum + "reindex-rpm-remote", "admin", "", 501},
+
+			// Local repositories only; writeProps=0 leaves the packages'
+			// properties alone.
+			{reindexDebian, deb + "reindex-debian", "admin", "", 200},
+			{reindexDebian, deb + "reindex-debian?writeProps=0", manager, "", 200},
+			{reindexDebian, deb + "reindex-debian?writeProps=2", "admin", "", 400},
+			{reindexDebian, deb + "reindex-debian", "user", "", 403},
+			{reindexDebian, deb + "reindex-debian", "", "", 401},
+			{reindexDebian, deb + "missing", "admin", "", 404},
+			{reindexDebian, deb + "reindex-helm", "admin", "", 400},
 		}
 	},
 	seed: func(t *testing.T, db *inmem.Store, _ blob.Store) {

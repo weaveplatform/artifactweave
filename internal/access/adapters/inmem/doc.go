@@ -64,7 +64,7 @@
 // Implemented P2: the user, group, permission, token, key and project
 // stores, as the metadata store's (pull request 3). The identity listings
 // and the API restriction store came with retry safety and bounded API
-// execution (pull request 905). Staged in P9d: Store and New.
+// execution (pull request 905). Moved here in P9d, which added Store and New.
 //
 // # Testing
 //

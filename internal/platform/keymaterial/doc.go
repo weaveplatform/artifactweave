@@ -62,7 +62,8 @@
 // # Status
 //
 // Implemented P4 (key pair and certificate checks) and P9c (the RSA and
-// Ed25519 signing keys of the Alpine, Hex and Nix formats). Staged in P9d.
+// Ed25519 signing keys of the Alpine, Hex and Nix formats). Moved here in
+// P9d.
 //
 // # Testing
 //

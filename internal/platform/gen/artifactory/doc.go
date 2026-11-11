@@ -105,7 +105,7 @@
 // implements the operations its handlers cover; the families later phases
 // own answer 501, among them federation and replication (P11, P13),
 // cleanup and archive (P11, P16), release bundles (P15) and most of system
-// administration. Staged in P9d.
+// administration. Moved here in P9d.
 //
 // # Testing
 //

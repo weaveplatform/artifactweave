@@ -61,8 +61,9 @@
 // # Status
 //
 // Implemented P2: the cleanup and archive stores, as the metadata store's
-// (pull request 3). Staged in P9d: Store, New and Module. The services that
-// call them arrive with P11 (cleanup) and P16 (the cold-storage tier).
+// (pull request 3). Moved here in P9d, which added Store, New and Module. The
+// services that call them arrive with P11 (cleanup) and P16 (the cold-storage
+// tier).
 //
 // # Testing
 //

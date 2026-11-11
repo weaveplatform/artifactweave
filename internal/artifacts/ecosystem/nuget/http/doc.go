@@ -96,7 +96,7 @@
 // # Status
 //
 // Implemented P8, with remote retrieval in P9: the v3 API (#628), then
-// the v2 feed and symbols (#629). Staged in P9d.
+// the v2 feed and symbols (#629). Moved here in P9d.
 //
 // # Testing
 //

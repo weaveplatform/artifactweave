@@ -99,7 +99,7 @@
 // 47). P7 added the bounded reader that the format handlers read
 // packages with (Limits and ReadFile), and Scan and ReadEntry for npm's
 // tarball inspection. P8 added ScanTar for PyPI's tar.bz2 source
-// distributions. Staged in P9d.
+// distributions. Moved here in P9d.
 //
 // # Testing
 //

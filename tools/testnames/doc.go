@@ -10,8 +10,8 @@
 //
 // # Inputs
 //
-//   - The _test.go files under api/, internal/, migration/, pkg/, test/ and
-//     tools/ below the repository root (-root).
+//   - The _test.go files under api/, internal/, pkg/, test/ and tools/ below
+//     the repository root (-root).
 //   - The reviewed owners of TestMain hooks and Fuzz targets, which are the
 //     only entry points without a TestUnit or TestAcc prefix.
 //
@@ -29,5 +29,5 @@
 //
 // # Status
 //
-// Implemented P9c (issue 809); P9d added migration/ to the scan.
+// Implemented P9c (issue 809).
 package main

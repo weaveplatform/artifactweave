@@ -68,7 +68,7 @@ finish successfully. Rewritten metadata must supply validators for its emitted b
 the implemented [cache maintenance](remote-cache-maintenance.md) activity clock (#622).
 A lookup, HEAD, 304 or failed stream must not call it; no-store results leave it nil.
 
-A confirmed missing resource is `store.ErrNotFound`. Other failures cannot become
+A confirmed missing resource is `kernel.ErrNotFound`. Other failures cannot become
 negative entries. `HTTPError` retains only an approved 401/403/429/5xx status, failure
 classification and a Retry-After duration capped at 300 seconds. Unknown failures are
 sanitized; URLs, credentials, cookies, upstream bodies and challenges are not exposed.

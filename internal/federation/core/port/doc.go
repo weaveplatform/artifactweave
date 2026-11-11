@@ -5,15 +5,15 @@
 //
 // # Role
 //
-// federation module, core layer, store ports. The metadata store's SQL and
-// in-memory stores implement ReplicationStore, PeerStore, FederationStore
-// and PlatformStore, and the metadata store satisfies Store; STO-15 moves
-// those implementations into the module's adapters. The ports take and
-// return the module's core/model values and kernel.Page, and join the unit
-// of work of platform/tx: an outbox entry is written in the transaction of
-// the change it records (decision 0021), so these stores run inside the
-// shared unit of work rather than one of their own. The outbox itself, the
-// peers' cursors and the instance identity are platform ports
+// federation module, core layer, store ports. The module's adapters implement
+// ReplicationStore, PeerStore, FederationStore, PlatformStore and Store:
+// adapters/sql over the shared SQL unit of work and adapters/inmem over a
+// shared memtx.Store, both held to the contract in adapters/storetest. The
+// ports take and return the module's core/model values and kernel.Page, and
+// join the unit of work of platform/tx: an outbox entry is written in the
+// transaction of the change it records (decision 0021), so these stores run
+// inside the shared unit of work rather than one of their own. The outbox
+// itself, the peers' cursors and the instance identity are platform ports
 // (platform/outbox and platform/instance).
 //
 // # Inputs
@@ -79,10 +79,9 @@
 //
 // Implemented P2: ReplicationStore, PeerStore, FederationStore and
 // PlatformStore, with the metadata store's in-memory, SQLite and PostgreSQL
-// stores (pull request 3). Staged in P9d, where Store is declared. The
-// services that call the ports arrive with P11 (replication), P13 (peer
-// trust and federated repositories) and P14 (platform federation and
-// topology).
+// stores (pull request 3). Moved here in P9d, where Store is declared. The
+// services that call the ports arrive with P11 (replication), P13 (peer trust
+// and federated repositories) and P14 (platform federation and topology).
 //
 // # Testing
 //

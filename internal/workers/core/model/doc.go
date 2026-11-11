@@ -60,7 +60,7 @@
 // # Status
 //
 // Implemented P2: the worker values among the shared domain types (pull
-// request 3). Staged in P9d, where the filter took its own matcher. The
+// request 3). Moved here in P9d, where the filter took its own matcher. The
 // behaviour that uses them arrives with P17.
 //
 // # Testing

@@ -59,7 +59,7 @@
 // # Status
 //
 // Implemented P2: the cleanup and archive values among the shared domain
-// types (pull request 3). Staged in P9d. The behaviour that uses them
+// types (pull request 3). Moved here in P9d. The behaviour that uses them
 // arrives with P11 (cleanup policies) and P16 (the cold-storage tier).
 //
 // # Testing

@@ -65,7 +65,7 @@
 // # Status
 //
 // Implemented P5 to P9c: the Builds API, promotion and retention in P5, and
-// the idempotent append replay after it. Staged in P9d.
+// the idempotent append replay after it. Moved here in P9d.
 //
 // # Testing
 //

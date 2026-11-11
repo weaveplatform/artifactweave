@@ -60,7 +60,8 @@ func (f WorkerFilter) Matches(repoKey string, c repo.Class, itemPath string) boo
 // model keeps its own copy because a module imports another only through
 // that module's api (decision 0044, dependency rule 6), and the federation
 // api does not carry PatternFilter. A change to the matching rule changes
-// both.
+// both, and TestUnitWorkerFilterGlobsMatchFederations (internal/app) fails
+// until it does.
 func matchPatterns(include, exclude []string, name string) bool {
 	match := func(p string) bool { ok, err := path.Match(p, name); return err == nil && ok }
 	if len(include) > 0 && !slices.ContainsFunc(include, match) {

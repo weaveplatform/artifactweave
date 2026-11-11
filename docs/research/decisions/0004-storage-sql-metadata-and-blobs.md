@@ -179,7 +179,7 @@ one such session; see [research 09](../09-jfrog-cli-compatibility.md#multipart-u
 - *SHA-3 as well*: no package client and no Artifactory API asks for it, so it would
   cost CPU on every upload for a digest nothing reads (maintainer decision, 2026-10-16).
   The checksum set is defined in one place (`internal/platform/blob.Hasher` and
-  `types.Checksums`), so another algorithm can be added when required. P20's client/contract
+  `kernel.Checksums`), so another algorithm can be added when required. P20's client/contract
   inventory must assign any newly identified checksum requirement to its format phase; this
   is not a permanent exclusion of algorithms required by the expanded ecosystems.
 - *Storing sidecar files as items*: simpler, but then a sidecar can disagree with its

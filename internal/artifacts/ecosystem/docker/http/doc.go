@@ -142,7 +142,7 @@
 //
 // # Status
 //
-// Implemented P6, with remote retrieval in P9. Staged in P9d, which also
+// Implemented P6, with remote retrieval in P9. Moved here in P9d, which also
 // moved the server root's Docker REST operations here (WEB-17).
 //
 // # Testing

@@ -67,9 +67,9 @@ Helm, Terraform registry and Terraform backend handlers. The backend has separat
 state/lock semantics in `internal/service/terraformstate` and
 `internal/server/terraformbackend`.
 
-`migration/artifacts/adapters/http/pkgroute` mounts the package protocols, enforces
+`internal/artifacts/adapters/http/pkgroute` mounts the package protocols, enforces
 repository class and permissions, supports host-root discovery and multipart uploads,
-and uses the ordinary item download path. `migration/artifacts/adapters/http/reindex.go`
+and uses the ordinary item download path. `internal/artifacts/adapters/http/reindex.go`
 wires the implemented formats' reindex operations through the persistent work queue;
 they are no longer the baseline's blanket 501 stubs. `formattest` proves rebuilding from
 the item tree, and `test/acceptance/features/package_wiring.feature` proves the REST
@@ -95,19 +95,19 @@ about absent hooks or handlers describe that baseline, not current support.
 | 2.3 | The hooks run inside the item service's transaction, from `internal/service/item/item.go` (deploy at line 328, delete at 543 to 579), `restore.go` line 72 and `transfer.go` (copy or move, 437 to 493) | [S] |
 | 2.4 | `internal/service/item` imports `internal/format`, so a format package cannot import `item` to write an item without an import cycle | [S] |
 | 2.5 | The hooks receive only `store.Store`. They have no blob store, so a format cannot read what was deployed: an npm `package.json`, a POM or a `go.mod` | [S] |
-| 2.6 | `internal/layout/layout_test.go` forbids `internal/format/` from importing `internal/server`, so a format cannot build an `apierror`. `ItemError` (`migration/artifacts/adapters/http/itemkit/items.go` line 111) maps the item service's own errors to statuses and turns anything else into a 500 | [S] |
+| 2.6 | `internal/layout/layout_test.go` forbids `internal/format/` from importing `internal/server`, so a format cannot build an `apierror`. `ItemError` (`internal/artifacts/adapters/http/itemkit/items.go` line 111) maps the item service's own errors to statuses and turns anything else into a 500 | [S] |
 | 2.7 | `format.For` is called only from the item service's deploy, delete, restore and transfer paths. No hook runs before a deploy, when a download path is resolved, or when an item's properties change | [S] |
 | 2.8 | `internal/service/pkgindex` offers `Link`, `VersionOf` and `Prune`. Nothing in the baseline calls `Link`: the Docker format writes its index through its own code (`internal/format/docker/index.go`), which also provides `docker.Reindex` | [S] |
-| 2.9 | `types.ComparatorFor` (`pkg/types/version.go`) gives npm, Go, Helm and Terraform `CompareSemver`, PyPI `ComparePEP440`, NuGet `CompareNuGet`, Docker, OCI and Helm OCI the push order, and every other type, the Maven family included, `CompareMaven`. The P5 searches order Maven versions with `CompareMercury`, Artifactory's comparator (`migration/artifacts/core/search/versions.go`, `migration/artifacts/adapters/http/searches_versions.go`) | [S] |
+| 2.9 | `model.ComparatorFor` (`internal/artifacts/core/model/version.go`) gives npm, Go, Helm and Terraform `CompareSemver`, PyPI `ComparePEP440`, NuGet `CompareNuGet`, Docker, OCI and Helm OCI the push order, and every other type, the Maven family included, `CompareMaven`. The P5 searches order Maven versions with `CompareMercury`, Artifactory's comparator (`internal/artifacts/core/search/versions.go`, `internal/artifacts/adapters/http/searches_versions.go`) | [S] |
 | 2.10 | The store has `RecordVersionDownload` (`pkg/store/content.go`), but nothing calls it: `serveFile` records item downloads only | [S] |
 | 2.11 | `pkg/layout/bundled.go` compiles the bundled layouts. `maven-2-default`, `ivy-default` and `gradle-default` are verified; `maven-1-default`, `sbt-default`, `sbt-ivy-default`, `npm-default`, `go-default`, `nuget-default` and `terraform-module-default` are marked unverified. #277 later checked every bundled layout ([research 03](03-repository-configuration-model.md#bundled-definitions)) | [S] |
-| 2.12 | `item.Service.Layout` (`transfer.go` line 305) resolves a layout by name. The token reading the P5 searches use (`LayoutScope.read`, `coordinates`) is private to `migration/artifacts/core/search/layout.go` | [S] |
+| 2.12 | `item.Service.Layout` (`internal/artifacts/core/item/transfer.go` line 477) resolves a layout by name. The token reading the P5 searches use (`LayoutScope.read`, which returns `layout.Coordinates`) is private to `internal/artifacts/core/search/layout.go` | [S] |
 | 2.13 | `repo.Defaults` sets an omitted `repoLayoutRef` to `sbt-default` for sbt, `ivy-default` for Ivy and `maven-2-default` for every other package type (`createLayout` in `pkg/repo/packagetypes.go`, [#396](https://github.com/weaveplatform/artifactweave/issues/396)). A protocol handler therefore cannot take its storage paths from `repoLayoutRef`. Artifactory's own defaults are in [research 03](03-repository-configuration-model.md#common-fields) | [S] for the code |
 | 2.14 | The item routes match `/artifactory/{repoKey}/...` with `repoKey` any segment but `api` (`notAPI`, `internal/server/handwritten.go` line 104), so `/artifactory/api/npm/...` and `/artifactory/api/go/...` answered 404 at the baseline | [S] |
 | 2.15 | The Docker registry is the one hand-written protocol package: `internal/server/docker`, mounted by `registry.Register(r)` in `internal/server/server.go` (line 178) before the generated servers, with the JFrog operations beside it reaching the generated server (decision 0031) | [S] |
 | 2.16 | `errorProfileFor` (`internal/server/stubs.go`) already picks the npm envelope `{"error":"..."}` for `/artifactory/api/npm/`, the plain-text one for `/artifactory/api/go/` and `/artifactory/api/pypi/`, and the Terraform registry's for `/artifactory/api/terraform/` | [S] |
-| 2.17 | `includesPattern`, `excludesPattern` and `blackedOut` are stored with their defaults (`pkg/repo/defaults.go`) but not checked when a file is deployed; only AQL reads the include patterns (`migration/artifacts/adapters/http/aql.go`) | [S] |
-| 2.18 | A deploy answers 201 with the `ItemCreated` JSON (`migration/artifacts/adapters/http/items.go` line 178) and no `X-Checksum-*` response headers; `serveFile` sets them on downloads only | [S] |
+| 2.17 | `includesPattern`, `excludesPattern` and `blackedOut` are stored with their defaults (`pkg/repo/defaults.go`) but not checked when a file is deployed; only AQL reads the include patterns (`internal/artifacts/adapters/http/aql.go`) | [S] |
+| 2.18 | A deploy answers 201 with the `ItemCreated` JSON (`internal/artifacts/adapters/http/items.go` line 178) and no `X-Checksum-*` response headers; `serveFile` sets them on downloads only | [S] |
 | 2.19 | `jf go-publish` reads `X-Checksum-Sha256` from the response to each PUT and logs when it is missing (jfrog-client-go `artifactory/services/go/publish.go` line 116) | [S] |
 | 2.20 | Stored content carries SHA-256, SHA-512, SHA-1 and MD5, computed in one pass on every upload path (`pkg/blob/blob.go`, #296) | [S] |
 | 2.21 | `internal/service/work` runs the persistent work queue of decision 0033: `Handle(kind, h)`, `Enqueue(ctx, kind, key, payload)` inside the caller's transaction, `EnsureFresh(ctx, kind, key)` and `WaitIdle(ctx)` (#297) | [S] |

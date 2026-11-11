@@ -112,7 +112,7 @@
 //
 // # Status
 //
-// Implemented P7, with remote retrieval in P9. Staged in P9d, which also
+// Implemented P7, with remote retrieval in P9. Moved here in P9d, which also
 // moved the server root's npm operations here (WEB-17).
 //
 // # Testing

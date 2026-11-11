@@ -74,7 +74,7 @@
 // # Status
 //
 // Implemented P0 (fetch, comparison and baseline) and P1 (inventory and
-// scaffold). Staged in P9d.
+// scaffold). Moved here in P9d.
 //
 // # Testing
 //

@@ -57,7 +57,7 @@
 // # Status
 //
 // Implemented P1 (the fragment bundler) and P1b (any number of services).
-// Staged in P9d.
+// Moved here in P9d.
 //
 // # Testing
 //

@@ -27,7 +27,7 @@ shared source/transport/cache implementation.
 
 The [Go GOPROXY protocol](https://go.dev/ref/mod#goproxy-protocol) treats upstream
 404 and 410 as absence. The trusted `Resource.GoneIsMissing` opt-in maps both to
-`store.ErrNotFound` and the ordinary negative-cache clock. It changes no other
+`kernel.ErrNotFound` and the ordinary negative-cache clock. It changes no other
 protocol's 410 behavior. Authorization refusal, 401/403, throttling, transport faults,
 invalid bodies and 5xx remain typed failures; they cannot become a missing member.
 

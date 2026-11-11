@@ -60,9 +60,9 @@
 //
 // Implemented P4: the permission target and Access permission APIs (pull
 // request 104), a MANAGE holder's limits (pull requests 435 and 459) and the
-// Manage Resources role and listing filters (pull request 470). Staged in
-// P9d, where Service takes Store and reads repositories through the
-// artifacts module's API.
+// Manage Resources role and listing filters (pull request 470). Moved here in
+// P9d, where Service takes Store and reads repositories through the artifacts
+// module's API.
 //
 // # Testing
 //

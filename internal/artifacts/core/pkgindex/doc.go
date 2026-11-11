@@ -89,7 +89,7 @@
 // format contract suite
 // (https://github.com/weaveplatform/artifactweave/issues/268), and Stored,
 // for the index of a remote repository's cache
-// (https://github.com/weaveplatform/artifactweave/issues/361). Staged in
+// (https://github.com/weaveplatform/artifactweave/issues/361). Moved here in
 // P9d, which narrowed the functions' store to Store
 // (https://github.com/weaveplatform/artifactweave/issues/1087).
 //

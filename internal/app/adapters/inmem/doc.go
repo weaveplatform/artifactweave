@@ -64,8 +64,8 @@
 // # Status
 //
 // Implemented P2: the reference in-memory store (pull request 3); later
-// phases added a store for each entity they introduced. Staged in P9d: each
-// module's in-memory stores split into its own adapters/inmem over memtx
+// phases added a store for each entity they introduced. Moved here in P9d:
+// each module's in-memory stores split into its own adapters/inmem over memtx
 // (issues 1056 to 1062), leaving this package the composition over them,
 // which issue 1098 moved under app.
 //

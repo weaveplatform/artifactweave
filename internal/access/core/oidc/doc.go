@@ -68,7 +68,7 @@
 //
 // Implemented P4: providers, identity mappings and the token exchange
 // (pull request 145), with mappings aligned with 7.x after (pull requests
-// 468, 486 and 499). Staged in P9d, where Service.Store needs only the
+// 468, 486 and 499). Moved here in P9d, where Service.Store needs only the
 // configuration documents.
 //
 // # Testing

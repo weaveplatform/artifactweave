@@ -72,7 +72,7 @@ The read of the package is bounded as npm's is (decision [0034](0034-npm.md)): a
   in 7.90.5 (RTDEV-41067, R29 8).
 - **The package index** (decision 0018): the package is the id lower-cased; its display id is
   the nuspec id of its newest version. The version is the normalised version, ordered by
-  `types.CompareNuGet`. A version's files are its `.nupkg` and, when present, its `.snupkg`.
+  `model.CompareNuGet`. A version's files are its `.nupkg` and, when present, its `.snupkg`.
 - **The per-version document** (`PackageVersion.Metadata`) caches the nuspec as stored, and
   what the feeds need from it: id, title, authors, owners, description, summary, release
   notes, copyright, language, tags, project, icon and licence URLs, licence expression,

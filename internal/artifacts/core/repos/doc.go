@@ -70,7 +70,7 @@
 //
 // # Status
 //
-// Implemented P3 to P9c. Staged in P9d.
+// Implemented P3 to P9c. Moved here in P9d.
 //
 // # Testing
 //

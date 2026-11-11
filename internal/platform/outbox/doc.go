@@ -78,8 +78,8 @@
 // # Status
 //
 // Implemented P2: the clock, the outbox values and OutboxStore, with the
-// metadata store's SQL and in-memory stores (pull request 3). Staged in P9d.
-// Roadmap: P11 generalises the outbox to Append(ctx, Event) for every
+// metadata store's SQL and in-memory stores (pull request 3). Moved here in
+// P9d. Roadmap: P11 generalises the outbox to Append(ctx, Event) for every
 // consumer, and P13 delivers its streams to peers.
 //
 // # Testing

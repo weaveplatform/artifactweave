@@ -4,15 +4,15 @@
 //
 // # Role
 //
-// retention module, core layer, store ports. The metadata store's SQL and
-// in-memory stores implement CleanupStore and ArchiveStore, and the metadata
-// store satisfies Store; STO-14 moves those implementations into the
-// module's adapters. The ports take and return the module's core/model
-// values, the retention api's RunStatus and kernel.Page, and join the unit
-// of work of platform/tx. ArchiveStore keeps the archive policies and
-// executions only: the archived items and the cold blob and replica indexes
-// are the artifacts module's records, which the metadata store reaches
-// through accessors of their own (decision 0044, "Ownership of shared
+// retention module, core layer, store ports. The module's adapters implement
+// CleanupStore, ArchiveStore and Store: adapters/sql over the shared SQL unit
+// of work and adapters/inmem over a shared memtx.Store, both held to the
+// contract in adapters/storetest. The ports take and return the module's
+// core/model values, the retention api's RunStatus and kernel.Page, and join
+// the unit of work of platform/tx. ArchiveStore keeps the archive policies
+// and executions only: the archived items and the cold blob and replica
+// indexes are the artifacts module's records, which the metadata store
+// reaches through accessors of their own (decision 0044, "Ownership of shared
 // models").
 //
 // # Inputs
@@ -65,9 +65,9 @@
 // # Status
 //
 // Implemented P2: CleanupStore and ArchiveStore, with the metadata store's
-// in-memory, SQLite and PostgreSQL stores (pull request 3). Staged in P9d,
-// where ArchiveStore gave its archived-item methods and the cold indexes to
-// accessors of their own and Store is declared. The services that call the
+// in-memory, SQLite and PostgreSQL stores (pull request 3). Moved here in
+// P9d, where ArchiveStore gave its archived-item methods and the cold indexes
+// to accessors of their own and Store is declared. The services that call the
 // ports arrive with P11 (cleanup) and P16 (the cold-storage tier).
 //
 // # Testing

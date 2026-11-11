@@ -109,8 +109,8 @@
 // request 87). P4b: SignURL and Signs for download and CDN redirects, with
 // signing failures kept out of member health (issue 119, pull requests 139
 // and 146). P7: SHA-512 among the digests that uploads record and repair
-// checks (issue 296, pull request 298). Staged in P9d: the index ports, with
-// the replica rows beside them, and leases from platform/work.
+// checks (issue 296, pull request 298). Moved here in P9d: the index ports,
+// with the replica rows beside them, and leases from platform/work.
 //
 // # Testing
 //

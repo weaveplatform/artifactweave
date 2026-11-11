@@ -33,13 +33,15 @@ func (s AgentPluginItems) getAgentMarketplace(w http.ResponseWriter, r *http.Req
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	c, cached, err := itemkit.ResolveRepo(ctx, st, chi.URLParam(r, "repoKey"))
+	c, _, err := itemkit.ResolveRepo(ctx, st, chi.URLParam(r, "repoKey"))
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve repository", err))
 		return
 	}
 	name := chi.URLParam(r, "marketplace")
-	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local || cached ||
+	// A remote repository's cache alias resolves to the remote repository,
+	// so the class check refuses it too.
+	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local ||
 		!agentplugins.IsMarketplace(name) {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return

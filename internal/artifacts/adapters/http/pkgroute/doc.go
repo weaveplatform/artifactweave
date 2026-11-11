@@ -91,7 +91,7 @@
 // host-root routes, encoded repository keys and multipart uploads (pull
 // request 580) for PyPI, NuGet, Helm and Terraform; P9 the remote source
 // boundary (pull requests 644 and 654); P9b and P9c the protocols that
-// followed. Staged in P9d, which narrowed the kit's store to Store
+// followed. Moved here in P9d, which narrowed the kit's store to Store
 // (https://github.com/weaveplatform/artifactweave/issues/1089).
 //
 // # Testing

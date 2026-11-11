@@ -45,7 +45,7 @@
 //
 // # Status
 //
-// Implemented P9. Staged in P9d.
+// Implemented P9. Moved here in P9d.
 //
 // # Testing
 //

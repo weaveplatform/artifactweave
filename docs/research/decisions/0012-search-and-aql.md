@@ -360,9 +360,9 @@ Ivy, sbt and custom layouts follow one rule.
   (`ArtifactVersionsSearchResource`, `ArtifactLatestVersionSearchResource`) both read its
   search add-on's `getArtifactVersions`. Both need `g` or `a`, and `repos` takes virtual keys.
   - **The list** is the module's versions, each once, newest first in Mercury order
-    (`types.CompareMercury`), the order of Artifactory's `MavenVersionComparator`. It ranks
+    (`model.CompareMercury`), the order of Artifactory's `MavenVersionComparator`. It ranks
     `1.0-SNAPSHOT` < `1.0-alpha-1` < `1.0-rc1` < `1.0` < `1.0-sp1`; Maven's own
-    `ComparableVersion`, which `types.CompareMaven` follows, puts SNAPSHOT above `rc`.
+    `ComparableVersion`, which `model.CompareMaven` follows, puts SNAPSHOT above `rc`.
   - **`v` without `*` or `?`** is a module version, and the list holds only its integration
     versions, by file version: `v=1.0-SNAPSHOT` lists `1.0-20260101.120000-1` and its
     siblings, and a release such as `v=1.0` lists nothing. The add-on's documentation says `v`

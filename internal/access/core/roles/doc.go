@@ -57,8 +57,8 @@
 //
 // Implemented P4: global roles and environments (pull request 93), editable
 // built-in roles (pull request 103) and the environment and role limits
-// (pull request 470). Staged in P9d, where Service takes Store and rewrites
-// repository configurations through the artifacts module's API.
+// (pull request 470). Moved here in P9d, where Service takes Store and
+// rewrites repository configurations through the artifacts module's API.
 //
 // # Testing
 //

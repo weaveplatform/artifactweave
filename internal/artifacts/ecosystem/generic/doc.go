@@ -67,7 +67,7 @@
 //
 // Implemented P3 (generic artifacts), with the download policy amended for
 // https://github.com/weaveplatform/artifactweave/issues/328 (decision
-// 0032). Staged in P9d.
+// 0032). Moved here in P9d.
 //
 // # Testing
 //

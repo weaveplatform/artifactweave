@@ -88,8 +88,8 @@
 // Implemented with decision 0043 (issue 890, pull request 905) and released
 // in v0.2.0, the P9c release: request budgets shared through the metadata
 // store, which declared the port; per-process and expensive permits without
-// a waiting queue; and the recovery reserve. Staged in P9d: New takes Store,
-// and the port and its values are declared here.
+// a waiting queue; and the recovery reserve. Moved here in P9d: New takes
+// Store, and the port and its values are declared here.
 //
 // # Testing
 //

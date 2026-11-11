@@ -91,8 +91,8 @@
 // Implemented P2: the in-memory store's tables, transactions, sequences, row
 // copies and paging (pull request 3). In the P9c release, v0.2.0, a
 // cancellable gate replaced its mutex, so that a call waiting for the store
-// ends with its context (decision 0043, issue 890, pull request 905). Staged
-// in P9d: the unit of work leaves the in-memory store for this package.
+// ends with its context (decision 0043, issue 890, pull request 905). Moved
+// here in P9d: the unit of work leaves the in-memory store for this package.
 //
 // # Testing
 //

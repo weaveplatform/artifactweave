@@ -76,7 +76,7 @@ func Read(tb testing.TB, rel string) []byte {
 	return data
 }
 
-// SkipDir is the walk rule every repository walk of the migration shares. It
+// SkipDir is the walk rule the repository-wide walks in tests share. It
 // reports whether a walk from root should skip the directory at path: one
 // whose name starts with ".", testdata, vendor, node_modules, or any
 // directory below root that holds its own go.mod. It never skips root itself

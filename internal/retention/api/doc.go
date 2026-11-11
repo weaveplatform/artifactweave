@@ -54,7 +54,7 @@
 // # Status
 //
 // Implemented P2: RunStatus among the shared domain types (pull request 3).
-// Staged in P9d. The contracts arrive with P11 and P16.
+// Moved here in P9d. The contracts arrive with P11 and P16.
 //
 // # Testing
 //

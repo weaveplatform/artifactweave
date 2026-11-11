@@ -91,32 +91,11 @@
 //
 // # Testing
 //
-// How a test that builds these pieces from access internals moves onto the
-// kit, where x is whether anonymous access is on and kit is the test's Kit
-// (the Docker token and npm login tests move with their slices, issues 1022
-// and 1031, and the other modules' tests with issue 1008):
-//
-//   - authn.Authorize(ctx, authz.Sources{Permissions: st.Permissions(),
-//     Groups: st.Groups(), AnonymousEnabled: x}, p), then
-//     authn.WithAuthorized: accesstest.Over(t, st).Authorize(ctx, p, x).
-//   - A test middleware that reads a header, authorises and calls
-//     WithPrincipal: router.Use(kit.Middleware(t, x, principalOf)), keeping
-//     the test's own mapping from header to principal.
-//   - authz.New(ctx, authz.Sources{...}, authz.Subject{...}):
-//     kit.Decide(ctx, accessapi.Subject{...}, x).
-//   - authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{...}):
-//     kit.API().Authenticator, with WithTokens, WithTokenVerifier or WithNow
-//     as the options had.
-//   - token.New(ctx, st, token.Options{KeyBits: 1024}):
-//     accesstest.Over(t, st, accesstest.WithTokens()).API().Tokens.
-//   - tokens.Verify(ctx, raw), and a field of an Issued.Record:
-//     kit.Verify(ctx, raw), and kit.Verify(ctx, issued.AccessToken).
-//   - authn.HashPasswordWith(cheap, pw): accesstest.HashPassword(t, pw).
-//   - authn.ErrLoginSuspended: accesstest.ErrLoginSuspended.
-//   - authz.Subject, authz.Repo, token.Request, token.RegistryRequest and
-//     token.Issued: accessapi.Subject, accessapi.Repo,
-//     accessapi.TokenRequest, accessapi.RegistryTokenRequest and
-//     accessapi.IssuedToken.
+// A test outside access that needs an authenticator, a decider or tokens
+// builds them with this kit (Over, Authorize, Middleware, Decide, API,
+// Verify, HashPassword) rather than from access internals;
+// TestUnitTestsAvoidAccessInternals (internal/layout) enforces it outside
+// the composition root and the server suites.
 //
 // The kit's own tests:
 //

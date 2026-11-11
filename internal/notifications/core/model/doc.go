@@ -58,7 +58,8 @@
 // # Status
 //
 // Implemented P2: the webhook values among the shared domain types (pull
-// request 3). Staged in P9d. The behaviour that uses them arrives with P11.
+// request 3). Moved here in P9d. The behaviour that uses them arrives with
+// P11.
 //
 // # Testing
 //

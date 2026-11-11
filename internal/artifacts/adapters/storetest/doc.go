@@ -75,7 +75,8 @@
 // replica cases (pull request 30), the build cases (pull request 193), the
 // property key cases (pull request 348), the remote cache cases (pull
 // request 646), the Git LFS lock cases (pull request 849) and the Bower
-// registration cases (pull request 912). Staged in P9d: Factory and Run.
+// registration cases (pull request 912). Moved here in P9d, which added
+// Factory and Run.
 //
 // # Testing
 //

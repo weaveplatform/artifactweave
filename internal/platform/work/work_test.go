@@ -528,10 +528,9 @@ func TestUnitPermanentRefusalParksWithoutRetry(t *testing.T) {
 }
 
 // Dashboards and alert rules select the queue's metrics by their
-// instrumentation scope. It is set once to the package's path after
-// promotion (decision 0044), so a scope that followed the package through
-// migration/ would move them twice. The second kind has no handler, so its
-// item waits and the two gauges have a value to report.
+// instrumentation scope, the package's import path (decision 0044). The
+// second kind has no handler, so its item waits and the two gauges have a
+// value to report.
 func TestUnitMeterName(t *testing.T) {
 	const want = "github.com/weaveplatform/artifactweave/internal/platform/work"
 	w := newWorld(t, work.Options{})

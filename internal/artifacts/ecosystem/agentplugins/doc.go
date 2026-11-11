@@ -91,7 +91,7 @@
 //
 // # Status
 //
-// Implemented P9b (newly identified Artifactory formats). Staged in P9d.
+// Implemented P9b (newly identified Artifactory formats). Moved here in P9d.
 //
 // # Testing
 //

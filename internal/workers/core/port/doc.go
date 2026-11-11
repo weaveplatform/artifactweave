@@ -3,12 +3,13 @@
 //
 // # Role
 //
-// workers module, core layer, store ports. The metadata store's SQL and
-// in-memory stores implement WorkerStore, and the metadata store satisfies
-// Store; STO-15 moves those implementations into the module's adapters. The
-// ports take and return the module's core/model values and kernel.Page,
-// and join the unit of work of platform/tx. The target layout also puts
-// the runtime's Sandbox port here, which arrives with P17.
+// workers module, core layer, store ports. The module's adapters implement
+// WorkerStore and Store: adapters/sql over the shared SQL unit of work and
+// adapters/inmem over a shared memtx.Store, both held to the contract in
+// adapters/storetest. The ports take and return the module's core/model
+// values and kernel.Page, and join the unit of work of platform/tx. The
+// target layout also puts the runtime's Sandbox port here, which arrives with
+// P17.
 //
 // # Inputs
 //
@@ -57,7 +58,7 @@
 // # Status
 //
 // Implemented P2: WorkerStore, with the metadata store's in-memory, SQLite
-// and PostgreSQL stores (pull request 3). Staged in P9d, where Store is
+// and PostgreSQL stores (pull request 3). Moved here in P9d, where Store is
 // declared. The runtime that calls the port arrives with P17.
 //
 // # Testing

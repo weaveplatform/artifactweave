@@ -57,7 +57,7 @@
 // Implemented P2. P4b replaced the presign case with the sign case, which
 // checks Signs, the refusal of a CDN route the store lacks (ErrCannotSign)
 // and the response overrides (issue 119). P7 added SHA-512 to the oracle
-// and to the digest cases (issue 296). Staged in P9d.
+// and to the digest cases (issue 296). Moved here in P9d.
 //
 // # Testing
 //

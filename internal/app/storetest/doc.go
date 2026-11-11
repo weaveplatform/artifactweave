@@ -87,8 +87,8 @@
 // Implemented P2: the contract suite and key rotation (pull request 3).
 // Later phases added the layout persistence suite (pull request 646), the
 // repository header suites (pull request 656), the replay crash (pull
-// request 905) and the legacy history refusal (pull request 1165). Staged in
-// P9d: each module's part of the contract moved to its adapters/storetest
+// request 905) and the legacy history refusal (pull request 1165). Moved here
+// in P9d: each module's part of the contract moved to its adapters/storetest
 // (issues 1056 to 1062), and issue 1098 merged the composite contract, the
 // composite SQL suites and the openers here.
 //

@@ -49,7 +49,7 @@
 // # Status
 //
 // Implemented P8 (Terraform module and provider local repositories), with
-// remote modules and providers in P9. Staged in P9d.
+// remote modules and providers in P9. Moved here in P9d.
 //
 // # Testing
 //

@@ -50,7 +50,7 @@
 //
 // # Status
 //
-// Implemented P1. Staged in P9d.
+// Implemented P1. Moved here in P9d.
 //
 // # Testing
 //

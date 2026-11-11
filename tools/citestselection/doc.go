@@ -43,6 +43,6 @@
 //
 // # Status
 //
-// Implemented P9b (issue 673); P9d added the staged and split test packages
-// (issue 951).
+// Implemented P9b (issue 673); P9d added the module layout's packages and
+// the split test packages (issue 951).
 package main

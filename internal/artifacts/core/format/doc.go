@@ -138,12 +138,12 @@
 // and caller checks for cached remote packages; P9c TransferSourceGuard,
 // Opkg's reindex that leaves item properties alone (writeProps=0) and
 // Write.By.
-// Staged in P9d, which added the injected Registry
+// Moved here in P9d, which added the injected Registry
 // (https://github.com/weaveplatform/artifactweave/issues/970), Env.Keys
-// (https://github.com/weaveplatform/artifactweave/issues/1004), Env's
-// lease and work-queue stores
-// (https://github.com/weaveplatform/artifactweave/issues/1029) and Store,
-// the narrow store Env.Store holds
+// (https://github.com/weaveplatform/artifactweave/issues/1004), Env's lease
+// and work-queue stores
+// (https://github.com/weaveplatform/artifactweave/issues/1029) and Store, the
+// narrow store Env.Store holds
 // (https://github.com/weaveplatform/artifactweave/issues/1087).
 //
 // # Testing
