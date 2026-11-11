@@ -74,6 +74,15 @@ type handler struct{ k *pkgroute.Kit }
 func failure(status int, message string) error { return apierror.New(status, message) }
 
 func (h handler) replyError(w http.ResponseWriter, r *http.Request, err error) {
+	if pkgroute.IsRefusal(err) {
+		// The download policy's refusal is the kit's, so it keeps
+		// Artifactory's envelope: 7.x answered a refused index/config.json
+		// in it (RTFACT-29873). A remote's refusal that a revalidation
+		// returns unmapped answers its own 404 and message, not a fault
+		// (R4); other errors keep their answers.
+		h.k.Error(w, r, pkgroute.SourceError(err, false))
+		return
+	}
 	var api *apierror.Error
 	if errors.As(err, &api) {
 		w.Header().Set("Content-Type", "application/json")
@@ -93,8 +102,16 @@ func (h handler) config(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
+	// 7.x reads config.json through the download path at the repository's
+	// root (RTFACT-29873 names '<repo>:config.json'), so its blackout and a
+	// pattern on that path refuse it, though this server computes it (R1,
+	// [I], #216).
+	if err := h.k.CheckDocument(r, "config.json"); err != nil {
+		h.replyError(w, r, err)
+		return
+	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
-		_, result, err := h.remoteDocument(r, "index/config.json", "")
+		_, result, err := h.remoteDocument(r, "index/config.json", "", false)
 		if err != nil {
 			h.replyError(w, r, err)
 			return
@@ -148,11 +165,11 @@ func recordFor(ctx context.Context, st format.Store, it model.Item) (cargo.Recor
 	return rec, nil
 }
 
+// localRecords returns the records of name's versions the caller may read.
+// The caller has checked read permission on the crate's folder and the
+// download policy of the document the records answer.
 func (h handler) localRecords(r *http.Request, name string) ([]cargo.Record, error) {
 	c := pkgroute.RequestFrom(r).Repo
-	if !h.k.CanFolder(r, "crates/"+name, api.ActionRead) {
-		return nil, failure(http.StatusForbidden, "Cargo crate read denied")
-	}
 	var out []cargo.Record
 	after := ""
 	for {
@@ -198,8 +215,16 @@ func (h handler) index(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, "crates/"+name, api.ActionRead) {
 		return
 	}
+	// 7.x keeps a crate's index file at index/<prefix>/<name> (RTFACT-30356)
+	// and reads it through the download path, so the blackout and a pattern
+	// on that path refuse it, and a pattern on one crate leaves its line
+	// listed (R1, R3).
+	if err := h.k.CheckDocument(r, "index/"+path); err != nil {
+		h.replyError(w, r, err)
+		return
+	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
-		data, result, err := h.remoteDocument(r, "index/"+path, name)
+		data, result, err := h.remoteDocument(r, "index/"+path, name, false)
 		if err != nil {
 			h.replyError(w, r, err)
 			return
@@ -262,18 +287,20 @@ func (h handler) filterRemoteIndex(
 		return nil, result, failure(http.StatusNotFound, "Cargo crate not found")
 	}
 	prior := result.Revalidate
-	checkRead := result.CheckRead
+	// Read permission only: a crate the remote's patterns reject keeps its
+	// line, and only its download refuses (R3).
+	checkPermission := result.CheckPermission
 	result.Revalidate = func(ctx context.Context) error {
 		if prior != nil {
 			if err := prior(ctx); err != nil {
 				return err
 			}
 		}
-		if checkRead == nil {
+		if checkPermission == nil {
 			return source.ErrDenied
 		}
 		for _, path := range paths {
-			if err := checkRead(ctx, path); err != nil {
+			if err := checkPermission(ctx, path); err != nil {
 				return err
 			}
 		}
@@ -519,6 +546,17 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request) {
 			r,
 			failure(http.StatusMethodNotAllowed, "remote Cargo versions API unavailable"),
 		)
+		return
+	}
+	if !h.k.CanFolder(r, "crates/"+name, api.ActionRead) {
+		h.replyError(w, r, failure(http.StatusForbidden, "Cargo crate read denied"))
+		return
+	}
+	// 7.x ignores a blacked-out repository and serves no download from it;
+	// where it would keep this answer is not documented, so its patterns
+	// do not refuse it (R2a, [I], #216).
+	if err := h.k.CheckBlackedOut(r, "api/v1/crates/"+name); err != nil {
+		h.replyError(w, r, err)
 		return
 	}
 	records, err := h.localRecords(r, name)

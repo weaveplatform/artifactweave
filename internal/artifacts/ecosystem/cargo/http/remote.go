@@ -59,7 +59,16 @@ func parseIndex(raw []byte, name string) ([]cargo.Record, error) {
 	return out, nil
 }
 
-func (h handler) remoteDocument(r *http.Request, path, name string) ([]byte, source.Result, error) {
+// remoteDocument reads the remote's config.json, when name is empty, or
+// name's index file, at path. The remote's download policy is checked where
+// 7.x caches the document, config.json at the root and an index file at its
+// own path (R1, R4), and only as the blackout for a lookup, the read a
+// crate's download makes to find the crate.
+func (h handler) remoteDocument(
+	r *http.Request,
+	path, name string,
+	lookup bool,
+) ([]byte, source.Result, error) {
 	upstream := strings.TrimPrefix(path, "index/")
 	res := source.Resource{
 		Kind:             source.ResourceKindMetadata,
@@ -68,10 +77,13 @@ func (h handler) remoteDocument(r *http.Request, path, name string) ([]byte, sou
 		Method:           http.MethodGet,
 		PermissionFolder: true,
 		PermissionPath:   "crates/" + name,
+		PolicyPath:       path,
+		BlackoutOnly:     lookup,
 		Variant:          "cargo-sparse-v1",
 	}
 	if name == "" {
 		res.PermissionPath = ""
+		res.PolicyPath = "config.json"
 	}
 	res.ValidateMetadata = func(_ context.Context, body io.ReadSeeker, size int64, _ source.MetadataResponse) error {
 		if size <= 0 || size > cargo.MaxIndex {
@@ -182,7 +194,13 @@ func (h handler) remoteCrate(w http.ResponseWriter, r *http.Request, name, versi
 	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
-	configRaw, configResult, err := h.remoteDocument(r, "index/config.json", "")
+	// The crate's own path, before the config.json and index file it is
+	// found through are read, so the refusal names the crate (R10).
+	if err := h.k.CheckDocument(r, path); err != nil {
+		h.replyError(w, r, err)
+		return
+	}
+	configRaw, configResult, err := h.remoteDocument(r, "index/config.json", "", true)
 	if err != nil {
 		h.replyError(w, r, err)
 		return
@@ -196,6 +214,7 @@ func (h handler) remoteCrate(w http.ResponseWriter, r *http.Request, name, versi
 		r,
 		"index/"+cargo.IndexPath(name),
 		strings.ToLower(name),
+		true,
 	)
 	if err != nil {
 		h.replyError(w, r, err)
