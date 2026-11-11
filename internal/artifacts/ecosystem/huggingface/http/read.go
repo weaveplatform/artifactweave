@@ -92,13 +92,14 @@ func (h handler) info(w http.ResponseWriter, r *http.Request) {
 }
 
 // selectResolution is selectRepo for the info and tree routes, which list
-// what a client then downloads: 7.x ignores a blacked-out repository when
-// it resolves, and where it keeps a revision's listing for a local
-// repository is not documented, so a blacked-out local or federated
-// repository refuses them before anything is computed, naming the model's
-// folder as a remote repository's refusal does. A caller who may not read
-// the model gets selectRepo's "not found" first. A remote repository's own
-// policy is the source boundary's, at its info read.
+// what a client then downloads, and for the Xet read token, which resolves
+// a revision for the reads it authorises: 7.x ignores a blacked-out
+// repository when it resolves, and where it keeps a revision's listing for
+// a local repository is not documented, so a blacked-out local or
+// federated repository refuses them before anything is computed, naming
+// the model's folder as a remote repository's refusal does. A caller who
+// may not read the model gets selectRepo's "not found" first. A remote
+// repository's own policy is the source boundary's, at its info read.
 func (h handler) selectResolution(
 	r *http.Request,
 	id format.Identity,

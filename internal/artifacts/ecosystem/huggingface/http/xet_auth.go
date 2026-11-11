@@ -69,7 +69,7 @@ func (h handler) xetToken(w http.ResponseWriter, r *http.Request, write bool) {
 		selectedRequest, err = h.targetRequest(r, id)
 	} else {
 		var selected selected
-		selected, err = h.selectRepo(r, id, revision, map[string]bool{})
+		selected, err = h.selectResolution(r, id, revision)
 		selectedRequest = selected.request
 		revision = selected.info.SHA
 	}

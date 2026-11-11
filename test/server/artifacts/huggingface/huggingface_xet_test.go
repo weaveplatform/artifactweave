@@ -423,15 +423,19 @@ func patchHubRepo(t *testing.T, w *itemWorld, key string, change func(*repo.Conf
 }
 
 // wantRefusal fails t unless rec answers 404 with message, and without the
-// headers resolve sets for a served file, which would hand the client the
-// refused file's commit, digest, Xet hash and token route.
+// headers resolve sets for a served file or the token route for an issued
+// token, which would hand the client the refused file's commit, digest,
+// Xet hash and token route, or a token.
 func wantRefusal(t *testing.T, rec *httptest.ResponseRecorder, message string) {
 	t.Helper()
 	wantStatus(t, rec, 404)
 	if !strings.Contains(rec.Body.String(), message) {
 		t.Fatalf("body %s, want %q", rec.Body, message)
 	}
-	for _, header := range []string{"X-Repo-Commit", "ETag", "X-Xet-Hash", "X-Xet-Refresh-Route"} {
+	for _, header := range []string{
+		"X-Repo-Commit", "ETag", "X-Xet-Hash", "X-Xet-Refresh-Route",
+		"X-Xet-Cas-Url", "X-Xet-Access-Token", "X-Xet-Token-Expiration",
+	} {
 		if got := rec.Header().Get(header); got != "" {
 			t.Fatalf("refusal carries %s: %q", header, got)
 		}
@@ -485,11 +489,12 @@ func commitHubFile(t *testing.T, w *itemWorld, key, path, content string) string
 // the Hub and Xet routes of a local and a federated repository (#1237).
 // Patterns that reject a file refuse its resolve, for an administrator too,
 // and its Xet reconstruction and chunk ranges, through a token issued
-// before the change, and leave the file listed. A blacked-out repository
-// refuses the same reads and its info and tree, whose 7.x storage is not
-// documented, so the refusal names the model's folder. No refusal carries
-// the headers of a served file, and a caller who may not read the model
-// learns nothing of how the repository is set.
+// before the change, and leave the file listed and a read token issued. A
+// blacked-out repository refuses the same reads, and its info, tree and
+// Xet read token, whose 7.x storage is not documented, with the refusal
+// naming the model's folder. No refusal carries the headers of a served
+// file or an issued token, and a caller who may not read the model learns
+// nothing of how the repository is set.
 func TestAccHuggingFaceDownloadPolicy(t *testing.T) {
 	for _, key := range []string{"hf", "hf-f"} {
 		t.Run(key, func(t *testing.T) {
@@ -501,6 +506,7 @@ func TestAccHuggingFaceDownloadPolicy(t *testing.T) {
 				endpoint + "/api/models/acme/demo",
 				endpoint + "/api/models/acme/demo/tree/main",
 			}
+			token := endpoint + "/api/models/acme/demo/xet-read-token/main"
 			read := xetTokenFor(t, w, key, "acme/demo", "read", "reader")
 			chunks := xetChunkURL(t, w, read)
 			file := "models--acme--demo/snapshots/" + revision + "/weights.bin"
@@ -534,6 +540,7 @@ func TestAccHuggingFaceDownloadPolicy(t *testing.T) {
 			for _, rec := range xetReads() {
 				wantRefusal(t, rec, rejected)
 			}
+			xetTokenFor(t, w, key, "acme/demo", "read", "reader")
 
 			patchHubRepo(t, w, key, func(c *repo.Config) {
 				c.BlackedOut, c.ExcludesPattern = new(true), new("")
@@ -544,17 +551,15 @@ func TestAccHuggingFaceDownloadPolicy(t *testing.T) {
 			}
 			for _, as := range []string{"admin", "reader"} {
 				wantRefusal(t, w.do("GET", resolve, as, ""), blackedOut(file))
-				for _, route := range listings {
+				for _, route := range append([]string{token}, listings...) {
 					wantRefusal(t, w.do("GET", route, as, ""), blackedOut("models--acme--demo"))
 				}
 			}
 			for _, rec := range xetReads() {
 				wantRefusal(t, rec, blackedOut(file))
 			}
-			// The token route keeps main's answer, a token whose reads refuse.
-			xetTokenFor(t, w, key, "acme/demo", "read", "reader")
 			// Read permission first (DV-057): the model is missing to user.
-			for _, route := range append([]string{resolve}, listings...) {
+			for _, route := range append([]string{resolve, token}, listings...) {
 				wantRefusal(
 					t,
 					w.do("GET", route, "user", ""),
@@ -567,6 +572,7 @@ func TestAccHuggingFaceDownloadPolicy(t *testing.T) {
 			for _, rec := range xetReads() {
 				wantStatus(t, rec, 200)
 			}
+			xetTokenFor(t, w, key, "acme/demo", "read", "reader")
 		})
 	}
 }
@@ -574,12 +580,13 @@ func TestAccHuggingFaceDownloadPolicy(t *testing.T) {
 // TestAccHuggingFaceVirtualDownloadPolicy checks how a virtual repository
 // chooses the member that serves a revision under the download policy
 // (#1237). It passes over a blacked-out member, as 7.x ignores one when it
-// resolves, and a later member serves the revision; with none left it
-// answers its own "not found", naming no member. A member whose patterns
-// reject the file is still the one chosen, and refuses it as the virtual
-// repository's "not found". The virtual repository's own patterns refuse
-// the file through the member request and leave the listing as it is. No
-// refusal carries the headers of a served file.
+// resolves, and a later member serves the revision, its info and the
+// revision a Xet read token names; with none left it answers its own "not
+// found", naming no member. A member whose patterns reject the file is
+// still the one chosen, and refuses it as the virtual repository's "not
+// found". The virtual repository's own patterns refuse the file through
+// the member request and leave the listing as it is. No refusal carries
+// the headers of a served file.
 func TestAccHuggingFaceVirtualDownloadPolicy(t *testing.T) {
 	w := newXetWorld(t)
 	member := repo.Config{Key: "hf2", Class: repo.Local, PackageType: repo.HuggingFaceML}
@@ -607,13 +614,18 @@ func TestAccHuggingFaceVirtualDownloadPolicy(t *testing.T) {
 		if !strings.Contains(listed.Body.String(), `"sha":"`+revisions[from]+`"`) {
 			t.Fatalf("GET %s: %s, want %s's revision", info, listed.Body, from)
 		}
+		// The token's CAS route names the revision it authorises.
+		token := xetTokenFor(t, w, "hf-v", "acme/demo", "read", "reader")
+		if !strings.HasSuffix(token.CAS, "/hf-v/xet/models/acme/demo/"+revisions[from]) {
+			t.Fatalf("read token CAS %s, want %s's revision", token.CAS, from)
+		}
 	}
 
 	served("hf")
 	patchHubRepo(t, w, "hf", func(c *repo.Config) { c.BlackedOut = new(true) })
 	served("hf2")
 	patchHubRepo(t, w, "hf2", func(c *repo.Config) { c.BlackedOut = new(true) })
-	for _, route := range []string{resolve, info, info + "/tree/main"} {
+	for _, route := range []string{resolve, info, info + "/tree/main", info + "/xet-read-token/main"} {
 		wantRefusal(t, w.do("GET", route, "admin", ""), "Hugging Face revision or file not found")
 	}
 	for _, key := range []string{"hf", "hf2"} {

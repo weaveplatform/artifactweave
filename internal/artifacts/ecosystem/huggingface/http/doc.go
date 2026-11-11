@@ -69,12 +69,11 @@
 //     item routes' message before any header of the served file is set,
 //     and its Xet reconstruction and chunk ranges answer the same unless
 //     another file of the revision with the same content may be served. A
-//     blacked-out local or federated repository answers info and tree with
-//     the blackout's 404, naming the model's folder, and a virtual
-//     repository passes over a blacked-out member, local or remote, when it
-//     chooses the member that serves a revision. The patterns leave a file
-//     listed, and the Xet read token is still issued: the reads it
-//     authorises refuse.
+//     blacked-out local or federated repository answers info, tree and the
+//     Xet read token with the blackout's 404, naming the model's folder,
+//     and a virtual repository passes over a blacked-out member, local or
+//     remote, when it chooses the member that serves a revision. The
+//     patterns leave a file listed and a read token issued.
 //   - Statuses and error texts stay byte-identical.
 //
 // # References
