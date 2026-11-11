@@ -31,8 +31,15 @@ func (k *Kit) CheckDownload(r *http.Request, path string) error {
 // checks a remote repository's own policy at path too, which the source
 // boundary checks at the read's permission path unless the read names a
 // PolicyPath. The patterns of the files a document lists are not checked:
-// the document lists a release whose file they reject (StoredItem). It
-// returns nil, or the refusal, which Error answers 404 with the item
+// the document lists a release whose file they reject (StoredItem).
+//
+// It also checks a file that a download finds through metadata reads,
+// before those reads run: Pub's archive, CocoaPods' source archive,
+// Composer's dist, Cargo's crate and Hex's tarball. CheckDownload would
+// leave a remote repository's own policy to the reads, which refuse at
+// their own paths, while the refusal must name the file (decision 0032).
+//
+// It returns nil, or the refusal, which Error answers 404 with the item
 // routes' message and IsRefusal recognises; a member request's refusal is
 // the member passed over, as DownloadItem's is.
 func (k *Kit) CheckDocument(r *http.Request, path string) error {

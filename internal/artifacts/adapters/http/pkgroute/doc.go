@@ -102,7 +102,9 @@
 //     stores or caches it at, a remote repository's own policy included,
 //     and resolution metadata whose 7.x storage is not documented with
 //     CheckBlackedOut, before it computes anything; a native search keeps
-//     its answer. It builds a virtual repository's merged document from the
+//     its answer. CheckDocument also refuses a file that a download finds
+//     through metadata reads, at the file's path and before those reads. A
+//     protocol builds a virtual repository's merged document from the
 //     members MergeMembers returns, which leave out a member that is
 //     blacked out or would refuse the document's path.
 //
