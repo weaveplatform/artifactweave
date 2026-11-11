@@ -245,6 +245,49 @@ func TestUnitResolveSnapshotBehaviours(t *testing.T) {
 	}
 }
 
+// [RELEASE] and [INTEGRATION] resolve among the files the repository's
+// patterns accept, as a snapshot does, and with none left the path is looked
+// up as it is. A file the caller may not read still takes part: the resolved
+// path's own check refuses it.
+func TestUnitResolveTokensFollowPatterns(t *testing.T) {
+	dir := "com/acme/app/"
+	release := format.Download{Path: dir + "[RELEASE]/app-[RELEASE].jar"}
+	w := newWorld(t, nil)
+	w.deploy(dir+"1.0/app-1.0.jar", dir+"2.0/app-2.0.jar")
+	// The patterns change after the deploys, which they would refuse.
+	excludes, includes := dir+"2.0/**", "org/**"
+	w.c.ExcludesPattern = &excludes
+	if got := w.resolve(release); got != dir+"1.0/app-1.0.jar" {
+		t.Errorf("newest release excluded: %s", got)
+	}
+	w.c.ExcludesPattern, w.c.IncludesPattern = nil, &includes
+	if got := w.resolve(release); got != release.Path {
+		t.Errorf("every release excluded: %s", got)
+	}
+	w.c.IncludesPattern = nil
+	unreadable := release
+	unreadable.Readable = func(p string) bool { return !strings.Contains(p, "/2.0/") }
+	if got := w.resolve(unreadable); got != dir+"2.0/app-2.0.jar" {
+		t.Errorf("newest release unreadable: %s", got)
+	}
+
+	w = newWorld(t, func(c *repo.Config) {
+		c.PackageType, c.RepoLayoutRef = repo.Gradle, "gradle-default"
+		c.SuppressPomConsistencyChecks = on()
+	})
+	lib := "org.acme/lib/"
+	w.deploy(
+		lib+"1.0-20261017090000/lib-1.0-20261017090000.jar",
+		lib+"1.0-20261017100000/lib-1.0-20261017100000.jar",
+	)
+	excludes = lib + "1.0-20261017100000/**"
+	w.c.ExcludesPattern = &excludes
+	integration := format.Download{Path: lib + "1.0-[INTEGRATION]/lib-1.0-[INTEGRATION].jar"}
+	if got := w.resolve(integration); got != lib+"1.0-20261017090000/lib-1.0-20261017090000.jar" {
+		t.Errorf("newest integration excluded: %s", got)
+	}
+}
+
 // Outside the Maven layout -SNAPSHOT is a name like any other, and
 // [RELEASE] and [INTEGRATION] name the alphabetically last release, or
 // integration revision of the path's base revision, as JFrog documents,

@@ -70,6 +70,39 @@ func TestAccMavenDownloadsResolveVersions(t *testing.T) {
 	)
 }
 
+// A version token resolves to the newest release the repository's patterns
+// accept, as JFrog says an excluded artifact is not resolved from the
+// repository ([I], #216); with every release excluded the token's own path
+// is looked up and not found.
+func TestAccMavenTokensSkipExcludedReleases(t *testing.T) {
+	w := newItemWorld(t, false)
+	ctx := context.Background()
+	c := *repo.Defaults(&repo.Config{Key: "mvn-local", Class: repo.Local, PackageType: repo.Maven})
+	if err := w.db.Repos().Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	dir := "/artifactory/mvn-local/com/acme/app/"
+	for path, body := range map[string]string{"1.0/app-1.0.jar": "jar 1.0", "2.0/app-2.0.jar": "jar 2.0"} {
+		wantStatus(t, w.do("PUT", dir+path, "admin", body), http.StatusCreated)
+	}
+	// The patterns change after the deploys, which they would refuse.
+	exclude := func(pattern string) {
+		t.Helper()
+		c.ExcludesPattern = &pattern
+		if err := w.db.Repos().Update(ctx, c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exclude("com/acme/app/2.0/**")
+	rec := w.do("GET", dir+"[RELEASE]/app-[RELEASE].jar", "reader", "")
+	wantStatus(t, rec, http.StatusOK)
+	if rec.Body.String() != "jar 1.0" {
+		t.Errorf("newest release excluded: %q", rec.Body)
+	}
+	exclude("com/acme/app/*.0/**")
+	wantStatus(t, w.do("GET", dir+"[RELEASE]/app-[RELEASE].jar", "reader", ""), http.StatusNotFound)
+}
+
 // Under a layout without both integration revisions a version token is part
 // of the name looked up, so the download is 404 though a release exists.
 func TestAccMavenLayoutWithoutIntegrationRevisions(t *testing.T) {

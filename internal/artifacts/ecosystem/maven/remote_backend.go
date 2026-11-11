@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -254,6 +255,12 @@ func MavenMetadata(
 
 // ResolveMavenSource uses authoritative metadata for Maven's changing version
 // names. The caller must authorize the returned canonical path before fetching.
+// Metadata the remote repository's own download policy refuses, as an
+// exclude pattern of **/maven-metadata.xml does, counts as absent and the
+// path is fetched as asked, so the file's own check decides: 6.20's
+// RemoteLatestMavenVersionResolver reads it through the download service and
+// takes any answer but 200 as no metadata (tryDownloadingMavenMetadata).
+// 7.x's answer is to be captured (#216).
 func ResolveMavenSource(
 	ctx context.Context,
 	service *source.Service,
@@ -279,7 +286,7 @@ func ResolveMavenSource(
 			q,
 			path.Join(path.Dir(p), "maven-metadata.xml"),
 		)
-		if errors.Is(err, kernel.ErrNotFound) {
+		if errors.Is(err, kernel.ErrNotFound) || refused(err) {
 			return p, nil
 		}
 		if err != nil {
@@ -317,6 +324,12 @@ func ResolveMavenSource(
 	}
 	dir := path.Dir(path.Dir(p))
 	metadata, err := MavenMetadata(ctx, service, q, path.Join(dir, "maven-metadata.xml"))
+	if refused(err) {
+		// The token path is fetched as asked, as 6.20 does. Missing metadata
+		// answers 404 without that fetch instead: 6.20 would ask the upstream
+		// there too, a difference the download policy does not decide.
+		return p, nil
+	}
 	if err != nil {
 		return "", err
 	}
@@ -334,6 +347,11 @@ func ResolveMavenSource(
 	}
 	return resolved, nil
 }
+
+// refused reports a read the download policy refused: a blackout or a
+// pattern of the remote repository, which the source boundary answers before
+// any upstream request.
+func refused(err error) bool { return errors.As(err, new(*format.RejectionError)) }
 
 func validVersion(version string) bool {
 	return version != "" && version != "." && version != ".." &&

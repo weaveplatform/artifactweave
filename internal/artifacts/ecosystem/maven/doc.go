@@ -84,6 +84,12 @@
 //     file, and only a delete has it rewritten.
 //   - Snapshot renaming, checksum sidecar mapping and -SNAPSHOT resolution
 //     apply only under a layout equal to maven-2-default (IsMavenLayout).
+//   - In a local repository or a remote's cache, a non-unique snapshot
+//     name and a version token resolve only to files the repository's
+//     include and exclude patterns accept, as JFrog says an excluded
+//     artifact is not resolved from the repository. A remote's
+//     maven-metadata.xml that its download policy refuses counts as
+//     absent, so the path is fetched as asked and its own check decides.
 //   - Upstream metadata and POMs are bounded and checked before they are
 //     cached, and an invalid one is refused with ErrRemoteContent, which
 //     never echoes upstream XML.
