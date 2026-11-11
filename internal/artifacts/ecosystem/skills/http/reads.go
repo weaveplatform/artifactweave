@@ -104,10 +104,32 @@ func (h handler) visible(r *http.Request, slug string) (skill, error) {
 	return s, nil
 }
 
+// resolvable answers the blackout's 404 for the reads a client resolves a
+// skill's version from (detail, versions, version and resolve; the JFrog
+// CLI's install resolves its version from the list of versions): 7.x
+// ignores a blacked-out repository when it resolves, and where it keeps a
+// skill's index is not documented, so the refusal names the skill's folder
+// and comes before the index is read. The list and search keep their
+// answers, as 6.20's searchers check permissions and patterns but not the
+// blackout, and patterns rejecting a version's bundle leave it listed: only
+// the bundle's download and its files refuse.
+func (h handler) resolvable(w http.ResponseWriter, r *http.Request, slug string) bool {
+	if err := h.k.CheckBlackedOut(r, slug); err != nil {
+		h.k.Error(w, r, err)
+		return false
+	}
+	return true
+}
+
+// selected finds the version a read names, after the caller's read
+// permission on the skill's folder; resolution is set for the version
+// route, whose answer is resolution metadata, and not for a download, whose
+// refusal names the bundle's own path.
 func (h handler) selected(
 	w http.ResponseWriter,
 	r *http.Request,
 	slug, version string,
+	resolution bool,
 ) (skillVersion, bool) {
 	if !h.authenticated(w, r) {
 		return skillVersion{}, false
@@ -117,6 +139,9 @@ func (h handler) selected(
 		return skillVersion{}, false
 	}
 	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
+		return skillVersion{}, false
+	}
+	if resolution && !h.resolvable(w, r, slug) {
 		return skillVersion{}, false
 	}
 	s, err := h.visible(r, slug)
@@ -303,7 +328,7 @@ func (h handler) detail(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badQuery("invalid skill slug"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
+	if !h.k.RequireFolder(w, r, slug, api.ActionRead) || !h.resolvable(w, r, slug) {
 		return
 	}
 	s, err := h.visible(r, slug)
@@ -332,7 +357,7 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badQuery("invalid skill slug"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
+	if !h.k.RequireFolder(w, r, slug, api.ActionRead) || !h.resolvable(w, r, slug) {
 		return
 	}
 	s, err := h.visible(r, slug)
@@ -373,7 +398,7 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request) {
 
 func (h handler) version(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
-	v, ok := h.selected(w, r, slug, chi.URLParam(r, "version"))
+	v, ok := h.selected(w, r, slug, chi.URLParam(r, "version"), true)
 	if !ok {
 		return
 	}
@@ -476,7 +501,7 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badQuery("invalid skill slug"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
+	if !h.k.RequireFolder(w, r, slug, api.ActionRead) || !h.resolvable(w, r, slug) {
 		return
 	}
 	s, err := h.visible(r, slug)
@@ -497,7 +522,7 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 
 func (h handler) download(w http.ResponseWriter, r *http.Request) {
 	slug := r.URL.Query().Get("slug")
-	v, ok := h.selected(w, r, slug, r.URL.Query().Get("version"))
+	v, ok := h.selected(w, r, slug, r.URL.Query().Get("version"), false)
 	if !ok {
 		return
 	}
@@ -506,7 +531,7 @@ func (h handler) download(w http.ResponseWriter, r *http.Request) {
 
 func (h handler) singleFile(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
-	v, ok := h.selected(w, r, slug, r.URL.Query().Get("version"))
+	v, ok := h.selected(w, r, slug, r.URL.Query().Get("version"), false)
 	if !ok {
 		return
 	}
@@ -520,7 +545,11 @@ func (h handler) singleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f, err := h.k.DownloadItem(r, path)
-	if errors.Is(err, kernel.ErrNotFound) {
+	// A file of the bundle takes the bundle's download policy, and its
+	// refusal, which is kernel.ErrNotFound too, keeps the policy's 404 and
+	// message, as the bundle's download answers; only a missing bundle is
+	// this route's own "not found".
+	if errors.Is(err, kernel.ErrNotFound) && !pkgroute.IsRefusal(err) {
 		h.k.Error(w, r, notFound())
 		return
 	}

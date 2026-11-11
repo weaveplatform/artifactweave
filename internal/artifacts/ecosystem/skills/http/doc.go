@@ -63,6 +63,15 @@
 //   - A single-file read takes a safe relative path (400) and serves only a
 //     regular entry of exactly that name from the stored bundle (404
 //     otherwise), read within the format's bound.
+//   - Artifactory's download policy, after the caller's read permission: a
+//     bundle's download, and a single-file read of it, from a blacked-out
+//     repository or at a bundle path the include and exclude patterns
+//     reject, answers 404 with the item routes' message. A blacked-out
+//     repository's detail, versions, version and resolve answer the
+//     blackout's 404, naming the skill's folder, before the index is read.
+//     The list and search keep their answers, the patterns leave a version
+//     listed, and the scan status answers for a stored bundle whatever the
+//     policy says.
 //   - Statuses and error texts stay byte-identical.
 //
 // # References
@@ -100,7 +109,8 @@
 //     admitted by the same format rules.
 //   - reads_test.go (external): reads that respect version permissions,
 //     pagination, single files and the lifecycle, version and search
-//     answers, and stored-bundle faults on a single-file read.
+//     answers, stored-bundle faults on a single-file read, and the download
+//     policy on every read.
 //   - publish_fault_test.go: multipart faults, malformed file
 //     dispositions, and the file count and total size caps.
 //

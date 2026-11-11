@@ -16,6 +16,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	skillsfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/skills"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -382,4 +383,106 @@ func TestAccSingleFileStoredBlobFaults(t *testing.T) {
 		})
 	}
 	f.items.Blobs = original
+}
+
+// TestAccSkillsDownloadPolicy checks Artifactory's download policy on the
+// Skills reads (#1237). A bundle's download and a file of it refuse a
+// blacked-out repository and a bundle the include and exclude patterns
+// reject with the item routes' 404 and message, for an administrator too.
+// A blacked-out repository's detail, versions, version and resolve, which
+// a client resolves a version from, answer the blackout's 404 naming the
+// skill's folder. The list and search keep their answers, a version whose
+// bundle the patterns reject stays listed, the scan status still answers
+// for the stored bundle, and discovery stays anonymous. A caller who may
+// not read the skill learns nothing of how the repository is set.
+func TestAccSkillsDownloadPolicy(t *testing.T) {
+	f := newFixture(t)
+	published(t, f, "alpha", "1.0.0")
+	latest := published(t, f, "alpha", "2.0.0")
+	patch := func(change func(*repo.Config)) {
+		t.Helper()
+		current, err := f.db.Repos().Get(t.Context(), f.repo.Key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		change(&current)
+		if err := f.db.Repos().Update(t.Context(), current); err != nil {
+			t.Fatal(err)
+		}
+	}
+	answers := func(as, path string, status int, body string) {
+		t.Helper()
+		r := f.read(as, path)
+		if r.Code != status || !strings.Contains(r.Body.String(), body) {
+			t.Errorf("%s %s: %d %s, want %d with %q", as, path, r.Code, r.Body, status, body)
+		}
+	}
+	bundle := "/api/v1/download?slug=alpha&version=2.0.0"
+	file := "/api/v1/skills/alpha/file?version=2.0.0&path=src%2Frun.js"
+	resolution := []string{
+		"/api/v1/skills/alpha", "/api/v1/skills/alpha/versions",
+		"/api/v1/skills/alpha/versions/2.0.0", "/api/v1/skills/alpha/versions/latest",
+		"/api/v1/resolve?slug=alpha&hash=" + latest,
+	}
+	kept := func() {
+		t.Helper()
+		answers("reader", "/api/v1/skills", http.StatusOK, `"slug":"alpha"`)
+		answers("reader", "/api/v1/search?q=alpha", http.StatusOK, `"version":"2.0.0"`)
+		answers("reader", "/xrayStatus?path=alpha/2.0.0/alpha-2.0.0.zip", http.StatusOK,
+			`"status":"NOT_IN_ENTITLEMENT"`)
+		answers("", "/.well-known/clawhub.json", http.StatusOK, "apiBase")
+	}
+
+	patch(func(c *repo.Config) { c.ExcludesPattern = new("alpha/2.0.0/**") })
+	rejected := "The repository 'skills-local' rejected the artifact " +
+		"'skills-local:alpha/2.0.0/alpha-2.0.0.zip' due to its include/exclude pattern settings."
+	for _, as := range []string{"admin", "reader"} {
+		answers(as, bundle, http.StatusNotFound, rejected)
+		answers(as, file, http.StatusNotFound, rejected)
+		answers(as, "/api/v1/skills/alpha/file?version=latest&path=SKILL.md",
+			http.StatusNotFound, rejected)
+	}
+	answers("reader", "/api/v1/download?slug=alpha&version=1.0.0", http.StatusOK, "PK")
+	answers("reader", "/api/v1/skills/alpha", http.StatusOK, `"latestVersion":"2.0.0"`)
+	answers("reader", "/api/v1/skills/alpha/versions", http.StatusOK, `"version":"2.0.0"`)
+	answers(
+		"reader",
+		"/api/v1/skills/alpha/versions/2.0.0",
+		http.StatusOK,
+		`"fingerprint":"`+latest+`"`,
+	)
+	answers("reader", "/api/v1/resolve?slug=alpha&hash="+latest, http.StatusOK, `"version":"2.0.0"`)
+	kept()
+
+	patch(func(c *repo.Config) { c.BlackedOut, c.ExcludesPattern = new(true), new("") })
+	blackedOut := func(path string) string {
+		return "The repository 'skills-local' is blacked out and cannot serve artifact " +
+			"'skills-local:" + path + "'."
+	}
+	for _, as := range []string{"admin", "reader"} {
+		answers(as, bundle, http.StatusNotFound, blackedOut("alpha/2.0.0/alpha-2.0.0.zip"))
+		answers(as, file, http.StatusNotFound, blackedOut("alpha/2.0.0/alpha-2.0.0.zip"))
+		for _, path := range resolution {
+			answers(as, path, http.StatusNotFound, blackedOut("alpha"))
+		}
+		// The refusal comes before the index is read: a skill or version
+		// that does not exist is refused alike.
+		answers(as, "/api/v1/skills/missing/versions", http.StatusNotFound, blackedOut("missing"))
+		answers(as, "/api/v1/skills/alpha/versions/9.9.9", http.StatusNotFound, blackedOut("alpha"))
+	}
+	kept()
+	// Read permission first (DV-057).
+	for _, path := range append([]string{bundle, file}, resolution...) {
+		r := f.read("nobody", path)
+		if r.Code != http.StatusForbidden || strings.Contains(r.Body.String(), "blacked out") {
+			t.Errorf("nobody %s: %d %s, want 403 without the setting", path, r.Code, r.Body)
+		}
+	}
+
+	patch(func(c *repo.Config) { c.BlackedOut = new(false) })
+	answers("reader", bundle, http.StatusOK, "PK")
+	answers("reader", file, http.StatusOK, "run 2.0.0")
+	for _, path := range resolution {
+		answers("reader", path, http.StatusOK, "2.0.0")
+	}
 }
