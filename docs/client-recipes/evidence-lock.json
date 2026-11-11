@@ -5,7 +5,7 @@
   ".github/actions/registry-clients/action.yml": "ef020d59ee4b103272682c15cd5a1db1fbf3d0ac782d7fa37200a83c161d0f5e",
   ".github/workflows/quality-gate.yml": "37474aae5f237275aca7e00e1b7360103d6e492e5a7b832fea6978a91bdec38c",
   "deploy/check.sh": "264837052199f1e4d93e080aebf8e747ff6f8a12823fb75100e5312cb1b03285",
-  "docs/research/39-vcs-legacy.md": "80f1ab4297ddb503ba6d08a26ff30229528c931f734f450111c7d58c29d82777",
+  "docs/research/39-vcs-legacy.md": "3e79e20a799adce720a38edeb3be24bfa277cc951a6261665ca4d5b57d90943e",
   "go.mod": "756e0e48b2ea06b78c65d96e34b288c299d642b134a4c5212de4f46104f1c647",
   "internal/access/adapters/http/authn_middleware.go": "26a242f13938c0ec86cabd65da43739f125fe010ba2b3360c2ef05812194f383",
   "internal/access/core/authn/token.go": "3b6bf9a0c5f232d8d873c521ae35da5d4e5dce5180b86cba362b101341cfa054",
