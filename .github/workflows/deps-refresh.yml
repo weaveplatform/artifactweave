@@ -241,6 +241,8 @@ jobs:
 
       # A push re-runs the full gate and, on a reviewed branch, can dismiss an
       # approval, so a branch that already holds this refresh is left alone.
+      # The checkout is one commit deep: fetching the branch without --depth
+      # would pull its whole history to compare one tree.
       - name: Open or update the refresh PR
         if: steps.refresh.outputs.changed == 'true'
         env:
@@ -255,7 +257,7 @@ jobs:
           git checkout -B "$HEX_BRANCH"
           git add test/acceptance/clients/hex.Dockerfile docs/client-recipes docs/testing/ci-client-images.md
           git commit -qm "$title"
-          if git fetch -q origin "$HEX_BRANCH" && git diff --quiet FETCH_HEAD HEAD; then
+          if git fetch -q --depth=1 origin "$HEX_BRANCH" && git diff --quiet FETCH_HEAD HEAD; then
             echo "$HEX_BRANCH already holds this refresh"
           else
             git push --force -u origin "$HEX_BRANCH"
