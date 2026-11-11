@@ -11,6 +11,6 @@
 # It has a directory of its own because Dependabot's entry for it keeps it
 # below Ruby 3.4, which an entry shared with the other Ruby images would do to
 # them too. The job builds it as artifactweave-accept-puppet.
-FROM ruby:3.3.13-slim@sha256:8743a2d8ce3a33aed0de5c009dca0542e5fa85a4bd5b43170ce7b4af8c23809a
+FROM ruby:3.3.13-slim@sha256:db3ad6dd68a886d51a187fb9bf486052f2976cdbe3b750169c25092aba1297fa
 RUN gem install --no-document puppet -v 8.10.0 && puppet --version
 ENTRYPOINT ["puppet"]
