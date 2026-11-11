@@ -249,8 +249,11 @@ func (h handler) remoteP2(r *http.Request, name string) ([]release, error) {
 			if !h.k.Can(r, rel.Path, accessapi.ActionRead) {
 				continue
 			}
+			// A release whose archive the remote's patterns reject stays
+			// listed, and only its archive is refused (R3).
 			if result.CheckRead != nil {
-				if e := result.CheckRead(r.Context(), rel.Path); e != nil {
+				if e := result.CheckRead(r.Context(), rel.Path); e != nil &&
+					!pkgroute.IsRefusal(e) {
 					if errors.Is(e, source.ErrDenied) {
 						continue
 					}
