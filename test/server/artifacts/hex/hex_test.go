@@ -222,14 +222,33 @@ func TestUnitHexLocalAndVirtualSignedRegistry(t *testing.T) {
 func TestUnitHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) {
 	w := newItemWorld(t, false)
 	keys := testKeys()
-	if err := w.db.Keys().CreateKeypair(t.Context(), api.Keypair{
-		Name: "hex-signing", Type: api.KeypairRSA,
-		PrivateKey: keys.private, PublicKey: keys.public,
-	}); err != nil {
-		t.Fatal(err)
+	for _, pair := range []api.Keypair{
+		{Name: "hex-signing", PrivateKey: keys.private, PublicKey: keys.public},
+		{Name: "hex-garbled", PrivateKey: "not an RSA key", PublicKey: keys.public},
+	} {
+		pair.Type = api.KeypairRSA
+		if err := w.db.Keys().CreateKeypair(t.Context(), pair); err != nil {
+			t.Fatal(err)
+		}
 	}
 	for _, c := range []repo.Config{
 		{Key: "hex-no-key", Class: repo.Local, PackageType: repo.Hex},
+		{
+			Key: "hex-garbled-key", Class: repo.Local, PackageType: repo.Hex,
+			PrimaryKeyPairRef: "hex-garbled",
+		},
+		{
+			Key: "hex-garbage-local", Class: repo.Local, PackageType: repo.Hex,
+			PrimaryKeyPairRef: "hex-signing",
+		},
+		{
+			Key: "hex-plain-remote", Class: repo.Remote, PackageType: repo.Hex,
+			URL: "https://up.example/",
+		},
+		{
+			Key: "hex-remote-member", Class: repo.Virtual, PackageType: repo.Hex,
+			Repositories: []string{"hex-plain-remote"}, KeyPair: "hex-signing",
+		},
 		{
 			Key: "hex-missing-key", Class: repo.Local, PackageType: repo.Hex,
 			PrimaryKeyPairRef: "missing",
@@ -287,6 +306,23 @@ func TestUnitHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) 
 	}); err != nil {
 		t.Fatal(err)
 	}
+	garbage, err := w.blobs.BeginUpload(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := garbage.Append(t.Context(), strings.NewReader("not a tarball")); err != nil {
+		t.Fatal(err)
+	}
+	garbageInfo, err := garbage.Commit(t.Context(), blob.Digests{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.db.Items().Put(t.Context(), model.Item{
+		RepoKey: "hex-garbage-local", Name: "tarballs/decimal-2.0.0.tar",
+		Actual: kernel.Checksums{SHA256: garbageInfo.Digests.SHA256},
+	}); err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct {
 		path     string
 		expected int
@@ -294,7 +330,11 @@ func TestUnitHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) 
 		{"hex-no-key/public_key", http.StatusServiceUnavailable},
 		{"hex-no-key/names", http.StatusServiceUnavailable},
 		{"hex-missing-key/public_key", http.StatusServiceUnavailable},
+		{"hex-garbled-key/public_key", http.StatusServiceUnavailable},
 		{"hex-broken-local/packages/decimal", http.StatusInternalServerError},
+		{"hex-garbage-local/packages/decimal", http.StatusInternalServerError},
+		{"hex-remote-member/versions", http.StatusBadRequest},
+		{"hex-remote-member/tarballs/decimal-2.0.0.tar", http.StatusBadRequest},
 		{"hex-mismatch-local/packages/other", http.StatusInternalServerError},
 		{"hex-no-key/packages/../secret", http.StatusNotFound},
 		{"hex-no-key/packages/not!name", http.StatusNotFound},
@@ -311,6 +351,10 @@ func TestUnitHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) 
 		if got.Code != tc.expected {
 			t.Errorf("%s: got %d want %d: %s", tc.path, got.Code, tc.expected, got.Body)
 		}
+	}
+	if got := w.do(http.MethodGet, "/artifactory/api/hex/hex-garbled-key/public_key", "user",
+		""); got.Code != http.StatusForbidden {
+		t.Errorf("public key without read: got %d: %s", got.Code, got.Body)
 	}
 }
 

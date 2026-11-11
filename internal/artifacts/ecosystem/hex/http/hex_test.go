@@ -22,6 +22,7 @@ func TestUnitTarballPathGrammar(t *testing.T) {
 		{"tarballs/my-lib-1.0.0-rc.1.tar", "my-lib", "1.0.0-rc.1"},
 		{"tarballs/../secret.tar", "", ""},
 		{"tarballs/pkg.tar", "", ""},
+		{"tarballs/decimal-x.tar", "", ""},
 		{"other/decimal-2.0.0.tar", "", ""},
 		{"tarballs/decimal-2.0.0.tar.gz", "", ""},
 	} {
