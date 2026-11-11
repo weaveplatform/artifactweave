@@ -34,6 +34,7 @@ import (
 )
 
 type remoteFixture struct {
+	db               *inmem.Store
 	server           *httptest.Server
 	upstream         *httptest.Server
 	object           []byte
@@ -189,6 +190,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	}))
 	t.Cleanup(f.upstream.Close)
 	db := inmem.New()
+	f.db = db
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -227,7 +229,12 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	}
 	router := chi.NewRouter()
 	router.Use(baseurl.Middleware(""))
-	router.Use(accesstest.Over(t, db).Middleware(t, true, func(*http.Request) kernel.Principal {
+	// X-User names a caller without grants, for the checks that come before
+	// the download policy; without it the caller is an administrator.
+	router.Use(accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
+		if name := r.Header.Get("X-User"); name != "" {
+			return kernel.Principal{Name: name}
+		}
 		return kernel.Principal{Name: "admin", Admin: true}
 	}))
 	pkgroute.Mount(
