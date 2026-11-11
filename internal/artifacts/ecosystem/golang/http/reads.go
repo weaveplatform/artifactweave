@@ -37,7 +37,13 @@ func (h reads) serve(w http.ResponseWriter, r *http.Request) {
 	case goformat.KindList:
 		h.list(w, r, q.Module)
 	case goformat.KindLatest:
-		h.latest(w, r, q.Module)
+		// The go command asks for either spelling, and a refusal names the
+		// one it asked for.
+		p := q.Module + "/@v/latest.info"
+		if strings.HasSuffix(pkgroute.RequestFrom(r).Rest, "/@latest") {
+			p = q.Module + "/@latest"
+		}
+		h.latest(w, r, q.Module, p)
 	case goformat.KindInfo:
 		h.info(w, r, q.File())
 	default:
@@ -56,10 +62,18 @@ type version struct {
 // read, pseudo-versions included, one per line in ascending order with
 // the time goformat.ListTime gives it. A module with none answers 404, to
 // a caller who may read nothing in it too, so the answer says nothing
-// about what it may not read.
+// about what it may not read. A blacked-out repository refuses the list
+// once the caller may read a version in it, read permission first as
+// DV-057 orders it: 7.x ignores a blacked-out repository when it resolves
+// and serves no download from it. Where 7.x keeps a local list is not
+// documented, so the patterns do not refuse it ([I], #216).
 func (h reads) list(w http.ResponseWriter, r *http.Request, m string) {
 	vs, err := h.readable(r, m)
 	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	if err := h.k.CheckBlackedOut(r, m+"/@v/list"); err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
@@ -75,12 +89,17 @@ func (h reads) list(w http.ResponseWriter, r *http.Request, m string) {
 	_, _ = io.WriteString(w, b.String())
 }
 
-// latest answers @latest and @v/latest.info with the .info of the version
-// goformat.Latest chooses among those list would consider, pseudo-versions
-// included.
-func (h reads) latest(w http.ResponseWriter, r *http.Request, m string) {
+// latest answers @latest and @v/latest.info, the request path p, with the
+// .info of the version goformat.Latest chooses among those list would
+// consider, pseudo-versions included. A blacked-out repository refuses it
+// as it refuses the list.
+func (h reads) latest(w http.ResponseWriter, r *http.Request, m, p string) {
 	vs, err := h.readable(r, m)
 	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	if err := h.k.CheckBlackedOut(r, p); err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
@@ -113,18 +132,23 @@ func (h reads) info(w http.ResponseWriter, r *http.Request, f goformat.File) {
 // needs Read on it, or synthesises one from the package index, which needs
 // Read on the .mod. A synthesised time is when the version's first file
 // was stored: jf go-publish deploys .info last and skips it against an
-// Artifactory older than 6.10 (research 26 section 3.1).
+// Artifactory older than 6.10 (research 26 section 3.1). A synthesised
+// .info answers the download policy as a stored one would, at the .info's
+// own path: 7.x applies the patterns to .info artifacts (RTDEV-60689), and
+// 6.x derived a local .info from the version's files (RTFACT-18310), so a
+// client cannot tell the two apart ([I] for a local repository, #216).
 func (h reads) serveInfo(w http.ResponseWriter, r *http.Request, m string, v version) {
+	infoPath := goformat.File{Module: m, Version: v.Version, Ext: goformat.ExtInfo}.Path()
 	if v.hasInfo {
-		h.k.ServeItem(
-			w,
-			r,
-			goformat.File{Module: m, Version: v.Version, Ext: goformat.ExtInfo}.Path(),
-		)
+		h.k.ServeItem(w, r, infoPath)
 		return
 	}
 	mod := goformat.File{Module: m, Version: v.Version, Ext: goformat.ExtMod}.Path()
 	if !h.k.Require(w, r, mod, api.ActionRead) {
+		return
+	}
+	if err := h.k.CheckDownload(r, infoPath); err != nil {
+		h.k.Error(w, r, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
