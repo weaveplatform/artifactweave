@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/pypi"
+	"github.com/weaveplatform/artifactweave/internal/platform/archive"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
@@ -259,6 +260,35 @@ func TestUnitReadFailure(t *testing.T) {
 	)
 	if !errors.Is(err, errRead) || errors.Is(err, pypi.ErrNotDist) {
 		t.Fatalf("%v", err)
+	}
+}
+
+// seekOnly hides a reader's ReadAt, as the S3, GCS and Azure blob readers
+// have none, so archive.ReaderAt reads it by seeking.
+type seekOnly struct{ io.ReadSeeker }
+
+// A distribution smaller than the sniff reads from a store that can only
+// seek, whatever its type: the sniff runs past the end of the content,
+// which is no failed read.
+func TestUnitReadDistSmallerThanSniff(t *testing.T) {
+	m := meta("x", "1.0")
+	for name, body := range map[string][]byte{
+		wheelName("x", "1.0"): zipOf(entry{"x-1.0.dist-info/METADATA", m}),
+		"x-1.0.tar.gz":        tarOf(true, entry{"x-1.0/PKG-INFO", m}),
+		"x-1.0.zip":           zipOf(entry{"x-1.0/PKG-INFO", m}),
+		"x-1.0-py3.8.egg":     zipOf(entry{"EGG-INFO/PKG-INFO", m}),
+	} {
+		if len(body) >= archive.SniffLen {
+			t.Fatalf("%s is %d bytes, no smaller than the sniff", name, len(body))
+		}
+		d, err := pypi.ReadDist(
+			archive.ReaderAt(seekOnly{bytes.NewReader(body)}),
+			int64(len(body)),
+			name,
+		)
+		if err != nil || d.Name != "x" || d.Version != "1.0" {
+			t.Errorf("%s: %+v %v", name, d, err)
+		}
 	}
 }
 

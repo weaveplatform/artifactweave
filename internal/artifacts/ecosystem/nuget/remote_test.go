@@ -57,6 +57,28 @@ func TestUnitRemoteArchiveAdmission(t *testing.T) {
 	}
 }
 
+// Admission over a store that can only seek reads the zip's directory with
+// a read that ends at the end of the content, and sniffs a package smaller
+// than the sniff with one that runs past it; neither is a failure.
+func TestUnitRemoteArchiveAdmissionSeekOnly(t *testing.T) {
+	for name, body := range map[string][]byte{
+		"a package": pkg("Acme.Package", "1.0.0", ""),
+		"a package smaller than the sniff": zipOf(
+			zipFile{"Acme.Package.nuspec", nuspecXML("Acme.Package", "1.0.0", "")},
+		),
+	} {
+		if err := nuget.ValidateRemote(
+			t.Context(),
+			seekOnly{bytes.NewReader(body)},
+			int64(len(body)),
+			"acme.package",
+			"1.0.0",
+		); err != nil {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
 func TestUnitRemoteArchivePayloadLimitsAndCompression(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

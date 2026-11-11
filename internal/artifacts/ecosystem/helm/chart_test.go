@@ -245,6 +245,23 @@ func TestUnitReadChartReadFailure(t *testing.T) {
 	}
 }
 
+// seekOnly hides a reader's ReadAt, as the S3, GCS and Azure blob readers
+// have none, so archive.ReaderAt reads it by seeking.
+type seekOnly struct{ io.ReadSeeker }
+
+// A chart smaller than the sniff reads from a store that can only seek:
+// the sniff runs past the end of the content, which is no failed read.
+func TestUnitReadChartSmallerThanSniff(t *testing.T) {
+	b := tgz(file{name: "x/Chart.yaml", body: chartYAML("x", "1.0.0")})
+	if len(b) >= archive.SniffLen {
+		t.Fatalf("the chart is %d bytes, no smaller than the sniff", len(b))
+	}
+	c, err := helm.ReadChart(archive.ReaderAt(seekOnly{bytes.NewReader(b)}), int64(len(b)))
+	if err != nil || c.Name != "x" || c.Version != "1.0.0" {
+		t.Fatalf("%+v %v", c, err)
+	}
+}
+
 // brokenBlobs fails every open.
 type brokenBlobs struct{}
 

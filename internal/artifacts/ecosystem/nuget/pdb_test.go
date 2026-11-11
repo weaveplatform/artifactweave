@@ -237,6 +237,26 @@ func TestUnitSymbolArchiveBoundsAndUnsupported(t *testing.T) {
 	}
 }
 
+// A symbols package smaller than the sniff reads from a store that can
+// only seek.
+func TestUnitSymbolArchiveSmallerThanSniff(t *testing.T) {
+	pdb := portablePDB()
+	body := zipOf(zipFile{"lib/a.pdb", string(pdb)})
+	if len(body) >= archive.SniffLen {
+		t.Fatalf("the package is %d bytes, no smaller than the sniff", len(body))
+	}
+	got, err := nuget.ReadSymbolArchive(
+		t.Context(),
+		archive.ReaderAt(seekOnly{bytes.NewReader(body)}),
+		int64(len(body)),
+		archive.DefaultLimits,
+	)
+	if err != nil || len(got) != 1 ||
+		!bytes.Equal(got[".symbols/a.pdb/"+symbolGUID+"FFFFFFFF/a.pdb"], pdb) {
+		t.Fatalf("%v %v", got, err)
+	}
+}
+
 func FuzzPDBKey(f *testing.F) {
 	f.Add(portablePDB())
 	f.Add(windowsPDB())

@@ -3,6 +3,7 @@ package npm_test
 import (
 	"bytes"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -211,6 +212,24 @@ func TestUnitReadTarballReadFailure(t *testing.T) {
 	short := failing{bytes.NewReader(body), 1 << 30}
 	if _, err := npm.ReadTarball(short, int64(len(body))); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// seekOnly hides a reader's ReadAt, as the S3, GCS and Azure blob readers
+// have none, so archive.ReaderAt reads it by seeking.
+type seekOnly struct{ io.ReadSeeker }
+
+// A tarball smaller than the sniff, as a minimal package packs to, reads
+// from a store that can only seek: the sniff runs past the end of the
+// content, which is no failed read, so its publish is no failure either.
+func TestUnitReadTarballSmallerThanSniff(t *testing.T) {
+	body := tgz(file{name: "package/package.json", body: `{"name":"x","version":"1.0.0"}`})
+	if len(body) >= archive.SniffLen {
+		t.Fatalf("the tarball is %d bytes, no smaller than the sniff", len(body))
+	}
+	got, err := npm.ReadTarball(archive.ReaderAt(seekOnly{bytes.NewReader(body)}), int64(len(body)))
+	if err != nil || got.Name != "x" || got.Version != "1.0.0" {
+		t.Fatalf("%+v %v", got, err)
 	}
 }
 

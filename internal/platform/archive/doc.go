@@ -44,7 +44,8 @@
 //     within Limits.File. ReadFile: the first regular file whose cleaned
 //     name a predicate accepts, with that name.
 //   - Clean: an entry name as a relative path, or a refusal.
-//   - ReaderAt: an io.ReaderAt over an io.ReadSeeker.
+//   - ReaderAt: an io.ReaderAt over an io.ReadSeeker, which reads at the
+//     end of the content as bytes.Reader does.
 //   - The sentinels ErrUnusable ("archive: unusable archive"), which every
 //     refusal wraps, and ErrNotFound ("archive: no such entry"), which
 //     ReadFile returns when no file matches. Callers test them with
@@ -79,7 +80,16 @@
 //     stream, is the one that can tell them apart.
 //   - A tar entry's reader is valid only until the walk moves on, so a
 //     callback reads the entry before it returns.
-//   - ReaderAt serialises reads, because they share one seek position.
+//   - ReaderAt serialises reads, because they share one seek position. It
+//     tells the end of the content by the size that one seek to the end
+//     gives, never by a read's error, since io.ReadFull and S3's reader
+//     both say io.ErrUnexpectedEOF: a read past the end returns the bytes
+//     before it with io.EOF, a read that ends at the end returns nil, as
+//     bytes.Reader's and *os.File's do, and content that ends before that
+//     size is a failed read, the reader's own error or
+//     io.ErrUnexpectedEOF, never io.EOF. So content smaller than SniffLen
+//     reads the same from every blob store, those without ReadAt
+//     included.
 //   - Error texts reach clients: the item API answers an unusable archive
 //     with a 400 whose message is the error's text, so the texts stay
 //     byte-identical.
@@ -103,8 +113,9 @@
 //     #p9d-modular-monolith-migration, epic PLT
 //     (https://github.com/weaveplatform/artifactweave/issues/938).
 //   - https://github.com/weaveplatform/artifactweave/issues/47,
-//     https://github.com/weaveplatform/artifactweave/issues/979 and
-//     https://github.com/weaveplatform/artifactweave/issues/1224
+//     https://github.com/weaveplatform/artifactweave/issues/979,
+//     https://github.com/weaveplatform/artifactweave/issues/1224 and
+//     https://github.com/weaveplatform/artifactweave/issues/1239
 //
 // # Status
 //
@@ -135,7 +146,14 @@
 //     an offset past the content's end never reaches the store, and a
 //     refused entry is named in the refusal.
 //   - TestUnitReaderAt: a reader that already reads at offsets is used as
-//     it is, and a seek-only reader reads at offsets.
+//     it is, a seek-only reader reads at every offset as bytes.Reader
+//     does, at and past the end of the content included, and content
+//     whose end a seek cannot find fails to read.
+//   - TestUnitReaderAtCutShort: content cut short before its size, whether
+//     the store says io.ErrUnexpectedEOF or io.EOF, is a failed read from
+//     ReadAt, and a walk wherever the cut either returns that failure,
+//     never ErrUnusable, or has read every entry; it never takes the cut
+//     for the end of the content.
 //   - TestUnitReadFile and TestUnitReadFileInflationBudget: the first file
 //     the predicate accepts, ErrNotFound, each limit, and a tar.gz whose
 //     skipped entries inflate past the budget.
@@ -145,5 +163,7 @@
 //     caller made that cannot be opened or read.
 //
 // The item service's explode and archive entry tests, and the format
-// handlers' package inspection tests, exercise it too.
+// handlers' package inspection tests, exercise it too; the Helm, npm, NuGet
+// and PyPI readers' tests read packages smaller than SniffLen through
+// ReaderAt over a seek-only reader.
 package archive
