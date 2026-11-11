@@ -49,13 +49,13 @@ func PushTime(m model.Item) time.Time {
 	return m.Modified
 }
 
-// manifestQuery finds the manifest files of the image name in repoKey,
+// manifestQuery finds the manifest files of the image name stored at ref,
 // each in a folder directly below the image (decision 0031), narrowed by
 // more criteria.
-func manifestQuery(repoKey, name string, more ...aql.Node) *aql.Query {
+func manifestQuery(ref aql.RepoRef, name string, more ...aql.Node) *aql.Query {
 	criteria := make(aql.And, 0, 5+len(more))
 	criteria = append(criteria,
-		aql.RepoSet{Refs: []aql.RepoRef{{Key: repoKey}}},
+		aql.RepoSet{Refs: []aql.RepoRef{ref}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
 		aql.Or{
 			&aql.FieldCriterion{Field: aql.FieldName, Op: aql.OpEq, Text: ManifestFile},
@@ -69,14 +69,15 @@ func manifestQuery(repoKey, name string, more ...aql.Node) *aql.Query {
 	return &aql.Query{Criteria: append(criteria, more...)}
 }
 
-// firstManifest returns the image's earliest stored manifest; ok is false
-// when it holds none.
+// firstManifest returns the earliest manifest of the image name among the
+// items c's index reads (pkgindex.Stored); ok is false when there is none.
 func firstManifest(
 	ctx context.Context,
 	items port.ItemStore,
-	repoKey, name string,
+	c repo.Config,
+	name string,
 ) (model.Item, bool, error) {
-	q := manifestQuery(repoKey, name)
+	q := manifestQuery(pkgindex.Stored(c), name)
 	q.Sort = &aql.Sort{Fields: []aql.Field{aql.FieldCreated}}
 	q.Limit, q.HasLimit = 1, true
 	hits, err := items.Search(ctx, q, aql.Options{})
@@ -126,7 +127,7 @@ func ensurePackage(
 	if !errors.Is(err, kernel.ErrNotFound) {
 		return model.Package{}, fmt.Errorf("docker: package %s: %w", name, err)
 	}
-	first, _, err := firstManifest(ctx, st.Items(), c.Key, name)
+	first, _, err := firstManifest(ctx, st.Items(), c, name)
 	if err != nil {
 		return model.Package{}, err
 	}
@@ -250,7 +251,7 @@ func dropTag(ctx context.Context, st format.Store, repoKey, name, folder string)
 
 // syncPackage keeps the image a package exactly while it holds a manifest.
 func syncPackage(ctx context.Context, st format.Store, c repo.Config, name string) error {
-	_, has, err := firstManifest(ctx, st.Items(), c.Key, name)
+	_, has, err := firstManifest(ctx, st.Items(), c, name)
 	if err != nil {
 		return err
 	}
@@ -310,18 +311,18 @@ func (a affected) sync(ctx context.Context, env format.Env, c repo.Config) error
 	return nil
 }
 
-// reindex brings the package index of the local image repository c back in
-// line with its item tree, which stays the source of truth (decision 0018):
-// every image holding a manifest is a package, dated by its earliest
-// manifest when indexed afresh, and every tag folder holding one a version
-// with exactly its folder's files; pkgindex.Reconcile drops the rest and
-// keeps what the tree still backs, so after the hooks' own maintenance
-// nothing changes.
+// reindex brings the package index of the image repository c back in line
+// with its item tree, which stays the source of truth (decision 0018) and
+// for a remote repository is its cache (pkgindex.Stored): every image
+// holding a manifest is a package, dated by its earliest manifest when
+// indexed afresh, and every tag folder holding one a version with exactly
+// its folder's files; pkgindex.Reconcile drops the rest and keeps what the
+// tree still backs, so after the hooks' own maintenance nothing changes.
 func reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	st := env.Store
 	err := st.Tx(ctx, func(ctx context.Context) error {
 		hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
-			aql.RepoSet{Refs: []aql.RepoRef{{Key: c.Key}}},
+			aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 			&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
 			aql.Or{
 				&aql.FieldCriterion{Field: aql.FieldName, Op: aql.OpEq, Text: ManifestFile},
@@ -358,7 +359,7 @@ func (a affected) indexed(
 	st := env.Store
 	byImage := map[string]*pkgindex.Indexed{}
 	for _, name := range slices.Sorted(maps.Keys(a.images)) {
-		first, _, err := firstManifest(ctx, st.Items(), c.Key, name)
+		first, _, err := firstManifest(ctx, st.Items(), c, name)
 		if err != nil {
 			return nil, err
 		}
