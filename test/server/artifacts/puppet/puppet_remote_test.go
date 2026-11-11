@@ -281,22 +281,48 @@ func checksum(data []byte) string {
 	return hex.EncodeToString(digest[:])
 }
 
+// searched returns the release versions the module search's one result
+// lists, joined in its order, or "" when it finds nothing.
+func searched(t *testing.T, r *httptest.ResponseRecorder) string {
+	t.Helper()
+	var doc struct {
+		Results []struct {
+			Releases []struct {
+				Version string `json:"version"`
+			} `json:"releases"`
+		} `json:"results"`
+	}
+	if r.Code != 200 || json.Unmarshal(r.Body.Bytes(), &doc) != nil || len(doc.Results) > 1 {
+		t.Fatalf("search: %d %s", r.Code, r.Body.String())
+	}
+	var out []string
+	for _, result := range doc.Results {
+		for _, rel := range result.Releases {
+			out = append(out, rel.Version)
+		}
+	}
+	return strings.Join(out, ",")
+}
+
 // A Puppet remote checks its download policy where 7.x caches a module's
 // release pages, .puppet/<m>/releases.json (RTFACT-13711), for every
-// answer built from them, while Read permission stays on the module folder,
-// and checks each archive at its own path before anything is fetched
-// (rulings R1, R3, R4, R10). A pattern on the archives leaves the releases
+// listing built from them, while Read permission stays on the module
+// folder, and checks each archive at its own path before anything is
+// fetched (R1, R3, R4, R10). A pattern on the archives leaves the releases
 // listed; one on the release pages refuses the listings but not an
-// archive, whose lookup only the blackout refuses.
+// archive, whose lookup only the blackout refuses. The module search, a
+// native search route, is refused by the blackout alone, at the module
+// folder (R2b).
 func TestAccPuppetRemotePolicyAtItsCachedPaths(t *testing.T) {
 	const (
 		remote  = "/artifactory/api/puppet/remote"
 		pages   = "remote:.puppet/acme-widget/releases.json"
 		archive = "remote:acme-widget/acme-widget-1.1.0.tar.gz"
+		search  = "/v3/modules?query=acme-widget"
 	)
 	metadata := []string{
 		"/v3/releases?module=acme-widget", "/v3/releases/acme-widget-1.1.0",
-		"/v3/modules/acme-widget", "/v3/modules?query=acme-widget",
+		"/v3/modules/acme-widget",
 	}
 	blackedOut := func(path string) string {
 		return "The repository 'remote' is blacked out and cannot serve artifact '" + path + "'."
@@ -321,6 +347,9 @@ func TestAccPuppetRemotePolicyAtItsCachedPaths(t *testing.T) {
 		for _, route := range metadata {
 			wantRefusal(t, w.request("GET", remote+route, "reader", ""), blackedOut(pages))
 		}
+		wantRefusal(t, w.request("GET", remote+search, "reader", ""),
+			blackedOut("remote:acme-widget"))
+		remoteStatus(t, w.request("GET", remote+search, "denied", ""), 403)
 		wantRefusal(t, w.request("GET", remote+"/v3/files/acme-widget-1.1.0.tar.gz", "reader", ""),
 			blackedOut(archive))
 		if up.requests("") != 0 {
@@ -332,6 +361,9 @@ func TestAccPuppetRemotePolicyAtItsCachedPaths(t *testing.T) {
 		for _, route := range metadata {
 			wantRefusal(t, w.request("GET", remote+route, "reader", ""), rejected(pages))
 		}
+		if got := searched(t, w.request("GET", remote+search, "reader", "")); got != "1.1.0,1.0.0" {
+			t.Fatalf("search: %q", got)
+		}
 		r := w.request("GET", remote+"/v3/files/acme-widget-1.1.0.tar.gz", "reader", "")
 		remoteStatus(t, r, 200)
 	})
@@ -339,6 +371,9 @@ func TestAccPuppetRemotePolicyAtItsCachedPaths(t *testing.T) {
 		w, up := setup(t, func(c *repo.Config) { c.ExcludesPattern = new("acme-widget/**") })
 		if got := listed(t, w.request("GET", remote+metadata[0], "reader", "")); len(got) != 2 {
 			t.Fatalf("listing: %v", got)
+		}
+		if got := searched(t, w.request("GET", remote+search, "reader", "")); got != "1.1.0,1.0.0" {
+			t.Fatalf("search: %q", got)
 		}
 		wantRefusal(t, w.request("GET", remote+"/v3/files/acme-widget-1.1.0.tar.gz", "reader", ""),
 			rejected(archive))
@@ -357,6 +392,9 @@ func TestAccPuppetRemotePolicyAtItsCachedPaths(t *testing.T) {
 		for _, route := range metadata[1:] {
 			remoteStatus(t, w.request("GET", remote+route, "reader", ""), 200)
 		}
+		if got := searched(t, w.request("GET", remote+search, "reader", "")); got != "1.1.0,1.0.0" {
+			t.Fatalf("search: %q", got)
+		}
 		wantRefusal(t, w.request("GET", remote+"/v3/files/acme-widget-1.1.0.tar.gz", "reader", ""),
 			rejected(archive))
 		r := w.request("GET", remote+"/v3/files/acme-widget-1.0.0.tar.gz", "reader", "")
@@ -373,8 +411,9 @@ func TestAccPuppetRemotePolicyAtItsCachedPaths(t *testing.T) {
 // releases when its patterns reject only their archives, with the checksum
 // of the first member that serves each archive. An archive is checked in
 // each member at its own path, never at the release pages a member reads
-// to find it, so a remote whose pages are refused still serves it (rulings
-// R5 and its addendum).
+// to find it, so a remote whose pages are refused still serves it (R5 and
+// its addendum). The module search, a native search route, leaves out only
+// a blacked-out remote (R2b).
 func TestAccPuppetVirtualOverARemoteMember(t *testing.T) {
 	const virtual = "/artifactory/api/puppet/pvirtual"
 	local, _ := puppetArchive(t, "1.1.0", "local")
@@ -383,6 +422,7 @@ func TestAccPuppetVirtualOverARemoteMember(t *testing.T) {
 		tune                         func(*repo.Config)
 		versions                     map[string]string
 		fromLocal, fromRemote, unset []string
+		search                       string
 	}{
 		{
 			"archive excluded",
@@ -391,6 +431,7 @@ func TestAccPuppetVirtualOverARemoteMember(t *testing.T) {
 			[]string{"1.1.0"},
 			[]string{"1.0.0"},
 			nil,
+			"1.1.0,1.0.0",
 		},
 		{
 			"blacked out",
@@ -399,6 +440,7 @@ func TestAccPuppetVirtualOverARemoteMember(t *testing.T) {
 			[]string{"1.1.0"},
 			nil,
 			[]string{"1.0.0"},
+			"1.1.0",
 		},
 		{
 			"release pages excluded",
@@ -407,6 +449,7 @@ func TestAccPuppetVirtualOverARemoteMember(t *testing.T) {
 			nil,
 			[]string{"1.0.0", "1.1.0"},
 			nil,
+			"1.1.0,1.0.0",
 		},
 		{
 			"module folder excluded",
@@ -415,6 +458,7 @@ func TestAccPuppetVirtualOverARemoteMember(t *testing.T) {
 			[]string{"1.1.0"},
 			nil,
 			[]string{"1.0.0"},
+			"1.1.0,1.0.0",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -459,6 +503,10 @@ func TestAccPuppetVirtualOverARemoteMember(t *testing.T) {
 				if got[version] != sum {
 					t.Fatalf("listing %v, want %v", got, want)
 				}
+			}
+			if found := searched(t, w.request("GET", virtual+"/v3/modules?query=acme-widget",
+				"admin", "")); found != tc.search {
+				t.Fatalf("search %q, want %q", found, tc.search)
 			}
 			file := func(version string) *httptest.ResponseRecorder {
 				return w.request(

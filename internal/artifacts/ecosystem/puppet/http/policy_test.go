@@ -86,12 +86,39 @@ func (f *fixture) create(c repo.Config) repo.Config {
 	return c
 }
 
+// emptySearch is the module search's answer when it finds nothing.
+const emptySearch = `{"pagination":{"limit":1000,"offset":0,"total":0,"next":null},"results":[]}`
+
+// searchVersions returns the release versions the module search's one
+// result lists, or none when it finds nothing.
+func searchVersions(t *testing.T, r *httptest.ResponseRecorder) []string {
+	t.Helper()
+	var doc struct {
+		Results []struct {
+			Releases []struct {
+				Version string `json:"version"`
+			} `json:"releases"`
+		} `json:"results"`
+	}
+	if r.Code != 200 || json.Unmarshal(r.Body.Bytes(), &doc) != nil || len(doc.Results) > 1 {
+		t.Fatalf("search: %d %s", r.Code, r.Body.String())
+	}
+	var out []string
+	for _, result := range doc.Results {
+		for _, rel := range result.Releases {
+			out = append(out, rel.Version)
+		}
+	}
+	return out
+}
+
 // A blacked-out local or federated repository refuses every Puppet route
-// with the blackout 404, administrators included, after the caller's read
-// permission (rulings R2a, R9, R10). The computed listings name the
-// request's own path, since 7.x is not shown to store them at one; the
-// archive names its own path, whether the release exists or not.
-func TestUnitHostedBlackoutRefusesEveryRoute(t *testing.T) {
+// but the module search with the blackout 404, administrators included,
+// after the caller's read permission (R2a, R9, R10). The computed listings
+// name the request's own path, since 7.x is not shown to store them at
+// one; the archive names its own path, whether the release exists or not.
+// The search, a native search route, finds nothing instead (R2b).
+func TestUnitHostedBlackoutRefusesEveryRouteButTheSearch(t *testing.T) {
 	const blackedOut = "The repository 'puppet-local' is blacked out and cannot serve artifact "
 	for _, class := range []repo.Class{repo.Local, repo.Federated} {
 		t.Run(string(class), func(t *testing.T) {
@@ -99,11 +126,21 @@ func TestUnitHostedBlackoutRefusesEveryRoute(t *testing.T) {
 			f.deploy(f.c, fixtureArchive(t))
 			f.c.BlackedOut = new(true)
 			f.save(f.c)
+			const query = "/v3/modules?query=acme-widget"
+			if r := f.do("GET", base+query, "admin"); r.Code != 200 ||
+				strings.TrimSpace(r.Body.String()) != emptySearch {
+				t.Fatalf("search: %d %s", r.Code, r.Body.String())
+			}
+			if r := f.do("HEAD", base+query, "admin"); r.Code != 200 || r.Body.Len() != 0 {
+				t.Fatalf("HEAD search: %d %s", r.Code, r.Body.String())
+			}
+			if r := f.do("GET", base+query, "denied"); r.Code != 403 {
+				t.Fatalf("denied search: %d %s", r.Code, r.Body.String())
+			}
 			for route, path := range map[string]string{
 				"/v3/releases?module=acme-widget":    "v3/releases",
 				"/v3/releases/acme-widget-1.0.0":     "v3/releases/acme-widget-1.0.0",
 				"/v3/modules/acme-widget":            "v3/modules/acme-widget",
-				"/v3/modules?query=acme-widget":      "v3/modules",
 				"/v3/files/acme-widget-1.0.0.tar.gz": "acme-widget/acme-widget-1.0.0.tar.gz",
 				"/v3/files/acme-widget-9.9.9.tar.gz": "acme-widget/acme-widget-9.9.9.tar.gz",
 			} {
@@ -121,6 +158,9 @@ func TestUnitHostedBlackoutRefusesEveryRoute(t *testing.T) {
 			if got := releaseVersions(t, f.do("GET", base+"/v3/releases?module=acme-widget",
 				"admin")); len(got) != 1 {
 				t.Fatalf("restored: %v", got)
+			}
+			if got := searchVersions(t, f.do("GET", base+query, "admin")); len(got) != 1 {
+				t.Fatalf("restored search: %v", got)
 			}
 			if r := f.do("GET", base+"/v3/files/acme-widget-1.0.0.tar.gz", "admin"); r.Code != 200 {
 				t.Fatalf("restored archive: %d", r.Code)
@@ -166,6 +206,10 @@ func TestUnitPatternsRefuseOnlyTheArchive(t *testing.T) {
 	if got := releaseVersions(t, f.do("GET", base+"/v3/releases?module=acme-widget",
 		"admin")); len(got) != 2 {
 		t.Fatalf("module folder excluded: %v", got)
+	}
+	if got := searchVersions(t, f.do("GET", base+"/v3/modules?query=acme-widget",
+		"admin")); len(got) != 2 {
+		t.Fatalf("module folder excluded, search: %v", got)
 	}
 	wantPolicy(t, f.do("GET", base+"/v3/files/acme-widget-9.9.9.tar.gz", "admin"),
 		strings.Replace(rejected, "%s", "acme-widget/acme-widget-9.9.9.tar.gz", 1))
@@ -217,6 +261,10 @@ func TestUnitVirtualMembersRefusingTheArchive(t *testing.T) {
 			}
 			if len(got) != 1 || got["1.0.0"] != listed {
 				t.Fatalf("listing: %v", got)
+			}
+			if found := searchVersions(t, f.do("GET", v+"/v3/modules?query=acme-widget",
+				"admin")); len(found) != 1 || found[0] != "1.0.0" {
+				t.Fatalf("search: %v", found)
 			}
 			r := f.do("GET", v+"/v3/files/acme-widget-1.0.0.tar.gz", "admin")
 			if tc.want == nil {
@@ -294,6 +342,33 @@ func TestUnitRemoteReleasePagesAndRejectedArchive(t *testing.T) {
 	if len(reads) != 2 || !reads[1].BlackoutOnly ||
 		reads[1].PolicyPath != ".puppet/acme-widget/releases.json" {
 		t.Fatalf("archive lookup: %d %+v", r.Code, reads)
+	}
+	// The search, a native search route, reads the pages with the blackout
+	// alone, checked at the module folder (R2b).
+	if got := searchVersions(t, f.do("GET", base+"/v3/modules?query=acme-widget",
+		"admin")); len(got) != 1 {
+		t.Fatalf("search: %v", got)
+	}
+	if len(reads) != 3 || !reads[2].BlackoutOnly || reads[2].PolicyPath != "" ||
+		reads[2].PermissionPath != "acme-widget" {
+		t.Fatalf("search read: %+v", reads)
+	}
+}
+
+// A virtual repository whose only member is blacked out finds nothing in
+// its module search, an empty result rather than a refusal (R2b, R5).
+func TestUnitVirtualSearchOverABlackedOutMember(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	f.deploy(f.c, fixtureArchive(t))
+	f.c.BlackedOut = new(true)
+	f.save(f.c)
+	f.create(repo.Config{
+		Key: "virtual", Class: repo.Virtual, PackageType: repo.Puppet,
+		Repositories: []string{f.c.Key},
+	})
+	r := f.do("GET", "/artifactory/api/puppet/virtual/v3/modules?query=acme-widget", "admin")
+	if r.Code != 200 || strings.TrimSpace(r.Body.String()) != emptySearch {
+		t.Fatalf("search: %d %s", r.Code, r.Body.String())
 	}
 }
 

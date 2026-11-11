@@ -117,11 +117,11 @@ func validArchiveURL(u *url.URL) bool {
 		u.Host != "" && u.User == nil && u.Fragment == "" && u.Opaque == ""
 }
 
-func (h handler) remoteVersions(r *http.Request, name string, file bool) ([]release, error) {
+func (h handler) remoteVersions(r *http.Request, name string, u use) ([]release, error) {
 	all := []release{}
 	seen := map[string]bool{}
 	for offset := 0; offset < maxVersions; offset += 1000 {
-		found, more, err := h.remotePage(r, name, offset, file)
+		found, more, err := h.remotePage(r, name, offset, u)
 		if err != nil {
 			return nil, err
 		}
@@ -144,7 +144,7 @@ func (h handler) remotePage(
 	r *http.Request,
 	name string,
 	offset int,
-	file bool,
+	u use,
 ) ([]release, bool, error) {
 	// Forge query parameters identify a protocol resource; they are not caller
 	// query propagation. An explicit same-source URL keeps them in cache identity
@@ -172,15 +172,18 @@ func (h handler) remotePage(
 		Method:           http.MethodGet,
 		PermissionFolder: true,
 		PermissionPath:   name,
-		// Read permission stays on the module folder, and the download
-		// policy is checked where 7.x caches a module's release pages,
+		// Read permission stays on the module folder. A listing checks the
+		// download policy where 7.x caches a module's release pages,
 		// .puppet/<m>/releases.json (RTFACT-13711), so a pattern on the
-		// module's archives leaves the releases listed (rulings R1, R3,
-		// R4). Looking a release up to serve its archive is an internal
-		// lookup, which only the blackout refuses (R4); the archive route
-		// has checked the archive's own path first.
-		PolicyPath:          ".puppet/" + name + "/releases.json",
-		BlackoutOnly:        file,
+		// module's archives leaves the releases listed (R1, R3, R4).
+		// Looking a release up to serve its archive is an internal lookup,
+		// which only the blackout refuses (R4); the archive route has
+		// checked the archive's own path first. The search, a native
+		// search route, keeps its answers under a blackout, the blackout
+		// 404 for the module folder (R2b), and no pattern refuses it,
+		// since its releases stay listed whatever the patterns say of
+		// their archives (R3).
+		BlackoutOnly:        u != listing,
 		Variant:             "puppet-forge-v3-releases-v1",
 		ExpectedContentType: mediaType,
 		ValidateMetadata: func(_ context.Context, body io.ReadSeeker, _ int64, meta source.MetadataResponse) error {
@@ -194,6 +197,9 @@ func (h handler) remotePage(
 			_, _, err = parseVersions(data, name, meta.BaseURL, offset)
 			return err
 		},
+	}
+	if u != search {
+		resource.PolicyPath = ".puppet/" + name + "/releases.json"
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {

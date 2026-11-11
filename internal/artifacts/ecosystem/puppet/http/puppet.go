@@ -193,7 +193,7 @@ func (h handler) releases(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
-	releases, err := h.lookup(r, name, false)
+	releases, err := h.lookup(r, name, listing)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -231,7 +231,7 @@ func (h handler) release(w http.ResponseWriter, r *http.Request) {
 	if !h.k.Require(w, r, puppetfmt.Path(name, version), api.ActionRead) {
 		return
 	}
-	releases, err := h.lookup(r, name, false)
+	releases, err := h.lookup(r, name, listing)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -281,7 +281,7 @@ func (h handler) module(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
-	releases, err := h.lookup(r, name, false)
+	releases, err := h.lookup(r, name, listing)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -308,7 +308,7 @@ func (h handler) modules(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
-	releases, err := h.lookup(r, name, false)
+	releases, err := h.lookup(r, name, search)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -353,7 +353,7 @@ func (h handler) archive(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	releases, err := h.lookup(r, name, true)
+	releases, err := h.lookup(r, name, download)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -400,26 +400,53 @@ func (h handler) authority(r *http.Request, releases []release) error {
 	return nil
 }
 
-// lookup returns the releases of module name the caller may read. file is
-// set when they are looked up to serve one archive, whose own path the
-// archive route has already checked, rather than to answer a listing.
-func (h handler) lookup(r *http.Request, name string, file bool) ([]release, error) {
+// use is what a module's releases are looked up to answer, which decides
+// the download policy the lookup applies.
+type use int
+
+const (
+	// listing answers a release list, a release or a module record, which
+	// 7.x reads from stored documents (RTFACT-26143).
+	listing use = iota
+	// search answers the exact-name module search, a native search route,
+	// which keeps its answers under a blackout (R2b): a blacked-out local
+	// repository finds nothing, and a blacked-out remote answers the
+	// blackout 404 for the module folder. No pattern refuses it, since a
+	// release whose archive the patterns reject stays listed (R3).
+	search
+	// download finds the release whose archive the archive route serves,
+	// once that route has checked the archive's own path.
+	download
+)
+
+// lookup returns the releases of module name the caller may read, for u.
+func (h handler) lookup(r *http.Request, name string, u use) ([]release, error) {
 	q := pkgroute.RequestFrom(r)
 	switch q.Repo.Class {
 	case repo.Local, repo.Federated:
+		// The search, a native search route, keeps its answer under a
+		// blackout (R2b): it finds none of a blacked-out repository's
+		// releases, an empty result rather than the blackout 404, and a
+		// virtual repository's search leaves such a member out.
+		if u == search {
+			if generic.CheckBlackedOut(q.Repo, q.Rest) != nil {
+				return nil, nil
+			}
+			return h.hosted(r, name)
+		}
 		// 7.x keeps a local repository's listings as documents
 		// (RTFACT-26143) at a path no source shows, so only the blackout
 		// refuses them, before anything is computed, naming the
-		// request's own path (rulings R2a, R9); patterns never do. A
-		// member of a virtual repository is passed over instead (R5).
+		// request's own path (R2a, R9); patterns never do. A member of a
+		// virtual repository is passed over instead (R5).
 		if err := h.k.CheckBlackedOut(r, q.Rest); err != nil {
 			return nil, fmt.Errorf("puppet: releases: %w", err)
 		}
 		return h.hosted(r, name)
 	case repo.Remote:
-		return h.remoteVersions(r, name, file)
+		return h.remoteVersions(r, name, u)
 	case repo.Virtual:
-		return h.virtual(r, name, file)
+		return h.virtual(r, name, u)
 	default:
 		return nil, source.ErrUnsupported
 	}
@@ -466,7 +493,7 @@ func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	return out, nil
 }
 
-func (h handler) virtual(r *http.Request, name string, file bool) ([]release, error) {
+func (h handler) virtual(r *http.Request, name string, u use) ([]release, error) {
 	q := pkgroute.RequestFrom(r)
 	byVersion := map[string]release{}
 	for _, key := range q.Repo.Repositories {
@@ -484,10 +511,11 @@ func (h handler) virtual(r *http.Request, name string, file bool) ([]release, er
 		if !h.k.CanFolder(mr, name, api.ActionRead) {
 			continue
 		}
-		// A blacked-out member, local or remote, and a remote member whose
-		// patterns reject its release pages answer 404 here and are left
-		// out of the merge (rulings R5).
-		found, err := h.lookup(mr, name, file)
+		// A blacked-out member, local or remote, and, outside the search, a
+		// remote member whose patterns reject its release pages answer 404
+		// here, or for the search find nothing, and are left out of the
+		// merge (R5, R2b).
+		found, err := h.lookup(mr, name, u)
 		if err != nil {
 			var response *apierror.Error
 			if errors.Is(err, kernel.ErrNotFound) ||

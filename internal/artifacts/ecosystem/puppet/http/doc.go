@@ -59,15 +59,18 @@
 //     index entry or archive does not match fails with 502 rather than
 //     being advertised.
 //   - The download policy (decision 0032) comes after Read permission. A
-//     blacked-out local or federated repository refuses every route with
-//     the blackout 404, a listing naming the request's own path before
-//     anything is computed (R2a, R9). The archive route checks the
-//     archive's own path before the release is looked up, so it answers
-//     the blackout 404, the patterns 404 or a virtual repository's own "No
-//     repository found" 404 (R6, R10). A remote's release pages are
-//     checked where 7.x caches them, .puppet/<m>/releases.json
-//     (RTFACT-13711), and for the blackout alone when they are read to
-//     find an archive (R4).
+//     blacked-out local or federated repository refuses every route but
+//     the module search with the blackout 404, a listing naming the
+//     request's own path before anything is computed (R2a, R9); the
+//     search, a native search route, keeps its answers and finds nothing
+//     (R2b). The archive route checks the archive's own path before the
+//     release is looked up, so it answers the blackout 404, the patterns
+//     404 or a virtual repository's own "No repository found" 404 (R6,
+//     R10). A remote's release pages are checked where 7.x caches them,
+//     .puppet/<m>/releases.json (RTFACT-13711), and for the blackout alone
+//     when they are read to find an archive (R4) or to answer the search,
+//     which a blacked-out remote refuses with the blackout 404 for the
+//     module folder (R2b).
 //   - A hosted or virtual module lists at most 4,096 releases (503 beyond),
 //     and a remote accepts no more from its upstream.
 //   - A remote builds each Forge query itself (module, limit, offset and
@@ -78,8 +81,8 @@
 //     advertised it. A cache hit rechecks the source's authority and the
 //     caller's read permission.
 //   - A virtual repository resolves its members in order, leaving out a
-//     blacked-out member and a remote whose patterns reject its release
-//     pages. A version comes from the first member that holds it and whose
+//     blacked-out member and, outside the search, a remote whose patterns
+//     reject its release pages. A version comes from the first member that holds it and whose
 //     own policy accepts its archive; when none does, it stays listed from
 //     the first member that holds it, and its archive answers "Puppet
 //     release not found" (R5). Each archive download selects that member
@@ -122,11 +125,12 @@
 //   - puppet_test.go: hosted routes, invalid routes and queries, remote
 //     authority, integrity, pagination and failures, virtual member order,
 //     permissions and changes, store failures and late read revocation.
-//   - policy_test.go: the blackout on every hosted route, a release whose
-//     archive the patterns reject kept listed, virtual members and
-//     patterns that refuse only an archive, and the policy path and
-//     blackout-only lookup of a remote's release pages. The route suite
-//     test/server/artifacts/puppet checks a remote's policy, and a virtual
+//   - policy_test.go: the blackout on every hosted route and the module
+//     search's empty answer under it, a release whose archive the patterns
+//     reject kept listed, virtual members and patterns that refuse only an
+//     archive, and the policy path and blackout-only lookup of a remote's
+//     release pages and search. The route suite test/server/artifacts/puppet
+//     checks a remote's policy, the search included, and a virtual
 //     repository's over it, through the source boundary.
 //   - remote_test.go: upstream document validation, the archive URL and
 //     feed boundaries, version order, and a remote archive refused before
