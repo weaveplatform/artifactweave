@@ -54,6 +54,16 @@
 //     read: permissions and filters apply before paging, so neither a
 //     total nor an upstream offset reveals a version the caller may not
 //     read.
+//   - The download policy, after read permission: a blacked-out local or
+//     federated repository refuses what restore reads, the flat
+//     container's version list, the registration index, pages and leaves,
+//     and the v2 package entry and FindPackagesById(), naming the
+//     request's path, while search, autocomplete, the v2 listing and the
+//     service documents keep their answers. A .nuspec takes its .nupkg's
+//     check, and a symbol file the policy refuses answers the refusal
+//     rather than NuGet's own 404. A remote's documents and feeds check its
+//     blackout alone, so a pattern on a .nupkg refuses only the .nupkg and
+//     its .nuspec and leaves the version listed.
 //   - A repository with forceNugetAuthentication on answers an anonymous
 //     request 401 with the Basic challenge before routing, because the
 //     NuGet client sends its credentials only after a 401.
@@ -123,6 +133,8 @@
 //     credentials and no-store answers, and dependency groups.
 //   - remote_symbols_test.go: remote PDB bytes, ranges, caching,
 //     permissions and refusals.
+//   - policy_test.go: the download policy on local restore reads, symbols,
+//     search and listings, and on remote v3 documents and v2 feeds.
 //   - fixture_test.go holds the fixture the tests share, with the access
 //     test kit (access/accesstest) for permissions.
 //   - The guard suite test/server/artifacts/nuget and the @nuget acceptance
