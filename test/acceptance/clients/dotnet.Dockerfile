@@ -1,4 +1,4 @@
-# Client pins: NuGet bundled with the .NET SDK 10.0 image.
+# Client pins: NuGet bundled with the .NET SDK 11.0 image.
 # SDK on its LTS line, whose dotnet restore and dotnet nuget commands carry
 # NuGet's client. Pinned by digest; Dependabot's docker entry moves it within
 # the line and holds the next major, so moving to the next LTS is deliberate.

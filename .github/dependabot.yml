@@ -79,10 +79,28 @@ updates:
   # Native acceptance images track all released updates, including majors.
   # A client version change still needs real-client CI and an eligible review;
   # auto-merge.yml leaves this directory's PRs for human qualification.
+  # Python's alphas, betas and release candidates are ignored (#1223).
+  # Dependabot skips its own prerelease filter when the current tag is newer
+  # than the plain version tag that shares latest's digest: python:latest
+  # matched 3.15 but not 3.15.2, so 3.15.2-slim counted as a prerelease and
+  # 3.16.0a1-slim got through (#1217). Ignore rules apply after that filter.
+  # RubyGems orders 3.16.0a1, 3.16.0b1 and 3.16.0rc1 at or above 3.16.0.a
+  # and below 3.16.0, so each range stops one minor line's prereleases while
+  # 3.16.0 and every patch release still arrive. A single range cannot span
+  # two lines without taking in the releases between them. Python ships one
+  # minor a year: add the next range before 3.21.0a1, due about October 2031.
   - package-ecosystem: "docker"
     directory: "/test/acceptance/clients"
     schedule:
       interval: "daily"
+    ignore:
+      - dependency-name: "python"
+        versions:
+          - ">= 3.16.0.a, < 3.16.0"
+          - ">= 3.17.0.a, < 3.17.0"
+          - ">= 3.18.0.a, < 3.18.0"
+          - ">= 3.19.0.a, < 3.19.0"
+          - ">= 3.20.0.a, < 3.20.0"
     groups:
       acceptance-clients:
         patterns: ["*"]

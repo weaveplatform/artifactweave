@@ -157,6 +157,28 @@ class ReferenceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "exactly one canonical pin"):
                 sync.sync(self.root)
 
+    def test_canonical_pin_errors_name_the_file_the_pattern_and_the_match_count(self):
+        def failure(name):
+            with self.assertRaises(ValueError) as caught:
+                sync.pins(self.root, self.catalog)
+            message = str(caught.exception)
+            source = self.catalog["pins"][name]
+            self.assertTrue(message.startswith(name + ": expected exactly one canonical pin"), message)
+            self.assertIn(source["path"], message)
+            self.assertIn(source["pattern"], message)
+            return message
+
+        ansible = self.root / self.catalog["pins"]["ansible.version"]["path"]
+        original = ansible.read_text()
+        # The drift in #1223: Dependabot moved the base to a Python alpha,
+        # which the release-number pattern cannot read.
+        self.set_pin("ansible.version", "3.16.0a1")
+        self.assertIn("found 0", failure("ansible.version"))
+        ansible.write_text(original)
+        go = self.root / "go.mod"
+        go.write_text(go.read_text() + "\ngo 1.28\n")
+        self.assertIn("found 2", failure("go"))
+
     def test_new_images_and_recipes_cannot_silently_miss_the_inventory(self):
         for name in ["test/acceptance/clients/unknown.Dockerfile", "docs/client-recipes/src/unknown.json"]:
             path = self.root / name
