@@ -172,20 +172,20 @@ func (h reads) version(r *http.Request, m, v string) (version, error) {
 	} else if err != nil {
 		return version{}, fmt.Errorf("golang: version %s of %s in %s: %w", v, m, key, err)
 	}
-	// What is stored, as readable reads it, rather than the kit's Item,
-	// which applies the download policy: ServeItem applies it to the one
-	// file a read serves, so a .mod the patterns accept stays readable
-	// where they reject the .zip, as Artifactory checks each path alone.
+	// What is stored, as readable reads it, through StoredItem, which
+	// applies no download policy: ServeItem applies it to the one file a
+	// read serves, so a .mod the patterns accept stays readable where they
+	// reject the .zip, as Artifactory checks each path alone.
 	stored := map[string]bool{}
 	for _, ext := range []string{goformat.ExtZip, goformat.ExtMod, goformat.ExtInfo} {
 		path := goformat.File{Module: m, Version: v, Ext: ext}.Path()
-		it, err := db.Items().Get(ctx, key, false, path)
+		f, err := h.k.StoredItem(r, path)
 		switch {
 		case errors.Is(err, kernel.ErrNotFound):
 		case err != nil:
-			return version{}, fmt.Errorf("golang: %s in %s: %w", path, key, err)
+			return version{}, err //nolint:wrapcheck // the kit wraps its own
 		default:
-			stored[ext] = !it.Folder
+			stored[ext] = !f.Item.Folder
 		}
 	}
 	if !stored[goformat.ExtZip] || !stored[goformat.ExtMod] {

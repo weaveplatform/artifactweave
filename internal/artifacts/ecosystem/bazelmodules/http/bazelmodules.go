@@ -179,7 +179,7 @@ func (h handler) memberRead(w http.ResponseWriter, r *http.Request, q requestPat
 			h.k.Error(w, r, missing())
 			return
 		}
-		h.k.ServeItem(w, r, modulePath(q))
+		h.k.ServeMetadata(w, r, modulePath(q))
 	case "source":
 		h.localSource(w, r, q)
 	case "archive":
@@ -221,7 +221,7 @@ func (h handler) localComplete(r *http.Request, q requestPath) bool {
 	if !ok {
 		return false
 	}
-	_, err := h.k.Item(r, modulePath(q))
+	_, err := h.k.StoredItem(r, modulePath(q))
 	return err == nil
 }
 
@@ -294,7 +294,7 @@ func (h handler) localSource(w http.ResponseWriter, r *http.Request, q requestPa
 	if !h.k.Require(w, r, p, api.ActionRead) {
 		return
 	}
-	f, err := h.k.Item(r, p)
+	f, err := h.k.StoredItem(r, p)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return

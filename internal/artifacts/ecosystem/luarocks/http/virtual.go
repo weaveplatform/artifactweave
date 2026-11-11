@@ -153,7 +153,7 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, path string
 			h.k.ServeResult(w, mr, result)
 			return
 		}
-		found, err := h.k.ResolveItem(mr, path)
+		found, err := h.k.ResolveDownloadItem(mr, path)
 		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
@@ -209,7 +209,7 @@ func (h handler) memberManifest(
 			return nil
 		}, nil
 	}
-	f, err := h.k.ResolveItem(r, path)
+	f, err := h.k.ResolveStoredItem(r, path)
 	if err != nil {
 		return remoteManifest{}, nil, fmt.Errorf("luarocks member manifest: %w", err)
 	}

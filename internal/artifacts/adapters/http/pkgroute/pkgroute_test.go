@@ -649,7 +649,7 @@ func TestAccServeFoundKeepsVerifiedSnapshot(t *testing.T) {
 	p := testFormat(nil)
 	p.Routes = func(r chi.Router, k *pkgroute.Kit) {
 		r.Get("/snapshot", func(w http.ResponseWriter, r *http.Request) {
-			found, err := k.Item(r, "a/b.txt")
+			found, err := k.DownloadItem(r, "a/b.txt")
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -519,7 +519,7 @@ func (h handler) singleFile(w http.ResponseWriter, r *http.Request) {
 	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
-	f, err := h.k.Item(r, path)
+	f, err := h.k.DownloadItem(r, path)
 	if errors.Is(err, kernel.ErrNotFound) {
 		h.k.Error(w, r, notFound())
 		return
@@ -587,7 +587,7 @@ func (h handler) xrayStatus(w http.ResponseWriter, r *http.Request) {
 	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
-	f, err := h.k.Item(r, path)
+	f, err := h.k.StoredItem(r, path)
 	if errors.Is(err, kernel.ErrNotFound) || err == nil && f.Item.Folder {
 		h.k.Error(w, r, notFound())
 		return

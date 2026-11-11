@@ -212,6 +212,10 @@ func (h handler) file(w http.ResponseWriter, r *http.Request, f conanfmt.FilePat
 			h.error(w, r, err)
 			return
 		}
+		if document(f.File) {
+			h.k.ServeMetadata(w, r, f.Path())
+			return
+		}
 		h.k.ServeItem(w, r, f.Path())
 	case http.MethodPut:
 		if c.Class == repo.Virtual {
@@ -239,11 +243,16 @@ func (h handler) requireComplete(r *http.Request, root string) error {
 	return h.manifest(r, root+"/"+conanfmt.Manifest)
 }
 
+// document reports a revision's metadata documents, its manifest and a
+// package's conaninfo.txt, which describe the revision's files: the download
+// policy is applied to the files, not to them.
+func document(file string) bool { return file == conanfmt.Manifest || file == "conaninfo.txt" }
+
 func (h handler) manifest(r *http.Request, path string) error {
 	if !h.k.Can(r, path, api.ActionRead) {
 		return denied(r)
 	}
-	found, err := h.k.Item(r, path)
+	found, err := h.k.StoredItem(r, path)
 	switch {
 	case errors.Is(err, kernel.ErrNotFound) || err == nil && found.Item.Folder:
 		return apierror.New(http.StatusNotFound, "Conan revision not found")

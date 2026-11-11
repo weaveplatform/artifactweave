@@ -50,6 +50,12 @@ func (h handler) download(w http.ResponseWriter, r *http.Request, p pkgroute.Pat
 			return
 		}
 	}
+	if strings.HasSuffix(path, metadataSuffix) {
+		// A stored core metadata file is a distribution's metadata, not
+		// the distribution a download serves.
+		h.k.ServeMetadata(w, r, path)
+		return
+	}
 	h.k.ServeItem(w, r, path)
 }
 
@@ -59,7 +65,7 @@ func (h handler) download(w http.ResponseWriter, r *http.Request, p pkgroute.Pat
 // wheel has metadata, and the bytes always match the hash the pages
 // advertise (decision 0037).
 func (h handler) coreMetadata(r *http.Request, path string) (string, bool, error) {
-	f, err := h.k.Item(r, path)
+	f, err := h.k.StoredItem(r, path)
 	switch {
 	case errors.Is(err, kernel.ErrNotFound) || err == nil && f.Item.Folder:
 		return "", false, nil

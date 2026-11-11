@@ -52,7 +52,7 @@ func (h handler) localRead(w http.ResponseWriter, r *http.Request, q request) {
 	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
-	f, err := h.k.Item(r, path)
+	f, err := h.k.StoredItem(r, path)
 	switch {
 	case errors.Is(err, kernel.ErrNotFound), err == nil && f.Item.Folder:
 		h.k.Error(w, r, bad(http.StatusNotFound, "Swift release not found"))

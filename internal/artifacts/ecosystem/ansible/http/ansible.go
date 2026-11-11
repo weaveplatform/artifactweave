@@ -180,7 +180,7 @@ func (h handler) localVersions(r *http.Request, ns, name string) ([]release, err
 			m.Namespace != ns || m.Name != name || m.Version != v.Version {
 			return nil, fmt.Errorf("ansible: corrupt package metadata: %w", ansiblefmt.ErrArchive)
 		}
-		it, err := h.k.Item(r, ansiblefmt.Path(ns, name, v.Version))
+		it, err := h.k.StoredItem(r, ansiblefmt.Path(ns, name, v.Version))
 		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
@@ -218,15 +218,25 @@ func (h handler) memberRequests(r *http.Request) ([]*http.Request, error) {
 	return out, nil
 }
 
-func (h handler) releases(r *http.Request, ns, name string) (catalog, error) {
+// releases lists the collection's releases, a virtual repository's merged
+// from its members in order. download, when set, is the artifact a download
+// serves: a virtual repository's member whose download policy refuses it is
+// passed over, as a search for a file passes over it, so the next member
+// that lists the version serves it. A listing keeps every member's releases,
+// those whose files the patterns reject included.
+func (h handler) releases(r *http.Request, ns, name, download string) (catalog, error) {
 	members, err := h.memberRequests(r)
 	if err != nil {
 		return catalog{}, err
 	}
+	virtual := pkgroute.RequestFrom(r).Repo.Class == repo.Virtual
 	byVersion := map[string]bool{}
 	var out catalog
 	for _, member := range members {
 		if !h.k.CanFolder(member, "collections/"+ns+"/"+name, api.ActionRead) {
+			continue
+		}
+		if virtual && download != "" && h.k.CheckDownload(member, download) != nil {
 			continue
 		}
 		var releases []release
@@ -237,8 +247,7 @@ func (h handler) releases(r *http.Request, ns, name string) (catalog, error) {
 		} else {
 			releases, err = h.localVersions(member, ns, name)
 		}
-		if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual &&
-			(isMissing(err) || errors.Is(err, source.ErrDenied)) {
+		if virtual && (isMissing(err) || errors.Is(err, source.ErrDenied)) {
 			continue
 		}
 		if err != nil {
@@ -262,7 +271,7 @@ func (h handler) collection(w http.ResponseWriter, r *http.Request, ns, name str
 	if !h.checkIdentity(w, r, ns, name) {
 		return
 	}
-	catalog, err := h.releases(r, ns, name)
+	catalog, err := h.releases(r, ns, name, "")
 	rels := catalog.items
 	if err != nil {
 		h.fail(w, r, err)
@@ -314,7 +323,7 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request, ns, name strin
 	if !h.checkIdentity(w, r, ns, name) {
 		return
 	}
-	catalog, err := h.releases(r, ns, name)
+	catalog, err := h.releases(r, ns, name, "")
 	rels := catalog.items
 	if err != nil {
 		h.fail(w, r, err)
@@ -356,7 +365,7 @@ func (h handler) version(w http.ResponseWriter, r *http.Request, ns, name, versi
 		h.fail(w, r, apierror.New(http.StatusBadRequest, "invalid collection version"))
 		return
 	}
-	rel, err := h.find(r, ns, name, version)
+	rel, err := h.find(r, ns, name, version, "")
 	if err != nil {
 		h.fail(w, r, err)
 		return
@@ -368,8 +377,11 @@ func (h handler) version(w http.ResponseWriter, r *http.Request, ns, name, versi
 	writeJSON(w, r, http.StatusOK, versionJSON(r, rel.Meta))
 }
 
-func (h handler) find(r *http.Request, ns, name, version string) (release, error) {
-	catalog, err := h.releases(r, ns, name)
+// find returns the release of version, from the member a download of the
+// artifact at download would serve it from when download is set, or from
+// the first member that lists it.
+func (h handler) find(r *http.Request, ns, name, version, download string) (release, error) {
+	catalog, err := h.releases(r, ns, name, download)
 	rels := catalog.items
 	if err != nil {
 		return release{}, err
@@ -432,7 +444,7 @@ func (h handler) artifact(w http.ResponseWriter, r *http.Request, file string) {
 	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
-	rel, err := h.find(r, ns, name, version)
+	rel, err := h.find(r, ns, name, version, path)
 	if err != nil {
 		h.fail(w, r, err)
 		return

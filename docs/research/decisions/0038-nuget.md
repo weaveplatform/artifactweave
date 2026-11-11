@@ -298,7 +298,7 @@ the request's base URL (decision [0002](0002-spec-first-flat-crud-handwritten-it
 - **Derived work**: the source transaction enqueues `nuget.symbols` keyed by repository.
   Existing persistent workers reconcile committed manifests through `Env.Derive` and
   `Env.Underive`; the symbol route requires Read, then waits for that work through
-  `ResolveItem`/`EnsureFresh` before a missing-item lookup. A debugger therefore sees
+  `ResolveDownloadItem`/`EnsureFresh` before a missing-item lookup. A debugger therefore sees
   completed pushes and deletes even if a background worker has not run yet. Source
   mutations never hold locks on derived items, avoiding inversion during deletes and moves.
   Item transfers buffer format enqueue requests and flush them in `(kind, key)` order

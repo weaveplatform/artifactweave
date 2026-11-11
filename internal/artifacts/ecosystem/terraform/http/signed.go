@@ -152,7 +152,7 @@ func (h handler) signed(w http.ResponseWriter, r *http.Request) {
 		h.remoteSignedModule(w, r, c)
 		return
 	}
-	f, err := h.k.Item(r, c.Path)
+	f, err := h.k.DownloadItem(r, c.Path)
 	if errors.Is(err, kernel.ErrNotFound) || err == nil && f.Item.Folder {
 		h.k.Error(w, r, missing())
 		return

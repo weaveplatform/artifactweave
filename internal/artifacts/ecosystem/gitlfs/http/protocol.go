@@ -228,7 +228,7 @@ func (h handler) uploadEntry(r *http.Request, obj batchObject, out *batchResult)
 		out.Actions = map[string]batchAction{"upload": {Href: objectURL(r, obj.OID, obj.Size)}}
 		return nil
 	}
-	found, err := h.k.Item(target, path)
+	found, err := h.k.StoredItem(target, path)
 	if err == nil {
 		if !found.Item.Folder && found.Item.Size == obj.Size &&
 			found.Item.Actual.SHA256 == obj.OID {
@@ -380,7 +380,7 @@ func (h handler) find(r *http.Request, path string) (pkgroute.Found, error) {
 	if err := generic.CheckDownload(pkgroute.RequestFrom(r).Repo, path, false); err != nil {
 		return pkgroute.Found{}, fmt.Errorf("gitlfs: download policy: %w", err)
 	}
-	found, err := h.k.Item(r, path)
+	found, err := h.k.DownloadItem(r, path)
 	if err != nil {
 		return pkgroute.Found{}, fmt.Errorf("gitlfs: find object: %w", err)
 	}
@@ -528,7 +528,7 @@ func (h handler) upload(w http.ResponseWriter, r *http.Request) {
 			h.k.Error(w, r, err)
 			return
 		}
-		found, getErr := h.k.Item(target, path)
+		found, getErr := h.k.StoredItem(target, path)
 		if getErr == nil && !found.Item.Folder && found.Item.Size == size &&
 			found.Item.Actual.SHA256 == oid {
 			w.WriteHeader(http.StatusOK)

@@ -49,8 +49,12 @@
 //     DB() returns. Each composite store in app satisfies it, so the server
 //     passes the store it holds.
 //   - Permission helpers: Can, CanFolder, Require and RequireFolder.
-//   - Download helpers: Item, ResolveItem, ServeItem, ServeFound, Read,
-//     CheckDownload, ServeResult, ServeStream and SourceError.
+//   - Download helpers: DownloadItem, ResolveDownloadItem, ServeItem,
+//     ServeFound, Read, CheckDownload, ServeResult, ServeStream and
+//     SourceError.
+//   - Metadata helpers: StoredItem, ResolveStoredItem, ServeMetadata,
+//     ServeFoundMetadata, ReadMetadata, CheckDocument, CheckBlackedOut,
+//     MergeMembers and IsRefusal.
 //   - Deploy helpers: Store, StoreOnce, StoreNew, StoreResolved, Upload,
 //     Deploy, DeployItem, Created, Annotate, Delete and DeleteTree.
 //   - Multipart helpers: ReadForm, ReadFormLimited and ReadFormWith; path
@@ -64,21 +68,43 @@
 //     in the protocol's own envelope before it.
 //   - A deploy goes through the item service, so formats' hooks and the
 //     item routes' rules apply as they do to any other write.
-//   - A file that Item, ResolveItem, ServeItem, ServeFound or Read finds in
-//     a local or federated repository, or in one as a virtual repository's
-//     member, is refused, after the caller's read permission, when the
-//     repository is blacked out or its include and exclude patterns reject
-//     the path, whether the file exists or not and for administrators too
-//     (generic.CheckDownload); CheckDownload gives the same answer to a
-//     protocol that reads a stored blob itself. The refusal answers 404
-//     with Artifactory's message, and is kernel.ErrNotFound to a protocol,
-//     so a virtual repository's search passes over a member that refuses
-//     and a deploy's check for an existing file is unchanged. A member
-//     request (MemberRequest) checks the virtual repository's own patterns
-//     first, for a remote member's file too; a member's own refusal is the
-//     virtual repository's "Could not find resource". A remote
-//     repository's own policy is left to the source boundary, which
-//     applies it to every read.
+//   - A file that DownloadItem, ResolveDownloadItem, ServeItem, ServeFound
+//     or Read finds in a local or federated repository, or in one as a
+//     virtual repository's member, is refused, after the caller's read
+//     permission, when the repository is blacked out or its include and
+//     exclude patterns reject the path, whether the file exists or not and
+//     for administrators too (generic.CheckDownload); CheckDownload gives
+//     the same answer to a protocol that reads a stored blob itself. The
+//     refusal answers 404 with Artifactory's message, and is
+//     kernel.ErrNotFound to a protocol too. IsRefusal tells it from a
+//     missing item, so a protocol with its own "not found" passes the
+//     policy's answer on unchanged. A remote repository's own policy is
+//     left to the source boundary, which applies it to every read.
+//   - A virtual repository's own include and exclude patterns are checked
+//     once, at the path the client asked for: CheckDownload or
+//     CheckDocument on the virtual repository's request, before its members
+//     are searched, or MergeMembers for a merge, refuses a path they reject
+//     with "No repository found to serve the request". A member request
+//     (MemberRequest) checks them too before a member's file is looked up
+//     or read, at the read's PolicyPath when it names one, so a search
+//     without that first check still refuses, with a refusal IsRefusal
+//     reports; a listing never applies them. A member's own refusal, a
+//     remote member's from the source boundary included, is the virtual
+//     repository's "Could not find resource", which says nothing of how the
+//     member is set, and is no refusal to IsRefusal, so the search passes
+//     over that member to the next.
+//   - The metadata helpers apply no download policy to what they find:
+//     a listing built from StoredItem, ResolveStoredItem or ReadMetadata
+//     keeps a release whose file the policy refuses, as Artifactory's
+//     listings do, and a lookup behind a write, such as whether a deploy
+//     replaces a file, is the write's to refuse. A protocol refuses a
+//     metadata document with CheckDocument at the path Artifactory 7.x
+//     stores or caches it at, a remote repository's own policy included,
+//     and resolution metadata whose 7.x storage is not documented with
+//     CheckBlackedOut, before it computes anything; a native search keeps
+//     its answer. It builds a virtual repository's merged document from the
+//     members MergeMembers returns, which leave out a member that is
+//     blacked out or would refuse the document's path.
 //
 // # References
 //
@@ -115,9 +141,12 @@
 // The package's own tests mount a test protocol over the in-memory store,
 // authorised by the access test kit: pkgroute_test.go, resolve_test.go,
 // folder_test.go, form_test.go, lifecycle_test.go, storeonce_test.go,
-// source_test.go, source_delivery_test.go, path_test.go and
-// download_test.go, which covers the download policy at each helper;
-// source_result_test.go tests ServeResult from inside the package. Every
+// source_test.go, source_delivery_test.go, path_test.go,
+// download_test.go, which covers the download policy at each helper, and
+// document_test.go, which covers CheckDocument and CheckBlackedOut, a
+// read's policy path and a remote member's refusal against a fake source
+// boundary; source_result_test.go tests ServeResult from inside the
+// package. Every
 // native protocol's route suite under test/server/artifacts reaches it
 // through the router.
 package pkgroute

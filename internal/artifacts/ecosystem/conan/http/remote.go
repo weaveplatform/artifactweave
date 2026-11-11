@@ -292,7 +292,11 @@ func (h handler) remoteFile(w http.ResponseWriter, r *http.Request, f conanfmt.F
 			return nil
 		}
 	}
-	result, err := h.k.Read(r, resource)
+	read := h.k.Read
+	if document(f.File) {
+		read = h.k.ReadMetadata
+	}
+	result, err := read(r, resource)
 	if err != nil {
 		h.error(w, r, pkgroute.SourceError(err, false))
 		return
@@ -321,7 +325,7 @@ func (h handler) remoteManifest(r *http.Request, f conanfmt.FilePath) (map[strin
 		UpstreamPath: fileURL(f), Method: http.MethodGet,
 		Variant: "conan-manifest-v1", Validate: validateRemoteManifest,
 	}
-	result, err := h.k.Read(r, resource)
+	result, err := h.k.ReadMetadata(r, resource)
 	if err != nil {
 		return nil, fmt.Errorf("read conan manifest: %w", pkgroute.SourceError(err, false))
 	}

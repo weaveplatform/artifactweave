@@ -194,7 +194,11 @@ func (h handler) virtualRevisionMember(
 			return nil, e
 		}
 		if f.File != conanfmt.Manifest {
-			_, e := h.k.Item(mr, f.Path())
+			lookup := h.k.DownloadItem
+			if document(f.File) {
+				lookup = h.k.StoredItem
+			}
+			_, e := lookup(mr, f.Path())
 			if missing(e) {
 				continue
 			}

@@ -27,14 +27,20 @@ const (
 	noMember = "no member serves it"
 )
 
-// policyFormat is the test protocol with one route per download helper of
-// the kit, so a test can see the download policy at each: ServeItem; Item,
-// ResolveItem and Read answering their error; ServeFound of a file read
-// from the store without Item; a virtual repository's search through its
-// members in order, as Hex's is; and a member the protocol chose, served
-// with ServeItem, as Pub's is, checked with CheckDownload, or served with
-// ServeFound under the virtual repository's own request. An error that is
-// kernel.ErrNotFound sets X-Not-Found.
+// policyFormat is the test protocol with one route per lookup, read and
+// serve helper of the kit, so a test can see the download policy at each:
+// ServeItem; DownloadItem, ResolveDownloadItem and Read answering their
+// error; ServeFound of a file read from the store without DownloadItem; a
+// virtual repository's search through its members in order, as Hex's is;
+// and a member the protocol chose, served with ServeItem, as Pub's is,
+// checked with CheckDownload, or served with ServeFound under the virtual
+// repository's own request. The metadata helpers have theirs: StoredItem,
+// ResolveStoredItem, ServeMetadata, ServeFoundMetadata and ReadMetadata,
+// which apply no policy; CheckDocument; and MergeMembers, which answers the
+// keys of the requests it returns; CheckBlackedOut; and a read naming a
+// PolicyPath (the "policy" query) or BlackoutOnly (the "blackout" query),
+// alone or through the first member. An error that is kernel.ErrNotFound
+// sets X-Not-Found, and one that IsRefusal reports sets X-Refused.
 func policyFormat(sources map[repo.Class]pkgroute.Source) pkgroute.Protocol {
 	p := testFormat(sources)
 	p.Routes = func(r chi.Router, k *pkgroute.Kit) {
@@ -43,9 +49,7 @@ func policyFormat(sources map[repo.Class]pkgroute.Source) pkgroute.Protocol {
 			return rest
 		}
 		fail := func(w http.ResponseWriter, r *http.Request, err error) {
-			if errors.Is(err, kernel.ErrNotFound) {
-				w.Header().Set("X-Not-Found", "true")
-			}
+			mark(w, err)
 			k.Error(w, r, err)
 		}
 		answer := func(w http.ResponseWriter, r *http.Request, f pkgroute.Found, err error) {
@@ -86,20 +90,98 @@ func policyFormat(sources map[repo.Class]pkgroute.Source) pkgroute.Protocol {
 			k.ServeItem(w, r, path(r))
 		})
 		r.Get("/item/*", func(w http.ResponseWriter, r *http.Request) {
-			f, err := k.Item(r, path(r))
+			f, err := k.DownloadItem(r, path(r))
 			answer(w, r, f, err)
 		})
 		r.Get("/resolve/*", func(w http.ResponseWriter, r *http.Request) {
-			f, err := k.ResolveItem(r, path(r))
+			f, err := k.ResolveDownloadItem(r, path(r))
 			answer(w, r, f, err)
 		})
 		r.Get("/read/*", func(w http.ResponseWriter, r *http.Request) {
-			result, err := k.Read(r, pkgroute.Resource(r, path(r), path(r)))
+			serveRead(w, r, k, k.Read)
+		})
+		stored := func(w http.ResponseWriter, r *http.Request, f pkgroute.Found, err error) {
 			if err != nil {
+				fail(w, r, err)
+				return
+			}
+			k.ServeFoundMetadata(w, r, f)
+		}
+		r.Get("/stored/*", func(w http.ResponseWriter, r *http.Request) {
+			f, err := k.StoredItem(r, path(r))
+			stored(w, r, f, err)
+		})
+		r.Get("/resolve-stored/*", func(w http.ResponseWriter, r *http.Request) {
+			f, err := k.ResolveStoredItem(r, path(r))
+			stored(w, r, f, err)
+		})
+		r.Get("/metadata/*", func(w http.ResponseWriter, r *http.Request) {
+			k.ServeMetadata(w, r, path(r))
+		})
+		r.Get("/read-metadata/*", func(w http.ResponseWriter, r *http.Request) {
+			serveRead(w, r, k, k.ReadMetadata)
+		})
+		r.Get("/first-metadata/*", func(w http.ResponseWriter, r *http.Request) {
+			if mr := member(w, r, k, pkgroute.RequestFrom(r).Repo.Repositories[0]); mr != nil {
+				k.ServeMetadata(w, mr, path(r))
+			}
+		})
+		checked := func(check func(*http.Request, string) error) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				if err := check(r, path(r)); err != nil {
+					fail(w, r, err)
+					return
+				}
+				w.WriteHeader(http.StatusNoContent)
+			}
+		}
+		firstChecked := func(check func(*http.Request, string) error) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				mr := member(w, r, k, pkgroute.RequestFrom(r).Repo.Repositories[0])
+				if mr == nil {
+					return
+				}
+				if err := check(mr, path(r)); err != nil {
+					fail(w, r, err)
+					return
+				}
+				w.WriteHeader(http.StatusNoContent)
+			}
+		}
+		r.Get("/document/*", checked(k.CheckDocument))
+		r.Get("/blackout/*", checked(k.CheckBlackedOut))
+		r.Get("/first-document/*", firstChecked(k.CheckDocument))
+		r.Get("/first-blackout/*", firstChecked(k.CheckBlackedOut))
+		readAs := func(w http.ResponseWriter, r, mr *http.Request) {
+			resource := pkgroute.Resource(mr, path(r), path(r))
+			resource.Query = ""
+			resource.PolicyPath = r.URL.Query().Get("policy")
+			resource.BlackoutOnly = r.URL.Query().Has("blackout")
+			result, err := k.Read(mr, resource)
+			if err != nil {
+				mark(w, err)
 				k.Error(w, r, pkgroute.SourceError(err, false))
 				return
 			}
-			k.ServeResult(w, r, result)
+			k.ServeResult(w, mr, result)
+		}
+		r.Get("/read-as/*", func(w http.ResponseWriter, r *http.Request) { readAs(w, r, r) })
+		r.Get("/first-read-as/*", func(w http.ResponseWriter, r *http.Request) {
+			if mr := member(w, r, k, pkgroute.RequestFrom(r).Repo.Repositories[0]); mr != nil {
+				readAs(w, r, mr)
+			}
+		})
+		r.Get("/merge/*", func(w http.ResponseWriter, r *http.Request) {
+			members, err := k.MergeMembers(r, path(r))
+			if err != nil {
+				fail(w, r, err)
+				return
+			}
+			keys := make([]string, 0, len(members))
+			for _, mr := range members {
+				keys = append(keys, pkgroute.RequestFrom(mr).Repo.Key)
+			}
+			_, _ = io.WriteString(w, strings.Join(keys, ","))
 		})
 		r.Get("/found/*", func(w http.ResponseWriter, r *http.Request) {
 			c := pkgroute.RequestFrom(r).Repo
@@ -119,7 +201,7 @@ func policyFormat(sources map[repo.Class]pkgroute.Source) pkgroute.Protocol {
 				if !k.Can(mr, path(r), api.ActionRead) {
 					continue
 				}
-				f, err := k.Item(mr, path(r))
+				f, err := k.DownloadItem(mr, path(r))
 				if errors.Is(err, kernel.ErrNotFound) {
 					continue
 				}
@@ -135,6 +217,35 @@ func policyFormat(sources map[repo.Class]pkgroute.Source) pkgroute.Protocol {
 		})
 	}
 	return p
+}
+
+// serveRead answers the GET of the path after the route's name with what
+// read returns for it.
+func serveRead(
+	w http.ResponseWriter,
+	r *http.Request,
+	k *pkgroute.Kit,
+	read func(*http.Request, source.Resource) (source.Result, error),
+) {
+	_, rest, _ := strings.Cut(pkgroute.RequestFrom(r).Rest, "/")
+	result, err := read(r, pkgroute.Resource(r, rest, rest))
+	if err != nil {
+		mark(w, err)
+		k.Error(w, r, pkgroute.SourceError(err, false))
+		return
+	}
+	k.ServeResult(w, r, result)
+}
+
+// mark sets X-Not-Found when err is kernel.ErrNotFound, and X-Refused when
+// IsRefusal reports it, before the answer maps it.
+func mark(w http.ResponseWriter, err error) {
+	if errors.Is(err, kernel.ErrNotFound) {
+		w.Header().Set("X-Not-Found", "true")
+	}
+	if pkgroute.IsRefusal(err) {
+		w.Header().Set("X-Refused", "true")
+	}
 }
 
 // member is the request for the virtual repository's member key, or nil
@@ -314,7 +425,7 @@ func TestAccDownloadPolicyVirtualMembers(t *testing.T) {
 	f.wantServed(t, virtual+"members/a/b.txt", "reader", local+"/a/b.txt")
 }
 
-// CheckDownload answers what Item would, for a protocol that reads a
+// CheckDownload answers what DownloadItem would, for a protocol that reads a
 // stored blob itself: nothing for a path the policy accepts, the refusal
 // for one it refuses, and through a virtual repository the pass-over of a
 // refusing member as a 404 that is no fault. ServeFound of a member's file
@@ -357,6 +468,112 @@ func TestAccDownloadPolicyCheckAndMemberFound(t *testing.T) {
 	if len(f.faults) != 0 {
 		t.Fatalf("a refusal was recorded as a fault: %v", f.faults)
 	}
+}
+
+// The metadata helpers apply no download policy, so a listing finds a
+// release whose file the policy refuses: StoredItem, ResolveStoredItem,
+// ServeMetadata, ServeFoundMetadata and ReadMetadata find and serve what a
+// blacked-out repository holds and what its patterns reject, through a
+// virtual repository's member too, still under Read permission.
+func TestAccDownloadPolicyMetadataHelpers(t *testing.T) {
+	f := policyFixture(t, nil)
+	routes := []string{"stored", "resolve-stored", "metadata", "read-metadata"}
+	for _, refuse := range []func(*repo.Config){blackOut, excludeA} {
+		f.patch(t, local, refuse)
+		f.patch(t, "gen-virtual", refuse)
+		for _, route := range routes {
+			f.wantServed(t, local+"/"+route+"/a/b.txt", "reader", local+"/a/b.txt")
+		}
+		f.wantPolicy(t, local+"/metadata/a/missing.txt", "reader", http.StatusNotFound,
+			"Could not find resource")
+		f.wantServed(t, "gen-virtual/first-metadata/a/b.txt", "reader", local+"/a/b.txt")
+		f.patch(t, local, restore)
+		f.patch(t, "gen-virtual", restore)
+	}
+	for _, route := range routes {
+		f.wantPolicy(t, local+"/"+route+"/a/b.txt", "nobody", http.StatusForbidden, "")
+		f.wantPolicy(t, local+"/"+route+"/a/b.txt", "", http.StatusUnauthorized, "")
+	}
+	if len(f.faults) != 0 {
+		t.Fatalf("a metadata lookup was recorded as a fault: %v", f.faults)
+	}
+}
+
+// CheckDocument refuses a metadata document's own path as CheckDownload
+// refuses a file's, and IsRefusal tells that refusal from a missing item and
+// from a member's refusal, which a virtual repository passes over.
+func TestAccDownloadPolicyCheckDocument(t *testing.T) {
+	f := policyFixture(t, nil)
+	wantRefused := func(path string, refused bool) {
+		t.Helper()
+		rec := f.do(http.MethodGet, base+path, "reader", "")
+		if got := rec.Header().Get("X-Refused") == "true"; got != refused {
+			t.Fatalf("GET %s: refused %t, want %t: %d %s", path, got, refused, rec.Code, rec.Body)
+		}
+	}
+	if rec := f.do(http.MethodGet, base+local+"/document/a/missing.txt", "reader", ""); rec.Code !=
+		http.StatusNoContent {
+		t.Fatalf("an accepted path: %d %s", rec.Code, rec.Body)
+	}
+	for _, c := range []struct {
+		refuse  func(*repo.Config)
+		message string
+	}{{blackOut, blackedOut}, {excludeA, excluded}} {
+		f.patch(t, local, c.refuse)
+		f.wantPolicy(t, local+"/document/a/b.txt", "root", http.StatusNotFound,
+			fmt.Sprintf(c.message, "a/b.txt"))
+		wantRefused(local+"/document/a/b.txt", true)
+		wantRefused(local+"/item/a/b.txt", true)
+		wantRefused("gen-virtual/first-check/a/b.txt", false)
+		f.patch(t, local, restore)
+	}
+	wantRefused(local+"/item/a/missing.txt", false)
+	f.patch(t, "gen-virtual", excludeA)
+	f.wantPolicy(t, "gen-virtual/document/a/b.txt", "reader", http.StatusNotFound,
+		"No repository found to serve the request for gen-virtual:a/b.txt")
+	wantRefused("gen-virtual/document/a/b.txt", true)
+}
+
+// MergeMembers is the request itself for a repository that is not virtual,
+// unless CheckDocument refuses the path. For a virtual repository it is
+// each member in order, without one that is gone, blacked out, or whose
+// patterns reject the path, and none when the virtual repository's own
+// patterns reject it.
+func TestAccDownloadPolicyMergeMembers(t *testing.T) {
+	f := policyFixture(t, nil)
+	wantMerged := func(path, want string) {
+		t.Helper()
+		rec := f.do(http.MethodGet, base+path, "reader", "")
+		if rec.Code != http.StatusOK || rec.Body.String() != want {
+			t.Fatalf("GET %s: %d %q, want %q", path, rec.Code, rec.Body, want)
+		}
+	}
+	const both = local + "," + federated
+	wantMerged(local+"/merge/a/b.txt", local)
+	wantMerged("gen-virtual/merge/a/b.txt", both)
+	f.patch(t, local, blackOut)
+	f.wantPolicy(t, local+"/merge/a/b.txt", "reader", http.StatusNotFound,
+		fmt.Sprintf(blackedOut, "a/b.txt"))
+	wantMerged("gen-virtual/merge/a/b.txt", federated)
+	wantMerged("gen-virtual/merge/dir/inner.txt", federated)
+	f.patch(t, local, restore)
+	f.patch(t, local, excludeA)
+	wantMerged("gen-virtual/merge/a/b.txt", federated)
+	wantMerged("gen-virtual/merge/dir/inner.txt", both)
+	f.patch(t, federated, excludeA)
+	wantMerged("gen-virtual/merge/a/b.txt", "")
+	f.patch(t, local, restore)
+	f.patch(t, federated, restore)
+	f.patch(t, "gen-virtual", func(c *repo.Config) {
+		c.Repositories = []string{local, "gen-gone", federated}
+	})
+	wantMerged("gen-virtual/merge/a/b.txt", both)
+	f.patch(t, "gen-virtual", excludeA)
+	f.wantPolicy(t, "gen-virtual/merge/a/b.txt", "reader", http.StatusNotFound,
+		"No repository found to serve the request for gen-virtual:a/b.txt")
+	wantMerged("gen-virtual/merge/dir/inner.txt", both)
+	f.patch(t, "gen-virtual", blackOut)
+	wantMerged("gen-virtual/merge/dir/inner.txt", both)
 }
 
 // remoteSource reads a remote repository as a source boundary that applies
@@ -417,5 +634,23 @@ func TestAccDownloadPolicyLeavesRemoteReads(t *testing.T) {
 	if wantChecked.Code != http.StatusNoContent || reads != 2 {
 		t.Fatalf("remote member check: %d %s after %d reads", wantChecked.Code, wantChecked.Body,
 			reads)
+	}
+	// A metadata read of a remote member applies neither repository's
+	// policy in the kit; MergeMembers passes over a remote member that
+	// refuses the path, which the source boundary would refuse.
+	rec = f.do(http.MethodGet, base+"gen-virtual/first-metadata/a/b.txt", "root", "")
+	if rec.Code != http.StatusOK || reads != 3 {
+		t.Fatalf("remote member metadata read: %d %s after %d reads", rec.Code, rec.Body, reads)
+	}
+	f.patch(t, "gen-virtual", restore)
+	f.patch(t, "gen-remote", restore)
+	f.patch(t, "gen-remote", excludeA)
+	rec = f.do(http.MethodGet, base+"gen-virtual/merge/a/b.txt", "root", "")
+	if rec.Code != http.StatusOK || rec.Body.String() != "" {
+		t.Fatalf("a refusing remote member was merged: %d %q", rec.Code, rec.Body)
+	}
+	rec = f.do(http.MethodGet, base+"gen-virtual/merge/dir/inner.txt", "root", "")
+	if rec.Code != http.StatusOK || rec.Body.String() != "gen-remote" {
+		t.Fatalf("an accepting remote member was not merged: %d %q", rec.Code, rec.Body)
 	}
 }

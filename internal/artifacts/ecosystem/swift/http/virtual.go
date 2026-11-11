@@ -166,7 +166,7 @@ func (h handler) virtualArchive(
 			h.k.ServeResult(w, mr, result)
 			return
 		}
-		found, err := h.k.ResolveItem(mr, path)
+		found, err := h.k.ResolveDownloadItem(mr, path)
 		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}

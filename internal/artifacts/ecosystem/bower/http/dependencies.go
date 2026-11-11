@@ -286,7 +286,7 @@ func (h handler) readDependency(
 	if err := h.currentDependencyRead(r.Context(), r, resource.Path, false); err != nil {
 		return dependencyRead{}, err
 	}
-	result, err := h.k.Read(member, resource)
+	result, err := h.k.ReadMetadata(member, resource)
 	if err != nil {
 		return dependencyRead{}, fmt.Errorf("bower dependency read: %w", err)
 	}

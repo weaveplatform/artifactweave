@@ -72,7 +72,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
-	f, err := h.k.ResolveItem(r, helmfmt.IndexPath)
+	f, err := h.k.ResolveStoredItem(r, helmfmt.IndexPath)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return

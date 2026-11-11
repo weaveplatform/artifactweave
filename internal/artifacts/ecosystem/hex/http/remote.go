@@ -325,7 +325,7 @@ func (h handler) legacyOuterChecksum(
 ) ([32]byte, error) {
 	var zero [32]byte
 	resource := tarballResource(r, path, expected.Name, expected.Version, expected)
-	result, err := h.k.Read(r, resource)
+	result, err := h.k.ReadMetadata(r, resource)
 	if err != nil {
 		return zero, fmt.Errorf("hex: read legacy tarball: %w", err)
 	}

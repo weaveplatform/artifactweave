@@ -61,10 +61,34 @@ type ReadSource interface {
 	Read(*http.Request, repo.Config, source.Resource) (source.Result, error)
 }
 
-// Read is the stream-aware extension of Item. A future virtual source can
-// implement the same optional method while retaining each member's permission
-// and fetch intent. Existing local sources continue using their stored items.
+// Read is the stream-aware extension of DownloadItem. A future virtual
+// source can implement the same optional method while retaining each
+// member's permission and fetch intent. Existing local sources continue
+// using their stored items. An artifact read is a download: the download
+// policy applies to it as DownloadItem applies it, at the resource's
+// PolicyPath when it names one and only as blackout when it is
+// BlackoutOnly, as the source boundary applies them to a remote read. A
+// member request's refusal, a remote member's from the source boundary
+// included, is the member passed over (CheckDownload).
 func (k *Kit) Read(r *http.Request, resource source.Resource) (source.Result, error) {
+	return k.read(r, resource, true)
+}
+
+// ReadMetadata is Read for an artifact read whose result builds a listing
+// or a metadata answer rather than serving the artifact, such as the
+// manifest a Conan revision's file list is read from, or for a metadata
+// document ServeMetadata serves. The download policy Read applies to an
+// artifact read is not applied, as StoredItem does not apply it; the source
+// boundary still applies a remote repository's own policy.
+func (k *Kit) ReadMetadata(r *http.Request, resource source.Resource) (source.Result, error) {
+	return k.read(r, resource, false)
+}
+
+func (k *Kit) read(
+	r *http.Request,
+	resource source.Resource,
+	download bool,
+) (source.Result, error) {
 	q := RequestFrom(r)
 	allowed := can(r, q.Repo, resource.Path, accessapi.ActionRead)
 	if resource.PermissionFolder {
@@ -73,17 +97,27 @@ func (k *Kit) Read(r *http.Request, resource source.Resource) (source.Result, er
 	if !allowed {
 		return source.Result{}, refusal(r)
 	}
+	// The policy checks the path 7.x keeps the artifact at, when the
+	// protocol names one, so a pattern written for 7.x's layout matches.
+	policyPath := resource.Path
+	if resource.PolicyPath != "" {
+		policyPath = resource.PolicyPath
+	}
 	if src, ok := q.Source.(ReadSource); ok {
 		// The source boundary checks the remote member's own policy, never
-		// that of the virtual repository the request came through. Metadata
-		// reads are left as they were: what a protocol's metadata answers
-		// under the policy is still open (#1237).
-		if q.virtual != nil && resource.Kind == source.ResourceKindArtifact {
-			if err := q.download(resource.Path); err != nil {
+		// that of the virtual repository the request came through, so a
+		// member request checks the virtual repository's patterns here.
+		if download && q.virtual != nil && resource.Kind == source.ResourceKindArtifact &&
+			!resource.BlackoutOnly {
+			if err := q.download(policyPath); err != nil {
 				return source.Result{}, err
 			}
 		}
 		result, err := src.Read(r, q.Repo, resource)
+		if err != nil && q.virtual != nil && IsRefusal(err) {
+			// A remote member that refuses is passed over as a local one is.
+			return source.Result{}, passOver(q.Repo.Key, policyPath)
+		}
 		if err != nil {
 			return source.Result{}, fmt.Errorf("read source: %w", err)
 		}
@@ -92,7 +126,12 @@ func (k *Kit) Read(r *http.Request, resource source.Resource) (source.Result, er
 	if resource.Kind != source.ResourceKindArtifact {
 		return source.Result{}, source.ErrUnsupported
 	}
-	f, err := k.Item(r, resource.Path)
+	if download {
+		if err := q.refuse(policyPath, resource.BlackoutOnly, false); err != nil {
+			return source.Result{}, k.wrap(err)
+		}
+	}
+	f, err := k.StoredItem(r, resource.Path)
 	if err != nil {
 		return source.Result{}, err
 	}

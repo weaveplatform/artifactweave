@@ -22,7 +22,7 @@ func (h handler) symbolFile(w http.ResponseWriter, r *http.Request) {
 			}
 			// Freshness precedes missing-item lookup: a newly pushed PDB may
 			// not have been extracted by a background worker yet.
-			if _, err := h.k.ResolveItem(r, p); err != nil {
+			if _, err := h.k.ResolveDownloadItem(r, p); err != nil {
 				if errors.Is(err, kernel.ErrNotFound) {
 					err = notFound(r)
 				}

@@ -145,21 +145,27 @@ Where the policy applies:
   (`ArtifactResource.writeStreamingFileList` maps `BlackedOutException` to 404).
 - The read paths of later formats, which find items through the same download lookup or call
   `generic.CheckDownload` themselves (#269).
-- The native package protocols, through the router kit (`pkgroute`, #1237). `Kit.Item`,
-  `ResolveItem`, `ServeItem` and `ServeFound` check the path they are given before they look
-  for it, so every protocol that finds its files there inherits the policy, as remote reads
-  inherit it from the source boundary. A protocol that reads a stored blob itself calls
+- The native package protocols, through the router kit (`pkgroute`, #1237). The file a
+  download serves is found through `Kit.DownloadItem`, `ResolveDownloadItem`, `ServeItem`,
+  `ServeFound` or `Read`, which check the path they are given before they look for it, so
+  every protocol that finds its files there inherits the policy, as remote reads inherit it
+  from the source boundary. A protocol that reads a stored blob itself calls
   `Kit.CheckDownload` (Bower's archive of a version's files). The refusal is
   `kernel.ErrNotFound` to the protocol, so a virtual repository's search passes over a member
-  that refuses. A member request checks the virtual repository's own patterns first, for a
-  remote member's file too. A protocol that answers a missing file with its own 404 answers
-  a refused one with it.
-- What a protocol's derived metadata answers is not settled yet (#1237). Until it is, a
-  metadata document a protocol reads through the kit is refused as a file is (Helm's
-  `index.yaml`), a listing that looks up each release's file through `Kit.Item` leaves out
-  a release whose file is refused (Ansible), and metadata built from the package index
-  answers as before (Hex `names`, npm packuments, Go's `@v/list`). #216 lists what to compare
-  with Artifactory 7.x.
+  that refuses, a remote member included, and `pkgroute.IsRefusal` tells it from a missing
+  item. A member request checks the virtual repository's own patterns first, for a remote
+  member's file too.
+- Metadata has its own kit helpers (#1237, #1251). A listing finds each release through
+  `Kit.StoredItem`, `ResolveStoredItem` or `ReadMetadata`, which apply no policy, so a release
+  whose file the patterns reject stays listed. `Kit.CheckDocument` refuses a document at the
+  path 7.x stores or caches it at, a remote repository's own policy included, and
+  `Kit.CheckBlackedOut` refuses a blacked-out repository's computed answers before they are
+  built. `Kit.MergeMembers` leaves a blacked-out or refusing member out of a virtual merge.
+  The source boundary checks a remote read's policy at its `PolicyPath` when the protocol
+  names one, or its blackout alone for a lookup a download makes on the way to its file, and
+  a policy refusal from `CheckRead` is the policy's own answer, so a listing can keep the
+  release. Each protocol's use of them, and its sources, follows in #1251; #216 lists what to
+  compare with Artifactory 7.x.
 
 Where it does not apply, as in 6.20:
 - The storage API's item info and its other views describe the item: `ArtifactResource`

@@ -271,7 +271,7 @@ func (h handler) tarball(w http.ResponseWriter, r *http.Request, path string) {
 				h.k.ServeResult(w, mr, result)
 				return
 			}
-			found, err := h.k.Item(mr, path)
+			found, err := h.k.DownloadItem(mr, path)
 			if missing(err) {
 				continue
 			}

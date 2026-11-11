@@ -199,7 +199,7 @@ func (h handler) memberIndex(r *http.Request, indexPath string, seen map[string]
 func (h handler) localIndex(r *http.Request, id condafmt.MetadataPath) (
 	condafmt.Repodata, func(context.Context) error, error,
 ) {
-	f, err := h.k.ResolveItem(r, id.Path)
+	f, err := h.k.ResolveStoredItem(r, id.Path)
 	if errors.Is(err, kernel.ErrNotFound) {
 		return condafmt.EmptyRepodata(id.Subdir), nil, nil
 	}
