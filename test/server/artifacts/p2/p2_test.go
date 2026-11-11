@@ -4,8 +4,11 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -445,5 +448,143 @@ func TestAccP2VirtualFiltersMembersAndDeniesUnpermittedChild(t *testing.T) {
 	res = w.do(http.MethodGet, "/artifactory/p2-cycle/p2.index", "admin", "")
 	if res.Code == http.StatusOK {
 		t.Fatalf("cyclic update site returned metadata: %s", res.Body)
+	}
+}
+
+// The download policy refuses P2 reads with its 404 and message, after the
+// read permission: a remote archive's entries as any remote file, a virtual
+// repository's own paths with "No repository found", and a member's file as
+// the virtual's not-found, the member being passed over. Paths ending .index
+// are never refused by patterns, and a blacked-out member is left out of the
+// composite ([I], #216). Nothing refused is fetched.
+func TestAccP2DownloadPolicy(t *testing.T) {
+	index, content := p2Fixture(t, "p2.index"), p2Fixture(t, "content.jar")
+	var zipped bytes.Buffer
+	zw := zip.NewWriter(&zipped)
+	for _, name := range []string{"p2.index", "content.jar"} {
+		f, err := zw.Create(name)
+		if err == nil {
+			_, err = f.Write(p2Fixture(t, name))
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var reads []string
+	backend := sourceBackend(
+		func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+			reads = append(reads, q.Repo.Key+":"+q.Resource.Path)
+			body := map[string][]byte{"p2.index": index, "content.jar": content}[q.Resource.Path]
+			if q.Resource.ExternalURL != "" {
+				body = zipped.Bytes()
+			}
+			if body == nil {
+				return source.Result{}, kernel.ErrNotFound
+			}
+			return source.Result{Stream: &source.Stream{
+				Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
+				Representation: source.Representation{Size: int64(len(body))},
+			}}, nil
+		},
+	)
+	sources := &source.Service{Resolve: sourceIdentity, HTTP: backend, Cache: backend}
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = sources })
+	on := true
+	configs := map[string]repo.Config{}
+	for _, c := range []repo.Config{
+		{Key: "p2-local", Class: repo.Local, PackageType: repo.Generic},
+		{Key: "p2-dark", Class: repo.Remote, PackageType: repo.P2, URL: "https://dark.example/site/", BlackedOut: &on},
+		{Key: "p2-remote", Class: repo.Remote, PackageType: repo.P2, URL: "https://download.eclipse.org/site/"},
+		{Key: "p2-zipped", Class: repo.Remote, PackageType: repo.P2, URL: "https://eclipse.example/site.zip!/"},
+		{
+			Key: "p2-virtual", Class: repo.Virtual, PackageType: repo.P2,
+			Repositories: []string{"p2-local", "p2-dark", "p2-remote"},
+		},
+	} {
+		c = *repo.Defaults(&c)
+		if err := w.db.Repos().Create(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+		configs[c.Key] = c
+	}
+	for name, body := range map[string][]byte{"p2.index": index, "content.jar": content} {
+		if res := w.do(http.MethodPut, "/artifactory/p2-local/"+name, "admin", string(body)); res.Code != http.StatusCreated {
+			t.Fatalf("publish %s: %d %s", name, res.Code, res.Body)
+		}
+	}
+	patch := func(key string, f func(*repo.Config)) {
+		t.Helper()
+		c := configs[key]
+		f(&c)
+		if err := w.db.Repos().Update(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+		configs[key] = c
+	}
+	served := func(path string, want []byte) {
+		t.Helper()
+		res := w.do(http.MethodGet, path, "admin", "")
+		if res.Code != http.StatusOK || (want != nil && !bytes.Equal(res.Body.Bytes(), want)) {
+			t.Errorf("%s: %d %.200s", path, res.Code, res.Body)
+		}
+	}
+	refused := func(path, msg string) {
+		t.Helper()
+		var body struct {
+			Errors []struct {
+				Status  int    `json:"status"`
+				Message string `json:"message"`
+			} `json:"errors"`
+		}
+		res := w.do(http.MethodGet, path, "admin", "")
+		if res.Code != http.StatusNotFound || json.Unmarshal(res.Body.Bytes(), &body) != nil ||
+			len(body.Errors) != 1 || body.Errors[0].Message != msg {
+			t.Errorf("%s: %d %s, want 404 %q", path, res.Code, res.Body, msg)
+		}
+		// The read permission is checked first.
+		if res := w.do(http.MethodGet, path, "user", ""); res.Code != http.StatusForbidden {
+			t.Errorf("%s as user: %d", path, res.Code)
+		}
+	}
+	const (
+		blackedOut = "The repository '%[1]s' is blacked out and cannot serve artifact '%[1]s:%[2]s'."
+		excluded   = "The repository '%[1]s' rejected the artifact '%[1]s:%[2]s' due to its " +
+			"include/exclude pattern settings."
+		virtual = "No repository found to serve the request for p2-virtual:%s"
+	)
+
+	res := w.do(http.MethodGet, "/artifactory/p2-virtual/compositeContent.xml", "admin", "")
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `children size="2"`) {
+		t.Errorf("blacked-out member listed: %d %s", res.Code, res.Body)
+	}
+	served("/artifactory/p2-virtual/__p2/1/content.jar", content)
+
+	patch("p2-virtual", func(c *repo.Config) { c.ExcludesPattern = new("**/*.xml,**/*.index,**/*.jar") })
+	refused("/artifactory/p2-virtual/compositeContent.xml", fmt.Sprintf(virtual, "compositeContent.xml"))
+	refused("/artifactory/p2-virtual/__p2/0/content.jar", fmt.Sprintf(virtual, "__p2/0/content.jar"))
+	served("/artifactory/p2-virtual/p2.index", nil)
+	served("/artifactory/p2-virtual/__p2/0/p2.index", index)
+
+	patch("p2-virtual", func(c *repo.Config) { c.ExcludesPattern = nil })
+	patch("p2-local", func(c *repo.Config) { c.ExcludesPattern = new("content.jar") })
+	refused("/artifactory/p2-virtual/__p2/0/content.jar", "Could not find resource")
+	served("/artifactory/p2-virtual/__p2/0/p2.index", index)
+
+	patch("p2-zipped", func(c *repo.Config) { c.ExcludesPattern = new("**") })
+	refused("/artifactory/p2-zipped/content.jar", fmt.Sprintf(excluded, "p2-zipped", "content.jar"))
+	served("/artifactory/p2-zipped/p2.index", index)
+	patch("p2-zipped", func(c *repo.Config) { c.ExcludesPattern, c.BlackedOut = nil, &on })
+	refused("/artifactory/p2-zipped/p2.index", fmt.Sprintf(blackedOut, "p2-zipped", "p2.index"))
+
+	patch("p2-remote", func(c *repo.Config) { c.ExcludesPattern = new("**") })
+	refused("/artifactory/p2-remote/content.jar", fmt.Sprintf(excluded, "p2-remote", "content.jar"))
+	served("/artifactory/p2-remote/p2.index", index)
+
+	want := []string{"p2-remote:content.jar", "p2-zipped:p2.index", "p2-remote:p2.index"}
+	if !slices.Equal(reads, want) {
+		t.Errorf("reads %v, want %v", reads, want)
 	}
 }
