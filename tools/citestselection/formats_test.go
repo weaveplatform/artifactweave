@@ -193,7 +193,7 @@ func matchesGodogTags(filter string, tags []*messages.PickleTag) bool {
 	return false
 }
 
-func TestUnitFormatSourceOwnerStagedLayouts(t *testing.T) {
+func TestUnitFormatSourceOwnerModuleLayouts(t *testing.T) {
 	useTestOwnership(t, testOwnership{
 		Version: 2,
 		Packages: map[string]string{
@@ -240,7 +240,7 @@ func TestUnitFormatSourceOwnerStagedLayouts(t *testing.T) {
 			t.Errorf("formatSourceOwner(%q) = %q, %t; want %q", file, owner, ok, want)
 		}
 	}
-	staged := proposeAffected([]change{
+	npmPlan := proposeAffected([]change{
 		{status: "M", path: "internal/artifacts/ecosystem/npm/tarball.go"},
 		{status: "A", path: "internal/artifacts/ecosystem/npm/http/routes.go"},
 		{status: "M", path: "test/server/artifacts/npm/fixture.go"},
@@ -249,16 +249,16 @@ func TestUnitFormatSourceOwnerStagedLayouts(t *testing.T) {
 		modulePath + "/internal/artifacts/ecosystem/npm",
 		modulePath + "/internal/artifacts/ecosystem/npm/http",
 	}
-	if staged.profile != "format" || staged.owner != "npm" ||
-		!slices.Equal(staged.changedPackages, want) {
-		t.Fatalf("staged npm plan: %+v", staged)
+	if npmPlan.profile != "format" || npmPlan.owner != "npm" ||
+		!slices.Equal(npmPlan.changedPackages, want) {
+		t.Fatalf("npm plan: %+v", npmPlan)
 	}
 	for _, pkg := range append(want, modulePath+"/internal/artifacts/ecosystem/npm/http/...") {
-		if !slices.Contains(strings.Split(staged.coverpkg, ","), pkg) {
-			t.Errorf("staged npm plan does not instrument %s: %s", pkg, staged.coverpkg)
+		if !slices.Contains(strings.Split(npmPlan.coverpkg, ","), pkg) {
+			t.Errorf("npm plan does not instrument %s: %s", pkg, npmPlan.coverpkg)
 		}
 	}
-	if !slices.Contains(staged.units, "./internal/app") || !staged.hasSharedTests {
-		t.Errorf("staged npm plan omitted its shared app dependency: %+v", staged)
+	if !slices.Contains(npmPlan.units, "./internal/app") || !npmPlan.hasSharedTests {
+		t.Errorf("npm plan omitted its shared app dependency: %+v", npmPlan)
 	}
 }

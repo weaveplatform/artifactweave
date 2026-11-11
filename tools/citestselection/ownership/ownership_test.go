@@ -2,7 +2,7 @@ package ownership
 
 import "testing"
 
-func TestUnitOwnedTestDirAcceptsLegacyAndStagedLayouts(t *testing.T) {
+func TestUnitOwnedTestDirAcceptsServerAppAndAdapterDirs(t *testing.T) {
 	for dir, want := range map[string]bool{
 		"test/server":                               true,
 		"test/server/access":                        true,

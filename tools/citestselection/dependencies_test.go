@@ -84,7 +84,7 @@ func TestUnitActualNPMReverseDependencies(t *testing.T) {
 	}
 }
 
-func TestUnitImportGraphIncludesStagedPackages(t *testing.T) {
+func TestUnitImportGraphFollowsModulePackages(t *testing.T) {
 	root := t.TempDir()
 	write := func(file, source string) {
 		t.Helper()
@@ -120,7 +120,7 @@ func TestUnitImportGraphIncludesStagedPackages(t *testing.T) {
 	if got := graph[modulePath+"/internal/app"]; !slices.Equal(
 		got, []string{modulePath + "/internal/artifacts/ecosystem/npm/http"},
 	) {
-		t.Fatalf("composition root's staged import was not recorded: %q", got)
+		t.Fatalf("composition root's import was not recorded: %q", got)
 	}
 	for _, pkg := range []string{"internal/.cache", "internal/artifacts/ecosystem/npm/testdata"} {
 		if _, ok := graph[modulePath+"/"+pkg]; ok {
@@ -136,11 +136,11 @@ func TestUnitImportGraphIncludesStagedPackages(t *testing.T) {
 	// internal/app imports an npm package but belongs to no format, so the
 	// closure stops there and never reaches cmd.
 	if !slices.Equal(got, want) {
-		t.Fatalf("staged reverse closure = %q, want %q", got, want)
+		t.Fatalf("reverse closure = %q, want %q", got, want)
 	}
 	write("internal/app/missing.go", imports("app", "internal/artifacts/missing"))
 	if _, err := sourceImportGraph(root); err == nil ||
 		!strings.Contains(err.Error(), "internal/artifacts/missing") {
-		t.Fatalf("missing staged import did not fail closed: %v", err)
+		t.Fatalf("missing import did not fail closed: %v", err)
 	}
 }

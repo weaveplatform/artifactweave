@@ -152,7 +152,7 @@ func TestUnitOwnershipV2RejectsInvalidInventories(t *testing.T) {
 		{"package outside owned directories", func(o *testOwnership) {
 			o.Packages["internal/legacy/xyz"] = "npm"
 		}, "invalid test package owner"},
-		{"staged ecosystem package outside http", func(o *testOwnership) {
+		{"ecosystem package outside http", func(o *testOwnership) {
 			o.Packages["internal/artifacts/ecosystem/npm"] = "npm"
 		}, "invalid test package owner"},
 		{"app subdirectory", func(o *testOwnership) {
