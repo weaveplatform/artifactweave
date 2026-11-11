@@ -94,7 +94,9 @@ func TestAccDebianIndexNeedsReadPermissionOnEveryListedPackage(t *testing.T) {
 		return !strings.HasPrefix(path, "pool/")
 	}}
 	r := w.request("deb-local", debPackages, "reader")
-	r = r.WithContext(accessapi.WithCaller(r.Context(), kernel.Principal{Name: "reader"}, indexOnly))
+	r = r.WithContext(
+		accessapi.WithCaller(r.Context(), kernel.Principal{Name: "reader"}, indexOnly),
+	)
 	rec := httptest.NewRecorder()
 	w.kit.GetItem(rec, r)
 	wantError(t, rec, http.StatusForbidden, "Forbidden")

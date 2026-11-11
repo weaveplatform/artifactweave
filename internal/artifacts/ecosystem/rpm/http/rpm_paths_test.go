@@ -273,9 +273,17 @@ func TestAccRPMVirtualPackageChecksAMemberAtThePackagesPath(t *testing.T) {
 			Key: "rpm-closed", Class: repo.Virtual, Repositories: []string{"rpm-member"},
 			ExcludesPattern: new("repodata/**"),
 		},
-		repo.Config{Key: "rpm-over-remote", Class: repo.Virtual, Repositories: []string{"rpm-remote"}},
+		repo.Config{
+			Key:          "rpm-over-remote",
+			Class:        repo.Virtual,
+			Repositories: []string{"rpm-remote"},
+		},
 		repo.Config{Key: "rpm-over-dark", Class: repo.Virtual, Repositories: []string{"rpm-dark"}},
-		repo.Config{Key: "rpm-over-closed", Class: repo.Virtual, Repositories: []string{"rpm-closed"}},
+		repo.Config{
+			Key:          "rpm-over-closed",
+			Class:        repo.Virtual,
+			Repositories: []string{"rpm-closed"},
+		},
 	)
 	w.publish("rpm-dark", "")
 	w.publish("rpm-member", "")
@@ -357,7 +365,11 @@ func TestAccRPMVirtualKeepsPackagesThePatternsReject(t *testing.T) {
 			Key: "rpm-virtual", Class: repo.Virtual,
 			Repositories: []string{"rpm-hiding", "rpm-member"},
 		},
-		repo.Config{Key: "rpm-only-hiding", Class: repo.Virtual, Repositories: []string{"rpm-hiding"}},
+		repo.Config{
+			Key:          "rpm-only-hiding",
+			Class:        repo.Virtual,
+			Repositories: []string{"rpm-hiding"},
+		},
 		repo.Config{
 			Key: "rpm-picky", Class: repo.Virtual, Repositories: []string{"rpm-member"},
 			ExcludesPattern: new("pool/**"),

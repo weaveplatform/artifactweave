@@ -917,7 +917,8 @@ func feedOf(t *testing.T, index, ipk []byte) sourceBackend {
 	return func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
 		body := index
 		if q.Resource.Path == opkgXlat {
-			if q.Repo.ExcludesPattern != nil && strings.Contains(*q.Repo.ExcludesPattern, "464xlat") {
+			if q.Repo.ExcludesPattern != nil &&
+				strings.Contains(*q.Repo.ExcludesPattern, "464xlat") {
 				t.Errorf("the source of %s was asked for an IPK its patterns reject", q.Repo.Key)
 			}
 			body = ipk
@@ -1077,13 +1078,21 @@ func TestAccOpkgVirtualKeepsPackagesThePatternsReject(t *testing.T) {
 			Key: "opkg-virtual", Class: repo.Virtual,
 			Repositories: []string{"opkg-hiding", "opkg-local"},
 		},
-		repo.Config{Key: "opkg-only-hiding", Class: repo.Virtual, Repositories: []string{"opkg-hiding"}},
+		repo.Config{
+			Key:          "opkg-only-hiding",
+			Class:        repo.Virtual,
+			Repositories: []string{"opkg-hiding"},
+		},
 		repo.Config{
 			Key: "opkg-picky", Class: repo.Virtual, Repositories: []string{"opkg-local"},
 			ExcludesPattern: new("**/464xlat*"),
 		},
 		repo.Config{Key: "opkg-nested", Class: repo.Virtual, Repositories: []string{"opkg-picky"}},
-		repo.Config{Key: "opkg-over-remote", Class: repo.Virtual, Repositories: []string{"opkg-remote"}},
+		repo.Config{
+			Key:          "opkg-over-remote",
+			Class:        repo.Virtual,
+			Repositories: []string{"opkg-remote"},
+		},
 	)
 	for _, key := range []string{"opkg-hiding", "opkg-local"} {
 		w.put(key, opkgFeed, index)
@@ -1130,9 +1139,21 @@ func TestAccOpkgVirtualIPKChecksAMemberAtTheIPKsPath(t *testing.T) {
 		repo.Config{
 			Key: "opkg-over-feedless", Class: repo.Virtual, Repositories: []string{"opkg-feedless"},
 		},
-		repo.Config{Key: "opkg-over-remote", Class: repo.Virtual, Repositories: []string{"opkg-remote"}},
-		repo.Config{Key: "opkg-over-dark", Class: repo.Virtual, Repositories: []string{"opkg-dark"}},
-		repo.Config{Key: "opkg-over-closed", Class: repo.Virtual, Repositories: []string{"opkg-closed"}},
+		repo.Config{
+			Key:          "opkg-over-remote",
+			Class:        repo.Virtual,
+			Repositories: []string{"opkg-remote"},
+		},
+		repo.Config{
+			Key:          "opkg-over-dark",
+			Class:        repo.Virtual,
+			Repositories: []string{"opkg-dark"},
+		},
+		repo.Config{
+			Key:          "opkg-over-closed",
+			Class:        repo.Virtual,
+			Repositories: []string{"opkg-closed"},
+		},
 	)
 	for _, key := range []string{"opkg-feedless", "opkg-dark", "opkg-local"} {
 		w.put(key, opkgFeed, index)
