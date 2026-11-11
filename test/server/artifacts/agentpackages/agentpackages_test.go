@@ -270,3 +270,115 @@ func TestAccAgentPackagesAPMProtocolAndLifecycle(t *testing.T) {
 		}
 	}
 }
+
+// Artifactory's download policy on the APM routes, for administrators and
+// readers alike, after the read permission: a blacked-out repository
+// refuses a version's download, and its version list, which the client
+// resolves a range against, with the blackout's 404; patterns rejecting a
+// version's archive refuse only its download and leave it listed. A refusal
+// carries none of a served archive's headers, which mark it immutable for a
+// day. The search keeps its answer.
+func TestAccAgentPackagesDownloadPolicy(t *testing.T) {
+	w := agentcommon.NewWorld(t)
+	ctx := context.Background()
+	for _, class := range []repo.Class{repo.Local, repo.Federated} {
+		c := repo.Config{Key: "apm-" + string(class), Class: class, PackageType: repo.AgentPackages}
+		if err := w.DB.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.DB.Permissions().Create(ctx, accesstest.Permission{
+			Name: "apm-policy-" + string(class),
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{
+					Users: map[string]api.Actions{"deployer": api.ActionRead},
+				},
+				Targets: map[string]accesstest.Target{c.Key: {Include: []string{"**"}}},
+			}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		versions := "/artifactory/api/agentpackages/" + c.Key + "/v1/packages/acme/my-pkg/versions"
+		for _, v := range []string{"1.0.0", "1.2.0"} {
+			wantStatus(t, w.Do(http.MethodPut, versions+"/"+v, "admin",
+				packageZIP(t, "my-pkg", v), "Content-Type", "application/zip"), http.StatusCreated)
+		}
+		patch := func(change func(*repo.Config)) {
+			t.Helper()
+			current, err := w.DB.Repos().Get(ctx, c.Key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			change(&current)
+			if err := w.DB.Repos().Update(ctx, current); err != nil {
+				t.Fatal(err)
+			}
+		}
+		refused := func(method, path, message string) {
+			t.Helper()
+			for _, as := range []string{"admin", "deployer"} {
+				rec := w.Do(method, path, as, "")
+				wantStatus(t, rec, http.StatusNotFound)
+				if method == http.MethodGet && !strings.Contains(rec.Body.String(), message) {
+					t.Fatalf("%s %s as %s: %s, want %q", method, path, as, rec.Body, message)
+				}
+				if got := rec.Header().Get("Cache-Control"); strings.Contains(got, "immutable") ||
+					rec.Header().Get("Content-Type") != "application/problem+json; charset=utf-8" {
+					t.Fatalf("%s %s as %s: headers %v on a refusal", method, path, as, rec.Header())
+				}
+			}
+			rec := w.Do(method, path, "user", "")
+			wantStatus(t, rec, http.StatusForbidden)
+			if strings.Contains(rec.Body.String(), c.Key+"'") ||
+				strings.Contains(rec.Header().Get("Cache-Control"), "immutable") {
+				t.Fatalf("%s %s as user: %v %s", method, path, rec.Header(), rec.Body)
+			}
+		}
+		listed := func(want ...string) {
+			t.Helper()
+			rec := w.Do(http.MethodGet, versions, "deployer", "")
+			wantStatus(t, rec, http.StatusOK)
+			for _, v := range want {
+				if !strings.Contains(rec.Body.String(), `"version":"`+v+`"`) {
+					t.Fatalf("versions: %s, want %s listed", rec.Body, v)
+				}
+			}
+		}
+		served := func(version string) {
+			t.Helper()
+			rec := w.Do(http.MethodGet, versions+"/"+version+"/download", "deployer", "")
+			wantStatus(t, rec, http.StatusOK)
+			if rec.Header().Get("Cache-Control") != "private, max-age=86400, immutable" ||
+				rec.Header().Get("Content-Type") != "application/zip" {
+				t.Fatalf("download %s: headers %v", version, rec.Header())
+			}
+		}
+		archive := apmfmt.Path("acme", "my-pkg", "1.2.0")
+
+		blackedOut := true
+		patch(func(rc *repo.Config) { rc.BlackedOut = &blackedOut })
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			refused(method, versions+"/1.2.0/download", "The repository '"+c.Key+
+				"' is blacked out and cannot serve artifact '"+c.Key+":"+archive+"'.")
+			refused(method, versions, "The repository '"+c.Key+
+				"' is blacked out and cannot serve artifact '"+c.Key+":acme/my-pkg'.")
+		}
+		search := w.Do(http.MethodGet, "/artifactory/api/agentpackages/"+c.Key+
+			"/v1/search?q=my-pkg", "deployer", "")
+		wantStatus(t, search, http.StatusOK)
+		if !strings.Contains(search.Body.String(), `"version":"1.2.0"`) {
+			t.Fatalf("search of a blacked-out repository: %s", search.Body)
+		}
+
+		blackedOut = false
+		patch(func(rc *repo.Config) { rc.BlackedOut, rc.ExcludesPattern = &blackedOut, &archive })
+		refused(http.MethodGet, versions+"/1.2.0/download", "The repository '"+c.Key+
+			"' rejected the artifact '"+c.Key+":"+archive+
+			"' due to its include/exclude pattern settings.")
+		listed("1.0.0", "1.2.0")
+		served("1.0.0")
+
+		cleared := ""
+		patch(func(rc *repo.Config) { rc.ExcludesPattern = &cleared })
+		served("1.2.0")
+	}
+}
