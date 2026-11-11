@@ -692,6 +692,17 @@ func (failingItems) Search(context.Context, *aql.Query, aql.Options) ([]aql.Hit,
 	return nil, errBoom
 }
 
+// failingCopies finds one copy of a blob but fails to list them all, which
+// a pull does when the repository's patterns reject the first copy.
+type failingCopies struct{ port.ItemStore }
+
+func (f failingCopies) Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.Hit, error) {
+	if !q.HasLimit {
+		return nil, errBoom
+	}
+	return f.ItemStore.Search(ctx, q, o) //nolint:wrapcheck // the store's own error
+}
+
 type itemsFault struct {
 	registry.Store
 	items port.ItemStore
@@ -722,6 +733,11 @@ func TestAccBlobStoreAndIndexFailures(t *testing.T) {
 		"mount": {func(w *blobWorld, o *Options) {
 			o.Store = itemsFault{Store: w.db, items: failingItems{w.db.Items()}}
 		}, http.MethodPost, "/v2/docker-local/app/blobs/uploads/?mount=" + d + "&from=oci-local/b"},
+		"copies": {func(w *blobWorld, o *Options) {
+			excluded := "app/**"
+			w.patchRepo("docker-local", func(c *repo.Config) { c.ExcludesPattern = &excluded })
+			o.Store = itemsFault{Store: w.db, items: failingCopies{w.db.Items()}}
+		}, http.MethodGet, "/v2/docker-local/app/blobs/" + d},
 		"open": {func(w *blobWorld, o *Options) {
 			o.Blobs = failingBlobs{w.blobs}
 		}, http.MethodGet, "/v2/docker-local/app/blobs/" + d},

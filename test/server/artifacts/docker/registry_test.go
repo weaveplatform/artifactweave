@@ -557,6 +557,51 @@ func TestAccRegistryBlobsDownloadAsFiles(t *testing.T) {
 	}
 }
 
+// Through the whole server, a pull the download policy refuses answers 404
+// with the policy's message in Artifactory's envelope, an administrator's
+// too, and keeps the registry's version header (RTFACT-27234).
+func TestAccRegistryPullPolicyThroughServer(t *testing.T) {
+	w := newItemWorld(t, false)
+	ctx := context.Background()
+	c := *repo.Defaults(&repo.Config{Key: "docker-local", Class: repo.Local, PackageType: repo.Docker})
+	if err := w.db.Repos().Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256Digest("layer")
+	target := "/v2/docker-local/app/blobs/" + digest
+	if rec := w.do(http.MethodPost, "/v2/docker-local/app/blobs/uploads/?digest="+digest, "admin",
+		"layer"); rec.Code != http.StatusCreated {
+		t.Fatalf("upload: %d %s", rec.Code, rec.Body)
+	}
+	on, excluded := true, "app/**"
+	for _, tc := range []struct {
+		patch func(*repo.Config)
+		msg   string
+	}{
+		{
+			func(c *repo.Config) { c.BlackedOut = &on },
+			"The repository 'docker-local' is blacked out and cannot serve artifact " +
+				"'docker-local:app/_uploads/sha256__" + digest[7:] + "'.",
+		},
+		{
+			func(c *repo.Config) { c.BlackedOut, c.ExcludesPattern = nil, &excluded },
+			"The repository 'docker-local' rejected the artifact 'docker-local:app/_uploads/" +
+				"sha256__" + digest[7:] + "' due to its include/exclude pattern settings.",
+		},
+	} {
+		tc.patch(&c)
+		if err := w.db.Repos().Update(ctx, c); err != nil {
+			t.Fatal(err)
+		}
+		rec := w.do(http.MethodGet, target, "admin", "")
+		want := `{"errors":[{"message":"` + tc.msg + `","status":404}]}` + "\n"
+		if rec.Code != http.StatusNotFound || rec.Body.String() != want ||
+			rec.Header().Get(dockerhttp.APIVersionHeader) != "registry/2.0" {
+			t.Fatalf("%d %v %s, want %s", rec.Code, rec.Header(), rec.Body, want)
+		}
+	}
+}
+
 // A manifest GET goes through the download redirect policy as a layer
 // does, as 7.x redirects manifests at or above the minimum size
 // (RTFACT-29705): the signed URL carries the manifest's media type, which

@@ -94,6 +94,15 @@
 //     Artifactory envelope.
 //   - Codes, statuses and messages stay byte-identical: docker, crane,
 //     oras, cosign, helm and the JFrog CLI read them.
+//   - A read the download policy refuses, a local or a remote repository's,
+//     answers 404 with the policy's message in Artifactory's envelope,
+//     under no registry code, as the Docker client showed 7.x's answer
+//     (RTFACT-27234); a missing manifest or blob keeps its registry code.
+//     Blackout is checked before the item is looked for, the patterns on
+//     the copy a pull serves, and a blob is served from any copy in the
+//     image the patterns accept (RTFACT-30134). The catalog leaves out an
+//     image its repository's patterns reject (RTFACT-26524), and a mount
+//     from another repository that would refuse the blob opens a session.
 //
 // # References
 //
@@ -163,10 +172,11 @@
 //   - token_test.go: the token endpoint, its grants, lifetime and parent
 //     binding, the challenge and the auth endpoints, on the access test kit
 //     (access/accesstest).
-//   - pull_policy_test.go, reject_test.go and remote_listing_test.go: pulls
-//     from a blacked-out repository and of items its patterns exclude, a
-//     format's refusals, which keep their status, and a remote listing's
-//     final fence.
+//   - pull_policy_test.go, reject_test.go and remote_listing_test.go: the
+//     download policy's refusals of pulls, a blob served from a copy the
+//     patterns accept, mounts from a refusing source and catalogs the
+//     patterns filter; a format's refusals of writes, which keep their
+//     status; and a remote listing's final fence.
 //   - The guard suites test/server/artifacts/docker and
 //     test/server/artifacts/helmoci, and the OCI conformance job, drive the
 //     registry through the whole server; the docker suite drives DockerAPI's

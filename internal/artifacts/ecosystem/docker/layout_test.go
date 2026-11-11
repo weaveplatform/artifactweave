@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -122,6 +123,25 @@ func findBlob(t *testing.T, db item.Store) {
 		it.Path != "a_b.c/sub/v1" {
 		t.Errorf("the deeper image: %+v %v", it, err)
 	}
+	// FindBlobs finds every copy FindBlob could have found, in the image's
+	// own folders only.
+	deploy("docker-local", "a_b.c/v3/sha256__"+tagged, "tagged")
+	deploy("docker-local", "a_b.c/sub/v2/sha256__"+tagged, "tagged")
+	deploy("docker-local", "aXb.c/v2/sha256__"+tagged, "tagged")
+	copies, err := layout.FindBlobs(ctx, db.Items(), "docker-local", "a_b.c", tagged)
+	paths := make([]string, 0, len(copies))
+	for _, it := range copies {
+		paths = append(paths, it.FullPath())
+	}
+	slices.Sort(paths)
+	if want := []string{"a_b.c/v1/sha256__" + tagged, "a_b.c/v3/sha256__" + tagged}; err != nil ||
+		!slices.Equal(paths, want) {
+		t.Errorf("copies: %v %v, want %v", paths, err, want)
+	}
+	if copies, err := layout.FindBlobs(ctx, db.Items(), "docker-local", "a_b.c", sum("absent")); err != nil ||
+		len(copies) != 0 {
+		t.Errorf("copies of an absent blob: %v %v", copies, err)
+	}
 }
 
 type failingSearch struct{ port.ItemStore }
@@ -134,5 +154,9 @@ func TestUnitFindBlobFails(t *testing.T) {
 	_, err := layout.FindBlob(context.Background(), failingSearch{}, "r", "app", sum("x"))
 	if err == nil || errors.Is(err, kernel.ErrNotFound) || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("err = %v", err)
+	}
+	_, err = layout.FindBlobs(context.Background(), failingSearch{}, "r", "app", sum("x"))
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("copies: err = %v", err)
 	}
 }

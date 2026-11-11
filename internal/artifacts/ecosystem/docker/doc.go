@@ -58,10 +58,12 @@
 //     carries (Properties: ManifestProperty, LabelPropertyPrefix and the
 //     rest, and SubjectProperty and ArtifactTypeProperty, from which the
 //     referrers API is answered).
-//   - Lookups over the item store: FindBlob, FindManifest, FolderManifest,
-//     ManifestFolders, Tags, Images, Manifests, Retained, ImageManifests and
-//     FindReferrers, with Compare, the specification's order of tags and
-//     names, and PushTime, a tag's place among its image's tags.
+//   - Lookups over the item store: FindBlob and FindBlobs (every copy of a
+//     blob in the image, from which a pull picks one the repository's
+//     patterns accept), FindManifest, FolderManifest, ManifestFolders,
+//     Tags, Images, Manifests, Retained, ImageManifests and FindReferrers,
+//     with Compare, the specification's order of tags and names, and
+//     PushTime, a tag's place among its image's tags.
 //   - Handler: the hooks that index images and tags, classify a tag's
 //     manifest as metadata, admit writes under the generic deploy policy,
 //     settle the index after deletes and reindex a repository; and Chart,
