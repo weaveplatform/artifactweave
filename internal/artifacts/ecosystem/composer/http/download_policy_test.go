@@ -264,8 +264,8 @@ func TestAccDownloadPolicyOfARemoteRepository(t *testing.T) {
 
 // TestAccDownloadPolicyRefusalOfARemoteRevalidation: a remote's policy
 // refusal that the revalidation of its metadata returns answers its own
-// 404 and message, where it answered 500 (R4); other failures keep their
-// answers, through a virtual repository too (#1237).
+// 404 and message, not a fault (R4); other failures keep their answers,
+// through a virtual repository too (#1237).
 func TestAccDownloadPolicyRefusalOfARemoteRevalidation(t *testing.T) {
 	archive := makeZIP(t, "1.0.0", "remote")
 	b := &sourceBackend{content: map[string][]byte{
