@@ -80,20 +80,20 @@
       "path": "test/acceptance/clients/debian.Dockerfile",
       "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
     },
+    "dotnet-10.image": {
+      "path": "test/acceptance/clients/dotnet-10/Dockerfile",
+      "pattern": "^FROM (\\S+)$"
+    },
+    "dotnet-10.version": {
+      "path": "test/acceptance/clients/dotnet-10/Dockerfile",
+      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
+    },
     "dotnet-11.image": {
       "path": "test/acceptance/clients/dotnet-11.Dockerfile",
       "pattern": "^FROM (\\S+)$"
     },
     "dotnet-11.version": {
       "path": "test/acceptance/clients/dotnet-11.Dockerfile",
-      "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
-    },
-    "dotnet.image": {
-      "path": "test/acceptance/clients/dotnet.Dockerfile",
-      "pattern": "^FROM (\\S+)$"
-    },
-    "dotnet.version": {
-      "path": "test/acceptance/clients/dotnet.Dockerfile",
       "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
     },
     "fedora.image": {
@@ -523,7 +523,7 @@
     "nimmodel": "curl for metadata; crane {{crane}} for the paired image",
     "nix": "Nix {{nix.version}}",
     "npm": "Bundled npm on Node {{node.version}}; npm {{npm12}} on Node {{node-npm12.version}}",
-    "nuget": "NuGet bundled with .NET SDK {{dotnet.version}} image; .NET {{dotnet-11.version}} image also exercised (exact SDK versions in CI logs)",
+    "nuget": "NuGet bundled with .NET SDK {{dotnet-10.version}} image; .NET {{dotnet-11.version}} image also exercised (exact SDK versions in CI logs)",
     "oci": "ORAS {{oras}}; crane {{crane}}; Cosign {{cosign}}",
     "opkg": "opkg {{opkg}}",
     "p2": "Eclipse Platform / Equinox P2 {{p2}}, Java 21",
@@ -610,14 +610,14 @@
       "replacement": "# Client pins: APT bundled with Ubuntu {{debian.version}} (immutable image)."
     },
     {
+      "path": "test/acceptance/clients/dotnet-10/Dockerfile",
+      "pattern": "\\A#[^\\n]*",
+      "replacement": "# Client pins: NuGet bundled with the .NET SDK {{dotnet-10.version}} image."
+    },
+    {
       "path": "test/acceptance/clients/dotnet-11.Dockerfile",
       "pattern": "\\A#[^\\n]*",
       "replacement": "# Client pins: NuGet bundled with the .NET SDK {{dotnet-11.version}} image."
-    },
-    {
-      "path": "test/acceptance/clients/dotnet.Dockerfile",
-      "pattern": "\\A#[^\\n]*",
-      "replacement": "# Client pins: NuGet bundled with the .NET SDK {{dotnet.version}} image."
     },
     {
       "path": "test/acceptance/clients/fedora.Dockerfile",
@@ -886,8 +886,8 @@
     "test/acceptance/clients/conda.Dockerfile",
     "test/acceptance/clients/dart.Dockerfile",
     "test/acceptance/clients/debian.Dockerfile",
+    "test/acceptance/clients/dotnet-10/Dockerfile",
     "test/acceptance/clients/dotnet-11.Dockerfile",
-    "test/acceptance/clients/dotnet.Dockerfile",
     "test/acceptance/clients/fedora.Dockerfile",
     "test/acceptance/clients/frogml/Dockerfile",
     "test/acceptance/clients/git-lfs.Dockerfile",

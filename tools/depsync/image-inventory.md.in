@@ -21,8 +21,8 @@ original tested versions.
 | [`conda.Dockerfile`](../../test/acceptance/clients/conda.Dockerfile) | `{{conda.image}}` | micromamba {{conda.version}} (Conda package protocol) | [micromamba {{conda.version}}](https://github.com/mamba-org/micromamba-releases/releases/tag/{{conda.version}}-0) |
 | [`dart.Dockerfile`](../../test/acceptance/clients/dart.Dockerfile) | `{{dart.image}}` | Dart/pub {{dart.version}} | [Dart archive](https://dart.dev/get-dart/archive) |
 | [`debian.Dockerfile`](../../test/acceptance/clients/debian.Dockerfile) | `{{debian.image}}` | APT bundled with Ubuntu {{debian.version}} (immutable image) | [Ubuntu releases](https://ubuntu.com/project/docs/release-team/list-of-releases/) |
+| [`dotnet-10/Dockerfile`](../../test/acceptance/clients/dotnet-10/Dockerfile) | `{{dotnet-10.image}}` | NuGet bundled with the .NET SDK {{dotnet-10.version}} image | [.NET downloads](https://dotnet.microsoft.com/en-us/download) |
 | [`dotnet-11.Dockerfile`](../../test/acceptance/clients/dotnet-11.Dockerfile) | `{{dotnet-11.image}}` | NuGet bundled with the .NET SDK {{dotnet-11.version}} image | [.NET downloads](https://dotnet.microsoft.com/en-us/download) |
-| [`dotnet.Dockerfile`](../../test/acceptance/clients/dotnet.Dockerfile) | `{{dotnet.image}}` | NuGet bundled with the .NET SDK {{dotnet.version}} image | [.NET downloads](https://dotnet.microsoft.com/en-us/download) |
 | [`fedora.Dockerfile`](../../test/acceptance/clients/fedora.Dockerfile) | `{{fedora.image}}` | DNF and RPM bundled with Fedora {{fedora.version}} (immutable image) | [Fedora downloads](https://fedoraproject.org/workstation/download/) |
 | [`frogml/Dockerfile`](../../test/acceptance/clients/frogml/Dockerfile) | `{{frogml.image}}` | FrogML {{frogml}}; Python {{frogml.version}} | [FrogML release and wheel](https://pypi.org/project/frogml/{{frogml}}/#files), [Python releases](https://www.python.org/downloads/) |
 | [`git-lfs.Dockerfile`](../../test/acceptance/clients/git-lfs.Dockerfile) | `{{git-lfs.image}}` | Git LFS {{git-lfs}} | [Git LFS {{git-lfs}}](https://github.com/git-lfs/git-lfs/releases/tag/v{{git-lfs}}) |
@@ -50,6 +50,9 @@ because the pinned Puppet cannot extract a module archive on Ruby 3.4
 ([#1126](https://github.com/weaveplatform/artifactweave/issues/1126)). The
 npm 12 image stays on Node 24 LTS the same way: it keeps the prior Node line
 beside the newest Node ([decision 0034](../research/decisions/0034-npm.md)).
+The `dotnet-10` image stays on the .NET SDK's 10.0 LTS line the same way,
+beside the newest line in `dotnet-11.Dockerfile`
+([#1229](https://github.com/weaveplatform/artifactweave/issues/1229)).
 
 Purposeful compatibility lanes retain their declared runtimes. Updating a pin
 regenerates this inventory, recipe labels and secondary version assertions; it

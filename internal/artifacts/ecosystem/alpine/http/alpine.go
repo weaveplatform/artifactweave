@@ -373,6 +373,12 @@ func (s alpineItems) serveRemoteAlpinePackage(
 	w http.ResponseWriter, r *http.Request, c repo.Config, req itemkit.ItemRequest,
 	p kernel.Principal, acc itemkit.Access,
 ) {
+	// The missing service is this server's fault, not the upstream's, so it
+	// answers 500 as the index read does rather than SourceError's 502.
+	if s.RemoteSources == nil {
+		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "Alpine source", source.ErrUnavailable))
+		return
+	}
 	query := source.Request{
 		Repo:    c,
 		Subject: accessapi.SubjectOf(p),
