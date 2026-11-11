@@ -785,7 +785,10 @@ func SplitRepoPath(escaped string) (key, p string, folder bool, err error) {
 }
 
 // getArchiveEntry serves one entry of an archive file: the part of an item
-// path after "!/" (decision 0002).
+// path after "!/" (decision 0002). An archive that cannot be read, such as
+// one whose blob is lost, answers 500 as the archive's own download does,
+// where returning without a write would send an empty 200. Once the entry's
+// status is sent, a failure can only be logged.
 func (s *Kit) getArchiveEntry(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -798,22 +801,28 @@ func (s *Kit) getArchiveEntry(
 		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
+	sw := &StatusWriter{ResponseWriter: w}
 	err := s.Items(st).ArchiveEntry(ctx, f.Item, entry, func(size int64, rd io.Reader) error {
-		h := w.Header()
+		h := sw.Header()
 		h.Set("Content-Type", item.MimeType(entry))
 		h.Set("Content-Length", strconv.FormatInt(size, 10))
 		h.Set("X-Artifactory-Filename", path.Base(entry))
-		w.WriteHeader(http.StatusOK)
+		sw.WriteHeader(http.StatusOK)
 		if r.Method == http.MethodHead {
 			return nil
 		}
-		_, err := io.Copy(w, rd)
+		_, err := io.Copy(sw, rd)
 		return err //nolint:wrapcheck // the status is sent; only logged
 	})
+	if err == nil {
+		return
+	}
 	switch {
+	case sw.status != 0:
+		_ = s.InternalError(ctx, "archive entry", err)
 	case errors.Is(err, item.ErrNotFound):
 		httpkit.WriteErr(w, r, ItemNotFound())
-	case err != nil:
-		_ = s.InternalError(ctx, "archive entry", err)
+	default:
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "archive entry", err))
 	}
 }
