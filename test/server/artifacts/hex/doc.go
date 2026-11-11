@@ -18,8 +18,9 @@
 //     request and seed helpers of test/server/support.
 //   - The decimal and ecto tarballs in
 //     internal/artifacts/ecosystem/hex/testdata, read root-relative through
-//     repopath, and an RSA key pair generated once per test binary
-//     (testKeys).
+//     repopath, and two RSA key pairs, each generated once per test binary:
+//     testKeys, and otherKeys for a virtual repository that signs with a
+//     key its members do not hold.
 //
 // # Outputs
 //
@@ -27,9 +28,10 @@
 //   - hex_test.go: the local and virtual signed registry, invalid routes and
 //     repository configuration, and the federated class refused.
 //   - hex_remote_test.go: a remote's signed metadata that filters a denied
-//     version, a virtual repository over remote members, and one that
-//     passes over a member whose upstream lacks the package or that the
-//     caller may not read.
+//     version, a virtual repository over remote members, one that passes
+//     over a member whose upstream lacks the package or that the caller may
+//     not read, and one whose own read permissions narrow what its members
+//     list.
 //
 // # References
 //

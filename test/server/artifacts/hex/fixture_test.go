@@ -59,7 +59,13 @@ type keyMaterial struct{ private, public string }
 
 // testKeys generates the pair once per test binary, as the root fixture of
 // the same name does for its first pair.
-var testKeys = sync.OnceValue(func() keyMaterial {
+var testKeys = sync.OnceValue(generateKeys)
+
+// otherKeys is a second pair, for a repository whose signatures must not
+// verify with testKeys.
+var otherKeys = sync.OnceValue(generateKeys)
+
+func generateKeys() keyMaterial {
 	k, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		panic(err)
@@ -74,4 +80,4 @@ var testKeys = sync.OnceValue(func() keyMaterial {
 		})),
 		public: string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der})),
 	}
-})
+}
