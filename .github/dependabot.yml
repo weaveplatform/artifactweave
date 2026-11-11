@@ -89,6 +89,12 @@ updates:
   # 3.16.0 and every patch release still arrive. A single range cannot span
   # two lines without taking in the releases between them. Python ships one
   # minor a year: add the next range before 3.21.0a1, due about October 2031.
+  # hexpm/elixir, hex.Dockerfile's base, is ignored outright (#1240). It holds
+  # about a million tags, and Docker Hub answers 504 after 30 seconds when
+  # Dependabot lists them, even 100 at a time; the error fails this entry's
+  # run. An ignore that names no versions keeps the image out of the run
+  # before any tag is listed; a version range would still list them.
+  # deps-refresh.yml moves the image instead.
   - package-ecosystem: "docker"
     directory: "/test/acceptance/clients"
     schedule:
@@ -101,6 +107,7 @@ updates:
           - ">= 3.18.0.a, < 3.18.0"
           - ">= 3.19.0.a, < 3.19.0"
           - ">= 3.20.0.a, < 3.20.0"
+      - dependency-name: "hexpm/elixir"
     groups:
       acceptance-clients:
         patterns: ["*"]

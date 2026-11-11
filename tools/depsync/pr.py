@@ -36,7 +36,7 @@ def eligible(pr, repo, branch, sha, base="main"):
     author = pr.get("user", {}).get("login")
     trusted = (author == "dependabot[bot]" and branch.startswith("dependabot/")) or (
         author == "weaveplatform-release-please[bot]" and branch in {
-            "deps/refresh", "deps/jfrog-providers", "deps/jfrog-providers-major"})
+            "deps/refresh", "deps/jfrog-providers", "deps/jfrog-providers-major", "deps/hex-image"})
     trusted = trusted or (author == "weaveplatform-release-please[bot]"
                           and re.fullmatch(r"deps/references/[0-9a-f]{40}", branch) is not None)
     return (trusted and pr.get("state") == "open" and pr.get("base", {}).get("ref") == base
