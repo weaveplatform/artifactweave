@@ -39,12 +39,14 @@
 //     package with no readable version answers 404.
 //   - Artifactory's download policy (generic.CheckDownload), after the
 //     caller's read permission: a version's download from a blacked-out
-//     repository, or of an archive the include and exclude patterns
-//     reject, answers 404 with the item routes' message, without the
-//     archive's Content-Type and immutable Cache-Control, which only a
-//     served archive carries. A blacked-out repository's version list
-//     answers the blackout's 404, naming the package's folder. The
-//     patterns do not shorten the list, and the search keeps its answer.
+//     repository, whether the version exists or not, or of an archive the
+//     include and exclude patterns reject, answers 404 with the item
+//     routes' message. A blacked-out repository's version list answers the
+//     blackout's 404, naming the package's folder. The patterns do not
+//     shorten the list, and the search keeps its answer.
+//   - Only a served archive carries the archive's Content-Type and the
+//     immutable Cache-Control; a refusal and a missing version's 404 do
+//     not.
 //   - A publish needs write permission on the archive's path, the
 //     application/zip media type (415) and at most 64 MiB (413), and never
 //     replaces a published version (409).

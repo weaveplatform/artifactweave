@@ -354,11 +354,20 @@ func TestAccAgentPackagesDownloadPolicy(t *testing.T) {
 		}
 		archive := apmfmt.Path("acme", "my-pkg", "1.2.0")
 
+		// A missing version is no version either, so its 404 is not
+		// marked immutable.
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			refused(method, versions+"/9.9.9/download", "Could not find resource")
+		}
+
 		blackedOut := true
 		patch(func(rc *repo.Config) { rc.BlackedOut = &blackedOut })
 		for _, method := range []string{http.MethodGet, http.MethodHead} {
 			refused(method, versions+"/1.2.0/download", "The repository '"+c.Key+
 				"' is blacked out and cannot serve artifact '"+c.Key+":"+archive+"'.")
+			refused(method, versions+"/9.9.9/download", "The repository '"+c.Key+
+				"' is blacked out and cannot serve artifact '"+c.Key+":"+
+				apmfmt.Path("acme", "my-pkg", "9.9.9")+"'.")
 			refused(method, versions, "The repository '"+c.Key+
 				"' is blacked out and cannot serve artifact '"+c.Key+":acme/my-pkg'.")
 		}

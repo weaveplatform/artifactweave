@@ -141,21 +141,32 @@ func (h handler) download(w http.ResponseWriter, r *http.Request) {
 	}
 	path := apmfmt.Path(owner, name, version)
 	// The contract marks a version's archive immutable for a day (APM
-	// registry HTTP API, sections 1.6 and 7.1), and a refusal is no version:
-	// a client that cached one would not see the version for a day after
-	// the repository lets it through. So the read grant, then the download
-	// policy, are checked before the headers are set, and ServeItem's own
-	// checks of both then pass.
+	// registry HTTP API, sections 1.6 and 7.1, "versions are immutable"),
+	// and neither a refusal nor a missing version is a version: a client
+	// that cached one would not see the version for a day after the
+	// repository lets it through or it is published. So the archive is
+	// found, after the read grant and the download policy, before the
+	// headers are set, and ServeFound's own checks of both then pass.
 	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
-	if err := h.k.CheckDownload(r, path); err != nil {
+	f, err := h.k.DownloadItem(r, path)
+	switch {
+	case pkgroute.IsRefusal(err):
+		h.k.Error(w, r, err)
+		return
+	case errors.Is(err, kernel.ErrNotFound) || err == nil && f.Item.Folder:
+		// The answer ServeItem gives a missing file, which this route gave
+		// before it found the archive itself.
+		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Could not find resource"))
+		return
+	case err != nil:
 		h.k.Error(w, r, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Cache-Control", "private, max-age=86400, immutable")
-	h.k.ServeItem(w, r, path)
+	h.k.ServeFound(w, r, f)
 }
 
 func (h handler) publish(w http.ResponseWriter, r *http.Request) {
