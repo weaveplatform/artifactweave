@@ -37,7 +37,8 @@ def pins(root, catalog):
         data = safe_path(root, source["path"]).read_text()
         matches = re.findall(source["pattern"], data, re.MULTILINE)
         if len(matches) != 1 or not isinstance(matches[0], str):
-            raise ValueError(name + ": expected exactly one canonical pin")
+            raise ValueError(name + ": expected exactly one canonical pin, found " + str(len(matches))
+                             + " in " + source["path"] + " matching " + source["pattern"])
         value = matches[0]
         if not re.fullmatch(r"[A-Za-z0-9._:/@+-]+", value):
             raise ValueError(name + ": invalid pin value")

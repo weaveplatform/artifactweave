@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **NuGet bundled with .NET SDK 10.0 image; .NET 11.0 image also exercised (exact SDK versions in CI logs)**. Registered classes: **local, remote, virtual, federated**.
+Client: **NuGet bundled with .NET SDK 11.0 image; .NET 11.0 image also exercised (exact SDK versions in CI logs)**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/nuget/v3/${AW_REPO}/index.json`
 

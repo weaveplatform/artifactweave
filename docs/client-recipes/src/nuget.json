@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "nuget",
   "name": "NuGet v3 with dotnet",
-  "client": "NuGet bundled with .NET SDK 10.0 image; .NET 11.0 image also exercised (exact SDK versions in CI logs)",
+  "client": "NuGet bundled with .NET SDK 11.0 image; .NET 11.0 image also exercised (exact SDK versions in CI logs)",
   "version_sources": [
     "test/acceptance/clients/dotnet.Dockerfile",
     "test/acceptance/clients/dotnet-11.Dockerfile"
