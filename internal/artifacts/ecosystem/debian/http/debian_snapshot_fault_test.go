@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -399,9 +400,9 @@ func TestUnitDebianSnapshotCopiesTheSourceMetadata(t *testing.T) {
 
 // TestUnitDebianSnapshotCreationFailsClosed: a snapshot is recorded only
 // when every step succeeds. A marker or metadata the store cannot read or
-// write, a target the caller may not write below the tag, a source Release
-// whose declarations do not parse, a listed package the source excludes,
-// and an InRelease that cannot be read each fail the snapshot.
+// write, a target the caller may not write below the tag, a listed package
+// the caller may not read, a source Release whose declarations do not
+// parse, and an InRelease that cannot be read each fail the snapshot.
 func TestUnitDebianSnapshotCreationFailsClosed(t *testing.T) {
 	// The caller may do anything but act below the tag in the target, which
 	// the snapshot checks file by file after it has checked the tag itself.
@@ -411,6 +412,16 @@ func TestUnitDebianSnapshotCreationFailsClosed(t *testing.T) {
 			_ accessapi.ResourceType, r accessapi.Repo, path string, _ accessapi.Actions,
 		) bool {
 			return r.Key != snapshotJob.Target || !strings.HasPrefix(path, snapshotMarker+"/")
+		},
+	}}
+	// The caller may do anything but read the source's packages, which the
+	// snapshot checks for each path the source's indexes list.
+	noReadsOfPackages := itemkit.Access{Decider: &accessapitest.Decider{
+		Admin: true,
+		AllowsFunc: func(
+			_ accessapi.ResourceType, r accessapi.Repo, path string, _ accessapi.Actions,
+		) bool {
+			return r.Key != snapshotJob.Source || !strings.HasPrefix(path, "pool/")
 		},
 	}}
 	for _, tc := range []struct {
@@ -444,22 +455,15 @@ func TestUnitDebianSnapshotCreationFailsClosed(t *testing.T) {
 			want: kernel.ErrForbidden,
 		},
 		{
+			name: "caller may not read a listed package", acc: &noReadsOfPackages,
+			want: kernel.ErrForbidden,
+		},
+		{
 			name: "source Release declarations do not parse",
 			seed: func(w *itemWorld) {
 				w.put("deb-source", debRelease, false, []byte("Suite: stable\n"))
 			},
 			step: "snapshot Release declarations",
-		},
-		{
-			name: "listed package excluded by the source",
-			seed: func(w *itemWorld) {
-				c := w.debRepo("deb-source")
-				c.ExcludesPattern = new("pool/**")
-				if err := w.db.Repos().Update(w.t.Context(), c); err != nil {
-					w.t.Fatal(err)
-				}
-			},
-			want: kernel.ErrForbidden,
 		},
 		{
 			name: "InRelease unreadable",
@@ -571,5 +575,101 @@ func TestAccDebianSnapshotReadsNeedAStoreAndACaller(t *testing.T) {
 			r.ServeHTTP(rec, req)
 			wantError(t, rec, tc.status, tc.message)
 		})
+	}
+}
+
+// snapshotRead serves a GET of rel in snapshotJob's tag through svc's
+// snapshot read route as the named caller: admin is kittest's
+// administrator, whom every question allows, and any other name a user
+// whom none allows.
+func snapshotRead(t *testing.T, svc DebianAPI, rel, as string) *httptest.ResponseRecorder {
+	t.Helper()
+	p, d := kittest.Admin, kittest.AdminAccess().Decider
+	if as != kittest.Admin.Name {
+		p, d = kernel.Principal{Name: as}, &accessapitest.Decider{}
+	}
+	r := chi.NewRouter()
+	svc.RegisterDebianSnapshotRoutes(r)
+	req := httptest.NewRequestWithContext(accessapi.WithCaller(t.Context(), p, d),
+		http.MethodGet, "/artifactory/api/deb/"+snapshotJob.Target+"/"+snapshotMarker+"/"+rel, nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	return rec
+}
+
+// setRepo stores the repository key's configuration as change leaves it.
+func setRepo(t *testing.T, w *itemWorld, key string, change func(*repo.Config)) {
+	t.Helper()
+	c := w.debRepo(key)
+	change(&c)
+	if err := w.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestUnitDebianSnapshotKeepsAPackageTheSourceRefuses: a snapshot copies
+// the source's indexes as they are, so a package whose file the source's
+// patterns reject stays listed, as it does in the source's own index
+// (RTFACT-30830). The snapshot's index is then served while the source
+// refuses that package, or is blacked out: only the package path, which
+// redirects to the source, meets the source's policy there.
+func TestUnitDebianSnapshotKeepsAPackageTheSourceRefuses(t *testing.T) {
+	w := snapshotWorld(t)
+	setRepo(t, w, snapshotJob.Source, func(c *repo.Config) { c.ExcludesPattern = new("pool/**") })
+	svc := DebianAPI{newKit(withAccess(t, Config{Store: w.db, Blobs: w.blobs}))}
+	if err := svc.createDebianSnapshot(t.Context(), w.db, snapshotJob,
+		kittest.Admin, kittest.AdminAccess()); err != nil {
+		t.Fatalf("snapshot of a source that rejects a listed package: %v", err)
+	}
+	wantListed := func(when string) {
+		t.Helper()
+		rec := snapshotRead(t, svc, debPackages, kittest.Admin.Name)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: snapshot Packages answered %d %s, want 200", when, rec.Code, rec.Body)
+		}
+		if got := filenames(t, rec.Body.Bytes()); !slices.Equal(got, []string{debAlpha}) {
+			t.Errorf("%s: snapshot Packages lists %v, want alpha", when, got)
+		}
+	}
+	wantListed("source rejects alpha")
+	setRepo(t, w, snapshotJob.Source, func(c *repo.Config) { c.BlackedOut = new(true) })
+	wantListed("source blacked out")
+	rec := snapshotRead(t, svc, debAlpha, kittest.Admin.Name)
+	if want := "/artifactory/" + snapshotJob.Source + "/" + debAlpha; rec.Code != http.StatusFound ||
+		rec.Header().Get("Location") != want {
+		t.Errorf("snapshot package answered %d to %q, want 302 to %q",
+			rec.Code, rec.Header().Get("Location"), want)
+	}
+	rec = snapshotRead(t, svc, debPackages, "reader")
+	wantError(t, rec, http.StatusForbidden, "Forbidden")
+}
+
+// TestUnitDebianSnapshotOfARemoteKeepsAPackageItsPatternsReject: a
+// snapshot of a remote source checks each package its index lists for
+// Read permission alone (source.Result.CheckPermission), so a package
+// whose file the remote's patterns reject is copied in the index rather
+// than failing the snapshot.
+func TestUnitDebianSnapshotOfARemoteKeepsAPackageItsPatternsReject(t *testing.T) {
+	index := packagesIndex("alpha 1.0 " + debAlpha)
+	w := newOverlayWorld(t, withSources(upstream(map[string]func() (source.Result, error){
+		debRelease:  streamed(releaseFor(index), nil),
+		debPackages: streamed(index, nil),
+	})))
+	w.debRepos(
+		repo.Config{Key: snapshotJob.Source, Class: repo.Remote, ExcludesPattern: new("pool/**")},
+		repo.Config{Key: snapshotJob.Target, Class: repo.Local},
+	)
+	svc := DebianAPI{w.kit}
+	if err := svc.createDebianSnapshot(t.Context(), w.db, snapshotJob,
+		kittest.Admin, kittest.AdminAccess()); err != nil {
+		t.Fatalf("snapshot of a remote that rejects a listed package: %v", err)
+	}
+	stored := w.item(snapshotJob.Target, false, snapshotMarker+"/"+debPackages)
+	body, err := svc.readDebianBlob(t.Context(), stored.Actual.SHA256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := filenames(t, body); !slices.Equal(got, []string{debAlpha}) {
+		t.Errorf("snapshot Packages lists %v, want alpha", got)
 	}
 }

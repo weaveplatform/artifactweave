@@ -22,7 +22,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
@@ -325,7 +324,7 @@ func (s DebianAPI) debianSnapshotFiles(
 		if ref.Size > debianIndexLimit || total+ref.Size > 512<<20 {
 			return nil, httpkit.BadRequestf("Debian snapshot metadata exceeds limit")
 		}
-		body, checkRead, err := s.debianMemberBytes(ctx, st, c, ref.Path, p, acc)
+		body, checkPermission, err := s.debianMemberBytes(ctx, st, c, ref.Path, p, acc)
 		if err != nil {
 			return nil, fmt.Errorf("snapshot index %s: %w", ref.Path, err)
 		}
@@ -338,13 +337,16 @@ func (s DebianAPI) debianSnapshotFiles(
 			if err != nil {
 				return nil, err
 			}
+			// Read permission alone: the snapshot copies the indexes as the
+			// source holds them, so a package the source's patterns reject
+			// stays listed, as it does in the source's own index
+			// (RTFACT-30830), and only its download is refused.
 			for _, artifact := range paths {
-				if !acc.File(c, artifact, accessapi.ActionRead) ||
-					generic.CheckDownload(c, artifact, false) != nil {
+				if !acc.File(c, artifact, accessapi.ActionRead) {
 					return nil, httpkit.Denied(p)
 				}
-				if checkRead != nil {
-					if err := checkRead(ctx, artifact); err != nil {
+				if checkPermission != nil {
+					if err := checkPermission(ctx, artifact); err != nil {
 						return nil, fmt.Errorf("snapshot artifact authority: %w", err)
 					}
 				}
@@ -454,6 +456,12 @@ func (s DebianAPI) getDebianSnapshot(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusFound)
 }
 
+// checkDebianSnapshotIndex refuses a snapshot's index to a caller who may
+// not read every package it lists in the recorded source. The source's
+// download policy is not applied: the index is the target's stored file,
+// and a package the source's patterns reject, or every package of a
+// blacked-out source, stays listed, refused only when the redirected
+// download reaches the source (RTFACT-30830).
 func (s DebianAPI) checkDebianSnapshotIndex(
 	ctx context.Context, rel string, it model.Item, sourceRepo repo.Config,
 	p kernel.Principal, acc itemkit.Access,
@@ -471,8 +479,7 @@ func (s DebianAPI) checkDebianSnapshotIndex(
 		return err
 	}
 	for _, artifact := range paths {
-		if !acc.File(sourceRepo, artifact, accessapi.ActionRead) ||
-			generic.CheckDownload(sourceRepo, artifact, false) != nil {
+		if !acc.File(sourceRepo, artifact, accessapi.ActionRead) {
 			return httpkit.Denied(p)
 		}
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
@@ -31,7 +32,9 @@ func refuseSources(t *testing.T) func(*overlayConfig) {
 // TestAccDebianVirtualMetadataRefusals: a virtual repository's metadata is
 // refused to a request with a query or a caller who may not read it, and is
 // not found when the virtual repository names no members, when no member
-// publishes the distribution, and for an InRelease it cannot sign.
+// publishes the distribution, and for an InRelease it cannot sign. When the
+// virtual repository's own patterns reject the document's path, it answers
+// that no repository serves it, once read permission is settled.
 func TestAccDebianVirtualMetadataRefusals(t *testing.T) {
 	w := newOverlayWorld(t)
 	w.debRepos(
@@ -41,6 +44,10 @@ func TestAccDebianVirtualMetadataRefusals(t *testing.T) {
 		repo.Config{Key: "deb-empty", Class: repo.Virtual},
 		repo.Config{
 			Key: "deb-bare", Class: repo.Virtual, Repositories: []string{"deb-unpublished"},
+		},
+		repo.Config{
+			Key: "deb-closed", Class: repo.Virtual, Repositories: []string{"deb-local"},
+			ExcludesPattern: new("dists/**"),
 		},
 	)
 	w.publish("deb-local", packagesIndex("alpha 1.0 "+debAlpha))
@@ -74,11 +81,87 @@ func TestAccDebianVirtualMetadataRefusals(t *testing.T) {
 			"no member publishes the distribution", "deb-bare", debRelease, "admin",
 			http.StatusNotFound, "Could not find resource",
 		},
+		{
+			"Release the virtual repository's patterns reject", "deb-closed", debRelease, "admin",
+			http.StatusNotFound,
+			"No repository found to serve the request for deb-closed:" + debRelease,
+		},
+		{
+			"Packages the virtual repository's patterns reject", "deb-closed", debPackages,
+			"admin", http.StatusNotFound,
+			"No repository found to serve the request for deb-closed:" + debPackages,
+		},
+		{
+			"caller who may not read a rejected Release", "deb-closed", debRelease, "user",
+			http.StatusForbidden, "Forbidden",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			wantError(t, w.get(tc.key, tc.path, tc.as), tc.status, tc.message)
 		})
 	}
+}
+
+// TestAccDebianVirtualKeepsPackagesThePatternsReject: a virtual Packages
+// index keeps a package whose file the listing member's patterns, or the
+// virtual repository's own, reject, with the listing member's own row, as
+// 7.x merges the members' indexes as they are (RTFACT-30830, RTFACT-30656).
+// The file's GET passes over the refusing member to the next that holds it,
+// answers not found when no member serves it, and answers that no
+// repository serves it when the virtual repository's patterns reject it.
+func TestAccDebianVirtualKeepsPackagesThePatternsReject(t *testing.T) {
+	w := newOverlayWorld(t)
+	w.debRepos(
+		repo.Config{Key: "deb-hiding", Class: repo.Local, ExcludesPattern: new("pool/alpha*")},
+		repo.Config{Key: "deb-local", Class: repo.Local},
+		repo.Config{
+			Key: "deb-virtual", Class: repo.Virtual,
+			Repositories: []string{"deb-hiding", "deb-local"},
+		},
+		repo.Config{
+			Key: "deb-only-hiding", Class: repo.Virtual, Repositories: []string{"deb-hiding"},
+		},
+		repo.Config{
+			Key: "deb-picky", Class: repo.Virtual, Repositories: []string{"deb-local"},
+			ExcludesPattern: new("pool/beta*"),
+		},
+	)
+	w.publish("deb-hiding", packagesIndex("alpha 1.0+hidden "+debAlpha))
+	w.put("deb-hiding", debAlpha, false, []byte("hidden bytes"))
+	w.publish("deb-local", packagesIndex("alpha 1.0 "+debAlpha, "beta 1.0 "+debBeta))
+	w.put("deb-local", debAlpha, false, debBody)
+	w.put("deb-local", debBeta, false, debBody)
+
+	rec := w.get("deb-virtual", debPackages, "admin")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("virtual Packages answered %d %s, want 200", rec.Code, rec.Body)
+	}
+	rows, err := debian.DecodePackagesIndex(rec.Body.Bytes())
+	if err != nil {
+		t.Fatalf("virtual Packages does not decode: %v", err)
+	}
+	listed := map[string]string{}
+	for _, row := range rows {
+		listed[row.Filename] = row.Version
+	}
+	if len(listed) != 2 || listed[debAlpha] != "1.0+hidden" || listed[debBeta] != "1.0" {
+		t.Errorf("virtual Packages lists %v, want deb-hiding's alpha row and beta", listed)
+	}
+	rec = w.get("deb-virtual", debAlpha, "admin")
+	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), debBody) {
+		t.Errorf("alpha answered %d %q, want deb-local's package", rec.Code, rec.Body)
+	}
+	wantError(t, w.get("deb-only-hiding", debAlpha, "admin"),
+		http.StatusNotFound, "Could not find resource")
+
+	rec = w.get("deb-picky", debPackages, "admin")
+	if got := filenames(t, rec.Body.Bytes()); rec.Code != http.StatusOK ||
+		!slices.Equal(got, []string{debAlpha, debBeta}) {
+		t.Errorf("deb-picky Packages answered %d listing %v, want both packages", rec.Code, got)
+	}
+	wantError(t, w.get("deb-picky", debBeta, "admin"), http.StatusNotFound,
+		"No repository found to serve the request for deb-picky:"+debBeta)
+	wantError(t, w.get("deb-picky", debBeta, "user"), http.StatusForbidden, "Forbidden")
 }
 
 // TestUnitDebianVirtualMetadataNeedsADistribution: the virtual metadata
@@ -330,6 +413,33 @@ func TestAccDebianVirtualMetadataFromARemoteMember(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestAccDebianVirtualKeepsARemoteMembersRefusedPackage: a remote member
+// whose patterns reject one listed file still lists it in the virtual
+// Packages index, its rows checked for read permission alone, while the
+// file's GET passes over that member without asking its source.
+func TestAccDebianVirtualKeepsARemoteMembersRefusedPackage(t *testing.T) {
+	index := packagesIndex("alpha 1.0 "+debAlpha, "beta 1.0 "+debBeta)
+	w := newOverlayWorld(t, withSources(upstream(map[string]func() (source.Result, error){
+		debRelease:  streamed(releaseFor(index), nil),
+		debPackages: streamed(index, nil),
+		debBeta: func() (source.Result, error) {
+			t.Error("the source was asked for a file its remote's patterns reject")
+			return streamed(debBody, nil)()
+		},
+	})))
+	w.debRepos(
+		repo.Config{Key: "deb-remote", Class: repo.Remote, ExcludesPattern: new("pool/beta*")},
+		repo.Config{Key: "deb-virtual", Class: repo.Virtual, Repositories: []string{"deb-remote"}},
+	)
+	rec := w.get("deb-virtual", debPackages, "admin")
+	if got := filenames(t, rec.Body.Bytes()); rec.Code != http.StatusOK ||
+		!slices.Equal(got, []string{debAlpha, debBeta}) {
+		t.Errorf("virtual Packages answered %d listing %v, want both packages", rec.Code, got)
+	}
+	wantError(t, w.get("deb-virtual", debBeta, "admin"),
+		http.StatusNotFound, "Could not find resource")
 }
 
 // TestUnitDebianMemberBytesRefusesAPathTheSourceCannotName: a remote

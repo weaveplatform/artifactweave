@@ -27,8 +27,9 @@
 //     writeProps=0 form (KindReindexNoProps) through Handler.Work, and every
 //     format's reindex through Handler.Reindex; the protocol (debianhttp),
 //     which checks metadata paths and decodes an index to serve it only to a
-//     caller who may read every package it lists, composes and signs a
-//     virtual repository's metadata (DecodePackagesIndex,
+//     caller with Read permission on every package it lists (a permission
+//     rule: a package the download policy refuses stays listed), composes
+//     and signs a virtual repository's metadata (DecodePackagesIndex,
 //     ReleasePackageIndexes, GzipIndex, Release, SignRelease), copies
 //     checksum-bound metadata into a snapshot (ReleaseIndexRefs) under
 //     WithSnapshotWrite, and queues KindReindexNoProps; the item kit
