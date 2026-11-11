@@ -325,6 +325,57 @@ func TestAccAlpineVirtualKeepsPackagesThePatternsReject(t *testing.T) {
 		"No repository found to serve the request for alpine-picky:"+apkHelloPath)
 }
 
+// TestAccAlpineVirtualPackageChecksAMemberAtThePackagesPath: a virtual
+// package GET checks each member at the package's own path, never at the
+// index it reads to find the package. A local or remote member, or a
+// nested virtual one, whose patterns reject only its APKINDEX.tar.gz serves
+// the package, while the virtual index still leaves that member out; a
+// blacked-out member, which refuses every file, takes no part.
+func TestAccAlpineVirtualPackageChecksAMemberAtThePackagesPath(t *testing.T) {
+	w := newItemWorld(t, withSource(upstream(map[string]func() (source.Result, error){
+		apkIndexPath: streamed(apkIndex(t, "hello"), nil),
+		apkHelloPath: func() (source.Result, error) { return source.Result{Stream: stream(apkBody)}, nil },
+	})))
+	indexless := alpineRepo("alpine-indexless", repo.Local)
+	indexless.ExcludesPattern = new("**/APKINDEX.tar.gz")
+	remote := alpineRepo(alpineRemote, repo.Remote)
+	remote.ExcludesPattern = new("**/APKINDEX.tar.gz")
+	dark := alpineRepo("alpine-dark", repo.Local)
+	dark.BlackedOut = new(true)
+	closed := alpineRepo("alpine-closed", repo.Virtual, alpineLocal)
+	closed.ExcludesPattern = new("**/APKINDEX.tar.gz")
+	w.repos(
+		indexless, remote, dark, closed, alpineRepo(alpineLocal, repo.Local),
+		alpineRepo("alpine-over-indexless", repo.Virtual, "alpine-indexless"),
+		alpineRepo("alpine-over-remote", repo.Virtual, alpineRemote),
+		alpineRepo("alpine-over-dark", repo.Virtual, "alpine-dark"),
+		alpineRepo("alpine-over-closed", repo.Virtual, "alpine-closed"),
+	)
+	for _, key := range []string{"alpine-indexless", "alpine-dark", alpineLocal} {
+		w.put(key, apkIndexPath, apkIndex(t, "hello"))
+		w.put(key, apkHelloPath, apkBody)
+	}
+	for _, key := range []string{
+		"alpine-over-indexless", "alpine-over-remote", "alpine-over-dark", "alpine-over-closed",
+	} {
+		rec := w.get(key, apkIndexPath)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s index answered %d %s, want 200", key, rec.Code, rec.Body)
+		}
+		if got := indexNames(t, rec.Body.Bytes()); len(got) != 0 {
+			t.Errorf("%s index lists %v, want the refusing member left out", key, got)
+		}
+	}
+	for _, key := range []string{"alpine-over-indexless", "alpine-over-remote", "alpine-over-closed"} {
+		rec := w.get(key, apkHelloPath)
+		if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), apkBody) {
+			t.Errorf("%s answered %d %q, want the member's package", key, rec.Code, rec.Body)
+		}
+	}
+	wantError(t, w.get("alpine-over-dark", apkHelloPath), http.StatusNotFound,
+		"Could not find resource")
+}
+
 // TestUnitAlpineCacheAliasOfALocalRepositoryHasNoIndex: only a remote
 // repository has a cache, so the overlay answers 404 for an index in any
 // other repository's cache. The item route already refuses such an alias

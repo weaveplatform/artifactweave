@@ -57,7 +57,10 @@
 //   - A missing member, or one whose index is unpublished, unreadable to the
 //     caller or refused by the member's download policy, is skipped; a
 //     member of another package type, a member cycle or a chain of more
-//     than eight nested repositories is refused.
+//     than eight nested repositories is refused. A virtual package's GET
+//     checks a member's policy at the package's own path, never at the
+//     index it reads to find the package, so there only a blacked-out
+//     member is skipped for its index.
 //   - A virtual repository serves a package only when an index the caller
 //     can see lists it.
 //   - An index is read up to 36 MiB, a remote's is validated before it is
@@ -102,14 +105,15 @@
 // the layout and callers who may not download refused, and indexes and
 // virtual packages the download policy refuses answering its 404; a
 // package the patterns reject kept in a local, remote or virtual index
-// while its GET is refused or passed over to the next member; local index
-// content that is a folder, lost, empty, unreadable or malformed; a remote
-// index whose authority is rechecked, streamed or cached; virtual indexes that
-// skip unreadable members and fail closed on cycles, wrong member types,
-// store faults and unusable signing keys; virtual packages served from a
-// listed local file or relayed from a remote member; and remote index and
-// package reads on a server built without remote sources. Its item GETs run
-// through the kit with TryAlpineItem as the only overlay. The @alpine
-// acceptance partition (test/acceptance/features/alpine.feature) drives its
-// indexes and packages through the router with apk.
+// while its GET is refused or passed over to the next member; a virtual
+// package served from a member whose patterns reject only its index; local
+// index content that is a folder, lost, empty, unreadable or malformed; a
+// remote index whose authority is rechecked, streamed or cached; virtual
+// indexes that skip unreadable members and fail closed on cycles, wrong
+// member types, store faults and unusable signing keys; virtual packages
+// served from a listed local file or relayed from a remote member; and
+// remote index and package reads on a server built without remote sources.
+// Its item GETs run through the kit with TryAlpineItem as the only overlay.
+// The @alpine acceptance partition (test/acceptance/features/alpine.feature)
+// drives its indexes and packages through the router with apk.
 package alpinehttp

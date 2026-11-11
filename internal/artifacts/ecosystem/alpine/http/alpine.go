@@ -271,12 +271,13 @@ func (s alpineItems) readAlpineBlob(ctx context.Context, sha string) ([]byte, er
 }
 
 // alpineCandidates walks ordered virtual members. A duplicate path belongs to
-// the first readable member. A member that refuses its index takes no part.
-// With download false, for the index, a row stays when the member's or the
-// virtual repository's patterns reject its file, which the index keeps as
-// 7.x's virtual indexes do (RTFACT-30656). With download true, for a
-// package GET, such a row is left out, so the GET passes over that member
-// to the next one that lists the path.
+// the first readable member. A member whose download policy refuses its
+// index takes no part in the index, and only a blacked-out one in a package
+// GET (alpineMemberRefusesIndex). With download false, for the index, a row
+// stays when the member's or the virtual repository's patterns reject its
+// file, which the index keeps as 7.x's virtual indexes do (RTFACT-30656).
+// With download true, for a package GET, such a row is left out, so the GET
+// passes over that member to the next one that lists the path.
 func (s alpineItems) alpineCandidates(
 	ctx context.Context, st itemkit.Store, c repo.Config, indexPath string,
 	p kernel.Principal, acc itemkit.Access, download bool, seen map[string]bool,
@@ -301,7 +302,7 @@ func (s alpineItems) alpineCandidates(
 		}
 		if !acc.Folder(member, indexPath, accessapi.ActionRead) ||
 			!acc.File(member, indexPath, accessapi.ActionRead) ||
-			generic.CheckDownload(member, indexPath, false) != nil {
+			alpineMemberRefusesIndex(member, indexPath, download) {
 			continue
 		}
 		var entries []alpineCandidate
@@ -349,6 +350,22 @@ func (s alpineItems) alpineCandidates(
 		}
 	}
 	return out, nil
+}
+
+// alpineMemberRefusesIndex reports whether a virtual repository's member
+// takes no part because its download policy refuses the index at
+// indexPath. The virtual index leaves out a member that refuses the
+// document. A package GET checks each member at the package's own path, as
+// 6.20's VirtualRepoDownloadStrategy does and as the patterns FAQ puts it
+// ("artifacts that match an exclude pattern are not resolved from that
+// repository"), so there the index is only the lookup that finds the file:
+// a blacked-out member, which refuses every file, takes no part, and
+// patterns that reject only the index leave the member's packages served.
+func alpineMemberRefusesIndex(member repo.Config, indexPath string, download bool) bool {
+	if !download {
+		return generic.CheckDownload(member, indexPath, false) != nil
+	}
+	return member.Class != repo.Virtual && generic.CheckBlackedOut(member, indexPath) != nil
 }
 
 func (s alpineItems) serveVirtualAlpinePackage(
