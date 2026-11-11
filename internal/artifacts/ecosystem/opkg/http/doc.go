@@ -40,13 +40,24 @@
 // # Invariants
 //
 //   - A caller receives a local, federated or remote repository's feed only
-//     when they may read every IPK it lists. A virtual feed lists only the
-//     IPKs the caller may read, both in the virtual repository and in the
-//     member that holds them, and an IPK path belongs to the first member
-//     that lists it.
-//   - A missing member, or one whose feed is unpublished or unreadable to
-//     the caller, is skipped; a member of another package type, a member
-//     cycle or a chain of more than eight nested repositories is refused.
+//     when they have Read permission on every IPK it lists. A virtual feed
+//     lists only the IPKs the caller has Read permission on, both in the
+//     virtual repository and in the member that holds them, and an IPK path
+//     belongs to the first member that lists it. The download policy does
+//     not filter or refuse a feed for the IPKs it lists: an IPK the include
+//     and exclude patterns reject stays listed and only its GET is refused,
+//     as in 7.x's Debian and RPM indexes (RTFACT-30830, RTFACT-30656).
+//   - A feed, and a remote or virtual IPK, is read under the download
+//     policy at its own path, after the Read permission check (DV-057): a
+//     blacked-out repository, or patterns that reject the path, answer the
+//     item route's 404 and message, and a virtual repository's own patterns
+//     answer that no repository serves the request. A virtual IPK's GET
+//     passes over a member whose download policy refuses the file to the
+//     next member that lists it.
+//   - A missing member, or one whose feed is unpublished, unreadable to the
+//     caller or refused by the member's download policy, is skipped; a
+//     member of another package type, a member cycle or a chain of more
+//     than eight nested repositories is refused.
 //   - An IPK is served only when a feed the caller can see lists it, and
 //     only with the SHA-256 that feed gives.
 //   - A feed is read up to 36 MiB, a remote's is validated before it is
@@ -92,10 +103,14 @@
 // OpenWrt feed and IPK; the virtual member graph and the overlay's routing;
 // local member IPKs that are missing or drifted; a remote feed's faults
 // and revoked authority; a remote IPK pinned to its indexed SHA-256 and
-// cached size; and remote feed and IPK reads on a server built without
-// remote sources. Its item GETs run through the kit with TryOpkgItem as the
-// only overlay. The route suite test/server/artifacts/opkg checks through
-// the router that a virtual feed is signed only with the configured GPG
-// key, and the @opkg acceptance partition
-// (test/acceptance/features/opkg.feature) is the native opkg evidence.
+// cached size; callers who may not read refused first, and feeds and
+// remote or virtual IPKs the download policy refuses answering its 404; an
+// IPK the patterns reject kept in a local, remote or virtual feed while
+// its GET is refused or passed over to the next member; and remote feed
+// and IPK reads on a server built without remote sources. Its item GETs
+// run through the kit with TryOpkgItem as the only overlay. The route
+// suite test/server/artifacts/opkg checks through the router that a
+// virtual feed is signed only with the configured GPG key, and the @opkg
+// acceptance partition (test/acceptance/features/opkg.feature) is the
+// native opkg evidence.
 package opkghttp

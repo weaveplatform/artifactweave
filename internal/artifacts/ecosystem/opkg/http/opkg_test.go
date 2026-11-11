@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -186,6 +187,7 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 			"feed/Packages",
 			p,
 			acc,
+			false,
 			map[string]bool{},
 		)
 		if !errors.Is(err, tc.expected) || tc.expected == nil && len(got) != 0 {
@@ -199,6 +201,7 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 		"feed/Packages",
 		p,
 		acc,
+		false,
 		map[string]bool{"opkg-cycle": true},
 	); !errors.Is(
 		err,
@@ -350,7 +353,7 @@ func TestAccOpkgDirectRoutingRejectsUnsafeAndWrongClassRequests(t *testing.T) {
 		t.Fatal(err)
 	}
 	if candidates, err := svc.opkgCandidates(t.Context(), w.db, localVirtual,
-		"feed/Packages", p, acc, map[string]bool{}); err != nil || len(candidates) != 0 {
+		"feed/Packages", p, acc, false, map[string]bool{}); err != nil || len(candidates) != 0 {
 		t.Errorf("unpublished member index exposed candidates: %v, %v", candidates, err)
 	}
 }
@@ -603,6 +606,7 @@ func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 		"feed/Packages",
 		p,
 		acc,
+		false,
 		map[string]bool{},
 	)
 	if err != nil || len(candidates) != 1 || candidates[0].pkg.Name != "464xlat" {
@@ -623,7 +627,7 @@ func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 	}
 	freshStream()
 	if _, err := svc.opkgCandidates(
-		t.Context(), w.db, virtual, "feed/Packages", p, acc, map[string]bool{},
+		t.Context(), w.db, virtual, "feed/Packages", p, acc, false, map[string]bool{},
 	); !errors.Is(err, source.ErrUnavailable) {
 		t.Errorf("virtual member hid source authority failure: %v", err)
 	}
@@ -834,4 +838,273 @@ func TestUnitOpkgRemoteReadsWithoutRemoteSources(t *testing.T) {
 			wantError(t, tc.serve(), http.StatusInternalServerError, "internal error")
 		})
 	}
+}
+
+// The fixture feed's path, and the IPK of its 464xlat package, whose bytes
+// opkgUpstreamFixture returns.
+const (
+	opkgFeed  = "feed/Packages"
+	opkgXlat  = "feed/464xlat_13_x86_64.ipk"
+	opkgOther = "feed/6in4_29_all.ipk"
+)
+
+// opkgRepos stores each of cs as an Opkg repository with its defaults.
+func (w *itemWorld) opkgRepos(cs ...repo.Config) {
+	w.t.Helper()
+	for _, c := range cs {
+		c.PackageType = repo.Opkg
+		if c.Class == repo.Remote {
+			c.URL = "https://up.example"
+		}
+		if err := w.db.Repos().Create(w.t.Context(), *repo.Defaults(&c)); err != nil {
+			w.t.Fatal(err)
+		}
+	}
+}
+
+// put stores body as the file at path in the repository key, blob first,
+// as a deploy leaves it.
+func (w *itemWorld) put(key, path string, body []byte) {
+	w.t.Helper()
+	upload, err := w.blobs.BeginUpload(w.t.Context())
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	if _, err := upload.Append(w.t.Context(), bytes.NewReader(body)); err != nil {
+		w.t.Fatal(err)
+	}
+	info, err := upload.Commit(w.t.Context(), blob.Digests{})
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	if _, err := w.db.Items().Put(w.t.Context(), model.Item{
+		RepoKey: key, Name: path, Size: int64(len(body)),
+		Actual: kernel.Checksums{SHA256: info.Digests.SHA256},
+	}); err != nil {
+		w.t.Fatal(err)
+	}
+}
+
+// withSource sets the world's remote source service over backend.
+func withSource(backend sourceBackend) func(*Config) {
+	return func(c *Config) {
+		c.RemoteSources = &source.Service{Resolve: sourceIdentity, HTTP: backend}
+	}
+}
+
+// feedPaths returns the paths of the packages a served feed lists, failing
+// the test when it was not served or does not decode.
+func feedPaths(t *testing.T, rec *httptest.ResponseRecorder) []string {
+	t.Helper()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("feed answered %d %s, want 200", rec.Code, rec.Body)
+	}
+	packages, err := opkg.DecodeIndex(rec.Body.Bytes(), opkgFeed)
+	if err != nil {
+		t.Fatalf("served feed does not decode: %v", err)
+	}
+	paths := make([]string, 0, len(packages))
+	for _, pkg := range packages {
+		paths = append(paths, pkg.Path)
+	}
+	return paths
+}
+
+// feedOf serves index as the upstream's feed and ipk as its 464xlat IPK,
+// and fails the test when the source is asked for an IPK whose remote's
+// patterns reject it.
+func feedOf(t *testing.T, index, ipk []byte) sourceBackend {
+	return func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+		body := index
+		if q.Resource.Path == opkgXlat {
+			if q.Repo.ExcludesPattern != nil && strings.Contains(*q.Repo.ExcludesPattern, "464xlat") {
+				t.Errorf("the source of %s was asked for an IPK its patterns reject", q.Repo.Key)
+			}
+			body = ipk
+		} else if q.Resource.Path != opkgFeed {
+			return source.Result{}, kernel.ErrNotFound
+		}
+		return source.Result{Stream: &source.Stream{
+			Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
+			Representation: source.Representation{Size: int64(len(body))},
+		}}, nil
+	}
+}
+
+// TestAccOpkgRefusalsAnswerTheDownloadPolicy: a feed, and a remote or
+// virtual IPK, is refused to a caller who may not read it before anything
+// else (DV-057). Past that, a blacked-out local or remote repository, its
+// -cache alias, or patterns that reject the requested path answer the
+// download policy's 404 and message before the source is asked, and a
+// virtual repository whose own patterns reject the path answers that no
+// repository serves it.
+func TestAccOpkgRefusalsAnswerTheDownloadPolicy(t *testing.T) {
+	index, _ := opkgUpstreamFixture(t)
+	w := newItemWorld(t)
+	w.opkgRepos(
+		repo.Config{Key: "opkg-local", Class: repo.Local},
+		repo.Config{Key: "opkg-dark", Class: repo.Local, BlackedOut: new(true)},
+		repo.Config{Key: "opkg-hidden", Class: repo.Local, ExcludesPattern: new("**/Packages*")},
+		repo.Config{Key: "opkg-dark-remote", Class: repo.Remote, BlackedOut: new(true)},
+		repo.Config{Key: "opkg-picky-remote", Class: repo.Remote, ExcludesPattern: new("**/*.ipk")},
+		repo.Config{
+			Key: "opkg-closed", Class: repo.Virtual, Repositories: []string{"opkg-local"},
+			ExcludesPattern: new("feed/**"),
+		},
+	)
+	for _, key := range []string{"opkg-local", "opkg-dark", "opkg-hidden"} {
+		w.put(key, opkgFeed, index)
+	}
+	blackedOut := func(key, path string) string {
+		return "The repository '" + key + "' is blacked out and cannot serve artifact '" +
+			key + ":" + path + "'."
+	}
+	rejected := func(key, path string) string {
+		return "The repository '" + key + "' rejected the artifact '" + key + ":" + path +
+			"' due to its include/exclude pattern settings."
+	}
+	for _, tc := range []struct {
+		name, key, path, as string
+		status              int
+		message             string
+	}{
+		{"user reads a feed", "opkg-local", opkgFeed, "user", http.StatusForbidden, "Forbidden"},
+		{
+			"user reads a blacked-out feed", "opkg-dark", opkgFeed, "user",
+			http.StatusForbidden, "Forbidden",
+		},
+		{
+			"user reads an IPK a remote's patterns reject", "opkg-picky-remote", opkgXlat, "user",
+			http.StatusForbidden, "Forbidden",
+		},
+		{
+			"blacked-out feed", "opkg-dark", opkgFeed, "admin",
+			http.StatusNotFound, blackedOut("opkg-dark", opkgFeed),
+		},
+		{
+			"blacked-out compressed feed", "opkg-dark", opkgFeed + ".gz", "admin",
+			http.StatusNotFound, blackedOut("opkg-dark", opkgFeed+".gz"),
+		},
+		{
+			"feed the patterns reject", "opkg-hidden", opkgFeed, "admin",
+			http.StatusNotFound, rejected("opkg-hidden", opkgFeed),
+		},
+		{
+			"blacked-out remote feed", "opkg-dark-remote", opkgFeed, "admin",
+			http.StatusNotFound, blackedOut("opkg-dark-remote", opkgFeed),
+		},
+		{
+			"blacked-out remote's cache", "opkg-dark-remote-cache", opkgFeed, "admin",
+			http.StatusNotFound, blackedOut("opkg-dark-remote", opkgFeed),
+		},
+		{
+			"blacked-out remote's IPK", "opkg-dark-remote", opkgXlat, "admin",
+			http.StatusNotFound, blackedOut("opkg-dark-remote", opkgXlat),
+		},
+		{
+			"remote IPK the patterns reject", "opkg-picky-remote", opkgXlat, "admin",
+			http.StatusNotFound, rejected("opkg-picky-remote", opkgXlat),
+		},
+		{
+			"virtual feed its patterns reject", "opkg-closed", opkgFeed, "admin",
+			http.StatusNotFound, "No repository found to serve the request for opkg-closed:" + opkgFeed,
+		},
+		{
+			"virtual IPK its patterns reject", "opkg-closed", opkgXlat, "admin",
+			http.StatusNotFound, "No repository found to serve the request for opkg-closed:" + opkgXlat,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := w.do(http.MethodGet, "/artifactory/"+tc.key+"/"+tc.path, tc.as, "")
+			wantError(t, rec, tc.status, tc.message)
+		})
+	}
+}
+
+// TestAccOpkgFeedKeepsAPackageThePatternsReject: a local or remote feed is
+// served as it is, listing a package whose IPK the repository's patterns
+// reject, as 7.x keeps such a package in its indexes (RTFACT-30830,
+// RTFACT-30656); only that IPK's GET answers the policy's 404. A remote
+// whose patterns reject only the feed's path still serves the IPK, which a
+// download checks at its own path: the feed read that pins its SHA-256
+// checks the remote's blackout alone.
+func TestAccOpkgFeedKeepsAPackageThePatternsReject(t *testing.T) {
+	index, ipk := opkgUpstreamFixture(t)
+	w := newItemWorld(t, withSource(feedOf(t, index, ipk)))
+	w.opkgRepos(
+		repo.Config{Key: "opkg-local", Class: repo.Local, ExcludesPattern: new("**/464xlat*")},
+		repo.Config{Key: "opkg-remote", Class: repo.Remote, ExcludesPattern: new("**/464xlat*")},
+		repo.Config{
+			Key: "opkg-feedless", Class: repo.Remote, ExcludesPattern: new("**/Packages*"),
+		},
+	)
+	w.put("opkg-local", opkgFeed, index)
+	w.put("opkg-local", opkgXlat, ipk)
+	for _, key := range []string{"opkg-local", "opkg-remote"} {
+		t.Run(key, func(t *testing.T) {
+			rec := w.do(http.MethodGet, "/artifactory/"+key+"/"+opkgFeed, "admin", "")
+			if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), index) {
+				t.Errorf("feed answered %d with %d bytes, want the feed as it is",
+					rec.Code, rec.Body.Len())
+			}
+			wantError(t, w.do(http.MethodGet, "/artifactory/"+key+"/"+opkgXlat, "admin", ""),
+				http.StatusNotFound, "The repository '"+key+"' rejected the artifact '"+key+":"+
+					opkgXlat+"' due to its include/exclude pattern settings.")
+		})
+	}
+	rec := w.do(http.MethodGet, "/artifactory/opkg-feedless/"+opkgXlat, "admin", "")
+	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), ipk) {
+		t.Errorf("IPK behind a rejected feed answered %d with %d bytes, want the IPK",
+			rec.Code, rec.Body.Len())
+	}
+}
+
+// TestAccOpkgVirtualKeepsPackagesThePatternsReject: a virtual feed keeps a
+// package whose IPK a local or remote member's patterns, or a virtual
+// repository's own, reject, nested ones included. The IPK's GET passes
+// over the refusing member to the next that lists it, without asking a
+// refusing remote's source, answers not found when none serves it, and
+// answers that no repository serves it when the virtual repository's own
+// patterns reject it.
+func TestAccOpkgVirtualKeepsPackagesThePatternsReject(t *testing.T) {
+	index, ipk := opkgUpstreamFixture(t)
+	w := newItemWorld(t, withSource(feedOf(t, index, ipk)))
+	w.opkgRepos(
+		repo.Config{Key: "opkg-hiding", Class: repo.Local, ExcludesPattern: new("**/464xlat*")},
+		repo.Config{Key: "opkg-local", Class: repo.Local},
+		repo.Config{Key: "opkg-remote", Class: repo.Remote, ExcludesPattern: new("**/464xlat*")},
+		repo.Config{
+			Key: "opkg-virtual", Class: repo.Virtual,
+			Repositories: []string{"opkg-hiding", "opkg-local"},
+		},
+		repo.Config{Key: "opkg-only-hiding", Class: repo.Virtual, Repositories: []string{"opkg-hiding"}},
+		repo.Config{
+			Key: "opkg-picky", Class: repo.Virtual, Repositories: []string{"opkg-local"},
+			ExcludesPattern: new("**/464xlat*"),
+		},
+		repo.Config{Key: "opkg-nested", Class: repo.Virtual, Repositories: []string{"opkg-picky"}},
+		repo.Config{Key: "opkg-over-remote", Class: repo.Virtual, Repositories: []string{"opkg-remote"}},
+	)
+	for _, key := range []string{"opkg-hiding", "opkg-local"} {
+		w.put(key, opkgFeed, index)
+		w.put(key, opkgXlat, ipk)
+	}
+	for _, key := range []string{
+		"opkg-virtual", "opkg-only-hiding", "opkg-picky", "opkg-nested", "opkg-over-remote",
+	} {
+		got := feedPaths(t, w.do(http.MethodGet, "/artifactory/"+key+"/"+opkgFeed, "admin", ""))
+		if !slices.Equal(got, []string{opkgXlat, opkgOther}) {
+			t.Errorf("%s feed lists %v, want both packages", key, got)
+		}
+	}
+	rec := w.do(http.MethodGet, "/artifactory/opkg-virtual/"+opkgXlat, "admin", "")
+	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), ipk) {
+		t.Errorf("IPK answered %d with %d bytes, want opkg-local's", rec.Code, rec.Body.Len())
+	}
+	for _, key := range []string{"opkg-only-hiding", "opkg-nested", "opkg-over-remote"} {
+		wantError(t, w.do(http.MethodGet, "/artifactory/"+key+"/"+opkgXlat, "admin", ""),
+			http.StatusNotFound, "Could not find resource")
+	}
+	wantError(t, w.do(http.MethodGet, "/artifactory/opkg-picky/"+opkgXlat, "admin", ""),
+		http.StatusNotFound, "No repository found to serve the request for opkg-picky:"+opkgXlat)
 }
