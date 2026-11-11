@@ -74,6 +74,15 @@ func (k *Kit) Read(r *http.Request, resource source.Resource) (source.Result, er
 		return source.Result{}, refusal(r)
 	}
 	if src, ok := q.Source.(ReadSource); ok {
+		// The source boundary checks the remote member's own policy, never
+		// that of the virtual repository the request came through. Metadata
+		// reads are left as they were: what a protocol's metadata answers
+		// under the policy is still open (#1237).
+		if q.virtual != nil && resource.Kind == source.ResourceKindArtifact {
+			if err := q.download(resource.Path); err != nil {
+				return source.Result{}, err
+			}
+		}
 		result, err := src.Read(r, q.Repo, resource)
 		if err != nil {
 			return source.Result{}, fmt.Errorf("read source: %w", err)

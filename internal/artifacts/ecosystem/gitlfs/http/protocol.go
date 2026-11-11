@@ -432,8 +432,15 @@ func (h handler) download(w http.ResponseWriter, r *http.Request) {
 	h.k.ServeFound(w, r, found)
 }
 
+// objectError answers a failed object download. The download policy's
+// refusal keeps its 404 and message: Error answers only an *apierror.Error,
+// and would make the bare RejectionError a 500.
 func (h handler) objectError(w http.ResponseWriter, r *http.Request, err error) {
-	if errors.Is(err, kernel.ErrNotFound) {
+	var rejected *baseformat.RejectionError
+	switch {
+	case errors.As(err, &rejected):
+		err = apierror.New(rejected.Status, rejected.Message)
+	case errors.Is(err, kernel.ErrNotFound):
 		err = apierror.New(http.StatusNotFound, "Git LFS object unavailable")
 	}
 	h.k.Error(w, r, err)

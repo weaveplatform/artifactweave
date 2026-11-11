@@ -24,7 +24,16 @@ const (
 	maxArchiveFiles = 4096
 )
 
+// localBinary answers the archive of a version's stored files. It reads
+// their blobs itself, so it applies the download policy the kit's Item
+// would: to the version's manifest first, so that a blacked-out
+// repository's answer names the same file whichever the listing reaches
+// first, then to each file the archive holds.
 func (h handler) localBinary(w http.ResponseWriter, r *http.Request, name, version string) {
+	if err := h.k.CheckDownload(r, bowerfmt.ManifestPath(name, version)); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	folder := name + "/" + version
 	var items []model.Item
 	var total int64
@@ -49,6 +58,10 @@ func (h handler) localBinary(w http.ResponseWriter, r *http.Request, name, versi
 					r,
 					apierror.New(http.StatusForbidden, "Bower package contains unreadable files"),
 				)
+				return
+			}
+			if err := h.k.CheckDownload(r, it.FullPath()); err != nil {
+				h.k.Error(w, r, err)
 				return
 			}
 			items = append(items, it)

@@ -6,9 +6,10 @@
 // it has at the host root (Protocol.Host). Before the protocol's handlers
 // run it resolves the repository, checks its package type and passes it
 // through the class gate, so every protocol answers those the same way and
-// in its own envelope. The kit's helpers then check permissions, download
-// through the item routes' download path, deploy through the item service
-// and read multipart uploads (ReadForm).
+// in its own envelope. The kit's helpers then check permissions, apply
+// Artifactory's download policy to the files they find, download through
+// the item routes' download path, deploy through the item service and read
+// multipart uploads (ReadForm).
 //
 // Docker's registry predates the kit and keeps its own router (decision
 // 0031).
@@ -49,7 +50,7 @@
 //     passes the store it holds.
 //   - Permission helpers: Can, CanFolder, Require and RequireFolder.
 //   - Download helpers: Item, ResolveItem, ServeItem, ServeFound, Read,
-//     ServeResult, ServeStream and SourceError.
+//     CheckDownload, ServeResult, ServeStream and SourceError.
 //   - Deploy helpers: Store, StoreOnce, StoreNew, StoreResolved, Upload,
 //     Deploy, DeployItem, Created, Annotate, Delete and DeleteTree.
 //   - Multipart helpers: ReadForm, ReadFormLimited and ReadFormWith; path
@@ -63,11 +64,26 @@
 //     in the protocol's own envelope before it.
 //   - A deploy goes through the item service, so formats' hooks and the
 //     item routes' rules apply as they do to any other write.
+//   - A file that Item, ResolveItem, ServeItem, ServeFound or Read finds in
+//     a local or federated repository, or in one as a virtual repository's
+//     member, is refused, after the caller's read permission, when the
+//     repository is blacked out or its include and exclude patterns reject
+//     the path, whether the file exists or not and for administrators too
+//     (generic.CheckDownload); CheckDownload gives the same answer to a
+//     protocol that reads a stored blob itself. The refusal answers 404
+//     with Artifactory's message, and is kernel.ErrNotFound to a protocol,
+//     so a virtual repository's search passes over a member that refuses
+//     and a deploy's check for an existing file is unchanged. A member
+//     request (MemberRequest) checks the virtual repository's own patterns
+//     first, for a remote member's file too; a member's own refusal is the
+//     virtual repository's "Could not find resource". A remote
+//     repository's own policy is left to the source boundary, which
+//     applies it to every read.
 //
 // # References
 //
 //   - Decision 0032: docs/research/decisions/0032-package-format-handlers.md
-//     (the protocol kit and the class gate).
+//     (the protocol kit, the class gate and the generic download policy).
 //   - Decision 0007: docs/research/decisions/0007-remote-repositories.md
 //     (remote content through the source boundary).
 //   - Decision 0006:
@@ -99,7 +115,8 @@
 // The package's own tests mount a test protocol over the in-memory store,
 // authorised by the access test kit: pkgroute_test.go, resolve_test.go,
 // folder_test.go, form_test.go, lifecycle_test.go, storeonce_test.go,
-// source_test.go, source_delivery_test.go and path_test.go;
+// source_test.go, source_delivery_test.go, path_test.go and
+// download_test.go, which covers the download policy at each helper;
 // source_result_test.go tests ServeResult from inside the package. Every
 // native protocol's route suite under test/server/artifacts reaches it
 // through the router.

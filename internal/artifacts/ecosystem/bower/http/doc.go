@@ -40,7 +40,11 @@
 //
 //   - A local or federated version's archive is built from its stored
 //     tree only when the caller may read every file in it, within 4096
-//     files and 128 MiB, and only when its bower.json is stored.
+//     files and 128 MiB, and only when its bower.json is stored. The
+//     download policy then refuses it as the kit's Item would
+//     (Kit.CheckDownload): from a blacked-out repository, by its
+//     bower.json, and when the patterns reject any file in it. A virtual
+//     repository passes over a member that refuses the bower.json.
 //   - A Git remote follows a registry pointer only within the configured
 //     Git origin and path, and an archive enters the remote cache only
 //     after its paths, size, file count, manifest and gzip integrity pass;
@@ -90,5 +94,6 @@
 // Artifactory remotes), register_test.go (registration), the dependency_*
 // and dependencies_test.go files (the external dependency rewrite), and
 // archive_fault_test.go, failure_paths_test.go and source_fault_test.go
-// (corrupt archives and failing sources).
+// (corrupt archives and failing sources), and download_policy_test.go
+// (a blacked-out repository and excluded files).
 package bowerhttp

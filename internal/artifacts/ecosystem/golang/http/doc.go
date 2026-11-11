@@ -39,6 +39,10 @@
 //     module with no version the caller may read answers 404.
 //   - A deploy of different content over a stored .zip or .mod answers 409
 //     even for a caller who may delete, since go.sum pins it.
+//   - A version is visible by what is stored, and the download policy
+//     (decision 0032) refuses only the file a read serves: a blacked-out
+//     repository's, or one the patterns reject, while a .mod they accept
+//     is served beside a .zip they reject.
 //   - Statuses and error texts stay byte-identical: the go command and the
 //     JFrog CLI read them.
 //
@@ -73,7 +77,8 @@
 //     repositories and paths, absent paths, store faults and paged lists.
 //   - publish_test.go: deploys, republishing, refusals and a .info body
 //     that cannot be read.
-//   - Both mount the protocol as the server mounts it, with the access
+//   - download_policy_test.go: a blacked-out repository and excluded files.
+//   - All three mount the protocol as the server mounts it, with the access
 //     test kit (access/accesstest) for permissions.
 //   - The guard suite test/server/artifacts/golang drives the protocol
 //     through the whole server.
