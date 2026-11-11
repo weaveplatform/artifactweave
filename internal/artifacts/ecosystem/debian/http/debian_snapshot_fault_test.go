@@ -644,6 +644,38 @@ func TestUnitDebianSnapshotKeepsAPackageTheSourceRefuses(t *testing.T) {
 	wantError(t, rec, http.StatusForbidden, "Forbidden")
 }
 
+// TestUnitDebianSnapshotReadsUnderTheTargetsPolicy: a snapshot's metadata
+// is a stored file of the target, so patterns that now reject its path, or
+// a blacked-out target, answer the item route's 404 and message naming
+// the stored path, once the caller's read permission is settled. A package
+// path still redirects to the source, whose policy answers that request.
+func TestUnitDebianSnapshotReadsUnderTheTargetsPolicy(t *testing.T) {
+	w := snapshotWorld(t)
+	svc := DebianAPI{newKit(withAccess(t, Config{Store: w.db, Blobs: w.blobs}))}
+	if err := svc.createDebianSnapshot(t.Context(), w.db, snapshotJob,
+		kittest.Admin, kittest.AdminAccess()); err != nil {
+		t.Fatal(err)
+	}
+	stored := snapshotJob.Target + ":" + snapshotMarker + "/" + debPackages
+	setRepo(t, w, snapshotJob.Target, func(c *repo.Config) { c.ExcludesPattern = new("**/Packages") })
+	wantError(t, snapshotRead(t, svc, debPackages, kittest.Admin.Name), http.StatusNotFound,
+		"The repository '"+snapshotJob.Target+"' rejected the artifact '"+stored+
+			"' due to its include/exclude pattern settings.")
+	if rec := snapshotRead(t, svc, debRelease, kittest.Admin.Name); rec.Code != http.StatusOK {
+		t.Errorf("Release the patterns accept answered %d %s, want 200", rec.Code, rec.Body)
+	}
+	setRepo(t, w, snapshotJob.Target, func(c *repo.Config) {
+		c.ExcludesPattern, c.BlackedOut = new(""), new(true)
+	})
+	wantError(t, snapshotRead(t, svc, debPackages, kittest.Admin.Name), http.StatusNotFound,
+		"The repository '"+snapshotJob.Target+"' is blacked out and cannot serve artifact '"+
+			stored+"'.")
+	wantError(t, snapshotRead(t, svc, debPackages, "reader"), http.StatusForbidden, "Forbidden")
+	if rec := snapshotRead(t, svc, debAlpha, kittest.Admin.Name); rec.Code != http.StatusFound {
+		t.Errorf("package path answered %d %s, want the redirect to the source", rec.Code, rec.Body)
+	}
+}
+
 // TestUnitDebianSnapshotOfARemoteKeepsAPackageItsPatternsReject: a
 // snapshot of a remote source checks each package its index lists for
 // Read permission alone (source.Result.CheckPermission), so a package

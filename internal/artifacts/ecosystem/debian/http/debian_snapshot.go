@@ -22,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
@@ -435,6 +436,16 @@ func (s DebianAPI) getDebianSnapshot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.HasPrefix(rel, "dists/") {
+		// The snapshot's metadata is a stored file of the target, so it is
+		// read under the target's download policy, as the item route reads
+		// it: a blacked-out target is "not available for download" (JFrog's
+		// local repositories page), and patterns changed since the snapshot
+		// was written can reject it. A package path only redirects, and the
+		// source's policy answers the redirected request.
+		if err := generic.CheckDownload(c, root+"/"+rel, false); err != nil {
+			httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian snapshot index download", err))
+			return
+		}
 		it, err := st.Items().Get(r.Context(), key, false, root+"/"+rel)
 		if err != nil || it.Folder {
 			httpkit.WriteErr(w, r, itemkit.ItemNotFound())

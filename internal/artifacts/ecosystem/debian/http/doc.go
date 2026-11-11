@@ -81,10 +81,12 @@
 //     Debian target: the source distribution's Release, each index it
 //     declares, bound to the size and SHA-256 the Release gives (at most 64
 //     MiB each and 512 MiB in all), and InRelease and Release.gpg where they
-//     exist. A read of a package path redirects to the recorded source. A
-//     request first claims the tag's folder, so a request from another
-//     source or distribution answers 409, and a retry of the same request
-//     completes it.
+//     exist. A read of the snapshot's metadata is a read of the target's
+//     stored file, under the target's download policy; a read of a package
+//     path redirects to the recorded source, whose policy answers the
+//     redirected request. A request first claims the tag's folder, so a
+//     request from another source or distribution answers 409, and a retry
+//     of the same request completes it.
 //   - A Packages or Sources index, stored, cached or in a snapshot, reaches
 //     only a caller with Read permission on every package it lists, which
 //     the generic item route cannot check. The download policy does not
@@ -189,9 +191,10 @@
 //     jobs it cannot run; claims and snapshots failing closed on store,
 //     blob and permission faults, Release declarations that do not parse,
 //     a listed package the caller may not read, an unreadable InRelease and
-//     a package a remote source refuses; and snapshots of a local or remote
+//     a package a remote source refuses; snapshots of a local or remote
 //     source whose patterns reject a listed package keeping it listed, the
-//     snapshot's index still served once the source is blacked out.
+//     snapshot's index still served once the source is blacked out; and a
+//     snapshot's metadata refused by a blacked-out target or its patterns.
 //
 // debian_index_test.go and debian_virtual_test.go serve their item GETs
 // through the kit with TryDebianItem as the only overlay
