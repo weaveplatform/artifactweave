@@ -11,6 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nuget"
+	"github.com/weaveplatform/artifactweave/internal/platform/archive"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
@@ -288,5 +289,22 @@ func TestUnitReadStoredFailures(t *testing.T) {
 		if !errors.Is(err, errBlob) || errors.Is(err, nuget.ErrNotPackage) {
 			t.Errorf("broken %v: %v", b.broken, err)
 		}
+	}
+}
+
+// seekOnly hides a reader's ReadAt, as the S3, GCS and Azure blob readers
+// have none, so archive.ReaderAt reads it by seeking.
+type seekOnly struct{ io.ReadSeeker }
+
+// A package smaller than the sniff reads from a store that can only seek:
+// the sniff runs past the end of the content, which is no failed read.
+func TestUnitReadPackageSmallerThanSniff(t *testing.T) {
+	b := zipOf(zipFile{"A.nuspec", nuspecXML("A", "1.0.0", "")})
+	if len(b) >= archive.SniffLen {
+		t.Fatalf("the package is %d bytes, no smaller than the sniff", len(b))
+	}
+	n, err := nuget.ReadPackage(archive.ReaderAt(seekOnly{bytes.NewReader(b)}), int64(len(b)))
+	if err != nil || n.ID != "A" || n.Version.Normalized() != "1.0.0" {
+		t.Fatalf("%+v %v", n, err)
 	}
 }

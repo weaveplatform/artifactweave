@@ -316,8 +316,10 @@ func Clean(name string) (string, error) {
 
 // ReaderAt gives random access over a reader that can only seek, such as
 // stored content, for zip, which reads its central directory from the end.
-// Reads are serialised because they share one seek position. A reader that
-// already reads at offsets is returned as it is.
+// Reads are serialised because they share one seek position. The first
+// read seeks to the end of the content to learn its size, and reads at the
+// end answer as bytes.Reader's do. A reader that already reads at offsets
+// is returned as it is.
 func ReaderAt(rs io.ReadSeeker) io.ReaderAt {
 	if ra, ok := rs.(io.ReaderAt); ok {
 		return ra
@@ -325,18 +327,50 @@ func ReaderAt(rs io.ReadSeeker) io.ReaderAt {
 	return &readerAt{rs: rs}
 }
 
+// readerAt tells the end of the content by its size, not by a read's
+// error: io.ReadFull answers a read past the end with io.ErrUnexpectedEOF,
+// which is also S3's word for a body cut short.
 type readerAt struct {
-	mu sync.Mutex
-	rs io.ReadSeeker
+	mu    sync.Mutex
+	rs    io.ReadSeeker
+	size  int64
+	sized bool
 }
 
+// ReadAt answers as bytes.Reader and *os.File do: a read past the end
+// returns the bytes before it with io.EOF, and one that ends at the end
+// returns nil, not the io.EOF that io.ReaderAt also allows, because
+// NuGet's, PyPI's and Terraform's readers of a zip's tail read up to the
+// end and fail on any error.
 func (r *readerAt) ReadAt(p []byte, off int64) (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if !r.sized {
+		size, err := r.rs.Seek(0, io.SeekEnd)
+		if err != nil {
+			return 0, err //nolint:wrapcheck // io.ReaderAt contract
+		}
+		r.size, r.sized = size, true
+	}
+	if off >= r.size {
+		return 0, io.EOF
+	}
 	if _, err := r.rs.Seek(off, io.SeekStart); err != nil {
 		return 0, err //nolint:wrapcheck // io.ReaderAt contract
 	}
-	return io.ReadFull(r.rs, p) //nolint:wrapcheck // io.ReaderAt contract
+	n, err := io.ReadFull(r.rs, p[:min(int64(len(p)), r.size-off)])
+	switch {
+	case errors.Is(err, io.EOF):
+		// The content ends before its size, and io.EOF would pass the cut
+		// for the end: a tar walk would stop there as if the archive did.
+		return n, fmt.Errorf("archive: the content ends at %d of its %d bytes: %w",
+			off+int64(n), r.size, io.ErrUnexpectedEOF)
+	case err != nil:
+		return n, err //nolint:wrapcheck // io.ReaderAt contract
+	case n < len(p):
+		return n, io.EOF
+	}
+	return n, nil
 }
 
 // Limits bound what reading one file from an archive may cost.

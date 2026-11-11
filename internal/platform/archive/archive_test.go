@@ -329,18 +329,113 @@ func TestUnitWalkCorruptArchives(t *testing.T) {
 // lacks one.
 type seeker struct{ io.ReadSeeker }
 
+var errSeek = errors.New("seek failed")
+
+// noEnd is content that cannot seek to its end.
+type noEnd struct{ io.ReadSeeker }
+
+func (n noEnd) Seek(off int64, whence int) (int64, error) {
+	if whence == io.SeekEnd {
+		return 0, errSeek
+	}
+	return n.ReadSeeker.Seek(off, whence) //nolint:wrapcheck // test double
+}
+
+// A seek-only reader reads at every offset as bytes.Reader does, the end of
+// the content included: a read past the end returns the bytes before it
+// with io.EOF itself, which archive/zip compares with ==, and a read that
+// ends at the end returns no error, which NuGet's, PyPI's and Terraform's
+// readers of a zip's tail need. Content whose end a seek cannot find fails
+// to read.
 func TestUnitReaderAt(t *testing.T) {
-	r := bytes.NewReader([]byte("0123456789"))
+	content := []byte("0123456789")
+	r := bytes.NewReader(content)
 	if archive.ReaderAt(r) != io.ReaderAt(r) {
 		t.Fatal("a ReaderAt is used as it is")
 	}
-	ra := archive.ReaderAt(seeker{r})
-	buf := make([]byte, 3)
-	if n, err := ra.ReadAt(buf, 4); err != nil || n != 3 || string(buf) != "456" {
-		t.Fatalf("ReadAt: %d %v %q", n, err, buf)
+	ra := archive.ReaderAt(seeker{bytes.NewReader(content)})
+	for off := int64(-1); off <= int64(len(content))+1; off++ {
+		for size := range len(content) + 2 {
+			got, want := make([]byte, size), make([]byte, size)
+			n, err := ra.ReadAt(got, off)
+			wantN, wantErr := r.ReadAt(want, off)
+			if n != wantN || !bytes.Equal(got[:n], want[:wantN]) ||
+				(err == nil) != (wantErr == nil) || (err == io.EOF) != (wantErr == io.EOF) {
+				t.Errorf("%d bytes at %d: %d %q %v, want %d %q %v",
+					size, off, n, got[:n], err, wantN, want[:wantN], wantErr)
+			}
+		}
 	}
-	if _, err := ra.ReadAt(buf, -1); err == nil {
-		t.Fatal("a negative offset must fail")
+	if _, err := archive.ReaderAt(noEnd{r}).ReadAt(make([]byte, 3), 0); !errors.Is(err, errSeek) {
+		t.Errorf("no end: %v", err)
+	}
+}
+
+// cut is content that a seek to its end says is size bytes long, but whose
+// reads stop after body with err, as a store's body cut short does.
+type cut struct {
+	body *bytes.Reader
+	size int64
+	err  error
+}
+
+func (c *cut) Read(p []byte) (int, error) {
+	n, err := c.body.Read(p)
+	if errors.Is(err, io.EOF) {
+		return n, c.err
+	}
+	return n, err //nolint:wrapcheck // test double
+}
+
+func (c *cut) Seek(off int64, whence int) (int64, error) {
+	if whence == io.SeekEnd {
+		off, whence = c.size+off, io.SeekStart
+	}
+	return c.body.Seek(off, whence) //nolint:wrapcheck // test double
+}
+
+// Content cut short before the size a seek to its end gives is a failed
+// read, wherever the cut and however the store words it: an error wrapping
+// io.ErrUnexpectedEOF, as S3, GCS and Azure give, returns as it is, and a
+// bare io.EOF returns as io.ErrUnexpectedEOF, so that neither passes for
+// the end of the content. A walk returns that failure, never ErrUnusable,
+// unless it needed nothing past the cut.
+func TestUnitReaderAtCutShort(t *testing.T) {
+	short := fmt.Errorf("store: %w", io.ErrUnexpectedEOF)
+	for _, failure := range []error{short, io.EOF} {
+		want := failure
+		if failure == io.EOF {
+			want = io.ErrUnexpectedEOF
+		}
+		// Ten bytes cut after six, read four at a time across the cut, at
+		// it and past it.
+		ra := archive.ReaderAt(&cut{bytes.NewReader([]byte("012345")), 10, failure})
+		for off, wantN := range map[int64]int{4: 2, 6: 0, 8: 0} {
+			n, err := ra.ReadAt(make([]byte, 4), off)
+			if n != wantN || !errors.Is(err, want) || errors.Is(err, io.EOF) {
+				t.Errorf("%v at %d: %d %v", failure, off, n, err)
+			}
+		}
+		for kind, body := range kinds(t, entry{name: "a.txt", body: "a"}) {
+			size := int64(len(body))
+			for at := range size {
+				var got []byte
+				read := func(e archive.Entry) (err error) {
+					got, err = archive.ReadEntry(e, archive.DefaultLimits)
+					return err
+				}
+				ra := archive.ReaderAt(&cut{bytes.NewReader(body[:at]), size, failure})
+				err := archive.Scan(ra, size, kind, archive.DefaultLimits, read)
+				// A cut in what the walk never needs, such as a tar.gz's
+				// trailer once tar has met its end blocks, leaves a walk
+				// that read everything; a walk that ends early without an
+				// error took the cut for the end of the content.
+				if err == nil && string(got) != "a" ||
+					err != nil && (!errors.Is(err, want) || errors.Is(err, archive.ErrUnusable)) {
+					t.Fatalf("%v cut at %d of %d by %v: %q %v", kind, at, size, failure, got, err)
+				}
+			}
+		}
 	}
 }
 
