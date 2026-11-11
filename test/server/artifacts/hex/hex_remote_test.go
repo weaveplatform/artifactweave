@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	hexfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/hex"
@@ -961,6 +963,194 @@ func TestUnitHexVirtualListsOnlyReleasesReadableThroughTheVirtual(t *testing.T) 
 			}
 		})
 	}
+}
+
+// TestUnitHexDownloadPolicyOfRemoteRepositories: a blacked-out remote
+// refuses names, versions, packages/NAME and a tarball with the blackout's
+// 404 naming each one's path, before its upstream is read; its patterns
+// refuse packages/NAME at that path and a tarball at its own, while a
+// release whose tarball they reject stays listed, a legacy one without its
+// outer checksum, and the package metadata a tarball's download reads is
+// not refused by them. A virtual repository leaves out a blacked-out remote
+// member and passes its tarball over to the next member, keeps a member
+// that rejects only a tarball, and completes a legacy release whose tarball
+// only its own patterns reject. A refusal that the revalidation of the
+// metadata returns answers its own 404 (#1237).
+func TestUnitHexDownloadPolicyOfRemoteRepositories(t *testing.T) {
+	keys := testKeys()
+	upstream, err := keymaterial.RSAPrivateKey(keys.private, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture := mustReadHexFixture(t)
+	pkg, err := hexfmt.InspectTarball(bytes.NewReader(fixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, legacyRelease := pkg, pkg
+	other.Version, legacyRelease.OuterChecksum = "2.0.1", [32]byte{}
+	encode := func(releases ...hexfmt.Package) []byte {
+		body, err := hexfmt.EncodePackage(hexfmt.RegistryPackage{
+			Name: "decimal", Repository: "hexpm", Releases: releases,
+		}, upstream)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return body
+	}
+	current, legacyBody := encode(pkg, other), encode(legacyRelease, other)
+	versions, err := hexfmt.EncodeVersions("hexpm", []hexfmt.RegistryPackage{{
+		Name: "decimal", Repository: "hexpm", Releases: []hexfmt.Package{pkg, other},
+	}}, upstream)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := false
+	reads := map[string]int{}
+	backend := hexSource(
+		func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+			reads[q.Resource.Path]++
+			body := map[string][]byte{
+				"packages/decimal": current, "versions": versions,
+				"tarballs/decimal-2.0.0.tar": fixture,
+			}[q.Resource.Path]
+			if legacy && q.Resource.Path == "packages/decimal" {
+				body = legacyBody
+			}
+			if body == nil {
+				return source.Result{}, kernel.ErrNotFound
+			}
+			return source.Result{Stream: &source.Stream{
+				Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
+				Representation: source.Representation{Size: int64(len(body))},
+			}}, nil
+		},
+	)
+	// The hook counts its calls and refuses from call number refuseFrom on.
+	calls, refuseFrom := 0, 0
+	var refusal error
+	w := newItemWorld(t, false, func(c *Config) {
+		c.RemoteSources = &source.Service{
+			HTTP: backend,
+			Resolve: func(_ context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
+				return artmodel.SourceIdentity{
+					Kind: artmodel.ExternalHTTP, Repository: artmodel.RepositoryIncarnation(c.Key),
+					ID: "upstream", Generation: "rev-1",
+				}, nil
+			},
+			Revalidate: func(context.Context, source.Request, source.Permit) error {
+				calls++
+				if refuseFrom > 0 && calls >= refuseFrom {
+					return refusal
+				}
+				return nil
+			},
+		}
+	})
+	if err := w.db.Keys().CreateKeypair(t.Context(), api.Keypair{
+		Name: "hex-key", Type: api.KeypairRSA, PrivateKey: keys.private, PublicKey: keys.public,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []repo.Config{
+		{
+			Key: "hex-r", Class: repo.Remote, URL: "https://up.example/",
+			HexPublicKey: keys.public, PrimaryKeyPairRef: "hex-key",
+		},
+		{Key: "hex-l", Class: repo.Local, PrimaryKeyPairRef: "hex-key"},
+		{Key: "hex-v", Class: repo.Virtual, KeyPair: "hex-key", Repositories: []string{"hex-r", "hex-l"}},
+	} {
+		c.PackageType = repo.Hex
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if put := w.do(http.MethodPut, "/artifactory/hex-l/tarballs/decimal-2.0.0.tar", "admin",
+		string(fixture)); put.Code != http.StatusCreated {
+		t.Fatalf("deploy: %d %s", put.Code, put.Body)
+	}
+	get := func(key, path string) *httptest.ResponseRecorder {
+		return w.do(http.MethodGet, "/artifactory/api/hex/"+key+"/"+path, "reader", "")
+	}
+	const tarball, sibling = "tarballs/decimal-2.0.0.tar", "tarballs/decimal-2.0.1.tar"
+	patchHexRepo(t, w, "hex-r", func(c *repo.Config) { c.BlackedOut = new(true) })
+	for _, path := range []string{"names", "versions", "packages/decimal", tarball} {
+		hexRefusal(t, "blacked out "+path, get("hex-r", path), hexBlackedOut("hex-r", path))
+	}
+	if reads["packages/decimal"] != 0 || reads["versions"] != 0 {
+		t.Errorf("blacked-out remote's upstream read: %v", reads)
+	}
+	hexListing(t, "virtual past a blacked-out remote", "packages/decimal",
+		get("hex-v", "packages/decimal"), keys.public, "2.0.0")
+	if got := get("hex-v", tarball); got.Code != http.StatusOK || !bytes.Equal(got.Body.Bytes(), fixture) {
+		t.Errorf("tarball past a blacked-out remote: %d %s", got.Code, got.Body)
+	}
+	patchHexRepo(t, w, "hex-r", func(c *repo.Config) {
+		c.BlackedOut, c.ExcludesPattern = new(false), new(sibling)
+	})
+	hexListing(t, "excluded tarball's package", "packages/decimal", get("hex-r", "packages/decimal"),
+		keys.public, "2.0.0", "2.0.1")
+	if got := get("hex-r", "versions"); got.Code != http.StatusOK {
+		t.Errorf("excluded tarball's versions: %d %s", got.Code, got.Body)
+	}
+	hexRefusal(t, "excluded tarball", get("hex-r", sibling), hexRejected("hex-r", sibling))
+	if got := get("hex-r", tarball); got.Code != http.StatusOK || !bytes.Equal(got.Body.Bytes(), fixture) {
+		t.Errorf("sibling of an excluded tarball: %d %s", got.Code, got.Body)
+	}
+	hexListing(t, "virtual over an excluded tarball", "packages/decimal",
+		get("hex-v", "packages/decimal"), keys.public, "2.0.0", "2.0.1")
+	patchHexRepo(t, w, "hex-r", func(c *repo.Config) { c.ExcludesPattern = new("packages/**") })
+	hexRefusal(t, "excluded package", get("hex-r", "packages/decimal"),
+		hexRejected("hex-r", "packages/decimal"))
+	if got := get("hex-r", tarball); got.Code != http.StatusOK {
+		t.Errorf("tarball found through an excluded package: %d %s", got.Code, got.Body)
+	}
+	hexListing(t, "names beside an excluded package", "names", get("hex-r", "names"),
+		keys.public, "decimal")
+	hexListing(t, "virtual past a remote that excludes the package", "packages/decimal",
+		get("hex-v", "packages/decimal"), keys.public, "2.0.0")
+	legacy = true
+	fetched := reads[tarball]
+	patchHexRepo(t, w, "hex-r", func(c *repo.Config) { c.ExcludesPattern = new(tarball) })
+	listed := hexListing(t, "legacy release whose tarball is excluded", "packages/decimal",
+		get("hex-r", "packages/decimal"), keys.public, "2.0.0", "2.0.1")
+	if len(listed) == 2 && listed[0].OuterChecksum != ([32]byte{}) || reads[tarball] != fetched {
+		t.Errorf("excluded legacy tarball read %d times to complete %+v", reads[tarball]-fetched, listed)
+	}
+	patchHexRepo(t, w, "hex-r", func(c *repo.Config) { c.ExcludesPattern = new("") })
+	patchHexRepo(t, w, "hex-v", func(c *repo.Config) { c.ExcludesPattern = new(tarball) })
+	listed = hexListing(t, "legacy release under the virtual's own pattern", "packages/decimal",
+		get("hex-v", "packages/decimal"), keys.public, "2.0.0", "2.0.1")
+	if len(listed) == 2 && listed[0].OuterChecksum != pkg.OuterChecksum {
+		t.Errorf("legacy release not completed under the virtual's pattern: %+v", listed[0])
+	}
+	hexRefusal(t, "virtual's own pattern on a tarball", get("hex-v", tarball),
+		hexNoRepository("hex-v", tarball))
+	legacy = false
+	// A caller who may read no tarball lists none, so the hook's last call
+	// is the revalidation of the metadata.
+	if err := w.db.Users().
+		Create(t.Context(), accesstest.User{Name: "no-tarballs", PasswordHash: cheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "hex-no-tarballs",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"no-tarballs": api.ActionRead}},
+			Targets: map[string]accesstest.Target{"hex-r": {Include: []string{"tarballs/none.tar"}}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	before := calls
+	got := w.do(http.MethodGet, "/artifactory/api/hex/hex-r/packages/decimal", "no-tarballs", "")
+	if got.Code != http.StatusNotFound || !strings.Contains(got.Body.String(), "Hex package not found") {
+		t.Fatalf("no readable tarball: %d %s", got.Code, got.Body)
+	}
+	message := hexBlackedOut("hex-r", "packages/decimal")
+	refuseFrom, refusal = calls+(calls-before), format.Rejectf(http.StatusNotFound, "%s", message)
+	hexRefusal(t, "refused at revalidation",
+		w.do(http.MethodGet, "/artifactory/api/hex/hex-r/packages/decimal", "no-tarballs", ""), message)
 }
 
 func mustReadHexFixture(t *testing.T) []byte {

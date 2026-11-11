@@ -3,6 +3,7 @@ package hex_test
 import (
 	"bytes"
 	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -384,4 +385,178 @@ func TestUnitHexFederatedClassRefused(t *testing.T) {
 	if write.Code != http.StatusBadRequest {
 		t.Fatalf("federated package bypassed Hex admission: %d %s", write.Code, write.Body)
 	}
+}
+
+// hexRefusal checks the download policy's 404 in Artifactory's envelope,
+// with none of the success answer's headers.
+func hexRefusal(t *testing.T, label string, got *httptest.ResponseRecorder, message string) {
+	t.Helper()
+	want := `{"errors":[{"message":"` + message + `","status":404}]}` + "\n"
+	if got.Code != http.StatusNotFound || got.Body.String() != want ||
+		got.Header().Get("Cache-Control") != "" {
+		t.Errorf("%s: %d %q (Cache-Control %q), want 404 %q", label, got.Code, got.Body,
+			got.Header().Get("Cache-Control"), want)
+	}
+}
+
+func hexBlackedOut(key, path string) string {
+	return "The repository '" + key + "' is blacked out and cannot serve artifact '" +
+		key + ":" + path + "'."
+}
+
+func hexRejected(key, path string) string {
+	return "The repository '" + key + "' rejected the artifact '" + key + ":" + path +
+		"' due to its include/exclude pattern settings."
+}
+
+func hexNoRepository(key, path string) string {
+	return "No repository found to serve the request for " + key + ":" + path
+}
+
+// patchHexRepo changes a repository's configuration in place.
+func patchHexRepo(t *testing.T, w *itemWorld, key string, change func(*repo.Config)) {
+	t.Helper()
+	c, err := w.db.Repos().Get(t.Context(), key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	change(&c)
+	if err := w.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// hexListing decodes a signed answer to path, names or packages/NAME, with
+// key and checks it lists want: package names for names, the versions of a
+// package's releases otherwise.
+func hexListing(
+	t *testing.T,
+	label, path string,
+	got *httptest.ResponseRecorder,
+	key string,
+	want ...string,
+) []hexfmt.Package {
+	t.Helper()
+	public, err := hexfmt.ParsePublicKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Code != http.StatusOK {
+		t.Errorf("%s: %d %s, want 200", label, got.Code, got.Body)
+		return nil
+	}
+	var listed []string
+	var releases []hexfmt.Package
+	if path == "names" {
+		_, listed, err = hexfmt.DecodeNames(got.Body.Bytes(), public)
+	} else {
+		var reg hexfmt.RegistryPackage
+		reg, err = hexfmt.DecodePackage(got.Body.Bytes(), public)
+		releases = reg.Releases
+		for _, release := range reg.Releases {
+			listed = append(listed, release.Version)
+		}
+	}
+	if err != nil || !slices.Equal(listed, want) {
+		t.Errorf("%s lists %q (%v), want %q", label, listed, err, want)
+	}
+	return releases
+}
+
+// TestUnitHexDownloadPolicyOfLocalAndVirtualRepositories: a blacked-out
+// local repository refuses names, versions and packages/NAME with the
+// blackout's 404 naming each path, after read permission; a pattern on a
+// document's path refuses it, and one on a tarball leaves its release
+// listed. A virtual repository leaves out a member that is blacked out or
+// whose patterns reject the document's path, keeps a member that rejects
+// only a tarball, and answers its own patterns on a document or a tarball
+// with "No repository found to serve the request" (#1237).
+func TestUnitHexDownloadPolicyOfLocalAndVirtualRepositories(t *testing.T) {
+	w := newItemWorld(t, false)
+	keys := testKeys()
+	if err := w.db.Keys().CreateKeypair(t.Context(), api.Keypair{
+		Name: "hex-signing", Type: api.KeypairRSA,
+		PrivateKey: keys.private, PublicKey: keys.public,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []repo.Config{
+		{Key: "hex-a", Class: repo.Local, PrimaryKeyPairRef: "hex-signing"},
+		{Key: "hex-b", Class: repo.Local, PrimaryKeyPairRef: "hex-signing"},
+		{Key: "hex-v", Class: repo.Virtual, KeyPair: "hex-signing", Repositories: []string{"hex-a", "hex-b"}},
+	} {
+		c.PackageType = repo.Hex
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for key, file := range map[string]string{"hex-a": "decimal-2.0.0.tar", "hex-b": "ecto-3.12.5.tar"} {
+		body := repopath.Read(t, "internal/artifacts/ecosystem/hex/testdata/"+file)
+		if put := w.do(http.MethodPut, "/artifactory/"+key+"/tarballs/"+file, "admin",
+			string(body)); put.Code != http.StatusCreated {
+			t.Fatalf("deploy %s: %d %s", file, put.Code, put.Body)
+		}
+	}
+	get := func(key, path string) *httptest.ResponseRecorder {
+		return w.do(http.MethodGet, "/artifactory/api/hex/"+key+"/"+path, "reader", "")
+	}
+	const tarball = "tarballs/decimal-2.0.0.tar"
+	patchHexRepo(t, w, "hex-a", func(c *repo.Config) { c.BlackedOut = new(true) })
+	for _, path := range []string{"names", "versions", "packages/decimal"} {
+		hexRefusal(t, "blacked out "+path, get("hex-a", path), hexBlackedOut("hex-a", path))
+	}
+	if got := w.do(http.MethodHead, "/artifactory/api/hex/hex-a/packages/decimal", "reader",
+		""); got.Code != http.StatusNotFound || got.Header().Get("Cache-Control") != "" {
+		t.Errorf("blacked out HEAD: %d %v", got.Code, got.Header())
+	}
+	if got := w.do(http.MethodGet, "/artifactory/api/hex/hex-a/names", "user",
+		""); got.Code != http.StatusForbidden {
+		t.Errorf("blacked out names, no permission: %d %s", got.Code, got.Body)
+	}
+	// public_key is not a 7.x Hex route: 7.x serves the key from
+	// /api/security/keypair/public/repositories/<repo>.
+	if got := get("hex-a", "public_key"); got.Code != http.StatusOK {
+		t.Errorf("blacked out public_key: %d %s", got.Code, got.Body)
+	}
+	hexListing(t, "virtual past a blacked-out member, names", "names", get("hex-v", "names"), keys.public, "ecto")
+	if got := get("hex-v", "packages/decimal"); got.Code != http.StatusNotFound ||
+		!strings.Contains(got.Body.String(), "Hex package not found") {
+		t.Errorf("virtual past a blacked-out member, package: %d %s", got.Code, got.Body)
+	}
+	patchHexRepo(t, w, "hex-a", func(c *repo.Config) {
+		c.BlackedOut, c.ExcludesPattern = new(false), new(tarball)
+	})
+	hexListing(t, "excluded tarball's package", "packages/decimal", get("hex-a", "packages/decimal"), keys.public, "2.0.0")
+	hexListing(t, "excluded tarball's names", "names", get("hex-a", "names"), keys.public, "decimal")
+	hexRefusal(t, "excluded tarball", get("hex-a", tarball), hexRejected("hex-a", tarball))
+	hexListing(t, "virtual over an excluded tarball", "packages/decimal", get("hex-v", "packages/decimal"),
+		keys.public, "2.0.0")
+	patchHexRepo(t, w, "hex-a", func(c *repo.Config) { c.ExcludesPattern = new("packages/**") })
+	hexRefusal(t, "excluded package", get("hex-a", "packages/decimal"),
+		hexRejected("hex-a", "packages/decimal"))
+	hexListing(t, "names beside an excluded package", "names", get("hex-a", "names"), keys.public, "decimal")
+	if got := get("hex-a", "versions"); got.Code != http.StatusOK {
+		t.Errorf("versions beside an excluded package: %d %s", got.Code, got.Body)
+	}
+	if got := get("hex-v", "packages/decimal"); got.Code != http.StatusNotFound ||
+		!strings.Contains(got.Body.String(), "Hex package not found") {
+		t.Errorf("virtual past a member that excludes the package: %d %s", got.Code, got.Body)
+	}
+	hexListing(t, "virtual names beside an excluded package", "names", get("hex-v", "names"),
+		keys.public, "decimal", "ecto")
+	patchHexRepo(t, w, "hex-a", func(c *repo.Config) { c.ExcludesPattern = new("names") })
+	hexRefusal(t, "excluded names", get("hex-a", "names"), hexRejected("hex-a", "names"))
+	hexListing(t, "virtual past a member that excludes names", "names", get("hex-v", "names"),
+		keys.public, "ecto")
+	patchHexRepo(t, w, "hex-a", func(c *repo.Config) { c.ExcludesPattern = new("") })
+	patchHexRepo(t, w, "hex-v", func(c *repo.Config) { c.ExcludesPattern = new("packages/**") })
+	hexRefusal(t, "virtual's own pattern on a package", get("hex-v", "packages/decimal"),
+		hexNoRepository("hex-v", "packages/decimal"))
+	hexListing(t, "virtual names beside its own pattern", "names", get("hex-v", "names"),
+		keys.public, "decimal", "ecto")
+	patchHexRepo(t, w, "hex-v", func(c *repo.Config) { c.ExcludesPattern = new(tarball) })
+	hexRefusal(t, "virtual's own pattern on a tarball", get("hex-v", tarball),
+		hexNoRepository("hex-v", tarball))
+	hexListing(t, "virtual package beside its own pattern on a tarball", "packages/decimal",
+		get("hex-v", "packages/decimal"), keys.public, "2.0.0")
 }
