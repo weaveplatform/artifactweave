@@ -38,7 +38,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P9 Remote repositories | Done (2026-10-22) | Shared source/HTTP/security/cache foundation, generic and native-format retrieval, [cache maintenance](remote-cache-maintenance.md), [Smart Remote synchronization](smart-remote.md), browsing, permission-safe upstream search (#213/#672), NuGet v2/symbols (#629), cached-package reindex (#700) and transitive AQL (#636) are implemented. The [all-15 public-upstream run](https://github.com/weaveplatform/artifactweave/actions/runs/39807833314) and [#708 merged-main full gate](https://github.com/weaveplatform/artifactweave/actions/runs/39810238539) passed. #487's runtime sharing completion belongs to P11 |
 | P9b Newly identified Artifactory formats | Native paths implemented; qualification evidence #693 | LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages have their documented repository classes and native paths. NIM's documented NGC model API and separate Docker pull are implemented; target runtime wire parity remains #216 |
 | P9c Native package catalog coverage | Done (2026-11-04) | All 28 format tasks and #789/#791/#843/#844/#852/#853 follow-ups are merged. The [class/client matrix](package-format-matrix.md), [CI evidence](../testing/phase9c-ci-signoff.md) and [combined qualification ledger](../testing/phase9c-signoff.md) retain #810/#792's passing final merged-main and current-release gates. P29 to P33 must not count these implementations again |
-| P9d Modular-monolith migration | Implemented; final qualification pending | Behaviour-preserving move to the layout of [decision 0044](../research/decisions/0044-modular-monolith-migration.md); code was staged under `migration/` and has been promoted to `internal/`, and [p9d-path-map.json](p9d-path-map.json) maps each legacy path to its final one. Final qualification is [PRO-05](https://github.com/weaveplatform/artifactweave/issues/1104). |
+| P9d Modular-monolith migration | Done (2026-11-11) | Behaviour-preserving move to the layout of [decision 0044](../research/decisions/0044-modular-monolith-migration.md); code was staged under `migration/` and promoted to `internal/`, and [p9d-path-map.json](p9d-path-map.json) maps each legacy path to its final one. The [Phase 9d qualification record](../testing/phase9d-signoff.md) holds [PRO-05](https://github.com/weaveplatform/artifactweave/issues/1104)'s merged-main, real-cloud and release evidence. |
 | P10 Virtual repositories | Not started | **M3** |
 | P11 Projects, webhooks, retention, replication | Not started | |
 | P12 Descriptor export, system configuration, LDAP | Not started | |
@@ -1009,15 +1009,16 @@ file.
 **Depends on:** P9c. P10 starts after P9d and builds straight into the module packages,
 with virtual repositories in the artifacts core.
 
-P9d moves the package tree to the modular-monolith layout without changing behaviour.
+P9d moved the package tree to the modular-monolith layout without changing behaviour.
 Every target package was built under `migration/`, the staged future `internal/`, and
 [PRO-03](https://github.com/weaveplatform/artifactweave/issues/1102) promoted the staged
 tree to `internal/`. Until then a ledger mapped each of the 151 legacy package
 directories to its target and owning ticket, with each entry's status derived from the
 tree; promotion deleted the ledger and the move tool and kept the final map in the path
-map. [repo-layout.md](repo-layout.md) describes the promoted tree. Promotion is done, and
-the final qualification against the exit criteria below is
-[PRO-05](https://github.com/weaveplatform/artifactweave/issues/1104)'s.
+map. [repo-layout.md](repo-layout.md) describes the promoted tree.
+[PRO-05](https://github.com/weaveplatform/artifactweave/issues/1104) qualified it against
+the exit criteria below, and the [Phase 9d qualification record](../testing/phase9d-signoff.md)
+holds the evidence.
 
 **Epics**
 
