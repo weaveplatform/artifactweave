@@ -193,6 +193,13 @@ func TestAccSourceErrorEnvelopes(t *testing.T) {
 	if pkgroute.SourceError(nil, false) != nil {
 		t.Fatal("nil became error")
 	}
+	// A policy refusal stays one, so a virtual repository passes over the
+	// remote member, and is no missing item to the protocol.
+	refusal := pkgroute.SourceError(format.Rejectf(404, "excluded"), false)
+	if !pkgroute.IsRefusal(refusal) || errors.Is(refusal, kernel.ErrNotFound) ||
+		refusal.Error() != "excluded" {
+		t.Fatalf("a policy refusal became %v", refusal)
+	}
 }
 
 type brokenReader struct{}

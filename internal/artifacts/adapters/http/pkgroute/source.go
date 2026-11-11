@@ -160,6 +160,9 @@ func Resource(r *http.Request, path, escaped string) source.Resource {
 
 // SourceError maps only known source errors. Other errors retain the router's
 // existing internal-fault treatment; no upstream body or challenge is relayed.
+// The download policy's refusal answers its own status and message, and
+// IsRefusal still recognises it, so a virtual repository passes over a
+// remote member that refuses.
 func SourceError(err error, anonymous bool) error {
 	var failure *source.HTTPError
 	var rejected *format.RejectionError
@@ -168,7 +171,10 @@ func SourceError(err error, anonymous bool) error {
 	case err == nil:
 		return nil
 	case errors.As(err, &rejected):
-		return apierror.New(rejected.Status, rejected.Message)
+		return &sourceRefusal{
+			answer:    apierror.New(rejected.Status, rejected.Message),
+			rejection: rejected,
+		}
 	case errors.As(err, &failure):
 		status = failure.Status
 		e := apierror.New(status, http.StatusText(status))
@@ -201,6 +207,20 @@ func SourceError(err error, anonymous bool) error {
 	}
 	return apierror.New(status, http.StatusText(status))
 }
+
+// sourceRefusal is the source boundary's policy refusal as SourceError
+// answers it: Error finds the answer as an *apierror.Error and IsRefusal the
+// *format.RejectionError behind it. Unlike the kit's own refusal it is not
+// kernel.ErrNotFound, so a protocol's handling of a missing item leaves it
+// as it was.
+type sourceRefusal struct {
+	answer    *apierror.Error
+	rejection *format.RejectionError
+}
+
+func (e *sourceRefusal) Error() string { return e.rejection.Message }
+
+func (e *sourceRefusal) Unwrap() []error { return []error{e.answer, e.rejection} }
 
 // ServeStream owns and closes the body, including HEAD/304. It writes only
 // representation headers, never cookies or upstream authentication challenges.

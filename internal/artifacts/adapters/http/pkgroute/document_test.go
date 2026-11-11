@@ -14,9 +14,9 @@ import (
 )
 
 // boundarySource reads a remote repository as the source boundary does
-// for the download policy: it refuses a read the remote's own policy
-// refuses, at the read's PolicyPath when it names one, and otherwise
-// answers "remote".
+// for the download policy, through SourceError as Remote does: it refuses
+// a read the remote's own policy refuses, at the read's PolicyPath when it
+// names one, and otherwise answers "remote".
 type boundarySource struct{}
 
 func (boundarySource) Item(
@@ -34,7 +34,7 @@ func (boundarySource) Read(
 	resource source.Resource,
 ) (source.Result, error) {
 	if err := resource.CheckPolicy(c, resource.Path); err != nil {
-		return source.Result{}, fmt.Errorf("source download: %w", err)
+		return source.Result{}, pkgroute.SourceError(fmt.Errorf("source download: %w", err), false)
 	}
 	return source.Result{Stream: &source.Stream{
 		Status: http.StatusOK, Body: io.NopCloser(strings.NewReader("remote")),
