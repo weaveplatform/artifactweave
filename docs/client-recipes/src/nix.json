@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "nix",
   "name": "Nix binary caches",
-  "client": "Nix 2.35.4",
+  "client": "Nix 2.35.5",
   "version_sources": [
     "test/acceptance/clients/nix.Dockerfile"
   ],

@@ -1,3 +1,3 @@
-# Client pins: Nix 2.35.4.
-FROM nixos/nix:2.35.4@sha256:f159a58f390677f41e8e900a74b6e2f9c7f27b364122ae6acf7a652ce6c551c0
-RUN nix --version | grep -F '2.35.4'
+# Client pins: Nix 2.35.5.
+FROM nixos/nix:2.35.5@sha256:9305de534abed691d0f569502a4962a3a072ea8e888502c453ecfe35ae182867
+RUN nix --version | grep -F '2.35.5'

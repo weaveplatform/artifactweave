@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Nix 2.35.4**. Registered classes: **local, remote, virtual, federated**.
+Client: **Nix 2.35.5**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/nix/${AW_REPO}`
 
