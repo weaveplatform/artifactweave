@@ -96,12 +96,20 @@ func Protocol(o Options) pkgroute.Protocol {
 }
 
 type release struct {
-	meta       puppetfmt.Metadata
-	item       model.Item
-	member     *http.Request
+	meta   puppetfmt.Metadata
+	item   model.Item
+	member *http.Request
+	// refused marks a virtual repository's release whose archive every
+	// member holding it refuses: it stays listed, and the archive route
+	// does not serve it.
+	refused    bool
 	remoteURL  string
 	revalidate func(context.Context) error
-	checkRead  func(context.Context, string) error
+	// checkPermission rechecks only Read on the archive, for an answer
+	// that lists the release; checkRead rechecks the remote's download
+	// policy too, before the archive is fetched.
+	checkPermission func(context.Context, string) error
+	checkRead       func(context.Context, string) error
 }
 
 type versionRecord struct {
@@ -185,7 +193,7 @@ func (h handler) releases(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
-	releases, err := h.lookup(r, name)
+	releases, err := h.lookup(r, name, false)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -223,7 +231,7 @@ func (h handler) release(w http.ResponseWriter, r *http.Request) {
 	if !h.k.Require(w, r, puppetfmt.Path(name, version), api.ActionRead) {
 		return
 	}
-	releases, err := h.lookup(r, name)
+	releases, err := h.lookup(r, name, false)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -273,7 +281,7 @@ func (h handler) module(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
-	releases, err := h.lookup(r, name)
+	releases, err := h.lookup(r, name, false)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -300,7 +308,7 @@ func (h handler) modules(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
-	releases, err := h.lookup(r, name)
+	releases, err := h.lookup(r, name, false)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -332,13 +340,28 @@ func (h handler) archive(w http.ResponseWriter, r *http.Request) {
 	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
-	releases, err := h.lookup(r, name)
+	// The archive is a download, which Artifactory refuses at its own path
+	// before it looks the release up (decision 0032; RTFACT-13710 shows the
+	// Puppet service reading archives through that check): the blackout
+	// 404 (rulings R9), the patterns 404 or a virtual repository's own
+	// "No repository found" 404, with the policy's message rather than
+	// "Puppet release not found" (R6, R10). CheckDocument rather than
+	// CheckDownload, because it checks a remote repository's own policy
+	// too, which the source boundary would otherwise check only once the
+	// release pages had been fetched from upstream.
+	if err := h.k.CheckDocument(r, path); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	releases, err := h.lookup(r, name, true)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
 	for _, rel := range releases {
-		if rel.meta.Version == version {
+		// A version every member of a virtual repository refuses has no
+		// member left to serve it, and answers as one none holds (R5).
+		if rel.meta.Version == version && !rel.refused {
 			if err = h.authority(r, []release{rel}); err != nil {
 				h.k.Error(w, r, err)
 				return
@@ -365,8 +388,11 @@ func (h handler) authority(r *http.Request, releases []release) error {
 				return fmt.Errorf("puppet: authority: %w", pkgroute.SourceError(err, false))
 			}
 		}
-		if rel.checkRead != nil {
-			if err := rel.checkRead(r.Context(), rel.meta.Path); err != nil {
+		// Read permission only: a listed release whose archive the
+		// patterns reject stays listed (rulings R3), and remoteArchive
+		// checks the policy when the archive itself is read.
+		if rel.checkPermission != nil {
+			if err := rel.checkPermission(r.Context(), rel.meta.Path); err != nil {
 				return fmt.Errorf("puppet: authority: %w", pkgroute.SourceError(err, false))
 			}
 		}
@@ -374,15 +400,26 @@ func (h handler) authority(r *http.Request, releases []release) error {
 	return nil
 }
 
-func (h handler) lookup(r *http.Request, name string) ([]release, error) {
+// lookup returns the releases of module name the caller may read. file is
+// set when they are looked up to serve one archive, whose own path the
+// archive route has already checked, rather than to answer a listing.
+func (h handler) lookup(r *http.Request, name string, file bool) ([]release, error) {
 	q := pkgroute.RequestFrom(r)
 	switch q.Repo.Class {
 	case repo.Local, repo.Federated:
+		// 7.x keeps a local repository's listings as documents
+		// (RTFACT-26143) at a path no source shows, so only the blackout
+		// refuses them, before anything is computed, naming the
+		// request's own path (rulings R2a, R9); patterns never do. A
+		// member of a virtual repository is passed over instead (R5).
+		if err := h.k.CheckBlackedOut(r, q.Rest); err != nil {
+			return nil, fmt.Errorf("puppet: releases: %w", err)
+		}
 		return h.hosted(r, name)
 	case repo.Remote:
-		return h.remoteVersions(r, name)
+		return h.remoteVersions(r, name, file)
 	case repo.Virtual:
-		return h.virtual(r, name)
+		return h.virtual(r, name, file)
 	default:
 		return nil, source.ErrUnsupported
 	}
@@ -407,8 +444,11 @@ func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	out := make([]release, 0, len(versions))
 	for _, v := range versions {
 		path := puppetfmt.Path(name, v.Version)
-		if !h.k.Can(r, path, api.ActionRead) ||
-			generic.CheckDownload(q.Repo, path, false) != nil {
+		// A release whose archive the include and exclude patterns reject
+		// stays listed, and only the archive is refused (rulings R3): 7.x
+		// writes Puppet's listings as stored documents (RTFACT-26143),
+		// which list such a release as the other formats' do.
+		if !h.k.Can(r, path, api.ActionRead) {
 			continue
 		}
 		var meta puppetfmt.Metadata
@@ -426,7 +466,7 @@ func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	return out, nil
 }
 
-func (h handler) virtual(r *http.Request, name string) ([]release, error) {
+func (h handler) virtual(r *http.Request, name string, file bool) ([]release, error) {
 	q := pkgroute.RequestFrom(r)
 	byVersion := map[string]release{}
 	for _, key := range q.Repo.Repositories {
@@ -444,7 +484,10 @@ func (h handler) virtual(r *http.Request, name string) ([]release, error) {
 		if !h.k.CanFolder(mr, name, api.ActionRead) {
 			continue
 		}
-		found, err := h.lookup(mr, name)
+		// A blacked-out member, local or remote, and a remote member whose
+		// patterns reject its release pages answer 404 here and are left
+		// out of the merge (rulings R5).
+		found, err := h.lookup(mr, name, file)
 		if err != nil {
 			var response *apierror.Error
 			if errors.Is(err, kernel.ErrNotFound) ||
@@ -454,12 +497,19 @@ func (h handler) virtual(r *http.Request, name string) ([]release, error) {
 			return nil, err
 		}
 		for _, v := range found {
-			if !h.k.Can(r, v.meta.Path, api.ActionRead) ||
-				generic.CheckDownload(q.Repo, v.meta.Path, false) != nil {
+			if !h.k.Can(r, v.meta.Path, api.ActionRead) {
 				continue
 			}
-			if _, exists := byVersion[v.meta.Version]; !exists {
-				v.member = mr
+			// A member whose patterns reject only a release's archive
+			// stays in the merge with the release listed, and the archive
+			// comes from the first member that holds the version and
+			// serves it (rulings R5, RTFACT-25571), so the listing gives
+			// that member's checksum. The virtual repository's own
+			// patterns leave the release listed too (R3); the archive
+			// route refuses its archive.
+			v.member = mr
+			v.refused = generic.CheckDownload(member, v.meta.Path, false) != nil
+			if prior, exists := byVersion[v.meta.Version]; !exists || prior.refused && !v.refused {
 				byVersion[v.meta.Version] = v
 			}
 		}
