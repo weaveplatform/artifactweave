@@ -139,7 +139,11 @@ func TestAccBazelDownloadPolicyLocalAndVirtual(t *testing.T) {
 	} {
 		refusedWith(t, f.request(http.MethodGet, local+route), blackedOut(f.local.Key, named))
 	}
-	if w := f.requestAs(http.MethodGet, local+"modules/hello/metadata.json", "reader"); w.Code != 403 {
+	if w := f.requestAs(
+		http.MethodGet,
+		local+"modules/hello/metadata.json",
+		"reader",
+	); w.Code != 403 {
 		t.Fatalf("read permission before the blackout: %d %s", w.Code, w.Body)
 	}
 	f.served(via+"modules/hello/metadata.json", `"1.0.0"`)

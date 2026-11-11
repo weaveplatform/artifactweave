@@ -1410,8 +1410,11 @@ func TestAccConanDownloadPolicyLocalAndVirtual(t *testing.T) {
 		conanRefused(t, one(recipe+"/revisions/abc/files/"+file, "admin"),
 			conanBlackedOut("conan-one", stored(file)))
 	}
-	conanRefused(t, one(recipe+"/revisions/abc/packages/id1/revisions/p1/files/conaninfo.txt", "admin"),
-		conanBlackedOut("conan-one", "_/hello/1.0/_/abc/package/id1/p1/conaninfo.txt"))
+	conanRefused(
+		t,
+		one(recipe+"/revisions/abc/packages/id1/revisions/p1/files/conaninfo.txt", "admin"),
+		conanBlackedOut("conan-one", "_/hello/1.0/_/abc/package/id1/p1/conaninfo.txt"),
+	)
 	conanRefused(t, one(recipe+"/revisions/zzz/files/conanfile.py", "admin"),
 		conanBlackedOut("conan-one", "_/hello/1.0/_/zzz/export/conanfile.py"))
 	for as, status := range map[string]int{"user": http.StatusForbidden, "": http.StatusUnauthorized} {

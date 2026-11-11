@@ -230,7 +230,12 @@ func TestAccConanDownloadPolicyRemote(t *testing.T) {
 		"conanfile.py":      "local recipe",
 		"conanmanifest.txt": fmt.Sprintf("1\nconanfile.py: %s\n", md5Hex("local recipe")),
 	} {
-		if rec := w.request(http.MethodPut, local+file, "admin", body); rec.Code != http.StatusCreated {
+		if rec := w.request(
+			http.MethodPut,
+			local+file,
+			"admin",
+			body,
+		); rec.Code != http.StatusCreated {
 			t.Fatalf("PUT %s: %d %s", file, rec.Code, rec.Body)
 		}
 	}

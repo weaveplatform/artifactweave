@@ -164,7 +164,10 @@ func TestAccChefDownloadPolicyVirtualRemoteMember(t *testing.T) {
 	f.member("chef-remote", repo.Remote, up.URL+"/chef/")
 	hosted := f.member("chef-hosted", repo.Local, "")
 	one := f.deploy(hosted, "widget", "1.0.0", memberArchive(t, "widget", "1.0.0", "chef-hosted"))
-	f.patch(f.c.Key, func(c *repo.Config) { c.Repositories = []string{"chef-remote", "chef-hosted"} })
+	f.patch(
+		f.c.Key,
+		func(c *repo.Config) { c.Repositories = []string{"chef-remote", "chef-hosted"} },
+	)
 	a := policyAnswers{f: f}
 	download := cookbookPath + "/versions/1_0_0/download"
 
@@ -263,7 +266,11 @@ func newSourceFixture(t *testing.T, class repo.Class) (*fixture, *fakeupstream.S
 	})
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	key := []byte(strings.Repeat("k", 32))
-	resolver, err := upstreamhttp.NewResolver(f.db, nil, upstreamhttp.ResolverOptions{RevisionKey: key})
+	resolver, err := upstreamhttp.NewResolver(
+		f.db,
+		nil,
+		upstreamhttp.ResolverOptions{RevisionKey: key},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
