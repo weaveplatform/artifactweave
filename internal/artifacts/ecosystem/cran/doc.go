@@ -26,8 +26,9 @@
 //     (cranhttp), which answers an index read by decoding the member's
 //     index (DecodeIndex: a local or federated repository's derived one
 //     once its rebuild is done, a remote's from upstream) and encoding
-//     again only the packages the caller may read, a virtual repository's
-//     members merged in order (EncodeIndex), whose POST
+//     again only the packages the caller has Read permission on, a
+//     package the download policy's patterns reject among them, a virtual
+//     repository's members merged in order (EncodeIndex), whose POST
 //     /api/cran/{repoKey}/sources and binaries check the feed (Feed) and
 //     take the package's identity from the archive (ReadUploaded,
 //     ErrPackage), and whose archive migration (GET

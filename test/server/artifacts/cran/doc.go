@@ -26,7 +26,10 @@
 //   - cran_test.go and cran_routes_test.go: virtual index filtering, native
 //     POST and reindex, remote index faults and authority checks, offline
 //     cached reads, nested virtual members, upload refusals and overwrite
-//     authority, and index variants.
+//     authority, index variants, and the download policy: its 404 for
+//     indexes and remote or virtual packages, and packages its patterns
+//     reject kept in local, remote and virtual indexes while their GETs are
+//     refused or passed over to the next member.
 //   - cran_archive_test.go: the archive migration, its rollback, refusals,
 //     collisions, destination policy and storage failure.
 //

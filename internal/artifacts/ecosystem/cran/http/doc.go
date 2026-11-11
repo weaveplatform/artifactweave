@@ -1,9 +1,10 @@
 // Package cranhttp serves the CRAN protocol over the item kit: every
 // class's PACKAGES and PACKAGES.gz, listing only the packages the caller
-// may read, with a virtual repository's members merged in order; a virtual
-// or remote repository's packages; the native source and binary uploads
-// (POST /api/cran/{repoKey}/sources and /binaries); and the artifactory
-// spec's legacy archive migration (GET /api/cran/{repoKey}/move-archives).
+// has Read permission on, with a virtual repository's members merged in
+// order; a virtual or remote repository's packages; the native source and
+// binary uploads (POST /api/cran/{repoKey}/sources and /binaries); and the
+// artifactory spec's legacy archive migration
+// (GET /api/cran/{repoKey}/move-archives).
 //
 // # Role
 //
@@ -50,16 +51,29 @@
 //
 // # Invariants
 //
-//   - An index lists only the packages the caller may read, and a remote's
-//     index checks each one against the caller's current authority through
-//     the remote source (source.Result.CheckRead) before listing it. A
-//     local or federated repository's index is served once its rebuild is
-//     done, and every index is read up to 32 MiB.
+//   - An index lists only the packages the caller has Read permission on,
+//     and a remote's index checks each one against the caller's current
+//     permission through the remote source (source.Result.CheckPermission)
+//     before listing it. The download policy does not filter an index: a
+//     package whose file the include and exclude patterns reject stays
+//     listed and only its GET is refused, as in 7.x's Debian and RPM
+//     indexes (RTFACT-30830, RTFACT-30656). A local or federated
+//     repository's index is served once its rebuild is done, and every
+//     index is read up to 32 MiB.
+//   - An index, and a remote or virtual package, is read under the download
+//     policy at its own path, after the Read permission check (DV-057): a
+//     blacked-out repository, or patterns that reject the path, answer the
+//     item route's 404 and message, and a virtual repository's own patterns
+//     answer that no repository serves the request.
 //   - A virtual repository merges its members' indexes in order: a missing
-//     member, or one whose index the caller may not read, is skipped; a
-//     member cycle, a chain of more than eight virtual repositories or a
-//     member of another package type is refused; and a package name belongs
-//     to the first member that lists it.
+//     member, or one whose index the caller may not read or the member's
+//     download policy refuses, is skipped; a member cycle, a chain of more
+//     than eight virtual repositories or a member of another package type
+//     is refused; and a package name belongs to the first member that lists
+//     it. A virtual package's GET leaves out each row whose file a member's
+//     or the virtual repository's download policy refuses before names are
+//     claimed, so it passes over that member to the next one that lists the
+//     package.
 //   - A virtual or remote repository serves a package only when the index
 //     of the repository that holds it lists that path, and pins a remote's
 //     download to the MD5 that index gives.
@@ -123,6 +137,7 @@
 //     artifactory strict handler with the CRAN partial alone.
 //
 // The route suite test/server/artifacts/cran checks the protocol through
-// the router, and the @cran acceptance partition
+// the router, the download policy's answers and the packages it keeps
+// listed among it, and the @cran acceptance partition
 // (test/acceptance/features/cran.feature) is the native R evidence.
 package cranhttp
