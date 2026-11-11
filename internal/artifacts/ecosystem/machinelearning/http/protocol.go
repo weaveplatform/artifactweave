@@ -163,6 +163,15 @@ func (h handler) manifest(w http.ResponseWriter, r *http.Request) {
 	if !h.k.Require(w, r, id.Manifest(), api.ActionRead) {
 		return
 	}
+	// FrogML stores the manifest at this path, and 7.x reads a stored
+	// document through its download path (RTFACT-13337), so a blacked-out
+	// repository or patterns rejecting the manifest's own path refuse it.
+	// Patterns rejecting a declared file leave it listed: only that file's
+	// download refuses.
+	if err := h.k.CheckDocument(r, id.Manifest()); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	c := pkgroute.RequestFrom(r).Repo
 	m, _, err := ml.Read(r.Context(), h.env(), c, id)
 	if err != nil {
