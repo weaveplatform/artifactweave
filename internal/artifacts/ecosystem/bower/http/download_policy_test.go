@@ -208,6 +208,10 @@ func TestAccBowerDownloadPolicyRemote(t *testing.T) {
 	a.answered("bower-remote/refs/bower-remote/hello", "refs/tags/v1.0.0")
 	a.refused(binary, rejected("bower-remote", cached))
 	a.archived("bower-virtual/binaries/bower-virtual/hello.git/v1.0.0", "from-bower-local")
+
+	f.configure(func(c *repo.Config) { c.ExcludesPattern = ptr("**/bower-archive.tar.gz") })
+	a.answered("bower-virtual/refs/bower-virtual/hello", "refs/tags/v1.0.0")
+	a.archived("bower-virtual/binaries/bower-virtual/hello.git/v1.0.0", "from-bower-local")
 }
 
 // A Git remote's lookups check its blackout alone too, and its catalog
