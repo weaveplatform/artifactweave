@@ -16,11 +16,13 @@ import (
 	"testing/iotest"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/alpine"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
@@ -116,31 +118,211 @@ func TestAccAlpineRefusesPathsOutsideTheLayout(t *testing.T) {
 	}
 }
 
-// TestAccAlpineRefusesCallersWhoMayNotDownload: an index is refused to a
-// caller who may not read it and in a blacked-out repository, and a
-// virtual package to a caller who may not read it, before anything is
-// read: the answer is the same 403 whatever the repository holds.
+// TestAccAlpineRefusesCallersWhoMayNotDownload: an index, and a virtual
+// package, is refused to a caller who may not read it before anything is
+// read, the same 403 whatever the repository holds or its settings say
+// (DV-057). Past that, a blacked-out local or remote repository's index,
+// through its -cache alias too, and one whose patterns reject the index's
+// own path answer the download policy's 404 and message, and a virtual
+// repository whose own patterns reject the index or the package answers
+// that no repository serves it.
 func TestAccAlpineRefusesCallersWhoMayNotDownload(t *testing.T) {
 	w := newItemWorld(t)
 	dark := alpineRepo("alpine-dark", repo.Local)
 	dark.BlackedOut = new(true)
+	darkRemote := alpineRepo("alpine-dark-remote", repo.Remote)
+	darkRemote.BlackedOut = new(true)
+	hidden := alpineRepo("alpine-hidden", repo.Local)
+	hidden.ExcludesPattern = new("**/" + alpine.IndexName)
+	closed := alpineRepo("alpine-closed", repo.Virtual, alpineLocal)
+	closed.ExcludesPattern = new("v3.20/**")
 	w.repos(
-		alpineRepo(alpineLocal, repo.Local),
-		dark,
+		alpineRepo(alpineLocal, repo.Local), dark, darkRemote, hidden, closed,
 		alpineRepo(alpineVirtual, repo.Virtual, alpineLocal),
 	)
-	w.put(alpineLocal, apkIndexPath, apkIndex(t, "hello"))
+	for _, key := range []string{alpineLocal, "alpine-dark", "alpine-hidden"} {
+		w.put(key, apkIndexPath, apkIndex(t, "hello"))
+	}
 	w.put(alpineLocal, apkHelloPath, apkBody)
-	w.put("alpine-dark", apkIndexPath, apkIndex(t, "hello"))
-	for _, tc := range []struct{ name, target, as string }{
-		{"user reads an index", "/artifactory/alpine-local/" + apkIndexPath, "user"},
-		{"blacked-out index", "/artifactory/alpine-dark/" + apkIndexPath, kittest.Admin.Name},
-		{"user reads a virtual package", "/artifactory/alpine/" + apkHelloPath, "user"},
+	blackedOut := func(key string) string {
+		return "The repository '" + key + "' is blacked out and cannot serve artifact '" +
+			key + ":" + apkIndexPath + "'."
+	}
+	for _, tc := range []struct {
+		name, key, path, as string
+		status              int
+		message             string
+	}{
+		{
+			"user reads an index", alpineLocal, apkIndexPath, "user",
+			http.StatusForbidden, "Forbidden",
+		},
+		{
+			"user reads a blacked-out index", "alpine-dark", apkIndexPath, "user",
+			http.StatusForbidden, "Forbidden",
+		},
+		{
+			"user reads a virtual package", alpineVirtual, apkHelloPath, "user",
+			http.StatusForbidden, "Forbidden",
+		},
+		{
+			"user reads a package the virtual's patterns reject", "alpine-closed", apkHelloPath,
+			"user", http.StatusForbidden, "Forbidden",
+		},
+		{
+			"blacked-out index", "alpine-dark", apkIndexPath, kittest.Admin.Name,
+			http.StatusNotFound, blackedOut("alpine-dark"),
+		},
+		{
+			"blacked-out remote index", "alpine-dark-remote", apkIndexPath, kittest.Admin.Name,
+			http.StatusNotFound, blackedOut("alpine-dark-remote"),
+		},
+		{
+			"blacked-out remote's cache", "alpine-dark-remote-cache", apkIndexPath,
+			kittest.Admin.Name, http.StatusNotFound, blackedOut("alpine-dark-remote"),
+		},
+		{
+			"index the patterns reject", "alpine-hidden", apkIndexPath, kittest.Admin.Name,
+			http.StatusNotFound, "The repository 'alpine-hidden' rejected the artifact " +
+				"'alpine-hidden:" + apkIndexPath + "' due to its include/exclude pattern settings.",
+		},
+		{
+			"virtual index its patterns reject", "alpine-closed", apkIndexPath, kittest.Admin.Name,
+			http.StatusNotFound,
+			"No repository found to serve the request for alpine-closed:" + apkIndexPath,
+		},
+		{
+			"virtual package its patterns reject", "alpine-closed", apkHelloPath,
+			kittest.Admin.Name, http.StatusNotFound,
+			"No repository found to serve the request for alpine-closed:" + apkHelloPath,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			wantError(t, w.do(http.MethodGet, tc.target, tc.as), http.StatusForbidden, "Forbidden")
+			rec := w.do(http.MethodGet, "/artifactory/"+tc.key+"/"+tc.path, tc.as)
+			wantError(t, rec, tc.status, tc.message)
 		})
 	}
+}
+
+// TestAccAlpineIndexNeedsReadPermissionOnEveryListedPackage: a caller who
+// may read an index but not a package it lists is refused a local index,
+// and a virtual index leaves that package out, the permission rule the
+// generic item route cannot apply.
+func TestAccAlpineIndexNeedsReadPermissionOnEveryListedPackage(t *testing.T) {
+	w := newItemWorld(t)
+	w.repos(
+		alpineRepo(alpineLocal, repo.Local),
+		alpineRepo(alpineVirtual, repo.Virtual, alpineLocal),
+	)
+	w.put(alpineLocal, apkIndexPath, apkIndex(t, "hello", "world"))
+	notHello := &accessapitest.Decider{Admin: true, AllowsFunc: func(
+		_ api.ResourceType, _ api.Repo, path string, _ api.Actions,
+	) bool {
+		return path != apkHelloPath
+	}}
+	get := func(key string) *httptest.ResponseRecorder {
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodGet,
+			"/artifactory/"+key+"/"+apkIndexPath, nil)
+		r = r.WithContext(api.WithCaller(r.Context(), kernel.Principal{Name: "reader"}, notHello))
+		rec := httptest.NewRecorder()
+		w.kit.GetItem(rec, r)
+		return rec
+	}
+	wantError(t, get(alpineLocal), http.StatusForbidden, "Forbidden")
+	rec := get(alpineVirtual)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("virtual index answered %d %s, want 200", rec.Code, rec.Body)
+	}
+	if got := indexNames(t, rec.Body.Bytes()); !slices.Equal(got, []string{"world"}) {
+		t.Errorf("virtual index lists %v, want only world", got)
+	}
+}
+
+// TestAccAlpineIndexKeepsAPackageThePatternsReject: a local or remote index
+// is served as it is, listing a package whose file the repository's
+// patterns reject, as 7.x keeps such a package in its indexes
+// (RTFACT-30830, RTFACT-30656); only that file's GET answers the policy's
+// 404.
+func TestAccAlpineIndexKeepsAPackageThePatternsReject(t *testing.T) {
+	index := apkIndex(t, "hello", "world")
+	w := newItemWorld(t, withSource(upstream(map[string]func() (source.Result, error){
+		apkIndexPath: streamed(index, nil),
+		apkHelloPath: streamed(apkBody, nil),
+	})))
+	local := alpineRepo(alpineLocal, repo.Local)
+	local.ExcludesPattern = new("**/hello-*")
+	remote := alpineRepo(alpineRemote, repo.Remote)
+	remote.ExcludesPattern = new("**/hello-*")
+	w.repos(local, remote)
+	w.put(alpineLocal, apkIndexPath, index)
+	w.put(alpineLocal, apkHelloPath, apkBody)
+	for _, key := range []string{alpineLocal, alpineRemote} {
+		t.Run(key, func(t *testing.T) {
+			rec := w.get(key, apkIndexPath)
+			if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), index) {
+				t.Errorf("index answered %d with %d bytes, want the index as it is",
+					rec.Code, rec.Body.Len())
+			}
+			wantError(t, w.get(key, apkHelloPath), http.StatusNotFound,
+				"The repository '"+key+"' rejected the artifact '"+key+":"+apkHelloPath+
+					"' due to its include/exclude pattern settings.")
+		})
+	}
+}
+
+// TestAccAlpineVirtualKeepsPackagesThePatternsReject: a virtual index keeps
+// a package whose file a local or remote member's patterns, or a virtual
+// repository's own, reject, nested ones included. The package's GET passes
+// over the refusing member to the next that lists it, without asking a
+// refusing remote's source, answers not found when none serves it, and
+// answers that no repository serves it when the virtual repository's own
+// patterns reject it.
+func TestAccAlpineVirtualKeepsPackagesThePatternsReject(t *testing.T) {
+	w := newItemWorld(t, withSource(upstream(map[string]func() (source.Result, error){
+		apkIndexPath: streamed(apkIndex(t, "hello"), nil),
+		apkHelloPath: func() (source.Result, error) {
+			t.Error("the source was asked for a package its remote's patterns reject")
+			return source.Result{Stream: stream(apkBody)}, nil
+		},
+	})))
+	hiding := alpineRepo("alpine-hiding", repo.Local)
+	hiding.ExcludesPattern = new("**/hello-*")
+	remote := alpineRepo(alpineRemote, repo.Remote)
+	remote.ExcludesPattern = new("**/hello-*")
+	picky := alpineRepo("alpine-picky", repo.Virtual, alpineLocal)
+	picky.ExcludesPattern = new("**/hello-*")
+	w.repos(
+		hiding, remote, picky, alpineRepo(alpineLocal, repo.Local),
+		alpineRepo(alpineVirtual, repo.Virtual, "alpine-hiding", alpineLocal),
+		alpineRepo("alpine-only-hiding", repo.Virtual, "alpine-hiding"),
+		alpineRepo("alpine-over-remote", repo.Virtual, alpineRemote),
+		alpineRepo("alpine-nested", repo.Virtual, "alpine-picky"),
+	)
+	for _, key := range []string{"alpine-hiding", alpineLocal} {
+		w.put(key, apkIndexPath, apkIndex(t, "hello"))
+	}
+	w.put("alpine-hiding", apkHelloPath, []byte("hidden bytes"))
+	w.put(alpineLocal, apkHelloPath, apkBody)
+	for _, key := range []string{
+		alpineVirtual, "alpine-only-hiding", "alpine-picky", "alpine-over-remote", "alpine-nested",
+	} {
+		rec := w.get(key, apkIndexPath)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s index answered %d %s, want 200", key, rec.Code, rec.Body)
+		}
+		if got := indexNames(t, rec.Body.Bytes()); !slices.Equal(got, []string{"hello"}) {
+			t.Errorf("%s index lists %v, want hello", key, got)
+		}
+	}
+	rec := w.get(alpineVirtual, apkHelloPath)
+	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), apkBody) {
+		t.Errorf("hello answered %d %q, want alpine-local's package", rec.Code, rec.Body)
+	}
+	for _, key := range []string{"alpine-only-hiding", "alpine-over-remote", "alpine-nested"} {
+		wantError(t, w.get(key, apkHelloPath), http.StatusNotFound, "Could not find resource")
+	}
+	wantError(t, w.get("alpine-picky", apkHelloPath), http.StatusNotFound,
+		"No repository found to serve the request for alpine-picky:"+apkHelloPath)
 }
 
 // TestUnitAlpineCacheAliasOfALocalRepositoryHasNoIndex: only a remote

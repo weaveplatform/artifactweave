@@ -32,12 +32,14 @@ var (
 )
 
 type alpineIndexView struct {
-	repo       repo.Config
-	packages   []alpine.Package
-	raw        []byte
-	checkRead  func(context.Context, string) error
-	revalidate func(context.Context) error
-	used       func(context.Context) error
+	repo     repo.Config
+	packages []alpine.Package
+	raw      []byte
+	// checkPermission is a remote index read's permission-only check of
+	// each package the index lists (source.Result.CheckPermission).
+	checkPermission func(context.Context, string) error
+	revalidate      func(context.Context) error
+	used            func(context.Context) error
 }
 
 type alpineCandidate struct {
@@ -89,9 +91,18 @@ func (s alpineItems) serveAlpineIndex(
 		return
 	}
 	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
-		!acc.File(c, req.Path, accessapi.ActionRead) ||
-		generic.CheckDownload(c, req.Path, false) != nil {
+		!acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		return
+	}
+	// 7.x calculates and stores a local index, caches a remote's and
+	// serves a virtual repository's as a file at this path, so a
+	// blacked-out repository or patterns that reject the index's own path
+	// answer the policy's 404 and message once read permission is settled
+	// (DV-057); a virtual repository's patterns answer that no repository
+	// serves it. A remote's -cache alias answers as the remote does.
+	if err := generic.CheckDownload(c, req.Path, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "Alpine index download", err))
 		return
 	}
 	if cached && c.Class != repo.Remote {
@@ -101,7 +112,7 @@ func (s alpineItems) serveAlpineIndex(
 	var body []byte
 	var used func(context.Context) error
 	if c.Class == repo.Virtual {
-		candidates, err := s.alpineCandidates(ctx, st, c, req.Path, p, acc,
+		candidates, err := s.alpineCandidates(ctx, st, c, req.Path, p, acc, false,
 			map[string]bool{})
 		if err != nil {
 			httpkit.WriteErr(w, r, s.ItemError(ctx, "Alpine virtual index", err))
@@ -134,7 +145,7 @@ func (s alpineItems) serveAlpineIndex(
 			}
 		}
 		for _, pkg := range view.packages {
-			allowed, err := alpinePackageReadable(ctx, c, pkg.Path, acc, view.checkRead)
+			allowed, err := alpinePackageReadable(ctx, c, pkg.Path, acc, view.checkPermission)
 			if err != nil {
 				httpkit.WriteErr(w, r, s.ItemError(ctx, "Alpine index permission", err))
 				return
@@ -155,11 +166,16 @@ func (s alpineItems) serveAlpineIndex(
 	}
 }
 
+// alpinePackageReadable reports whether the caller has Read permission on
+// a package an index lists, in c and, through check, at a remote's source.
+// It is permission alone: an index keeps a package whose file the patterns
+// reject and only that file's GET is refused, as 7.x keeps such a package
+// in a Debian or RPM index (RTFACT-30830, RTFACT-30656).
 func alpinePackageReadable(
 	ctx context.Context, c repo.Config, path string, acc itemkit.Access,
 	check func(context.Context, string) error,
 ) (bool, error) {
-	if !acc.File(c, path, accessapi.ActionRead) || generic.CheckDownload(c, path, false) != nil {
+	if !acc.File(c, path, accessapi.ActionRead) {
 		return false, nil
 	}
 	if check != nil {
@@ -199,7 +215,7 @@ func (s alpineItems) alpineMemberIndex(
 				p.Anonymous,
 			)
 		}
-		view.checkRead = result.CheckRead
+		view.checkPermission = result.CheckPermission
 		view.revalidate = result.Revalidate
 		view.used = result.Used
 		switch {
@@ -255,10 +271,15 @@ func (s alpineItems) readAlpineBlob(ctx context.Context, sha string) ([]byte, er
 }
 
 // alpineCandidates walks ordered virtual members. A duplicate path belongs to
-// the first readable member, which is the same member package GET must use.
+// the first readable member. A member that refuses its index takes no part.
+// With download false, for the index, a row stays when the member's or the
+// virtual repository's patterns reject its file, which the index keeps as
+// 7.x's virtual indexes do (RTFACT-30656). With download true, for a
+// package GET, such a row is left out, so the GET passes over that member
+// to the next one that lists the path.
 func (s alpineItems) alpineCandidates(
 	ctx context.Context, st itemkit.Store, c repo.Config, indexPath string,
-	p kernel.Principal, acc itemkit.Access, seen map[string]bool,
+	p kernel.Principal, acc itemkit.Access, download bool, seen map[string]bool,
 ) ([]alpineCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
 		return nil, errAlpineVirtualCycle
@@ -285,7 +306,7 @@ func (s alpineItems) alpineCandidates(
 		}
 		var entries []alpineCandidate
 		if member.Class == repo.Virtual {
-			entries, err = s.alpineCandidates(ctx, st, member, indexPath, p, acc, seen)
+			entries, err = s.alpineCandidates(ctx, st, member, indexPath, p, acc, download, seen)
 		} else {
 			var view alpineIndexView
 			view, err = s.alpineMemberIndex(ctx, st, member, false, indexPath, p, acc)
@@ -294,8 +315,11 @@ func (s alpineItems) alpineCandidates(
 			}
 			if err == nil {
 				for _, pkg := range view.packages {
+					if download && generic.CheckDownload(member, pkg.Path, false) != nil {
+						continue
+					}
 					allowed, checkErr := alpinePackageReadable(
-						ctx, member, pkg.Path, acc, view.checkRead)
+						ctx, member, pkg.Path, acc, view.checkPermission)
 					if checkErr != nil {
 						err = checkErr
 						break
@@ -314,8 +338,10 @@ func (s alpineItems) alpineCandidates(
 		}
 		for _, entry := range entries {
 			if selected[entry.packageInfo.Path] ||
-				!acc.File(c, entry.packageInfo.Path, accessapi.ActionRead) ||
-				generic.CheckDownload(c, entry.packageInfo.Path, false) != nil {
+				!acc.File(c, entry.packageInfo.Path, accessapi.ActionRead) {
+				continue
+			}
+			if download && generic.CheckDownload(c, entry.packageInfo.Path, false) != nil {
 				continue
 			}
 			selected[entry.packageInfo.Path] = true
@@ -334,13 +360,16 @@ func (s alpineItems) serveVirtualAlpinePackage(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.File(c, req.Path, accessapi.ActionRead) ||
-		generic.CheckDownload(c, req.Path, false) != nil {
+	if !acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
+	if err := generic.CheckDownload(c, req.Path, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Alpine virtual package download", err))
+		return
+	}
 	indexPath := req.Path[:strings.LastIndexByte(req.Path, '/')+1] + alpine.IndexName
-	candidates, err := s.alpineCandidates(r.Context(), st, c, indexPath, p, acc,
+	candidates, err := s.alpineCandidates(r.Context(), st, c, indexPath, p, acc, true,
 		map[string]bool{})
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Alpine virtual package", err))
