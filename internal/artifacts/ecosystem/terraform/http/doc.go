@@ -53,6 +53,18 @@
 //   - Remote answers keep the upstream's signed bytes and public-key
 //     identity, and a provider package is advertised only after its whole
 //     bundle has passed.
+//   - The download policy (decision 0032) is checked after Read
+//     permission, a signed URL's principal included, and answers its own
+//     404 and message. A blacked-out local or federated repository refuses
+//     every route: a version list, package metadata or mirror document at
+//     the request's path, before the index is read, and a file or a
+//     module's /download at the archive's path. Patterns refuse only a
+//     file, and a module's /download whose archive they reject; a release
+//     whose file they reject stays listed. A remote checks its policy at
+//     the 7.x cache path of the registry document a client asks for, under
+//     .terraform/ (RTFACT-30802, RTFACT-31026), and each file at its cache
+//     path; the lookups on the way are refused by the blackout alone, and a
+//     listing keeps a release whose archive the patterns reject.
 //   - Errors are {"errors":[...]} (the Terraform registry profile), and
 //     statuses and messages stay byte-identical.
 //
@@ -102,4 +114,7 @@
 //   - remote_provider_test.go, remote_provider_policy_test.go,
 //     remote_provider_rotation_test.go and remote_provider_source_test.go:
 //     remote providers, the mirror, redirects and credentials.
+//   - policy_test.go: the download policy on local and remote module and
+//     provider routes: blackout, patterns on one archive, patterns on the
+//     .terraform/ metadata paths, and Read permission checked first.
 package terraformhttp

@@ -214,3 +214,17 @@ func providerFolder(q providerOp) string {
 	}
 	return q.name
 }
+
+// providerDocument is the 7.x cache path of the registry document a client
+// asks a remote for, where the remote's patterns are checked. 7.x caches
+// the version list at .terraform/providers/<ns>/<type>/versions, also when
+// it answers the network mirror's index (RTFACT-31026), so the mirror's
+// documents are checked there; a platform's package metadata is taken to
+// sit below it [I].
+func providerDocument(q providerOp) string {
+	base := ".terraform/providers/" + q.name
+	if q.isList || q.isMirror {
+		return base + "/versions"
+	}
+	return base + "/" + q.version + "/download/" + q.os + "/" + q.arch
+}

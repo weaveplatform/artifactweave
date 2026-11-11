@@ -117,6 +117,7 @@ func (h handler) upstreamMirrorMetadata(
 		base+suffix,
 		providerFolder(q),
 		"terraform-provider-mirror-v1",
+		false,
 		func(body io.Reader, actual string) error {
 			if list {
 				_, err := parseMirrorVersions(body, q)

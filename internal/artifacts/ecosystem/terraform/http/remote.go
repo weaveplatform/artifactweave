@@ -27,6 +27,11 @@ func (h handler) moduleMetadata(
 	location bool,
 	validate func(io.Reader, string) error,
 ) (source.Result, error) {
+	// Every module metadata read is a lookup on the way to another answer:
+	// the document a client asks for is checked at its 7.x cache path
+	// before any read (remoteModule), and a signed download's own archive
+	// read applies the policy to the file. So only the blackout refuses a
+	// lookup, and patterns on the module folder no longer do (rulings R4).
 	resource := source.Resource{
 		Kind:                   source.ResourceKindMetadata,
 		Path:                   path,
@@ -34,6 +39,7 @@ func (h handler) moduleMetadata(
 		Method:                 http.MethodGet,
 		PermissionFolder:       true,
 		PermissionPath:         folder,
+		BlackoutOnly:           true,
 		Variant:                variant,
 		Accept:                 "application/json",
 		ExpectedContentType:    "application/json",
@@ -134,7 +140,7 @@ func (h handler) upstreamModuleVersions(
 		return nil, result, err
 	}
 	defer closeModuleResult(result)
-	result.Revalidate = combineModuleFences([]source.Result{discovery, result}, nil)
+	result.Revalidate = combineModuleFences([]source.Result{discovery, result}, nil, nil)
 	result.Used = combineModuleUsage([]source.Result{discovery, result})
 	if result.Stream == nil {
 		return nil, result, remoteModuleError()
@@ -170,7 +176,7 @@ func (h handler) upstreamModuleLocation(
 		return moduleSource{}, result, err
 	}
 	defer closeModuleResult(result)
-	result.Revalidate = combineModuleFences([]source.Result{discovery, result}, nil)
+	result.Revalidate = combineModuleFences([]source.Result{discovery, result}, nil, nil)
 	result.Used = combineModuleUsage([]source.Result{discovery, result})
 	if result.Stream == nil {
 		return moduleSource{}, result, remoteModuleError()
@@ -180,6 +186,19 @@ func (h handler) upstreamModuleLocation(
 }
 
 func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operation) {
+	// 7.x caches a remote's registry metadata under .terraform/ and checks
+	// the remote's patterns there, so include patterns that leave out
+	// .terraform/** refuse it (RTFACT-30802). The provider versions' path
+	// is shown (RTFACT-31026); the modules' is taken to follow it [I]. The
+	// blackout's refusal names the same path.
+	document := ".terraform/modules/" + q.module.Package() + "/versions"
+	if !q.isList {
+		document = ".terraform/modules/" + q.module.Package() + "/" + q.module.Version + "/download"
+	}
+	if err := h.k.CheckDocument(r, document); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	versions, result, err := h.upstreamModuleVersions(r, q.module)
 	if err != nil {
 		h.k.Error(w, r, err)
@@ -239,7 +258,11 @@ func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operatio
 		h.k.Error(w, r, err)
 		return
 	}
-	revalidate := combineModuleFences([]source.Result{result, metadata, artifact}, []string{path})
+	revalidate := combineModuleFences(
+		[]source.Result{result, metadata, artifact},
+		readCheck,
+		[]string{path},
+	)
 	control := source.Result{
 		Stream: &source.Stream{
 			Body:           http.NoBody,
@@ -310,11 +333,29 @@ func (h handler) remoteModuleVersions(
 			ETag:      `"` + hex.EncodeToString(sum[:]) + `"`,
 		},
 	}
-	result.Revalidate = combineModuleFences(results, paths)
+	result.Revalidate = combineModuleFences(results, permissionCheck, paths)
 	h.k.ServeResult(w, r, result)
 }
 
-func combineModuleFences(results []source.Result, paths []string) func(context.Context) error {
+// readCheck checks a path a delivery serves, or signs a URL for, against
+// Read permission and the download policy.
+func readCheck(r source.Result) func(context.Context, string) error { return r.CheckRead }
+
+// permissionCheck checks a path a listing discloses against Read
+// permission alone: a release whose file the patterns reject stays listed
+// (rulings R3), where CheckRead's refusal of one archive refused the whole
+// list. A document built from files it fetched, such as a provider's
+// package metadata, loses nothing by it: each file's result fences its own
+// policy, at the path its read checked, through its Revalidate.
+func permissionCheck(r source.Result) func(context.Context, string) error {
+	return r.CheckPermission
+}
+
+func combineModuleFences(
+	results []source.Result,
+	check func(source.Result) func(context.Context, string) error,
+	paths []string,
+) func(context.Context) error {
 	return func(ctx context.Context) error {
 		for _, result := range results {
 			if result.Revalidate != nil {
@@ -323,11 +364,12 @@ func combineModuleFences(results []source.Result, paths []string) func(context.C
 				}
 			}
 		}
-		if len(results) > 0 && results[0].CheckRead != nil {
-			for _, path := range paths {
-				if err := results[0].CheckRead(ctx, path); err != nil {
-					return fmt.Errorf("terraform module delivery: %w", err)
-				}
+		if len(results) == 0 || check == nil || check(results[0]) == nil {
+			return nil
+		}
+		for _, path := range paths {
+			if err := check(results[0])(ctx, path); err != nil {
+				return fmt.Errorf("terraform module delivery: %w", err)
 			}
 		}
 		return nil
@@ -448,7 +490,11 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 		h.k.Error(w, r, forbidden)
 		return
 	}
-	result.Revalidate = combineModuleFences([]source.Result{metadata, result}, []string{c.Path})
+	result.Revalidate = combineModuleFences(
+		[]source.Result{metadata, result},
+		readCheck,
+		[]string{c.Path},
+	)
 	h.k.ServeResult(w, r, result)
 }
 

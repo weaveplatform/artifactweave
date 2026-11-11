@@ -21,9 +21,17 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
+// providerMetadata reads one upstream metadata document. A lookup, a read
+// on the way to another answer, is refused by the blackout alone (rulings
+// R4): the registry's documents a client asks for are checked at their 7.x
+// cache paths before any read (remoteProvider), and each file a bundle
+// fetches at its cache path, where the remote cache admits it too. The
+// upstream mirror's documents, which have no 7.x counterpart, keep the
+// policy at the provider's folder [I].
 func (h handler) providerMetadata(
 	r *http.Request,
 	path, target, folder, variant string,
+	lookup bool,
 	validate func(io.Reader, string) error,
 ) (source.Result, error) {
 	resource := source.Resource{
@@ -33,6 +41,7 @@ func (h handler) providerMetadata(
 		Method:              http.MethodGet,
 		PermissionFolder:    true,
 		PermissionPath:      folder,
+		BlackoutOnly:        lookup,
 		Variant:             variant + ":url-policy-v2",
 		Accept:              "application/json",
 		ExpectedContentType: "application/json",
@@ -83,6 +92,7 @@ func (h handler) providerService(r *http.Request, folder string) (string, source
 		base+".well-known/terraform.json",
 		folder,
 		"terraform-provider-discovery-v1",
+		true,
 		func(body io.Reader, actual string) error {
 			target, e := parseProviderDiscovery(body, actual)
 			if e != nil {
@@ -124,6 +134,7 @@ func (h handler) upstreamProviderVersions(
 		service+escapeModulePath(q.name)+"/versions",
 		q.name,
 		"terraform-provider-versions-v1",
+		true,
 		func(body io.Reader, _ string) error { _, e := parseRemoteProviderVersions(body, q); return e },
 	)
 	if err != nil {
@@ -134,7 +145,7 @@ func (h handler) upstreamProviderVersions(
 		return nil, result, remoteProviderError("missing version bytes")
 	}
 	versions, err := parseRemoteProviderVersions(result.Stream.Body, q)
-	result.Revalidate = combineModuleFences([]source.Result{discovery, result}, nil)
+	result.Revalidate = combineModuleFences([]source.Result{discovery, result}, nil, nil)
 	result.Used = combineModuleUsage([]source.Result{discovery, result})
 	result.Stream = nil
 	return versions, result, err
@@ -160,6 +171,7 @@ func (h handler) upstreamProviderPackage(
 		service+suffix,
 		q.name,
 		"terraform-provider-package-v1",
+		true,
 		func(body io.Reader, actual string) error {
 			_, e := parseRemoteProviderPackage(body, actual, c, q)
 			return e
@@ -174,7 +186,7 @@ func (h handler) upstreamProviderPackage(
 	}
 	metadata, err := parseRemoteProviderPackage(result.Stream.Body, result.Metadata.BaseURL, c, q)
 	digest := moduleDigest(result)
-	result.Revalidate = combineModuleFences([]source.Result{discovery, result}, nil)
+	result.Revalidate = combineModuleFences([]source.Result{discovery, result}, nil, nil)
 	result.Used = combineModuleUsage([]source.Result{discovery, result})
 	result.Stream = nil
 	return metadata, result, digest, err
@@ -404,6 +416,10 @@ func (h handler) remoteProvider(w http.ResponseWriter, r *http.Request, q provid
 		h.remoteProviderMirrorUpstream(w, r, q)
 		return
 	}
+	if err := h.k.CheckDocument(r, providerDocument(q)); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	versions, result, err := h.upstreamProviderVersions(r, q)
 	if err != nil {
 		h.k.Error(w, r, err)
@@ -622,7 +638,7 @@ func (h handler) serveProviderJSON(
 				ETag:      `"` + hex.EncodeToString(digest[:]) + `"`,
 			},
 		},
-		Revalidate: combineModuleFences(results, paths),
+		Revalidate: combineModuleFences(results, permissionCheck, paths),
 		Used:       combineModuleUsage(results),
 	}
 	h.k.ServeResult(w, r, response)

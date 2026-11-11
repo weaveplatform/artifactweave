@@ -463,7 +463,7 @@ func TestUnitRemoteModuleDeliveryRejectsUnreadableAndRevokedSources(t *testing.T
 			}
 			return nil
 		},
-	}}, []string{"public.zip", "private.zip"})
+	}}, readCheck, []string{"public.zip", "private.zip"})
 	if err := fence(t.Context()); !errors.Is(err, denied) || len(checked) != 2 {
 		t.Fatalf("changed item permissions were not fenced: paths=%v err=%v", checked, err)
 	}
@@ -473,9 +473,31 @@ func TestUnitRemoteModuleDeliveryRejectsUnreadableAndRevokedSources(t *testing.T
 	}, CheckRead: func(context.Context, string) error {
 		called = true
 		return nil
-	}}}, []string{"private.zip"})
+	}}}, readCheck, []string{"private.zip"})
 	if err := fence(t.Context()); !errors.Is(err, denied) || called {
 		t.Fatalf("revoked source reached descendant check: called=%t err=%v", called, err)
+	}
+	// A listing's fence checks Read permission alone, never the policy that
+	// CheckRead applies, so a release whose file the patterns reject stays
+	// listed (rulings R3); a result without the check fences nothing more.
+	checked = nil
+	fence = combineModuleFences([]source.Result{{
+		CheckRead: func(context.Context, string) error {
+			t.Fatal("a listing's fence applied the download policy")
+			return nil
+		},
+		CheckPermission: func(_ context.Context, path string) error {
+			checked = append(checked, path)
+			return nil
+		},
+	}}, permissionCheck, []string{"public.zip"})
+	if err := fence(t.Context()); err != nil || len(checked) != 1 {
+		t.Fatalf("listing fence: paths=%v err=%v", checked, err)
+	}
+	if err := combineModuleFences([]source.Result{{}}, permissionCheck, []string{"public.zip"})(
+		t.Context(),
+	); err != nil {
+		t.Fatalf("a result without CheckPermission failed its fence: %v", err)
 	}
 	used := combineModuleUsage(
 		[]source.Result{{Used: func(context.Context) error { return denied }}},
