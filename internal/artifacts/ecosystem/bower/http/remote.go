@@ -91,17 +91,34 @@ func validateRefs(
 	return err
 }
 
+// remoteArchivePath is the path a remote's cache keeps a version's archive
+// at, where its download policy is checked. 7.x documents no cache path for
+// a Bower remote's archives (#216).
+func remoteArchivePath(name, version string) string {
+	return name + "/" + version + "/bower-archive.tar.gz"
+}
+
+// lookupPolicy sets a remote metadata read that resolves a package to check
+// the repository's blackout alone, naming the request's path: 7.x keeps
+// this metadata at no documented path, so the patterns do not refuse it,
+// and a version whose archive they reject stays listed while the archive's
+// own read is refused (R2a, R3, R4).
+func lookupPolicy(r *http.Request, resource source.Resource) source.Resource {
+	resource.PolicyPath, resource.BlackoutOnly = requestPath(r), true
+	return resource
+}
+
 func (h handler) remoteRefs(r *http.Request, name string) ([]remoteRef, source.Result, error) {
 	if gitRemote(r) {
 		return h.gitRefs(r, name)
 	}
 	owner := pkgroute.RequestFrom(r).Repo.Key
-	resource := source.Resource{
+	resource := lookupPolicy(r, source.Resource{
 		Kind: source.ResourceKindMetadata, Path: "catalog/" + name + "/refs",
 		UpstreamPath: "refs/" + owner + "/" + name,
 		Method:       http.MethodGet, PermissionFolder: true, PermissionPath: name,
 		Variant: "bower-refs-v1", ValidateMetadata: validateRefs,
-	}
+	})
 	result, err := h.k.Read(r, resource)
 	if err != nil {
 		return nil, source.Result{}, fmt.Errorf("bower remote refs: %w", err)
@@ -135,8 +152,11 @@ func (h handler) remoteVersions(r *http.Request, name string) ([]string, error) 
 		if !h.k.Can(r, manifest, api.ActionRead) {
 			continue
 		}
-		if result.CheckRead != nil {
-			if err := result.CheckRead(r.Context(), manifest); err != nil {
+		// Read permission alone decides the listing: a version whose files
+		// the patterns reject stays listed, and only its archive is refused
+		// (R3).
+		if result.CheckPermission != nil {
+			if err := result.CheckPermission(r.Context(), manifest); err != nil {
 				if errors.Is(err, source.ErrDenied) {
 					continue
 				}
@@ -363,7 +383,7 @@ func (h handler) remoteBinary(w http.ResponseWriter, r *http.Request, name, vers
 	}
 	resource := source.Resource{
 		Kind:         source.ResourceKindArtifact,
-		Path:         name + "/" + version + "/bower-archive.tar.gz",
+		Path:         remoteArchivePath(name, version),
 		UpstreamPath: "binaries/" + owner + "/" + name + ".git/" + tag,
 		Method:       r.Method,
 		Variant:      "bower-archive-v1",
@@ -379,7 +399,14 @@ func (h handler) remoteBinary(w http.ResponseWriter, r *http.Request, name, vers
 
 // pkgroute maps source misses to the protocol status; both forms are a normal
 // absent virtual member, unlike upstream refusal, timeout or integrity failure.
+// The download policy's refusal is a 404 too, but it is the repository's
+// own answer, which the caller passes on rather than "Bower package not
+// found" (RTDEV-47144); a virtual repository's member that refuses is
+// passed over as missing, as pkgroute reports it.
 func missingPackage(err error) bool {
+	if pkgroute.IsRefusal(err) {
+		return false
+	}
 	var failure *apierror.Error
 	return errors.Is(err, kernel.ErrNotFound) ||
 		errors.As(err, &failure) && failure.Status == http.StatusNotFound

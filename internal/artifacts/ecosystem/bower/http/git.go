@@ -137,7 +137,7 @@ func (h handler) gitPackage(r *http.Request, name string) (gitPointer, error) {
 	if err != nil {
 		return gitPointer{}, err
 	}
-	resource := source.Resource{
+	resource := lookupPolicy(r, source.Resource{
 		Kind:             source.ResourceKindMetadata,
 		Path:             "catalog/" + name + "/pointer.json",
 		ExternalURL:      target.String(),
@@ -157,7 +157,7 @@ func (h handler) gitPackage(r *http.Request, name string) (gitPointer, error) {
 			_, parseErr := decodePointer(data, c, name)
 			return parseErr
 		},
-	}
+	})
 	result, err := h.k.Read(r, resource)
 	if err != nil {
 		return gitPointer{}, fmt.Errorf("bower git registry pointer: %w", err)
@@ -280,7 +280,7 @@ func (h handler) gitRefsForPointer(
 			return checkURL(ctx, u)
 		}
 	}
-	resource := source.Resource{
+	resource := lookupPolicy(r, source.Resource{
 		Kind:             source.ResourceKindMetadata,
 		Path:             "catalog/" + name + "/git-refs",
 		ExternalURL:      target.String(),
@@ -300,7 +300,7 @@ func (h handler) gitRefsForPointer(
 			_, parseErr := parseGitRefs(data)
 			return parseErr
 		},
-	}
+	})
 	result, err := h.k.Read(r, resource)
 	if err != nil {
 		return nil, source.Result{}, fmt.Errorf("bower git refs: %w", err)
@@ -436,7 +436,7 @@ func (h handler) gitBinary(w http.ResponseWriter, r *http.Request, name, version
 	}
 	resource := source.Resource{
 		Kind:        source.ResourceKindArtifact,
-		Path:        name + "/" + version + "/bower-archive.tar.gz",
+		Path:        remoteArchivePath(name, version),
 		ExternalURL: target.String(),
 		CheckURL:    guard,
 		Method:      r.Method,
@@ -543,9 +543,12 @@ func (h handler) gitPackageNames(r *http.Request, query string) ([]string, error
 			continue
 		}
 		if result.CheckFolder != nil {
+			// A package whose folder the patterns reject stays listed, and
+			// only its archive is refused (R3): CheckFolder checks the
+			// policy after Read permission, so its refusal keeps the name.
 			if err := result.CheckFolder(r.Context(), name); errors.Is(err, source.ErrDenied) {
 				continue
-			} else if err != nil {
+			} else if err != nil && !pkgroute.IsRefusal(err) {
 				return nil, fmt.Errorf("bower git catalog authority: %w", err)
 			}
 		}
