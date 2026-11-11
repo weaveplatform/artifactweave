@@ -42,7 +42,26 @@ func remoteIndexURL(c repo.Config, name string) (string, error) {
 	return target, nil
 }
 
-func (h handler) upstreamIndex(r *http.Request, name string) (remoteIndex, source.Result, error) {
+// itemPath reports whether path can be a read's policy path: a request or
+// upstream path that is no item path, which no stored file could have,
+// leaves the policy at the read's own path.
+func itemPath(path string) bool {
+	_, _, _, err := kernel.SplitItemPath(path)
+	return err == nil && path == strings.Trim(path, "/") && !strings.ContainsAny(path, "\r\n")
+}
+
+// upstreamIndex reads the remote's page of project name, or its project
+// list for "". Read permission is checked at the project's folder, or the
+// root, and the remote's download policy at the page's 7.x cache path
+// (pagePath), so a pattern on a project's folder, which 7.x's hash paths
+// for files never match, leaves the page served (JFrog on RTFACT-17256).
+// lookup, when set, names what a download or another page reads the page
+// for: that read is refused only by the blackout, naming lookup, so the
+// patterns of the file or page it serves decide.
+func (h handler) upstreamIndex(
+	r *http.Request,
+	name, lookup string,
+) (remoteIndex, source.Result, error) {
 	target, err := remoteIndexURL(pkgroute.RequestFrom(r).Repo, name)
 	if err != nil {
 		return remoteIndex{}, source.Result{}, err
@@ -60,6 +79,15 @@ func (h handler) upstreamIndex(r *http.Request, name string) (remoteIndex, sourc
 		PermissionFolder: true,
 		PermissionPath:   name,
 		Variant:          "pypi-simple-v3",
+	}
+	if itemPath(pagePath(name)) {
+		resource.PolicyPath = pagePath(name)
+	}
+	if lookup != "" {
+		resource.BlackoutOnly = true
+		if itemPath(lookup) {
+			resource.PolicyPath = lookup
+		}
 	}
 	if name != "" {
 		resource.Path += "/" + name
@@ -89,7 +117,7 @@ func (h handler) upstreamIndex(r *http.Request, name string) (remoteIndex, sourc
 }
 
 func (h handler) remoteProject(w http.ResponseWriter, r *http.Request, name string) {
-	index, result, err := h.upstreamIndex(r, name)
+	index, result, err := h.upstreamIndex(r, name, "")
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -178,7 +206,7 @@ func remoteProjectJSON(index remoteIndex, files []remoteFile, name, base string,
 }
 
 func (h handler) remoteList(w http.ResponseWriter, r *http.Request) {
-	index, result, err := h.upstreamIndex(r, "")
+	index, result, err := h.upstreamIndex(r, "", "")
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -192,12 +220,15 @@ func (h handler) remoteList(w http.ResponseWriter, r *http.Request) {
 		}
 		// A folder or invented marker can match permission rules while every real
 		// distribution is excluded. Prove a readable file before project disclosure.
+		// 7.x answers the list from its stored copy, which a pattern on one
+		// project's page does not change, so this read checks the blackout
+		// alone [I].
 		lookups++
 		if lookups > 256 {
 			h.k.Error(w, r, remoteError())
 			return
 		}
-		child, _, e := h.upstreamIndex(r, name)
+		child, _, e := h.upstreamIndex(r, name, pagePath(name))
 		if e != nil {
 			h.k.Error(w, r, e)
 			return
@@ -223,9 +254,14 @@ func (h handler) remoteList(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// fenceRemote checks again, before delivery, that the caller may read each
+// file the answer discloses. It checks Read permission alone
+// (CheckPermission): a release whose file the remote's patterns reject
+// stays listed, as 7.x lists it (RTFACT-24511, RTFACT-29715), and only the
+// file's own read is refused.
 func fenceRemote(result *source.Result, paths []string) {
 	prior := result.Revalidate
-	check := result.CheckRead
+	check := result.CheckPermission
 	result.Revalidate = func(ctx context.Context) error {
 		if prior != nil {
 			if err := prior(ctx); err != nil {
@@ -280,7 +316,7 @@ func (h handler) remoteDownload(w http.ResponseWriter, r *http.Request, p pkgrou
 	if !h.k.Require(w, r, parent, api.ActionRead) {
 		return
 	}
-	index, _, err := h.upstreamIndex(r, p.Segments[0])
+	index, _, err := h.upstreamIndex(r, p.Segments[0], parent)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -312,6 +348,15 @@ func (h handler) remoteDownload(w http.ResponseWriter, r *http.Request, p pkgrou
 	h.k.Error(w, r, notFound(r))
 }
 
+// remoteFileResource is the read of path, f or, after suffix, its core
+// metadata or signature. The remote's download policy is checked at the
+// path 7.x caches f at, its upstream URL's path, which for PyPI.org is
+// packages/<a>/<b>/<hash>/<file> (RTFACT-31147), rather than at path:
+// JFrog's support answer quoted on RTFACT-17256 has a project's name in a
+// pattern not stop retrieval, as files are stored by hash. The metadata
+// and signature take f's check, as decision 0032 checks a sidecar at its
+// file. [I] The path 7.x keeps a file from another upstream at is not
+// known (#216).
 func (h handler) remoteFileResource(
 	r *http.Request,
 	f remoteFile,
@@ -324,6 +369,9 @@ func (h handler) remoteFileResource(
 	resource.Variant = "pypi-dist-v2:" + string(encode(f.hashes))
 	resource.Checksums = checksumPins(f.hashes)
 	resource.Validate = f.validateArtifact
+	if u, err := url.Parse(f.target); err == nil && itemPath(strings.Trim(u.Path, "/")) {
+		resource.PolicyPath = strings.Trim(u.Path, "/")
+	}
 	if suffix == "" {
 		return resource, f.hashes, nil
 	}
