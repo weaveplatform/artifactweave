@@ -243,7 +243,17 @@
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "agentplugins": [
+      "test/server/artifacts/protocol_download_policy_test.go",
       "test/server/artifacts/repositories_format_class_test.go"
+    ],
+    "alpine": [
+      "test/server/artifacts/protocol_download_policy_test.go"
+    ],
+    "ansible": [
+      "test/server/artifacts/protocol_download_policy_test.go"
+    ],
+    "bazelmodules": [
+      "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "bower": [
       "test/server/artifacts/protocol_download_policy_test.go"
@@ -253,16 +263,32 @@
       "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "chef": [
-      "internal/app/status_chef_test.go"
+      "internal/app/status_chef_test.go",
+      "test/server/artifacts/protocol_download_policy_test.go"
+    ],
+    "cocoapods": [
+      "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "composer": [
-      "internal/app/server_test.go"
+      "internal/app/server_test.go",
+      "test/server/artifacts/protocol_download_policy_test.go"
+    ],
+    "conan": [
+      "test/server/artifacts/protocol_download_policy_test.go"
+    ],
+    "conda": [
+      "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "cran": [
-      "internal/app/status_cran_archive_test.go"
+      "internal/app/status_cran_archive_test.go",
+      "test/server/artifacts/protocol_download_policy_test.go"
+    ],
+    "debian": [
+      "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "docker": [
-      "internal/app/registry_shared_test.go"
+      "internal/app/registry_shared_test.go",
+      "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "gems": [
       "test/server/artifacts/protocol_download_policy_test.go"
@@ -292,7 +318,8 @@
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "machinelearning": [
-      "internal/app/status_machinelearning_test.go"
+      "internal/app/status_machinelearning_test.go",
+      "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "maven": [
       "test/server/artifacts/searches_upstream_mapped_test.go",
@@ -309,7 +336,14 @@
       "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "nuget": [
+      "test/server/artifacts/protocol_download_policy_test.go",
       "test/server/artifacts/repositories_test.go"
+    ],
+    "opkg": [
+      "test/server/artifacts/protocol_download_policy_test.go"
+    ],
+    "pub": [
+      "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "puppet": [
       "internal/app/status_puppet_test.go"
@@ -318,6 +352,12 @@
       "internal/app/reindex_internal_test.go",
       "test/server/artifacts/protocol_download_policy_test.go",
       "test/server/artifacts/reindex_test.go"
+    ],
+    "rpm": [
+      "test/server/artifacts/protocol_download_policy_test.go"
+    ],
+    "skills": [
+      "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "swift": [
       "test/server/artifacts/protocol_download_policy_test.go"
