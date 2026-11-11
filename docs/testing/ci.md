@@ -77,7 +77,11 @@ The same-repository `release-please--branches--main` PR always selects `full`
 even if it changes only release metadata; an arbitrary title does not affect
 selection. Manual dispatch also selects `full`. Add the `ci:full` label to an
 ordinary PR to require full qualification on its current head; adding or
-removing the label starts a new check run. Reverting the activation PR returns
+removing the label starts a new check run. The label can also be set when the
+PR is opened, as `gh pr create --label ci:full` does. That starts two runs at
+once, and the workflow's concurrency group cancels the older one; the newer
+run's checks replace its cancelled checks because every job has a fixed name
+(see the unit jobs below). Reverting the activation PR returns
 the workflow to docs/full selection if the scoped policy needs rollback.
 
 The stable required gate demands success from exactly the selected jobs and
@@ -99,7 +103,7 @@ The four visible lanes are `Go unit tests (<OS>)`, `Go acceptance tests
 (Linux packages)` plus its named native-client partitions, `Terraform provider
 conformance (pinned JFrog apply, plan, destroy)`, and `Terraform deployment
 checks (fmt, validate, tflint, trivy, mocked tests, docs)`. A format PR with
-no selected `TestUnit` entry point or fuzz seed skips the three-OS unit matrix.
+no selected `TestUnit` entry point or fuzz seed skips the three unit jobs.
 A format PR with no selected package `TestAcc` entry point skips the package
 acceptance job while still running its native feature partition. Narrow native
 partitions run only `TestAccFeatures`, so unrelated tests in the shared
@@ -108,6 +112,20 @@ job verifies that its anchored prefix finds runnable tests on that runner.
 The provider and deployment checks are selected by owning paths rather than
 Go test prefixes. The release-please candidate and manual dispatch run all
 four lanes and all required native, OCI, security and generation checks.
+
+The unit lane is three jobs, `unit-linux`, `unit-macos` and `unit-windows`,
+whose checks are `Go unit tests (ubuntu-latest)`, `Go unit tests
+(macos-latest)` and `Go unit tests (windows-latest)`. The macOS and Windows
+jobs reuse the Linux job's condition and step list through YAML aliases, so
+the three run the same steps. They are not an OS matrix because of how a
+cancelled run reports its jobs. When the concurrency group cancels a run while
+`Select CI tests` is still running, each job still waiting on it reports a
+cancelled check under its literal name. A matrix job's literal name keeps the
+unexpanded `${{ matrix.os }}`, so no check of the replacing run shares it, and
+the cancelled check stays on the PR's head commit as a failure after every
+lane has passed. `TestUnitWorkflowCheckNamesSurviveACancelledRun` in
+`tools/citestselection` therefore fails on any quality-gate job with a matrix
+or a name built from an expression, and on unit jobs whose steps differ.
 
 The [docs-only #708 run](https://github.com/weaveplatform/artifactweave/actions/runs/39809324912)
 is the before baseline: 22m48s from run start to required gate and 95.87
@@ -360,7 +378,7 @@ name lists; local use defaults to all non-native Go packages.
 Through `-exec`, `tools/coverexec` gives each test binary a coverage directory of its own
 under `cover/unit/parts`. When the binaries are done, `go tool covdata merge` combines the
 parts into `cover/unit`, the flat directory that each `Go unit tests` job uploads as
-`cover-unit-<os>` and that `make cover` reads.
+`cover-unit-linux`, `cover-unit-macos` or `cover-unit-windows` and that `make cover` reads.
 
 `make accept-go` runs selected package `TestAcc` entry points on Linux with
 the same coverage mechanism and writes `cover/accept-go`. Native `make accept`
@@ -469,7 +487,7 @@ containers. testcontainers-go, MinIO, PostgreSQL and the client containers there
 only on Linux runners. The real-client acceptance job uses `ubuntu-26.04` to prove the
 current Docker engine while `ubuntu-latest` is moving from 24.04 to 26.04; other Linux
 jobs use `ubuntu-latest`. Unit suites that need Docker call `t.Skip` when the daemon is
-unreachable, so the macOS and Windows matrix legs stay green and cover the same packages
+unreachable, so the macOS and Windows unit jobs stay green and cover the same packages
 through fakes. See decision
 [0015](../research/decisions/0015-testing-and-acceptance.md).
 
