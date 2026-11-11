@@ -100,9 +100,12 @@
 //     (RTFACT-27234); a missing manifest or blob keeps its registry code.
 //     Blackout is checked before the item is looked for, the patterns on
 //     the copy a pull serves, and a blob is served from any copy in the
-//     image the patterns accept (RTFACT-30134). The catalog leaves out an
-//     image its repository's patterns reject (RTFACT-26524), and a mount
-//     from another repository that would refuse the blob opens a session.
+//     image the patterns accept (RTFACT-30134). A blacked-out repository
+//     also refuses an image's tags list and referrers, naming the image as
+//     a remote's refusal does; the patterns refuse neither. The catalog
+//     leaves out an image its repository's patterns reject (RTFACT-26524),
+//     and a mount from another repository that would refuse the blob opens
+//     a session.
 //
 // # References
 //
@@ -173,10 +176,10 @@
 //     binding, the challenge and the auth endpoints, on the access test kit
 //     (access/accesstest).
 //   - pull_policy_test.go, reject_test.go and remote_listing_test.go: the
-//     download policy's refusals of pulls, a blob served from a copy the
-//     patterns accept, mounts from a refusing source and catalogs the
-//     patterns filter; a format's refusals of writes, which keep their
-//     status; and a remote listing's final fence.
+//     download policy's refusals of pulls, of tags lists and of referrers,
+//     a blob served from a copy the patterns accept, mounts from a refusing
+//     source and catalogs the patterns filter; a format's refusals of writes,
+//     which keep their status; and a remote listing's final fence.
 //   - The guard suites test/server/artifacts/docker and
 //     test/server/artifacts/helmoci, and the OCI conformance job, drive the
 //     registry through the whole server; the docker suite drives DockerAPI's

@@ -25,10 +25,14 @@ func (g *Registry) registerListings() {
 }
 
 // listTags serves GET .../<name>/tags/list: the image's tags in the
-// specification's order, a page of them with n and last.
+// specification's order, a page of them with n and last. A blacked-out
+// repository refuses it before the image is looked for (imageBlackedOut).
 func (g *Registry) listTags(w http.ResponseWriter, r *http.Request, q Request) {
 	if err := q.Require(r, q.Name+"/", api.ActionRead); err != nil {
 		Write(w, err)
+		return
+	}
+	if imageBlackedOut(w, q) {
 		return
 	}
 	tags, found, err := layout.Tags(r.Context(), g.store.Items(), q.Repo.Key, q.Name)

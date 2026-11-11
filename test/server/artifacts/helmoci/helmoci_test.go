@@ -32,27 +32,7 @@ const jfHelmAQL = "items.find({\n\t  \"repo\": \"helmoci-local\",\n\t  \"path\":
 // helm_oci.feature runs the pinned jf and helm themselves.
 func TestAccJFHelmPushRequests(t *testing.T) {
 	w := registryfixture.New(t, false)
-	c := repo.Config{Key: "helmoci-local", Class: repo.Local, PackageType: repo.HelmOCI}
-	if err := w.DB.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {
-		t.Fatal(err)
-	}
-	config := `{"name":"acme","version":"0.2.0","apiVersion":"v2","appVersion":"1.16.0"}`
-	chart := "the packaged chart"
-	for _, b := range []string{config, chart} {
-		wantStatus(t, w.Do(http.MethodPost, "/v2/helmoci-local/acme/blobs/uploads/?digest="+
-			support.SHA256Digest(b), "admin", b), http.StatusCreated)
-	}
-	// Helm writes no mediaType into its manifest; the Content-Type names it.
-	manifest := `{"schemaVersion":2,"config":{"mediaType":"` + layout.MediaTypeHelmConfig +
-		`","digest":"` + support.SHA256Digest(config) + `","size":` + strconv.Itoa(len(config)) + `},` +
-		`"layers":[{"mediaType":"application/vnd.cncf.helm.chart.content.v1.tar+gzip",` +
-		`"digest":"` + support.SHA256Digest(chart) + `","size":` + strconv.Itoa(len(chart)) + `}],` +
-		`"annotations":{"org.opencontainers.image.title":"acme",` +
-		`"org.opencontainers.image.version":"0.2.0"}}`
-	for _, ref := range []string{support.SHA256Digest(manifest), "0.2.0"} {
-		wantStatus(t, w.Do(http.MethodPut, "/v2/helmoci-local/acme/manifests/"+ref, "admin",
-			manifest, "Content-Type", layout.MediaTypeOCIManifest), http.StatusCreated)
-	}
+	config, chart, manifest := pushChart(t, w)
 
 	rec := w.Do(http.MethodPost, "/artifactory/api/search/aql", "admin", jfHelmAQL,
 		"Content-Type", "text/plain")
@@ -134,6 +114,79 @@ func TestAccJFHelmPushRequests(t *testing.T) {
 		m[0].ID != "acme:0.2.0" || len(m[0].Artifacts) != 3 {
 		t.Fatalf("build-info %s", rec.Body)
 	}
+}
+
+// A blacked-out Helm OCI repository refuses the chart's tags list, from
+// which helm resolves an unversioned or ranged chart, and its referrers,
+// through which cosign and notation find signatures, with the policy's 404
+// in Artifactory's envelope, naming the chart as a blacked-out remote's
+// refusal does. The read permission is checked first: a caller who may not
+// read the chart is refused as before, 403 or 401.
+func TestAccBlackedOutChartListings(t *testing.T) {
+	w := registryfixture.New(t, false)
+	_, _, manifest := pushChart(t, w)
+	targets := []string{
+		"/v2/helmoci-local/acme/tags/list",
+		"/artifactory/api/docker/helmoci-local/v2/acme/tags/list",
+		"/v2/helmoci-local/acme/referrers/" + support.SHA256Digest(manifest),
+	}
+	rec := w.Do(http.MethodGet, targets[0], "reader", "")
+	if rec.Code != http.StatusOK ||
+		rec.Body.String() != `{"name":"helmoci-local/acme","tags":["0.2.0"]}`+"\n" {
+		t.Fatalf("tags: %d %s", rec.Code, rec.Body)
+	}
+
+	ctx := context.Background()
+	c, err := w.DB.Repos().Get(ctx, "helmoci-local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	on := true
+	c.BlackedOut = &on
+	if err := w.DB.Repos().Update(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	want := `{"errors":[{"message":"The repository 'helmoci-local' is blacked out and cannot ` +
+		`serve artifact 'helmoci-local:acme'.","status":404}]}` + "\n"
+	for _, target := range targets {
+		for _, as := range []string{"admin", "reader"} {
+			if rec := w.Do(http.MethodGet, target, as, ""); rec.Code != http.StatusNotFound ||
+				rec.Body.String() != want {
+				t.Fatalf("%s as %s: %d %s, want %s", target, as, rec.Code, rec.Body, want)
+			}
+		}
+		wantStatus(t, w.Do(http.MethodGet, target, "user", ""), http.StatusForbidden)
+		wantStatus(t, w.Do(http.MethodGet, target, "", ""), http.StatusUnauthorized)
+	}
+}
+
+// pushChart creates helmoci-local and pushes acme 0.2.0 to it as helm 4
+// does, its blobs and then its manifest by digest and by tag, and returns
+// the chart's config, its packaged chart and its manifest.
+func pushChart(t *testing.T, w *registryfixture.World) (config, chart, manifest string) {
+	t.Helper()
+	c := repo.Config{Key: "helmoci-local", Class: repo.Local, PackageType: repo.HelmOCI}
+	if err := w.DB.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+	config = `{"name":"acme","version":"0.2.0","apiVersion":"v2","appVersion":"1.16.0"}`
+	chart = "the packaged chart"
+	for _, b := range []string{config, chart} {
+		wantStatus(t, w.Do(http.MethodPost, "/v2/helmoci-local/acme/blobs/uploads/?digest="+
+			support.SHA256Digest(b), "admin", b), http.StatusCreated)
+	}
+	// Helm writes no mediaType into its manifest; the Content-Type names it.
+	manifest = `{"schemaVersion":2,"config":{"mediaType":"` + layout.MediaTypeHelmConfig +
+		`","digest":"` + support.SHA256Digest(config) + `","size":` + strconv.Itoa(len(config)) + `},` +
+		`"layers":[{"mediaType":"application/vnd.cncf.helm.chart.content.v1.tar+gzip",` +
+		`"digest":"` + support.SHA256Digest(chart) + `","size":` + strconv.Itoa(len(chart)) + `}],` +
+		`"annotations":{"org.opencontainers.image.title":"acme",` +
+		`"org.opencontainers.image.version":"0.2.0"}}`
+	for _, ref := range []string{support.SHA256Digest(manifest), "0.2.0"} {
+		wantStatus(t, w.Do(http.MethodPut, "/v2/helmoci-local/acme/manifests/"+ref, "admin",
+			manifest, "Content-Type", layout.MediaTypeOCIManifest), http.StatusCreated)
+	}
+	return config, chart, manifest
 }
 
 func wantStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {

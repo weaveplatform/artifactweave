@@ -602,6 +602,55 @@ func TestAccRegistryPullPolicyThroughServer(t *testing.T) {
 	}
 }
 
+// Through the whole server, a blacked-out repository refuses an image's
+// tags list and referrers with the policy's 404 in Artifactory's envelope,
+// naming the image as a blacked-out remote's refusal does. The read
+// permission is checked first: a caller who may not read the image is
+// refused as before, 403 or 401.
+func TestAccRegistryBlackedOutListings(t *testing.T) {
+	w := newItemWorld(t, false)
+	ctx := context.Background()
+	c := *repo.Defaults(&repo.Config{Key: "docker-local", Class: repo.Local, PackageType: repo.Docker})
+	if err := w.db.Repos().Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	for _, b := range []string{registryConfig, "registry layer"} {
+		wantStatus(t, w.do(http.MethodPost, "/v2/docker-local/app/blobs/uploads/?digest="+
+			sha256Digest(b), "admin", b), http.StatusCreated)
+	}
+	body := registryManifest("listed")
+	wantStatus(t, w.do(http.MethodPut, "/v2/docker-local/app/manifests/v1", "admin", body,
+		"Content-Type", layout.MediaTypeOCIManifest), http.StatusCreated)
+	targets := []string{
+		"/v2/docker-local/app/tags/list",
+		"/artifactory/api/docker/docker-local/v2/app/tags/list",
+		"/v2/docker-local/app/referrers/" + sha256Digest(body),
+	}
+	for _, target := range targets {
+		wantStatus(t, w.do(http.MethodGet, target, "reader", ""), http.StatusOK)
+	}
+
+	on := true
+	c.BlackedOut = &on
+	if err := w.db.Repos().Update(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	want := `{"errors":[{"message":"The repository 'docker-local' is blacked out and cannot ` +
+		`serve artifact 'docker-local:app'.","status":404}]}` + "\n"
+	for _, target := range targets {
+		for _, as := range []string{"admin", "reader"} {
+			rec := w.do(http.MethodGet, target, as, "")
+			if rec.Code != http.StatusNotFound || rec.Body.String() != want ||
+				rec.Header().Get(dockerhttp.APIVersionHeader) != "registry/2.0" {
+				t.Fatalf("%s as %s: %d %v %s, want %s", target, as, rec.Code, rec.Header(),
+					rec.Body, want)
+			}
+		}
+		wantStatus(t, w.do(http.MethodGet, target, "user", ""), http.StatusForbidden)
+		wantStatus(t, w.do(http.MethodGet, target, "", ""), http.StatusUnauthorized)
+	}
+}
+
 // A manifest GET goes through the download redirect policy as a layer
 // does, as 7.x redirects manifests at or above the minimum size
 // (RTFACT-29705): the signed URL carries the manifest's media type, which

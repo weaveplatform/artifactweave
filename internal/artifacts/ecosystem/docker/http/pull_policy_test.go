@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -123,6 +124,64 @@ func TestAccPullPolicy(t *testing.T) {
 	w.patchRepo("docker-local", func(c *repo.Config) { c.BlackedOut = &off })
 	expect(t, w.do(http.MethodGet, v2+"manifests/v1", "", accept), http.StatusOK, "")
 	expect(t, w.do(http.MethodGet, v2+"blobs/"+layer, "", nil), http.StatusOK, "")
+}
+
+// A blacked-out repository refuses an image's tags list and referrers with
+// the policy's 404, naming the image as a blacked-out remote's refusal of
+// the same reads does, before the image is looked for or the digest is
+// parsed: helm resolves an unversioned or ranged chart through the tags
+// list, and cosign and notation find signatures through the referrers. The
+// patterns refuse neither: the tags list keeps the tags they reject
+// (RTFACT-27234), and the referrers list every manifest.
+func TestAccListingsOfABlackedOutRepository(t *testing.T) {
+	w := newBlobWorld(t)
+	amd, _ := w.pushPlatforms()
+	sig := referrer("application/vnd.example.sig", amd, "signed")
+	for tag, body := range map[string]string{"v1": amd, "sig": sig} {
+		expect(t, w.do(http.MethodPut, "/v2/docker-local/app/manifests/"+tag, body, ociManifest),
+			http.StatusCreated, "")
+	}
+	const (
+		v2       = "/v2/docker-local/app/"
+		prefixed = "/artifactory/api/docker/docker-local/v2/app/"
+	)
+	listed := func() {
+		t.Helper()
+		for _, base := range []string{v2, prefixed} {
+			if got := list(t, w.do(http.MethodGet, base+"tags/list", "", nil)).Tags; !slices.Equal(
+				got, []string{"sig", "v1"}) {
+				t.Fatalf("%s tags %v", base, got)
+			}
+			rec := w.do(http.MethodGet, base+"referrers/"+digestOf(amd), "", nil)
+			expect(t, rec, http.StatusOK, "")
+			if !strings.Contains(rec.Body.String(), digestOf(sig)) {
+				t.Fatalf("%s referrers %s", base, rec.Body)
+			}
+		}
+	}
+
+	excluded, empty, on, off := "app/**", "", true, false
+	w.patchRepo("docker-local", func(c *repo.Config) { c.ExcludesPattern = &excluded })
+	listed()
+
+	w.patchRepo("docker-local", func(c *repo.Config) {
+		c.ExcludesPattern = &empty
+		c.BlackedOut = &on
+	})
+	for target, image := range map[string]string{
+		v2 + "tags/list":                        "app",
+		prefixed + "tags/list":                  "app",
+		v2 + "referrers/" + digestOf(amd):       "app",
+		prefixed + "referrers/" + digestOf(amd): "app",
+		// Whether or not the image exists, and whatever the reference.
+		"/v2/docker-local/nowhere/tags/list": "nowhere",
+		v2 + "referrers/sha256:nope":         "app",
+	} {
+		expectRefusal(t, w.do(http.MethodGet, target, "", nil), msg(blackedOutMsg, image))
+	}
+
+	w.patchRepo("docker-local", func(c *repo.Config) { c.BlackedOut = &off })
+	listed()
 }
 
 // A layer that two tags share is served from a copy the repository's

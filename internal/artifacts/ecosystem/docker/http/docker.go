@@ -398,6 +398,16 @@ func blackedOut(w http.ResponseWriter, q Request, operation string) bool {
 	return refuse(w, generic.CheckBlackedOut(q.Repo, path))
 }
 
+// imageBlackedOut refuses a read of an image's tags list or referrers from a
+// blacked-out repository, naming the image as a blacked-out remote
+// repository's refusal of the same reads does. Clients resolve through both:
+// helm finds an unversioned or ranged chart's version in the tags list, and
+// cosign and notation find signatures through the referrers. The patterns
+// refuse neither: a tags list keeps the tags they reject (RTFACT-27234).
+func imageBlackedOut(w http.ResponseWriter, q Request) bool {
+	return refuse(w, generic.CheckBlackedOut(q.Repo, q.Name))
+}
+
 // excluded refuses a pulled item the repository's include and exclude
 // patterns reject.
 func excluded(w http.ResponseWriter, q Request, it model.Item) bool {
