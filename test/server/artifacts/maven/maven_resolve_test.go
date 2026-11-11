@@ -103,6 +103,30 @@ func TestAccMavenTokensSkipExcludedReleases(t *testing.T) {
 	wantStatus(t, w.do("GET", dir+"[RELEASE]/app-[RELEASE].jar", "reader", ""), http.StatusNotFound)
 }
 
+// The repository's patterns never refuse the Maven index, a system path in
+// 6.20 (NamingUtils.isSystem, [I], #216), though its blackout does.
+func TestAccMavenIndexIgnoresPatterns(t *testing.T) {
+	w := newItemWorld(t, false)
+	ctx := context.Background()
+	c := *repo.Defaults(&repo.Config{Key: "mvn-local", Class: repo.Local, PackageType: repo.Maven})
+	if err := w.db.Repos().Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	index := "/artifactory/mvn-local/.index/nexus-maven-repository-index.gz"
+	wantStatus(t, w.do("PUT", index, "admin", "index"), http.StatusCreated)
+	includes, on := "org/**", true
+	c.IncludesPattern = &includes
+	if err := w.db.Repos().Update(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	wantStatus(t, w.do("GET", index, "reader", ""), http.StatusOK)
+	c.BlackedOut = &on
+	if err := w.db.Repos().Update(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	wantStatus(t, w.do("GET", index, "reader", ""), http.StatusNotFound)
+}
+
 // Under a layout without both integration revisions a version token is part
 // of the name looked up, so the download is 404 though a release exists.
 func TestAccMavenLayoutWithoutIntegrationRevisions(t *testing.T) {
