@@ -133,16 +133,20 @@ jobs:
             python3 -m json.tool "$path" > /dev/null
           done
 
-  unit:
-    name: 'Go unit tests (${{ matrix.os }})'
+  # One job per OS rather than an OS matrix. When the concurrency group
+  # cancels a run while Select CI tests is still running, every job waiting
+  # on it reports a cancelled check under its literal name. A matrix job's
+  # literal name holds its unexpanded matrix.os expression, so no check of
+  # the run that replaces it has that name and the cancelled check stays on
+  # the pull request. The macOS and Windows jobs reuse this job's condition
+  # and steps through YAML aliases; Actions has no merge key, so each job
+  # sets its own name and runner.
+  unit-linux:
+    name: 'Go unit tests (ubuntu-latest)'
     needs: [impact]
-    if: (needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'format') && needs.impact.outputs.has_unit == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
+    if: &unit-selected (needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'format') && needs.impact.outputs.has_unit == 'true'
+    runs-on: ubuntu-latest
+    steps: &unit-steps
       - name: Harden Runner
         uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
         with:
@@ -212,13 +216,29 @@ jobs:
             make test UNIT_PKGS="$UNIT_PACKAGES" FUZZ_PKGS="$FUZZ_PACKAGES" UNIT_RUN="$UNIT_RUN" COVERPKG="$FORMAT_COVERPKG"
           fi
 
+      # The three jobs share this step, so the job id gives each artifact its
+      # own name: cover-unit-linux, cover-unit-macos and cover-unit-windows.
       - name: Upload unit coverage
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: cover-unit-${{ matrix.os }}
+          name: cover-${{ github.job }}
           path: cover/unit
           include-hidden-files: true
           retention-days: 7
+
+  unit-macos:
+    name: 'Go unit tests (macos-latest)'
+    needs: [impact]
+    if: *unit-selected
+    runs-on: macos-latest
+    steps: *unit-steps
+
+  unit-windows:
+    name: 'Go unit tests (windows-latest)'
+    needs: [impact]
+    if: *unit-selected
+    runs-on: windows-latest
+    steps: *unit-steps
 
   acceptance-go:
     name: 'Go acceptance tests (Linux packages)'
@@ -385,7 +405,7 @@ jobs:
   # Acceptance runs the real binary with the real clients (decision 0015).
   # It is Linux-only: the macOS runners have no Docker daemon and the Windows
   # runners only run Windows containers, so the container-backed scenarios
-  # cannot run there. The unit matrix still covers those OSes through fakes.
+  # cannot run there. The unit jobs still cover those OSes through fakes.
   acceptance:
     name: 'Go acceptance (Linux, native clients)'
     needs: [impact]
@@ -1225,7 +1245,7 @@ jobs:
     # The download pattern cover-* picks up the unit directories from every OS,
     # package TestAcc, all four required native partitions, optional Gradle,
     # the Terraform run and OCI conformance, all from this workflow revision.
-    needs: [impact, unit, acceptance-go, acceptance, acceptance-conan, acceptance-nuget, acceptance-jvm, acceptance-gradle, terraform, oci-conformance]
+    needs: [impact, unit-linux, unit-macos, unit-windows, acceptance-go, acceptance, acceptance-conan, acceptance-nuget, acceptance-jvm, acceptance-gradle, terraform, oci-conformance]
     # Gradle is informational, so a failure there must not prevent the
     # required sources from being checked or the merged gate from running.
     if: always() && needs.impact.result == 'success' && needs.impact.outputs.profile == 'full'
@@ -1238,7 +1258,9 @@ jobs:
 
       - name: Required coverage sources succeeded
         env:
-          UNIT_RESULT: ${{ needs.unit.result }}
+          UNIT_LINUX_RESULT: ${{ needs['unit-linux'].result }}
+          UNIT_MACOS_RESULT: ${{ needs['unit-macos'].result }}
+          UNIT_WINDOWS_RESULT: ${{ needs['unit-windows'].result }}
           GO_ACCEPTANCE_RESULT: ${{ needs['acceptance-go'].result }}
           ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
           CONAN_RESULT: ${{ needs['acceptance-conan'].result }}
@@ -1247,7 +1269,8 @@ jobs:
           TERRAFORM_RESULT: ${{ needs.terraform.result }}
           OCI_RESULT: ${{ needs['oci-conformance'].result }}
         run: |
-          for result in "$UNIT_RESULT" "$GO_ACCEPTANCE_RESULT" "$ACCEPTANCE_RESULT" "$CONAN_RESULT" "$NUGET_RESULT" "$JVM_RESULT" "$TERRAFORM_RESULT" "$OCI_RESULT"; do
+          for result in "$UNIT_LINUX_RESULT" "$UNIT_MACOS_RESULT" "$UNIT_WINDOWS_RESULT" "$GO_ACCEPTANCE_RESULT" \
+            "$ACCEPTANCE_RESULT" "$CONAN_RESULT" "$NUGET_RESULT" "$JVM_RESULT" "$TERRAFORM_RESULT" "$OCI_RESULT"; do
             [ "$result" = success ] || { echo "required coverage source: $result"; exit 1; }
           done
 
@@ -1275,7 +1298,7 @@ jobs:
 
   affected-coverage:
     name: 'Affected-package coverage (≥90% changed packages)'
-    needs: [impact, unit, acceptance-go, acceptance, acceptance-conan, acceptance-nuget]
+    needs: [impact, unit-linux, unit-macos, unit-windows, acceptance-go, acceptance, acceptance-conan, acceptance-nuget]
     if: always() && needs.impact.result == 'success' && needs.impact.outputs.profile == 'format'
     runs-on: ubuntu-latest
     steps:
@@ -1289,17 +1312,21 @@ jobs:
           OWNER: ${{ needs.impact.outputs.owner }}
           HAS_UNIT: ${{ needs.impact.outputs.has_unit }}
           HAS_ACCEPTANCE: ${{ needs.impact.outputs.has_acceptance }}
-          UNIT_RESULT: ${{ needs.unit.result }}
+          UNIT_LINUX_RESULT: ${{ needs['unit-linux'].result }}
+          UNIT_MACOS_RESULT: ${{ needs['unit-macos'].result }}
+          UNIT_WINDOWS_RESULT: ${{ needs['unit-windows'].result }}
           GO_ACCEPTANCE_RESULT: ${{ needs['acceptance-go'].result }}
           ACCEPTANCE_RESULT: ${{ needs.acceptance.result }}
           CONAN_RESULT: ${{ needs['acceptance-conan'].result }}
           NUGET_RESULT: ${{ needs['acceptance-nuget'].result }}
         run: |
-          if [ "$HAS_UNIT" = true ]; then
-            [ "$UNIT_RESULT" = success ] || exit 1
-          else
-            [ "$UNIT_RESULT" = skipped ] || exit 1
-          fi
+          for result in "$UNIT_LINUX_RESULT" "$UNIT_MACOS_RESULT" "$UNIT_WINDOWS_RESULT"; do
+            if [ "$HAS_UNIT" = true ]; then
+              [ "$result" = success ] || exit 1
+            else
+              [ "$result" = skipped ] || exit 1
+            fi
+          done
           if [ "$HAS_ACCEPTANCE" = true ]; then
             [ "$GO_ACCEPTANCE_RESULT" = success ] || exit 1
           else
@@ -1355,7 +1382,7 @@ jobs:
   gate:
     name: 'Quality gate'
     if: always()
-    needs: [impact, docs, unit, acceptance-go, lint, vuln, build, acceptance, acceptance-conan, acceptance-nuget, acceptance-jvm, coverage, affected-coverage, parity, terraform, oci-conformance, deploy-terraform]
+    needs: [impact, docs, unit-linux, unit-macos, unit-windows, acceptance-go, lint, vuln, build, acceptance, acceptance-conan, acceptance-nuget, acceptance-jvm, coverage, affected-coverage, parity, terraform, oci-conformance, deploy-terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Required jobs match the selected profile
@@ -1363,7 +1390,9 @@ jobs:
           PROFILE: ${{ needs.impact.outputs.profile }}
           IMPACT: ${{ needs.impact.result }}
           DOCS: ${{ needs.docs.result }}
-          UNIT: ${{ needs.unit.result }}
+          UNIT_LINUX: ${{ needs['unit-linux'].result }}
+          UNIT_MACOS: ${{ needs['unit-macos'].result }}
+          UNIT_WINDOWS: ${{ needs['unit-windows'].result }}
           HAS_UNIT: ${{ needs.impact.outputs.has_unit }}
           GO_ACCEPTANCE: ${{ needs['acceptance-go'].result }}
           HAS_ACCEPTANCE: ${{ needs.impact.outputs.has_acceptance }}
@@ -1393,19 +1422,19 @@ jobs:
             full)
               require docs "$DOCS" skipped
               require affected-coverage "$AFFECTED_COVERAGE" skipped
-              for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$CONAN" "$NUGET" "$JVM" \
-                "$COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
+              for result in "$UNIT_LINUX" "$UNIT_MACOS" "$UNIT_WINDOWS" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" \
+                "$ACCEPTANCE" "$CONAN" "$NUGET" "$JVM" "$COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
                 require full-job "$result" success
               done
               ;;
             format)
               require docs "$DOCS" skipped
               require acceptance-jvm "$JVM" skipped
-              if [ "$HAS_UNIT" = true ]; then
-                require unit "$UNIT" success
-              else
-                require unit "$UNIT" skipped
-              fi
+              unit=skipped
+              if [ "$HAS_UNIT" = true ]; then unit=success; fi
+              require unit-linux "$UNIT_LINUX" "$unit"
+              require unit-macos "$UNIT_MACOS" "$unit"
+              require unit-windows "$UNIT_WINDOWS" "$unit"
               require lint "$LINT" success
               require affected-coverage "$AFFECTED_COVERAGE" success
               if [ "$HAS_ACCEPTANCE" = true ]; then
@@ -1441,16 +1470,16 @@ jobs:
               else
                 require terraform-deployment "$DEPLOY" skipped
               fi
-              for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$CONAN" "$NUGET" "$JVM" \
-                "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$OCI"; do
+              for result in "$UNIT_LINUX" "$UNIT_MACOS" "$UNIT_WINDOWS" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" \
+                "$ACCEPTANCE" "$CONAN" "$NUGET" "$JVM" "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$OCI"; do
                 require unselected "$result" skipped
               done
               ;;
             *) echo "unknown CI profile: $PROFILE"; exit 1 ;;
           esac
           if [ "$PROFILE" = docs ]; then
-            for result in "$UNIT" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" "$ACCEPTANCE" "$CONAN" "$NUGET" "$JVM" \
-              "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
+            for result in "$UNIT_LINUX" "$UNIT_MACOS" "$UNIT_WINDOWS" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" \
+              "$ACCEPTANCE" "$CONAN" "$NUGET" "$JVM" "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
               require unselected "$result" skipped
             done
           fi
