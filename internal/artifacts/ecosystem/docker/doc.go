@@ -81,6 +81,11 @@
 //     tag folder holding one is a version whose files are the folder's
 //     items, ordered by the tag's last push; digest folders and _uploads
 //     are no versions (decision 0018).
+//   - A remote repository's index covers its cache, which alone holds its
+//     items: the hooks and the reindex read only there (pkgindex.Stored,
+//     decision 0018). Tag Retention and Max Unique Tags run after a push,
+//     which a remote never takes, so Retained and Manifests read a
+//     repository's own items.
 //   - The layout's folder and file names and the manifest properties are
 //     what jf searches with AQL and reads through the storage API (research
 //     23, 5.1 and 5.2), so they stay byte-identical.
@@ -131,15 +136,15 @@
 //     storage layout), https://github.com/weaveplatform/artifactweave/issues/227
 //     (tags in the package index and tag retention),
 //     https://github.com/weaveplatform/artifactweave/issues/624 (remote
-//     reads), https://github.com/weaveplatform/artifactweave/issues/1022 and
-//     https://github.com/weaveplatform/artifactweave/issues/1023
+//     reads), https://github.com/weaveplatform/artifactweave/issues/1022,
+//     https://github.com/weaveplatform/artifactweave/issues/1023 and
+//     https://github.com/weaveplatform/artifactweave/issues/1180 (a remote
+//     repository's cached images in the index)
 //
 // # Status
 //
 // Implemented P6, with Helm OCI chart metadata in P8 and remote retrieval
-// in P9. Moved here in P9d. A reindex of a remote repository still reads the
-// repository's own items, not the cache its hooks index (decision 0018), so
-// the format contract suite runs Docker without its cache scenario.
+// in P9. Moved here in P9d.
 //
 // # Testing
 //
@@ -152,8 +157,13 @@
 //     manifests that cannot be read.
 //   - referrers_test.go: subjects, artifact types, index children and the
 //     referrers lookup.
+//   - index_test.go: a cached image's package, dated by its earliest cached
+//     manifest and kept while a cached tag remains, and the reindex of a
+//     local and a remote repository over the hooks' index and from empty.
+//   - retention_test.go: Manifests, from a repository's own items and never
+//     a remote's cache.
 //   - contract_test.go: the format contract suite
-//     (artifacts/core/formattest) for docker, with NoRemoteCache.
+//     (artifacts/core/formattest) for docker, its cache scenario included.
 //   - remote_content_test.go: registry path validation, listing pagination
 //     and its boundaries, descriptor integrity and the foreign layer
 //     policy; remote_path_test.go: the parser's name grammar against the

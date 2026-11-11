@@ -89,9 +89,7 @@ type Format struct {
 	RepoWork []string
 	// NoRemoteCache marks a format whose index does not cover a remote
 	// repository's cache as decision 0018 has the npm, Go and Maven formats
-	// do, so the cache scenario passes it unchecked. Docker sets it because
-	// its reindex reads only a repository's own items, not the cache its
-	// hooks index, and so drops every cached image.
+	// do, so the cache scenario passes it unchecked.
 	NoRemoteCache bool
 }
 

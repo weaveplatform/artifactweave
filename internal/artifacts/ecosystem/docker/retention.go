@@ -20,7 +20,7 @@ func Retained(
 	repoKey, name, tag string,
 ) ([]model.Item, error) {
 	q := manifestQuery(
-		repoKey,
+		aql.RepoRef{Key: repoKey},
 		name,
 		&aql.FieldCriterion{
 			Field: aql.FieldPath,
@@ -40,7 +40,8 @@ func Manifests(
 	items port.ItemStore,
 	repoKey, name string,
 ) ([]model.Item, error) {
-	return search(ctx, items, manifestQuery(repoKey, name), "manifests of "+name)
+	q := manifestQuery(aql.RepoRef{Key: repoKey}, name)
+	return search(ctx, items, q, "manifests of "+name)
 }
 
 func search(
