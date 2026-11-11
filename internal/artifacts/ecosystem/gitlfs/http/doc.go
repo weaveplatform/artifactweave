@@ -143,6 +143,9 @@
 //   - remote_validation_test.go and locking_remote_validation_test.go: the
 //     upstream batch, action URL, redirect, cached identity and lock page
 //     checks, the lock cursor's binding, and the lock origin guard.
+//   - download_policy_test.go (external): a direct object download from a
+//     blacked-out repository, or of an excluded object, answers the
+//     policy's 404 and message.
 //
 // The @gitlfs acceptance scenarios drive git-lfs through local, federated,
 // virtual and remote repositories, including two-user locking.

@@ -145,6 +145,21 @@ Where the policy applies:
   (`ArtifactResource.writeStreamingFileList` maps `BlackedOutException` to 404).
 - The read paths of later formats, which find items through the same download lookup or call
   `generic.CheckDownload` themselves (#269).
+- The native package protocols, through the router kit (`pkgroute`, #1237). `Kit.Item`,
+  `ResolveItem`, `ServeItem` and `ServeFound` check the path they are given before they look
+  for it, so every protocol that finds its files there inherits the policy, as remote reads
+  inherit it from the source boundary. A protocol that reads a stored blob itself calls
+  `Kit.CheckDownload` (Bower's archive of a version's files). The refusal is
+  `kernel.ErrNotFound` to the protocol, so a virtual repository's search passes over a member
+  that refuses. A member request checks the virtual repository's own patterns first, for a
+  remote member's file too. A protocol that answers a missing file with its own 404 answers
+  a refused one with it.
+- What a protocol's derived metadata answers is not settled yet (#1237). Until it is, a
+  metadata document a protocol reads through the kit is refused as a file is (Helm's
+  `index.yaml`), a listing that looks up each release's file through `Kit.Item` leaves out
+  a release whose file is refused (Ansible), and metadata built from the package index
+  answers as before (Hex `names`, npm packuments, Go's `@v/list`). #216 lists what to compare
+  with Artifactory 7.x.
 
 Where it does not apply, as in 6.20:
 - The storage API's item info and its other views describe the item: `ArtifactResource`

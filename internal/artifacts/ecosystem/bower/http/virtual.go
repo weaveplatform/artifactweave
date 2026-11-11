@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	bowerfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/bower"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
@@ -95,6 +96,14 @@ func (h handler) serveBinary(w http.ResponseWriter, r *http.Request, name, versi
 	case repo.Remote:
 		h.remoteBinary(w, r, name, version, tag)
 	case repo.Virtual:
+		// The virtual repository's own patterns rejecting the version leave
+		// it no member to search; a member whose own policy refuses it is
+		// passed over, as one without it is (decision 0032).
+		manifest := bowerfmt.ManifestPath(name, version)
+		if err := h.k.CheckDownload(r, manifest); err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
 		members, err := h.virtualMembers(r)
 		if err != nil {
 			h.k.Error(w, r, err)
@@ -106,7 +115,7 @@ func (h handler) serveBinary(w http.ResponseWriter, r *http.Request, name, versi
 				h.k.Error(w, r, pkgroute.SourceError(err, false))
 				return
 			}
-			if !slices.Contains(vs, version) {
+			if !slices.Contains(vs, version) || h.k.CheckDownload(mr, manifest) != nil {
 				continue
 			}
 			if dependencyRewrite(pkgroute.RequestFrom(r).Repo) {

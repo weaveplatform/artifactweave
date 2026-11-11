@@ -355,6 +355,10 @@ type Request struct {
 	// Rest is the escaped path after the repository key, without its
 	// leading slash; ParsePath parses it.
 	Rest string
+	// virtual is the virtual repository a member request came through
+	// (MemberRequest), whose own patterns a download checks before the
+	// member's policy.
+	virtual *repo.Config
 }
 
 type requestKey struct{}
@@ -381,7 +385,8 @@ func (k *Kit) MemberRequest(r *http.Request, member repo.Config) (*http.Request,
 	if !ok {
 		return nil, apierror.New(http.StatusBadRequest, "unsupported virtual repository member")
 	}
-	q.Repo, q.Source = member, src
+	virtual := q.Repo
+	q.Repo, q.Source, q.virtual = member, src, &virtual
 	return r.WithContext(context.WithValue(r.Context(), requestKey{}, q)), nil
 }
 
@@ -704,9 +709,19 @@ func refusal(r *http.Request) error {
 func (k *Kit) DB() Store { return k.o.Store }
 
 // Item returns the item at path in the request's repository, through its
-// Source.
+// Source, unless the download policy refuses path (Request.download): that
+// refusal is kernel.ErrNotFound to the caller, which passes over it as it
+// passes over a missing item, and Error answers its 404. The caller checks
+// read permission first.
 func (k *Kit) Item(r *http.Request, path string) (Found, error) {
 	q := RequestFrom(r)
+	if err := q.download(path); err != nil {
+		return Found{}, fmt.Errorf("%s: %w", k.p.Name, err)
+	}
+	return k.find(r, q, path)
+}
+
+func (k *Kit) find(r *http.Request, q Request, path string) (Found, error) {
 	f, err := q.Source.Item(r.Context(), k.o.Store, q.Repo, path)
 	if err != nil {
 		return Found{}, fmt.Errorf("%s: %w", k.p.Name, err)
@@ -717,20 +732,27 @@ func (k *Kit) Item(r *http.Request, path string) (Found, error) {
 // ResolveItem applies the format's download resolution and refreshes its
 // derived work before looking up the item. The caller checks permission
 // first, including formats whose metadata has repository-wide visibility.
+// The download policy checks path as requested, before it is resolved, as
+// the item routes' download does.
 func (k *Kit) ResolveItem(r *http.Request, path string) (Found, error) {
 	q := RequestFrom(r)
+	if err := q.download(path); err != nil {
+		return Found{}, fmt.Errorf("%s: %w", k.p.Name, err)
+	}
 	resolved, err := k.o.Items().Resolve(r.Context(), q.Repo, format.Download{Path: path})
 	if err != nil {
 		return Found{}, fmt.Errorf("%s: resolve %s: %w", k.p.Name, path, err)
 	}
-	return k.Item(r, resolved)
+	return k.find(r, q, resolved)
 }
 
 // ServeItem answers GET or HEAD of the file at path in the request's
 // repository through the item routes' download, so the download redirect
 // policy and download counts apply. A caller that may not read path is
 // refused before the item is looked up, so a refusal says nothing about
-// whether it exists; a missing file, or a folder, answers 404.
+// whether it exists or how the repository is set (DV-057); then the
+// download policy refuses path, whether it exists or not; a missing file,
+// or a folder, answers 404.
 func (k *Kit) ServeItem(w http.ResponseWriter, r *http.Request, path string) {
 	if !k.Require(w, r, path, accessapi.ActionRead) {
 		return
@@ -746,8 +768,10 @@ func (k *Kit) ServeItem(w http.ResponseWriter, r *http.Request, path string) {
 	}
 	f, err := k.Item(r, path)
 	switch {
+	case errors.As(err, new(*refusedError)):
+		k.Error(w, r, err)
 	case errors.Is(err, kernel.ErrNotFound) || err == nil && f.Item.Folder:
-		k.Error(w, r, apierror.New(http.StatusNotFound, "Could not find resource"))
+		k.Error(w, r, notFound())
 	case err != nil:
 		k.Error(w, r, err)
 	default:
@@ -755,16 +779,34 @@ func (k *Kit) ServeItem(w http.ResponseWriter, r *http.Request, path string) {
 	}
 }
 
-// ServeFound serves an already resolved file after checking Read. Signed
-// downloads use the verified item so a concurrent overwrite cannot replace
-// the bytes between checking the signed digest and opening the blob.
+// ServeFound serves an already resolved file after checking Read and the
+// download policy, against f's repository, for a file the protocol found
+// without Item. A file a virtual repository's request found in a member is
+// checked as the member request's would be. Signed downloads use the
+// verified item so a concurrent overwrite cannot replace the bytes between
+// checking the signed digest and opening the blob.
 func (k *Kit) ServeFound(w http.ResponseWriter, r *http.Request, f Found) {
 	if !can(r, f.Repo, f.Item.FullPath(), accessapi.ActionRead) {
 		k.Error(w, r, refusal(r))
 		return
 	}
+	q := RequestFrom(r)
+	if q.Repo.Class == repo.Virtual && q.Repo.Key != f.Repo.Key {
+		virtual := q.Repo
+		q.virtual = &virtual
+	}
+	q.Repo = f.Repo
+	if err := q.download(f.Item.FullPath()); err != nil {
+		if !errors.As(err, new(*refusedError)) {
+			err = notFound()
+		}
+		k.Error(w, r, err)
+		return
+	}
 	k.o.ServeItem(w, r, f.Repo, f.Item)
 }
+
+func notFound() error { return apierror.New(http.StatusNotFound, "Could not find resource") }
 
 // Store writes body at path in the request's repository through the item
 // service, as the item routes' deploy does: the caller needs Write on

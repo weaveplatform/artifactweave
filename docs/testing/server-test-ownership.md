@@ -127,6 +127,7 @@ path, and in each shared directory a narrow PR runs only the `TestUnit` and
 | Format | Listed shared tests | What they cover |
 | --- | --- | --- |
 | `agentpackages`, `agentplugins`, `hex`, `luarocks`, `nimmodel` | `test/server/artifacts/repositories_format_class_test.go` | The repository classes each of these formats accepts |
+| `agentpackages`, `bower`, `cargo`, `gems`, `gitlfs`, `golang`, `helm`, `hex`, `huggingface`, `luarocks`, `npm`, `pypi`, `swift` | `test/server/artifacts/protocol_download_policy_test.go` | The download policy on each of these formats' native file download |
 | `cargo` | `internal/app/spec_test.go` | The specification checks, among them that every Cargo operation the package router owns is served |
 | `chef` | `internal/app/status_chef_test.go` | Chef's rows of the status table and route matrix |
 | `composer` | `internal/app/server_test.go` | The whole-router checks, among them that the native Composer routes avoid the handwritten stubs |
