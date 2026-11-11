@@ -43,10 +43,11 @@
 // # Invariants
 //
 //   - Only local and federated repositories publish (405), with write
-//     permission on the repository and the archive's path; an upload of at
-//     most 64 MiB must be a valid archive (400), a published version is
-//     never replaced (409), and finalizing checks that the stored archive
-//     is still the one uploaded (409).
+//     permission on the repository and the archive's path. An upload over
+//     64 MiB is too large (413); any other, an empty one included, must be
+//     a valid archive (400). A published version is never replaced (409),
+//     and finalizing checks that the stored archive is still the one
+//     uploaded (409).
 //   - Version lists show only versions the caller may read; a package with
 //     none answers 404. A hosted index entry that disagrees with its
 //     archive answers 502.
@@ -95,9 +96,10 @@
 //   - pub_test.go: the remote's metadata authority, denied versions, broken
 //     sources and stale authority, and its archive rechecks, mismatches and
 //     revalidation; publishing and resolving on local and federated
-//     repositories, rejected uploads, anonymous publishing, identity and
-//     read rights on the version and archive routes, malformed or changed
-//     finalize requests, and read-only classes and oversized bodies.
+//     repositories, rejected uploads, an empty one included, anonymous
+//     publishing, identity and read rights on the version and archive
+//     routes, malformed or changed finalize requests, read-only classes and
+//     oversized bodies, and the archive size limit at its boundary.
 //   - remote_test.go: untrusted upstream version documents and the
 //     same-origin archive link rule.
 //

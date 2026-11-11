@@ -30,6 +30,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	pubfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/pub"
 	pubhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/pub/http"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
@@ -466,6 +467,31 @@ func upload(t *testing.T, data []byte) (*bytes.Buffer, string) {
 	return &b, w.FormDataContentType()
 }
 
+// zeroUpload is upload with a file of size zero bytes, streamed rather than
+// built in memory because the archives at the size limit are 64 MiB.
+func zeroUpload(t *testing.T, size int64) (io.Reader, string) {
+	t.Helper()
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+	if _, err := w.CreateFormFile("file", "package.tar.gz"); err != nil {
+		t.Fatal(err)
+	}
+	head := bytes.Clone(b.Bytes())
+	b.Reset()
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return io.MultiReader(bytes.NewReader(head), io.LimitReader(zeros{}, size), &b),
+		w.FormDataContentType()
+}
+
+type zeros struct{}
+
+func (zeros) Read(p []byte) (int, error) {
+	clear(p)
+	return len(p), nil
+}
+
 func TestUnitPublishAndResolveLocalAndFederated(t *testing.T) {
 	for _, class := range []repo.Class{repo.Local, repo.Federated} {
 		t.Run(string(class), func(t *testing.T) {
@@ -528,16 +554,19 @@ func TestUnitPublishAndResolveLocalAndFederated(t *testing.T) {
 
 func TestUnitRejectedUploadDoesNotPublish(t *testing.T) {
 	f := newFixture(t, repo.Local)
-	for _, data := range [][]byte{[]byte("not tar"), archive(t, "bad-name", "1.0.0")} {
-		body, ct := upload(t, data)
-		if rec := f.do(
-			"POST",
-			base+"/api/packages/versions/new",
-			"admin",
-			ct,
-			body,
-		); rec.Code != 400 {
-			t.Fatalf("invalid archive: %d %s", rec.Code, rec.Body)
+	for _, tc := range []struct {
+		name string
+		data []byte
+	}{
+		{"empty", nil},
+		{"not an archive", []byte("not tar")},
+		{"invalid name", archive(t, "bad-name", "1.0.0")},
+	} {
+		body, ct := upload(t, tc.data)
+		rec := f.do("POST", base+"/api/packages/versions/new", "admin", ct, body)
+		if status, message := pubError(t, rec); status != http.StatusBadRequest ||
+			message != "invalid Dart pub archive" {
+			t.Fatalf("%s upload: %d %s", tc.name, rec.Code, rec.Body)
 		}
 	}
 	if rec := f.do("GET", base+"/api/packages/hello_pub", "admin", "", nil); rec.Code != 404 {
@@ -732,6 +761,29 @@ func TestUnitPublishRejectsReadOnlyClassesAndOversizedBody(t *testing.T) {
 	f.r.ServeHTTP(rec, r)
 	if rec.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("oversized multipart: %d %s", rec.Code, rec.Body)
+	}
+}
+
+// TestUnitPublishRefusesOnlyAnArchiveOverTheLimitAsTooLarge: inside the
+// multipart allowance, an upload of exactly MaxArchiveBytes is still read as
+// an archive, so content that is not one answers 400, and one byte more
+// answers 413.
+func TestUnitPublishRefusesOnlyAnArchiveOverTheLimitAsTooLarge(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	for _, tc := range []struct {
+		size    int64
+		status  int
+		message string
+	}{
+		{pubfmt.MaxArchiveBytes, http.StatusBadRequest, "invalid Dart pub archive"},
+		{pubfmt.MaxArchiveBytes + 1, http.StatusRequestEntityTooLarge, "pub archive exceeds limit"},
+	} {
+		body, contentType := zeroUpload(t, tc.size)
+		rec := f.do(http.MethodPost, base+"/api/packages/versions/new", "admin", contentType, body)
+		if status, message := pubError(t, rec); status != tc.status || message != tc.message {
+			t.Fatalf("upload of %d bytes: %d %q, want %d %q",
+				tc.size, status, message, tc.status, tc.message)
+		}
 	}
 }
 
