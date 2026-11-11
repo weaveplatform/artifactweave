@@ -189,6 +189,7 @@
       "checksum_files_test.go",
       "download_policy_test.go",
       "fixture_test.go",
+      "folder_archive_policy_test.go",
       "folder_limit_test.go",
       "format_test.go",
       "idempotency_sql_test.go",

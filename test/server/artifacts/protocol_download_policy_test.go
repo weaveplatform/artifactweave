@@ -26,11 +26,9 @@ type protocolDownload struct {
 	// file is the stored file's path, and body its content.
 	file, body string
 	// route is the native download of the file, after /artifactory/api/.
+	// A refusal answers it with CheckDownload's message in the protocol's
+	// envelope, never the protocol's own "not found" (RTDEV-47144).
 	route string
-	// own is the protocol's 404 message for a file it does not find, where
-	// it answers a refused file with it; otherwise the answer carries
-	// CheckDownload's message.
-	own string
 	// archive is a download that packs the file rather than serving its
 	// bytes, as Bower's binary does.
 	archive bool
@@ -96,7 +94,7 @@ func protocolDownloads() []protocolDownload {
 		{
 			name: "swift", repo: repo.Config{Key: "swift-local", PackageType: repo.Swift},
 			file: "acme/demo/demo-1.0.0.zip", body: "swift source archive",
-			route: "swift/swift-local/acme/demo/1.0.0.zip", own: "Swift release not found",
+			route: "swift/swift-local/acme/demo/1.0.0.zip",
 		},
 		{
 			name:   "huggingface",
@@ -138,6 +136,18 @@ func lfsPath(body string) string {
 // needs only the file its download serves.
 func (w *itemWorld) storeFile(key, p, body string) {
 	w.t.Helper()
+	w.storeItem(key, p, body, false)
+}
+
+// storeCached puts body at p in the remote repository key's cache, as a
+// fetch from its upstream would have.
+func (w *itemWorld) storeCached(key, p, body string) {
+	w.t.Helper()
+	w.storeItem(key, p, body, true)
+}
+
+func (w *itemWorld) storeItem(key, p, body string, cached bool) {
+	w.t.Helper()
 	ctx := context.Background()
 	u, err := w.blobs.BeginUpload(ctx)
 	if err != nil {
@@ -159,7 +169,7 @@ func (w *itemWorld) storeFile(key, p, body string) {
 	}
 	dir, name := path.Split(p)
 	if _, err := w.db.Items().Put(ctx, artmodel.Item{
-		RepoKey: key, Path: strings.TrimSuffix(dir, "/"), Name: name,
+		RepoKey: key, Cached: cached, Path: strings.TrimSuffix(dir, "/"), Name: name,
 		Size: int64(len(body)), Actual: sums,
 	}); err != nil {
 		w.t.Fatal(err)
@@ -206,9 +216,6 @@ func TestAccProtocolDownloadPolicy(t *testing.T) {
 				for _, as := range []string{"admin", "reader"} {
 					rec := w.do(http.MethodGet, route, as, "")
 					wantStatus(t, rec, http.StatusNotFound)
-					if c.own != "" {
-						message = c.own
-					}
 					if !strings.Contains(rec.Body.String(), message) {
 						t.Fatalf("GET %s as %s: body %s, want %q", route, as, rec.Body, message)
 					}

@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -285,7 +286,11 @@ const defaultFolderSlots = 10
 // Like Artifactory it is off until the folder download setting enables it,
 // bounded by that setting's file count and size, and refused with 400 while
 // the most folder downloads that may run at once are running, after every
-// other check as 6.20's FolderDownloadServiceImpl orders them.
+// other check as 6.20's FolderDownloadServiceImpl orders them. The download
+// policy applies as to any download, after read permission and before
+// anything is listed: 7.x refuses a blacked-out repository's archive
+// (RTFACT-30253, fixed in 7.68.14 and 7.71.11; RTDEV-38679, SaaS 7.80.0),
+// and a folder its patterns reject answers as the item route does [I].
 func (s ArtifactoryAPI) downloadFolderArchive(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.content()
@@ -337,6 +342,10 @@ func (s ArtifactoryAPI) downloadFolderArchive(w http.ResponseWriter, r *http.Req
 		httpkit.WriteErr(w, r, apierror.New(http.StatusForbidden, "Folder download is disabled"))
 		return
 	}
+	if err := generic.CheckDownload(c, p, true); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "download check", err))
+		return
+	}
 	t := item.Target{Repo: c, Cached: cached || c.Class == repo.Remote, Path: p}
 	tree, err := s.Items(st).Tree(ctx, t)
 	if err != nil {
@@ -347,17 +356,7 @@ func (s ArtifactoryAPI) downloadFolderArchive(w http.ResponseWriter, r *http.Req
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("%s is a file, not a folder", p))
 		return
 	}
-	var files []model.Item
-	var total int64
-	for _, it := range tree {
-		// Files the caller may not read are left out of the archive.
-		if !it.Folder && !protocolPrivateItem(c, it.FullPath()) &&
-			!machineLearningPrivate(c, it.FullPath()) && !chefMetadataItem(c, it.FullPath()) &&
-			acc.File(c, it.FullPath(), api.ActionRead) {
-			files = append(files, it)
-			total += it.Size
-		}
-	}
+	files, total := archiveFiles(c, tree, acc)
 	if len(files) > fd.MaxFiles || total > int64(fd.MaxDownloadSizeMB)<<20 {
 		httpkit.WriteErr(w, r, httpkit.BadRequestf(
 			"The folder exceeds the download limits: %d files and %d MB at most",
@@ -381,6 +380,26 @@ func (s ArtifactoryAPI) downloadFolderArchive(w http.ResponseWriter, r *http.Req
 		// The status is sent; the client sees a truncated archive.
 		_ = s.InternalError(ctx, "stream folder archive", err)
 	}
+}
+
+// archiveFiles returns the files of tree a folder archive holds, and their
+// total size: each one the caller may read and a download of it would serve.
+// A file the patterns reject is left out, as a folder listing leaves it out
+// [I], and so is a file a protocol keeps private.
+func archiveFiles(c repo.Config, tree []model.Item, acc itemkit.Access) ([]model.Item, int64) {
+	var files []model.Item
+	var total int64
+	for _, it := range tree {
+		p := it.FullPath()
+		if it.Folder || protocolPrivateItem(c, p) || machineLearningPrivate(c, p) ||
+			chefMetadataItem(c, p) || !acc.File(c, p, api.ActionRead) ||
+			generic.CheckDownload(c, p, false) != nil {
+			continue
+		}
+		files = append(files, it)
+		total += it.Size
+	}
+	return files, total
 }
 
 // takeFolderSlot reserves a place among the folder downloads that may run
