@@ -74,7 +74,7 @@ func (h handler) info(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badIdentity())
 		return
 	}
-	chosen, err := h.selectRepo(r, id, rev, map[string]bool{})
+	chosen, err := h.selectResolution(r, id, rev)
 	if err != nil {
 		if rev != "main" && isNotFound(err) {
 			w.Header().Set("X-Error-Code", "RevisionNotFound")
@@ -89,6 +89,28 @@ func (h handler) info(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.writeJSON(w, chosen.info)
+}
+
+// selectResolution is selectRepo for the info and tree routes, which list
+// what a client then downloads: 7.x ignores a blacked-out repository when
+// it resolves, and where it keeps a revision's listing for a local
+// repository is not documented, so a blacked-out local or federated
+// repository refuses them before anything is computed, naming the model's
+// folder as a remote repository's refusal does. A caller who may not read
+// the model gets selectRepo's "not found" first. A remote repository's own
+// policy is the source boundary's, at its info read.
+func (h handler) selectResolution(
+	r *http.Request,
+	id format.Identity,
+	rev string,
+) (selected, error) {
+	if c := pkgroute.RequestFrom(r).Repo; c.Class != repo.Virtual && c.Class != repo.Remote &&
+		h.k.CanFolder(r, id.Prefix(), api.ActionRead) {
+		if err := h.k.CheckBlackedOut(r, id.Prefix()); err != nil {
+			return selected{}, fmt.Errorf("huggingface: model folder: %w", err)
+		}
+	}
+	return h.selectRepo(r, id, rev, map[string]bool{})
 }
 
 // selectRepo chooses one member for an entire revision. File reads use the
@@ -121,6 +143,12 @@ func (h handler) selectRepo(
 			mr, err := h.k.MemberRequest(r, member)
 			if err != nil {
 				return selected{}, fmt.Errorf("huggingface: member request: %w", err)
+			}
+			// 7.x ignores a blacked-out repository when it resolves, so a
+			// blacked-out member, local or remote, is passed over as one
+			// without the revision is, and a later member serves it.
+			if h.k.CheckBlackedOut(mr, id.Prefix()) != nil {
+				continue
 			}
 			chosen, err := h.selectRepo(mr, id, rev, seen)
 			if errors.Is(err, kernel.ErrNotFound) || isNotFound(err) {
@@ -426,6 +454,13 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path, _ := format.SnapshotPath(id, chosen.info.SHA, file.String())
+	// The download policy before any header of a served file, so a refused
+	// file's commit, ETag, Xet hash and token route stay off the 404. It is
+	// the check ServeItem and a member's remote read make again.
+	if err := h.k.CheckDownload(chosen.request, path); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	w.Header().Set("X-Repo-Commit", chosen.info.SHA)
 	if target.LFS != nil {
 		w.Header().Set("ETag", `"`+target.LFS.SHA256+`"`)
@@ -580,7 +615,7 @@ func (h handler) tree(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	chosen, err := h.selectRepo(r, id, rev, map[string]bool{})
+	chosen, err := h.selectResolution(r, id, rev)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
