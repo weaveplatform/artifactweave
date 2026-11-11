@@ -83,7 +83,7 @@ func (s MavenAPI) mavenTargetOf(
 		return mavenTarget{}, err
 	}
 	missing := apierror.New(http.StatusNotFound, fmt.Sprintf("Could not find path '%s/%s'", key, p))
-	c, cached, err := itemkit.ResolveRepo(ctx, st, key)
+	c, _, err := itemkit.ResolveRepo(ctx, st, key)
 	var api *apierror.Error
 	switch {
 	case errors.As(err, &api) && api.Status == http.StatusNotFound:
@@ -92,7 +92,7 @@ func (s MavenAPI) mavenTargetOf(
 		return mavenTarget{}, s.ItemError(ctx, "resolve repository", err)
 	case !acc.File(c, p, want):
 		return mavenTarget{}, httpkit.Denied(who)
-	case cached || c.Class != repo.Local:
+	case c.Class != repo.Local: // a cache alias resolves to its remote repository
 		return mavenTarget{}, apierror.New(http.StatusNotFound,
 			fmt.Sprintf("Unable to find local repository '%s'.", key))
 	case !maven.Serves(c.PackageType):
