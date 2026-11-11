@@ -24,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	ansiblefmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/ansible"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
@@ -136,6 +137,23 @@ func (h handler) checkIdentity(w http.ResponseWriter, r *http.Request, ns, name 
 	return h.k.RequireFolder(w, r, "collections/"+ns+"/"+name, api.ActionRead)
 }
 
+// resolution refuses the Galaxy metadata a client resolves a collection
+// from, before it is built, when the repository is blacked out: 7.x ignores
+// a blacked-out repository when it resolves (R2a). It names the request's
+// own path, since 7.x documents none it keeps this metadata at, and so the
+// patterns do not refuse it (#216).
+func (h handler) resolution(w http.ResponseWriter, r *http.Request) bool {
+	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
+	if err == nil {
+		err = h.k.CheckBlackedOut(r, p.String())
+	}
+	if err != nil {
+		h.fail(w, r, err)
+		return false
+	}
+	return true
+}
+
 type release struct {
 	Meta   ansiblefmt.Metadata
 	At     time.Time
@@ -220,10 +238,12 @@ func (h handler) memberRequests(r *http.Request) ([]*http.Request, error) {
 
 // releases lists the collection's releases, a virtual repository's merged
 // from its members in order. download, when set, is the artifact a download
-// serves: a virtual repository's member whose download policy refuses it is
-// passed over, as a search for a file passes over it, so the next member
-// that lists the version serves it. A listing keeps every member's releases,
-// those whose files the patterns reject included.
+// serves: a virtual repository's member whose download policy refuses it,
+// a remote member's own included, is passed over, as a search for a file
+// passes over it, so the next member that lists the version serves it. A
+// listing leaves out a blacked-out member, which 7.x ignores when it
+// resolves (R5), and keeps every other member's releases, those whose files
+// the patterns reject included (R3).
 func (h handler) releases(r *http.Request, ns, name, download string) (catalog, error) {
 	members, err := h.memberRequests(r)
 	if err != nil {
@@ -236,12 +256,14 @@ func (h handler) releases(r *http.Request, ns, name, download string) (catalog, 
 		if !h.k.CanFolder(member, "collections/"+ns+"/"+name, api.ActionRead) {
 			continue
 		}
-		if virtual && download != "" && h.k.CheckDownload(member, download) != nil {
+		// With no download path only the blackout refuses.
+		if virtual &&
+			generic.CheckDownload(pkgroute.RequestFrom(member).Repo, download, false) != nil {
 			continue
 		}
 		var releases []release
 		if pkgroute.RequestFrom(member).Repo.Class == repo.Remote {
-			remote, readErr := h.remoteVersions(member, ns, name)
+			remote, readErr := h.remoteVersions(member, ns, name, download)
 			releases, err = remote.items, readErr
 			out.checks = append(out.checks, remote.checks...)
 		} else {
@@ -268,7 +290,7 @@ func (h handler) releases(r *http.Request, ns, name, download string) (catalog, 
 }
 
 func (h handler) collection(w http.ResponseWriter, r *http.Request, ns, name string) {
-	if !h.checkIdentity(w, r, ns, name) {
+	if !h.checkIdentity(w, r, ns, name) || !h.resolution(w, r) {
 		return
 	}
 	catalog, err := h.releases(r, ns, name, "")
@@ -320,7 +342,7 @@ func pagination(r *http.Request, count int) (offset, limit int, err error) {
 }
 
 func (h handler) versions(w http.ResponseWriter, r *http.Request, ns, name string) {
-	if !h.checkIdentity(w, r, ns, name) {
+	if !h.checkIdentity(w, r, ns, name) || !h.resolution(w, r) {
 		return
 	}
 	catalog, err := h.releases(r, ns, name, "")
@@ -363,6 +385,9 @@ func (h handler) version(w http.ResponseWriter, r *http.Request, ns, name, versi
 	}
 	if !ansiblefmt.ValidVersion(version) {
 		h.fail(w, r, apierror.New(http.StatusBadRequest, "invalid collection version"))
+		return
+	}
+	if !h.resolution(w, r) {
 		return
 	}
 	rel, err := h.find(r, ns, name, version, "")
@@ -442,6 +467,14 @@ func (h handler) artifact(w http.ResponseWriter, r *http.Request, file string) {
 	}
 	path := ansiblefmt.Path(ns, name, version)
 	if !h.k.Require(w, r, path, api.ActionRead) {
+		return
+	}
+	// The policy's own 404 and message, not "Could not find resource",
+	// whether the release exists or not (RTDEV-47144 fixed a refused download
+	// answering a plain 404): a local repository's blackout or patterns, or a
+	// virtual repository's own patterns. A remote repository's are its read's.
+	if err := h.k.CheckDownload(r, path); err != nil {
+		h.fail(w, r, err)
 		return
 	}
 	rel, err := h.find(r, ns, name, version, path)
@@ -586,9 +619,14 @@ func upstreamBase(c repo.Config) string {
 	}
 }
 
+// remoteJSON reads one Galaxy metadata page of a remote repository. Only
+// the blackout refuses it: a listing keeps a release whose archive the
+// patterns reject (R3) and resolution metadata is not refused by them
+// (R2a), and a download's lookups check the blackout alone (R4), naming
+// the archive the download serves, download, when it is set.
 func (h handler) remoteJSON(
 	r *http.Request,
-	path, cachePath, permissionPath string,
+	path, cachePath, permissionPath, download string,
 	validate func([]byte) error,
 ) (source.Result, error) {
 	base := upstreamBase(pkgroute.RequestFrom(r).Repo)
@@ -603,6 +641,8 @@ func (h handler) remoteJSON(
 		Variant:              "ansible-galaxy-v3",
 		PermissionFolder:     true,
 		PermissionPath:       permissionPath,
+		PolicyPath:           download,
+		BlackoutOnly:         true,
 		ExpectedContentTypes: []string{"application/json"},
 		ValidateMetadata: func(_ context.Context, reader io.ReadSeeker, size int64, _ source.MetadataResponse) error {
 			if size < 0 || size > maxPageBytes {
@@ -643,7 +683,10 @@ func (h handler) remoteJSON(
 	return result, nil
 }
 
-func (h handler) remoteVersion(r *http.Request, ns, name, version string) (remoteRelease, error) {
+func (h handler) remoteVersion(
+	r *http.Request,
+	ns, name, version, download string,
+) (remoteRelease, error) {
 	path := "/collections/" + ns + "/" + name + "/versions/" + version + "/"
 	permissionPath := "collections/" + ns + "/" + name
 	var release remoteRelease
@@ -672,16 +715,19 @@ func (h handler) remoteVersion(r *http.Request, ns, name, version string) (remot
 		path,
 		permissionPath+"/versions/"+version,
 		permissionPath,
+		download,
 		validate,
 	)
 	if err != nil {
 		return remoteRelease{}, err
 	}
+	// The archive's Read permission alone: the version is listed when the
+	// patterns reject its archive, whose own read is refused (R3).
 	release.finish = func(ctx context.Context) error {
 		if err := result.Revalidate(ctx); err != nil {
 			return fmt.Errorf("ansible: version source authority: %w", err)
 		}
-		if err := result.CheckRead(ctx, ansiblefmt.Path(ns, name, version)); err != nil {
+		if err := result.CheckPermission(ctx, ansiblefmt.Path(ns, name, version)); err != nil {
 			return fmt.Errorf("ansible: version read authority: %w", err)
 		}
 		return nil
@@ -694,7 +740,7 @@ func (h handler) remoteVersion(r *http.Request, ns, name, version string) (remot
 
 // Remote pagination is bounded and every continuation must remain on the same
 // collection endpoint. A malicious next URL cannot broaden the source request.
-func (h handler) remoteVersions(r *http.Request, ns, name string) (catalog, error) {
+func (h handler) remoteVersions(r *http.Request, ns, name, download string) (catalog, error) {
 	root := "/collections/" + ns + "/" + name + "/versions/"
 	next := root + "?limit=100&offset=0"
 	permissionPath := "collections/" + ns + "/" + name
@@ -730,6 +776,7 @@ func (h handler) remoteVersions(r *http.Request, ns, name string) (catalog, erro
 			next,
 			permissionPath+"/versions/list/"+strconv.Itoa(page),
 			permissionPath,
+			download,
 			validate,
 		)
 		if err != nil {
@@ -744,13 +791,13 @@ func (h handler) remoteVersions(r *http.Request, ns, name string) (catalog, erro
 			if !h.k.Can(r, ansiblefmt.Path(ns, name, v.Version), api.ActionRead) {
 				continue
 			}
-			if err := result.CheckRead(
+			if err := result.CheckPermission(
 				r.Context(),
 				ansiblefmt.Path(ns, name, v.Version),
 			); err != nil {
 				return catalog{}, fmt.Errorf("ansible: listed version authority: %w", err)
 			}
-			info, err := h.remoteVersion(r, ns, name, v.Version)
+			info, err := h.remoteVersion(r, ns, name, v.Version, download)
 			if err != nil {
 				return catalog{}, err
 			}
@@ -785,7 +832,8 @@ func (h handler) remoteVersions(r *http.Request, ns, name string) (catalog, erro
 
 func (h handler) remoteArtifact(w http.ResponseWriter, r *http.Request, rel release) {
 	m := rel.Meta
-	info, err := h.remoteVersion(rel.Req, m.Namespace, m.Name, m.Version)
+	info, err := h.remoteVersion(rel.Req, m.Namespace, m.Name, m.Version,
+		ansiblefmt.Path(m.Namespace, m.Name, m.Version))
 	if err != nil {
 		h.fail(w, r, err)
 		return
