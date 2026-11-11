@@ -232,7 +232,10 @@ var generatedRoutes = map[string]bool{
 
 // TestAccUnimplementedOperationsAnswer501 proves the generated stubs reach the
 // client: a specified but unimplemented operation answers 501 rather than 404
-// (which would tell clients the endpoint does not exist) or 500.
+// (which would tell clients the endpoint does not exist) or 500. testHandler
+// has no store, and a real handler that needs one answers 501 without it
+// (itemkit.Kit.Content), so an implemented operation missing from implemented
+// still passes here.
 func TestAccUnimplementedOperationsAnswer501(t *testing.T) {
 	h := testHandler()
 	checked := 0

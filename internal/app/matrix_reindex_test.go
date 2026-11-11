@@ -6,7 +6,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 )
 
-// reindexMatrixPart is the P8 reindex operations' share of the matrix:
+// reindexMatrixPart is the reindex operations' share of the matrix:
 // Manage on the repository, which only the administrators hold on
 // reindexRepos here, and an administrator for Terraform's. The status
 // table's reindexer holds Manage alone.
@@ -17,6 +17,8 @@ var reindexMatrixPart = matrixPart{
 			nuget     = "/artifactory/api/nuget/"
 			helm      = "/artifactory/api/helm/"
 			terraform = "/artifactory/api/terraform/"
+			yum       = "/artifactory/api/yum/"
+			deb       = "/artifactory/api/deb/reindex/"
 		)
 		manages := func(key string) rule { return holds(key, "", api.ActionManage) }
 		return []matrixRow{
@@ -28,6 +30,8 @@ var reindexMatrixPart = matrixPart{
 			row(reindexHelmPath, helm+"reindex-helm/charts/team/reindex", "",
 				manages("reindex-helm"), 200),
 			row(reindexTerraform, terraform+"reindex-terraform/reindex", "", administrators, 200),
+			row(reindexYum, yum+"reindex-rpm", "", manages("reindex-rpm"), 200),
+			row(reindexDebian, deb+"reindex-debian", "", manages("reindex-debian"), 200),
 		}
 	},
 	seed: func(t *testing.T, f *matrixFixture) {

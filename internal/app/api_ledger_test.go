@@ -364,7 +364,10 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	if strings.Contains(path, "/api/build/append/") {
 		e.Effects, e.Retry = "append build modules and persist build-info metadata/blob", "optional quoted key: same credential/resource/body, atomic durable receipt, current authorization, 24h retention; otherwise every call appends"
 	}
-	if strings.Contains(path, "/reindex") || strings.Contains(path, "/calculate") {
+	// The Yum metadata calculation, POST /artifactory/api/yum/{repoKey}, is
+	// the one reindex whose path names neither.
+	if strings.Contains(path, "/reindex") || strings.Contains(path, "/calculate") ||
+		strings.HasPrefix(path, "/artifactory/api/yum/") {
 		e.Effects += "; index rebuild/possibly queued work; queue coalescing is not a replay guarantee"
 	}
 	if path == "/artifactory/api/search/aql" {
