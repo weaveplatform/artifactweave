@@ -194,7 +194,10 @@ func TestAccRPMVirtualPackageMustBeListedBelowItsRoot(t *testing.T) {
 // TestAccRPMVirtualRepodataSkipsMembersItCannotRead: a virtual repository's
 // repodata leaves out a member that is blacked out, one whose exclude
 // pattern hides its primary, and one whose repomd.xml path is a folder,
-// instead of failing for them, and none of their packages is served.
+// instead of failing for them. A package GET checks each member at the
+// package's own path, never at the repodata it reads to find the package,
+// so the member whose patterns hide only its primary serves the package;
+// the blacked-out member, which refuses every file, does not.
 func TestAccRPMVirtualRepodataSkipsMembersItCannotRead(t *testing.T) {
 	w := newItemWorld(t)
 	w.rpmRepos(
@@ -232,7 +235,63 @@ func TestAccRPMVirtualRepodataSkipsMembersItCannotRead(t *testing.T) {
 			res.Code, packages, err)
 	}
 	res = w.do(http.MethodGet, "/artifactory/rpm-virtual/"+rpmAlphaPath, "admin", "")
-	wantError(t, res, http.StatusNotFound, "Could not find resource")
+	if res.Code != http.StatusOK || !bytes.Equal(res.Body.Bytes(), rpmAlpha(t)) {
+		t.Errorf("alpha answered %d, want rpm-hidden's package", res.Code)
+	}
+}
+
+// TestAccRPMVirtualPackageChecksAMemberAtThePackagesPath: a virtual package
+// GET checks each member at the package's own path, never at the repodata
+// it reads to find the package. A remote member, or a nested virtual one,
+// whose patterns reject only its repodata serves the package, while the
+// virtual repodata still leaves that member out; a blacked-out member,
+// which refuses every file, takes no part.
+func TestAccRPMVirtualPackageChecksAMemberAtThePackagesPath(t *testing.T) {
+	manifest, primary, primaryPath := rpmUpstreamFixture(t)
+	responses := map[string][]byte{
+		"repodata/repomd.xml": manifest, primaryPath: primary, rpmAlphaPath: rpmAlpha(t),
+	}
+	w := newItemWorld(t, func(c *Config) {
+		c.RemoteSources = &source.Service{Resolve: sourceIdentity, HTTP: sourceBackend(func(
+			_ context.Context, q source.Request, _ source.Permit,
+		) (source.Result, error) {
+			body, ok := responses[q.Resource.Path]
+			if !ok {
+				return source.Result{}, kernel.ErrNotFound
+			}
+			return source.Result{Stream: &source.Stream{
+				Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
+				Representation: source.Representation{Size: int64(len(body))},
+			}}, nil
+		})}
+	})
+	w.rpmRepos(
+		repo.Config{Key: "rpm-remote", Class: repo.Remote, ExcludesPattern: new("repodata/**")},
+		repo.Config{Key: "rpm-dark", Class: repo.Local, BlackedOut: new(true)},
+		repo.Config{Key: "rpm-member", Class: repo.Local},
+		repo.Config{
+			Key: "rpm-closed", Class: repo.Virtual, Repositories: []string{"rpm-member"},
+			ExcludesPattern: new("repodata/**"),
+		},
+		repo.Config{Key: "rpm-over-remote", Class: repo.Virtual, Repositories: []string{"rpm-remote"}},
+		repo.Config{Key: "rpm-over-dark", Class: repo.Virtual, Repositories: []string{"rpm-dark"}},
+		repo.Config{Key: "rpm-over-closed", Class: repo.Virtual, Repositories: []string{"rpm-closed"}},
+	)
+	w.publish("rpm-dark", "")
+	w.publish("rpm-member", "")
+	for _, key := range []string{"rpm-over-remote", "rpm-over-dark", "rpm-over-closed"} {
+		if got := rpmListed(t, w, key); len(got) != 0 {
+			t.Errorf("%s repodata lists %v, want the refusing member left out", key, got)
+		}
+	}
+	for _, key := range []string{"rpm-over-remote", "rpm-over-closed"} {
+		res := w.do(http.MethodGet, "/artifactory/"+key+"/"+rpmAlphaPath, "admin", "")
+		if res.Code != http.StatusOK || !bytes.Equal(res.Body.Bytes(), rpmAlpha(t)) {
+			t.Errorf("%s alpha answered %d, want the member's package", key, res.Code)
+		}
+	}
+	wantError(t, w.do(http.MethodGet, "/artifactory/rpm-over-dark/"+rpmAlphaPath, "admin", ""),
+		http.StatusNotFound, "Could not find resource")
 }
 
 // rpmListed returns the paths of the packages the virtual repository key's

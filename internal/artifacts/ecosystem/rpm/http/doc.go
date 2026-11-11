@@ -53,7 +53,10 @@
 //     the caller or refused by the member's download policy (blacked out,
 //     or patterns that reject its repomd.xml or primary file), is skipped;
 //     a member of another package type, a member cycle or a chain of more
-//     than eight nested repositories is refused.
+//     than eight nested repositories is refused. A package GET checks a
+//     member's policy at the package's own path, never at the repodata it
+//     reads to find the package, so there only a blacked-out member is
+//     skipped for its repodata.
 //   - The repodata and package reads check Read permission first and then
 //     the virtual repository's own patterns at the requested path, which
 //     answer 404 "No repository found to serve the request for
@@ -116,11 +119,12 @@
 // repository's own patterns answering that no repository serves the path,
 // packages a local or remote member's patterns, or a virtual repository's
 // own, reject kept listed while their GET passes over the refusing member,
+// a package served from a member whose patterns reject only its repodata,
 // remote packages whose bytes are not an RPM or whose cached copy is
-// revoked, and the YUM calculation's path and virtual view checks. Their item GETs run through
-// the kit with TryRPMItem as the only overlay. The route suite
-// test/server/artifacts/rpm checks through the router that virtual
-// repodata is signed with the configured GPG key, and the @rpm acceptance
-// partition (test/acceptance/features/rpm.feature) is the native dnf
-// evidence.
+// revoked, and the YUM calculation's path and virtual view checks. Their
+// item GETs run through the kit with TryRPMItem as the only overlay. The
+// route suite test/server/artifacts/rpm checks through the router that
+// virtual repodata is signed with the configured GPG key, and the @rpm
+// acceptance partition (test/acceptance/features/rpm.feature) is the
+// native dnf evidence.
 package rpmhttp

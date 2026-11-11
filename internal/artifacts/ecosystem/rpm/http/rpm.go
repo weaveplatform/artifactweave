@@ -261,14 +261,15 @@ func (s RPMAPI) serveVirtualRemoteRPMPackage(
 }
 
 // rpmCandidates returns the packages the members of the virtual repository
-// c list below root, the first member's row for each path. A member that
-// refuses its repodata takes no part. With download false, for repodata, a
-// row stays when the member's or the virtual repository's patterns reject
-// its file: 7.x keeps such a package in a virtual repository's
-// primary.xml.gz and refuses only its GET (RTFACT-30656, RTFACT-5000).
-// With download true, for a package GET, a row whose file the policy
-// refuses is left out, so the GET passes over that member to the next one
-// that lists the path.
+// c list below root, the first member's row for each path. A member whose
+// download policy refuses its repodata takes no part in the repodata, and
+// only a blacked-out one in a package GET (rpmMemberRefusesMetadata). With
+// download false, for repodata, a row stays when the member's or the
+// virtual repository's patterns reject its file: 7.x keeps such a package
+// in a virtual repository's primary.xml.gz and refuses only its GET
+// (RTFACT-30656, RTFACT-5000). With download true, for a package GET, a
+// row whose file the policy refuses is left out, so the GET passes over
+// that member to the next one that lists the path.
 func (s RPMAPI) rpmCandidates(
 	ctx context.Context, st itemkit.Store, c repo.Config, root string,
 	p kernel.Principal, acc itemkit.Access, download bool, seen map[string]bool,
@@ -294,7 +295,7 @@ func (s RPMAPI) rpmCandidates(
 		}
 		if !acc.Folder(member, indexPath, accessapi.ActionRead) ||
 			!acc.File(member, indexPath, accessapi.ActionRead) ||
-			generic.CheckDownload(member, indexPath, false) != nil {
+			rpmMemberRefusesMetadata(member, indexPath, download) {
 			continue
 		}
 		var entries []rpmCandidate
@@ -302,7 +303,7 @@ func (s RPMAPI) rpmCandidates(
 			entries, err = s.rpmCandidates(ctx, st, member, root, p, acc, download, seen)
 		} else {
 			var packages []rpm.Package
-			packages, err = s.rpmMemberPackages(ctx, st, member, root, p, acc)
+			packages, err = s.rpmMemberPackages(ctx, st, member, root, p, acc, download)
 			for _, pkg := range packages {
 				entries = append(entries, rpmCandidate{repo: member, pkg: pkg})
 			}
@@ -329,9 +330,29 @@ func (s RPMAPI) rpmCandidates(
 	return out, nil
 }
 
+// rpmMemberRefusesMetadata reports whether a virtual repository's member
+// takes no part because its download policy refuses the repodata file at
+// path. The virtual repodata leaves out a member that refuses the
+// document. A package GET checks each member at the package's own path, as
+// 6.20's VirtualRepoDownloadStrategy does and as the patterns FAQ puts it
+// ("artifacts that match an exclude pattern are not resolved from that
+// repository"), so there the repodata is only the lookup that finds the
+// file: a blacked-out member, which refuses every file, takes no part, and
+// patterns that reject only the repodata leave the member's packages
+// served.
+func rpmMemberRefusesMetadata(member repo.Config, path string, download bool) bool {
+	if !download {
+		return generic.CheckDownload(member, path, false) != nil
+	}
+	return member.Class != repo.Virtual && generic.CheckBlackedOut(member, path) != nil
+}
+
+// rpmMemberPackages reads the packages a local or remote member's repodata
+// lists below root, refusing the primary file as rpmCandidates refuses the
+// member's repomd.xml (rpmMemberRefusesMetadata).
 func (s RPMAPI) rpmMemberPackages(
 	ctx context.Context, st itemkit.Store, c repo.Config, root string,
-	p kernel.Principal, acc itemkit.Access,
+	p kernel.Principal, acc itemkit.Access, download bool,
 ) ([]rpm.Package, error) {
 	manifest, err := s.rpmMemberBytes(ctx, st, c, root+"repodata/repomd.xml", p, acc)
 	if err != nil {
@@ -342,7 +363,7 @@ func (s RPMAPI) rpmMemberPackages(
 		return nil, fmt.Errorf("rpm: parse member repomd: %w", err)
 	}
 	if !acc.File(c, primaryPath, accessapi.ActionRead) ||
-		generic.CheckDownload(c, primaryPath, false) != nil {
+		rpmMemberRefusesMetadata(c, primaryPath, download) {
 		return nil, kernel.ErrNotFound
 	}
 	primary, err := s.rpmMemberBytes(ctx, st, c, primaryPath, p, acc)
@@ -392,8 +413,12 @@ func (s RPMAPI) rpmMemberBytes(
 				)
 			}
 		}
-		if result.CheckRead != nil {
-			if err := result.CheckRead(ctx, path); err != nil {
+		// Read permission on the document itself. Its download policy is the
+		// caller's to apply (rpmMemberRefusesMetadata): the repodata settles
+		// the member's whole policy before this read, and a package GET only
+		// its blackout, which the source has already checked.
+		if result.CheckPermission != nil {
+			if err := result.CheckPermission(ctx, path); err != nil {
 				return nil, fmt.Errorf(
 					"rpm: remote metadata read authority: %w",
 					pkgroute.SourceError(err, p.Anonymous),
