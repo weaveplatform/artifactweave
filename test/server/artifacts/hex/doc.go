@@ -27,7 +27,9 @@
 //   - hex_test.go: the local and virtual signed registry, invalid routes and
 //     repository configuration, and the federated class refused.
 //   - hex_remote_test.go: a remote's signed metadata that filters a denied
-//     version, and a virtual repository over remote members.
+//     version, a virtual repository over remote members, and one that
+//     passes over a member whose upstream lacks the package or that the
+//     caller may not read.
 //
 // # References
 //
