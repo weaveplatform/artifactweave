@@ -52,7 +52,9 @@
 //     statistics writes and long property values.
 //   - trash_test.go, trash_handlers_test.go and trash_views_test.go: the
 //     trash can on and off, restore, empty and its storage views;
-//     transfer_test.go: copy and move.
+//     transfer_test.go: copy and move, archive explode, archive entries,
+//     those of lost, unreadable and corrupt archives included, and folder
+//     archive downloads.
 //   - builds_test.go, builds_diff_test.go, builds_promote_test.go and
 //     builds_routes_test.go: build-info publish, read, rename, diff,
 //     promotion and retention; idempotency_test.go and

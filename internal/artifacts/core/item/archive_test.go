@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -144,17 +145,39 @@ func TestUnitExplode(t *testing.T) {
 	}
 }
 
+// unknownMethodZip is a zip whose one entry, a.txt, is compressed with a
+// method no reader knows, so it lists but cannot be opened.
+func unknownMethodZip(t *testing.T) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, err := zw.CreateRaw(&zip.FileHeader{
+		Name: "a.txt", Method: 99, CompressedSize64: 1, UncompressedSize64: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(w, "a"); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
 func TestUnitExplodeRefused(t *testing.T) {
 	ctx := context.Background()
 	for name, body := range map[string][]byte{
-		"parent":       zipOf(t, entry{name: "ok.txt", body: "ok"}, entry{name: "../evil.txt", body: "x"}),
-		"nested":       zipOf(t, entry{name: "a/../../evil.txt", body: "x"}),
-		"absolute":     tarOf(t, false, entry{name: "/etc/evil", body: "x"}),
-		"drive":        zipOf(t, entry{name: "C:\\evil.txt", body: "x"}),
-		"backslash":    zipOf(t, entry{name: "a\\..\\..\\evil.txt", body: "x"}),
-		"not archive":  []byte("plain text"),
-		"gzip not tar": gzipOf(t, "plain"),
-		"corrupt zip":  []byte("PK\x03\x04garbage"),
+		"parent":         zipOf(t, entry{name: "ok.txt", body: "ok"}, entry{name: "../evil.txt", body: "x"}),
+		"nested":         zipOf(t, entry{name: "a/../../evil.txt", body: "x"}),
+		"absolute":       tarOf(t, false, entry{name: "/etc/evil", body: "x"}),
+		"drive":          zipOf(t, entry{name: "C:\\evil.txt", body: "x"}),
+		"backslash":      zipOf(t, entry{name: "a\\..\\..\\evil.txt", body: "x"}),
+		"not archive":    []byte("plain text"),
+		"gzip not tar":   gzipOf(t, "plain"),
+		"corrupt zip":    []byte("PK\x03\x04garbage"),
+		"unknown method": unknownMethodZip(t),
 	} {
 		w := newWorld(t)
 		if _, err := w.explode("x/archive.bin", body, false); !errors.Is(err, ErrBadArchive) {
@@ -231,6 +254,56 @@ func TestUnitExplodeLimits(t *testing.T) {
 	if _, err := w.svc.uploadEntries(context.Background(), f, size, Zip,
 		Explode{Deploy: Deploy{Target: Target{Repo: w.loc}}}, ""); !errors.Is(err, ErrBadArchive) {
 		t.Fatalf("extracted bytes: %v", err)
+	}
+}
+
+// closing closes f when an upload begins, so the read of the entry about
+// to be stored fails.
+type closing struct {
+	blob.Store
+	f *os.File
+}
+
+func (c closing) BeginUpload(ctx context.Context, o ...blob.UploadOption) (blob.Upload, error) {
+	_ = c.f.Close()
+	return c.Store.BeginUpload(ctx, o...)
+}
+
+// A spooled archive that cannot be read is no unusable archive: explode's
+// walks return the read's error, before they list the entries and while an
+// entry is being stored. A tar.gz is left out of the second, because gzip
+// has read so small an archive whole before its entry is stored.
+func TestUnitExplodeReadFailures(t *testing.T) {
+	ctx := context.Background()
+	sample := entry{name: "a.txt", body: "a"}
+	for _, c := range []struct {
+		name string
+		kind ArchiveKind
+		body []byte
+	}{
+		{"zip", Zip, zipOf(t, sample)},
+		{"tar", Tar, tarOf(t, false, sample)},
+		{"tar.gz", TarGz, tarOf(t, true, sample)},
+	} {
+		w := newWorld(t)
+		d := Explode{Deploy: Deploy{Target: Target{Repo: w.loc}}, CanOverwrite: true}
+		f, size, err := spool(bytes.NewReader(c.body), kernel.Checksums{}, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Remove(f.Name()) })
+		if c.kind != TarGz {
+			w.svc.Blobs = closing{Store: w.svc.Blobs, f: f}
+			_, err = w.svc.uploadEntries(ctx, f, size, c.kind, d, "")
+			if !errors.Is(err, os.ErrClosed) || errors.Is(err, ErrBadArchive) {
+				t.Errorf("%s while storing an entry: %v", c.name, err)
+			}
+		}
+		_ = f.Close()
+		_, err = w.svc.validateEntries(ctx, f, size, c.kind, d, "")
+		if !errors.Is(err, os.ErrClosed) || errors.Is(err, ErrBadArchive) {
+			t.Errorf("%s before listing: %v", c.name, err)
+		}
 	}
 }
 
@@ -380,6 +453,86 @@ func TestUnitArchiveEntry(t *testing.T) {
 	gone.Actual.SHA256 = strings.Repeat("0", 64)
 	if err := w.svc.ArchiveEntry(ctx, gone, "x", nil); err == nil || errors.Is(err, ErrNotFound) {
 		t.Fatalf("missing blob: %v", err)
+	}
+}
+
+var errRead = errors.New("read failed")
+
+// unreadable opens content that serves its first sound reads at offsets
+// and fails every other read with errRead, as a store whose connection
+// drops does.
+type unreadable struct {
+	blob.Store
+	sound int
+}
+
+func (u unreadable) Open(ctx context.Context, sha string) (io.ReadSeekCloser, blob.Info, error) {
+	r, info, err := u.Store.Open(ctx, sha)
+	return &failing{ReadSeekCloser: r, sound: u.sound}, info, err
+}
+
+type failing struct {
+	io.ReadSeekCloser
+	sound int
+}
+
+func (f *failing) ReadAt(p []byte, off int64) (int, error) {
+	if f.sound == 0 {
+		return 0, errRead
+	}
+	f.sound--
+	return archive.ReaderAt(f.ReadSeekCloser).ReadAt(p, off)
+}
+
+func (f *failing) Read([]byte) (int, error) { return 0, errRead }
+
+// An archive whose blob opens but cannot be read is no corrupt archive:
+// ArchiveEntry returns the read's error, not ErrNotFound, whether the read
+// that sniffs the kind fails or the walk's after it, through ReadAt or a
+// store without it, and for a name that tells no kind as well. Content
+// that is no usable archive is still ErrNotFound.
+func TestUnitArchiveEntryReadFailures(t *testing.T) {
+	ctx := context.Background()
+	sample := entry{name: "dir/in.txt", body: "inside"}
+	for name, body := range map[string][]byte{
+		"zip":    zipOf(t, sample),
+		"tar":    tarOf(t, false, sample),
+		"tar.gz": tarOf(t, true, sample),
+	} {
+		for _, p := range []string{"a/archive." + name, "a/archive.bin"} {
+			w := newWorld(t)
+			it := w.must(p, string(body))
+			fs := w.svc.Blobs
+			for i, blobs := range []blob.Store{
+				unreadable{Store: fs},
+				unreadable{Store: fs, sound: 1},
+				noReaderAt{unreadable{Store: fs}},
+			} {
+				w.svc.Blobs = blobs
+				err := w.svc.ArchiveEntry(ctx, it, "dir/in.txt", func(int64, io.Reader) error {
+					t.Errorf("%s %d: served", p, i)
+					return nil
+				})
+				if !errors.Is(err, errRead) || errors.Is(err, ErrNotFound) {
+					t.Errorf("%s %d: %v", p, i, err)
+				}
+			}
+		}
+	}
+	w := newWorld(t)
+	for p, body := range map[string]string{
+		"corrupt.zip":    "PK\x03\x04garbage",
+		"corrupt.tar":    strings.Repeat("x", 1024),
+		"corrupt.tar.gz": "\x1f\x8bgarbage",
+		"method.zip":     string(unknownMethodZip(t)),
+	} {
+		it := w.must(p, body)
+		if err := w.svc.ArchiveEntry(ctx, it, "a.txt", func(int64, io.Reader) error {
+			t.Errorf("%s: served", p)
+			return nil
+		}); !errors.Is(err, ErrNotFound) {
+			t.Errorf("%s: %v", p, err)
+		}
 	}
 }
 

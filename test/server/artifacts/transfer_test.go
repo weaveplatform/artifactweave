@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"sort"
@@ -17,6 +18,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/platform/archive"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
 
@@ -452,6 +455,117 @@ func TestAccArchiveEntryOverHTTP(t *testing.T) {
 		"Requested resource is contained within an archive",
 		"Sending a response with the status '500' and the message 'internal error'",
 	)
+}
+
+func tarBytes(t *testing.T, files map[string]string, gz bool) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	var out io.Writer = &buf
+	g := gzip.NewWriter(&buf)
+	if gz {
+		out = g
+	}
+	tw := tar.NewWriter(out)
+	names := make([]string, 0, len(files))
+	for n := range files {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		if err := tw.WriteHeader(&tar.Header{
+			Name: n, Mode: 0o644, Size: int64(len(files[n])), Typeflag: tar.TypeReg,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		_, _ = io.WriteString(tw, files[n])
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if gz {
+		if err := g.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return buf.Bytes()
+}
+
+var errDropped = errors.New("the store dropped the connection")
+
+// droppingBlobs serves the blobs in dropped with content that answers the
+// first read at an offset, the one that sniffs an archive's kind, and fails
+// every later one, as a store whose connection drops does.
+type droppingBlobs struct {
+	blob.Store
+	dropped map[string]bool
+}
+
+func (d droppingBlobs) Open(ctx context.Context, sha string) (io.ReadSeekCloser, blob.Info, error) {
+	r, info, err := d.Store.Open(ctx, sha)
+	if err != nil || !d.dropped[sha] {
+		return r, info, err
+	}
+	return &droppingContent{ReadSeekCloser: r}, info, nil
+}
+
+type droppingContent struct {
+	io.ReadSeekCloser
+	read bool
+}
+
+func (c *droppingContent) ReadAt(p []byte, off int64) (int, error) {
+	if c.read {
+		return 0, errDropped
+	}
+	c.read = true
+	return archive.ReaderAt(c.ReadSeekCloser).ReadAt(p, off)
+}
+
+// An entry of a zip, tar or tar.gz whose blob opens but fails while the
+// archive is walked answers 500 "internal error", as an entry of a lost
+// archive does, and its trace ends on that 500. A corrupt archive still
+// answers 404 for an entry.
+func TestAccArchiveEntryOfAnUnreadableArchive(t *testing.T) {
+	blobs := droppingBlobs{dropped: map[string]bool{}}
+	w := newItemWorld(t, false, func(cfg *Config) {
+		blobs.Store = cfg.Blobs
+		cfg.Blobs = blobs
+	})
+	files := map[string]string{"dir/in.txt": "inside", "top.txt": "top"}
+	for name, body := range map[string][]byte{
+		"zip":    zipBytes(t, files),
+		"tar":    tarBytes(t, files, false),
+		"tar.gz": tarBytes(t, files, true),
+	} {
+		file := "unreadable." + name
+		w.put("/artifactory/libs-local/"+file, string(body))
+		blobs.dropped[w.item("libs-local", false, file).Actual.SHA256] = true
+		entry := "/artifactory/libs-local/" + file + "!/dir/in.txt"
+		for _, method := range []string{"GET", "HEAD"} {
+			rec := w.do(method, entry, "admin", "")
+			if rec.Code != http.StatusInternalServerError ||
+				method == "GET" && !strings.Contains(rec.Body.String(), "internal error") {
+				t.Errorf("%s %s: %d %q", method, entry, rec.Code, rec.Body)
+			}
+		}
+		_, steps := traceOf(t, w, http.MethodGet, entry+"?trace", "admin")
+		wantSteps(t, entry, steps,
+			"Received request",
+			"Retrieving info from local repository 'libs-local' type generic",
+			"Unable to find resource in libs-local:"+file+"!/dir/in.txt",
+			"Requested resource is contained within an archive",
+			"Sending a response with the status '500' and the message 'internal error'",
+		)
+	}
+	for file, body := range map[string]string{
+		"corrupt.zip":    "PK\x03\x04garbage",
+		"corrupt.tar":    strings.Repeat("x", 1024),
+		"corrupt.tar.gz": "\x1f\x8bgarbage",
+	} {
+		w.put("/artifactory/libs-local/"+file, body)
+		wantStatus(t, w.do("GET", "/artifactory/libs-local/"+file+"!/dir/in.txt", "admin", ""),
+			http.StatusNotFound)
+	}
 }
 
 func TestAccFolderArchiveOverHTTP(t *testing.T) {

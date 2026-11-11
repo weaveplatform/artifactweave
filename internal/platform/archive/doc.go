@@ -36,7 +36,8 @@
 //   - Kind, with ParseKind, Sniff and KindOf, and the media type and file
 //     extension of each kind (ContentType, Ext).
 //   - Entry: one entry as the archive lists it, with the size its header
-//     claims and Open, which reads it.
+//     claims, Open, which reads it, and Wrap, which reports an error from
+//     opening or reading it as the walk would.
 //   - Walk: every entry, in archive order, until the callback returns an
 //     error.
 //   - Scan and ScanTar: Walk within Limits. ReadEntry: one entry whole,
@@ -47,7 +48,9 @@
 //   - The sentinels ErrUnusable ("archive: unusable archive"), which every
 //     refusal wraps, and ErrNotFound ("archive: no such entry"), which
 //     ReadFile returns when no file matches. Callers test them with
-//     errors.Is.
+//     errors.Is. A read of the content that fails is no refusal: Walk,
+//     Scan, ScanTar, ReadFile, ReadEntry and Wrap return its error as the
+//     reader gave it.
 //
 // # Invariants
 //
@@ -63,6 +66,17 @@
 //     (kernel.SplitItemPath), makes the archive unusable: Clean refuses it
 //     with ErrUnusable, and an explode refuses the whole archive. ReadFile
 //     passes over such an entry, which cannot be the file it looks for.
+//   - A failed read is not an unusable archive. Each walk keeps the first
+//     read of its content that failed, other than at the content's end,
+//     and returns that read's error where a parser's would be. Every other
+//     error a parser reports is ErrUnusable, whichever error it is, so a
+//     corrupt archive is refused even when the parser names it with
+//     io.EOF, io.ErrUnexpectedEOF or flate.CorruptInputError. A walk reads
+//     no further than the size it is given, so an offset that a corrupt
+//     archive gives past its end meets the end of the content, not a store
+//     that might fail the read. ScanTar returns the errors of the stream it
+//     is given as they are, since the caller, which decompresses that
+//     stream, is the one that can tell them apart.
 //   - A tar entry's reader is valid only until the walk moves on, so a
 //     callback reads the entry before it returns.
 //   - ReaderAt serialises reads, because they share one seek position.
@@ -88,8 +102,9 @@
 //     #p8-pypi-nuget-helm-terraform-locals and
 //     #p9d-modular-monolith-migration, epic PLT
 //     (https://github.com/weaveplatform/artifactweave/issues/938).
-//   - https://github.com/weaveplatform/artifactweave/issues/47 and
-//     https://github.com/weaveplatform/artifactweave/issues/979
+//   - https://github.com/weaveplatform/artifactweave/issues/47,
+//     https://github.com/weaveplatform/artifactweave/issues/979 and
+//     https://github.com/weaveplatform/artifactweave/issues/1224
 //
 // # Status
 //
@@ -111,14 +126,23 @@
 //   - TestUnitWalk: zip, tar and tar.gz walks list a directory, a file and
 //     a link in archive order; a callback's error ends the walk; garbage
 //     and a truncated tar are unusable.
+//   - TestUnitWalkReadFailures and TestUnitReadEntryReadFailure: a read
+//     that fails, before a walk lists the entries or after, returns its
+//     own error, a store's io.ErrUnexpectedEOF included, and never
+//     ErrUnusable.
+//   - TestUnitWalkCorruptArchives and TestUnitReadEntryCorrupt: corrupt
+//     content stays ErrUnusable whichever error the parser names it with,
+//     an offset past the content's end never reaches the store, and a
+//     refused entry is named in the refusal.
 //   - TestUnitReaderAt: a reader that already reads at offsets is used as
 //     it is, and a seek-only reader reads at offsets.
 //   - TestUnitReadFile and TestUnitReadFileInflationBudget: the first file
 //     the predicate accepts, ErrNotFound, each limit, and a tar.gz whose
 //     skipped entries inflate past the budget.
 //   - TestUnitScan, TestUnitScanTar and TestUnitReadEntryFailures: the
-//     limits of a scan over a sniffed or a caller-decompressed archive, and
-//     an entry that cannot be opened or read.
+//     limits of a scan over a sniffed or a caller-decompressed archive, the
+//     errors of a caller's stream returned as they are, and an entry a
+//     caller made that cannot be opened or read.
 //
 // The item service's explode and archive entry tests, and the format
 // handlers' package inspection tests, exercise it too.
