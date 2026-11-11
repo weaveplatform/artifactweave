@@ -39,7 +39,7 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [NIM metadata and paired container](nimmodel.md) | curl for metadata; crane 0.22.1 for the paired image | none | remote |
 | [Nix binary caches](nix.md) | Nix 2.35.5 | local, federated | local, remote, virtual, federated |
 | [npm](npm.md) | Bundled npm on Node 26.13.0; npm 12.2.1 on Node 24.22.2 | local | local, remote |
-| [NuGet v3 with dotnet](nuget.md) | NuGet bundled with .NET SDK 11.0 image; .NET 11.0 image also exercised (exact SDK versions in CI logs) | local | local, remote |
+| [NuGet v3 with dotnet](nuget.md) | NuGet bundled with .NET SDK 10.0 image; .NET 11.0 image also exercised (exact SDK versions in CI logs) | local | local, remote |
 | [OCI artifacts](oci.md) | ORAS 1.3.6; crane 0.22.1; Cosign 3.1.4 | local, federated | local, remote, virtual, federated |
 | [Opkg feeds](opkg.md) | opkg 0.10.0 | local, federated | local, remote, virtual, federated |
 | [Eclipse P2 update sites](p2.md) | Eclipse Platform / Equinox P2 4.41, Java 21 | none | remote, virtual |

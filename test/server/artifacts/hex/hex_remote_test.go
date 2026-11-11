@@ -776,6 +776,193 @@ func TestUnitHexVirtualPassesOverMissingAndUnreadableMembers(t *testing.T) {
 	}
 }
 
+// TestUnitHexVirtualListsOnlyReleasesReadableThroughTheVirtual: a caller
+// who may read both members whole, but through the virtual only Decimal's
+// tarballs, gets Decimal alone in names, versions and packages/NAME,
+// whichever member comes first, each signed with the virtual's own key;
+// Ecto is not found there, and its tarball through the virtual is refused
+// with 403 (decision 0008). A caller who may read the whole virtual gets
+// both packages.
+func TestUnitHexVirtualListsOnlyReleasesReadableThroughTheVirtual(t *testing.T) {
+	memberKeys, virtualKeys := testKeys(), otherKeys()
+	upstream, err := keymaterial.RSAPrivateKey(memberKeys.private, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	both := []string{"decimal", "ecto"}
+	archives := map[string][]byte{
+		"decimal": mustReadHexFixture(t),
+		"ecto":    repopath.Read(t, "internal/artifacts/ecosystem/hex/testdata/ecto-3.12.5.tar"),
+	}
+	releases, tarballs := map[string]string{}, map[string]string{}
+	bodies := map[string][]byte{}
+	var registries []hexfmt.RegistryPackage
+	for _, name := range both {
+		release, err := hexfmt.InspectTarball(bytes.NewReader(archives[name]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		releases[name] = release.Version
+		tarballs[name] = "tarballs/" + name + "-" + release.Version + ".tar"
+		reg := hexfmt.RegistryPackage{
+			Name: name, Repository: "hexpm", Releases: []hexfmt.Package{release},
+		}
+		registries = append(registries, reg)
+		if bodies["packages/"+name], err = hexfmt.EncodePackage(reg, upstream); err != nil {
+			t.Fatal(err)
+		}
+		bodies[tarballs[name]] = archives[name]
+	}
+	if bodies["versions"], err = hexfmt.EncodeVersions("hexpm", registries, upstream); err != nil {
+		t.Fatal(err)
+	}
+	backend := hexSource(
+		func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+			body, ok := bodies[q.Resource.Path]
+			if !ok {
+				return source.Result{}, kernel.ErrNotFound
+			}
+			return source.Result{Stream: &source.Stream{
+				Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
+				Representation: source.Representation{Size: int64(len(body))},
+			}}, nil
+		},
+	)
+	w := newItemWorld(t, false, func(c *Config) {
+		c.RemoteSources = &source.Service{
+			HTTP: backend,
+			Resolve: func(_ context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
+				return artmodel.SourceIdentity{
+					Kind: artmodel.ExternalHTTP, Repository: artmodel.RepositoryIncarnation(c.Key),
+					ID: "upstream", Generation: "rev-1",
+				}, nil
+			},
+		}
+	})
+	for name, pair := range map[string]keyMaterial{
+		"hex-member-key": memberKeys, "hex-virtual-key": virtualKeys,
+	} {
+		if err := w.db.Keys().CreateKeypair(t.Context(), api.Keypair{
+			Name: name, Type: api.KeypairRSA, PrivateKey: pair.private, PublicKey: pair.public,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	orders := map[string][]string{
+		"hex-v-local-first":  {"hex-local", "hex-r"},
+		"hex-v-remote-first": {"hex-r", "hex-local"},
+	}
+	configs := []repo.Config{
+		{Key: "hex-local", Class: repo.Local, PrimaryKeyPairRef: "hex-member-key"},
+		{
+			Key: "hex-r", Class: repo.Remote,
+			URL: "https://up.example/", HexPublicKey: memberKeys.public,
+		},
+	}
+	for key, members := range orders {
+		configs = append(configs, repo.Config{
+			Key: key, Class: repo.Virtual, Repositories: members, KeyPair: "hex-virtual-key",
+		})
+	}
+	for _, c := range configs {
+		c.PackageType = repo.Hex
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range both {
+		if put := w.do(http.MethodPut, "/artifactory/hex-local/"+tarballs[name],
+			"admin", string(archives[name])); put.Code != http.StatusCreated {
+			t.Fatalf("deploy %s %d: %s", name, put.Code, put.Body)
+		}
+	}
+	if err := w.db.Users().
+		Create(t.Context(), accesstest.User{Name: "decimal-only", PasswordHash: cheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	// Both members whole, so only the virtual's own permissions can narrow
+	// what the caller gets through it.
+	targets := map[string]accesstest.Target{
+		"hex-local": {Include: []string{"**"}},
+		"hex-r":     {Include: []string{"**"}},
+	}
+	for key := range orders {
+		targets[key] = accesstest.Target{Include: []string{"tarballs/decimal-*"}}
+	}
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "hex-decimal-through-virtuals",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{
+				Users: map[string]api.Actions{"decimal-only": api.ActionRead},
+			},
+			Targets: targets,
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	public, err := hexfmt.ParsePublicKey(virtualKeys.public)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		virtual, as string
+		listed      []string
+	}{
+		{"hex-v-local-first", "decimal-only", []string{"decimal"}},
+		{"hex-v-remote-first", "decimal-only", []string{"decimal"}},
+		{"hex-v-local-first", "reader", both},
+		{"hex-v-remote-first", "reader", both},
+	} {
+		t.Run(tc.virtual+" as "+tc.as, func(t *testing.T) {
+			base := "/artifactory/api/hex/" + tc.virtual + "/"
+			for _, name := range both {
+				pkg := w.do(http.MethodGet, base+"packages/"+name, tc.as, "")
+				archive := w.do(http.MethodGet, base+tarballs[name], tc.as, "")
+				if !slices.Contains(tc.listed, name) {
+					if pkg.Code != http.StatusNotFound ||
+						!strings.Contains(pkg.Body.String(), "Hex package not found") {
+						t.Errorf("packages/%s: %d %s", name, pkg.Code, pkg.Body)
+					}
+					if archive.Code != http.StatusForbidden {
+						t.Errorf("%s tarball: %d %s", name, archive.Code, archive.Body)
+					}
+					continue
+				}
+				reg, err := hexfmt.DecodePackage(pkg.Body.Bytes(), public)
+				if pkg.Code != http.StatusOK || err != nil || reg.Name != name ||
+					reg.Repository != tc.virtual || len(reg.Releases) != 1 ||
+					reg.Releases[0].Version != releases[name] {
+					t.Errorf("packages/%s: %d %s, %+v %v", name, pkg.Code, pkg.Body, reg, err)
+				}
+				if archive.Code != http.StatusOK ||
+					!bytes.Equal(archive.Body.Bytes(), archives[name]) {
+					t.Errorf("%s tarball: %d, %d bytes", name, archive.Code, archive.Body.Len())
+				}
+			}
+			names := w.do(http.MethodGet, base+"names", tc.as, "")
+			gotRepo, gotNames, err := hexfmt.DecodeNames(names.Body.Bytes(), public)
+			if names.Code != http.StatusOK || err != nil || gotRepo != tc.virtual ||
+				!slices.Equal(gotNames, tc.listed) {
+				t.Errorf("names: %d %s, %q %q %v", names.Code, names.Body, gotRepo, gotNames, err)
+			}
+			index := w.do(http.MethodGet, base+"versions", tc.as, "")
+			gotRepo, packages, err := hexfmt.DecodeVersions(index.Body.Bytes(), public)
+			var gotPackages []string
+			for _, p := range packages {
+				if len(p.Releases) != 1 || p.Releases[0].Version != releases[p.Name] {
+					t.Errorf("versions lists %s at %+v", p.Name, p.Releases)
+				}
+				gotPackages = append(gotPackages, p.Name)
+			}
+			if index.Code != http.StatusOK || err != nil || gotRepo != tc.virtual ||
+				!slices.Equal(gotPackages, tc.listed) {
+				t.Errorf("versions: %d %s, %q %q %v",
+					index.Code, index.Body, gotRepo, gotPackages, err)
+			}
+		})
+	}
+}
+
 func mustReadHexFixture(t *testing.T) []byte {
 	t.Helper()
 	return repopath.Read(t, "internal/artifacts/ecosystem/hex/testdata/decimal-2.0.0.tar")

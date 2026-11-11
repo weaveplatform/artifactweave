@@ -358,7 +358,11 @@ func (h handler) virtualPackages(
 			offset := uint64(len(current.Advisories))
 			added := false
 			for _, release := range entry.Releases {
-				if !seen[release.Version] {
+				// The member's listing checked the member's permissions only.
+				// The virtual's tarball route also requires the virtual's own,
+				// so a release that fails them must not be listed either.
+				p, ok := hexfmt.TarballPath(name, release.Version)
+				if !seen[release.Version] && ok && h.k.Can(r, p, accessapi.ActionRead) {
 					mapped := rebindRelease(release, entry.Repository, current.Repository)
 					mapped.AdvisoryIndexes = slices.Clone(mapped.AdvisoryIndexes)
 					for i := range mapped.AdvisoryIndexes {
@@ -368,10 +372,12 @@ func (h handler) virtualPackages(
 					added = true
 				}
 			}
+			// names lists every package in out, so one without a readable
+			// release must not enter it.
 			if added {
 				current.Advisories = append(current.Advisories, entry.Advisories...)
+				out[name] = current
 			}
-			out[name] = current
 		}
 	}
 	for name, entry := range out {
