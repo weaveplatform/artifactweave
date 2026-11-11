@@ -71,9 +71,10 @@
 //     blackout's 404 naming the skill's folder, and a download or a
 //     single-file read with the same 404 naming the version's bundle, or
 //     the folder for latest, all before the index is read, so a version or
-//     skill that does not exist is refused alike. The list and search keep
-//     their answers, the patterns leave a version listed, and the scan
-//     status answers for a stored bundle whatever the policy says.
+//     skill that does not exist is refused alike, while a malformed request
+//     still answers its 400. The list and search keep their answers, the
+//     patterns leave a version listed, and the scan status answers for a
+//     stored bundle whatever the policy says.
 //   - Statuses and error texts stay byte-identical.
 //
 // # References

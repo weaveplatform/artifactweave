@@ -396,7 +396,7 @@ func TestAccSingleFileStoredBlobFaults(t *testing.T) {
 // a client resolves a version from, answer the blackout's 404 naming the
 // skill's folder, and its downloads and single-file reads refuse before the
 // index is read, so a version or skill that does not exist is refused
-// alike. The list and
+// alike, while a malformed request still answers its 400. The list and
 // search keep their answers, a version whose bundle the patterns reject
 // stays listed, the scan status still answers for the stored bundle, and
 // discovery stays anonymous. A caller who may not read the skill learns
@@ -440,16 +440,17 @@ func TestAccSkillsDownloadPolicy(t *testing.T) {
 	bundle := "/api/v1/download?slug=alpha&version=2.0.0"
 	file := "/api/v1/skills/alpha/file?version=2.0.0&path=src%2Frun.js"
 	malformed := "/api/v1/skills/alpha/file?version=2.0.0&path=..%2Fsecret"
+	malformedMissing := "/api/v1/skills/missing/file?version=1.0.0&path=..%2Fsecret"
+	absent := "/api/v1/skills/alpha/file?version=2.0.0&path=absent.md"
 	// bundleReads maps each read of a bundle, or of a file in it, that a
 	// blacked-out repository refuses before the index is read to the path
 	// its refusal names: a named version's bundle, stored or not, and the
 	// skill's folder for latest, which only the index could resolve. A
-	// file's name is checked after the index read, so a malformed one is
-	// refused alike.
+	// well-formed file name the bundle lacks is refused alike.
 	bundleReads := map[string]string{
-		bundle:    "alpha/2.0.0/alpha-2.0.0.zip",
-		file:      "alpha/2.0.0/alpha-2.0.0.zip",
-		malformed: "alpha/2.0.0/alpha-2.0.0.zip",
+		bundle: "alpha/2.0.0/alpha-2.0.0.zip",
+		file:   "alpha/2.0.0/alpha-2.0.0.zip",
+		absent: "alpha/2.0.0/alpha-2.0.0.zip",
 
 		"/api/v1/download?slug=alpha&version=9.9.9":    "alpha/9.9.9/alpha-9.9.9.zip",
 		"/api/v1/download?slug=missing&version=1.0.0":  "missing/1.0.0/missing-1.0.0.zip",
@@ -501,8 +502,6 @@ func TestAccSkillsDownloadPolicy(t *testing.T) {
 		return "The repository 'skills-local' is blacked out and cannot serve artifact " +
 			"'skills-local:" + path + "'."
 	}
-	// A read that names no version is malformed, and answers 400 before
-	// any check, as without the blackout.
 	unversioned := []string{
 		"/api/v1/download?slug=alpha",
 		"/api/v1/skills/alpha/file?path=SKILL.md",
@@ -518,13 +517,19 @@ func TestAccSkillsDownloadPolicy(t *testing.T) {
 		// that does not exist is refused alike.
 		answers(as, "/api/v1/skills/missing/versions", http.StatusNotFound, blackedOut("missing"))
 		answers(as, "/api/v1/skills/alpha/versions/9.9.9", http.StatusNotFound, blackedOut("alpha"))
+		// A malformed request answers its 400 before any policy check, as
+		// without the blackout: a read that names no version, and a file
+		// path that is not a safe relative name, whether or not its version
+		// is stored.
 		for _, path := range unversioned {
 			failed(as, path, http.StatusBadRequest, "invalid skill slug or version")
 		}
+		failed(as, malformed, http.StatusBadRequest, "invalid skill file path")
+		failed(as, malformedMissing, http.StatusBadRequest, "invalid skill file path")
 	}
 	kept()
 	// Read permission first (DV-057).
-	for path := range bundleReads {
+	for _, path := range append(slices.Collect(maps.Keys(bundleReads)), malformed, malformedMissing) {
 		failed("nobody", path, http.StatusForbidden, "Forbidden")
 	}
 	for _, path := range resolution {
@@ -544,7 +549,8 @@ func TestAccSkillsDownloadPolicy(t *testing.T) {
 		answers("reader", path, http.StatusOK, "2.0.0")
 	}
 	// Without the blackout the index answers for a version or skill it
-	// does not hold, and a file's name is checked once the version is.
+	// does not hold, before a file's name is checked, and the bundle for a
+	// file it lacks.
 	for _, path := range []string{
 		"/api/v1/download?slug=alpha&version=9.9.9",
 		"/api/v1/download?slug=missing&version=1.0.0",
@@ -552,6 +558,8 @@ func TestAccSkillsDownloadPolicy(t *testing.T) {
 		"/api/v1/skills/alpha/file?version=9.9.9&path=SKILL.md",
 		"/api/v1/skills/missing/file?version=1.0.0&path=SKILL.md",
 		"/api/v1/skills/missing/file?version=latest&path=SKILL.md",
+		malformedMissing,
+		absent,
 	} {
 		failed("reader", path, http.StatusNotFound, "Could not find resource")
 	}

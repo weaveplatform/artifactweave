@@ -129,10 +129,16 @@ func (h handler) notBlackedOut(w http.ResponseWriter, r *http.Request, path stri
 // permission on the skill's folder. A blacked-out repository is refused
 // first, naming blackout: the skill's folder for the version route's
 // resolution metadata, and refusedAt's path for a bundle or a file in it.
+// malformed, when not nil, is the 400 the rest of the request's shape
+// earns. A blacked-out repository answers it in place of the refusal, as
+// request-shape checks come before any policy check; without the blackout
+// the caller answers it once the version is found, so that a version that
+// does not exist keeps its 404 first.
 func (h handler) selected(
 	w http.ResponseWriter,
 	r *http.Request,
 	slug, version, blackout string,
+	malformed error,
 ) (skillVersion, bool) {
 	if !h.authenticated(w, r) {
 		return skillVersion{}, false
@@ -142,6 +148,10 @@ func (h handler) selected(
 		return skillVersion{}, false
 	}
 	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
+		return skillVersion{}, false
+	}
+	if malformed != nil && h.k.CheckBlackedOut(r, blackout) != nil {
+		h.k.Error(w, r, malformed)
 		return skillVersion{}, false
 	}
 	if !h.notBlackedOut(w, r, blackout) {
@@ -401,7 +411,7 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request) {
 
 func (h handler) version(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
-	v, ok := h.selected(w, r, slug, chi.URLParam(r, "version"), slug)
+	v, ok := h.selected(w, r, slug, chi.URLParam(r, "version"), slug, nil)
 	if !ok {
 		return
 	}
@@ -538,24 +548,32 @@ func refusedAt(slug, version string) string {
 
 func (h handler) download(w http.ResponseWriter, r *http.Request) {
 	slug, version := r.URL.Query().Get("slug"), r.URL.Query().Get("version")
-	v, ok := h.selected(w, r, slug, version, refusedAt(slug, version))
+	v, ok := h.selected(w, r, slug, version, refusedAt(slug, version), nil)
 	if !ok {
 		return
 	}
 	h.k.ServeItem(w, r, skillsfmt.Path(slug, v.record.Version))
 }
 
+// badFileName is the 400 a single-file read's path earns unless it names a
+// safe relative file, and nil otherwise.
+func badFileName(name string) error {
+	if !safeFileName(name) || strings.HasSuffix(name, "/") {
+		return badQuery("invalid skill file path")
+	}
+	return nil
+}
+
 func (h handler) singleFile(w http.ResponseWriter, r *http.Request) {
 	slug, version := chi.URLParam(r, "slug"), r.URL.Query().Get("version")
-	// The file's name is checked after the index read, so a blacked-out
-	// repository refuses a malformed one as well.
-	v, ok := h.selected(w, r, slug, version, refusedAt(slug, version))
+	name := r.URL.Query().Get("path")
+	malformed := badFileName(name)
+	v, ok := h.selected(w, r, slug, version, refusedAt(slug, version), malformed)
 	if !ok {
 		return
 	}
-	name := r.URL.Query().Get("path")
-	if !safeFileName(name) || strings.HasSuffix(name, "/") {
-		h.k.Error(w, r, badQuery("invalid skill file path"))
+	if malformed != nil {
+		h.k.Error(w, r, malformed)
 		return
 	}
 	path := skillsfmt.Path(slug, v.record.Version)
