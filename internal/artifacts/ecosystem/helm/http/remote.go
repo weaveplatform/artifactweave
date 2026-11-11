@@ -21,7 +21,16 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
 )
 
-func (h handler) upstreamIndex(r *http.Request) (remoteIndex, source.Result, error) {
+// upstreamIndex reads the remote's index.yaml for the request whose policy
+// path is download: index.yaml itself when the index is answered, which 7.x
+// caches there, so a blackout or a pattern on index.yaml refuses it; or the
+// chart or provenance file a download serves, which looks its URL up in the
+// index on its way, so only the blackout refuses the lookup and its answer
+// names the requested file.
+func (h handler) upstreamIndex(
+	r *http.Request,
+	download string,
+) (remoteIndex, source.Result, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	resource := source.Resource{
 		Kind:   source.ResourceKindMetadata,
@@ -36,6 +45,8 @@ func (h handler) upstreamIndex(r *http.Request) (remoteIndex, source.Result, err
 			"application/octet-stream",
 		},
 		PermissionFolder: true,
+		PolicyPath:       download,
+		BlackoutOnly:     download != helmfmt.IndexPath,
 		Variant:          "helm-index-v2",
 		ValidateMetadata: validateRemoteIndex(c),
 	}
@@ -65,7 +76,7 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, requested st
 		(provenance && !h.k.Require(w, r, owner, api.ActionRead)) {
 		return
 	}
-	index, metadata, err := h.upstreamIndex(r)
+	index, metadata, err := h.upstreamIndex(r, requested)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -76,8 +87,12 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, requested st
 				if target.path != owner || r.URL.RawQuery != "" {
 					continue
 				}
-				if metadata.CheckRead != nil {
-					if err = metadata.CheckRead(r.Context(), owner); err != nil {
+				// The chart's Read permission only: the read below applies the
+				// policy at the requested path, so a provenance file is
+				// checked at its own path, not its chart's, as 6.20's
+				// RepoBase.accepts checks every path but a checksum's.
+				if metadata.CheckPermission != nil {
+					if err = metadata.CheckPermission(r.Context(), owner); err != nil {
 						h.k.Error(w, r, pkgroute.SourceError(err, false))
 						return
 					}
@@ -142,7 +157,7 @@ func (h handler) cachedProvenance(
 }
 
 func (h handler) remoteIndex(w http.ResponseWriter, r *http.Request) {
-	index, result, err := h.upstreamIndex(r)
+	index, result, err := h.upstreamIndex(r, helmfmt.IndexPath)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -211,6 +226,10 @@ type remoteIndexBody struct{ *bytes.Reader }
 
 func (*remoteIndexBody) Close() error { return nil }
 
+// fenceHelmDisclosures checks again, before delivery, that the caller may
+// read each chart the answer discloses. It checks Read permission alone: the
+// index lists a chart whose file the remote's patterns reject, as 7.x's does
+// (RTFACT-29572), and a chart's own read result applies the policy to it.
 func fenceHelmDisclosures(result *source.Result, metadata source.Result, paths []string) {
 	prior := result.Revalidate
 	result.Revalidate = func(ctx context.Context) error {
@@ -224,9 +243,9 @@ func fenceHelmDisclosures(result *source.Result, metadata source.Result, paths [
 				return fmt.Errorf("helm metadata authority: %w", err)
 			}
 		}
-		if metadata.CheckRead != nil {
+		if metadata.CheckPermission != nil {
 			for _, path := range paths {
-				if err := metadata.CheckRead(ctx, path); err != nil {
+				if err := metadata.CheckPermission(ctx, path); err != nil {
 					return fmt.Errorf("helm chart authority: %w", err)
 				}
 			}
