@@ -69,7 +69,11 @@ func (h handler) query(w http.ResponseWriter, r *http.Request) {
 			if !h.k.Can(r, path, api.ActionRead) {
 				return false
 			}
-			return original.CheckRead == nil || original.CheckRead(ctx, path) == nil
+			// path is the extension's folder: the patterns admit it when
+			// they could admit a file below it, so an include naming one
+			// version's folder keeps the extension listed. Checked as a
+			// file, the folder's own path matched no such include.
+			return original.CheckFolder == nil || original.CheckFolder(ctx, path) == nil
 		},
 	)
 	if err != nil {
@@ -133,9 +137,17 @@ func projectedResult(original source.Result, data []byte, paths []string) source
 				return fmt.Errorf("revalidate gallery source: %w", err)
 			}
 		}
+		// Each disclosed extension again as the query admitted it: the
+		// caller's Read of the folder's own path, as Can checked it, and
+		// the policy at the folder, as the listing filter applied it.
 		for _, path := range paths {
-			if original.CheckRead != nil {
-				if err := original.CheckRead(ctx, path); err != nil {
+			if original.CheckPermission != nil {
+				if err := original.CheckPermission(ctx, path); err != nil {
+					return fmt.Errorf("revalidate extension read: %w", err)
+				}
+			}
+			if original.CheckFolder != nil {
+				if err := original.CheckFolder(ctx, path); err != nil {
 					return fmt.Errorf("revalidate extension read: %w", err)
 				}
 			}
