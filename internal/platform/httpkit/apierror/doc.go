@@ -15,7 +15,7 @@
 // it, and the 501 stubs that tools/stubgen writes return ErrNotImplemented.
 // The kernel's authentication sentinels are Error values; decision 0044 lets
 // the kernel import this one platform package. It imports only the standard
-// library: encoding/json, errors, net/http and strconv.
+// library: encoding/json, errors, net/http, strconv and strings.
 //
 // # Inputs
 //
@@ -51,9 +51,13 @@
 //   - Envelopes, statuses, content types, challenges and messages are what
 //     JFrog's clients and the native package clients read or print, so they
 //     stay byte-identical.
-//   - New sets Code from the status (BAD_REQUEST, UNAUTHORIZED, FORBIDDEN,
-//     NOT_FOUND, CONFLICT, UNSUPPORTED, otherwise INTERNAL_ERROR), the code
-//     Access answers with when a handler gives none.
+//   - New sets Code from the status, the code that the Access, Grid and Pub
+//     envelopes carry when a handler gives none: the name of the status's
+//     constant in JAX-RS's Response.Status, as 7.x Access names its codes,
+//     which is Go's status text in upper case with underscores for spaces
+//     (BAD_REQUEST, METHOD_NOT_ALLOWED, REQUEST_ENTITY_TOO_LARGE,
+//     TOO_MANY_REQUESTS, SERVICE_UNAVAILABLE). 500 is INTERNAL_ERROR, as is
+//     a status Go has no text for, and 501 is UNSUPPORTED.
 //   - It imports nothing beyond the standard library. Decision 0044 holds the
 //     kernel to the standard library and this package, so any other import
 //     would reach the kernel too, and an import of the kernel would be a
@@ -71,6 +75,16 @@
 //     (the envelopes are JFrog's, so that JFrog's clients read them).
 //   - Research 10: docs/research/10-scope-and-tiers.md, "Error envelopes by
 //     surface".
+//   - The codes: JAX-RS's Response.Status
+//     (https://github.com/jakartaee/rest/blob/2.1.6/jaxrs-api/src/main/java/javax/ws/rs/core/Response.java);
+//     7.x Access bodies that pair UNAUTHORIZED with JAX-RS's message "HTTP
+//     401 Unauthorized" (https://jfrog.atlassian.net/browse/RTFACT-23421)
+//     and answer a 500 with INTERNAL_SERVER_ERROR
+//     (https://jfrog.atlassian.net/browse/RTFACT-30977); the Error schemas
+//     of the Projects and Grid specs; and the hosted pub repository spec v2,
+//     "Rejecting Requests"
+//     (https://github.com/dart-lang/pub/blob/master/doc/repository-spec-v2.md),
+//     whose code is free text that the Dart client does not read.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
 //     ("Persistence": the kernel imports only the standard library and
 //     platform/httpkit/apierror; "Dependency rules"; "Constraints": the lint
@@ -83,7 +97,9 @@
 //     #p1b-enterprise-products-specs-and-model, task 1; and
 //     #p9d-modular-monolith-migration, epic WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
-//   - https://github.com/weaveplatform/artifactweave/issues/1000
+//   - https://github.com/weaveplatform/artifactweave/issues/1000 and
+//     https://github.com/weaveplatform/artifactweave/issues/1236 (a code
+//     for every status).
 //
 // # Status
 //
@@ -96,7 +112,8 @@
 // Later phases added the profiles and fields of their surfaces: the
 // Terraform backend (P8, #558), NoChallenge and RetryAfterSeconds for remote
 // sources (P9, #616), APM (P9b, #692), and the Swift registry and Dart pub
-// (P9c, #766 and #765). Moved here in P9d.
+// (P9c, #766 and #765). Moved here in P9d. New takes the code from the
+// status's name (#1236).
 //
 // # Testing
 //
@@ -108,13 +125,16 @@
 //     content type.
 //   - TestUnitUnauthorizedChallenges: the Basic challenge on a 401, a
 //     handler's own challenge kept, and none on a 403.
-//   - TestUnitDefaultCodes: the code New derives from each status, and the
-//     text of Error.
+//   - TestUnitDefaultCodes: a table over status and profile. For each status
+//     that a handler, the middleware or a remote's upstream can send through
+//     the Access, Grid and Pub envelopes, the code New derives, with the
+//     status, content type and message, in each of the three; and the text
+//     of Error.
 //
 // These tests leave the APM and Swift registry problem JSON, the Dart pub
-// document with its Bearer challenge, and Retry-After to the tests of the
-// routes that write them: the Agent Packages suite, the Swift and pub
-// format tests and the remote source tests. Over HTTP, the server's
+// Bearer challenge, and Retry-After to the tests of the routes that write
+// them: the Agent Packages suite, the Swift and pub format tests and the
+// remote source tests. Over HTTP, the server's
 // TestAccStubsAndEnvelopes checks the 501 and 404 envelopes of the stubbed
 // products and of unknown paths on each surface, and
 // TestAccUnimplementedOperationsAnswer501 checks that every specified

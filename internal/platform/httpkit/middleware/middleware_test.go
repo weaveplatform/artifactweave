@@ -278,10 +278,12 @@ func TestAccBindingError(t *testing.T) {
 		),
 		&http.MaxBytesError{Limit: 8},
 	)
-	if rec.Code != http.StatusRequestEntityTooLarge ||
-		!strings.Contains(rec.Body.String(), `"code":"INTERNAL_ERROR"`) &&
-			!strings.Contains(rec.Body.String(), "request body too large") {
+	if rec.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("max bytes: %d %s", rec.Code, rec.Body.String())
+	}
+	want := `{"errors":[{"code":"REQUEST_ENTITY_TOO_LARGE","message":"http: request body too large"}]}`
+	if diff := cmp.Diff(decode(t, want), decode(t, rec.Body.String())); diff != "" {
+		t.Fatalf("max bytes: body mismatch (-want +got):\n%s", diff)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 // Profile selects the error envelope, content type, and default authentication
@@ -55,8 +56,9 @@ const (
 	ProfilePub
 )
 
-// Error carries everything needed to render with any profile. Code is the OCI
-// or Access symbolic code; Artifactory ignores it and uses Status.
+// Error carries everything needed to render with any profile. Code is the
+// symbolic code of the Access, OCI, Grid and Pub envelopes; the others ignore
+// it.
 type Error struct {
 	Status  int
 	Code    string
@@ -214,23 +216,30 @@ func envelope(s Profile, e *Error) any {
 	}
 }
 
-// defaultCode maps a status to the symbolic code Access uses when a handler
-// did not supply one. OCI handlers always set their own spec code.
+// defaultCode is the code New gives a status: the name of the status's
+// constant in JAX-RS's Response.Status, which is Go's status text in upper
+// case with underscores for spaces. 7.x Access names its codes so: its 401
+// pairs UNAUTHORIZED with JAX-RS's default message "HTTP 401 Unauthorized"
+// (RTFACT-23421, on 7.5.7), and the Projects and Grid specs give
+// BAD_REQUEST, NOT_FOUND and CONFLICT as examples. Pub takes the same names,
+// since the Dart client reads only the message. OCI handlers set the
+// specification's codes themselves.
+//
+// 500 is INTERNAL_ERROR until the P19 comparison on #216 settles it:
+// RTFACT-30977 shows 7.x Access sending INTERNAL_SERVER_ERROR. 501 is
+// UNSUPPORTED, NotSupported's code, because a 501 built with New is something
+// artifactweave does not support. A status Go has no text for, such as a 520
+// that a remote relays from its upstream, gets INTERNAL_ERROR.
 func defaultCode(status int) string {
 	switch status {
-	case http.StatusBadRequest:
-		return "BAD_REQUEST"
-	case http.StatusUnauthorized:
-		return "UNAUTHORIZED"
-	case http.StatusForbidden:
-		return "FORBIDDEN"
-	case http.StatusNotFound:
-		return "NOT_FOUND"
-	case http.StatusConflict:
-		return "CONFLICT"
+	case http.StatusInternalServerError:
+		return "INTERNAL_ERROR"
 	case http.StatusNotImplemented:
 		return "UNSUPPORTED"
-	default:
+	}
+	text := http.StatusText(status)
+	if text == "" {
 		return "INTERNAL_ERROR"
 	}
+	return strings.ToUpper(strings.ReplaceAll(text, " ", "_"))
 }
