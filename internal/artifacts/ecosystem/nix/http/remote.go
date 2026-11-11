@@ -56,7 +56,11 @@ func checkURL(c repo.Config, target *url.URL) error {
 	return nil
 }
 
-func (h handler) remoteInfo(r *http.Request, path string) (located, error) {
+// remoteInfo reads a remote's narinfo at path, for a narinfo request or,
+// when nar is set, for a request of the NAR it names. The read is a lookup
+// that only the blackout refuses, its policy being checked at the root:
+// lookup has checked the remote's policy at the path the client asked for.
+func (h handler) remoteInfo(r *http.Request, path string, nar bool) (located, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	resource := source.Resource{
 		Kind:              source.ResourceKindMetadata,
@@ -109,17 +113,27 @@ func (h handler) remoteInfo(r *http.Request, path string) (located, error) {
 	if err = h.verifyRemote(r, info); err != nil {
 		return located{}, err
 	}
-	if result.Revalidate == nil || result.CheckRead == nil {
+	if result.Revalidate == nil || result.CheckRead == nil || result.CheckPermission == nil {
 		return located{}, source.ErrInvalidResult
+	}
+	// The fence rechecks the policy at the path the client asked for and
+	// Read permission alone at the other: patterns rejecting only the NAR
+	// leave the narinfo served, where CheckRead's refusal of the NAR made
+	// the narinfo a 502 that turns the Nix client's substituter off
+	// (rulings R1, R3), and a NAR request is not refused at the narinfo it
+	// was found through (rulings R4).
+	checkInfo, checkNAR := result.CheckRead, result.CheckPermission
+	if nar {
+		checkInfo, checkNAR = result.CheckPermission, result.CheckRead
 	}
 	check := func(ctx context.Context) error {
 		if err := result.Revalidate(ctx); err != nil {
 			return fmt.Errorf("nix: metadata authority: %w", err)
 		}
-		if err := result.CheckRead(ctx, path); err != nil {
+		if err := checkInfo(ctx, path); err != nil {
 			return fmt.Errorf("nix: metadata read authority: %w", err)
 		}
-		return result.CheckRead(ctx, info.URL)
+		return checkNAR(ctx, info.URL)
 	}
 	if err = check(r.Context()); err != nil {
 		return located{}, err

@@ -52,6 +52,15 @@
 //     kept for the client's own trusted-public-keys check. Its archive must
 //     match the narinfo's hashes and sizes, and every upstream URL and
 //     redirect must stay beneath the remote's URL, on its origin.
+//   - The download policy (decision 0032) is checked after Read
+//     permission, at the path the client asked for alone: nix-cache-info,
+//     a narinfo, or a NAR at its stored path nar/<file>. A blacked-out
+//     repository or a path its patterns reject answers 404 with the
+//     policy's message. Patterns rejecting only a NAR leave its narinfo
+//     served, and a NAR is not refused at the narinfo it is found
+//     through. A virtual repository checks its own patterns at that path
+//     ("No repository found to serve the request") and passes over a
+//     member whose policy refuses it, a remote member's included.
 //   - A request with a query string is refused, publication needs a local
 //     or federated repository, and a virtual repository cannot be
 //     reindexed.
@@ -95,4 +104,8 @@
 //     path and virtual policy, exact-path permissions and revocation,
 //     faults that must not answer as a miss, and the request and delivery
 //     fences.
+//   - policy_test.go: the download policy at the path asked for on hosted
+//     and remote repositories, Read permission first, and a virtual
+//     repository's own patterns and its pass-over of refusing local and
+//     remote members.
 package nixhttp
