@@ -30,6 +30,22 @@ class AutomationTests(unittest.TestCase):
         for candidate in variants:
             self.assertFalse(pr.eligible(candidate, REPO, BRANCH, SHA))
 
+    def test_the_app_owns_its_refresh_branches_and_nobody_else_does(self):
+        for branch in ["deps/refresh", "deps/jfrog-providers", "deps/jfrog-providers-major", "deps/hex-image"]:
+            candidate = pull(); candidate["head"]["ref"] = branch
+            candidate["user"] = {"login": "weaveplatform-release-please[bot]"}
+            self.assertTrue(pr.eligible(candidate, REPO, branch, SHA))
+            candidate["user"] = {"login": "dependabot[bot]"}
+            self.assertFalse(pr.eligible(candidate, REPO, branch, SHA))
+        candidate = pull(); candidate["head"]["ref"] = "deps/other"
+        candidate["user"] = {"login": "weaveplatform-release-please[bot]"}
+        self.assertFalse(pr.eligible(candidate, REPO, "deps/other", SHA))
+        catalog = json.loads(pr.CATALOG.read_text())
+        pr.allowed_changes([{"filename": name, "status": "modified"} for name in [
+            "test/acceptance/clients/hex.Dockerfile", "docs/client-recipes/src/hex.json",
+            "docs/client-recipes/hex.md", "docs/client-recipes/index.md",
+            "docs/client-recipes/evidence-lock.json", "docs/testing/ci-client-images.md"]], catalog)
+
     def test_pr_cannot_replace_automation_templates_or_scripts(self):
         catalog = json.loads(pr.CATALOG.read_text())
         for name in ["tools/depsync/sync.py", "tools/depsync/catalog.json", "tools/clientrecipes/main.go", "../outside"]:

@@ -19,9 +19,17 @@ name: deps | Refresh
 # separate, on deps/jfrog-providers, which auto-merge.yml merges once the
 # gate (including the terraform apply job and deploy-check) passes. A major
 # goes up on deps/jfrog-providers-major instead, which it never merges, so a
-# person reviews it, as Dependabot holds majors for deploy/platform. Nothing here edits workflow files: Dependabot owns action pins, and
-# an App push that touched .github/workflows would need the workflows
-# permission the App deliberately lacks.
+# person reviews it, as Dependabot holds majors for deploy/platform.
+#
+# A third job moves the Hex acceptance client's base, hexpm/elixir, whose tag
+# list Docker Hub cannot return to Dependabot (tools/depsync/hex_image.py).
+# Its PR is on deps/hex-image, apart from deps/refresh: auto-merge.yml merges
+# no PR that touches test/acceptance/clients, so sharing a branch would hold
+# the Go refresh for the client image's review.
+#
+# Nothing here edits workflow files: Dependabot owns action pins, and an App
+# push that touched .github/workflows would need the workflows permission the
+# App deliberately lacks.
 on:
   # Repository birth: creating a repository from the template pushes the
   # initial commit, which creates main.
@@ -185,6 +193,76 @@ jobs:
           pr=$(gh pr list --head "$branch" --state open --json number -q '.[].number')
           if [ -z "$pr" ]; then
             gh pr create --head "$branch" --title "$title" --body "$body"
+          else
+            gh pr edit "$pr" --title "$title" --body "$body"
+          fi
+
+  hex-image:
+    name: '♻️ Refresh the Hex client image'
+    if: ${{ github.event_name != 'push' || github.event.created }}
+    runs-on: ubuntu-latest
+    env:
+      HEX_BRANCH: deps/hex-image
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        with:
+          egress-policy: audit
+
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          app-id: ${{ vars.RP_APP_ID }}
+          private-key: ${{ secrets.RP_APP_PRIVATE_KEY }}
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      # make deps-sync renders the client recipes with go run.
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+
+      # Takes the newest Elixir release from GitHub and the newest OTP and
+      # Alpine hexpm/elixir publishes for it from Docker Hub's name-filtered
+      # tag API, pinned by digest; it never moves a part of the pin backwards.
+      - name: Move the pin
+        id: refresh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 tools/depsync/hex_image.py
+          make deps-sync
+
+      # A push re-runs the full gate and, on a reviewed branch, can dismiss an
+      # approval, so a branch that already holds this refresh is left alone.
+      - name: Open or update the refresh PR
+        if: steps.refresh.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: ${{ steps.refresh.outputs.tag }}
+        run: |
+          set -euo pipefail
+          title="chore(deps): refresh the Hex client image to hexpm/elixir $TAG"
+          body="Raised by deps-refresh.yml (tools/depsync/hex_image.py): Dependabot cannot list hexpm/elixir's tags. A native acceptance client image, so auto-merge.yml leaves it for an eligible review and a manual merge once the quality gate passes."
+          git config user.name "weaveplatform-release-please[bot]"
+          git config user.email "weaveplatform-release-please[bot]@users.noreply.github.com"
+          git checkout -B "$HEX_BRANCH"
+          git add test/acceptance/clients/hex.Dockerfile docs/client-recipes docs/testing/ci-client-images.md
+          git commit -qm "$title"
+          if git fetch -q origin "$HEX_BRANCH" && git diff --quiet FETCH_HEAD HEAD; then
+            echo "$HEX_BRANCH already holds this refresh"
+          else
+            git push --force -u origin "$HEX_BRANCH"
+          fi
+          pr=$(gh pr list --head "$HEX_BRANCH" --state open --json number -q '.[].number')
+          if [ -z "$pr" ]; then
+            gh pr create --head "$HEX_BRANCH" --title "$title" --body "$body"
           else
             gh pr edit "$pr" --title "$title" --body "$body"
           fi

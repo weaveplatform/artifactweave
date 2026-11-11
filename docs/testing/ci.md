@@ -565,6 +565,16 @@ Dockerfile, pinned digest, binary version, release source and compatibility lane
   | `puppet/Dockerfile` | Puppet 8.10.0 on Ruby 3.3, in a directory of its own so that its Dependabot entry can hold it below Ruby 3.4, where Puppet cannot extract a module archive (#1126); every Facter 4 release excludes Ruby 4 as well | every `@puppet` scenario |
   | `frogml/Dockerfile` | FrogML 3.0.0 on Python 3.13, in a directory of its own so that its Dependabot entry can hold it below Python 3.14, which the SDK excludes | every `@machinelearning` scenario |
 
+Dependabot moves every image in `test/acceptance/clients` except the Hex
+client's, `hex.Dockerfile`. Docker Hub answers 504 when Dependabot lists the
+tags of its base, `hexpm/elixir`, which number about a million (#1240). So
+`.github/dependabot.yml` ignores that image, and the `hex-image` job in
+`deps-refresh.yml` moves it every day with `tools/depsync/hex_image.py`. The job
+raises the move on `deps/hex-image`, which `auto-merge.yml` never merges, so it
+gets the same review as Dependabot's client image PRs. The
+[client image inventory](ci-client-images.md) records how the script chooses the
+tag.
+
 The `@cran` selector builds this R image when CRAN code changes and runs its
 native client scenarios in the Linux acceptance lane. The image is also built
 during a full acceptance run. See [CRAN qualification](cran.md) for the client

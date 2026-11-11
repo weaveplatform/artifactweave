@@ -54,6 +54,20 @@ The `dotnet-10` image stays on the .NET SDK's 10.0 LTS line the same way,
 beside the newest line in `dotnet-11.Dockerfile`
 ([#1229](https://github.com/weaveplatform/artifactweave/issues/1229)).
 
+The Hex image is the one that Dependabot does not move. `hexpm/elixir` holds a
+tag for every combination of Elixir, Erlang/OTP and OS release, about a million,
+and Docker Hub answers 504 when Dependabot lists them, even 100 at a time
+([#1240](https://github.com/weaveplatform/artifactweave/issues/1240)). So
+Dependabot ignores the image, and `deps-refresh.yml` moves it with
+`tools/depsync/hex_image.py`. The script takes the newest Elixir release and the
+newest OTP and Alpine image that `hexpm/elixir` publishes for it, through Docker
+Hub's name-filtered tag API. It pins the tag by digest and never moves a part of
+the pin backwards. The move goes up on `deps/hex-image` and needs the same review
+as any client image. The official `elixir` image has few tags, but they name only
+the OTP major, so the declared pins could no longer name the exact OTP release.
+Dependabot also misorders those tags: from `1.20.5-otp-29-alpine` it would
+propose `1.20-otp-28-alpine`.
+
 Purposeful compatibility lanes retain their declared runtimes. Updating a pin
 regenerates this inventory, recipe labels and secondary version assertions; it
 does not bypass native tests or the review required for acceptance client changes.
