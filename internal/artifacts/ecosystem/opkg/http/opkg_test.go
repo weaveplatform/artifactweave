@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
@@ -782,5 +783,55 @@ func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 	)
 	if response.Code == http.StatusOK {
 		t.Fatal("unsafe direct package path was delivered")
+	}
+}
+
+// TestUnitOpkgRemoteReadsWithoutRemoteSources: on a server built without a
+// remote source service, a remote IPK read answers as a remote feed read
+// does, 500 for the missing service, rather than calling through it. An
+// IPK request, to the remote repository or to a virtual one over it, reads
+// the remote's feed before any IPK and fails there, so only a direct call
+// reaches the IPK read's own refusal.
+func TestUnitOpkgRemoteReadsWithoutRemoteSources(t *testing.T) {
+	w := newItemWorld(t)
+	remote := *repo.Defaults(&repo.Config{
+		Key: "opkg-remote", Class: repo.Remote, PackageType: repo.Opkg,
+		URL: "https://up.example",
+	})
+	virtual := *repo.Defaults(&repo.Config{
+		Key: "opkg-virtual", Class: repo.Virtual, PackageType: repo.Opkg,
+		Repositories: []string{remote.Key},
+	})
+	for _, c := range []repo.Config{remote, virtual} {
+		if err := w.db.Repos().Create(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const ipk = "feed/alpha_1.0_all.ipk"
+	for _, tc := range []struct {
+		name  string
+		serve func() *httptest.ResponseRecorder
+	}{
+		{"remote feed", func() *httptest.ResponseRecorder {
+			return w.do(http.MethodGet, "/artifactory/opkg-remote/feed/Packages", "admin", "")
+		}},
+		{"remote IPK", func() *httptest.ResponseRecorder {
+			return w.do(http.MethodGet, "/artifactory/opkg-remote/"+ipk, "admin", "")
+		}},
+		{"virtual IPK", func() *httptest.ResponseRecorder {
+			return w.do(http.MethodGet, "/artifactory/opkg-virtual/"+ipk, "admin", "")
+		}},
+		{"direct remote IPK read", func() *httptest.ResponseRecorder {
+			rec := httptest.NewRecorder()
+			r := kittest.Request(t, http.MethodGet, "/artifactory/opkg-remote/"+ipk)
+			req := itemkit.ItemRequest{Key: remote.Key, Path: ipk}
+			opkgItems{w.kit}.serveRemoteOpkgPackage(rec, r, remote, false, req,
+				opkg.Package{Path: ipk}, kittest.Admin, kittest.AdminAccess())
+			return rec
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wantError(t, tc.serve(), http.StatusInternalServerError, "internal error")
+		})
 	}
 }

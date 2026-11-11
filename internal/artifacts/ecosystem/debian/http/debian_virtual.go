@@ -291,9 +291,11 @@ func (s DebianAPI) serveRemoteVirtualDebianPackage(
 	w http.ResponseWriter, r *http.Request, member repo.Config, req itemkit.ItemRequest,
 	p kernel.Principal, acc itemkit.Access,
 ) bool {
+	// The missing service is this server's fault, not the upstream's, so it
+	// answers 500 as the index read does rather than SourceError's 502.
 	if s.RemoteSources == nil {
-		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian virtual source",
-			pkgroute.SourceError(source.ErrUnavailable, p.Anonymous)))
+		httpkit.WriteErr(w, r,
+			s.InternalError(r.Context(), "Debian virtual source", source.ErrUnavailable))
 		return true
 	}
 	q := source.Request{

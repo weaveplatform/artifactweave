@@ -350,9 +350,10 @@ func TestUnitDebianMemberBytesRefusesAPathTheSourceCannotName(t *testing.T) {
 // the first member, in order, that may serve it and holds it as a file,
 // skipping members that are absent, blacked out, hold a folder there or
 // whose upstream lacks it. A query or a caller who may not read it is
-// refused; a member that cannot be looked up or read, or is of another
-// type, is a server fault; a remote member's upstream fault answers 502,
-// its stream is relayed and its revoked cached copy is refused.
+// refused; a member that cannot be looked up or read, is of another type,
+// or is remote on a server without remote sources is a server fault; a
+// remote member's upstream fault answers 502, its stream is relayed and its
+// revoked cached copy is refused.
 func TestAccDebianVirtualPackage(t *testing.T) {
 	noSuch := func(*overlayWorld) (source.Result, error) {
 		return source.Result{}, kernel.ErrNotFound
@@ -404,7 +405,7 @@ func TestAccDebianVirtualPackage(t *testing.T) {
 		},
 		{
 			name: "remote member without a source", members: []string{"deb-remote"},
-			status: http.StatusBadGateway, message: "Bad Gateway",
+			status: http.StatusInternalServerError, message: "internal error",
 		},
 		{
 			name: "remote member's upstream lacks it", members: []string{"deb-remote", "deb-local"},
@@ -487,4 +488,49 @@ func TestUnitDebianRemoteVirtualPackageRefusesAPathTheSourceCannotName(t *testin
 		t.Error("the read left a refused path to the next member")
 	}
 	wantError(t, rec, http.StatusNotFound, "Could not find resource")
+}
+
+// TestUnitDebianRemoteReadsWithoutRemoteSources: on a server built without
+// a remote source service, a virtual package read over a remote member
+// answers as a remote index read does, 500 for the missing service, not
+// the 502 of an upstream fault. A virtual package request reaches the
+// member's read with no index read first, so the route meets the read's
+// own refusal, as a direct call does, and never tries the later member
+// that holds the package.
+func TestUnitDebianRemoteReadsWithoutRemoteSources(t *testing.T) {
+	w := newOverlayWorld(t)
+	w.debRepos(
+		repo.Config{Key: "deb-remote", Class: repo.Remote},
+		repo.Config{Key: "deb-local", Class: repo.Local},
+		repo.Config{
+			Key: "deb-virtual", Class: repo.Virtual,
+			Repositories: []string{"deb-remote", "deb-local"},
+		},
+	)
+	w.put("deb-local", debAlpha, false, debBody)
+	for _, tc := range []struct {
+		name  string
+		serve func(*testing.T) *httptest.ResponseRecorder
+	}{
+		{"remote index", func(*testing.T) *httptest.ResponseRecorder {
+			return w.get("deb-remote", debPackages, "admin")
+		}},
+		{"virtual package", func(*testing.T) *httptest.ResponseRecorder {
+			return w.get("deb-virtual", debAlpha, "admin")
+		}},
+		{"remote member package read", func(t *testing.T) *httptest.ResponseRecorder {
+			rec := httptest.NewRecorder()
+			req := itemkit.ItemRequest{Key: "deb-virtual", Path: debAlpha}
+			if !(DebianAPI{w.kit}).serveRemoteVirtualDebianPackage(rec,
+				w.request("deb-virtual", debAlpha, "admin"), w.debRepo("deb-remote"), req,
+				kittest.Admin, kittest.AdminAccess()) {
+				t.Error("the read left the missing service to the next member")
+			}
+			return rec
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wantError(t, tc.serve(t), http.StatusInternalServerError, "internal error")
+		})
+	}
 }

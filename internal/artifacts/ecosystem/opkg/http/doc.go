@@ -53,6 +53,8 @@
 //     used, and the remote source's authority is checked again before a
 //     feed is disclosed. Feed responses are private and never stored by a
 //     shared cache.
+//   - A server built without a remote source service answers a remote
+//     feed or IPK read 500, a fault of its own, not the upstream's.
 //   - A request with matrix parameters or a query string answers 404.
 //   - Statuses and error and log text stay byte-identical.
 //
@@ -89,8 +91,9 @@
 // fixtures the tests used): the remote source's checks of the published
 // OpenWrt feed and IPK; the virtual member graph and the overlay's routing;
 // local member IPKs that are missing or drifted; a remote feed's faults
-// and revoked authority; and a remote IPK pinned to its indexed SHA-256 and
-// cached size. Its item GETs run through the kit with TryOpkgItem as the
+// and revoked authority; a remote IPK pinned to its indexed SHA-256 and
+// cached size; and remote feed and IPK reads on a server built without
+// remote sources. Its item GETs run through the kit with TryOpkgItem as the
 // only overlay. The route suite test/server/artifacts/opkg checks through
 // the router that a virtual feed is signed only with the configured GPG
 // key, and the @opkg acceptance partition
