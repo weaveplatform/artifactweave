@@ -74,8 +74,9 @@ func TestUnitFixtureReadsAreRootRelative(t *testing.T) {
 }
 
 // checkFixtureReads returns, sorted, every depth-relative path in the _test.go
-// files of the repository at root, walked with repopath.SkipDir, and every
-// entry of exempt that excused nothing. tools/ is not walked: P9d left it in
+// files of the repository at root, walked with repopath.SkipDir, every path
+// into another package's testdata counted from the package directory, and
+// every entry of exempt that excused nothing. tools/ is not walked: P9d left it in
 // place, so its relative paths never needed rewriting.
 func checkFixtureReads(root string, exempt map[exemption]string) []string {
 	var problems []string
@@ -192,7 +193,25 @@ func fixtureReads(fset *token.FileSet, root, rel string) ([]fixtureRead, error) 
 			// A bare ".." is left out: it always resolves, and tests use it
 			// as a path-traversal input dozens of times.
 			value, err := strconv.Unquote(n.Value)
-			if err != nil || value == ".." || !climbs(value) {
+			if err != nil || value == ".." {
+				return true
+			}
+			if !climbs(value) {
+				// A subdirectory's testdata, such as "vcs/testdata/x" read
+				// from the parent package, does not move with the reading
+				// package, so the read breaks when either package moves.
+				target := path.Join(path.Dir(rel), value)
+				if readsOtherTestdata(value) &&
+					existsUnder(root, target) {
+					report(
+						n,
+						value,
+						true,
+						"%q names %s, another package's testdata, counted from the package directory",
+						value,
+						target,
+					)
+				}
 				return true
 			}
 			// A literal that leaves the repository or names nothing in it is
@@ -218,6 +237,21 @@ func fixtureReads(fset *token.FileSet, root, rel string) ([]fixtureRead, error) 
 		return true
 	})
 	return found, nil
+}
+
+// readsOtherTestdata reports whether p, a slash-separated relative path,
+// passes through a testdata directory below its first element, so it names
+// a testdata directory other than the package's own.
+func readsOtherTestdata(p string) bool {
+	elems := strings.Split(p, "/")
+	return !path.IsAbs(p) && len(elems) > 1 && slices.Contains(elems[1:], "testdata")
+}
+
+// existsUnder reports whether target, a slash-separated path relative to
+// root, names something in the repository at root.
+func existsUnder(root, target string) bool {
+	_, err := os.Stat(filepath.Join(root, filepath.FromSlash(target)))
+	return err == nil
 }
 
 // climbs reports whether p, a slash-separated path, starts by leaving its
@@ -302,6 +336,9 @@ func TestUnitB(t *testing.T) {
 	conforming := map[string]string{
 		"go.mod":                          "module github.com/weaveplatform/artifactweave\n",
 		"internal/a/testdata/fixture.txt": "fixture\n",
+		// A subdirectory of b's, whose testdata b must not read by a path
+		// counted from b's directory.
+		"internal/b/c/testdata/fixture.txt": "fixture\n",
 		// Traversal inputs that name nothing in the repository, a ".." that
 		// is not the first element, and a root-relative read all pass.
 		"internal/a/a_test.go": testFile(
@@ -360,6 +397,17 @@ func TestUnitB(t *testing.T) {
 			name: "existing path joined after another argument",
 			src:  testFile(`	_ = fp.Join(t.TempDir(), "../a/testdata")`),
 			want: []string{b + `:13: "../a/testdata" names internal/a/testdata counted`},
+		},
+		{
+			name: "read of a subdirectory's testdata",
+			src:  testFile(`	_, _ = os.ReadFile("c/testdata/fixture.txt")`),
+			want: []string{b + `:13: "c/testdata/fixture.txt" names internal/b/c/testdata/fixture.txt, ` +
+				`another package's testdata`},
+		},
+		{
+			name: "own testdata and a subdirectory path that names nothing",
+			src: testFile(`	_, _ = os.ReadFile("testdata/fixture.txt")
+	_ = "c/testdata/missing.txt"`),
 		},
 		{
 			name: "climb to the repository root",
