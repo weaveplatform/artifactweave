@@ -48,6 +48,12 @@ records successful merged-main and current-release qualification for
 [#792](https://github.com/weaveplatform/artifactweave/issues/792), alongside
 [#810's CI evidence](docs/testing/phase9c-ci-signoff.md).
 Federated client evidence covers one node; cross-peer convergence remains P13.
+P9d moved the code to the modular-monolith layout of
+[decision 0044](docs/research/decisions/0044-modular-monolith-migration.md) without
+changing its behaviour. [repo-layout.md](docs/implementation/repo-layout.md) describes
+the tree, and the [Phase 9d qualification record](docs/testing/phase9d-signoff.md)
+holds its final merged-main and real-cloud runs. A database created by v0.1.x or
+v0.2.x must be recreated ([schema migrations](docs/operations/configuration-reference.md#schema-migrations)).
 
 | Capability | Current implementation |
 |---|---|
