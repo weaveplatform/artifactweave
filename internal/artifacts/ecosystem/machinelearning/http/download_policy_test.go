@@ -57,7 +57,10 @@ func TestAccManifestDownloadPolicy(t *testing.T) {
 	served := func() ml.Manifest {
 		t.Helper()
 		var got ml.Manifest
-		if err := json.Unmarshal(f.status(http.StatusOK, "GET", route, nil, "", "reader"), &got); err != nil {
+		if err := json.Unmarshal(
+			f.status(http.StatusOK, "GET", route, nil, "", "reader"),
+			&got,
+		); err != nil {
 			t.Fatal(err)
 		}
 		return got
