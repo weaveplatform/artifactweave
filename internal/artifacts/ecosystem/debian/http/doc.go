@@ -94,6 +94,9 @@
 //     the size and SHA-256 its Release gives, and only the packages the
 //     caller may read are listed. A key pair, GPG only, signs the Release as
 //     InRelease and Release.gpg.
+//   - A server built without a remote source service answers a remote
+//     index read, and a virtual repository's metadata or package read that
+//     reaches a remote member, 500, a fault of its own, not the upstream's.
 //   - Statuses and error and log text stay byte-identical.
 //
 // # References
@@ -155,8 +158,9 @@
 //   - debian_virtual_test.go: virtual metadata refused, merged from the
 //     readable members, and failing closed on store faults, wrong member
 //     types and unusable signing keys; a remote member's Release and
-//     Packages through its source; and virtual packages served from the
-//     first member that holds them.
+//     Packages through its source; virtual packages served from the first
+//     member that holds them; and remote index and virtual package reads on
+//     a server built without remote sources.
 //   - debian_operations_test.go: the rebuild that writes no properties, for
 //     an absent repository, an unreadable package and a queue that refuses
 //     it.

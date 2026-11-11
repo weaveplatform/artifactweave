@@ -9,6 +9,7 @@ package opkghttp
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http/httptest"
 	"strings"
@@ -107,6 +108,23 @@ func (w *itemWorld) do(method, path, as, body string) *httptest.ResponseRecorder
 	rec := httptest.NewRecorder()
 	w.kit.GetItem(rec, r)
 	return rec
+}
+
+// wantError fails the test unless rec answered status with the Artifactory
+// error envelope that carries message, as the item route writes an error.
+func wantError(t *testing.T, rec *httptest.ResponseRecorder, status int, message string) {
+	t.Helper()
+	var body struct {
+		Errors []struct {
+			Status  int    `json:"status"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if rec.Code != status || json.Unmarshal(rec.Body.Bytes(), &body) != nil ||
+		len(body.Errors) != 1 || body.Errors[0].Status != status ||
+		body.Errors[0].Message != message {
+		t.Errorf("answered %d %s, want %d %q", rec.Code, rec.Body, status, message)
+	}
 }
 
 // sourceBackend is a remote source transport made of one function.
