@@ -125,11 +125,16 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, missing())
 		return
 	}
-	if generic.CheckDownload(pkgroute.RequestFrom(r).Repo, clean.String(), false) != nil {
-		h.k.Error(w, r, missing())
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
+	// Read permission first (DV-057), then the policy at the path 7.x keeps
+	// the file or document at, answered with its own 404 and message rather
+	// than "Could not find Bazel module resource" (R1, R10, RTDEV-47144): a
+	// blackout or the patterns, a remote's own included, or a virtual
+	// repository's own patterns.
+	if err := h.k.CheckDocument(r, policyPath(q, pkgroute.RequestFrom(r).Repo.Class)); err != nil {
+		h.k.Error(w, r, err)
 		return
 	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
@@ -156,13 +161,10 @@ func moduleFolder(q requestPath) string { return "modules/" + q.name + "/" + q.v
 func modulePath(q requestPath) string   { return moduleFolder(q) + "/MODULE.bazel" }
 func sourcePath(q requestPath) string   { return moduleFolder(q) + "/source.json" }
 
+// memberRead answers q from a repository that is not virtual, whose policy
+// read or a virtual repository's choice of member has checked.
 func (h handler) memberRead(w http.ResponseWriter, r *http.Request, q requestPath) {
 	c := pkgroute.RequestFrom(r).Repo
-	policyPath := routePath(q)
-	if generic.CheckDownload(c, policyPath, false) != nil {
-		h.k.Error(w, r, missing())
-		return
-	}
 	if q.kind == "registry" {
 		writeJSON(w, r, []byte("{}"))
 		return
@@ -192,6 +194,19 @@ func (h handler) memberRead(w http.ResponseWriter, r *http.Request, q requestPat
 	default:
 		h.k.Error(w, r, missing())
 	}
+}
+
+// policyPath is the path the download policy checks q at, where 7.x keeps
+// it in the Bazel Central Registry layout (D-Bazel): an archive a local
+// repository stores is modules/<name>/<version>/<file>, not the archives
+// route artifactweave serves it on, and a remote repository's archive is
+// checked where its cache keeps it, as its read is. bazel_registry.json
+// and metadata.json are the registry layout's own files.
+func policyPath(q requestPath, class repo.Class) string {
+	if q.kind == "archive" && class != repo.Remote {
+		return moduleFolder(q) + "/" + q.file
+	}
+	return routePath(q)
 }
 
 func routePath(q requestPath) string {
@@ -356,6 +371,9 @@ func (h handler) remoteBytes(
 	path string,
 	validate func([]byte) error,
 ) ([]byte, source.Result, error) {
+	// read has checked the requested file or document's own path, so these
+	// reads, the requested document's and the lookups the request makes,
+	// are refused by the blackout alone (R4), naming the document.
 	resource := source.Resource{
 		Kind:             source.ResourceKindMetadata,
 		Path:             path,
@@ -363,6 +381,8 @@ func (h handler) remoteBytes(
 		Variant:          "bazelmodules-metadata-v1",
 		PermissionFolder: true,
 		PermissionPath:   parent(path),
+		PolicyPath:       path,
+		BlackoutOnly:     true,
 		ValidateMetadata: func(_ context.Context, body io.ReadSeeker, size int64, _ source.MetadataResponse) error {
 			if size < 0 || size > metadataLimit {
 				return invalid()
@@ -768,7 +788,13 @@ func (h handler) virtualRead(
 		if !h.k.Can(mr, modulePath(q), api.ActionRead) {
 			continue
 		}
-		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
+		// A member whose own policy refuses q, a blacked-out one included,
+		// is passed over, so the next member serves it (R5).
+		member := pkgroute.RequestFrom(mr).Repo
+		if generic.CheckDownload(member, policyPath(q, member.Class), false) != nil {
+			continue
+		}
+		if member.Class == repo.Remote {
 			_, _, e := h.upstreamSource(mr, q)
 			if isMissing(e) {
 				continue
@@ -804,6 +830,12 @@ func (h handler) virtualMetadata(
 	deprecated := ""
 	for _, mr := range members {
 		if !h.k.CanFolder(mr, "modules/"+q.name, api.ActionRead) {
+			continue
+		}
+		// A blacked-out member, and one whose patterns reject metadata.json,
+		// add nothing (R5); a member whose patterns reject a version's files
+		// keeps the version listed (R3).
+		if generic.CheckDownload(pkgroute.RequestFrom(mr).Repo, routePath(q), false) != nil {
 			continue
 		}
 		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
