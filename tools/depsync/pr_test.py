@@ -36,7 +36,9 @@ class AutomationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 pr.allowed_changes([{"filename": name, "status": "modified"}], catalog)
         pr.allowed_changes([{"filename": "go.mod", "status": "modified"},
-                            {"filename": ".github/workflows/quality-gate.yml", "status": "modified"}], catalog)
+                            {"filename": ".github/workflows/quality-gate.yml", "status": "modified"},
+                            {"filename": "Dockerfile", "status": "modified"},
+                            {"filename": "Dockerfile.release", "status": "modified"}], catalog)
 
     def refresh_with(self, *, moved=False, closed=False, stale_fetch=False, changed=True, concurrent_push=False):
         calls = []

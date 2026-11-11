@@ -55,6 +55,27 @@ updates:
       prefix: "chore"
       include: "scope"
 
+  # The root Dockerfile's Go build and distroless runtime bases, and
+  # Dockerfile.release's base. Dependabot reads every file in the directory
+  # whose name contains "Dockerfile", so one PR moves the runtime digest in
+  # both files, which must match. The Go image takes every Go release,
+  # patches included; TestUnitDockerfileGoNotBehindToolchain fails the gate
+  # once CI's Go is newer than the Dockerfile's (#1208). The group names no
+  # update-types: a group that does leaves out each update that keeps its
+  # version, such as a new digest for the distroless nonroot tag or for a
+  # rebuilt golang tag, and Dependabot raises those as PRs of their own.
+  # auto-merge.yml merges these PRs once the gate passes.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    groups:
+      base-images:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
   # Native acceptance images track all released updates, including majors.
   # A client version change still needs real-client CI and an eligible review;
   # auto-merge.yml leaves this directory's PRs for human qualification.

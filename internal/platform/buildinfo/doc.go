@@ -14,7 +14,8 @@
 //     the commit (git rev-parse HEAD) and the build time in UTC.
 //   - The image build: the Dockerfile stamps the version and the commit from
 //     its VERSION and COMMIT build arguments, which make docker sets. It
-//     stamps no build date.
+//     stamps no build date. The tag of its golang build stage names the Go
+//     release the image's binary is built with.
 //   - The release build: .goreleaser.yaml stamps the version of the tag, the
 //     full commit and, as the build date, the commit date rather than the
 //     time of the build, so that the build is reproducible.
@@ -39,6 +40,14 @@
 //     refers to another variable, and nothing reports that either.
 //   - "devel" is also the version the Makefile and the Dockerfile fall back
 //     to when they have none; TestUnitDefaults pins it.
+//   - The Dockerfile's build stage names a full Go release, pinned by the
+//     digest of its multi-arch index, no older than the Go the unit tests
+//     run on: in CI, the release setup-go resolves from go.mod. The image's
+//     binary carries the standard library of the Go that builds it, so an
+//     image left behind ships without fixes that CI's tests and govulncheck
+//     already have, and nothing else reports it;
+//     TestUnitDockerfileGoNotBehindToolchain fails first. Dependabot moves
+//     the stage (.github/dependabot.yml, the docker entry for /).
 //
 // # References
 //
@@ -57,6 +66,14 @@
 //     (https://github.com/weaveplatform/artifactweave/issues/938).
 //   - https://github.com/weaveplatform/artifactweave/issues/947 (the -X
 //     guard) and https://github.com/weaveplatform/artifactweave/issues/977.
+//   - https://github.com/weaveplatform/artifactweave/issues/1208 (the image
+//     build's Go release and the refresh of its bases).
+//   - setup-go resolves go.mod's go line from the runner's tool cache, then
+//     the newest matching release:
+//     https://github.com/actions/setup-go/blob/main/docs/advanced-usage.md#using-the-go-version-file-input.
+//   - Dependabot proposes no docker tag more precise than the current one
+//     (remove_more_precise_tags):
+//     https://github.com/dependabot/dependabot-core/blob/main/docker/lib/dependabot/docker/update_checker.rb.
 //
 // # Status
 //
@@ -64,7 +81,8 @@
 // package, and the version command and the revision of the system version
 // read it. The image build has stamped it since #73, and the release build
 // since #507, which brought the release binaries of P18 forward. Moved here
-// in P9d.
+// in P9d. Its tests hold the image build's Go release to the toolchain's
+// (#1208).
 //
 // # Testing
 //
@@ -74,6 +92,13 @@
 //     the Makefile and .goreleaser.yaml stamp all three variables and the
 //     Dockerfile the version and the commit. The test takes the address of
 //     each variable, so renaming one fails to compile.
+//   - TestUnitDockerfileGoNotBehindToolchain: every golang stage of the
+//     Dockerfile names a full Go release pinned by digest, no older than
+//     the toolchain running the test. It skips on a prerelease or a
+//     development build, since the Dockerfile takes only released Go.
+//   - TestUnitDockerfileGoRuleDetectsViolations and
+//     TestUnitGoReleaseNamesOnlyReleases: each way the rule fails, and the
+//     runtime.Version forms it reads.
 //
 // No test runs the linker, so the stamped values themselves show only when a
 // built binary runs version: one from make build, make docker or a snapshot
