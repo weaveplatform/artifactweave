@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	accmodel "github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	platformblob "github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/storekit"
@@ -16,6 +17,7 @@ import (
 func runCore(t *testing.T, newStore Factory) {
 	t.Run("TxCommit", func(t *testing.T) { testTxCommit(t, newStore(t)) })
 	t.Run("TxRollback", func(t *testing.T) { testTxRollback(t, newStore(t)) })
+	t.Run("TxAcrossModules", func(t *testing.T) { testTxAcrossModules(t, newStore(t)) })
 	t.Run("TxNested", func(t *testing.T) { testTxNested(t, newStore(t)) })
 	t.Run("Cancelled", func(t *testing.T) { testCancelled(t, newStore(t)) })
 	t.Run("BadCursor", func(t *testing.T) { testBadCursor(t, newStore(t)) })
@@ -90,6 +92,52 @@ func testTxRollback(t *testing.T, s Store) {
 		s.Blobs().Get(ctx, blob(1).Checksums.SHA256),
 	); got.Refs != 1 {
 		t.Fatalf("refs after rollback = %d, want 1", got.Refs)
+	}
+}
+
+// testTxAcrossModules writes through two modules' stores, the artifacts
+// module's blob index and the access module's users, in one transaction.
+// The composites build every module's store over one unit of work (decision
+// 0044): a module store that ran its writes outside the caller's transaction
+// would pass the single-module tests above, but would keep its write here
+// after the transaction rolls back.
+func testTxAcrossModules(t *testing.T, s Store) {
+	ctx := context.Background()
+	write := func(ctx context.Context, i int, name string) error {
+		if _, err := s.Blobs().Ref(ctx, blob(i), 1); err != nil {
+			return err //nolint:wrapcheck // the transaction returns the store's own error
+		}
+		err := s.Users().Create(ctx, user(i, name))
+		return err //nolint:wrapcheck // the transaction returns the store's own error
+	}
+	commit := func(ctx context.Context) error { return write(ctx, 1, "committed") }
+	storekit.Must(t, s.Tx(ctx, commit))
+	storekit.Get[platformblob.Blob](t)(s.Blobs().Get(ctx, blob(1).Checksums.SHA256))
+	storekit.Get[accmodel.User](t)(s.Users().Get(ctx, "committed"))
+
+	err := s.Tx(ctx, func(ctx context.Context) error {
+		if err := write(ctx, 2, "rolled-back"); err != nil {
+			return err
+		}
+		return errBoom
+	})
+	storekit.WantErr(t, err, errBoom)
+	_, err = s.Blobs().Get(ctx, blob(2).Checksums.SHA256)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
+	_, err = s.Users().Get(ctx, "rolled-back")
+	storekit.WantErr(t, err, kernel.ErrNotFound)
+}
+
+// user builds an internal user with the fields every user store requires.
+func user(i int, name string) accmodel.User {
+	return accmodel.User{
+		Name:         name,
+		Email:        name + "@example.com",
+		PasswordHash: fmt.Appendf(nil, "$argon2id$v=19$m=65536,t=3,p=4$%s", name),
+		Realm:        accmodel.RealmInternal,
+		Status:       accmodel.UserEnabled,
+		MFA:          accmodel.MFANone,
+		Created:      storekit.At(i),
 	}
 }
 

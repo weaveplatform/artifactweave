@@ -38,8 +38,9 @@
 //
 // # Outputs
 //
-//   - Run: a subtest per concern: the transactions and pagination input
-//     every store builds on, each module's contract and the platform's,
+//   - Run: a subtest per concern: the transactions, one of them across two
+//     modules' stores, and the pagination input every store builds on,
+//     each module's contract and the platform's,
 //     the layout fence that needs the platform's config store and the
 //     artifacts module's remote sources together, and the build row lock.
 //   - Opener, Rotation, RepositoryHeaderEnvironmentRename,
@@ -90,7 +91,9 @@
 // request 905) and the legacy history refusal (pull request 1165). Moved here
 // in P9d: each module's part of the contract moved to its adapters/storetest
 // (issues 1056 to 1062), and issue 1098 merged the composite contract, the
-// composite SQL suites and the openers here.
+// composite SQL suites and the openers here. P9d's final qualification added
+// the transaction across two modules' stores, which epic STO (issue 939)
+// asks for.
 //
 // # Testing
 //
