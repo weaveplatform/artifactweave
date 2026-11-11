@@ -45,9 +45,14 @@ the index; the index's SHA256sum fields bind downloaded IPKs.
 
 Remote feeds follow same-origin package redirects through the shared source
 policy and validate bounded index and package bodies before caching. A
-virtual feed combines readable member records in configured order, selects
-the same member for IPK downloads, and excludes packages that the caller
-cannot read. Direct index reads require access to every listed package.
+virtual feed combines readable member records in configured order and
+excludes packages that the caller cannot read; a package whose IPK a
+member's or the virtual repository's patterns reject stays listed. An IPK
+download is served by the first member that lists it and whose download
+policy accepts the IPK's path, so it passes over a member that refuses the
+file, and a member left out of the feed because its patterns reject only the
+feed still serves its IPKs. Direct index reads require Read permission on
+every listed package; the download policy does not filter them.
 
 ## Evidence
 
