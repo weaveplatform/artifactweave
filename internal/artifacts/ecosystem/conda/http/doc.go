@@ -47,6 +47,17 @@
 //     configured remote's origin and path.
 //   - A remote archive must have the size and digests its index record
 //     gives and be a valid Conda archive.
+//   - The download policy (#1251): an index document is checked at its own
+//     path, where 7.x calculates or caches it (Kit.CheckDocument), after
+//     Read permission, so a blacked-out repository or a pattern on the
+//     requested document answers 404 naming it; notices.json is not
+//     checked. An index lists a package whose file the patterns reject
+//     (RTFACT-24940), and a package download is checked at the package's
+//     own path, its index lookup refused by the blackout alone.
+//   - A virtual repository's index leaves out a blacked-out member and one
+//     whose patterns reject the requested document, and its own patterns
+//     rejecting the document refuse it; a package download passes over a
+//     member whose policy refuses the package.
 //   - A virtual repository combines its members' readable records in
 //     member order, the first member to list a file name winning. It never
 //     lends one member's rights or source permits to another, and refuses

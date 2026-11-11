@@ -34,12 +34,14 @@
 //   - conda_test.go: index read failures, unsafe requests and virtual
 //     cycles, the remote's filtering by current source authority, corrupt
 //     and incompatible local indexes, the remote index and archive trust
-//     boundary, and the shard endpoints with their permissions, transfers,
-//     checksum reuse and trash restore.
+//     boundary, the shard endpoints with their permissions, transfers,
+//     checksum reuse and trash restore, and the download policy of local
+//     and virtual channels.
 //   - conda_remote_test.go: a remote's CEP-16 shards through refresh and
 //     offline answers, an invalid shard that is neither published, cached
-//     nor fallen back from, and shard fetches that recheck the caller's
-//     permission and the repository's revision.
+//     nor fallen back from, shard fetches that recheck the caller's
+//     permission and the repository's revision, and a remote's download
+//     policy.
 //
 // # References
 //

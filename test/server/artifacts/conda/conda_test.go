@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"path"
 	"strings"
@@ -1386,4 +1387,182 @@ func TestAccCondaRemoteShardsValidateBeforeCacheAndDelivery(t *testing.T) {
 			}
 		})
 	}
+}
+
+// wantRefusal asserts the download policy's 404 in the Artifactory error
+// envelope, with message.
+func wantRefusal(t *testing.T, rec *httptest.ResponseRecorder, message string) {
+	t.Helper()
+	var body struct {
+		Errors []struct {
+			Status  int    `json:"status"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	wantStatus(t, rec, http.StatusNotFound)
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || len(body.Errors) != 1 ||
+		body.Errors[0].Status != http.StatusNotFound || body.Errors[0].Message != message {
+		t.Fatalf("body %s, want 404 %q", rec.Body, message)
+	}
+}
+
+func condaBlackedOut(key, path string) string {
+	return fmt.Sprintf("The repository '%s' is blacked out and cannot serve artifact '%s:%s'.",
+		key, key, path)
+}
+
+func condaRejected(key, path string) string {
+	return fmt.Sprintf("The repository '%s' rejected the artifact '%s:%s' due to its "+
+		"include/exclude pattern settings.", key, key, path)
+}
+
+// condaListed decodes the noarch channel index rec holds and reports which
+// of packages it lists.
+func condaListed(
+	t *testing.T,
+	rec *httptest.ResponseRecorder,
+	metadata string,
+	packages ...string,
+) map[string]bool {
+	t.Helper()
+	wantStatus(t, rec, http.StatusOK)
+	id, _ := condafmt.ParseMetadataPath("noarch/" + metadata)
+	index, err := condafmt.DecodeRepodata(rec.Body.Bytes(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := map[string]bool{}
+	for _, name := range packages {
+		_, legacy := index.Packages[name]
+		_, modern := index.PackagesConda[name]
+		listed[name] = legacy || modern
+	}
+	return listed
+}
+
+// 7.x calculates a local channel's index files and reads each through the
+// download path at its own path (R1): a blackout, or a pattern on the
+// document, refuses that document with 404 naming it, after Read
+// permission, in place of 403 "Conda index is not readable". A pattern on
+// a package's file leaves its record listed and refuses only its download
+// (RTFACT-24940), and a package is checked at its own path, not its
+// index's. A virtual channel merges its members without a blacked-out one
+// or one whose patterns refuse the document (R5), passes over a member
+// that refuses a package, and its own patterns refuse a document with "No
+// repository found" (R5).
+func TestAccCondaDownloadPolicyLocalAndVirtual(t *testing.T) {
+	var q *work.Queue
+	w := newItemWorld(t, false, func(cfg *Config) {
+		var err error
+		q, err = work.New(cfg.Store, work.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		svc := &item.Service{Store: cfg.Store, Blobs: cfg.Blobs, Work: q, Formats: ecosystem.For}
+		if err := svc.RegisterWork(q); err != nil {
+			t.Fatal(err)
+		}
+		cfg.Work = q
+	})
+	for _, c := range []repo.Config{
+		{Key: "conda-local", Class: repo.Local, PackageType: repo.Conda},
+		{Key: "conda-fed", Class: repo.Federated, PackageType: repo.Conda},
+		{
+			Key: "conda-virtual", Class: repo.Virtual, PackageType: repo.Conda,
+			Repositories: []string{"conda-local", "conda-fed"},
+		},
+	} {
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const legacy = "artifactweave-conda-fixture-1.0.0-0.tar.bz2"
+	const modern = "ca-certificates-2026.7.22-hbd8a1cb_0.conda"
+	wantStatus(t, w.do(http.MethodPut, "/artifactory/conda-local/noarch/"+legacy, "admin",
+		string(condaFixture(t))), http.StatusCreated)
+	wantStatus(t, w.do(http.MethodPut, "/artifactory/conda-fed/noarch/"+modern, "admin",
+		string(repopath.Read(t, "internal/artifacts/ecosystem/conda/testdata/"+modern))),
+		http.StatusCreated)
+	for _, key := range []string{"conda-local", "conda-fed"} {
+		if err := q.EnsureFresh(t.Context(), condafmt.KindIndex, key); err != nil {
+			t.Fatal(err)
+		}
+	}
+	patch := func(key string, change func(*repo.Config)) {
+		t.Helper()
+		c, err := w.db.Repos().Get(t.Context(), key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		change(&c)
+		if err := w.db.Repos().Update(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	get := func(key, path string) *httptest.ResponseRecorder {
+		t.Helper()
+		return w.do(http.MethodGet, "/artifactory/api/conda/"+key+"/noarch/"+path, "reader", "")
+	}
+	listed := func(key, metadata string, want map[string]bool) {
+		t.Helper()
+		got := condaListed(t, get(key, metadata), metadata, legacy, modern)
+		if got[legacy] != want[legacy] || got[modern] != want[modern] {
+			t.Fatalf("%s %s lists %v, want %v", key, metadata, got, want)
+		}
+	}
+	notFound := func(key, name string) {
+		t.Helper()
+		rec := get(key, name)
+		wantStatus(t, rec, http.StatusNotFound)
+		if !strings.Contains(rec.Body.String(), "Conda package not found") ||
+			strings.Contains(rec.Body.String(), "conda-local") {
+			t.Fatalf("%s %s: %s, want the virtual's own not-found", key, name, rec.Body)
+		}
+	}
+	both := map[string]bool{legacy: true, modern: true}
+
+	patch("conda-local", func(c *repo.Config) { c.BlackedOut = new(true) })
+	for _, metadata := range []string{"repodata.json", "current_repodata.json", "repodata.json.zst"} {
+		wantRefusal(t, get("conda-local", metadata),
+			condaBlackedOut("conda-local", "noarch/"+metadata))
+	}
+	wantRefusal(t, get("conda-local", legacy), condaBlackedOut("conda-local", "noarch/"+legacy))
+	wantStatus(t, w.do(http.MethodGet,
+		"/artifactory/api/conda/conda-local/noarch/repodata.json", "user", ""),
+		http.StatusForbidden)
+	// notices.json is no index document; it keeps main's answer (#216).
+	if rec := get("conda-local", "notices.json"); rec.Code != http.StatusOK ||
+		rec.Body.String() != `{"notices":[]}` {
+		t.Fatalf("notices.json: %d %s", rec.Code, rec.Body)
+	}
+	listed("conda-virtual", "repodata.json", map[string]bool{modern: true})
+	wantStatus(t, get("conda-virtual", modern), http.StatusOK)
+	notFound("conda-virtual", legacy)
+
+	patch("conda-local", func(c *repo.Config) {
+		c.BlackedOut, c.ExcludesPattern = new(false), new("**/repodata.json")
+	})
+	wantRefusal(t, get("conda-local", "repodata.json"),
+		condaRejected("conda-local", "noarch/repodata.json"))
+	listed("conda-local", "current_repodata.json", map[string]bool{legacy: true})
+	wantStatus(t, get("conda-local", legacy), http.StatusOK)
+	listed("conda-virtual", "repodata.json", map[string]bool{modern: true})
+	listed("conda-virtual", "current_repodata.json", both)
+	wantStatus(t, get("conda-virtual", legacy), http.StatusOK)
+
+	patch("conda-local", func(c *repo.Config) { c.ExcludesPattern = new("**/*.tar.bz2") })
+	listed("conda-local", "repodata.json", map[string]bool{legacy: true})
+	wantRefusal(t, get("conda-local", legacy), condaRejected("conda-local", "noarch/"+legacy))
+	listed("conda-virtual", "repodata.json", both)
+	notFound("conda-virtual", legacy)
+
+	patch("conda-local", func(c *repo.Config) { c.ExcludesPattern = new("") })
+	patch("conda-virtual", func(c *repo.Config) { c.ExcludesPattern = new("**/repodata.json") })
+	wantRefusal(t, get("conda-virtual", "repodata.json"),
+		"No repository found to serve the request for conda-virtual:noarch/repodata.json")
+	listed("conda-virtual", "current_repodata.json", both)
+	patch("conda-virtual", func(c *repo.Config) { c.ExcludesPattern = new("**/*.tar.bz2") })
+	listed("conda-virtual", "repodata.json", both)
+	wantRefusal(t, get("conda-virtual", legacy),
+		"No repository found to serve the request for conda-virtual:noarch/"+legacy)
 }

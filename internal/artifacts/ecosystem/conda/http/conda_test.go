@@ -70,6 +70,7 @@ func TestUnitCondaRecursionAndPathGuardsBeforeAnySourceRead(t *testing.T) {
 	if _, _, err := h.memberIndex(
 		r,
 		"../noarch/repodata.json",
+		readPolicy{},
 		map[string]bool{},
 	); !errors.Is(
 		err,
@@ -80,6 +81,7 @@ func TestUnitCondaRecursionAndPathGuardsBeforeAnySourceRead(t *testing.T) {
 	if _, _, err := h.memberIndex(
 		r,
 		"noarch/repodata.json",
+		readPolicy{},
 		map[string]bool{"": true},
 	); err == nil {
 		t.Fatal("recursive index lookup reached a repository source")
