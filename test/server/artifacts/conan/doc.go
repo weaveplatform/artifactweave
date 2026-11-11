@@ -36,12 +36,14 @@
 // Assertions only:
 //   - conan_test.go: search and package deletion, revision ordering, route
 //     and class policy, manifest and upload refusals, virtual members, the
-//     authentication boundary, the native revision lifecycle and the remote
-//     and virtual source with its failures.
+//     authentication boundary, the native revision lifecycle, the remote
+//     and virtual source with its failures, and the download policy of
+//     local and virtual repositories.
 //   - conan_client_test.go: create, upload, remove and download with each
 //     client generation on local, federated and virtual repositories.
 //   - conan_remote_test.go: a Conan remote's cache integrity and offline
-//     answers, and the integrity of the archives it fetches.
+//     answers, the integrity of the archives it fetches, and a remote's
+//     download policy, directly and through a virtual repository.
 //   - conan_client_remote_test.go: each client generation downloads through
 //     a Conan remote from an upstream that the same client uploaded to.
 //
