@@ -10,8 +10,11 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/app/config"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	fedmodel "github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
+	workersmodel "github.com/weaveplatform/artifactweave/internal/workers/core/model"
 )
 
 // buildModules over a store whose every call panics, because its embedded
@@ -29,6 +32,37 @@ func TestUnitBuildModulesDoesNoIO(t *testing.T) {
 	if _, err := buildModules(config.Default(), moduleDeps{}); err == nil ||
 		!strings.HasPrefix(err.Error(), "access: ") {
 		t.Fatalf("buildModules without a store = %v, want the access module's refusal", err)
+	}
+}
+
+// The workers model keeps its own copy of federation's include and exclude
+// glob rule, because neither module may import the other's model (decision
+// 0044, dependency rule 6). Only the composition root sees both, so it holds
+// the copy to the same answers.
+func TestUnitWorkerFilterGlobsMatchFederations(t *testing.T) {
+	for _, c := range []struct {
+		include, exclude []string
+		name             string
+	}{
+		{nil, nil, "a.jar"},
+		{[]string{"*.jar"}, nil, "a.jar"},
+		{[]string{"*.jar"}, nil, "a.tmp"},
+		{nil, []string{"*.tmp"}, "a.tmp"},
+		{[]string{"team-*"}, []string{"team-secret"}, "team-a"},
+		{[]string{"team-*"}, []string{"team-secret"}, "team-secret"},
+		{[]string{"a/*"}, nil, "a/b"},
+		{[]string{"a/*"}, nil, "a/b/c"},
+		// A malformed glob matches nothing.
+		{[]string{"["}, nil, "a"},
+		{nil, []string{"["}, "a"},
+	} {
+		federation := fedmodel.PatternFilter{Include: c.include, Exclude: c.exclude}.Matches(c.name)
+		worker := workersmodel.WorkerFilter{
+			AnyLocal: true, IncludePatterns: c.include, ExcludePatterns: c.exclude,
+		}.Matches("libs", repo.Local, c.name)
+		if worker != federation {
+			t.Errorf("%+v: workers %t, federation %t", c, worker, federation)
+		}
 	}
 }
 
