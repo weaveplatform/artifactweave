@@ -302,7 +302,7 @@ historical evidence, not the current implementation status.
 - **[S]** Matrix parameter values are decoded with `url.QueryUnescape` since #260, so the
   properties `jf gp` encodes arrive intact; a literal `+` in a path segment, as in
   `v2.0.0+incompatible.zip`, is kept.
-- **[S]** The generic deploy (`migration/artifacts/adapters/http/items.go`, `deployItem`)
+- **[S]** The generic deploy (`internal/artifacts/adapters/http/items.go`, `deployItem`)
   needs Delete to overwrite a file with other content (the same content, declared by its
   SHA-1 or SHA-256, needs Deploy only, as on 7.x; #400), patches the request's properties
   into the stored ones, and answers 201 with the item JSON but without `X-Checksum-*`

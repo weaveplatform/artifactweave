@@ -35,7 +35,7 @@ settings revision, preventing a changed provider endpoint from selecting old
 bytes. Existing archive CRC, entry, size, traversal and selected-file limits
 apply before cache admission or extraction.
 
-`migration/artifacts/ecosystem/vcs/http/paths_test.go` verifies the context-aware
+`internal/artifacts/ecosystem/vcs/http/paths_test.go` verifies the context-aware
 mappings; `test/server/artifacts/vcs/vcs_legacy_test.go` verifies immutable ref resolution,
 redirect restrictions and authorization-before-fetch. The pinned curl
 scenarios in `test/acceptance/features/vcs_legacy.feature` cover public/private

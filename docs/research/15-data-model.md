@@ -219,7 +219,7 @@ Supporting records in the same family:
 | Signed URL request | `POST /api/signed/url` | `{repo_path, valid_for_secs, expiry}` (Enterprise contract; generated 501 today, P38) |
 | Trash | `/api/trash/*` | no body shapes; `restore` takes `to` and `transaction-size`; `deleteDirectoryTrashProperty/start` takes `{batchSize, pauseBetweenBatchesMs, batchesCount}` |
 
-The storage summary artifactweave serves (`migration/artifacts/adapters/http/storageinfo.go`)
+The storage summary artifactweave serves (`internal/artifacts/adapters/http/storageinfo.go`)
 follows 7.x ([#390](https://github.com/weaveplatform/artifactweave/issues/390)). Besides JFrog's
 [get storage summary info](https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo)
 page and the clients, the evidence is three 7.x captures:
