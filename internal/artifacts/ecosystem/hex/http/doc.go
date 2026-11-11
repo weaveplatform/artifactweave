@@ -44,7 +44,11 @@
 //
 //   - A registry resource lists only releases the caller may read, and
 //     keeps only the advisories those releases reference, so a denied or
-//     shadowed version discloses nothing.
+//     shadowed version discloses nothing. A virtual repository lists a
+//     release only when the caller may read its tarball both in the member
+//     that supplies it and through the virtual itself, as its tarball route
+//     requires; a package with no such release is absent from names and
+//     versions, and its packages/NAME is not found.
 //   - A signing key that is not configured, cannot be read, is not RSA or
 //     is shorter than 2048 bits fails closed with 503.
 //   - A remote reads upstream registry resources only once their signature
@@ -87,8 +91,9 @@
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
 //   - https://github.com/weaveplatform/artifactweave/issues/767,
 //     https://github.com/weaveplatform/artifactweave/issues/1037,
-//     https://github.com/weaveplatform/artifactweave/issues/1089 and
-//     https://github.com/weaveplatform/artifactweave/issues/1205
+//     https://github.com/weaveplatform/artifactweave/issues/1089,
+//     https://github.com/weaveplatform/artifactweave/issues/1205 and
+//     https://github.com/weaveplatform/artifactweave/issues/1220
 //
 // # Status
 //

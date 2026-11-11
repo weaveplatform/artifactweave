@@ -52,6 +52,8 @@
 //     used, and the remote source's authority is checked again before an
 //     index is disclosed. Index responses are private and never stored by a
 //     shared cache.
+//   - A server built without a remote source service answers a remote
+//     index or package read 500, a fault of its own, not the upstream's.
 //   - A request with matrix parameters or a query string answers 404.
 //   - Statuses and error and log text stay byte-identical.
 //
@@ -89,8 +91,9 @@
 // that is a folder, lost, empty, unreadable or malformed; a remote index
 // whose authority is rechecked, streamed or cached; virtual indexes that
 // skip unreadable members and fail closed on cycles, wrong member types,
-// store faults and unusable signing keys; and virtual packages served from
-// a listed local file or relayed from a remote member. Its item GETs run
+// store faults and unusable signing keys; virtual packages served from a
+// listed local file or relayed from a remote member; and remote index and
+// package reads on a server built without remote sources. Its item GETs run
 // through the kit with TryAlpineItem as the only overlay. The @alpine
 // acceptance partition (test/acceptance/features/alpine.feature) drives its
 // indexes and packages through the router with apk.

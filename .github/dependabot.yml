@@ -149,6 +149,27 @@ updates:
       prefix: "chore"
       include: "scope"
 
+  # The .NET client holds the SDK's LTS line, .NET 10, beside the newest line
+  # in dotnet-11.Dockerfile (#534). The image has a directory of its own
+  # because an ignore applies to a whole entry: on /test/acceptance/clients it
+  # would also stop dotnet-11.Dockerfile taking the next .NET major.
+  # Dependabot names the image dotnet/sdk, without its registry, and an ignore
+  # under any other name matches nothing. Updates within 10.0 still arrive.
+  - package-ecosystem: "docker"
+    directory: "/test/acceptance/clients/dotnet-10"
+    schedule:
+      interval: "daily"
+    ignore:
+      - dependency-name: "dotnet/sdk"
+        versions: [">= 11"]
+    groups:
+      acceptance-clients-dotnet-10:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
   # The Puppet client stays on Ruby 3.3. Puppet 8.10.0, the newest Puppet
   # gem, cannot extract a module archive on Ruby 3.4: safe_posix_fork closes
   # the descriptor of its own /proc/self/fd walk, which Ruby 3.4 reports as

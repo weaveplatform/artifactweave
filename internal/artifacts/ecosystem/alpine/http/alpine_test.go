@@ -610,3 +610,38 @@ func TestUnitAlpineRemotePackageRefusesAPathOutsideTheLayout(t *testing.T) {
 		kittest.Admin, kittest.AdminAccess())
 	wantError(t, rec, http.StatusNotFound, "Could not find resource")
 }
+
+// TestUnitAlpineRemoteReadsWithoutRemoteSources: on a server built without
+// a remote source service, a remote package read answers as a remote index
+// read does, 500 for the missing service, rather than calling through it.
+// A virtual repository reads its remote member's index before any package
+// and fails there, so only a direct call reaches the package read's own
+// refusal.
+func TestUnitAlpineRemoteReadsWithoutRemoteSources(t *testing.T) {
+	w := newItemWorld(t)
+	remote := w.repos(alpineRepo(alpineRemote, repo.Remote),
+		alpineRepo(alpineVirtual, repo.Virtual, alpineRemote))[0]
+	for _, tc := range []struct {
+		name  string
+		serve func() *httptest.ResponseRecorder
+	}{
+		{"remote index", func() *httptest.ResponseRecorder {
+			return w.get(alpineRemote, apkIndexPath)
+		}},
+		{"virtual package", func() *httptest.ResponseRecorder {
+			return w.get(alpineVirtual, apkHelloPath)
+		}},
+		{"remote package read", func() *httptest.ResponseRecorder {
+			rec := httptest.NewRecorder()
+			r := kittest.Request(t, http.MethodGet, "/artifactory/alpine/"+apkHelloPath)
+			req := itemkit.ItemRequest{Key: alpineVirtual, Path: apkHelloPath}
+			alpineItems{w.kit}.serveRemoteAlpinePackage(rec, r, remote, req,
+				kittest.Admin, kittest.AdminAccess())
+			return rec
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wantError(t, tc.serve(), http.StatusInternalServerError, "internal error")
+		})
+	}
+}
