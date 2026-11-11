@@ -108,3 +108,92 @@ func TestUnitPathRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func tarStream(t *testing.T, entries []tar.Header, bodies [][]byte) []byte {
+	t.Helper()
+	var out bytes.Buffer
+	tarWriter := tar.NewWriter(&out)
+	for i := range entries {
+		if err := tarWriter.WriteHeader(&entries[i]); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tarWriter.Write(bodies[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return out.Bytes()
+}
+
+func gzipStream(t *testing.T, plain []byte) []byte {
+	t.Helper()
+	var out bytes.Buffer
+	gz := gzip.NewWriter(&out)
+	if _, err := gz.Write(plain); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return out.Bytes()
+}
+
+// TestUnitReadArchiveChecksSizesEntriesAndTrailer: ReadArchive refuses a
+// declared size that is not the archive's, a manifest that is missing, empty,
+// cut short or not representable as JSON, a mapping key that is not a
+// string, and data after the TAR end marker, and accepts folder entries and
+// the zero padding after that marker.
+func TestUnitReadArchiveChecksSizesEntriesAndTrailer(t *testing.T) {
+	manifest := []byte("name: widget_pub\nversion: 1.2.3\n")
+	pubspec := tar.Header{
+		Name: "pubspec.yaml", Mode: 0o644, Size: int64(len(manifest)), Typeflag: tar.TypeReg,
+	}
+	folder := tar.Header{Name: "lib/", Mode: 0o755, Typeflag: tar.TypeDir}
+	plain := tarStream(t, []tar.Header{folder, pubspec}, [][]byte{nil, manifest})
+	// GNU tar pads an archive to a 10 KiB record with zero blocks after its
+	// end marker; refusing that padding would refuse archives pub publishes.
+	padded := gzipStream(t, append(bytes.Clone(plain), make([]byte, 10240-len(plain)%10240)...))
+	meta, err := ReadArchive(bytes.NewReader(padded), int64(len(padded)))
+	if err != nil || meta.Name != "widget_pub" || meta.Version != "1.2.3" {
+		t.Fatalf("padded archive with a folder: %+v, %v", meta, err)
+	}
+	good := gzipStream(t, plain)
+	for _, size := range []int64{0, int64(len(good)) - 1, MaxArchiveBytes + 1} {
+		if _, err := ReadArchive(bytes.NewReader(good), size); !errors.Is(err, ErrArchive) {
+			t.Errorf("declared size %d of a %d-byte archive: %v", size, len(good), err)
+		}
+	}
+	manifestOf := func(text string) []byte {
+		return archiveFixture(t, []tar.Header{{
+			Name: "pubspec.yaml", Mode: 0o644, Size: int64(len(text)), Typeflag: tar.TypeReg,
+		}}, [][]byte{[]byte(text)})
+	}
+	for name, data := range map[string][]byte{
+		"no manifest": archiveFixture(t, []tar.Header{
+			folder,
+			{Name: "lib/widget_pub.dart", Mode: 0o644, Size: 4, Typeflag: tar.TypeReg},
+		}, [][]byte{nil, []byte("dart")}),
+		"empty manifest": archiveFixture(t, []tar.Header{{
+			Name: "pubspec.yaml", Mode: 0o644, Typeflag: tar.TypeReg,
+		}}, [][]byte{nil}),
+		// Both header blocks survive; the manifest breaks off after five bytes.
+		"manifest cut short":               gzipStream(t, plain[:2*512+5]),
+		"data after the end marker":        gzipStream(t, append(bytes.Clone(plain), "trailing"...)),
+		"mapping key that is not a string": manifestOf("name: widget_pub\nversion: 1.2.3\n1: one\n"),
+		"value JSON cannot hold":           manifestOf("name: widget_pub\nversion: 1.2.3\nscore: .inf\n"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := ReadArchive(
+				bytes.NewReader(data),
+				int64(len(data)),
+			); !errors.Is(
+				err,
+				ErrArchive,
+			) {
+				t.Fatalf("got %v, want invalid archive", err)
+			}
+		})
+	}
+}

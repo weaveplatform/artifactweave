@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
@@ -443,6 +444,136 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 	badKey := w.do(http.MethodGet, base+"versions", "partial", "")
 	if badKey.Code != http.StatusServiceUnavailable {
 		t.Fatalf("invalid upstream signing key accepted: %d %s", badKey.Code, badKey.Body)
+	}
+}
+
+// TestUnitHexVirtualRemoteMembers: a virtual repository merges its remote
+// members' signed releases and fetches a tarball through the member that
+// lists its version, passing over a member that lists other versions only
+// and members the caller may not read; it refuses a corrupt tarball from
+// the remote with 502, and its index fails while a remote member's upstream
+// key is invalid.
+func TestUnitHexVirtualRemoteMembers(t *testing.T) {
+	keys := testKeys()
+	upstream, err := keymaterial.RSAPrivateKey(keys.private, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture := mustReadHexFixture(t)
+	pkg, err := hexfmt.InspectTarball(bytes.NewReader(fixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	older := pkg
+	older.Version = "1.0.0"
+	listings := map[string][]byte{}
+	for key, release := range map[string]hexfmt.Package{"hex-old": older, "hex-r": pkg} {
+		listings[key], err = hexfmt.EncodePackage(hexfmt.RegistryPackage{
+			Name: "decimal", Repository: "hexpm", Releases: []hexfmt.Package{release},
+		}, upstream)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	corrupt := false
+	backend := hexSource(
+		func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+			body := listings[q.Repo.Key]
+			if q.Resource.Path == "tarballs/decimal-2.0.0.tar" {
+				body = fixture
+				if corrupt {
+					body = bytes.Clone(fixture)
+					body[100] ^= 1
+				}
+			}
+			return source.Result{Stream: &source.Stream{
+				Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
+				Representation: source.Representation{Size: int64(len(body))},
+			}}, nil
+		},
+	)
+	w := newItemWorld(t, false, func(c *Config) {
+		c.RemoteSources = &source.Service{
+			HTTP: backend,
+			Resolve: func(_ context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
+				return artmodel.SourceIdentity{
+					Kind: artmodel.ExternalHTTP, Repository: artmodel.RepositoryIncarnation(c.Key),
+					ID: "upstream", Generation: "rev-1",
+				}, nil
+			},
+		}
+	})
+	if err := w.db.Keys().CreateKeypair(t.Context(), api.Keypair{
+		Name: "hex-key", Type: api.KeypairRSA, PrivateKey: keys.private, PublicKey: keys.public,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []repo.Config{
+		{Key: "hex-old", Class: repo.Remote, HexPublicKey: keys.public},
+		{Key: "hex-r", Class: repo.Remote, HexPublicKey: keys.public},
+		{Key: "hex-unkeyed", Class: repo.Remote, HexPublicKey: "not a PEM key"},
+		{Key: "hex-v", Class: repo.Virtual, Repositories: []string{"hex-old", "hex-r"}},
+		{Key: "hex-v-unkeyed", Class: repo.Virtual, Repositories: []string{"hex-unkeyed"}},
+	} {
+		c.PackageType, c.KeyPair = repo.Hex, "hex-key"
+		if c.Class == repo.Remote {
+			c.URL, c.KeyPair = "https://up.example/", ""
+		}
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.db.Users().
+		Create(t.Context(), accesstest.User{Name: "virtual-only", PasswordHash: cheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "hex-virtual-only",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{
+				Users: map[string]api.Actions{"virtual-only": api.ActionRead},
+			},
+			Targets: map[string]accesstest.Target{"hex-v": {Include: []string{"**"}}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	public, err := hexfmt.ParsePublicKey(keys.public)
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := "/artifactory/api/hex/hex-v/"
+	index := w.do(http.MethodGet, base+"packages/decimal", "admin", "")
+	reg, err := hexfmt.DecodePackage(index.Body.Bytes(), public)
+	if index.Code != http.StatusOK || err != nil || reg.Repository != "hex-v" ||
+		len(reg.Releases) != 2 || reg.Releases[0].Version != "1.0.0" ||
+		reg.Releases[1].Version != "2.0.0" {
+		t.Fatalf("virtual package over remote members: %d %+v %v", index.Code, reg, err)
+	}
+	got := w.do(http.MethodGet, base+"tarballs/decimal-2.0.0.tar", "admin", "")
+	if got.Code != http.StatusOK || !bytes.Equal(got.Body.Bytes(), fixture) {
+		t.Fatalf("remote member's tarball: %d, %d bytes", got.Code, got.Body.Len())
+	}
+	for _, tc := range []struct{ path, as string }{
+		{"tarballs/decimal-9.9.9.tar", "admin"},
+		{"tarballs/decimal-2.0.0.tar", "virtual-only"},
+	} {
+		got := w.do(http.MethodGet, base+tc.path, tc.as, "")
+		if got.Code != http.StatusNotFound ||
+			!strings.Contains(got.Body.String(), "Hex tarball not found") {
+			t.Errorf("%s as %s: %d %s", tc.path, tc.as, got.Code, got.Body)
+		}
+	}
+	corrupt = true
+	got = w.do(http.MethodGet, base+"tarballs/decimal-2.0.0.tar", "admin", "")
+	if got.Code != http.StatusBadGateway ||
+		!strings.Contains(got.Body.String(), "invalid upstream Hex registry resource") {
+		t.Fatalf("corrupt remote member tarball: %d %s", got.Code, got.Body)
+	}
+	got = w.do(http.MethodGet, "/artifactory/api/hex/hex-v-unkeyed/versions", "admin", "")
+	if got.Code != http.StatusServiceUnavailable ||
+		!strings.Contains(got.Body.String(), "upstream Hex public key is missing or invalid") {
+		t.Fatalf("remote member without a valid upstream key: %d %s", got.Code, got.Body)
 	}
 }
 
