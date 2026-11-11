@@ -1,11 +1,14 @@
 package itemkit_test
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"log/slog"
 	"net/http"
@@ -347,8 +350,8 @@ func TestUnitDeployTargetResolvesVirtualRepositories(t *testing.T) {
 // TestUnitGetItemAndTraceRefuseWhatTheyCannotServe: without a caller a
 // download and its trace answer 401; without a store the trace answers 501,
 // and a path that is not an item path 400; a file whose content the blob
-// store no longer holds answers 500, and the trace of an entry in such an
-// archive ends on that 500.
+// store no longer holds answers 500, an entry in such an archive answers
+// with the archive's own 500, and the entry's trace ends on that 500.
 func TestUnitGetItemAndTraceRefuseWhatTheyCannotServe(t *testing.T) {
 	w := kittest.New(t, inmem.New())
 	k := w.Kit(itemkit.Deps{Logger: slog.New(slog.DiscardHandler)})
@@ -394,6 +397,17 @@ func TestUnitGetItemAndTraceRefuseWhatTheyCannotServe(t *testing.T) {
 			t.Errorf("%s: %d %s; want %d", tc.name, rec.Code, rec.Body, tc.status)
 		}
 	}
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		archive, entry := httptest.NewRecorder(), httptest.NewRecorder()
+		k.GetItem(archive, kittest.Request(t, method, "/artifactory/libs-local/lost.zip"))
+		k.GetItem(entry, kittest.Request(t, method, "/artifactory/libs-local/lost.zip!/a.txt"))
+		if archive.Code != http.StatusInternalServerError || entry.Code != archive.Code ||
+			entry.Header().Get("Content-Type") != archive.Header().Get("Content-Type") ||
+			entry.Body.String() != archive.Body.String() {
+			t.Errorf("%s of an entry in a lost archive: %d %q; the archive's: %d %q",
+				method, entry.Code, entry.Body, archive.Code, archive.Body)
+		}
+	}
 	rec := httptest.NewRecorder()
 	k.GetItem(
 		rec,
@@ -402,6 +416,41 @@ func TestUnitGetItemAndTraceRefuseWhatTheyCannotServe(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.HasSuffix(rec.Body.String(),
 		" Sending a response with the status '500' and the message 'internal error'\n") {
 		t.Errorf("trace of an entry in a lost archive: %d %q", rec.Code, rec.Body)
+	}
+}
+
+// TestUnitArchiveEntryFailureAfterItsStatusIsLogged: a zip entry whose CRC-32
+// is wrong fails only at its end, after its 200 and its bytes are sent, so
+// the failure is logged and nothing is written after the entry.
+func TestUnitArchiveEntryFailureAfterItsStatusIsLogged(t *testing.T) {
+	const content = "inside"
+	var archive bytes.Buffer
+	zw := zip.NewWriter(&archive)
+	fw, err := zw.CreateRaw(&zip.FileHeader{
+		Name:               "a.txt",
+		Method:             zip.Store,
+		CRC32:              crc32.ChecksumIEEE([]byte(content)) ^ 1,
+		CompressedSize64:   uint64(len(content)),
+		UncompressedSize64: uint64(len(content)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(fw, content); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	w := kittest.New(t, inmem.New())
+	w.Put(t, w.Local, false, "bad.zip", archive.Bytes())
+	var logs bytes.Buffer
+	k := w.Kit(itemkit.Deps{Logger: slog.New(slog.NewTextHandler(&logs, nil))})
+	rec := httptest.NewRecorder()
+	k.GetItem(rec, kittest.Request(t, http.MethodGet, "/artifactory/libs-local/bad.zip!/a.txt"))
+	if rec.Code != http.StatusOK || rec.Body.String() != content ||
+		!strings.Contains(logs.String(), zip.ErrChecksum.Error()) {
+		t.Errorf("entry failing its checksum: %d %q, logged %q", rec.Code, rec.Body, logs.String())
 	}
 }
 

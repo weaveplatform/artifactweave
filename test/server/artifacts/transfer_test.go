@@ -425,6 +425,33 @@ func TestAccArchiveEntryOverHTTP(t *testing.T) {
 			t.Errorf("%s as %q: %d, want %d", c.path, c.as, rec.Code, c.expected)
 		}
 	}
+	// An archive whose blob is lost answers for an entry as it answers its
+	// own download, and the entry's trace ends on that answer.
+	lost := zipBytes(t, map[string]string{"in.txt": "lost"})
+	w.put("/artifactory/libs-local/lost.zip", string(lost))
+	if err := w.blobs.Delete(context.Background(),
+		w.item("libs-local", false, "lost.zip").Actual.SHA256); err != nil {
+		t.Fatal(err)
+	}
+	for _, method := range []string{"GET", "HEAD"} {
+		archive := w.do(method, "/artifactory/libs-local/lost.zip", "admin", "")
+		entry := w.do(method, "/artifactory/libs-local/lost.zip!/in.txt", "admin", "")
+		if archive.Code != http.StatusInternalServerError || entry.Code != archive.Code ||
+			entry.Header().Get("Content-Type") != archive.Header().Get("Content-Type") ||
+			entry.Body.String() != archive.Body.String() {
+			t.Errorf("%s of an entry in a lost archive: %d %q; the archive's: %d %q",
+				method, entry.Code, entry.Body, archive.Code, archive.Body)
+		}
+	}
+	const lostTrace = "/artifactory/libs-local/lost.zip!/in.txt?trace"
+	_, steps := traceOf(t, w, http.MethodGet, lostTrace, "admin")
+	wantSteps(t, lostTrace, steps,
+		"Received request",
+		"Retrieving info from local repository 'libs-local' type generic",
+		"Unable to find resource in libs-local:lost.zip!/in.txt",
+		"Requested resource is contained within an archive",
+		"Sending a response with the status '500' and the message 'internal error'",
+	)
 }
 
 func TestAccFolderArchiveOverHTTP(t *testing.T) {
