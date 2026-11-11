@@ -71,6 +71,17 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, path string
 		h.k.Error(w, r, err)
 		return
 	}
+	if validCDNPath(path) {
+		// The virtual repository's own patterns refuse a CDN document they
+		// reject at its 7.x path ([I], R5), and a member that would refuse
+		// the document adds nothing to it: 7.x ignores a blacked-out member
+		// when it resolves.
+		if err := h.k.CheckDocument(r, cdnDocument(path)); err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+		members = h.serving(members, cdnDocument(path))
+	}
 	if path == "CocoaPods-version.yml" {
 		serveBytes(
 			w,
@@ -103,6 +114,18 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, path string
 	h.k.Error(w, r, notFound())
 }
 
+// serving returns the members that do not refuse path, in order: a
+// member's refusal is the member passed over.
+func (h handler) serving(members []*http.Request, path string) []*http.Request {
+	out := make([]*http.Request, 0, len(members))
+	for _, mr := range members {
+		if h.k.CheckDocument(mr, path) == nil {
+			out = append(out, mr)
+		}
+	}
+	return out
+}
+
 func (h handler) virtualIndex(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -114,7 +137,7 @@ func (h handler) virtualIndex(
 	for _, mr := range members {
 		c := pkgroute.RequestFrom(mr).Repo
 		if c.Class == repo.Remote {
-			result, err := h.remoteResult(mr, path)
+			result, err := h.remoteResult(mr, path, false)
 			if missingMember(err) {
 				continue
 			}
@@ -208,7 +231,7 @@ func (h handler) virtualSpec(
 	for _, mr := range members {
 		c := pkgroute.RequestFrom(mr).Repo
 		if c.Class == repo.Remote {
-			result, err := h.remoteResult(mr, path)
+			result, err := h.remoteResult(mr, path, false)
 			if missingMember(err) {
 				continue
 			}
@@ -254,6 +277,14 @@ func (h handler) virtualLocalArchive(
 		h.k.Error(w, r, notFound())
 		return
 	}
+	// The virtual repository's own patterns leave it no member to search
+	// (6.20 VirtualRepoDownloadStrategy), and a member that refuses the
+	// archive is passed over for the next one that lists it, as 7.x
+	// ignores a blacked-out member when it resolves (R5).
+	if err := h.k.CheckDownload(r, path); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	for _, mr := range members {
 		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
 			continue
@@ -263,7 +294,7 @@ func (h handler) virtualLocalArchive(
 			h.k.Error(w, r, err)
 			return
 		}
-		if v, found := packages[name][version]; found {
+		if v, found := packages[name][version]; found && h.k.CheckDownload(v.request, path) == nil {
 			h.k.ServeItem(w, v.request, path)
 			return
 		}
@@ -277,15 +308,22 @@ func (h handler) virtualSourceArchive(
 	members []*http.Request,
 	name, version, ext string,
 ) {
-	if !h.k.Can(r, sourcePath(name, version, ext), api.ActionRead) {
+	p := sourcePath(name, version, ext)
+	if !h.k.Can(r, p, api.ActionRead) {
 		h.k.Error(w, r, notFound())
 		return
 	}
+	if err := h.k.CheckDownload(r, p); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	for _, mr := range members {
-		if pkgroute.RequestFrom(mr).Repo.Class != repo.Remote {
+		// A remote member whose own policy refuses the archive is passed
+		// over, as a local member is (R5).
+		if pkgroute.RequestFrom(mr).Repo.Class != repo.Remote || h.k.CheckDocument(mr, p) != nil {
 			continue
 		}
-		result, err := h.remoteResult(mr, podfmt.SpecPath(name, version))
+		result, err := h.remoteResult(mr, podfmt.SpecPath(name, version), true)
 		if missingMember(err) {
 			continue
 		}

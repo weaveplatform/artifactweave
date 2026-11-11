@@ -45,6 +45,16 @@
 //   - Upstream CDN metadata and source archives are checked whole before
 //     they are cached, and a source archive is fetched only from an origin
 //     the repository allows (externalDependenciesEnabled and its patterns).
+//   - The download policy (decision 0032) refuses a CDN document at
+//     .pod/cdn/<path>, where 7.x keeps it, with the policy's 404, after read
+//     permission: a blacked-out repository's, a remote's included, and one
+//     whose patterns reject that path. A pattern on one pod's archive
+//     leaves the pod listed and refuses only the archive, which a remote
+//     checks at its own path before it reads the spec. A virtual
+//     repository's own patterns refuse what they reject with "No
+//     repository found to serve the request"; it leaves out a member that
+//     would refuse a document, and passes an archive a member refuses on
+//     to the next member that holds it.
 //   - Statuses and error texts stay byte-identical: the pod client reads
 //     them.
 //
@@ -86,6 +96,8 @@
 //   - metadata_failure_test.go and zip_source_test.go: metadata stream and
 //     read failures, the authority recheck before delivery and zip path
 //     traversal.
+//   - download_policy_test.go: the download policy on local, virtual and
+//     remote repositories.
 //   - The @cocoapods acceptance scenarios
 //     (test/acceptance/features/cocoapods.feature) drive the pod client
 //     through the whole server.
