@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **NuGet bundled with .NET SDK 11.0 image; .NET 11.0 image also exercised (exact SDK versions in CI logs)**. Registered classes: **local, remote, virtual, federated**.
+Client: **NuGet bundled with .NET SDK 10.0 image; .NET 11.0 image also exercised (exact SDK versions in CI logs)**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/nuget/v3/${AW_REPO}/index.json`
 
@@ -76,7 +76,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 These are the pinned client definitions and executable evidence from which this recipe was reviewed. Their [fingerprints](evidence-lock.json) detect subsequent source changes; a fingerprint alone is not a native-client test result. See [verification](README.md#verification) for the required run evidence.
 
-- Client pin: [test/acceptance/clients/dotnet.Dockerfile](../../test/acceptance/clients/dotnet.Dockerfile).
+- Client pin: [test/acceptance/clients/dotnet-10/Dockerfile](../../test/acceptance/clients/dotnet-10/Dockerfile).
 - Client pin: [test/acceptance/clients/dotnet-11.Dockerfile](../../test/acceptance/clients/dotnet-11.Dockerfile).
 - Evidence: [test/acceptance/features/nuget_publish.feature](../../test/acceptance/features/nuget_publish.feature).
 - Evidence: [test/acceptance/features/nuget_v3.feature](../../test/acceptance/features/nuget_v3.feature).

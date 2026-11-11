@@ -41,8 +41,12 @@ func (h handler) publishUpload(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	if form.File.Size <= 0 || form.File.Size > pubfmt.MaxArchiveBytes {
+	if form.File.Size > pubfmt.MaxArchiveBytes {
 		h.k.Error(w, r, apierror.New(http.StatusRequestEntityTooLarge, "pub archive exceeds limit"))
+		return
+	}
+	if form.File.Size == 0 {
+		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Dart pub archive"))
 		return
 	}
 	rc, info, err := h.k.Blobs().Open(r.Context(), form.File.Digests.SHA256)
