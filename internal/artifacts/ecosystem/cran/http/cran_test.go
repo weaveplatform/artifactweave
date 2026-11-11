@@ -129,7 +129,7 @@ func TestUnitCRANVirtualRejectsCyclesAndWrongMembers(t *testing.T) {
 		}
 	}
 	if _, err := svc.cranMemberIndex(t.Context(), w.db,
-		repo.Config{Key: "cran-local", Class: repo.Local}, true,
+		repo.Config{Key: "cran-local", Class: repo.Local}, true, false,
 		"src/contrib/PACKAGES", p, acc); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("local cache alias accepted: %v", err)
 	}

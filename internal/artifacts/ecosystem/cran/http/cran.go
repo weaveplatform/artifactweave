@@ -120,7 +120,7 @@ func (s CranAPI) serveCranIndex(
 			map[string]bool{})
 	} else {
 		var view cranIndexView
-		view, err = s.cranMemberIndex(ctx, st, c, cached, req.Path, p, acc)
+		view, err = s.cranMemberIndex(ctx, st, c, cached, false, req.Path, p, acc)
 		if err == nil && view.revalidate != nil {
 			err = view.revalidate(ctx)
 		}
@@ -192,8 +192,12 @@ func cranPackageReadable(
 	return true, nil
 }
 
+// cranMemberIndex reads the index at indexPath of a local, federated or
+// remote repository. lookup says the read is the one a package GET makes to
+// find the package and pin its MD5, rather than a read of the document
+// itself.
 func (s CranAPI) cranMemberIndex(
-	ctx context.Context, st itemkit.Store, c repo.Config, cached bool, indexPath string,
+	ctx context.Context, st itemkit.Store, c repo.Config, cached, lookup bool, indexPath string,
 	p kernel.Principal, acc itemkit.Access,
 ) (cranIndexView, error) {
 	view := cranIndexView{repo: c}
@@ -213,6 +217,15 @@ func (s CranAPI) cranMemberIndex(
 		if err != nil {
 			return view, err
 		}
+		// The kit checks Read permission at the feed folder, and without a
+		// policy path the source would check the remote's patterns there too,
+		// so a pattern that matches only the folder, such as src/*, would
+		// refuse the index and every package. The policy is checked at the
+		// path 7.x caches the index at instead, and a package GET's lookup
+		// checks only the blackout, since the package's own path was checked
+		// before the lookup (decision 0032, "Where the policy applies").
+		query.Resource.PolicyPath = indexPath
+		query.Resource.BlackoutOnly = lookup
 		result, err := s.RemoteSources.Read(ctx, query)
 		if err != nil {
 			return view, fmt.Errorf(
@@ -330,7 +343,7 @@ func (s CranAPI) cranCandidates(
 			entries, err = s.cranCandidates(ctx, st, member, indexPath, p, acc, download, seen)
 		} else {
 			var view cranIndexView
-			view, err = s.cranMemberIndex(ctx, st, member, false, indexPath, p, acc)
+			view, err = s.cranMemberIndex(ctx, st, member, false, download, indexPath, p, acc)
 			if err == nil && view.revalidate != nil {
 				err = view.revalidate(ctx)
 			}
@@ -409,9 +422,9 @@ func (s CranAPI) serveCranPackage(
 	// remote or patterns that reject the file answer the policy's 404 and
 	// message, and a virtual repository's patterns answer that no repository
 	// serves it. The index read below, which pins a remote download's MD5,
-	// checks a remote's patterns at the feed folder
-	// (itemkit.CranSourceRequest), so patterns that reject only the PACKAGES
-	// file leave the package served, as a download checks only its own path.
+	// is a lookup that checks only the remote's blackout (cranMemberIndex),
+	// so patterns that reject the PACKAGES file or its folder leave the
+	// package served, as a download checks only its own path.
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "CRAN package download", err))
 		return
@@ -425,7 +438,7 @@ func (s CranAPI) serveCranPackage(
 			map[string]bool{})
 	} else {
 		var view cranIndexView
-		view, err = s.cranMemberIndex(r.Context(), st, c, cached, indexPath, p, acc)
+		view, err = s.cranMemberIndex(r.Context(), st, c, cached, true, indexPath, p, acc)
 		if err == nil && view.revalidate != nil {
 			err = view.revalidate(r.Context())
 		}

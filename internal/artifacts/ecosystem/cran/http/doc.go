@@ -64,7 +64,12 @@
 //     policy at its own path, after the Read permission check (DV-057): a
 //     blacked-out repository, or patterns that reject the path, answer the
 //     item route's 404 and message, and a virtual repository's own patterns
-//     answer that no repository serves the request.
+//     answer that no repository serves the request. A remote's index is
+//     read from its source under the remote's policy at the index's own
+//     path (source.Resource.PolicyPath), never at the feed folder its Read
+//     permission is checked on, and the index lookup a package GET makes to
+//     find the package and pin its MD5 checks only the remote's blackout
+//     (source.Resource.BlackoutOnly).
 //   - A virtual repository merges its members' indexes in order: a missing
 //     member, or one whose index the caller may not read or the member's
 //     download policy refuses, is skipped; a member cycle, a chain of more
