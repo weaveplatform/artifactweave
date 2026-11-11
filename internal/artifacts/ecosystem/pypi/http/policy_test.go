@@ -172,7 +172,11 @@ func TestAccCoreMetadataPolicy(t *testing.T) {
 // hashedProject serves name's versions from PyPI.org's layout,
 // /packages/<a>/<b>/<rest of the hash>/<file>, and returns each wheel's
 // path there by version.
-func (f *remoteFixture) hashedProject(t *testing.T, name string, versions ...string) map[string]string {
+func (f *remoteFixture) hashedProject(
+	t *testing.T,
+	name string,
+	versions ...string,
+) map[string]string {
 	t.Helper()
 	paths := map[string]string{}
 	files := []map[string]any{}
@@ -192,7 +196,10 @@ func (f *remoteFixture) hashedProject(t *testing.T, name string, versions ...str
 		})
 		octets := http.Header{"Content-Type": []string{"application/octet-stream"}}
 		f.up.Set("/"+paths[v], fakeupstream.Resource{Body: body, Header: octets})
-		f.up.Set("/"+paths[v]+".metadata", fakeupstream.Resource{Body: []byte(meta), Header: octets})
+		f.up.Set(
+			"/"+paths[v]+".metadata",
+			fakeupstream.Resource{Body: []byte(meta), Header: octets},
+		)
 	}
 	f.setJSON("/custom/simple/"+name+"/", map[string]any{
 		"meta": map[string]string{"api-version": "1.1"}, "name": name,
@@ -248,7 +255,12 @@ func TestAccRemotePagePolicy(t *testing.T) {
 		blackedOut("pypi-remote", ".pypi/demo.html"))
 
 	f.setPolicy(t, "pypi-remote", false, "", ".pypi/demo.html")
-	wantAnswer(t, get("simple/demo/"), http.StatusNotFound, rejected("pypi-remote", ".pypi/demo.html"))
+	wantAnswer(
+		t,
+		get("simple/demo/"),
+		http.StatusNotFound,
+		rejected("pypi-remote", ".pypi/demo.html"),
+	)
 	requireRemote(t, get("simple/"), http.StatusOK, `"name":"demo"`)
 	wantStatus(t, get(wheel1), http.StatusOK)
 	f.setPolicy(t, "pypi-remote", false, "", ".pypi/simple.html")

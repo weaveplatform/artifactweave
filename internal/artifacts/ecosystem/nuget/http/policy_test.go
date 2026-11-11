@@ -215,8 +215,12 @@ func TestAccRemoteV2FeedPolicy(t *testing.T) {
 				}
 			}
 		}
-		wantError(t, f.do(http.MethodGet, remoteV2+"Download/Acme.Mixed/1.0.0", "reader"),
-			http.StatusNotFound, rejected("nuget-remote", "acme.mixed/1.0.0/acme.mixed.1.0.0.nupkg"))
+		wantError(
+			t,
+			f.do(http.MethodGet, remoteV2+"Download/Acme.Mixed/1.0.0", "reader"),
+			http.StatusNotFound,
+			rejected("nuget-remote", "acme.mixed/1.0.0/acme.mixed.1.0.0.nupkg"),
+		)
 	}
 
 	f.setPolicy(t, "nuget-remote", true, "", "")

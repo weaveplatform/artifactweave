@@ -598,7 +598,12 @@ func TestAccVirtualRejectsWrongPackageTypeMember(t *testing.T) {
 	for _, path := range []string{"versions", "gems/rake-12.3.1.gem"} {
 		got := w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/"+path, "admin", nil)
 		if got.Code < 400 {
-			t.Fatalf("wrong-type virtual member accepted through %s: %d %s", path, got.Code, got.Body)
+			t.Fatalf(
+				"wrong-type virtual member accepted through %s: %d %s",
+				path,
+				got.Code,
+				got.Body,
+			)
 		}
 	}
 }
