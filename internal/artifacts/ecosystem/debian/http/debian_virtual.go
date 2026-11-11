@@ -355,13 +355,21 @@ func (s DebianAPI) serveRemoteVirtualDebianPackage(
 // upstream freshness and redirect constraints. For a remote member it also
 // returns the read's permission-only check of the packages the document
 // lists (source.Result.CheckPermission), and nil for any other.
+//
+// A path the caller may not read, or that the member's download policy
+// refuses, is source.ErrDenied, which a virtual merge leaves the member out
+// for. A policy refusal also carries the policy's 404 and message naming
+// <member>:<path> (pkgroute.IsRefusal), which a snapshot of the member
+// answers with, as a GET of that file would.
 func (s DebianAPI) debianMemberBytes(
 	ctx context.Context, st itemkit.Store, member repo.Config, path string,
 	p kernel.Principal, acc itemkit.Access,
 ) ([]byte, func(context.Context, string) error, error) {
-	if !acc.File(member, path, accessapi.ActionRead) ||
-		generic.CheckDownload(member, path, false) != nil {
+	if !acc.File(member, path, accessapi.ActionRead) {
 		return nil, nil, source.ErrDenied
+	}
+	if err := generic.CheckDownload(member, path, false); err != nil {
+		return nil, nil, fmt.Errorf("%w: %w", source.ErrDenied, err)
 	}
 	if member.Class == repo.Remote {
 		if s.RemoteSources == nil {

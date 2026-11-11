@@ -86,7 +86,12 @@
 //     path redirects to the recorded source, whose policy answers the
 //     redirected request. A request first claims the tag's folder, so a
 //     request from another source or distribution answers 409, and a retry
-//     of the same request completes it.
+//     of the same request completes it. The source's Release, each index it
+//     declares, InRelease and Release.gpg are read under the source's
+//     download policy at their own path, after the Read permission check
+//     (DV-057): a blacked-out source, or patterns that reject one of them,
+//     answer the policy's 404 and message naming <source>:<path>, as a GET
+//     of that file would, and the target gets no snapshot.
 //   - A Packages or Sources index, stored, cached or in a snapshot, reaches
 //     only a caller with Read permission on every package it lists, which
 //     the generic item route cannot check. The download policy does not
@@ -157,7 +162,8 @@
 //   - debian_snapshot_test.go: a snapshot claim bound to its source and
 //     distribution, the repositories and permissions a snapshot needs,
 //     completed and claimed tags kept, and the queued work under the
-//     caller's current permissions and without an authenticator.
+//     caller's current permissions, without an authenticator, and answering
+//     the source's download policy.
 //   - debian_snapshot_security_test.go: snapshot metadata that is missing,
 //     oversized, misdigested or malformed is refused, and a claimed tag
 //     cannot pass to another source; its snapshot request runs through the
@@ -193,8 +199,12 @@
 //     a listed package the caller may not read, an unreadable InRelease and
 //     a package a remote source refuses; snapshots of a local or remote
 //     source whose patterns reject a listed package keeping it listed, the
-//     snapshot's index still served once the source is blacked out; and a
-//     snapshot's metadata refused by a blacked-out target or its patterns.
+//     snapshot's index still served once the source is blacked out; a
+//     snapshot's metadata refused by a blacked-out target or its patterns;
+//     and a snapshot whose source is blacked out, or whose patterns reject
+//     its Release, an index or its InRelease, answering the policy's 404 and
+//     message, while a caller who may not read an index still fails it as
+//     before.
 //
 // debian_index_test.go and debian_virtual_test.go serve their item GETs
 // through the kit with TryDebianItem as the only overlay
