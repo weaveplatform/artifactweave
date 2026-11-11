@@ -177,7 +177,7 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 		if err != nil {
 			t.Fatal(err)
 		}
-		packages, err := svc.rpmCandidates(t.Context(), w.db, c, "", p, acc, map[string]bool{})
+		packages, err := svc.rpmCandidates(t.Context(), w.db, c, "", p, acc, false, map[string]bool{})
 		if !errors.Is(err, tc.expected) || (tc.expected == nil && len(packages) != 0) {
 			t.Errorf("%s: packages=%v error=%v, want %v", tc.key, packages, err, tc.expected)
 		}
@@ -218,6 +218,7 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 		"",
 		p,
 		acc,
+		false,
 		map[string]bool{"rpm-cycle": true},
 	); !errors.Is(
 		err,

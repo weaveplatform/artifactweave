@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
@@ -232,6 +233,127 @@ func TestAccRPMVirtualRepodataSkipsMembersItCannotRead(t *testing.T) {
 	}
 	res = w.do(http.MethodGet, "/artifactory/rpm-virtual/"+rpmAlphaPath, "admin", "")
 	wantError(t, res, http.StatusNotFound, "Could not find resource")
+}
+
+// rpmListed returns the paths of the packages the virtual repository key's
+// repodata lists, read as kittest's administrator, and fails the test when
+// the repodata is not served or does not decode.
+func rpmListed(t *testing.T, w *itemWorld, key string) []string {
+	t.Helper()
+	res := w.do(http.MethodGet, "/artifactory/"+key+"/repodata/repomd.xml", "admin", "")
+	if res.Code != http.StatusOK {
+		t.Fatalf("%s repomd.xml answered %d %s, want 200", key, res.Code, res.Body)
+	}
+	primaryPath, sum, err := rpm.DecodeRepomd(res.Body.Bytes(), "")
+	if err != nil {
+		t.Fatalf("%s repomd.xml does not decode: %v", key, err)
+	}
+	res = w.do(http.MethodGet, "/artifactory/"+key+"/"+primaryPath, "admin", "")
+	packages, err := rpm.DecodePrimary(res.Body.Bytes(), "", sum)
+	if res.Code != http.StatusOK || err != nil {
+		t.Fatalf("%s primary answered %d (%v), want 200", key, res.Code, err)
+	}
+	paths := make([]string, 0, len(packages))
+	for _, pkg := range packages {
+		paths = append(paths, pkg.Path)
+	}
+	return paths
+}
+
+// TestAccRPMVirtualOwnPatternsAnswerNoRepository: a virtual repository's
+// own patterns rejecting a repodata file or a package leave no repository
+// to serve it, 404 "No repository found to serve the request" (6.20
+// VirtualRepoDownloadStrategy), once read permission is settled: a caller
+// who may not read the path is refused first (DV-057).
+func TestAccRPMVirtualOwnPatternsAnswerNoRepository(t *testing.T) {
+	w := newItemWorld(t)
+	w.rpmRepos(
+		repo.Config{Key: "rpm-member", Class: repo.Local},
+		repo.Config{
+			Key: "rpm-closed", Class: repo.Virtual, Repositories: []string{"rpm-member"},
+			ExcludesPattern: new("repodata/**,pool/**"),
+		},
+	)
+	w.publish("rpm-member", "")
+	for _, path := range []string{"repodata/repomd.xml", rpmAlphaPath} {
+		wantError(t, w.do(http.MethodGet, "/artifactory/rpm-closed/"+path, "admin", ""),
+			http.StatusNotFound, "No repository found to serve the request for rpm-closed:"+path)
+		wantError(t, w.do(http.MethodGet, "/artifactory/rpm-closed/"+path, "user", ""),
+			http.StatusForbidden, "Forbidden")
+	}
+}
+
+// TestAccRPMVirtualKeepsPackagesThePatternsReject: a virtual repository's
+// repodata keeps a package whose file a member's patterns, or its own,
+// reject, as 7.x's virtual primary.xml.gz does (RTFACT-30656). The
+// package's GET passes over the refusing member to the next that lists it,
+// answers not found when none serves it, and answers that no repository
+// serves it when the virtual repository's own patterns reject it.
+func TestAccRPMVirtualKeepsPackagesThePatternsReject(t *testing.T) {
+	w := newItemWorld(t)
+	w.rpmRepos(
+		repo.Config{Key: "rpm-hiding", Class: repo.Local, ExcludesPattern: new("pool/**")},
+		repo.Config{Key: "rpm-member", Class: repo.Local},
+		repo.Config{
+			Key: "rpm-virtual", Class: repo.Virtual,
+			Repositories: []string{"rpm-hiding", "rpm-member"},
+		},
+		repo.Config{Key: "rpm-only-hiding", Class: repo.Virtual, Repositories: []string{"rpm-hiding"}},
+		repo.Config{
+			Key: "rpm-picky", Class: repo.Virtual, Repositories: []string{"rpm-member"},
+			ExcludesPattern: new("pool/**"),
+		},
+		repo.Config{Key: "rpm-nested", Class: repo.Virtual, Repositories: []string{"rpm-picky"}},
+	)
+	w.publish("rpm-hiding", "")
+	w.publish("rpm-member", "")
+	for _, key := range []string{"rpm-virtual", "rpm-only-hiding", "rpm-picky", "rpm-nested"} {
+		if got := rpmListed(t, w, key); !slices.Equal(got, []string{rpmAlphaPath}) {
+			t.Errorf("%s repodata lists %v, want alpha", key, got)
+		}
+	}
+	res := w.do(http.MethodGet, "/artifactory/rpm-virtual/"+rpmAlphaPath, "admin", "")
+	if res.Code != http.StatusOK || !bytes.Equal(res.Body.Bytes(), rpmAlpha(t)) {
+		t.Errorf("rpm-virtual alpha answered %d, want rpm-member's package", res.Code)
+	}
+	for _, key := range []string{"rpm-only-hiding", "rpm-nested"} {
+		wantError(t, w.do(http.MethodGet, "/artifactory/"+key+"/"+rpmAlphaPath, "admin", ""),
+			http.StatusNotFound, "Could not find resource")
+	}
+	wantError(t, w.do(http.MethodGet, "/artifactory/rpm-picky/"+rpmAlphaPath, "admin", ""),
+		http.StatusNotFound, "No repository found to serve the request for rpm-picky:"+rpmAlphaPath)
+}
+
+// TestAccRPMVirtualKeepsARemoteMembersRefusedPackage: a remote member whose
+// patterns reject a package it lists keeps it in the virtual repodata, and
+// the package's GET passes over that member without asking its source.
+func TestAccRPMVirtualKeepsARemoteMembersRefusedPackage(t *testing.T) {
+	manifest, primary, primaryPath := rpmUpstreamFixture(t)
+	responses := map[string][]byte{"repodata/repomd.xml": manifest, primaryPath: primary}
+	w := newItemWorld(t, func(c *Config) {
+		c.RemoteSources = &source.Service{Resolve: sourceIdentity, HTTP: sourceBackend(func(
+			_ context.Context, q source.Request, _ source.Permit,
+		) (source.Result, error) {
+			body, ok := responses[q.Resource.Path]
+			if !ok {
+				t.Errorf("the source was asked for %s", q.Resource.Path)
+				return source.Result{}, kernel.ErrNotFound
+			}
+			return source.Result{Stream: &source.Stream{
+				Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
+				Representation: source.Representation{Size: int64(len(body))},
+			}}, nil
+		})}
+	})
+	w.rpmRepos(
+		repo.Config{Key: "rpm-remote", Class: repo.Remote, ExcludesPattern: new("pool/**")},
+		repo.Config{Key: "rpm-virtual", Class: repo.Virtual, Repositories: []string{"rpm-remote"}},
+	)
+	if got := rpmListed(t, w, "rpm-virtual"); !slices.Equal(got, []string{rpmAlphaPath}) {
+		t.Errorf("virtual repodata lists %v, want alpha", got)
+	}
+	wantError(t, w.do(http.MethodGet, "/artifactory/rpm-virtual/"+rpmAlphaPath, "admin", ""),
+		http.StatusNotFound, "Could not find resource")
 }
 
 // TestUnitRPMVirtualRemotePackageRefusesBadBytesAndRevokedCopies: a remote

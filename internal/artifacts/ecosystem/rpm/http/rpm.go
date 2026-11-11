@@ -78,12 +78,19 @@ func (s RPMAPI) serveVirtualRPMMetadata(
 		return
 	}
 	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
-		!acc.File(c, req.Path, accessapi.ActionRead) ||
-		generic.CheckDownload(c, req.Path, false) != nil {
+		!acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
-	candidates, err := s.rpmCandidates(r.Context(), st, c, root, p, acc, map[string]bool{})
+	// 7.x stores a virtual repository's repodata in the virtual repository
+	// (RTFACT-14054, RTFACT-30422), so its own patterns rejecting the file
+	// leave no repository to serve it from, the 404 a file gets (6.20
+	// VirtualRepoDownloadStrategy), once read permission is settled.
+	if err := generic.CheckDownload(c, req.Path, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM virtual metadata download", err))
+		return
+	}
+	candidates, err := s.rpmCandidates(r.Context(), st, c, root, p, acc, false, map[string]bool{})
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM virtual members", err))
 		return
@@ -145,9 +152,12 @@ func (s RPMAPI) serveVirtualRPMPackage(
 		return
 	}
 	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
-		!acc.File(c, req.Path, accessapi.ActionRead) ||
-		generic.CheckDownload(c, req.Path, false) != nil {
+		!acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		return
+	}
+	if err := generic.CheckDownload(c, req.Path, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM virtual package download", err))
 		return
 	}
 	root := ""
@@ -159,7 +169,7 @@ func (s RPMAPI) serveVirtualRPMPackage(
 		}
 		root = strings.Join(parts[:*c.YumRootDepth], "/") + "/"
 	}
-	candidates, err := s.rpmCandidates(r.Context(), st, c, root, p, acc, map[string]bool{})
+	candidates, err := s.rpmCandidates(r.Context(), st, c, root, p, acc, true, map[string]bool{})
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM virtual members", err))
 		return
@@ -250,9 +260,18 @@ func (s RPMAPI) serveVirtualRemoteRPMPackage(
 	s.ServeFile(w, r, s.Store, itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }
 
+// rpmCandidates returns the packages the members of the virtual repository
+// c list below root, the first member's row for each path. A member that
+// refuses its repodata takes no part. With download false, for repodata, a
+// row stays when the member's or the virtual repository's patterns reject
+// its file: 7.x keeps such a package in a virtual repository's
+// primary.xml.gz and refuses only its GET (RTFACT-30656, RTFACT-5000).
+// With download true, for a package GET, a row whose file the policy
+// refuses is left out, so the GET passes over that member to the next one
+// that lists the path.
 func (s RPMAPI) rpmCandidates(
 	ctx context.Context, st itemkit.Store, c repo.Config, root string,
-	p kernel.Principal, acc itemkit.Access, seen map[string]bool,
+	p kernel.Principal, acc itemkit.Access, download bool, seen map[string]bool,
 ) ([]rpmCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
 		return nil, errRPMVirtualCycle
@@ -280,7 +299,7 @@ func (s RPMAPI) rpmCandidates(
 		}
 		var entries []rpmCandidate
 		if member.Class == repo.Virtual {
-			entries, err = s.rpmCandidates(ctx, st, member, root, p, acc, seen)
+			entries, err = s.rpmCandidates(ctx, st, member, root, p, acc, download, seen)
 		} else {
 			var packages []rpm.Package
 			packages, err = s.rpmMemberPackages(ctx, st, member, root, p, acc)
@@ -296,9 +315,11 @@ func (s RPMAPI) rpmCandidates(
 		}
 		for _, entry := range entries {
 			if selected[entry.pkg.Path] || !acc.File(c, entry.pkg.Path, accessapi.ActionRead) ||
-				!acc.File(entry.repo, entry.pkg.Path, accessapi.ActionRead) ||
-				generic.CheckDownload(c, entry.pkg.Path, false) != nil ||
-				generic.CheckDownload(entry.repo, entry.pkg.Path, false) != nil {
+				!acc.File(entry.repo, entry.pkg.Path, accessapi.ActionRead) {
+				continue
+			}
+			if download && (generic.CheckDownload(c, entry.pkg.Path, false) != nil ||
+				generic.CheckDownload(entry.repo, entry.pkg.Path, false) != nil) {
 				continue
 			}
 			selected[entry.pkg.Path] = true
@@ -453,7 +474,7 @@ func (s RPMAPI) CalculateYumRepositoryMetadata(
 		if err != nil {
 			return nil, s.InternalError(ctx, "RPM virtual rights", err)
 		}
-		candidates, err := s.rpmCandidates(ctx, st, c, root, p, acc, map[string]bool{})
+		candidates, err := s.rpmCandidates(ctx, st, c, root, p, acc, false, map[string]bool{})
 		if err != nil {
 			return nil, s.ItemError(ctx, "RPM virtual calculation", err)
 		}
