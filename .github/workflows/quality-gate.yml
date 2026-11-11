@@ -882,8 +882,7 @@ jobs:
       - name: NuGet client images (background)
         run: |
           {
-            docker build -t artifactweave-accept-dotnet \
-              -f test/acceptance/clients/dotnet.Dockerfile test/acceptance/clients
+            docker build -t artifactweave-accept-dotnet test/acceptance/clients/dotnet-10
             docker build -t artifactweave-accept-dotnet11 \
               -f test/acceptance/clients/dotnet-11.Dockerfile test/acceptance/clients
           } > "$RUNNER_TEMP/client-images.log" 2>&1 &
