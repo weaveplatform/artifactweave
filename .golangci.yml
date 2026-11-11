@@ -237,35 +237,6 @@ linters:
 
     # fine-grained rules to drop issues by path, linter, text, or source
     rules:
-      # in test files, silence these noisy checks
-      - path: _test\.go
-        linters:
-          - gocyclo
-          - errcheck
-          - dupl
-          - gosec
-
-      # only run “forbidigo” on tests (silence everywhere else)
-      - path-except: _test\.go
-        linters:
-          - forbidigo
-
-      # silence known gosec warning in this vendored code
-      - path: internal/hmac/
-        text: "weak cryptographic primitive"
-        linters:
-          - gosec
-
-      # drop staticcheck’s SA9003 messages
-      - linters:
-          - staticcheck
-        text: "SA9003:"
-
-      # exclude “lll” warnings on go:generate lines
-      - linters:
-          - lll
-        source: "^//go:generate "
-
       # Every linter reports on internal/; elsewhere only revive
       # (decision 0044: widening the others would surface about 126 unrelated
       # findings). A linter added to enable must join this list, or it reports
