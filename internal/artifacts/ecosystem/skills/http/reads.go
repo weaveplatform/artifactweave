@@ -110,13 +110,13 @@ func (h handler) visible(r *http.Request, slug string) (skill, error) {
 // it keeps a skill's index is not documented, so the reads a client
 // resolves a skill's version from (detail, versions, version and resolve;
 // the JFrog CLI's install resolves its version from the list of versions)
-// refuse at the skill's folder. A download refuses before the index is
-// read too, whether its version exists or not, as the item routes refuse a
-// missing path (6.20 checks the download policy before it looks a path
-// up). The list and search keep their answers, as 6.20's searchers check
-// permissions and patterns but not the blackout, and patterns rejecting a
-// version's bundle leave it listed: only the bundle's download and its
-// files refuse.
+// refuse at the skill's folder. A download, and a read of one file of a
+// bundle, refuse before the index is read too, whether the version exists
+// or not, as the item routes refuse a missing path (6.20 checks the
+// download policy before it looks a path up). The list and search keep
+// their answers, as 6.20's searchers check permissions and patterns but
+// not the blackout, and patterns rejecting a version's bundle leave it
+// listed: only the bundle's download and its files refuse.
 func (h handler) notBlackedOut(w http.ResponseWriter, r *http.Request, path string) bool {
 	if err := h.k.CheckBlackedOut(r, path); err != nil {
 		h.k.Error(w, r, err)
@@ -127,10 +127,8 @@ func (h handler) notBlackedOut(w http.ResponseWriter, r *http.Request, path stri
 
 // selected finds the version a read names, after the caller's read
 // permission on the skill's folder. A blacked-out repository is refused
-// first, at blackout, when that is not empty: the skill's folder for the
-// version route's resolution metadata, and for a download the path its
-// refusal names. A file of a version's bundle passes none, so that its
-// refusal names the bundle's path, after the index is read.
+// first, naming blackout: the skill's folder for the version route's
+// resolution metadata, and refusedAt's path for a bundle or a file in it.
 func (h handler) selected(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -146,7 +144,7 @@ func (h handler) selected(
 	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
 		return skillVersion{}, false
 	}
-	if blackout != "" && !h.notBlackedOut(w, r, blackout) {
+	if !h.notBlackedOut(w, r, blackout) {
 		return skillVersion{}, false
 	}
 	s, err := h.visible(r, slug)
@@ -525,17 +523,22 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 	h.k.Error(w, r, notFound())
 }
 
+// refusedAt is the path a blacked-out repository's refusal of a version's
+// bundle names, and of a file in it, which takes its bundle's check. A
+// named version's refusal names its bundle, as the refusal of a stored one
+// does, whether it is stored or not; latest is resolved from the index,
+// which a blacked-out repository does not read, so its refusal names the
+// skill's folder, as resolve's does.
+func refusedAt(slug, version string) string {
+	if version == "" || version == "latest" {
+		return slug
+	}
+	return skillsfmt.Path(slug, version)
+}
+
 func (h handler) download(w http.ResponseWriter, r *http.Request) {
 	slug, version := r.URL.Query().Get("slug"), r.URL.Query().Get("version")
-	// A named version's refusal names its bundle, as the refusal of a
-	// stored one does; latest is resolved from the index, which a
-	// blacked-out repository does not read, so its refusal names the
-	// skill's folder, as resolve's does.
-	blackout := skillsfmt.Path(slug, version)
-	if version == "" || version == "latest" {
-		blackout = slug
-	}
-	v, ok := h.selected(w, r, slug, version, blackout)
+	v, ok := h.selected(w, r, slug, version, refusedAt(slug, version))
 	if !ok {
 		return
 	}
@@ -543,8 +546,10 @@ func (h handler) download(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) singleFile(w http.ResponseWriter, r *http.Request) {
-	slug := chi.URLParam(r, "slug")
-	v, ok := h.selected(w, r, slug, r.URL.Query().Get("version"), "")
+	slug, version := chi.URLParam(r, "slug"), r.URL.Query().Get("version")
+	// The file's name is checked after the index read, so a blacked-out
+	// repository refuses a malformed one as well.
+	v, ok := h.selected(w, r, slug, version, refusedAt(slug, version))
 	if !ok {
 		return
 	}

@@ -394,8 +394,9 @@ func TestAccSingleFileStoredBlobFaults(t *testing.T) {
 // reject with the item routes' 404 and message, for an administrator too.
 // A blacked-out repository's detail, versions, version and resolve, which
 // a client resolves a version from, answer the blackout's 404 naming the
-// skill's folder, and its downloads refuse before the index is read, so a
-// version or skill that does not exist is refused alike. The list and
+// skill's folder, and its downloads and single-file reads refuse before the
+// index is read, so a version or skill that does not exist is refused
+// alike. The list and
 // search keep their answers, a version whose bundle the patterns reject
 // stays listed, the scan status still answers for the stored bundle, and
 // discovery stays anonymous. A caller who may not read the skill learns
@@ -437,18 +438,29 @@ func TestAccSkillsDownloadPolicy(t *testing.T) {
 		}
 	}
 	bundle := "/api/v1/download?slug=alpha&version=2.0.0"
-	// downloads maps each download a blacked-out repository refuses before
-	// the index is read to the path its refusal names: a named version's
-	// bundle, stored or not, and the skill's folder for latest, which only
-	// the index could resolve.
-	downloads := map[string]string{
-		bundle: "alpha/2.0.0/alpha-2.0.0.zip",
+	file := "/api/v1/skills/alpha/file?version=2.0.0&path=src%2Frun.js"
+	malformed := "/api/v1/skills/alpha/file?version=2.0.0&path=..%2Fsecret"
+	// bundleReads maps each read of a bundle, or of a file in it, that a
+	// blacked-out repository refuses before the index is read to the path
+	// its refusal names: a named version's bundle, stored or not, and the
+	// skill's folder for latest, which only the index could resolve. A
+	// file's name is checked after the index read, so a malformed one is
+	// refused alike.
+	bundleReads := map[string]string{
+		bundle:    "alpha/2.0.0/alpha-2.0.0.zip",
+		file:      "alpha/2.0.0/alpha-2.0.0.zip",
+		malformed: "alpha/2.0.0/alpha-2.0.0.zip",
+
 		"/api/v1/download?slug=alpha&version=9.9.9":    "alpha/9.9.9/alpha-9.9.9.zip",
 		"/api/v1/download?slug=missing&version=1.0.0":  "missing/1.0.0/missing-1.0.0.zip",
 		"/api/v1/download?slug=alpha&version=latest":   "alpha",
 		"/api/v1/download?slug=missing&version=latest": "missing",
+
+		"/api/v1/skills/alpha/file?version=9.9.9&path=SKILL.md":    "alpha/9.9.9/alpha-9.9.9.zip",
+		"/api/v1/skills/missing/file?version=1.0.0&path=SKILL.md":  "missing/1.0.0/missing-1.0.0.zip",
+		"/api/v1/skills/alpha/file?version=latest&path=SKILL.md":   "alpha",
+		"/api/v1/skills/missing/file?version=latest&path=SKILL.md": "missing",
 	}
-	file := "/api/v1/skills/alpha/file?version=2.0.0&path=src%2Frun.js"
 	resolution := []string{
 		"/api/v1/skills/alpha", "/api/v1/skills/alpha/versions",
 		"/api/v1/skills/alpha/versions/2.0.0", "/api/v1/skills/alpha/versions/latest",
@@ -489,11 +501,16 @@ func TestAccSkillsDownloadPolicy(t *testing.T) {
 		return "The repository 'skills-local' is blacked out and cannot serve artifact " +
 			"'skills-local:" + path + "'."
 	}
+	// A read that names no version is malformed, and answers 400 before
+	// any check, as without the blackout.
+	unversioned := []string{
+		"/api/v1/download?slug=alpha",
+		"/api/v1/skills/alpha/file?path=SKILL.md",
+	}
 	for _, as := range []string{"admin", "reader"} {
-		for path, named := range downloads {
+		for path, named := range bundleReads {
 			failed(as, path, http.StatusNotFound, blackedOut(named))
 		}
-		answers(as, file, http.StatusNotFound, blackedOut("alpha/2.0.0/alpha-2.0.0.zip"))
 		for _, path := range resolution {
 			answers(as, path, http.StatusNotFound, blackedOut("alpha"))
 		}
@@ -501,13 +518,16 @@ func TestAccSkillsDownloadPolicy(t *testing.T) {
 		// that does not exist is refused alike.
 		answers(as, "/api/v1/skills/missing/versions", http.StatusNotFound, blackedOut("missing"))
 		answers(as, "/api/v1/skills/alpha/versions/9.9.9", http.StatusNotFound, blackedOut("alpha"))
+		for _, path := range unversioned {
+			failed(as, path, http.StatusBadRequest, "invalid skill slug or version")
+		}
 	}
 	kept()
 	// Read permission first (DV-057).
-	for path := range downloads {
+	for path := range bundleReads {
 		failed("nobody", path, http.StatusForbidden, "Forbidden")
 	}
-	for _, path := range append([]string{file}, resolution...) {
+	for _, path := range resolution {
 		r := f.read("nobody", path)
 		if r.Code != http.StatusForbidden || strings.Contains(r.Body.String(), "blacked out") {
 			t.Errorf("nobody %s: %d %s, want 403 without the setting", path, r.Code, r.Body)
@@ -518,16 +538,25 @@ func TestAccSkillsDownloadPolicy(t *testing.T) {
 	answers("reader", bundle, http.StatusOK, "PK")
 	answers("reader", "/api/v1/download?slug=alpha&version=latest", http.StatusOK, "PK")
 	answers("reader", file, http.StatusOK, "run 2.0.0")
+	answers("reader", "/api/v1/skills/alpha/file?version=latest&path=SKILL.md", http.StatusOK,
+		"name: alpha")
 	for _, path := range resolution {
 		answers("reader", path, http.StatusOK, "2.0.0")
 	}
 	// Without the blackout the index answers for a version or skill it
-	// does not hold.
+	// does not hold, and a file's name is checked once the version is.
 	for _, path := range []string{
 		"/api/v1/download?slug=alpha&version=9.9.9",
 		"/api/v1/download?slug=missing&version=1.0.0",
 		"/api/v1/download?slug=missing&version=latest",
+		"/api/v1/skills/alpha/file?version=9.9.9&path=SKILL.md",
+		"/api/v1/skills/missing/file?version=1.0.0&path=SKILL.md",
+		"/api/v1/skills/missing/file?version=latest&path=SKILL.md",
 	} {
 		failed("reader", path, http.StatusNotFound, "Could not find resource")
+	}
+	failed("reader", malformed, http.StatusBadRequest, "invalid skill file path")
+	for _, path := range unversioned {
+		failed("reader", path, http.StatusBadRequest, "invalid skill slug or version")
 	}
 }
