@@ -129,20 +129,20 @@ func TestUnitSwiftCachedMetadataBlobAndPermissionFence(t *testing.T) {
 			return nil
 		},
 	}
-	fence(&result, metadata, []string{"acme/Widget/Widget-1.0.0.zip"})
+	fence(&result, metadata, metadata.CheckRead, []string{"acme/Widget/Widget-1.0.0.zip"})
 	if err := result.Revalidate(t.Context()); err != nil || !reflect.DeepEqual(order,
 		[]string{"archive", "metadata", "acme/Widget/Widget-1.0.0.zip"}) {
 		t.Fatalf("archive delivery fence: order=%v err=%v", order, err)
 	}
 	result = source.Result{}
-	fence(&result, source.Result{}, []string{"acme/Widget/Widget-1.0.0.zip"})
+	fence(&result, source.Result{}, nil, []string{"acme/Widget/Widget-1.0.0.zip"})
 	if err := result.Revalidate(t.Context()); !errors.Is(err, source.ErrDenied) {
 		t.Fatalf("missing metadata permission check was accepted: %v", err)
 	}
 	result = source.Result{}
-	fence(&result, source.Result{CheckRead: func(context.Context, string) error {
+	fence(&result, source.Result{}, func(context.Context, string) error {
 		return source.ErrDenied
-	}}, []string{"acme/Widget/Widget-1.0.0.zip"})
+	}, []string{"acme/Widget/Widget-1.0.0.zip"})
 	if err := result.Revalidate(t.Context()); !errors.Is(err, source.ErrDenied) {
 		t.Fatalf("revoked archive permission was accepted: %v", err)
 	}
@@ -156,10 +156,9 @@ func TestUnitSwiftCachedMetadataBlobAndPermissionFence(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			result := source.Result{Revalidate: tc.archive}
-			fence(&result, source.Result{
-				Revalidate: tc.metadata,
-				CheckRead:  func(context.Context, string) error { return nil },
-			}, []string{"acme/Widget/Widget-1.0.0.zip"})
+			fence(&result, source.Result{Revalidate: tc.metadata},
+				func(context.Context, string) error { return nil },
+				[]string{"acme/Widget/Widget-1.0.0.zip"})
 			if err := result.Revalidate(t.Context()); !errors.Is(err, source.ErrDenied) {
 				t.Fatalf("revoked source credentials were accepted: %v", err)
 			}

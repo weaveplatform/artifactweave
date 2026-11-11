@@ -67,6 +67,16 @@
 //     served without the member's Link headers and with redirects onto the
 //     virtual URL, so the client's next request meets the virtual
 //     repository's permissions. A member that fails answers 502.
+//   - The download policy (decision 0032) is checked after Read
+//     permission. A blacked-out local or federated repository refuses
+//     every read, the release list, release metadata and Package.swift at
+//     the requested path before anything is computed; patterns refuse only
+//     a release's archive, which the list, the metadata and Package.swift
+//     still name, local and remote alike. An archive refused answers the
+//     policy's own 404 and message, with no archive header. A virtual
+//     repository's own patterns refuse an archive with "No repository found
+//     to serve the request", and a member that refuses an archive, remote
+//     ones included, is passed over.
 //   - Statuses and error texts stay byte-identical.
 //
 // # References
@@ -115,6 +125,9 @@
 //     and authorization.
 //   - cache_fence_test.go: input and cancellation bounds, and the cached
 //     metadata's blob and permission fence.
+//   - policy_test.go: the download policy on local, remote and virtual
+//     reads: blackout, patterns on one archive, members passed over or
+//     left out, and the virtual repository's own patterns.
 //
 // The TestAccSwiftPM tests skip unless ARTIFACTWEAVE_SWIFT_IMAGE names the
 // SwiftPM client image or ARTIFACTWEAVE_SWIFT_CLIENT_LOCAL=1 is set with
