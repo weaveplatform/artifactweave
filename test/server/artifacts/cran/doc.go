@@ -29,7 +29,8 @@
 //     authority, index variants, and the download policy: its 404 for
 //     indexes and remote or virtual packages, and packages its patterns
 //     reject kept in local, remote and virtual indexes while their GETs are
-//     refused or passed over to the next member.
+//     refused or passed over to the next member, and a virtual package
+//     served from a member whose patterns reject only its index.
 //   - cran_archive_test.go: the archive migration, its rollback, refusals,
 //     collisions, destination policy and storage failure.
 //

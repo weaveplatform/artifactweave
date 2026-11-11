@@ -73,7 +73,9 @@
 //     it. A virtual package's GET leaves out each row whose file a member's
 //     or the virtual repository's download policy refuses before names are
 //     claimed, so it passes over that member to the next one that lists the
-//     package.
+//     package. It checks a member's policy at the package's own path, never
+//     at the index it reads to find the package, so there only a
+//     blacked-out member is skipped for its index.
 //   - A virtual or remote repository serves a package only when the index
 //     of the repository that holds it lists that path, and pins a remote's
 //     download to the MD5 that index gives.

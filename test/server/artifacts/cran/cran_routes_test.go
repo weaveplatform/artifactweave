@@ -953,3 +953,56 @@ func TestAccCRANVirtualKeepsPackagesThePatternsReject(t *testing.T) {
 		http.StatusNotFound,
 		"No repository found to serve the request for cran-picky:"+cranAssertthat)
 }
+
+// TestAccCRANVirtualPackageChecksAMemberAtThePackagesPath: a virtual
+// package GET checks each member at the package's own path, never at the
+// index it reads to find the package. A local or remote member, or a
+// nested virtual one, whose patterns reject only its PACKAGES serves the
+// package, while the virtual index still leaves that member out; a
+// blacked-out member, which refuses every file, takes no part.
+func TestAccCRANVirtualPackageChecksAMemberAtThePackagesPath(t *testing.T) {
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = cranUpstream(t) })
+	archive := cranFixtureBytes(t, "assertthat_0.2.1.tar.gz")
+	cranPublish(t, w, "cran-indexless", cranExcluding("**/PACKAGES*"), string(archive))
+	cranPublish(t, w, "cran-dark", func(c *repo.Config) { c.BlackedOut = new(true) },
+		string(archive))
+	cranPublish(t, w, "cran-plain", func(*repo.Config) {}, string(archive))
+	for _, c := range []repo.Config{
+		{
+			Key: "cran-remote", Class: repo.Remote, PackageType: repo.Cran,
+			URL: "https://up.example", ExcludesPattern: new("**/PACKAGES*"),
+		},
+		{
+			Key: "cran-closed", Repositories: []string{"cran-plain"},
+			ExcludesPattern: new("**/PACKAGES*"),
+		},
+		{Key: "cran-over-indexless", Repositories: []string{"cran-indexless"}},
+		{Key: "cran-over-remote", Repositories: []string{"cran-remote"}},
+		{Key: "cran-over-dark", Repositories: []string{"cran-dark"}},
+		{Key: "cran-over-closed", Repositories: []string{"cran-closed"}},
+	} {
+		if c.Class == "" {
+			c.Class, c.PackageType = repo.Virtual, repo.Cran
+		}
+		cranRepo(t, w, c)
+	}
+	for _, key := range []string{
+		"cran-over-indexless", "cran-over-remote", "cran-over-dark", "cran-over-closed",
+	} {
+		index := w.do(http.MethodGet, "/artifactory/"+key+"/"+cranIndex, "admin", "")
+		wantStatus(t, index, http.StatusOK)
+		if strings.Contains(index.Body.String(), "assertthat") {
+			t.Errorf("%s index lists the refusing member's package: %s", key, index.Body)
+		}
+	}
+	for _, key := range []string{"cran-over-indexless", "cran-over-remote", "cran-over-closed"} {
+		got := w.do(http.MethodGet, "/artifactory/"+key+"/"+cranAssertthat, "admin", "")
+		wantStatus(t, got, http.StatusOK)
+		if !bytes.Equal(got.Body.Bytes(), archive) {
+			t.Errorf("%s changed the member's archive during delivery", key)
+		}
+	}
+	wantCRANError(t,
+		w.do(http.MethodGet, "/artifactory/cran-over-dark/"+cranAssertthat, "admin", ""),
+		http.StatusNotFound, "Could not find resource")
+}
