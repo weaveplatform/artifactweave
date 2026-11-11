@@ -199,6 +199,7 @@
       "multipart_test.go",
       "overwrite_test.go",
       "properties_long_test.go",
+      "protocol_download_policy_test.go",
       "redirect_test.go",
       "reindex_remote_test.go",
       "reindex_test.go",
@@ -237,13 +238,18 @@
   },
   "format_dependencies": {
     "agentpackages": [
+      "test/server/artifacts/protocol_download_policy_test.go",
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "agentplugins": [
       "test/server/artifacts/repositories_format_class_test.go"
     ],
+    "bower": [
+      "test/server/artifacts/protocol_download_policy_test.go"
+    ],
     "cargo": [
-      "internal/app/spec_test.go"
+      "internal/app/spec_test.go",
+      "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "chef": [
       "internal/app/status_chef_test.go"
@@ -257,18 +263,31 @@
     "docker": [
       "internal/app/registry_shared_test.go"
     ],
+    "gems": [
+      "test/server/artifacts/protocol_download_policy_test.go"
+    ],
+    "gitlfs": [
+      "test/server/artifacts/protocol_download_policy_test.go"
+    ],
+    "golang": [
+      "test/server/artifacts/protocol_download_policy_test.go"
+    ],
     "helm": [
       "internal/app/reindex_internal_test.go",
+      "test/server/artifacts/protocol_download_policy_test.go",
       "test/server/artifacts/reindex_test.go",
       "test/server/artifacts/sidecar_rights_test.go"
     ],
     "hex": [
+      "test/server/artifacts/protocol_download_policy_test.go",
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "huggingface": [
-      "internal/app/status_huggingface_xet_test.go"
+      "internal/app/status_huggingface_xet_test.go",
+      "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "luarocks": [
+      "test/server/artifacts/protocol_download_policy_test.go",
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "machinelearning": [
@@ -285,7 +304,8 @@
       "internal/app/status_nix_test.go"
     ],
     "npm": [
-      "internal/app/error_profiles_p8_test.go"
+      "internal/app/error_profiles_p8_test.go",
+      "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "nuget": [
       "test/server/artifacts/repositories_test.go"
@@ -295,7 +315,11 @@
     ],
     "pypi": [
       "internal/app/reindex_internal_test.go",
+      "test/server/artifacts/protocol_download_policy_test.go",
       "test/server/artifacts/reindex_test.go"
+    ],
+    "swift": [
+      "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "terraform": [
       "test/server/access/keypairs_test.go",
