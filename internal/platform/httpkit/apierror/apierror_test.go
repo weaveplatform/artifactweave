@@ -3,6 +3,7 @@ package apierror
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -170,10 +171,66 @@ func TestUnitWriteText(t *testing.T) {
 	}
 }
 
+// TestUnitDefaultCodes: in the Access, Grid and Pub envelopes, each status
+// that a handler, the middleware or a remote's upstream can send through them
+// carries a code of its own beside the status and message as given: its JAX-RS
+// name, INTERNAL_ERROR for 500 and for a status Go has no text for, and
+// UNSUPPORTED for 501.
 func TestUnitDefaultCodes(t *testing.T) {
-	for status, code := range map[int]string{400: "BAD_REQUEST", 401: "UNAUTHORIZED", 403: "FORBIDDEN", 404: "NOT_FOUND", 409: "CONFLICT", 501: "UNSUPPORTED", 418: "INTERNAL_ERROR"} {
-		if got := New(status, "x").Code; got != code {
-			t.Errorf("status %d: code %q, want %q", status, got, code)
+	codes := []struct {
+		status int
+		code   string
+	}{
+		{http.StatusBadRequest, "BAD_REQUEST"},
+		{http.StatusUnauthorized, "UNAUTHORIZED"},
+		{http.StatusForbidden, "FORBIDDEN"},
+		{http.StatusNotFound, "NOT_FOUND"},
+		{http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED"},
+		{http.StatusConflict, "CONFLICT"},
+		{http.StatusRequestEntityTooLarge, "REQUEST_ENTITY_TOO_LARGE"},
+		{http.StatusUnsupportedMediaType, "UNSUPPORTED_MEDIA_TYPE"},
+		{http.StatusTooManyRequests, "TOO_MANY_REQUESTS"},
+		{http.StatusInternalServerError, "INTERNAL_ERROR"},
+		{http.StatusNotImplemented, "UNSUPPORTED"},
+		{http.StatusBadGateway, "BAD_GATEWAY"},
+		{http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE"},
+		{http.StatusGatewayTimeout, "GATEWAY_TIMEOUT"},
+		{http.StatusHTTPVersionNotSupported, "HTTP_VERSION_NOT_SUPPORTED"},
+		{599, "INTERNAL_ERROR"},
+	}
+	profiles := []struct {
+		name        string
+		profile     Profile
+		contentType string
+		body        string
+	}{
+		{
+			"access",
+			ProfileAccess,
+			"application/json",
+			`{"errors":[{"code":"%s","message":"refused"}]}`,
+		},
+		{"grid", ProfileGrid, "application/json", `{"code":"%s","message":"refused"}`},
+		{
+			"pub",
+			ProfilePub,
+			"application/vnd.pub.v2+json",
+			`{"error":{"code":"%s","message":"refused"}}`,
+		},
+	}
+	for _, p := range profiles {
+		for _, c := range codes {
+			t.Run(fmt.Sprintf("%s %d", p.name, c.status), func(t *testing.T) {
+				rec := httptest.NewRecorder()
+				Write(rec, p.profile, New(c.status, "refused"))
+				want := fmt.Sprintf(p.body, c.code) + "\n"
+				if rec.Code != c.status || rec.Header().Get("Content-Type") != p.contentType ||
+					rec.Body.String() != want {
+					t.Fatalf("%d %q %s, want %d %q %s",
+						rec.Code, rec.Header().Get("Content-Type"), rec.Body,
+						c.status, p.contentType, want)
+				}
+			})
 		}
 	}
 	if New(404, "m").Error() != "m" {
