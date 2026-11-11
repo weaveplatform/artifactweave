@@ -5,12 +5,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // helmRepos are Helm's fixture repositories: helm-local, helm-remote and
@@ -32,7 +32,7 @@ func helmChart(name, version string) []byte {
 func seedHelm(
 	t *testing.T,
 	items *item.Service,
-	db store.Store,
+	db harness.Store,
 	key string,
 	prov bool,
 	paths ...string,
@@ -62,7 +62,7 @@ func seedHelm(
 // path of helm-local but its .prov files, which its permission excludes:
 // the caller a chart's operation must refuse when it would take a .prov
 // along (decision 0039).
-func grantCharter(t *testing.T, db store.Store) {
+func grantCharter(t *testing.T, db harness.Store) {
 	t.Helper()
 	support.SeedHelmCharter(t, db, cheapHash)
 }
@@ -72,7 +72,7 @@ func grantCharter(t *testing.T, db store.Store) {
 // Enforce Layout fields on an update. Helm's reindex operation answers
 // since the format rebuilds its index; reindexStatusPart has its rows.
 var helmStatusPart = statusPart{
-	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
+	seed: func(t *testing.T, db harness.Store, blobs blob.Store) {
 		t.Helper()
 		yes := true
 		c := repo.Config{

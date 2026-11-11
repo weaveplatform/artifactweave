@@ -4,13 +4,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
 )
 
 // The Maven calculateMetadata route requires all content actions on the
 // folder, matching the documented REST permission set.
-const calculateMetadataActions = types.ActionManage | types.ActionDelete |
-	types.ActionWrite | types.ActionAnnotate | types.ActionRead
+const calculateMetadataActions = api.ActionManage | api.ActionDelete |
+	api.ActionWrite | api.ActionAnnotate | api.ActionRead
 
 // mavenMatrixPart is Maven's share of the route × principal matrix, which
 // its pull requests (#276–#284) fill in. Each rule answers a caller who may
@@ -21,7 +21,7 @@ var mavenMatrixPart = matrixPart{
 			local    = "/artifactory/maven-local/work/"
 			releases = "/artifactory/maven-releases/work/"
 		)
-		write, read := types.ActionWrite, types.ActionRead
+		write, read := api.ActionWrite, api.ActionRead
 		writes := holds("maven-local", "work/", write)
 		sha1 := strings.Repeat("0", 40)
 		return []matrixRow{

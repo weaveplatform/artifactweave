@@ -76,7 +76,7 @@ linters:
       # Only these two rules run: a rules list replaces revive's defaults.
       # The stuttering check is off because the migration renames nothing, and
       # checkPublicInterface stays off (decision 0044).
-      # TestUnitLintScopeListsEveryLinter (migration/layout) pins this list.
+      # TestUnitLintScopeListsEveryLinter (internal/layout) pins this list.
       rules:
         - name: exported
           arguments:
@@ -96,9 +96,9 @@ linters:
         # package path relative to the module root: a full import path
         # matches nothing, and tagliatelle then reports every JFrog name.
         overrides:
-          - pkg: migration/artifacts/api/repo
+          - pkg: internal/artifacts/api/repo
             ignore: true
-          - pkg: migration/kernel/wire
+          - pkg: internal/kernel/wire
             ignore: true
     wrapcheck:
       # Constructors of new errors with an HTTP status, this project's
@@ -126,10 +126,10 @@ linters:
       # The SQLite and PostgreSQL drivers' OpenDB names the engine in its
       # errors as the dialect layer names the operation ("sqlite: open: ...",
       # "postgres: parse dsn: ..."), or returns the sentinels ErrPathRequired
-      # and ErrDSNRequired. The composite stores' Open passes them up as it
-      # did while the code was its own, and the store opener adds
-      # "open store: "; wrapping them again would change those texts. STO-19
-      # moves the same call into app.
+      # and ErrDSNRequired. The composite store's openers in
+      # app/adapters/sql/sqlite and app/adapters/sql/postgres pass them up as
+      # they did while the code was their own, and app's store opener adds
+      # "open store: "; wrapping them again would change those texts.
       #
       # The remote policy's typed errors: remote.ResponseError turns an
       # upstream answer into its *source.HTTPError, and remote.PolicyError
@@ -266,23 +266,17 @@ linters:
           - lll
         source: "^//go:generate "
 
-      # Every linter reports on internal/ and migration/; elsewhere only revive
+      # Every linter reports on internal/; elsewhere only revive
       # (decision 0044: widening the others would surface about 126 unrelated
       # findings). A linter added to enable must join this list, or it reports
       # everywhere; TestUnitLintScopeListsEveryLinter fails until it does.
-      - path-except: ^(internal|migration)/
+      - path-except: ^internal/
         linters: [govet, staticcheck, errcheck, unused, ineffassign, errorlint, err113, bodyclose, gosec,
                   contextcheck, noctx, nilnil, gocritic, prealloc, misspell, gocyclo, wrapcheck, musttag, tagliatelle]
 
-      # Legacy roots keep their documentation debt until they move, so this
-      # rule shrinks as they empty and goes at promotion. The pattern must equal
-      # ledger.LegacyRegexp() (TestUnitLintLegacyRuleMatchesLedgerLegacyRoots).
-      - path: ^(internal|pkg/(aql|blob|cdn|layout|repo|store|types))/
-        linters: [revive]
-
     # Files whose issues are never reported (they are still analysed).
     # The patterns match anywhere in the path, so each is anchored: an
-    # unanchored "tools/.*" would also hide migration/devtools/. warn-unused
+    # unanchored "tools/.*" would also hide internal/devtools/. warn-unused
     # flags a pattern that matches nothing, so none is kept for a directory
     # the repository does not have.
     paths:

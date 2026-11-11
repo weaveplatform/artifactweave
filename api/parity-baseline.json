@@ -57,6 +57,7 @@
     "POST /mc/api/v1/buckets/{}/deploy",
     "POST /mc/api/v1/buckets/{}/release",
     "POST /mc/api/v1/jpds",
+    "PUT /access/api/v2/groups/{}",
     "PUT /bridge-client/api/v1/service_trust/pairing/bridge/{}",
     "PUT /bridge-server/api/v1/blacklist/{}",
     "PUT /mc/api/v1/federation/{}",

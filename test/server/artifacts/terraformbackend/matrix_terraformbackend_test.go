@@ -3,8 +3,8 @@ package terraformbackend_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/terraformstate"
 )
 
 // tfbeMatrixPart is the Terraform backend's share of the route × principal
@@ -20,17 +20,17 @@ var tfbeMatrixPart = matrixPart{
 		const latest = "workspaces/app/state.latest.json"
 		return append(tfbeAPIMatrixRows(), []matrixRow{
 			row(tfbeGet, "/artifactory/tfbe-local/"+latest, "",
-				holds("tfbe-local", latest, types.ActionRead), 200),
+				holds("tfbe-local", latest, api.ActionRead), 200),
 			row(tfbePut, "/artifactory/tfbe-local/workspaces/{p}/state.latest.json", tfbeState(3),
-				holds("tfbe-local", "workspaces/x/state.latest.json", types.ActionWrite), 400),
+				holds("tfbe-local", "workspaces/x/state.latest.json", api.ActionWrite), 400),
 		}...)
 	},
 }
 
 func tfbeAPIMatrixRows() []matrixRow {
-	read := holds("tfbe-local", "workspaces/app", types.ActionRead)
-	write := holds("tfbe-local", "workspaces/app/state.latest.json", types.ActionWrite)
-	del := holds("tfbe-local", "workspaces/app", types.ActionDelete)
+	read := holds("tfbe-local", "workspaces/app", api.ActionRead)
+	write := holds("tfbe-local", "workspaces/app/state.latest.json", api.ActionWrite)
+	del := holds("tfbe-local", "workspaces/app", api.ActionDelete)
 	base := tfbeAPI + "/organizations/tfbe-local"
 	ws := tfbeAPI + "/workspaces/tfbe-local__app"
 	state := tfbeAPI + "/state-versions/" + tfbeVersion
@@ -74,7 +74,7 @@ func tfbeAPIMatrixRows() []matrixRow {
 	orgRead := func(p matrixPrincipal) int {
 		// Organization discovery accepts Read anywhere in this repository.
 		for _, g := range p.grants {
-			if (g.repo == "*" || g.repo == "tfbe-local") && g.actions&types.ActionRead != 0 {
+			if (g.repo == "*" || g.repo == "tfbe-local") && g.actions&api.ActionRead != 0 {
 				return 0
 			}
 		}

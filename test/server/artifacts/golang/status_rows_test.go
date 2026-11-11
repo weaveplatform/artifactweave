@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // goRepos are Go's fixture repositories: go-local, go-remote and
@@ -46,7 +46,7 @@ const goModule = "example.com/acme/lib"
 
 // seedGoModule deploys goModule's files to go-local through the item
 // service, which indexes them as the Go format does.
-func seedGoModule(t *testing.T, items *item.Service, db store.Store) {
+func seedGoModule(t *testing.T, items *item.Service, db harness.Store) {
 	t.Helper()
 	ctx := context.Background()
 	c, err := db.Repos().Get(ctx, "go-local")
@@ -77,7 +77,7 @@ var goStatusPart = statusPart{
 		goModHead: true, goZip: true, goZipHead: true, goLatest: true, goLatestHead: true,
 		goLatestInfo: true, goPut: true,
 	},
-	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
+	seed: func(t *testing.T, db harness.Store, blobs blob.Store) {
 		t.Helper()
 		seedGoModule(t, &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}, db)
 		grantOverwriter(t, db, "go-local", goModule+"/")

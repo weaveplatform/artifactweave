@@ -1,0 +1,233 @@
+package app
+
+import (
+	"context"
+	"fmt"
+	pathpkg "path"
+	"strings"
+	"testing"
+
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/build"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+)
+
+// testStarted is a started timestamp in the layout the JFrog CLI writes.
+const testStarted = "2026-10-15T09:30:00.000+0000"
+
+// allowBuilds lets a fixture publish builds without a caller.
+type allowBuilds struct{}
+
+func (allowBuilds) Build(string, string, bool, api.Actions) bool { return true }
+func (allowBuilds) Item(repo.Config, string, api.Actions) bool   { return true }
+
+// buildDoc is a build-info document of one run without modules.
+func buildDoc(name, number, started string) string {
+	return fmt.Sprintf(`{"name":%q,"number":%q,"started":%q}`, name, number, started)
+}
+
+// seedBuild publishes run number 1 of name, started at testStarted.
+func seedBuild(t *testing.T, db *inmem.Store, blobs blob.Store, name string) {
+	t.Helper()
+	svc := build.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
+	if _, err := svc.Publish(
+		context.Background(), "", []byte(buildDoc(name, "1", testStarted)), "admin", allowBuilds{},
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// seedBuildArtifact publishes run 1 of name, started at testStarted, which
+// produced libs-local's file at path, deployed carrying the run's build
+// properties: a run the build artifacts search finds a file of.
+func seedBuildArtifact(t *testing.T, db *inmem.Store, blobs blob.Store, name, path string) {
+	t.Helper()
+	ctx := context.Background()
+	libs, err := db.Repos().Get(ctx, "libs-local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (&item.Service{
+		Store: db, Blobs: blobs, Formats: ecosystem.For,
+	}).Deploy(ctx, item.Deploy{
+		Target: item.Target{Repo: libs, Path: path}, Body: strings.NewReader(name),
+		Properties: model.Properties{"build.name": {name}, "build.number": {"1"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	doc := fmt.Sprintf(`{"name":%q,"number":"1","started":%q,"modules":[{"id":"m",`+
+		`"artifacts":[{"name":%q,"sha1":%q}]}]}`, name, testStarted, pathpkg.Base(path), sha1Hex(name))
+	if _, err := (&build.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}).Publish(
+		ctx, "", []byte(doc), "admin", allowBuilds{},
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// buildStatusRows covers the Builds API (#165, #166). The fixture published
+// run 1 of st-app, st-ren, st-del, st-del2, st-pro and st-ret
+// (seedStatusBuilds); the rows that change a build each use their own.
+func buildStatusRows() []statusCase {
+	const (
+		all       = "GET /artifactory/api/build"
+		publish   = "PUT /artifactory/api/build"
+		runs      = "GET /artifactory/api/build/{buildName}"
+		info      = "GET /artifactory/api/build/{buildName}/{buildNumber}"
+		appendOp  = "POST /artifactory/api/build/append/{buildName}/{buildNumber}"
+		rename    = "POST /artifactory/api/build/rename/{buildName}"
+		remove    = "DELETE /artifactory/api/build/{buildName}"
+		removeAll = "POST /artifactory/api/build/delete"
+		artifacts = "GET /artifactory/api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo}"
+		promote   = "POST /artifactory/api/build/promote/{buildName}/{buildNumber}"
+		retention = "POST /artifactory/api/build/retention/{buildName}"
+		b         = "/artifactory/api/build"
+		arts      = "/artifactory/api/builds/buildArtifacts"
+	)
+	doc := buildDoc("st-new", "1", testStarted)
+	rows := []statusCase{
+		{all, b, "admin", "", 200},
+		{all, b, "user", "", 200},
+		{all, b + "?project=default", "anonymous", "", 200},
+		{all, b, "", "", 401},
+
+		{publish, b, "admin", doc, 204},
+		// The same identity again replaces the run.
+		{publish, b + "?buildRepo=artifactory-build-info", "admin", doc, 204},
+		{publish, b + "?buildRepo=libs-local", "admin", doc, 400},
+		{publish, b, "admin", `{"number":"1","started":"` + testStarted + `"}`, 400},
+		{publish, b, "admin", buildDoc("st-new", "1", "yesterday"), 400},
+		{publish, b, "admin", `[]`, 400},
+		{publish, b + "?project=nope", "admin", doc, 404},
+		{publish, b, "user", doc, 403},
+		{publish, b, "anonymous", doc, 401},
+		{publish, b, "", doc, 401},
+
+		{runs, b + "/st-app", "admin", "", 200},
+		{runs, b + "/absent", "admin", "", 404},
+		{runs, b + "/st-app", "user", "", 403},
+		{runs, b + "/st-app", "anonymous", "", 401},
+		{runs, b + "/st-app", "", "", 401},
+
+		{info, b + "/st-app/1", "admin", "", 200},
+		{info, b + "/st-app/1?started=2026-10-15T09:30:00.000%2B0000", "admin", "", 200},
+		// Comparing runs (diff) is not served (DV-088).
+		{info, b + "/st-app/1?diff=1", "admin", "", 501},
+		{info, b + "/st-app/1?diff=null", "admin", "", 400},
+		{info, b + "/st-app/1?diff=0", "admin", "", 404},
+		{info, b + "/st-app/1?started=soon", "admin", "", 400},
+		{info, b + "/st-app/2", "admin", "", 404},
+		{info, b + "/st-app/1", "user", "", 403},
+		{info, b + "/st-app/1", "anonymous", "", 401},
+		{info, b + "/st-app/1", "", "", 401},
+
+		{appendOp, b + "/append/st-app/1", "admin", `[{"id":"more"}]`, 204},
+		{appendOp, b + "/append/st-app/1?buildRepo=libs-local", "admin", `[]`, 400},
+		{appendOp, b + "/append/st-app/1?started=soon", "admin", `[]`, 400},
+		{appendOp, b + "/append/st-app/1?project=nope", "admin", `[]`, 404},
+		{appendOp, b + "/append/st-app/2", "admin", `[]`, 404},
+		{appendOp, b + "/append/st-app/1", "user", `[]`, 403},
+		{appendOp, b + "/append/st-app/1", "anonymous", `[]`, 401},
+		{appendOp, b + "/append/st-app/1", "", `[]`, 401},
+
+		{rename, b + "/rename/st-ren?to=st-app", "admin", "", 409},
+		{rename, b + "/rename/st-ren?to=", "admin", "", 400},
+		{rename, b + "/rename/absent?to=st-x", "admin", "", 404},
+		{rename, b + "/rename/st-ren?to=st-x", "user", "", 403},
+		{rename, b + "/rename/st-ren?to=st-x", "anonymous", "", 401},
+		{rename, b + "/rename/st-ren?to=st-x", "", "", 401},
+		{rename, b + "/rename/st-ren?to=st-renamed", "admin", "", 200},
+
+		{remove, b + "/st-del", "admin", "", 400},
+		{remove, b + "/absent?buildNumbers=1", "admin", "", 404},
+		{remove, b + "/st-del?buildNumbers=1", "user", "", 403},
+		{remove, b + "/st-del?buildNumbers=1", "anonymous", "", 401},
+		{remove, b + "/st-del?buildNumbers=1", "", "", 401},
+		{remove, b + "/st-del?buildNumbers=1&artifacts=0&deleteAll=0", "admin", "", 200},
+
+		{removeAll, b + "/delete", "admin", `{"buildName":"absent","deleteAll":true}`, 404},
+		{removeAll, b + "/delete", "admin", `{"buildName":"st-del2"}`, 400},
+		{removeAll, b + "/delete", "user", `{"buildName":"st-del2","deleteAll":true}`, 403},
+		{removeAll, b + "/delete", "anonymous", `{"buildName":"st-del2","deleteAll":true}`, 401},
+		{removeAll, b + "/delete", "", `{"buildName":"st-del2","deleteAll":true}`, 401},
+		{removeAll, b + "/delete", "admin", `{"buildName":"st-del2","deleteAll":true}`, 200},
+
+		{artifacts, arts + "/st-app/1/artifactory-build-info", "admin", "", 200},
+		{artifacts, arts + "/st-app/1/libs-local", "admin", "", 404},
+		{artifacts, arts + "/st-app/2/artifactory-build-info", "admin", "", 404},
+		{artifacts, arts + "/st-app/1/artifactory-build-info", "user", "", 403},
+		{artifacts, arts + "/st-app/1/artifactory-build-info", "anonymous", "", 401},
+		{artifacts, arts + "/st-app/1/artifactory-build-info", "", "", 401},
+
+		{promote, b + "/promote/st-pro/1", "admin", `{"status":"released"}`, 200},
+		{promote, b + "/promote/st-pro/1", "admin", `{"timestamp":"soon"}`, 400},
+		{promote, b + "/promote/st-pro/1", "admin", `{"targetRepo":"absent"}`, 404},
+		{promote, b + "/promote/st-pro/2", "admin", `{}`, 404},
+		{promote, b + "/promote/st-pro/1", "user", `{}`, 403},
+		{promote, b + "/promote/st-pro/1", "anonymous", `{}`, 401},
+		{promote, b + "/promote/st-pro/1", "", `{}`, 401},
+
+		{retention, b + "/retention/st-ret?async=false", "admin", `{"count":"1"}`, 204},
+		{retention, b + "/retention/st-ret", "admin", `{"count":0}`, 400},
+		{retention, b + "/retention/absent", "admin", `{"count":1}`, 404},
+		{retention, b + "/retention/st-ret", "user", `{"count":1}`, 403},
+		{retention, b + "/retention/st-ret", "anonymous", `{"count":1}`, 401},
+		{retention, b + "/retention/st-ret", "", `{"count":1}`, 401},
+	}
+	return append(rows, aqlStatusRows()...)
+}
+
+// aqlStatusRows covers what #410, #445 and #494 added to POST
+// /api/search/aql: several criteria objects, the long relative-time units,
+// includes of related domains and of their properties and statistics,
+// repository roots, item.infos and the length limit.
+// buildStatusRows lists them beside the Builds API's.
+func aqlStatusRows() []statusCase {
+	const (
+		aqlOp = "POST /artifactory/api/search/aql"
+		path  = "/artifactory/api/search/aql"
+	)
+	return []statusCase{
+		{
+			aqlOp,
+			path,
+			"admin",
+			`items.find({"repo":"libs-local"},{"created":{"$last":"3days"}})`,
+			200,
+		},
+		{
+			aqlOp,
+			path,
+			"user",
+			`items.find({"type":"folder","name":"."}).include("repo","path","name")`,
+			200,
+		},
+		{aqlOp, path, "admin", `items.find().include("name","artifact.module.build.*")`, 200},
+		{aqlOp, path, "admin", `builds.find().include("name","module.artifact.item.name")`, 200},
+		{aqlOp, path, "admin", `items.find().include("artifact.module.build.@os")`, 200},
+		{
+			aqlOp,
+			path,
+			"admin",
+			`items.find().include("artifact.item.stat","artifact.module.property.*")`,
+			200,
+		},
+		{aqlOp, path, "admin", `builds.find().include("@os","module.artifact.item.@team")`, 200},
+		{aqlOp, path, "admin", `items.find().include("artifact.module.build.stat")`, 400},
+		{aqlOp, path, "admin", `item.infos.find()`, 400},
+		{aqlOp, path, "admin", `items.find({"name":"` + strings.Repeat("a", 6000) + `"})`, 400},
+		{aqlOp, path, "anonymous", `items.find({},{})`, 403},
+	}
+}
+
+// seedStatusBuilds publishes the runs buildStatusRows act on.
+func seedStatusBuilds(t *testing.T, db *inmem.Store, blobs blob.Store) {
+	t.Helper()
+	for _, name := range []string{"st-app", "st-ren", "st-del", "st-del2", "st-pro", "st-ret"} {
+		seedBuild(t, db, blobs, name)
+	}
+}

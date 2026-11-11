@@ -15,7 +15,7 @@ CONFORMANCE_ENV = \
   ARTIFACTWEAVE_TEST_S3_BUCKET=$$($(TERRAFORM) -chdir=$(CURDIR) output -raw bucket) \
   ARTIFACTWEAVE_TEST_S3_REGION=$$($(TERRAFORM) -chdir=$(CURDIR) output -raw region)
 CONFORMANCE_RUN := TestAccContractOnRealS3|TestAccRealS3Probes
-CONFORMANCE_PKG := ./migration/platform/blob/s3/
+CONFORMANCE_PKG := ./internal/platform/blob/s3/
 # The role and region variables, and the environment, come from the
 # bootstrap (deploy/ci/terraform/aws).
 GITHUB_VARS := \

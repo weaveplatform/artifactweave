@@ -16,8 +16,15 @@
 //     newItemWorld): the users reader, deployer and user, the deploy-libs
 //     permission and eight local, remote and virtual repositories, with the
 //     request and seed helpers of test/server/support.
+//   - The application runtime and the production router from
+//     test/server/support/harness, through the harness's remote world under
+//     the name the tests had in internal/app (fixture_test.go,
+//     newRemoteWorld): the generic remote repository remote over a fake
+//     upstream, the users reader and denied and the remote-read permission,
+//     beside which the tests retype the remote or add the repositories they
+//     need.
 //   - The controlled and conda-forge fixtures in
-//     migration/artifacts/ecosystem/conda/testdata, read root-relative
+//     internal/artifacts/ecosystem/conda/testdata, read root-relative
 //     through repopath, and remote sources over stub backends
 //     (sourceIdentity, sourceBackend).
 //
@@ -29,6 +36,10 @@
 //     and incompatible local indexes, the remote index and archive trust
 //     boundary, and the shard endpoints with their permissions, transfers,
 //     checksum reuse and trash restore.
+//   - conda_remote_test.go: a remote's CEP-16 shards through refresh and
+//     offline answers, an invalid shard that is neither published, cached
+//     nor fallen back from, and shard fetches that recheck the caller's
+//     permission and the repository's revision.
 //
 // # References
 //
@@ -42,10 +53,11 @@
 //     suites).
 //   - docs/testing/server-test-ownership.md: how CI selection gives the
 //     package an owner.
-//   - https://github.com/weaveplatform/artifactweave/issues/1068
+//   - https://github.com/weaveplatform/artifactweave/issues/1068 and
+//     https://github.com/weaveplatform/artifactweave/issues/1096
 //
 // # Status
 //
-// Implemented P9c (the plan's P32 group). P9d moved the tests here from
-// internal/server (TST-06).
+// Implemented P9c (the plan's P32 group). P9d moved the tests here from the
+// server root (TST-06) and the remote suite from internal/app (TST-07).
 package conda

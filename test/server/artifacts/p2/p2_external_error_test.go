@@ -11,12 +11,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/p2"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/blobtest"
 )
 
 func TestAccP2ExternalMetadataFallbackAndChecksumRequired(t *testing.T) {
@@ -38,21 +40,21 @@ func TestAccP2ExternalMetadataFallbackAndChecksumRequired(t *testing.T) {
 				} else if metadataMode == "fault" {
 					return source.Result{}, source.ErrUnavailable
 				} else {
-					return source.Result{}, store.ErrNotFound
+					return source.Result{}, kernel.ErrNotFound
 				}
 			case strings.HasSuffix(q.Resource.Path, "/artifacts.jar"):
 				if metadataMode == "missing" {
-					return source.Result{}, store.ErrNotFound
+					return source.Result{}, kernel.ErrNotFound
 				}
 				body = p2Fixture(t, "artifacts.jar")
 			case strings.HasSuffix(q.Resource.Path, "/artifacts.xml"):
-				return source.Result{}, store.ErrNotFound
+				return source.Result{}, kernel.ErrNotFound
 			case strings.HasSuffix(q.Resource.Path, "/content.jar"):
 				body = p2Fixture(t, "content.jar")
 			case strings.HasSuffix(q.Resource.Path, "/plugins/org.eclipse.glsp.layout.source_2.7.0.jar"):
 				body = p2Fixture(t, "org.eclipse.glsp.layout.source_2.7.0.jar")
 			default:
-				return source.Result{}, store.ErrNotFound
+				return source.Result{}, kernel.ErrNotFound
 			}
 			return source.Result{Stream: &source.Stream{
 				Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
@@ -151,7 +153,7 @@ func TestAccP2ArchiveCorruptionStaysBehindRepositoryRoute(t *testing.T) {
 						}}, nil
 					},
 				), Cache: sourceBackend(func(context.Context, source.Request, source.Permit) (source.Result, error) {
-					return source.Result{}, store.ErrNotFound
+					return source.Result{}, kernel.ErrNotFound
 				})}
 			})
 			c := *repo.Defaults(&repo.Config{
@@ -181,7 +183,7 @@ func TestAccP2VirtualRejectsForgedMemberSelectionAndCycle(t *testing.T) {
 	backend := sourceBackend(
 		func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
 			if q.Resource.Path != "content.jar" {
-				return source.Result{}, store.ErrNotFound
+				return source.Result{}, kernel.ErrNotFound
 			}
 			childReads++
 			body := p2Fixture(t, "content.jar")
@@ -256,7 +258,7 @@ func TestAccP2ExternalCompositeDepthStopsBeforePublishingNextChild(t *testing.T)
 					"https://child.example/site%d/compositeContent.xml",
 					&at,
 				); err != nil || at < 1 {
-					return source.Result{}, store.ErrNotFound
+					return source.Result{}, kernel.ErrNotFound
 				}
 				if at > highestFetched {
 					highestFetched = at
@@ -264,7 +266,7 @@ func TestAccP2ExternalCompositeDepthStopsBeforePublishingNextChild(t *testing.T)
 				body = composite(at + 1)
 				base = q.Resource.ExternalURL
 			} else {
-				return source.Result{}, store.ErrNotFound
+				return source.Result{}, kernel.ErrNotFound
 			}
 			return source.Result{
 				Metadata: source.MetadataResponse{BaseURL: base},
@@ -352,11 +354,11 @@ func TestAccP2VirtualInventoryKeepsOnlyReadableNativeMembersInOrder(t *testing.T
 		strings.Contains(res.Body.String(), "__p2/3") {
 		t.Fatalf("virtual native member order/filter changed: %d %s", res.Code, res.Body)
 	}
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "p2-inventory-virtual-only",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
-			Targets: map[string]types.Target{"p2-inventory-root": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accesstest.Target{"p2-inventory-root": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -366,11 +368,13 @@ func TestAccP2VirtualInventoryKeepsOnlyReadableNativeMembersInOrder(t *testing.T
 		strings.Contains(res.Body.String(), "__p2/") {
 		t.Fatalf("virtual-only grant disclosed member inventory: %d %s", res.Code, res.Body)
 	}
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "p2-inventory-narrow-member",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
-			Targets: map[string]types.Target{"p2-inventory-remote": {Include: []string{"foo/**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
+				"p2-inventory-remote": {Include: []string{"foo/**"}},
+			},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -416,12 +420,12 @@ func TestAccP2ArchiveSuffixReadsStoredCacheOffline(t *testing.T) {
 						t.Fatalf("offline archive read escaped cache: %+v, %+v", permit, q.Resource)
 					}
 					return source.Result{
-						Item: &types.Item{
+						Item: &artmodel.Item{
 							RepoKey: q.Repo.Key,
-							Path:    types.RootPath,
+							Path:    kernel.RootPath,
 							Name:    q.Resource.Path,
 							Cached:  true,
-							Actual:  types.Checksums{SHA256: cacheSHA},
+							Actual:  kernel.Checksums{SHA256: cacheSHA},
 						},
 						Used: func(context.Context) error { used++; return nil },
 					}, nil

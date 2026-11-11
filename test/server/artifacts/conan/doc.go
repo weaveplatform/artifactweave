@@ -19,10 +19,17 @@
 //   - Remote sources over stub backends (sourceIdentity, sourceBackend),
 //     Conan archives from support.TarGz (conanTestArchive), and a token
 //     service for the clients' login (seedTokens).
+//   - The application runtime and the production router from
+//     test/server/support/harness, through the harness's remote world under
+//     the name the tests had in internal/app (fixture_test.go,
+//     newRemoteWorld): the generic remote repository remote over a fake
+//     upstream, the users reader and denied and the remote-read permission,
+//     beside which the tests retype the remote or add the repositories they
+//     need.
 //   - The Conan 2 and Conan 1 binaries named by ARTIFACTWEAVE_CONAN2_BIN and
-//     ARTIFACTWEAVE_CONAN1_BIN; TestAccConanClients skips a generation whose
-//     variable is unset. make conan-accept runs the TestAccConan tests here
-//     and in migration/app with coverage.
+//     ARTIFACTWEAVE_CONAN1_BIN; TestAccConanClients and
+//     TestAccConanRemoteClient skip a generation whose variable is unset.
+//     make conan-accept runs the TestAccConan tests here with coverage.
 //
 // # Outputs
 //
@@ -33,6 +40,10 @@
 //     and virtual source with its failures.
 //   - conan_client_test.go: create, upload, remove and download with each
 //     client generation on local, federated and virtual repositories.
+//   - conan_remote_test.go: a Conan remote's cache integrity and offline
+//     answers, and the integrity of the archives it fetches.
+//   - conan_client_remote_test.go: each client generation downloads through
+//     a Conan remote from an upstream that the same client uploaded to.
 //
 // # References
 //
@@ -46,10 +57,12 @@
 //     suites).
 //   - docs/testing/server-test-ownership.md: how CI selection gives the
 //     package an owner.
-//   - https://github.com/weaveplatform/artifactweave/issues/1068
+//   - Decision 0007: docs/research/decisions/0007-remote-repositories.md.
+//   - https://github.com/weaveplatform/artifactweave/issues/1068 and
+//     https://github.com/weaveplatform/artifactweave/issues/1096
 //
 // # Status
 //
-// Implemented P9c (the plan's P31 group). P9d moved the tests here from
-// internal/server (TST-06).
+// Implemented P9c (the plan's P31 group). P9d moved the tests here from the
+// server root (TST-06) and the remote suites from internal/app (TST-07).
 package conan

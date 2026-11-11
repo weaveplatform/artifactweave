@@ -13,18 +13,18 @@ GOEXE := $(shell $(GO) env GOEXE)
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo devel)
 COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-LDFLAGS := -s -w -X $(MODULE)/migration/platform/buildinfo.version=$(VERSION) -X $(MODULE)/migration/platform/buildinfo.commit=$(COMMIT) -X $(MODULE)/migration/platform/buildinfo.buildDate=$(BUILD_DATE)
+LDFLAGS := -s -w -X $(MODULE)/internal/platform/buildinfo.version=$(VERSION) -X $(MODULE)/internal/platform/buildinfo.commit=$(COMMIT) -X $(MODULE)/internal/platform/buildinfo.buildDate=$(BUILD_DATE)
 PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
 # test/acceptance runs in its own job; test/platform runs only in
 # platform-scenarios.yml, against a deployment, and is evidence rather than coverage.
 UNIT_PKGS = $(shell GOWORK=off $(GO) list ./... | grep -v -e /test/acceptance -e /test/platform)
 ACC_PKGS ?= $(UNIT_PKGS)
-FUZZ_PKGS ?= ./migration/kernel/antpath ./migration/artifacts/ecosystem/huggingface/xet ./migration/artifacts/ecosystem/nuget ./migration/kernel
+FUZZ_PKGS ?= ./internal/kernel/antpath ./internal/artifacts/ecosystem/huggingface/xet ./internal/artifacts/ecosystem/nuget ./internal/kernel
 UNIT_RUN ?= ^TestUnit
 ACC_RUN ?= ^TestAcc
 ACCEPT_RUN ?= ^TestAcc
 COVERPKG ?= $(MODULE)/...
-CONAN_COVERPKG ?= $(MODULE)/migration/artifacts/ecosystem/conan/...,$(MODULE)/migration/artifacts/ecosystem/conan/http/...
+CONAN_COVERPKG ?= $(MODULE)/internal/artifacts/ecosystem/conan/...,$(MODULE)/internal/artifacts/ecosystem/conan/http/...
 ACCEPT_TIMEOUT ?= 15m
 
 ## help: list targets
@@ -106,7 +106,7 @@ accept: test-names
 conan-accept:
 	@rm -rf $(COVER_DIR)/conan && mkdir -p $(COVER_DIR)/conan/parts $(BIN_DIR)
 	$(GO) build -o $(BIN_DIR)/coverexec$(GOEXE) ./tools/coverexec
-	$(GO) test -timeout=15m -count=1 -cover -covermode=atomic -coverpkg=$(CONAN_COVERPKG) -run '^TestAccConan' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) ./test/server/artifacts/conan ./migration/app -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/conan/parts
+	$(GO) test -timeout=15m -count=1 -cover -covermode=atomic -coverpkg=$(CONAN_COVERPKG) -run '^TestAccConan' -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) ./test/server/artifacts/conan -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/conan/parts
 	@parts=($(COVER_DIR)/conan/parts/*/); IFS=,; $(GO) tool covdata merge -i="$${parts[*]}" -o=$(COVER_DIR)/conan
 	@rm -rf $(COVER_DIR)/conan/parts
 
@@ -163,7 +163,7 @@ jfrog-providers:
 deploy-docs:
 	./deploy/check.sh docs
 
-## capture-aql: refresh migration/artifacts/core/aql/aqltest/testdata with the AQL the pinned jf sends (needs ARTIFACTWEAVE_JF_BIN)
+## capture-aql: refresh internal/artifacts/core/aql/aqltest/testdata with the AQL the pinned jf sends (needs ARTIFACTWEAVE_JF_BIN)
 capture-aql:
 	./test/acceptance/capture-aql.sh
 
@@ -238,7 +238,7 @@ deps-sync: client-recipes
 
 ## api-ledger: refresh the reviewed operation inventory after reviewing API/routing changes
 api-ledger:
-	ARTIFACTWEAVE_UPDATE_API_LEDGER=1 $(GO) test ./internal/server -run '^TestAccAPIReliabilityLedger$$' -count=1
+	ARTIFACTWEAVE_UPDATE_API_LEDGER=1 $(GO) test ./internal/app -run '^TestAccAPIReliabilityLedger$$' -count=1
 
 ## bundle: merge api/src/<service>/*.yaml fragments into api/<service>.openapi.yaml
 # Authors edit fragments (one per API family) so families can be written in
@@ -257,14 +257,14 @@ generate: bundle
 		echo "generate $$s"; \
 		$(GO) run $(OAPI_CODEGEN) -config api/oapi-server-$$s.yaml api/$$s.openapi.yaml || exit 1; \
 		$(GO) run $(OAPI_CODEGEN) -config api/oapi-client-$$s.yaml api/$$s.openapi.yaml || exit 1; \
-		$(GO) run ./tools/stubgen migration/platform/gen/$$s/server.gen.go || exit 1; \
+		$(GO) run ./tools/stubgen internal/platform/gen/$$s/server.gen.go || exit 1; \
 	done
 
 ## verify-generate: fail if make generate would change the committed generated code
 # Outputs owned by make generate; verify-generate checks exactly these paths.
 # git diff passes on a pathspec that matches nothing and ignores untracked
 # files, so without the two extra checks a moved output would pass unnoticed.
-GEN_PATHS := api/*.openapi.yaml migration/platform/gen pkg/client
+GEN_PATHS := api/*.openapi.yaml internal/platform/gen pkg/client
 verify-generate: generate
 	@for p in $(GEN_PATHS); do [ -e "$$p" ] || { echo "verify-generate: missing $$p" >&2; exit 1; }; done
 	git diff --exit-code -- $(GEN_PATHS)

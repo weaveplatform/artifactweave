@@ -1,0 +1,113 @@
+package npmhttp
+
+import (
+	"context"
+	"errors"
+	"strings"
+
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	npmfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
+	"github.com/weaveplatform/artifactweave/internal/platform/work"
+)
+
+// NPMAPI is the npm ecosystem's partial strict server: the repository
+// metadata and strict-layout operations and the npm auth documents, over
+// the item kit.
+type NPMAPI struct{ *itemkit.Kit }
+
+// The JFrog operations on an npm local repository's index: the reindex and
+// the strict-layout conversion with its resume (decision 0034). Each needs
+// Manage on the repository ("From version 4.8 only requires the set of
+// permissions assumed by Manage", JFrog's archived REST reference for
+// Calculate npm Repository Metadata) and queues its work on the persistent
+// work queue, keyed by the repository (decision 0033), as 7.x schedules
+// them rather than running them before it answers. The reindex is every
+// format's (the item kit's reindex.go); the conversion is the npm format's
+// own work.
+
+// npmOperation resolves the repository an npm operation names and checks
+// it as the reindex does: 404 when there is none, 401 or 403 to a caller
+// without Manage on it, and 400 for a repository that is no npm local one.
+func (s NPMAPI) npmOperation(
+	ctx context.Context,
+	key string,
+) (itemkit.Store, repo.Config, string, error) {
+	return s.OperationRepo(ctx, repo.NPM, itemkit.ReindexOps[repo.NPM], key)
+}
+
+// CalculateNpmRepositoryMetadata queues the reindex of an npm local
+// repository's index, the item kit's Reindex that every format shares, and
+// answers 7.x's text once the work is queued. It refuses as npmOperation
+// does.
+func (s NPMAPI) CalculateNpmRepositoryMetadata(
+	ctx context.Context,
+	req artgen.CalculateNpmRepositoryMetadataRequestObject,
+) (artgen.CalculateNpmRepositoryMetadataResponseObject, error) {
+	msg, err := s.Reindex(ctx, repo.NPM, req.RepoKey, "", false)
+	if err != nil {
+		return nil, err
+	}
+	return artgen.CalculateNpmRepositoryMetadata200TextResponse(msg), nil
+}
+
+// MigrateNpmRepositoryToStrictLayout queues the npm format's conversion of
+// a local repository to the strict layout (npmfmt.KindConvert), keyed by
+// the repository, and answers 202 once it is queued. It refuses as
+// npmOperation does.
+func (s NPMAPI) MigrateNpmRepositoryToStrictLayout(
+	ctx context.Context,
+	req artgen.MigrateNpmRepositoryToStrictLayoutRequestObject,
+) (artgen.MigrateNpmRepositoryToStrictLayoutResponseObject, error) {
+	st, c, by, err := s.npmOperation(ctx, req.RepoKey)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.Enqueue(ctx, st, npmfmt.KindConvert, c.Key, by); err != nil {
+		return nil, err
+	}
+	return artgen.MigrateNpmRepositoryToStrictLayout202Response{}, nil
+}
+
+// ResumeNpmRepositoryMigration queues again a conversion the work queue
+// parked once its retries ran out. A conversion cannot be cancelled, so
+// that is the only one to resume; any other answers 400. [I] 7.x's answer
+// then is unknown (#216).
+func (s NPMAPI) ResumeNpmRepositoryMigration(
+	ctx context.Context,
+	req artgen.ResumeNpmRepositoryMigrationRequestObject,
+) (artgen.ResumeNpmRepositoryMigrationResponseObject, error) {
+	st, c, by, err := s.npmOperation(ctx, req.RepoKey)
+	if err != nil {
+		return nil, err
+	}
+	it, err := st.WorkQueue().Get(ctx, npmfmt.KindConvert, c.Key)
+	switch {
+	case errors.Is(err, kernel.ErrNotFound) || err == nil && it.State != work.WorkParked:
+		return nil, httpkit.BadRequestf("Repository '%s' has no failed conversion to resume", c.Key)
+	case err != nil:
+		return nil, s.InternalError(ctx, "npm conversion", err)
+	}
+	if err := s.Enqueue(ctx, st, npmfmt.KindConvert, c.Key, by); err != nil {
+		return nil, err
+	}
+	return artgen.ResumeNpmRepositoryMigration202Response{}, nil
+}
+
+// IsNPMReindex reports whether path is the JFrog reindex operation beside
+// an npm registry, which answers in Artifactory's envelope, as the JFrog
+// operations there do on 7.x (RTFACT-30181), where the registry answers in
+// npm's. Only POST is the operation: to a GET, "reindex" is a package, and
+// a refusal the server answers before routing gives its npm client
+// Artifactory's envelope.
+func IsNPMReindex(path string) bool {
+	rest, ok := strings.CutPrefix(path, "/artifactory/api/npm/")
+	if !ok {
+		return false
+	}
+	key, op, ok := strings.Cut(rest, "/")
+	return ok && key != "" && op == "reindex"
+}

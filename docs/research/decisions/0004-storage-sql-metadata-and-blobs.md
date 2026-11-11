@@ -21,9 +21,10 @@ chunks and as the CLI's multipart protocol.
 
 ## Decision
 
-**Metadata.** Store contracts in `pkg/store` with narrow interfaces per concern (repos,
-items, properties, stats, package index, users, groups, permissions, tokens, policies,
-webhooks, projects, builds) composed into `Store` with `Tx`. `internal/sqlstore` follows
+**Metadata.** Store contracts with narrow interfaces per concern (repos, items, properties,
+stats, package index, users, groups, permissions, tokens, policies, webhooks, projects,
+builds), each in the `core/port` package of the module that owns the concern, over one unit
+of work (`Tx`). The SQL stores run on `internal/platform/sql/dialect`, which follows
 hostweave's `sqlcommon` pattern with two dialects: SQLite (`modernc.org/sqlite`, CGO-free,
 WAL, one writer connection; the default) and PostgreSQL (`pgx/v5/stdlib`). Embedded
 migrations per dialect. An in-memory store exists for unit tests.
@@ -93,7 +94,7 @@ against Jira and the legacy release notes (2026-10-18, #378).
 No 7.x source covers any of this, so all of it is inferred **[I]** and on
 [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 
-**Blobs.** `migration/platform/blob` is a content-addressed store keyed by sha256. Every
+**Blobs.** `internal/platform/blob` is a content-addressed store keyed by sha256. Every
 upload computes four checksums in one pass: SHA-256, SHA-512, SHA-1 and MD5. The other three
 are recorded in the blob and item index, so checksum deploy, checksum search and checksum
 files work from the database. SHA-1 and MD5 are looked up by checksum deploy and the
@@ -177,7 +178,7 @@ one such session; see [research 09](../09-jfrog-cli-compatibility.md#multipart-u
   what Docker and the CLI check; indexing all three costs one table.
 - *SHA-3 as well*: no package client and no Artifactory API asks for it, so it would
   cost CPU on every upload for a digest nothing reads (maintainer decision, 2026-10-16).
-  The checksum set is defined in one place (`migration/platform/blob.Hasher` and
+  The checksum set is defined in one place (`internal/platform/blob.Hasher` and
   `types.Checksums`), so another algorithm can be added when required. P20's client/contract
   inventory must assign any newly identified checksum requirement to its format phase; this
   is not a permanent exclusion of algorithms required by the expanded ecosystems.
@@ -250,7 +251,7 @@ it is documented; a PUT of the checksum file fixes a missing checksum here. Six 
 
 ## Verification
 
-- `pkg/store/storetest` and `migration/platform/blob/blobtest` contract suites run against
+- `internal/app/storetest` and `internal/platform/blob/blobtest` contract suites run against
   the in-memory store, SQLite, PostgreSQL (testcontainers) and MinIO (testcontainers) on
   Linux CI and skip cleanly where Docker is absent.
 - Upload-session tests resume across simulated process boundaries on both blob backends.

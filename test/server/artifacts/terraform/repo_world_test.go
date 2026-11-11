@@ -7,10 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -84,4 +83,4 @@ func (w *repoWorld) stored(key string) repo.Config {
 	return c
 }
 
-var _ store.Store = faultyStore{}
+var _ harness.Store = faultyStore{}

@@ -12,11 +12,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 )
 
 // The health probes (#403): ping and readiness probe the database and the
@@ -35,26 +34,26 @@ var secretCause = errors.New(
 // error, then fails them, as a database that stopped answering does. It
 // records whether each read had a deadline.
 type healthStore struct {
-	store.Store
+	*inmem.Store
 	fail       atomic.Pointer[error]
 	noDeadline atomic.Bool
 }
 
-func (s *healthStore) Instance() store.InstanceStore {
+func (s *healthStore) Instance() instance.InstanceStore {
 	return healthInstance{s.Store.Instance(), s}
 }
 
 type healthInstance struct {
-	store.InstanceStore
+	instance.InstanceStore
 	s *healthStore
 }
 
-func (i healthInstance) Get(ctx context.Context) (types.InstanceIdentity, error) {
+func (i healthInstance) Get(ctx context.Context) (instance.InstanceIdentity, error) {
 	if _, ok := ctx.Deadline(); !ok {
 		i.s.noDeadline.Store(true)
 	}
 	if err := i.s.fail.Load(); err != nil {
-		return types.InstanceIdentity{}, *err
+		return instance.InstanceIdentity{}, *err
 	}
 	return i.InstanceStore.Get(ctx)
 }
@@ -83,7 +82,7 @@ func newHealthFixture(t *testing.T, identity bool) healthFixture {
 	t.Helper()
 	db := inmem.New()
 	if identity {
-		if err := db.Instance().Init(context.Background(), types.InstanceIdentity{
+		if err := db.Instance().Init(context.Background(), instance.InstanceIdentity{
 			InstanceID: healthInstanceID, ProtocolVersion: 1,
 		}); err != nil {
 			t.Fatal(err)

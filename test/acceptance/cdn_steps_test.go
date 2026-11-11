@@ -23,11 +23,11 @@ import (
 	"github.com/cucumber/godog"
 	"google.golang.org/api/option"
 
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/gcs"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/s3"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/session"
-	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
-	"github.com/weaveplatform/artifactweave/migration/platform/cdn/cdntest"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/gcs"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/s3"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/session"
+	"github.com/weaveplatform/artifactweave/internal/platform/cdn"
+	"github.com/weaveplatform/artifactweave/internal/platform/cdn/cdntest"
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
 )
 

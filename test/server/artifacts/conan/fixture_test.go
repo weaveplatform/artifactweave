@@ -1,10 +1,10 @@
 package conan_test
 
 // This file holds the Conan suite's fixtures: adapters over
-// test/server/support/harness and test/server/support under the names the
-// tests had in internal/server, and a token service built as the root's
-// seedTokens builds it. The router is the harness's, so a change to its
-// assembly reaches these tests without an edit here.
+// test/server/support/harness and test/server/support, and a token service
+// built as the router guards' seedTokens builds it. The router is the
+// harness's, so a change to its assembly reaches these tests without an edit
+// here.
 
 import (
 	"context"
@@ -14,13 +14,16 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	"github.com/weaveplatform/artifactweave/internal/app"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -59,9 +62,9 @@ var testHash = support.TestHash
 
 // sourceIdentity resolves every remote repository to one fixed HTTP source
 // identity, as the root fixture of the same name does.
-func sourceIdentity(context.Context, repo.Config) (types.SourceIdentity, error) {
-	return types.SourceIdentity{
-		Kind:       types.ExternalHTTP,
+func sourceIdentity(context.Context, repo.Config) (model.SourceIdentity, error) {
+	return model.SourceIdentity{
+		Kind:       model.ExternalHTTP,
 		Repository: "repo-1",
 		ID:         "http-1",
 		Generation: "revision-1",
@@ -84,10 +87,10 @@ func md5Hex(s string) string {
 	return hex.EncodeToString(b[:])
 }
 
-func setTrashcan(t *testing.T, db store.Store, on bool) {
+func setTrashcan(t *testing.T, db *inmem.Store, on bool) {
 	t.Helper()
-	if err := db.Settings().Put(context.Background(), types.SettingTrashcan,
-		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
+	if err := db.Settings().Put(context.Background(), settings.SettingTrashcan,
+		model.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -106,10 +109,10 @@ func conanTestArchiveEntries(t *testing.T, entries map[string]string) string {
 // it. The root fixture of the same name also seeds the token records that
 // the status tables address and returns their secrets; no test here reads
 // them, so the second result is always nil.
-func seedTokens(t *testing.T, db store.Store) (*token.Service, map[string]string) {
+func seedTokens(t *testing.T, db harness.Store) (*token.Service, map[string]string) {
 	t.Helper()
 	ctx := context.Background()
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -119,4 +122,35 @@ func seedTokens(t *testing.T, db store.Store) (*token.Service, map[string]string
 		t.Fatal(err)
 	}
 	return tokens, nil
+}
+
+// remoteWorld is the harness's remote world under the fields the tests had
+// in internal/app: a test changes c and saves it with update, or replaces h
+// with a router built with other options.
+type remoteWorld struct {
+	t  *testing.T
+	rt *app.Runtime
+	h  http.Handler
+	up *fakeupstream.Server
+	c  repo.Config
+}
+
+func newRemoteWorld(t *testing.T) *remoteWorld {
+	t.Helper()
+	w := harness.NewRemoteWorld(t)
+	return &remoteWorld{t: w.T, rt: w.Runtime, h: w.H, up: w.Upstream, c: w.Repo}
+}
+
+// world is w as the harness's remote world, with the handler and the
+// repository the test may have replaced.
+func (w *remoteWorld) world() *harness.RemoteWorld {
+	return &harness.RemoteWorld{T: w.t, Runtime: w.rt, H: w.h, Upstream: w.up, Repo: w.c}
+}
+
+func (w *remoteWorld) request(
+	method, path, user, body string,
+	headers ...string,
+) *httptest.ResponseRecorder {
+	w.t.Helper()
+	return w.world().Request(method, path, user, body, headers...)
 }

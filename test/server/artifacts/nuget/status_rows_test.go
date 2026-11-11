@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 )
 
 const (
@@ -227,7 +227,13 @@ func nugetWriteStatusRows() []statusCase {
 
 // deployNuGet deploys body at path in the repository key through items,
 // so the NuGet format checks and indexes it.
-func deployNuGet(t *testing.T, db store.Store, items *item.Service, key, path string, body []byte) {
+func deployNuGet(
+	t *testing.T,
+	db *inmem.Store,
+	items *item.Service,
+	key, path string,
+	body []byte,
+) {
 	t.Helper()
 	ctx := context.Background()
 	c, err := db.Repos().Get(ctx, key)

@@ -11,13 +11,13 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/sql/sqlite"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
 
 func (w *world) registerCacheMaintenance(sc *godog.ScenarioContext) {
@@ -33,11 +33,11 @@ func (w *world) registerCacheMaintenance(sc *godog.ScenarioContext) {
 	sc.Step(`^I run remote cache cleanup$`, w.runRemoteCacheCleanup)
 }
 
-func (w *world) maintenanceStore() (*sqlcommon.Store, *item.Service, error) {
+func (w *world) maintenanceStore() (*appsql.Store, *item.Service, error) {
 	st, err := sqlite.Open(
 		context.Background(),
 		filepath.Join(w.dataDir, "artifactweave.db"),
-		sqlite.Options{Options: sqlcommon.Options{SkipMigrate: true}},
+		sqlite.Options{Options: appsql.Options{SkipMigrate: true}},
 	)
 	if err != nil {
 		return nil, nil, err
@@ -61,7 +61,7 @@ func (w *world) agedCacheContent(remote, kind, path, body string) error {
 	if err != nil {
 		return err
 	}
-	token, err := st.RemoteCache().Begin(ctx, types.RemoteCacheKey{RepoKey: remote, Path: path})
+	token, err := st.RemoteCache().Begin(ctx, model.RemoteCacheKey{RepoKey: remote, Path: path})
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,7 @@ func (w *world) agedCacheContent(remote, kind, path, body string) error {
 		item.CacheUpload{
 			Token:  token,
 			Repo:   c,
-			Kind:   types.RemoteKind(kind),
+			Kind:   model.RemoteKind(kind),
 			Body:   strings.NewReader(body),
 			Length: int64(len(body)),
 		},
@@ -87,7 +87,7 @@ func (w *world) negativeCacheEntry(remote, path string) error {
 	}
 	defer func() { _ = st.Close() }()
 	ctx := context.Background()
-	token, err := st.RemoteCache().Begin(ctx, types.RemoteCacheKey{RepoKey: remote, Path: path})
+	token, err := st.RemoteCache().Begin(ctx, model.RemoteCacheKey{RepoKey: remote, Path: path})
 	if err != nil {
 		return err
 	}
@@ -101,11 +101,11 @@ func (w *world) expiredCacheMetadata(remote, path, body string) error {
 	}
 	defer func() { _ = st.Close() }()
 	ctx := context.Background()
-	e, err := st.RemoteCache().Read(ctx, types.RemoteCacheKey{RepoKey: remote, Path: path})
+	e, err := st.RemoteCache().Read(ctx, model.RemoteCacheKey{RepoKey: remote, Path: path})
 	if err != nil {
 		return err
 	}
-	if e.Kind != types.RemoteMetadata || !e.ValidatedAt.IsZero() {
+	if e.Kind != model.RemoteMetadata || !e.ValidatedAt.IsZero() {
 		return fmt.Errorf("metadata not expired: %+v", e)
 	}
 	r, _, err := svc.Blobs.Open(ctx, e.Blob.Checksums.SHA256)

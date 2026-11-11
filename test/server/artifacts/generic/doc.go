@@ -1,0 +1,48 @@
+// Package generic runs the generic remote repository routes of the
+// assembled application: downloads through the remote cache, sidecars,
+// authorization and its revocation, restarts and signed delivery.
+//
+// # Role
+//
+// Test support: server-assembly suites for generic remote repositories,
+// outside the modules. They drive the production router over the
+// application runtime through HTTP requests. The package's owner in
+// tools/citestselection/test_ownership.json is shared, since generic is no
+// selector owner, so the suites run in the full profile only.
+//
+// # Inputs
+//
+//   - The application runtime and the production router from
+//     test/server/support/harness, through the harness's remote world under
+//     the name the tests had in internal/app (fixture_test.go,
+//     newRemoteWorld): the generic remote repository remote over a fake
+//     upstream, the users reader and denied and the remote-read permission.
+//   - Runtimes the restart tests open and close themselves (testConfig and
+//     openRuntime over the harness's configuration and costs), and a blob
+//     store that signs CDN URLs.
+//
+// # Outputs
+//
+// Assertions only:
+//   - remote_test.go: the remote download lifecycle, transient sidecars and
+//     upstream failures, authorization and revocation, trace fetches,
+//     cache identity across a restart, which no configuration descriptor
+//     exposes, and cold and warm signed delivery with its checksums.
+//
+// # References
+//
+//   - Decision 0007: docs/research/decisions/0007-remote-repositories.md.
+//   - docs/operations/remote-repositories.md.
+//   - Decision 0044:
+//     docs/research/decisions/0044-modular-monolith-migration.md
+//     (test/server/artifacts/<type> holds each ecosystem's server-assembly
+//     suites).
+//   - docs/testing/server-test-ownership.md: how CI selection gives the
+//     package an owner.
+//   - https://github.com/weaveplatform/artifactweave/issues/1096
+//
+// # Status
+//
+// Implemented P9 (remote repositories). P9d moved the tests here from
+// internal/app (TST-07).
+package generic

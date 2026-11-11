@@ -6,15 +6,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -72,7 +72,7 @@ func TestAccStatusNuGetV3Remote(t *testing.T) {
 		cfg.RemoteSources = &source.Service{
 			HTTP:  policy,
 			Cache: policy,
-			Resolve: func(ctx context.Context, c repo.Config) (types.SourceIdentity, error) {
+			Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
 				return cfg.Store.RemoteCache().Source(ctx, c.Key)
 			},
 		}

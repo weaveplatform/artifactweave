@@ -13,7 +13,7 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
 const module = "github.com/weaveplatform/artifactweave"

@@ -1,11 +1,11 @@
 package access_test
 
-// This file holds the access suites' fixtures: adapters, under the names the
-// tests had in internal/server, over test/server/support/harness and
-// test/server/support, and copies of the seeding the root's fixtures do,
-// which the root keeps for its own guard tables. Every router here is
-// harness.Router, so a change to the router's assembly reaches these tests
-// without an edit here.
+// This file holds the access suites' fixtures: adapters, under the names of
+// the router guards' fixtures in internal/app, over
+// test/server/support/harness and test/server/support, and copies of the
+// seeding those fixtures do, which app keeps for its guard tables. Every
+// router here is harness.Router, so a change to the router's assembly reaches
+// these tests without an edit here.
 
 import (
 	"archive/zip"
@@ -31,16 +31,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -57,7 +61,7 @@ var (
 	cheapHash = support.CheapHash
 )
 
-func cheapSeed(t *testing.T, db store.Store) {
+func cheapSeed(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	support.Seed(t, db)
 }
@@ -90,8 +94,8 @@ func (w *itemWorld) do(
 	return world.Do(method, path, as, body, headers...)
 }
 
-// The router's paths and limits that the tests name, spelled as
-// internal/server spells them, so that a change there fails a test here.
+// The router's paths and limits that the tests name, spelled as the router and
+// its handlers spell them, so that a change there fails a test here.
 const (
 	apiRestrictionPath      = "/artifactory/api/artifactweave/api-restrictions/"
 	apiRestrictionAuditPath = "/artifactory/api/artifactweave/api-restriction-audit"
@@ -140,17 +144,17 @@ func newStatusFixture(
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(ctx, types.User{Name: "user", PasswordHash: cheapHash}); err != nil {
+		Create(ctx, accesstest.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	// A locked account, until securityStatusRows unlocks every user.
-	if err := db.Users().Create(ctx, types.User{
-		Name: "locked", PasswordHash: cheapHash, Status: types.UserLocked,
+	if err := db.Users().Create(ctx, accesstest.User{
+		Name: "locked", PasswordHash: cheapHash, Status: accesstest.UserLocked,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if anonymous {
-		if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+		if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -192,8 +196,8 @@ func newStatusFixture(
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Settings().Put(ctx, types.SettingFolderDownload,
-		types.FolderDownloadSettings{Enabled: true}); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingFolderDownload,
+		artmodel.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	tokens, secrets := seedTokens(t, db)
@@ -219,21 +223,21 @@ func newStatusFixture(
 // "user" holds READ and MANAGE on the st-managed* permissions. Every permission the
 // rows create or seed targets perm-local, a repository no other row reads:
 // a grant on a shared repository would change other rows' answers.
-func seedPermissions(t *testing.T, db store.Store) {
+func seedPermissions(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	ctx := context.Background()
 	if err := db.Repos().
 		Create(ctx, *repo.Defaults(&repo.Config{Key: "perm-local", Class: repo.Local})); err != nil {
 		t.Fatal(err)
 	}
-	libs := map[string]types.Target{"perm-local": {Include: []string{"**"}}}
+	libs := map[string]accesstest.Target{"perm-local": {Include: []string{"**"}}}
 	for _, name := range []string{
 		"st-del-v1", "st-del-v2", "st-del-access", "st-res-put", "st-res-patch", "st-res-del",
 	} {
-		if err := db.Permissions().Create(ctx, types.Permission{
+		if err := db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{
-				types.ResourceArtifact: {Targets: libs},
+			Resources: map[api.ResourceType]accesstest.Resource{
+				api.ResourceArtifact: {Targets: libs},
 			},
 		}); err != nil {
 			t.Fatal(err)
@@ -242,11 +246,11 @@ func seedPermissions(t *testing.T, db store.Store) {
 	for _, name := range []string{
 		"st-managed", "st-managed-put", "st-managed-del", "st-managed-grant", "st-managed-other",
 	} {
-		if err := db.Permissions().Create(ctx, types.Permission{
+		if err := db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					"user": types.ActionRead | types.ActionManage,
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{
+					"user": api.ActionRead | api.ActionManage,
 				}},
 				Targets: libs,
 			}},
@@ -340,10 +344,10 @@ type statusSecrets map[string]string
 // token records with fixed ids the status table addresses (two of admin's,
 // one of user's, and a short-lived non-revocable one of admin's), and the
 // statusSecrets.
-func seedTokens(t *testing.T, db store.Store) (*token.Service, statusSecrets) {
+func seedTokens(t *testing.T, db harness.Store) (*token.Service, statusSecrets) {
 	t.Helper()
 	ctx := context.Background()
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -353,7 +357,7 @@ func seedTokens(t *testing.T, db store.Store) (*token.Service, statusSecrets) {
 		t.Fatal(err)
 	}
 	now := time.Now().Truncate(time.Second)
-	for _, r := range []types.Token{
+	for _, r := range []accesstest.Token{
 		{ID: "admin-token", Subject: subjectOf(tokens, "admin"), Revocable: true},
 		{ID: "admin-token-2", Subject: subjectOf(tokens, "admin"), Revocable: true},
 		{ID: "user-token", Subject: subjectOf(tokens, "user"), Revocable: true},
@@ -362,7 +366,7 @@ func seedTokens(t *testing.T, db store.Store) (*token.Service, statusSecrets) {
 			ExpiresAt: now.Add(time.Hour),
 		},
 	} {
-		r.Scope, r.IssuedAt, r.AccessDigest = types.UserScope(), now, []byte(r.ID)
+		r.Scope, r.IssuedAt, r.AccessDigest = kernel.UserScope(), now, []byte(r.ID)
 		if err := db.Tokens().Create(ctx, r); err != nil {
 			t.Fatal(err)
 		}
@@ -409,7 +413,7 @@ func seedTokens(t *testing.T, db store.Store) (*token.Service, statusSecrets) {
 		secrets[r.name+"-access"], secrets[r.name+"-id"] = issued.AccessToken, issued.Record.ID
 	}
 	transient, err := tokens.Issue(ctx, token.Request{
-		Username: "ghost", ExpiresIn: &hour, ByAdmin: true, Identity: types.IdentityTransient,
+		Username: "ghost", ExpiresIn: &hour, ByAdmin: true, Identity: kernel.IdentityTransient,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -418,8 +422,8 @@ func seedTokens(t *testing.T, db store.Store) (*token.Service, statusSecrets) {
 	return tokens, secrets
 }
 
-// subjectOf is the subject of name's tokens, as internal/server writes it,
-// so that the seeded token records belong to the users the tests name.
+// subjectOf is the subject of name's tokens, as the token API writes it, so
+// that the seeded token records belong to the users the tests name.
 func subjectOf(svc *token.Service, name string) string {
 	return svc.Issuer() + "/users/" + name
 }
@@ -485,7 +489,7 @@ func newIdentityWorld(t *testing.T) identityWorld {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -539,7 +543,7 @@ func (w identityWorld) bearer(t *testing.T, user string, scope string) map[strin
 	t.Helper()
 	req := token.Request{Username: user, ByAdmin: true}
 	if scope != "" {
-		sc, err := types.ParseScope(scope)
+		sc, err := kernel.ParseScope(scope)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -655,17 +659,17 @@ func keypairBody(name, alias, public string) string {
 // seedKeys adds what the key pair and certificate rows need to a status
 // fixture: a pair a repository signs with and a certificate a remote
 // repository presents, neither of which can be deleted.
-func seedKeys(t *testing.T, db store.Store) {
+func seedKeys(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	ctx := context.Background()
 	k := testKeys()
-	if err := db.Keys().CreateKeypair(ctx, types.Keypair{
-		Name: "kp-used", Type: types.KeypairRSA, Alias: "used",
+	if err := db.Keys().CreateKeypair(ctx, api.Keypair{
+		Name: "kp-used", Type: api.KeypairRSA, Alias: "used",
 		PrivateKey: k.private, PublicKey: k.public,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Keys().PutCertificate(ctx, types.Certificate{
+	if err := db.Keys().PutCertificate(ctx, api.Certificate{
 		Alias: "cert-used", PEM: k.bundle,
 	}); err != nil {
 		t.Fatal(err)

@@ -14,11 +14,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/blobtest"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/blobtest"
 )
 
 // Cached plugin archives can outlive an artifacts.xml refresh. The current
@@ -57,13 +57,13 @@ func TestAccP2CachedArchiveRejectsChangedPublishedPluginChecksum(t *testing.T) {
 				case strings.HasSuffix(q.Resource.Path, "/"+pluginPath):
 					sha = pluginArchiveSHA
 				default:
-					return source.Result{}, store.ErrNotFound
+					return source.Result{}, kernel.ErrNotFound
 				}
 				return source.Result{
-					Item: &types.Item{
+					Item: &model.Item{
 						RepoKey: q.Repo.Key, Path: path.Dir(q.Resource.Path),
 						Name: path.Base(q.Resource.Path), Cached: true,
-						Actual: types.Checksums{SHA256: sha},
+						Actual: kernel.Checksums{SHA256: sha},
 					},
 					Used: func(context.Context) error {
 						if strings.HasSuffix(q.Resource.Path, "/"+pluginPath) {

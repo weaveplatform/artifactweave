@@ -11,11 +11,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/p2"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 const (
@@ -50,7 +52,7 @@ func TestAccP2ExternalCompositeChildIsOwnedAndParentBound(t *testing.T) {
 				body = p2Fixture(t, "org.eclipse.glsp.layout.source_2.7.0.jar")
 				base = q.Resource.ExternalURL
 			default:
-				return source.Result{}, store.ErrNotFound
+				return source.Result{}, kernel.ErrNotFound
 			}
 			if q.Resource.ValidateMetadata != nil {
 				if err := q.Resource.ValidateMetadata(
@@ -186,11 +188,13 @@ func TestAccP2ExternalCompositeChildIsOwnedAndParentBound(t *testing.T) {
 	if childReads != 3 {
 		t.Fatalf("child fetch count %d, want 3", childReads)
 	}
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
-		Name: "p2-child-only", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
-				Targets: map[string]types.Target{"p2-external": {Include: []string{"__p2_ext/**"}}},
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "p2-child-only", Resources: map[api.ResourceType]accesstest.Resource{
+			api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+				Targets: map[string]accesstest.Target{
+					"p2-external": {Include: []string{"__p2_ext/**"}},
+				},
 			},
 		},
 	}); err != nil {
@@ -290,7 +294,7 @@ func TestAccP2NestedExternalCompositeAndCycleBound(t *testing.T) {
 				base = q.Resource.ExternalURL
 				externalReads++
 			default:
-				return source.Result{}, store.ErrNotFound
+				return source.Result{}, kernel.ErrNotFound
 			}
 			return source.Result{
 				Metadata: source.MetadataResponse{BaseURL: base},
@@ -404,7 +408,7 @@ func TestAccP2ArchiveCompositeRewritesExternalChild(t *testing.T) {
 			case "https://child.example/site/artifacts.xml.xz":
 				body = p2Fixture(t, "artifacts.xml.xz")
 			default:
-				return source.Result{}, store.ErrNotFound
+				return source.Result{}, kernel.ErrNotFound
 			}
 			if q.Resource.Validate != nil {
 				if err := q.Resource.Validate(
@@ -462,7 +466,7 @@ func TestAccP2VirtualDoesNotLendExternalChildAuthority(t *testing.T) {
 				body = p2Fixture(t, "content.jar")
 				externalReads++
 			default:
-				return source.Result{}, store.ErrNotFound
+				return source.Result{}, kernel.ErrNotFound
 			}
 			return source.Result{
 				Metadata: source.MetadataResponse{
@@ -477,10 +481,10 @@ func TestAccP2VirtualDoesNotLendExternalChildAuthority(t *testing.T) {
 	)
 	w := newItemWorld(t, false, func(c *Config) {
 		c.RemoteSources = &source.Service{
-			Resolve: func(_ context.Context, c repo.Config) (types.SourceIdentity, error) {
-				return types.SourceIdentity{
-					Kind:       types.ExternalHTTP,
-					Repository: types.RepositoryIncarnation(c.Key), ID: c.Key,
+			Resolve: func(_ context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
+				return artmodel.SourceIdentity{
+					Kind:       artmodel.ExternalHTTP,
+					Repository: artmodel.RepositoryIncarnation(c.Key), ID: c.Key,
 					Generation: "v1",
 				}, nil
 			},

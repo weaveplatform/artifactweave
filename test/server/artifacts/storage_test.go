@@ -12,9 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // storageWorld is an item world with a small tree in libs-local and
@@ -198,7 +202,7 @@ func TestAccStorageList(t *testing.T) {
 		wantStatus(t, w.do(http.MethodGet, list+bad, "admin", ""), http.StatusBadRequest)
 	}
 	// Listing refuses anonymous callers even where they may read.
-	grant(t, w, "anon-read", "anonymous", "libs-local", types.ActionRead)
+	grant(t, w, "anon-read", "anonymous", "libs-local", accessapi.ActionRead)
 	wantStatus(
 		t,
 		w.do(http.MethodGet, "/artifactory/api/storage/libs-local/top.txt", "", ""),
@@ -208,13 +212,13 @@ func TestAccStorageList(t *testing.T) {
 }
 
 // grant gives user actions on a repository.
-func grant(t *testing.T, w *itemWorld, name, user, repoKey string, a types.Actions) {
+func grant(t *testing.T, w *itemWorld, name, user, repoKey string, a accessapi.Actions) {
 	t.Helper()
-	if err := w.db.Permissions().Create(context.Background(), types.Permission{
+	if err := w.db.Permissions().Create(context.Background(), accesstest.Permission{
 		Name: name,
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{user: a}},
-			Targets: map[string]types.Target{repoKey: {Include: []string{"**"}}},
+		Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]accessapi.Actions{user: a}},
+			Targets: map[string]accesstest.Target{repoKey: {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -449,7 +453,7 @@ func TestAccStorageRootProperties(t *testing.T) {
 	// Removing keys from a root that never had any creates nothing.
 	wantStatus(t, w.do(http.MethodDelete, api+"other-local?properties=k&recursive=0", "admin", ""),
 		http.StatusNoContent)
-	if _, err := w.db.Items().Root(ctx, "other-local", false); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.db.Items().Root(ctx, "other-local", false); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("a delete created a root record: %v", err)
 	}
 
@@ -471,7 +475,7 @@ func TestAccStorageRootProperties(t *testing.T) {
 
 	// Annotating the root needs the action on the whole repository; reading
 	// or deploying there is not enough.
-	grant(t, w, "read-libs", "user", "libs-local", types.ActionRead)
+	grant(t, w, "read-libs", "user", "libs-local", accessapi.ActionRead)
 	wantStatus(t, w.do(http.MethodPut, api+"libs-local?properties=k=v", "user", ""),
 		http.StatusForbidden)
 	wantStatus(t, w.do(http.MethodPatch, meta+"libs-local", "deployer", `{"props":{"k":"v"}}`),
@@ -479,19 +483,19 @@ func TestAccStorageRootProperties(t *testing.T) {
 }
 
 // failingRoots fails every read and creation of a repository root's record.
-type failingRoots struct{ store.ItemStore }
+type failingRoots struct{ port.ItemStore }
 
-func (failingRoots) Root(context.Context, string, bool) (types.Item, error) {
-	return types.Item{}, errBoom
+func (failingRoots) Root(context.Context, string, bool) (artmodel.Item, error) {
+	return artmodel.Item{}, errBoom
 }
 
-func (failingRoots) EnsureRoot(context.Context, types.Item) (types.Item, error) {
-	return types.Item{}, errBoom
+func (failingRoots) EnsureRoot(context.Context, artmodel.Item) (artmodel.Item, error) {
+	return artmodel.Item{}, errBoom
 }
 
-type failingRootStore struct{ store.Store }
+type failingRootStore struct{ harness.Store }
 
-func (s failingRootStore) Items() store.ItemStore { return failingRoots{s.Store.Items()} }
+func (s failingRootStore) Items() port.ItemStore { return failingRoots{s.Store.Items()} }
 
 // A store that cannot read or create a root's record answers 500.
 func TestAccStorageRootStoreErrors(t *testing.T) {
@@ -513,7 +517,7 @@ func TestAccStorageRootStoreErrors(t *testing.T) {
 
 func TestAccStoragePropertiesOnRemoteCache(t *testing.T) {
 	w := storageWorld(t, false)
-	if _, err := w.db.Items().Put(context.Background(), types.Item{
+	if _, err := w.db.Items().Put(context.Background(), artmodel.Item{
 		RepoKey:  "up",
 		Cached:   true,
 		Name:     "cached.txt",
@@ -575,7 +579,7 @@ func TestAccMetadataPatch(t *testing.T) {
 	}
 	p, err := w.db.Items().
 		Properties(context.Background(), w.item("libs-local", false, "dir/a.txt").ID)
-	if err != nil || !reflect.DeepEqual(p, types.Properties{"c": {"new"}}) {
+	if err != nil || !reflect.DeepEqual(p, artmodel.Properties{"c": {"new"}}) {
 		t.Fatalf("properties %v, %v", p, err)
 	}
 	if c := patch(
@@ -700,9 +704,9 @@ func TestAccStoragePermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := anyRemote.Resources[types.ResourceArtifact]
-	r.Actions.Users = map[string]types.Actions{"user": types.ActionRead}
-	anyRemote.Resources[types.ResourceArtifact] = r
+	r := anyRemote.Resources[accessapi.ResourceArtifact]
+	r.Actions.Users = map[string]accessapi.Actions{"user": accessapi.ActionRead}
+	anyRemote.Resources[accessapi.ResourceArtifact] = r
 	if err := w.db.Permissions().Update(context.Background(), anyRemote); err != nil {
 		t.Fatal(err)
 	}

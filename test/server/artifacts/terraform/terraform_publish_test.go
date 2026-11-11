@@ -14,7 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // The pinned jf packages both modules through ordinary item deployment,
@@ -29,14 +31,16 @@ func TestAccJFTerraformPublish(t *testing.T) {
 	h := statusFixture(t, false, allowBasicTokens, func(c *Config) {
 		c.BaseURL = ""
 		tuneRegistry(c)
-		if err := c.Store.Permissions().Create(t.Context(), types.Permission{
+		if err := c.Store.Permissions().Create(t.Context(), accesstest.Permission{
 			Name: "module-reader",
-			Resources: map[types.ResourceType]types.Resource{
-				types.ResourceArtifact: {
-					Actions: types.Grants{
-						Users: map[string]types.Actions{"user": types.ActionRead},
+			Resources: map[api.ResourceType]accesstest.Resource{
+				api.ResourceArtifact: {
+					Actions: accesstest.Grants{
+						Users: map[string]api.Actions{"user": api.ActionRead},
 					},
-					Targets: map[string]types.Target{"tf-publish": {Include: []string{"acme/**"}}},
+					Targets: map[string]accesstest.Target{
+						"tf-publish": {Include: []string{"acme/**"}},
+					},
 				},
 			},
 		}); err != nil {
@@ -126,7 +130,7 @@ func TestAccJFTerraformPublish(t *testing.T) {
 	if len(doc.BuildInfo.Modules) != 1 {
 		t.Fatalf("build modules: %s", build.Body)
 	}
-	sums := map[string]types.Checksums{}
+	sums := map[string]kernel.Checksums{}
 	for _, module := range doc.BuildInfo.Modules {
 		if module.ID != "terraform-publish" || module.Type != "terraform" ||
 			len(module.Artifacts) != 2 {
@@ -140,14 +144,14 @@ func TestAccJFTerraformPublish(t *testing.T) {
 			if _, duplicate := sums[a.Path]; duplicate {
 				t.Fatalf("duplicate artifact path: %q", a.Path)
 			}
-			sums[a.Path] = types.Checksums{SHA1: a.SHA1, SHA256: a.SHA256, MD5: a.MD5}
+			sums[a.Path] = kernel.Checksums{SHA1: a.SHA1, SHA256: a.SHA256, MD5: a.MD5}
 		}
 	}
 	for _, name := range []string{"alpha", "beta"} {
 		path := "acme/" + name + "/aws/v1.2.3.zip"
 		rec := do(t, h, "GET", "/artifactory/api/storage/tf-publish/"+path, bearerAuth(admin), "")
 		wantStatus(t, rec, 200)
-		var stored struct{ Checksums types.Checksums }
+		var stored struct{ Checksums kernel.Checksums }
 		if err := json.Unmarshal(rec.Body.Bytes(), &stored); err != nil {
 			t.Fatalf("stored checksums: %s, %v", rec.Body, err)
 		}

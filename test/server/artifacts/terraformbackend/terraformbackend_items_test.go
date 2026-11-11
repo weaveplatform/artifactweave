@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/terraformstate"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	tfbe "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraformbackend"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/terraformstate"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	tfbe "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraformbackend"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // tfbeKeys is the master key the Terraform backend fixtures seal under.
@@ -36,7 +36,7 @@ func tfbeState(serial int) string {
 // under k while the repository's encryptStates says so.
 func seedTfbe(
 	t *testing.T,
-	db store.Store,
+	db harness.Store,
 	blobs blob.Store,
 	k *crypt.Keyring,
 	key string,

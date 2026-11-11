@@ -4,7 +4,7 @@ This file is the detailed layout for option 2 (hexagonal, ports and adapters); t
 other options are the sibling documents in this folder. Every file uses the same
 sections in the same order, so two options can be read side by side. The stance is
 the same for every option: no existing decision, gate or import rule is a
-constraint, and the roadmap in the [implementation plan](../docs/implementation/plan.md)
+constraint, and the roadmap in the [implementation plan](../../implementation/plan.md)
 (P10 to P41) is scope.
 
 ## Summary

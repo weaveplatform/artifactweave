@@ -22,7 +22,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/weaveplatform/artifactweave/migration/platform/cdn"
+	"github.com/weaveplatform/artifactweave/internal/platform/cdn"
 )
 
 // The CDN scenarios (#132 to #134): a store behind a real edge. A CDN

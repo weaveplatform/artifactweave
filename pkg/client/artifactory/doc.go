@@ -14,7 +14,7 @@
 //     api/src/artifactory.
 //   - The server URL and the ClientOption values given to NewClient or
 //     NewClientWithResponses, such as WithHTTPClient.
-//   - migration/artifacts/api/repo and migration/kernel/wire, which the
+//   - internal/artifacts/api/repo and internal/kernel/wire, which the
 //     document names through x-go-type-import, so repository configurations
 //     and wire models are the server's own types.
 //

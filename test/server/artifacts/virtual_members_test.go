@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 )
 
 // A virtual repository may have no members, given as an absent or an empty

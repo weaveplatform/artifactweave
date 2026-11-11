@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 type statusCase struct {
@@ -22,7 +22,7 @@ func (c statusCase) method() string { method, _, _ := strings.Cut(c.route, " ");
 
 type statusPart struct {
 	handwritten map[string]bool
-	seed        func(*testing.T, store.Store, blob.Store)
+	seed        func(*testing.T, harness.Store, blob.Store)
 	rows        func() []statusCase
 	tune        func(*Config)
 }
@@ -41,7 +41,7 @@ func newTerraformStatusWorld(
 	h, db, _ := terraformServer(t, func(cfg *Config) {
 		if anonymous {
 			if err := cfg.Store.Settings().
-				Put(t.Context(), types.SettingAnonymousAccess, true); err != nil {
+				Put(t.Context(), settings.SettingAnonymousAccess, true); err != nil {
 				t.Fatal(err)
 			}
 		}

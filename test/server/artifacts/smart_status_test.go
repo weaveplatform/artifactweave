@@ -6,10 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/smart"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/smart"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
+	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
 
 func TestAccSmartDiagnosticAuthorizationAndExactPath(t *testing.T) {
@@ -21,7 +22,7 @@ func TestAccSmartDiagnosticAuthorizationAndExactPath(t *testing.T) {
 				t.Error("unbounded diagnostics")
 			}
 			if key == "missing" {
-				return smart.SmartStatus{}, store.ErrNotFound
+				return smart.SmartStatus{}, kernel.ErrNotFound
 			}
 			return smart.SmartStatus{
 				Repository: key,
@@ -32,7 +33,7 @@ func TestAccSmartDiagnosticAuthorizationAndExactPath(t *testing.T) {
 						Claimed:   7,
 						Uncertain: 2,
 						Work: []smart.SmartWorkStatus{
-							{Operation: "statistics", State: types.WorkParked, Attempts: 1},
+							{Operation: "statistics", State: work.WorkParked, Attempts: 1},
 						},
 					},
 				},
@@ -79,7 +80,7 @@ func TestAccSmartDiagnosticAuthorizationAndExactPath(t *testing.T) {
 
 func TestAccSharedConfigurationRequiresAuthenticatedUser(t *testing.T) {
 	w := newRepoWorld(t)
-	if err := w.db.Settings().Put(t.Context(), types.SettingAnonymousAccess, true); err != nil {
+	if err := w.db.Settings().Put(t.Context(), settings.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)
 	}
 	w.create(

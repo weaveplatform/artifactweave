@@ -106,22 +106,23 @@ the work.
 - **Engine drivers.** `platform/sql/sqlite` and `platform/sql/postgres` open a pool for
   their engine (`OpenDB`) and describe it as a `dialect.Dialect`, with no store,
   migration or keyring knowledge. Opening the composite store (the driver's pool, migrated
-  and wrapped in the SQL store) stays legacy, in the `Open` of `internal/sqlstore/sqlite`
-  and `internal/sqlstore/postgres`, with its signature, options and error texts, until
-  STO-19 moves it into `app`.
+  and wrapped in the SQL store) is the `Open` of `app/adapters/sql/sqlite` and
+  `app/adapters/sql/postgres`, with the signature, options and error texts it had in
+  `internal/sqlstore`.
 - **The composite store** (every module store over the one unit of work) lives in
-  `app/adapters/{sql,inmem}`, with its contract suite in `app/storetest` and test openers
-  in `app/apptest`. Module tests reach it only through those test-support packages, and
-  `formattest.Run` takes its backends as a parameter, so artifacts core never imports
-  `app`.
+  `app/adapters/{sql,inmem}`, with its contract suite, its SQL suites and the test
+  openers in `app/storetest` and the format contract's backends in `app/apptest`. Module
+  tests reach it only through those test-support packages, and `formattest.Run` takes its
+  backends as a parameter, so artifacts core never imports `app`. Nothing aggregates the
+  stores in its place: the router takes `app.RouterStore`, the union of the store types
+  its handlers declare, and every other user names a narrow store or a composite.
 - **Contract suites.** Module SQL contract suites run on SQLite through
   `platform/sql/sqltest`'s `RunModule`, which gives every store a fresh database migrated
   with the module's streams alone, and they share their assertions through
-  `platform/testkit/storekit`. PostgreSQL runs stay in the composite packages, with one
-  container per test process, and stay legacy, in `internal/sqlstore/postgres` and the
-  composite suites of `internal/sqlstore/sqltest`, until STO-19. A module suite that asks
-  for a PostgreSQL run (`WithPostgres`) gets a scratch schema of its own on the shared
-  server for each store.
+  `platform/testkit/storekit`. PostgreSQL runs stay in the composite packages
+  (`app/adapters/sql/postgres`, with the composite suites of `app/storetest`), with one
+  container per test process. A module suite that asks for a PostgreSQL run
+  (`WithPostgres`) gets a scratch schema of its own on the shared server for each store.
 - **Ownership of shared models.**
   - `PackageType` and the version comparators stay out of the kernel. They live in
     `artifacts/api/repo` and `artifacts/core/model`.
@@ -363,6 +364,22 @@ change that adds a name appends its row; the change column gives the ticket of t
 | `Deps` | `artifacts` | What app passes `artifacts.New`: the whole store, the hot blob store, the keyring, the access module's API (the module root may not import access core, so the authenticator comes as the API's binding), the work queue, the garbage collector app builds over its multipart and registry upload services, the module's `Settings`, the logger, and `PrepareNIMModelUpload`, NIM's upload preparation, which lives in an ecosystem `http` package that the module root may not import; the target document's `Deps` names the platform's transaction, SQL, blob stores, CDN, work and outbox and access's `Authorizer` and `Keys` | WEB-20 |
 | `Module` | `artifacts` | The artifacts module as app holds it: `API()`, `Start` (the garbage collection loop) and `Close`, as the target document names them, without `Routes()`, which P9d does not create because the routes stay in the server; and `RegisterWork` and `OpenRemoteSources`, which the target document's module surface does not have: the work registration writes its schedule and the remote wiring reads and writes the remote policy key, so neither can run in `New`, and app calls each at its place in the start-up order. Its accessors `FormatSettings`, `GC`, `RemoteHTTP`, `RemoteSources`, `RegistrySources`, `RemoteStatus` and `MavenEager` hand the router, the Debian snapshot work and app's remote tests what they take | WEB-20 |
 | `Deps`, `Module`, `Store` | `configuration` | What app passes `configuration.New`: a store that runs the apply's transaction and holds the configuration documents, which the module reaches on each call so that `New` calls nothing on it, the artifacts module's `Repositories` and `Layouts`, the access module's API, the configuration settings and the logger; the target document's `Deps` names the platform's transaction and SQL and access's `Identity`. `Module`'s `API()` returns the descriptor binding and its `Settings()` the settings; `Routes()` is not created in P9d | WEB-20 |
+| `Runtime`, `RuntimeOptions`, `OpenRuntime`, `Runtime.Close` | `app` | What serve holds open, exported so that test support builds the router over the stores and modules serve uses: the runtime with the fields `Store`, `Blobs`, `Auth`, `Tokens`, `Keys`, `Work` and `Artifacts` (the artifacts module, whose accessors give its remote sources and remote HTTP pool); the options that set the password hash cost and the signing key size, whose zero value is production's; the function that opens it and the method that releases it. The target document does not name the runtime | TST-07 |
+| `App`, `AppConfig`, `AppOptions` | `test/server/support/harness` | The application runtime opened as serve opens it, for the suites that left `migration/app`: the default configuration with a temporary data directory, a cheap password hash and the smallest signing key, closed when the test ends | TST-07 |
+| `RemoteWorld`, `NewRemoteWorld`, `RemoteWorld.Request`, `RemoteWorld.Update` | `test/server/support/harness` | The remote world of app's remote suites: the router over an `App` runtime with the generic remote repository `remote` in front of a fake upstream, the users `reader` and `denied` and the `remote-read` permission; a request as one of those users, and a save of the changed remote | TST-07 |
+| `RouterStore` | `app` | The store `RouterConfig.Store` takes: the union of the store types of the handlers, middleware and bindings that `NewRouter` builds (`artifacts/adapters/http`'s `Store`, `registry.Store`, `repos.Store`, `access.Store`, the access HTTP adapter's `Store` and `instance.Store`), derived from the router's consumers rather than declared as a new aggregate, so a handler that reads one more accessor makes it grow. Both composite stores satisfy it, asserted beside it for the SQL one and in a test for the in-memory one, which production code never imports. The target document does not name the router's store | STO-19 |
+| `Store` | `app/storetest` | What the composite contract's `Factory` returns: the platform's `Store` with the seven module port stores. Both composite stores satisfy it, which the package asserts at compile time in place of the aggregate's assertions | STO-19 |
+| `SQLStore`, `Options`, `SQLiteOptions`, `PostgresOptions`, `OpenSQLite`, `OpenPostgres` | `app/storetest` | The composite SQL store's type and options, and openers with the signatures, behaviour and error texts of `app/adapters/sql/sqlite.Open` and `app/adapters/sql/postgres.Open`, for the tests of modules, which may import test support from app and nothing else (dependency rule 1) | STO-19 |
+| `FormatBackends` | `app/apptest` | The format contract's three backends, in memory, SQLite on disk and PostgreSQL after `Reset` (skipped where no server answers), in that order and with those names, which every external caller of `formattest.Run` passes | STO-19 |
+| `Run(t, f, backends)` | `artifacts/core/formattest` | The format contract takes its backends from its caller and fails the test when it is given none; `Backends()` is gone, so artifacts core opens no composite store | STO-19 |
+| `Store` | `test/server/support/harness` | An alias of `app.RouterStore`, the type of the harness `Config.Store`, so that a suite's fake can embed it and keep the `Store:` key in its literals | STO-19 |
+| `SeedStore` | `test/server/support` | What `Seed`, `Repositories` and `SeedHelmCharter` read and write: the seed's principals (`authn.SeedStore`), the repositories (`repos.Store`) and the access module's store (`access.Store`). The SQL composite, the router's store and fakes reach them as well as the in-memory composite | STO-19 |
+| `sql`, `sqlite`, `postgres`, `inmem`, `storetest`, `apptest` | `app/adapters/sql`, `app/adapters/sql/sqlite`, `app/adapters/sql/postgres`, `app/adapters/inmem`, `app/storetest`, `app/apptest` | The packages of the composite stores, which the target document does not map because it has no composite: the SQL composite with its `Open`, module list and layout watch registration, its two dialect openers, the in-memory composite, the composite contract and SQL suites with the test openers, and the format contract's backends | STO-19 |
+| `ResolveKey` | `artifacts/api/repo` | The stored key a client's repository key names, and whether it names that remote repository's cache (`maven-remote-cache` is the cache of `maven-remote`). The artifacts model's `ResolveRepoKey` returns it, and access evaluates permission targets on the stored key through it, because access may not import the artifacts module's core | PRO-01 |
+| `DefaultRefreshGrace`, `RegistryTokenExpiry` | `access/api` | The token lifetimes of decision 0005 that other modules apply to the tokens access issues: how long a token record outlives its expiry, which the garbage collector waits before it deletes the record, and a registry token's lifetime, which the Docker token endpoint asks for, shortened to what remains of the credential that obtained the token; moved from `access/core/model` | PRO-01 |
+| `EnvironmentDev`, `EnvironmentProd`, `BuiltinEnvironments` | `access/api` | The built-in environments, which the artifacts repository service assigns to a repository that names none and accepts beside the stored ones; moved from `access/core/model` | PRO-01 |
+| `User`, `Group`, `RoleFlags`, `UserLockPolicy`, `AccessLockSettings`, `Permission`, `Resource`, `Grants`, `Target`, `Token`, `Project`, `Role`, `Environment`, `UserStore`, `PermissionStore`, `TokenStore`, `TokenFilter`, `APIRestriction`, `UserDisabled`, `UserLocked`, `RoleCustomGlobal` | `access/accesstest` | The access records and store ports that other modules' tests store and wrap, and the constants they set, as aliases of `access/core/model` and `access/core/port`, which a test outside access may not import | PRO-01 |
+| `Item`, `RepoFilter`, `RepoStore` | `test/server/support` | The artifacts record and store port that other modules' tests name when they seed a `SeedStore` or wrap its repositories to fail, such as the descriptor core's, as aliases of `artifacts/core/model` and `artifacts/core/port` | PRO-01 |
 
 ### Placeholders
 
@@ -431,7 +448,7 @@ rule can fail. There is no depguard configuration.
   linters would surface about 126 unrelated findings. Revive's `checkPublicInterface`
   stays off.
 - **Guidance.** `CLAUDE.md` is unchanged, since its layout rule stays true.
-  [`migration/README.md`](../../../migration/README.md) and a banner in
+  [`migration/README.md`](https://github.com/weaveplatform/artifactweave/blob/671fb9459b9c1717fc6c485695daa85b07fe0861/migration/README.md) and a banner in
   [`repo-layout.md`](../../implementation/repo-layout.md) carry the migration guidance.
 
 ### Type-alias bridges
@@ -440,7 +457,7 @@ A declaration that leaves a legacy split package, such as `pkg/types`, `pkg/stor
 `internal/auth` or `internal/authz`, leaves an alias at its old path while its users are
 re-pointed: one `bridge_<target>.go` per target, headed by a comment that names the
 declaring package and the change that deletes the bridge (the exact form is in
-[`migration/README.md`](../../../migration/README.md)), and never marked `Deprecated:`.
+[`migration/README.md`](https://github.com/weaveplatform/artifactweave/blob/671fb9459b9c1717fc6c485695daa85b07fe0861/migration/README.md)), and never marked `Deprecated:`.
 Sentinel errors bridge as `var ErrNotFound = kernel.ErrNotFound`, the same pointer, so
 `errors.Is` keeps matching; generic functions bridge as wrappers. A `package X` test that
 would form an import cycle becomes `package X_test` with an `export_test.go`. Every user
@@ -543,7 +560,7 @@ Nothing in this decision departs from Artifactory's behaviour, so it has no entr
   rules, repository root and package mapping), and the other option documents in
   [`docs/research/architecture-options/`](../architecture-options/).
 - [Implementation plan, modular-monolith migration section](../../implementation/plan.md#p9d-modular-monolith-migration),
-  and [`migration/README.md`](../../../migration/README.md).
+  and [`migration/README.md`](https://github.com/weaveplatform/artifactweave/blob/671fb9459b9c1717fc6c485695daa85b07fe0861/migration/README.md).
 - Decisions that stay in force and that the moves preserve:
   [0002](0002-spec-first-flat-crud-handwritten-item-paths.md) (generated strict servers and
   handwritten item paths), [0004](0004-storage-sql-metadata-and-blobs.md) (SQL metadata and

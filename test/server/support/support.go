@@ -16,12 +16,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access"
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	artifactsapi "github.com/weaveplatform/artifactweave/migration/artifacts/api"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/layout"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/repos"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/internal/access"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
 )
 
 // TestHash keeps server-route authentication tests fast under the race detector.
@@ -36,12 +37,39 @@ var CheapHash = func() []byte {
 	return h
 }()
 
+// SeedStore is what Seed and Repositories read and write: the principals
+// the seed creates (authn.SeedStore), and the repositories that the
+// artifacts module's binding writes (repos.Store) with the access module's
+// key pairs and projects that it checks (access.Store, whose access ports
+// a test outside access may not name). Both composite stores are one, so is
+// the router's store, and so is a fake that embeds any of them.
+type SeedStore interface {
+	authn.SeedStore
+	repos.Store
+	access.Store
+}
+
 // Repositories is the artifacts module's Repositories over db, bound as the
 // server binds them, with the key pairs and projects that access reads from
 // db. Every call takes part in a transaction of db that its context carries.
-func Repositories(db store.Store) artifactsapi.Repositories {
+func Repositories(db SeedStore) artifactsapi.Repositories {
 	return repos.NewRepositories(db, access.KeysOf(db), access.ProjectsOf(db))
 }
+
+// The artifacts record and store port that the tests of other modules name
+// when they seed a SeedStore or wrap its repositories to fail. The artifacts
+// module declares them in core/model and core/port, which another module may
+// reach only through its api (decision 0044, dependency rule 11), so support
+// names them. Each is an alias: a fake built over them still satisfies
+// SeedStore.
+type (
+	// Item is a stored file or folder of a repository.
+	Item = model.Item
+	// RepoFilter selects the repositories RepoStore lists.
+	RepoFilter = port.RepoFilter
+	// RepoStore stores repository configurations.
+	RepoStore = port.RepoStore
+)
 
 // Layouts is the artifacts module's Layouts, bound as the server binds it:
 // the layout engine's check, which reads and writes nothing.
@@ -52,7 +80,7 @@ func Layouts() artifactsapi.Layouts { return layout.Checker{} }
 // and the artifactory-build-info repository), with "pw" as the admin
 // password, and fails t if the store refuses them. A store that is already
 // seeded is left as it is.
-func Seed(t *testing.T, db store.Store) {
+func Seed(t *testing.T, db SeedStore) {
 	t.Helper()
 	repositories := Repositories(db)
 	if _, err := authn.SeedHashed(

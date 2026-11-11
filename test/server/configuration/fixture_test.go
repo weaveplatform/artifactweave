@@ -1,11 +1,11 @@
 package configuration_test
 
 // This file holds the configuration suites' fixtures: adapters, under the
-// names the tests had in internal/server, over test/server/support/harness
-// and test/server/support, and copies of the world and helpers that root
-// files staying in internal/server define, which the root keeps for its
-// own tests. Every router here is harness.Router, so a change to the
-// router's assembly reaches these tests without an edit here.
+// names of the router guards' fixtures in internal/app, over
+// test/server/support/harness and test/server/support, and copies of the world
+// and helpers those fixtures define, which app keeps for its guard tables.
+// Every router here is harness.Router, so a change to the router's assembly
+// reaches these tests without an edit here.
 
 import (
 	"context"
@@ -17,14 +17,14 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/migration/platform/settings"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -41,7 +41,7 @@ var (
 	cheapHash = support.CheapHash
 )
 
-func cheapSeed(t *testing.T, db store.Store) {
+func cheapSeed(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	support.Seed(t, db)
 }
@@ -153,7 +153,7 @@ func newRepoWorld(t *testing.T) *repoWorld {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	reader := types.User{
+	reader := accesstest.User{
 		Name:         "reader",
 		PasswordHash: cheapHash,
 		Groups:       []string{authn.ReadersGroup},
@@ -221,16 +221,16 @@ type faultyStore struct {
 
 var errBoom = errors.New("boom")
 
-func (f faultyStore) Repos() store.RepoStore {
+func (f faultyStore) Repos() port.RepoStore {
 	return faultyRepos{RepoStore: f.Store.Repos(), fail: f.fail}
 }
 
 type faultyRepos struct {
-	store.RepoStore
+	port.RepoStore
 	fail map[string]bool
 }
 
-func (f faultyRepos) List(ctx context.Context, rf store.RepoFilter) ([]repo.Config, error) {
+func (f faultyRepos) List(ctx context.Context, rf port.RepoFilter) ([]repo.Config, error) {
 	if f.fail["list"] {
 		return nil, errBoom
 	}

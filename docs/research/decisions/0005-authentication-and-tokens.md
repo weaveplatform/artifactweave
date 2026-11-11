@@ -405,7 +405,7 @@ decodes them; string spellings such as `"true"` and `"60"` are accepted on write
   Unlocking (one, several or all users) and disabling the policy clear locks.
   `secondsToUnlock` (default 1) is stored and returned only: a lock lasts until an
   administrator lifts it.
-- **The temporary login suspension** (`migration/access/core/authn/suspension.go`, #408) is the second
+- **The temporary login suspension** (`internal/access/core/authn/suspension.go`, #408) is the second
   defence, independent of the lock. From the second failed Basic login in a row for a user
   name (`maxLoginDelayIncorrectAttempts`), every Basic login with that name answers `403`
   "This request is blocked due to recurrent login failures, please try again in N seconds"
@@ -773,7 +773,7 @@ source states are inferred and listed on
   route refuses the password, the legacy route and `jf c add` with a password still work, and
   the token from the legacy route creates one through the Access route.
 - `artifactory_scoped_token` and `platform_permission` Terraform acceptance.
-- OIDC: `migration/access/core/oidc` and `migration/access/core/idtoken` tests against a
+- OIDC: `internal/access/core/oidc` and `internal/access/core/idtoken` tests against a
   fake issuer (`idtokentest`), including every dynamic mapping example on the integration
   page; `TestAccOIDCDynamicMappings`, which follows a narrowed token to what it may read;
   `oidc.feature`, where the real `jf eot` exchanges a token and downloads with it, also

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 )
 
 // PATCH /api/metadata takes props, stats or both, and refuses a body with
@@ -20,7 +20,7 @@ func TestAccPatchMetadataStats(t *testing.T) {
 	w.put("/artifactory/libs-local/d/a.txt;team=core", "a")
 	const meta = "/artifactory/api/metadata/libs-local/d/a.txt"
 	file := w.item("libs-local", false, "d/a.txt")
-	stats := func() types.ItemStats {
+	stats := func() model.ItemStats {
 		t.Helper()
 		st, err := w.db.Items().Stats(ctx, file.ID)
 		if err != nil {
@@ -28,7 +28,7 @@ func TestAccPatchMetadataStats(t *testing.T) {
 		}
 		return st
 	}
-	props := func(p string) types.Properties {
+	props := func(p string) model.Properties {
 		t.Helper()
 		got, err := w.db.Items().Properties(ctx, w.item("libs-local", false, p).ID)
 		if err != nil {
@@ -42,7 +42,7 @@ func TestAccPatchMetadataStats(t *testing.T) {
 		`{"stats":{"downloadCount":5,"lastDownloaded":1700000000000,"lastDownloadedBy":"bob",`+
 			`"remoteDownloadCount":2,"remoteLastDownloaded":1600000000000,`+
 			`"remoteLastDownloadedBy":"edge"}}`), http.StatusNoContent)
-	want := types.ItemStats{
+	want := model.ItemStats{
 		DownloadCount: 5, LastDownloaded: time.UnixMilli(1700000000000).UTC(),
 		LastDownloadedBy: "bob", RemoteDownloadCount: 2,
 		RemoteLastDownloaded: time.UnixMilli(1600000000000).UTC(), RemoteLastDownloadedBy: "edge",

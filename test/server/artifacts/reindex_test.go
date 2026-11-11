@@ -10,15 +10,16 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/reindexauth"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/generic"
-	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/reindexauth"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
 
 // reindexRecorder is the format of the P8 package types in these tests:
@@ -66,7 +67,7 @@ type claimsReindex struct{ generic.Handler }
 
 func (claimsReindex) WorkKinds() []string { return []string{format.KindReindex} }
 
-func (claimsReindex) Work(context.Context, format.Env, types.WorkItem) error { return nil }
+func (claimsReindex) Work(context.Context, format.Env, work.WorkItem) error { return nil }
 
 func (claimsReindex) Owed(repo.Config, bool, string) []format.WorkRef { return nil }
 
@@ -127,17 +128,17 @@ func reindexWorld(
 		cfg.Work = q
 	})
 	ctx := context.Background()
-	targets := map[string]types.Target{}
+	targets := map[string]accesstest.Target{}
 	for _, c := range p8Repos {
 		if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
 		}
-		targets[c.Key] = types.Target{Include: []string{"**"}}
+		targets[c.Key] = accesstest.Target{Include: []string{"**"}}
 	}
-	if err := w.db.Permissions().Create(ctx, types.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "manage-p8",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"deployer": types.ActionManage}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}},
 			Targets: targets,
 		}},
 	}); err != nil {
@@ -251,7 +252,7 @@ func TestAccPypiReindexRunsBeforeItAnswers(t *testing.T) {
 		}
 		if _, err := w.db.WorkQueue().Get(ctx, format.KindReindex, "pypi-local"); !errors.Is(
 			err,
-			store.ErrNotFound,
+			kernel.ErrNotFound,
 		) {
 			t.Errorf("%q: still queued: %v", query, err)
 		}
@@ -268,7 +269,7 @@ func TestAccPypiReindexRunsBeforeItAnswers(t *testing.T) {
 	wantStatus(t, w.do("POST", "/artifactory/api/pypi/pypi-local/reindex", "deployer", ""),
 		http.StatusInternalServerError)
 	it, err := w.db.WorkQueue().Get(ctx, format.KindReindex, "pypi-local")
-	if err != nil || it.State != types.WorkPending || it.LastError != "boom" {
+	if err != nil || it.State != work.WorkPending || it.LastError != "boom" {
 		t.Errorf("after a failed run: %+v %v", it, err)
 	}
 	wantStatus(t, w.do("POST", "/artifactory/api/pypi/pypi-local/reindex?async=maybe", "admin", ""),
@@ -344,7 +345,7 @@ func TestAccHelmPartialReindex(t *testing.T) {
 		{"helm-virtual/charts/reindex", "admin", http.StatusBadRequest},
 		{"pypi-local/charts/reindex", "admin", http.StatusBadRequest},
 		{
-			"helm-local/" + strings.Repeat("x", store.MaxWorkKey) + "/reindex", "admin",
+			"helm-local/" + strings.Repeat("x", work.MaxWorkKey) + "/reindex", "admin",
 			http.StatusBadRequest,
 		},
 	} {

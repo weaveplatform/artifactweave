@@ -115,7 +115,7 @@ and offset APIs retain their existing envelopes and complete result semantics.
 
 The application enables admission controls by default. They apply to the HTTP
 boundary, including native protocols and generated stubs. Embedders opt in with
-`server.Config.RequestLimits`. `api.enabled=false` disables request budgeting,
+`app.RouterConfig.RequestLimits`. `api.enabled=false` disables request budgeting,
 not administrative restrictions. Health probes bypass admission. The existing
 request-body, upload, archive, AQL and outgoing-source limits remain in force.
 
@@ -136,7 +136,7 @@ this is not a claim that every child resource has been individually charged.
 
 Management mutations, search, build operations, archive/import/export, VCS, trash,
 legacy full repository/identity collections, reindex and deep file lists receive
-the expensive classification in `internal/server/request_limits.go`. They have
+the expensive classification in `internal/app/limits.go`. They have
 shared limits of 6000 requests per minute globally and 600 per principal, plus
 32 concurrent requests per process and 16 per principal. These defaults allow
 normal provider provisioning batches, including Terraform's ten concurrent

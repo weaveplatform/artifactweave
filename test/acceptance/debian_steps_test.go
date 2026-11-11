@@ -18,10 +18,10 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/debian"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraform/terraformtest"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 func (w *world) registerDebian(sc *godog.ScenarioContext) {
@@ -103,7 +103,7 @@ func (w *world) debianUpstream(name, version string) error {
 		return fmt.Errorf("unsafe Debian fixture coordinates")
 	}
 	archive, err := os.ReadFile(
-		filepath.Join(repoRoot, "migration/artifacts/ecosystem/debian/testdata",
+		filepath.Join(repoRoot, "internal/artifacts/ecosystem/debian/testdata",
 			name+"_"+version+"_amd64_0.deb"),
 	)
 	if err != nil {
@@ -116,7 +116,7 @@ func (w *world) debianUpstream(name, version string) error {
 	packagePath := "pool/main/a/" + name + "/" + name + "_" + version + "_amd64.deb"
 	packages, err := debian.Packages([]debian.IndexedBinary{{
 		Binary: binary, Path: packagePath, Size: int64(len(archive)),
-		Checksums: types.Checksums{
+		Checksums: kernel.Checksums{
 			MD5:    fmt.Sprintf("%x", md5.Sum(archive)),
 			SHA256: fmt.Sprintf("%x", sha256.Sum256(archive)),
 		},
@@ -175,16 +175,16 @@ func (w *world) debianSourceUpstream() error {
 		"alpha_1.0-1.debian.tar.xz",
 	}
 	files := map[string][]byte{}
-	checksums := map[string]types.Checksums{}
+	checksums := map[string]kernel.Checksums{}
 	for _, name := range names {
 		body, err := os.ReadFile(
-			filepath.Join(repoRoot, "migration/artifacts/ecosystem/debian/testdata", name),
+			filepath.Join(repoRoot, "internal/artifacts/ecosystem/debian/testdata", name),
 		)
 		if err != nil {
 			return err
 		}
 		files[name] = body
-		checksums[name] = types.Checksums{
+		checksums[name] = kernel.Checksums{
 			MD5:    fmt.Sprintf("%x", md5.Sum(body)), //nolint:gosec // Debian wire checksum.
 			SHA256: fmt.Sprintf("%x", sha256.Sum256(body)),
 		}
@@ -258,7 +258,7 @@ func (w *world) debianRedirect(name, version string) error {
 		return fmt.Errorf("unsafe Debian fixture coordinates")
 	}
 	archive, err := os.ReadFile(
-		filepath.Join(repoRoot, "migration/artifacts/ecosystem/debian/testdata",
+		filepath.Join(repoRoot, "internal/artifacts/ecosystem/debian/testdata",
 			name+"_"+version+"_amd64_0.deb"),
 	)
 	if err != nil {
@@ -322,7 +322,7 @@ func (w *world) copyDebianPackageVariant(name, version, variant, folder string) 
 		return fmt.Errorf("unknown Debian fixture variant")
 	}
 	content, err := os.ReadFile(
-		filepath.Join(repoRoot, "migration/artifacts/ecosystem/debian/testdata",
+		filepath.Join(repoRoot, "internal/artifacts/ecosystem/debian/testdata",
 			name+"_"+version+"_amd64_"+variant+".deb"),
 	)
 	if err != nil {
@@ -398,7 +398,7 @@ func (w *world) copyDebianSource(folder string) error {
 		"alpha_1.0-1.dsc", "alpha_1.0.orig.tar.gz", "alpha_1.0-1.debian.tar.xz",
 	} {
 		content, err := os.ReadFile(
-			filepath.Join(repoRoot, "migration/artifacts/ecosystem/debian/testdata", name),
+			filepath.Join(repoRoot, "internal/artifacts/ecosystem/debian/testdata", name),
 		)
 		if err != nil {
 			return err

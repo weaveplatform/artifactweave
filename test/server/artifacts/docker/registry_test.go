@@ -13,21 +13,24 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/registry"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	layout "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker"
-	dockerhttp "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/docker/http"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/registry"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
+	dockerhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker/http"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // The registry's own routing is tested in
-// migration/artifacts/ecosystem/docker/http; these rows and tests cover
+// internal/artifacts/ecosystem/docker/http; these rows and tests cover
 // what the server adds: authentication in front of it, the version header
 // on the middleware's answers, the mounting under both prefixes and the
 // reverse proxy read (#220).
@@ -42,7 +45,7 @@ const (
 )
 
 // The blob routes (#222), on the repository path; the router tests in
-// migration/artifacts/ecosystem/docker/http cover the other addressing
+// internal/artifacts/ecosystem/docker/http cover the other addressing
 // forms.
 const (
 	blobRoute    = "/v2/{repo}/{name}/blobs/{digest}"
@@ -74,7 +77,7 @@ var (
 // docker-blobs, admin-only like the rest, with registryLayer in the image
 // app, and admin's upload sessions, one per row that needs one, as
 // {upload-<row>} secrets.
-func seedRegistryStatus(t *testing.T, db store.Store, blobs blob.Store, secrets statusSecrets) {
+func seedRegistryStatus(t *testing.T, db harness.Store, blobs blob.Store, secrets statusSecrets) {
 	t.Helper()
 	ctx := context.Background()
 	c := *repo.Defaults(&repo.Config{Key: "docker-blobs", Class: repo.Local, PackageType: repo.Docker})
@@ -214,10 +217,10 @@ func uploadSession(t *testing.T, f *matrixFixture, p string) {
 // gets a session, 202.
 func mountRule(srcRepo, srcPath string) rule {
 	return func(p matrixPrincipal) int {
-		if !p.holds(dockerA, "work/", types.ActionWrite) {
+		if !p.holds(dockerA, "work/", api.ActionWrite) {
 			return refuse(p)
 		}
-		if !p.holds(srcRepo, srcPath, types.ActionRead) {
+		if !p.holds(srcRepo, srcPath, api.ActionRead) {
 			return http.StatusAccepted
 		}
 		return 0
@@ -233,7 +236,7 @@ func registryBlobMatrix() []matrixRow {
 		uploads = "/v2/" + dockerA + "/work/{p}/blobs/uploads/"
 		session = uploads + "{upload}"
 	)
-	read, write := types.ActionRead, types.ActionWrite
+	read, write := api.ActionRead, api.ActionWrite
 	mount := uploads + "?mount=" + registryLayer + "&from="
 	return []matrixRow{
 		row(headBlob, layer+registryLayer, "", holds(dockerA, "work/app/", read), 200),
@@ -657,7 +660,7 @@ func contentTypeOf(body string) (contentType, rest string) {
 // already be in the image.
 func pushImage(
 	t *testing.T,
-	db store.Store,
+	db harness.Store,
 	blobs blob.Store,
 	c repo.Config,
 	name, tag, body string,
@@ -668,7 +671,7 @@ func pushImage(
 
 // seedRegistryManifests pushes registryManifest("v1") to docker-blobs'
 // image app as v1.
-func seedRegistryManifests(t *testing.T, db store.Store, blobs blob.Store) {
+func seedRegistryManifests(t *testing.T, db harness.Store, blobs blob.Store) {
 	t.Helper()
 	c, err := db.Repos().Get(context.Background(), "docker-blobs")
 	if err != nil {
@@ -737,7 +740,7 @@ func seedMatrixManifests(t *testing.T, f *matrixFixture) {
 // is challenged whatever it holds.
 func registryManifestMatrix() []matrixRow {
 	const base = "/v2/" + dockerA + "/work/app/manifests/"
-	read, write, del := types.ActionRead, types.ActionWrite, types.ActionDelete
+	read, write, del := api.ActionRead, api.ActionWrite, api.ActionDelete
 	return []matrixRow{
 		row(headManifest, base+"v1", "", holds(dockerA, "work/app/", read), 200),
 		row(getManifest, base+sha256Digest(registryManifest("v1")), "",
@@ -756,7 +759,7 @@ func registryManifestMatrix() []matrixRow {
 // the registry and nothing else, and an anonymous one works only while
 // anonymous access does.
 func TestAccRegistryTokenFlow(t *testing.T) {
-	var db store.Store
+	var db harness.Store
 	h := statusFixture(t, true, func(c *Config) { db = c.Store })
 	admin := basic("admin", "pw")
 	if rec := do(t, h, http.MethodPut, "/artifactory/api/repositories/docker-local", jsonAs(admin),
@@ -799,7 +802,7 @@ func TestAccRegistryTokenFlow(t *testing.T) {
 		t.Fatalf("anonymous token: %d %s", rec.Code, rec.Body)
 	}
 	if err := db.Settings().
-		Put(context.Background(), types.SettingAnonymousAccess, false); err != nil {
+		Put(context.Background(), settings.SettingAnonymousAccess, false); err != nil {
 		t.Fatal(err)
 	}
 	rec := do(t, h, http.MethodGet, "/v2/", bearerAuth(anon), "")
@@ -835,7 +838,7 @@ func registryReferrersMatrix() []matrixRow {
 	const base = "/v2/" + dockerA + "/work/app/referrers/"
 	return []matrixRow{
 		row(getReferrers, base+sha256Digest(registryManifest("v1")), "",
-			holds(dockerA, "work/app/", types.ActionRead), 200),
+			holds(dockerA, "work/app/", api.ActionRead), 200),
 	}
 }
 
@@ -856,7 +859,7 @@ const (
 
 // seedRegistryDeletes pushes the tags the status rows delete or promote to
 // docker-blobs' image app, each with a manifest of its own.
-func seedRegistryDeletes(t *testing.T, db store.Store, blobs blob.Store) {
+func seedRegistryDeletes(t *testing.T, db harness.Store, blobs blob.Store) {
 	t.Helper()
 	c, err := db.Repos().Get(context.Background(), "docker-blobs")
 	if err != nil {
@@ -1031,7 +1034,7 @@ func registryListingMatrix() []matrixRow {
 		base     = "/v2/" + dockerA + "/work/app/manifests/"
 		prefixed = "/artifactory/api/docker/" + dockerA + "/v2/"
 	)
-	read, del := types.ActionRead, types.ActionDelete
+	read, del := api.ActionRead, api.ActionDelete
 	return []matrixRow{
 		row(tagsRoute, tags, "", holds(dockerA, "work/app/", read), 200),
 		at(catalogRoute, "", signedIn, 200),
@@ -1051,7 +1054,7 @@ func registryListingMatrix() []matrixRow {
 				`"tag":"t-{p}","targetDockerRepository":"work/promoted-{p}","copy":true}`,
 			allOf(
 				holds(dockerA, "work/app/", read),
-				holds(dockerA, "work/promoted-{p}/", types.ActionWrite),
+				holds(dockerA, "work/promoted-{p}/", api.ActionWrite),
 			),
 			200,
 		).seeding(taggedFor),
@@ -1180,14 +1183,14 @@ func TestAccMultiArchDelete(t *testing.T) {
 }
 
 // failingGetStore fails reading any item.
-type failingGetStore struct{ store.Store }
+type failingGetStore struct{ harness.Store }
 
-func (s failingGetStore) Items() store.ItemStore { return failingGets{s.Store.Items()} }
+func (s failingGetStore) Items() port.ItemStore { return failingGets{s.Store.Items()} }
 
-type failingGets struct{ store.ItemStore }
+type failingGets struct{ port.ItemStore }
 
-func (failingGets) Get(context.Context, string, bool, string) (types.Item, error) {
-	return types.Item{}, errBoom
+func (failingGets) Get(context.Context, string, bool, string) (model.Item, error) {
+	return model.Item{}, errBoom
 }
 
 func TestAccMultiArchDeleteStoreFailures(t *testing.T) {

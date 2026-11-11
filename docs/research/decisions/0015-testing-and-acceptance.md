@@ -59,7 +59,7 @@ impact plan selects by prefix within reviewed packages and retains exact test
 names as a run artifact. The `TestMain` hooks remain Go hooks and the `Fuzz`
 targets retain their distinct reviewed owner.
 
-**Contract suites** (`pkg/store/storetest`, `migration/platform/blob/blobtest`) run
+**Contract suites** (`internal/app/storetest`, `internal/platform/blob/blobtest`) run
 against the in-memory store, SQLite, PostgreSQL and MinIO. Container-backed cases skip
 with a clear message when Docker is unreachable, so the macOS and Windows jobs stay green
 while only Linux exercises PostgreSQL and MinIO.
@@ -68,10 +68,10 @@ while only Linux exercises PostgreSQL and MinIO.
 include the route × principal matrix.
 
 **Fault injection.** Every handler package depends on narrow interfaces and the shared
-`migration/platform/testkit/fault` fakes (client disconnect mid-stream, blob write failure
+`internal/platform/testkit/fault` fakes (client disconnect mid-stream, blob write failure
 after headers, upstream 5xx, slow upstream, wrong content type), so error paths in
 streaming handlers are covered without real failures. The remote-repository design adds
-`migration/artifacts/adapters/upstream/fakeupstream` chi fakes of each upstream registry with the
+`internal/artifacts/adapters/upstream/fakeupstream` chi fakes of each upstream registry with the
 same fault modes; that package is not part of the current local-protocol implementation.
 
 **Acceptance** runs on `ubuntu-latest` only. The required non-Gradle scenarios

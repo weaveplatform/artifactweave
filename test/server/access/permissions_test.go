@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/kernel"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 func adminJSON() map[string]string {

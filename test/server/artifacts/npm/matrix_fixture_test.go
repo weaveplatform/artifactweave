@@ -7,19 +7,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 type matrixFixture struct {
 	h       http.Handler
-	db      store.Store
+	db      *inmem.Store
 	items   *item.Service
 	secrets map[string]string
 }
@@ -37,21 +40,21 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		}
 		for _, p := range matrixPrincipals {
 			if err := cfg.Store.Users().
-				Create(t.Context(), types.User{Name: "v-" + p.name, PasswordHash: cheapHash}); err != nil {
+				Create(t.Context(), accesstest.User{Name: "v-" + p.name, PasswordHash: cheapHash}); err != nil {
 				t.Fatal(err)
 			}
 		}
 		for _, name := range []string{"nobody", "reader", "writer", "deployer", "member", "gadmin", "charter", "resmgr", "gresmgr"} {
-			role := types.RoleFlags{ResourcesManager: name == "resmgr"}
+			role := accesstest.RoleFlags{ResourcesManager: name == "resmgr"}
 			if err := cfg.Store.Users().
-				Create(t.Context(), types.User{Name: name, PasswordHash: cheapHash, Roles: role}); err != nil {
+				Create(t.Context(), accesstest.User{Name: name, PasswordHash: cheapHash, Roles: role}); err != nil {
 				t.Fatal(err)
 			}
 		}
-		for _, group := range []types.Group{
+		for _, group := range []accesstest.Group{
 			{Name: "team", Members: []string{"member"}},
 			{Name: "ops", Members: []string{"gadmin"}, AdminPrivileges: true},
-			{Name: "res-managers", Members: []string{"gresmgr"}, Roles: types.RoleFlags{ResourcesManager: true}},
+			{Name: "res-managers", Members: []string{"gresmgr"}, Roles: accesstest.RoleFlags{ResourcesManager: true}},
 		} {
 			if err := cfg.Store.Groups().Create(t.Context(), group); err != nil {
 				t.Fatal(err)
@@ -59,21 +62,21 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		}
 		for _, grant := range []struct {
 			name, under string
-			users       map[string]types.Actions
-			groups      map[string]types.Actions
+			users       map[string]api.Actions
+			groups      map[string]api.Actions
 		}{
-			{"reader", "**", map[string]types.Actions{"reader": types.ActionRead}, nil},
-			{"writer", "work/**", map[string]types.Actions{"writer": rwd}, nil},
-			{"team", "**", nil, map[string]types.Actions{"team": rawd}},
+			{"reader", "**", map[string]api.Actions{"reader": api.ActionRead}, nil},
+			{"writer", "work/**", map[string]api.Actions{"writer": rwd}, nil},
+			{"team", "**", nil, map[string]api.Actions{"team": rawd}},
 		} {
-			targets := map[string]types.Target{}
+			targets := map[string]accesstest.Target{}
 			for _, c := range npmRepos {
-				targets[c.Key] = types.Target{Include: []string{grant.under}}
+				targets[c.Key] = accesstest.Target{Include: []string{grant.under}}
 			}
-			if err := cfg.Store.Permissions().Create(t.Context(), types.Permission{
+			if err := cfg.Store.Permissions().Create(t.Context(), accesstest.Permission{
 				Name: "npm-matrix-" + grant.name,
-				Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-					Actions: types.Grants{
+				Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+					Actions: accesstest.Grants{
 						Users:  grant.users,
 						Groups: grant.groups,
 					},
@@ -92,7 +95,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	return f
 }
 
-func seedNPMMatrixTokens(t *testing.T, db store.Store, svc *token.Service) map[string]string {
+func seedNPMMatrixTokens(t *testing.T, db *inmem.Store, svc *token.Service) map[string]string {
 	t.Helper()
 	ctx := t.Context()
 	past, err := token.New(ctx, db, token.Options{
@@ -101,9 +104,9 @@ func seedNPMMatrixTokens(t *testing.T, db store.Store, svc *token.Service) map[s
 	if err != nil {
 		t.Fatal(err)
 	}
-	issue := func(s *token.Service, user, scope string, id types.TokenIdentity) token.Issued {
+	issue := func(s *token.Service, user, scope string, id kernel.TokenIdentity) token.Issued {
 		t.Helper()
-		parsed, err := types.ParseScope(scope)
+		parsed, err := kernel.ParseScope(scope)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -143,7 +146,7 @@ func seedNPMMatrixTokens(t *testing.T, db store.Store, svc *token.Service) map[s
 			svc,
 			"v-"+p.name,
 			"applied-permissions/user",
-			types.IdentityStored,
+			kernel.IdentityStored,
 		).AccessToken
 	}
 	return secrets
@@ -166,7 +169,7 @@ func (f *matrixFixture) deploy(t *testing.T, key, path string, body []byte) repo
 func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int, string) {
 	t.Helper()
 	if err := f.db.Settings().
-		Put(t.Context(), types.SettingAnonymousAccess, p.anonymousOn); err != nil {
+		Put(t.Context(), settings.SettingAnonymousAccess, p.anonymousOn); err != nil {
 		t.Fatal(err)
 	}
 	fill := strings.NewReplacer("{p}", p.name, "{u}", p.user, "{token}", f.secrets["v-"+p.name])

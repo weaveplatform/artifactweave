@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // mavenWorld is an item world holding Maven-layout files (every test
@@ -29,8 +30,8 @@ func mavenWorld(t *testing.T, anonymous bool) *itemWorld {
 	t.Helper()
 	w := newItemWorld(t, anonymous)
 	ctx := context.Background()
-	if err := w.db.Configs().Put(ctx, types.ConfigDocument{
-		Kind: types.ConfigLayout, Key: "broken",
+	if err := w.db.Configs().Put(ctx, configdoc.ConfigDocument{
+		Kind: configdoc.ConfigLayout, Key: "broken",
 		Document: json.RawMessage(`{"artifactPathPattern":"[orgPath]/[nope]"}`),
 	}); err != nil {
 		t.Fatal(err)
@@ -63,7 +64,7 @@ func mavenWorld(t *testing.T, anonymous bool) *itemWorld {
 	} {
 		w.put("/artifactory/"+p, p)
 	}
-	if _, err := w.db.Items().Put(ctx, types.Item{
+	if _, err := w.db.Items().Put(ctx, model.Item{
 		RepoKey: "up", Cached: true, Path: "org/acme/lib/0.9", Name: "lib-0.9.jar",
 		Created: time.Now(), Modified: time.Now(),
 	}); err != nil {
@@ -294,16 +295,16 @@ func TestAccLayoutSearchStoreErrors(t *testing.T) {
 }
 
 // failingConfigs fails every configuration document read.
-type failingConfigs struct{ store.Store }
+type failingConfigs struct{ harness.Store }
 
-func (f failingConfigs) Configs() store.ConfigStore { return failingConfigStore{f.Store.Configs()} }
+func (f failingConfigs) Configs() configdoc.ConfigStore { return failingConfigStore{f.Store.Configs()} }
 
-type failingConfigStore struct{ store.ConfigStore }
+type failingConfigStore struct{ configdoc.ConfigStore }
 
 func (failingConfigStore) Get(
 	context.Context,
-	types.ConfigKind,
+	configdoc.ConfigKind,
 	string,
-) (types.ConfigDocument, error) {
-	return types.ConfigDocument{}, errBoom
+) (configdoc.ConfigDocument, error) {
+	return configdoc.ConfigDocument{}, errBoom
 }

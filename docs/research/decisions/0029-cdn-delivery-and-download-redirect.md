@@ -92,7 +92,7 @@ checksum check after a redirect (research 19 section 2).
   a tag by. Never a checksum sidecar, an archive entry (`!/`), a folder download or a remote
   repository's cache miss.
 
-**Policy.** One function, `migration/artifacts/adapters/http/itemkit/redirect.go`, decides for every caller, in this
+**Policy.** One function, `internal/artifacts/adapters/http/itemkit/redirect.go`, decides for every caller, in this
 order:
 
 1. A conditional request whose validators decide the answer (304 or 412) is answered
@@ -130,7 +130,7 @@ check, `BEFORE_DOWNLOAD` workers ([0026](0026-workers-runtime.md)) and archived 
 - A redirected download is counted under the same rule as a streamed one: a whole file, or
   a range starting at byte 0, unless `skipUpdateStats=true`.
 
-**Signing contract.** `migration/platform/blob` replaces `Presigner` with:
+**Signing contract.** `internal/platform/blob` replaces `Presigner` with:
 
 ```go
 type Via int // ViaStorage or ViaCDN
@@ -159,9 +159,9 @@ type Signer interface {
 - A repository whose flags ask for a redirect its store cannot sign is logged once at
   start. A signing failure at request time is logged at WARN at most once a minute and the
   download streams.
-- The CDN signers live in `migration/platform/cdn`, one per provider, and are injected
+- The CDN signers live in `internal/platform/cdn`, one per provider, and are injected
   through each backend's `Options`, so `Signs` is known at construction. Front Door is the
-  exception in kind: it checks no signature, so `migration/platform/cdn.FrontDoor` only
+  exception in kind: it checks no signature, so `internal/platform/cdn.FrontDoor` only
   places a SAS on the endpoint, and the azure store signs the SAS with its own
   credentials. A store is never wrapped in a CDN decorator, because a wrapper hides the
   store's other interfaces, `blob.PartSizer` in particular, which silently changes mirror
@@ -324,7 +324,7 @@ still redirects a HEAD is on #216.
 
 ## Verification
 
-- `internal/server` tests for every policy rule:
+- `test/server/artifacts` tests for every policy rule:
   - the threshold, from the configuration and from the descriptor;
   - the CDN's size limit;
   - a manifest redirected with its media type, its HEAD answered locally;
@@ -335,11 +335,11 @@ still redirects a HEAD is on #216.
   - download counts.
 - `blobtest` covers `Signs` and `SignURL` with overrides on fs, s3 (fake and MinIO), gcs
   (fake and emulator), azure (fake and Azurite) and the mirror.
-- `migration/platform/cdn` tests sign with generated keys and verify with the public key
+- `internal/platform/cdn` tests sign with generated keys and verify with the public key
   (CloudFront) and Google's documented algorithm (Cloud CDN), and check that a Front Door
   URL carries the storage SAS unchanged. The azure store's tests check that its Front Door
   URL repeats within a window, and Azurite checks the SAS through the fake edge.
-- `migration/platform/cdn/cdntest`, a chi fake edge, validates CloudFront and Cloud CDN
+- `internal/platform/cdn/cdntest`, a chi fake edge, validates CloudFront and Cloud CDN
   signatures and proxies to a blob store. As Front Door it checks no signature: it
   forwards to a storage origin, which checks the SAS, and caches on the full URL.
   Acceptance serves artifactweave on `127.0.0.1` and the edge on `localhost`, so Go strips
@@ -357,5 +357,5 @@ still redirects a HEAD is on #216.
 - Decisions [0004](0004-storage-sql-metadata-and-blobs.md) (the blob contract),
   [0027](0027-cloud-blob-backends.md) (the cloud backends) and
   [0028](0028-blob-mirroring.md) (the mirror).
-- `migration/artifacts/adapters/http/itemkit/redirect.go` and `migration/artifacts/adapters/http/itemkit/items.go` (`ServeFile`).
+- `internal/artifacts/adapters/http/itemkit/redirect.go` and `internal/artifacts/adapters/http/itemkit/items.go` (`ServeFile`).
 - `github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign@v1.12.5`.

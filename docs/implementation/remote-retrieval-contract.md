@@ -322,7 +322,7 @@ The following are artifactweave limits and decisions, not claimed vendor default
 
 ## Field ownership and required evidence
 
-This matrix covers every common/remote field in research 03 and `migration/artifacts/api/repo.Config`,
+This matrix covers every common/remote field in research 03 and `internal/artifacts/api/repo.Config`,
 including inherited ecosystem fields and the nested `contentSynchronisation` flags. **Stored** means accepted/echoed at the P8 baseline,
 not effective remote behavior. **Existing** names a reusable current control. Every P9
 row includes a concrete implementation owner and success/denial/failure evidence; all

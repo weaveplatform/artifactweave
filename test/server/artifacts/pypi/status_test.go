@@ -5,12 +5,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -26,20 +27,20 @@ func (c statusCase) method() string { method, _, _ := strings.Cut(c.route, " ");
 type statusPart struct {
 	handwritten map[string]bool
 	generated   map[string]bool
-	seed        func(*testing.T, store.Store, blob.Store)
+	seed        func(*testing.T, harness.Store, blob.Store)
 	rows        func() []statusCase
 	tune        harness.Tune
 }
 
-func grantOverwriter(t *testing.T, db store.Store, key, under string) {
+func grantOverwriter(t *testing.T, db harness.Store, key, under string) {
 	t.Helper()
-	if err := db.Permissions().Create(t.Context(), types.Permission{
+	if err := db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "st-overwrite-" + key,
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"overwriter": types.ActionRead | types.ActionWrite,
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
+				"overwriter": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]types.Target{key: {Include: []string{under + "**"}}},
+			Targets: map[string]accesstest.Target{key: {Include: []string{under + "**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -58,7 +59,7 @@ func newPypiStatusWorld(t *testing.T, anonymous bool) pypiStatusWorld {
 		}
 		if anonymous {
 			if err := cfg.Store.Settings().
-				Put(t.Context(), types.SettingAnonymousAccess, true); err != nil {
+				Put(t.Context(), settings.SettingAnonymousAccess, true); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -67,7 +68,7 @@ func newPypiStatusWorld(t *testing.T, anonymous bool) pypiStatusWorld {
 				t.Fatal(err)
 			}
 		}
-		if err := cfg.Store.Users().Create(t.Context(), types.User{
+		if err := cfg.Store.Users().Create(t.Context(), accesstest.User{
 			Name: "overwriter", PasswordHash: cheapHash,
 		}); err != nil {
 			t.Fatal(err)

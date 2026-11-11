@@ -14,9 +14,9 @@
 //
 //   - The production router from test/server/support/harness, over an
 //     in-memory store seeded by test/server/support: the admin user, whose
-//     password is "pw", and the local repository libs-local
-//     (fixture_test.go, statusFixture, which keeps the name of the root
-//     fixture the tests used in internal/server).
+//     password is "pw", and the local repository libs-local (fixture_test.go,
+//     statusFixture, which keeps the name of the router guards' fixture in
+//     internal/app).
 //   - The X-Forwarded-Host, X-Forwarded-Proto and X-Forwarded-Port headers a
 //     case sends, and the configured base URL a case sets.
 //   - For the probes, a store and a binary store that fail on demand
@@ -64,8 +64,8 @@
 //
 // # Status
 //
-// Implemented P0, with the proxy-chain and configured base URL fixes of
-// issues 249 and 313, and with the probes (issue 403), the service id and
-// the descriptor PATCH in later phases. P9d moved the tests out of
-// internal/server.
+// Implemented P0, with the proxy-chain and configured base URL fixes of issues
+// 249 and 313, and with the probes (issue 403), the service id and the
+// descriptor PATCH in later phases. P9d moved the tests out of the server
+// root.
 package configuration

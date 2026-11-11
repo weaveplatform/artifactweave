@@ -11,7 +11,7 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 )
 
 const vcsFixtureOID = "0123456789abcdef0123456789abcdef01234567"

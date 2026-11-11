@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // mavenRepos are Maven's fixture repositories: maven-local, maven-remote and
@@ -102,7 +102,7 @@ var mavenStatusPart = statusPart{
 			{mavenPut, local + "1.0/app-1.0.jar", overwriter, "other jar", 403},
 		}
 	},
-	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
+	seed: func(t *testing.T, db harness.Store, blobs blob.Store) {
 		t.Helper()
 		ctx := context.Background()
 		c, err := db.Repos().Get(ctx, "maven-local")

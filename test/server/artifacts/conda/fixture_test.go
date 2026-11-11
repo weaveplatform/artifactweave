@@ -1,10 +1,9 @@
 package conda_test
 
 // This file holds the Conda suite's fixtures: adapters over
-// test/server/support/harness and test/server/support under the names the
-// tests had in internal/server, and a copy of the failing reader of the
-// root's opkg tests. The router is the harness's, so a change to its
-// assembly reaches these tests without an edit here.
+// test/server/support/harness and test/server/support, and a copy of the
+// failing reader of the router guards' fixtures. The router is the harness's,
+// so a change to its assembly reaches these tests without an edit here.
 
 import (
 	"context"
@@ -15,11 +14,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/app"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -60,9 +61,9 @@ func wantStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
 
 // sourceIdentity resolves every remote repository to one fixed HTTP source
 // identity, as the root fixture of the same name does.
-func sourceIdentity(context.Context, repo.Config) (types.SourceIdentity, error) {
-	return types.SourceIdentity{
-		Kind:       types.ExternalHTTP,
+func sourceIdentity(context.Context, repo.Config) (model.SourceIdentity, error) {
+	return model.SourceIdentity{
+		Kind:       model.ExternalHTTP,
 		Repository: "repo-1",
 		ID:         "http-1",
 		Generation: "revision-1",
@@ -90,3 +91,44 @@ func sha256Hex(s string) string {
 type opkgReadError struct{}
 
 func (opkgReadError) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
+
+// remoteWorld is the harness's remote world under the fields the tests had
+// in internal/app: a test changes c and saves it with update, or replaces h
+// with a router built with other options.
+type remoteWorld struct {
+	t  *testing.T
+	rt *app.Runtime
+	h  http.Handler
+	up *fakeupstream.Server
+	c  repo.Config
+}
+
+func newRemoteWorld(t *testing.T) *remoteWorld {
+	t.Helper()
+	w := harness.NewRemoteWorld(t)
+	return &remoteWorld{t: w.T, rt: w.Runtime, h: w.H, up: w.Upstream, c: w.Repo}
+}
+
+// world is w as the harness's remote world, with the handler and the
+// repository the test may have replaced.
+func (w *remoteWorld) world() *harness.RemoteWorld {
+	return &harness.RemoteWorld{T: w.t, Runtime: w.rt, H: w.h, Upstream: w.up, Repo: w.c}
+}
+
+func (w *remoteWorld) request(
+	method, path, user, body string,
+	headers ...string,
+) *httptest.ResponseRecorder {
+	w.t.Helper()
+	return w.world().Request(method, path, user, body, headers...)
+}
+
+func (w *remoteWorld) update() {
+	w.t.Helper()
+	w.world().Update()
+}
+
+func remoteStatus(t *testing.T, r *httptest.ResponseRecorder, code int) {
+	t.Helper()
+	harness.WantStatus(t, r, code)
+}

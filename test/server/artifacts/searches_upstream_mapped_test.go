@@ -7,21 +7,23 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 )
 
 const mappedVersions = `<metadata><groupId>org.acme</groupId><artifactId>lib</artifactId><versioning><versions><version>1.0</version><version>2.0</version></versions></versioning></metadata>`
 
 func mappedSearchGrant(t *testing.T, u *upstreamSearchWorld, patterns ...string) {
 	t.Helper()
-	grant := types.Permission{
+	grant := accesstest.Permission{
 		Name: "mapped-user",
-		Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
-				Targets: map[string]types.Target{"up": {Include: patterns}},
+		Resources: map[api.ResourceType]accesstest.Resource{
+			api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+				Targets: map[string]accesstest.Target{"up": {Include: patterns}},
 			},
 		},
 	}
@@ -37,7 +39,7 @@ func mappedSearchLayout(t *testing.T, u *upstreamSearchWorld, name, pattern stri
 		t.Fatal(err)
 	}
 	if err = u.db.Configs().
-		Put(t.Context(), types.ConfigDocument{Kind: types.ConfigLayout, Key: name, Document: doc}); err != nil {
+		Put(t.Context(), configdoc.ConfigDocument{Kind: configdoc.ConfigLayout, Key: name, Document: doc}); err != nil {
 		t.Fatal(err)
 	}
 	u.config(
@@ -138,7 +140,7 @@ func TestAccSearchUpstreamMappedCanonicalPermissionAndCurrentFences(t *testing.T
 				u.late = nil
 				if mutation == "layout" {
 					if err := u.db.Configs().
-						Put(t.Context(), types.ConfigDocument{Kind: types.ConfigLayout, Key: "gradle-default", Document: json.RawMessage(`{"artifactPathPattern":"new/[org]/[module]/[baseRev]/[module]-[baseRev].[ext]"}`)}); err != nil {
+						Put(t.Context(), configdoc.ConfigDocument{Kind: configdoc.ConfigLayout, Key: "gradle-default", Document: json.RawMessage(`{"artifactPathPattern":"new/[org]/[module]/[baseRev]/[module]-[baseRev].[ext]"}`)}); err != nil {
 						t.Fatal(err)
 					}
 				} else {

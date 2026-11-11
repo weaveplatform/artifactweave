@@ -11,10 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 func TestAccConanSearchAndPackageDeletion(t *testing.T) {
@@ -181,11 +183,11 @@ func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
 	if rec := w.do(http.MethodGet, longSearch, "admin", ""); rec.Code != http.StatusBadRequest {
 		t.Fatalf("unbounded Conan search accepted: %d %s", rec.Code, rec.Body)
 	}
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "conan-virtual-only-reader",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
-			Targets: map[string]types.Target{"conan-union": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accesstest.Target{"conan-union": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -230,11 +232,11 @@ func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
 			)
 		}
 	}
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "conan-manifest-only-reader",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
-			Targets: map[string]types.Target{"conan-first": {
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accesstest.Target{"conan-first": {
 				Include: []string{"_/hello/1.0/_/rev-new/export/conanmanifest.txt"},
 			}},
 		}},
@@ -263,13 +265,13 @@ func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
 			)
 		}
 	}
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "conan-virtual-write-only",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{
-				Users: map[string]types.Actions{"deployer": types.ActionRead | types.ActionWrite},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{
+				Users: map[string]api.Actions{"deployer": api.ActionRead | api.ActionWrite},
 			},
-			Targets: map[string]types.Target{"conan-union": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"conan-union": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -282,11 +284,11 @@ func TestAccConanRevisionOrderingAndVirtualDeduplication(t *testing.T) {
 	); rec.Code != http.StatusForbidden {
 		t.Fatalf("virtual writer without target permission deployed: %d %s", rec.Code, rec.Body)
 	}
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "conan-content-without-manifest",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"deployer": types.ActionRead}},
-			Targets: map[string]types.Target{"conan-first": {
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionRead}},
+			Targets: map[string]accesstest.Target{"conan-first": {
 				Include: []string{"_/hello/1.0/_/rev-new/export/conanfile.py"},
 			}},
 		}},
@@ -663,7 +665,7 @@ func TestAccConanNativeRevisionLifecycle(t *testing.T) {
 		t.Fatalf("manifest upload: %d %s", rec.Code, rec.Body)
 	}
 	if packages, _, err := w.db.Packages().
-		List(t.Context(), "conan-local", store.Page{}); err != nil ||
+		List(t.Context(), "conan-local", kernel.Page{}); err != nil ||
 		len(packages) != 1 {
 		t.Fatalf("committed recipe index: %d %v", len(packages), err)
 	}
@@ -738,7 +740,7 @@ func TestAccConanNativeRevisionLifecycle(t *testing.T) {
 		t.Fatalf("deleted read: %d %s", rec.Code, rec.Body)
 	}
 	if packages, _, err := w.db.Packages().
-		List(t.Context(), "conan-local", store.Page{}); err != nil ||
+		List(t.Context(), "conan-local", kernel.Page{}); err != nil ||
 		len(packages) != 0 {
 		t.Fatalf("deleted recipe index: %d %v", len(packages), err)
 	}
@@ -760,7 +762,7 @@ func TestAccConanNativeRevisionLifecycle(t *testing.T) {
 		t.Fatalf("restored recipe: %d %s", rec.Code, rec.Body)
 	}
 	if packages, _, err := w.db.Packages().
-		List(t.Context(), "conan-local", store.Page{}); err != nil ||
+		List(t.Context(), "conan-local", kernel.Page{}); err != nil ||
 		len(packages) != 1 {
 		t.Fatalf("restored recipe index: %d %v", len(packages), err)
 	}
@@ -1087,19 +1089,19 @@ func TestAccConanMalformedUpstreamMetadata(t *testing.T) {
 		}
 	}
 	deny = ""
-	for _, grant := range []types.Permission{
+	for _, grant := range []accesstest.Permission{
 		{
 			Name: "conan-search-only",
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"deployer": types.ActionRead}},
-				Targets: map[string]types.Target{"conan-remote": {Include: []string{".conan/**"}}},
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionRead}},
+				Targets: map[string]accesstest.Target{"conan-remote": {Include: []string{".conan/**"}}},
 			}},
 		},
 		{
 			Name: "conan-recipe-metadata-only",
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
-				Targets: map[string]types.Target{"conan-remote": {
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+				Targets: map[string]accesstest.Target{"conan-remote": {
 					Include: []string{"_/hello/1.0/_/abc/export/**"},
 				}},
 			}},
@@ -1131,7 +1133,7 @@ func TestAccConanRemoteSourceFailures(t *testing.T) {
 			func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
 				switch mode {
 				case "missing":
-					return source.Result{}, store.ErrNotFound
+					return source.Result{}, kernel.ErrNotFound
 				case "backend-invalid":
 					return source.Result{}, source.ErrInvalidResult
 				case "empty":
@@ -1139,10 +1141,10 @@ func TestAccConanRemoteSourceFailures(t *testing.T) {
 				case "missing-cache-blob":
 					path := q.Resource.Path
 					at := strings.LastIndexByte(path, '/')
-					item := types.Item{
+					item := artmodel.Item{
 						RepoKey: q.Repo.Key, Cached: true,
 						Path: path[:at], Name: path[at+1:],
-						Actual: types.Checksums{SHA256: strings.Repeat("0", 64)},
+						Actual: kernel.Checksums{SHA256: strings.Repeat("0", 64)},
 					}
 					return source.Result{Item: &item}, nil
 				}
@@ -1215,10 +1217,10 @@ func TestAccConanRemoteManifestDeliveryBoundary(t *testing.T) {
 				if mode == "missing-cache-blob" {
 					path := q.Resource.Path
 					at := strings.LastIndexByte(path, '/')
-					item := types.Item{
+					item := artmodel.Item{
 						RepoKey: q.Repo.Key, Cached: true,
 						Path: path[:at], Name: path[at+1:],
-						Actual: types.Checksums{SHA256: strings.Repeat("0", 64)},
+						Actual: kernel.Checksums{SHA256: strings.Repeat("0", 64)},
 					}
 					return source.Result{Item: &item}, nil
 				}

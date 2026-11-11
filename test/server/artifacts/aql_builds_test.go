@@ -9,14 +9,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 )
 
 // buildsAQLWorld is a router over a store with runs app/1, app/2 and
@@ -27,19 +31,20 @@ func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *token.S
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	if err := db.Users().Create(ctx, types.User{Name: "dev", PasswordHash: cheapHash}); err != nil {
+	if err := db.Users().
+		Create(ctx, accesstest.User{Name: "dev", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
-	dev := types.Grants{Users: map[string]types.Actions{"dev": types.ActionRead}}
-	if err := db.Permissions().Create(ctx, types.Permission{
-		Name: "dev-app", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
+	dev := accesstest.Grants{Users: map[string]api.Actions{"dev": api.ActionRead}}
+	if err := db.Permissions().Create(ctx, accesstest.Permission{
+		Name: "dev-app", Resources: map[api.ResourceType]accesstest.Resource{
+			api.ResourceArtifact: {
 				Actions: dev,
-				Targets: map[string]types.Target{"libs-local": {Include: []string{"**"}}},
+				Targets: map[string]accesstest.Target{"libs-local": {Include: []string{"**"}}},
 			},
-			types.ResourceBuild: {
+			api.ResourceBuild: {
 				Actions: dev,
-				Targets: map[string]types.Target{
+				Targets: map[string]accesstest.Target{
 					"artifactory-build-info": {Include: []string{"app/**"}},
 				},
 			},
@@ -63,18 +68,18 @@ func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *token.S
 		t.Fatal(err)
 	}
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	jar := types.BuildFile{Name: "app.jar", Checksums: types.Checksums{SHA1: sha1Hex("jar")}}
+	jar := artmodel.BuildFile{Name: "app.jar", Checksums: kernel.Checksums{SHA1: sha1Hex("jar")}}
 	for n, run := range [][2]string{{"app", "1"}, {"app", "2"}, {"tool", "1"}} {
-		b, err := db.Builds().Put(ctx, types.Build{
+		b, err := db.Builds().Put(ctx, artmodel.Build{
 			Name: run[0], Number: run[1], Started: base.Add(time.Duration(n) * time.Minute),
 			Created: base.Add(time.Hour), CreatedBy: "ci", URL: "https://ci/" + run[0],
-			Modules: []types.BuildModule{{ID: run[0], Artifacts: []types.BuildFile{jar}}},
+			Modules: []artmodel.BuildModule{{ID: run[0], Artifacts: []artmodel.BuildFile{jar}}},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if n == 0 {
-			if _, err := db.Builds().AddPromotion(ctx, types.BuildPromotion{
+			if _, err := db.Builds().AddPromotion(ctx, artmodel.BuildPromotion{
 				BuildID: b.ID, Created: base.Add(2 * time.Hour), CreatedBy: "admin",
 				Status: "released", Repo: "libs-release", CIUser: "jenkins",
 			}); err != nil {
@@ -82,7 +87,7 @@ func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *token.S
 			}
 		}
 	}
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -110,7 +115,7 @@ func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *token.S
 // bearerFor issues dev a token with scope.
 func bearerFor(t *testing.T, tokens *token.Service, scope string) map[string]string {
 	t.Helper()
-	sc, err := types.ParseScope(scope)
+	sc, err := kernel.ParseScope(scope)
 	if err != nil {
 		t.Fatal(err)
 	}

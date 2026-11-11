@@ -72,6 +72,6 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 These are the pinned client definitions and executable evidence from which this recipe was reviewed. Their [fingerprints](evidence-lock.json) detect subsequent source changes; a fingerprint alone is not a native-client test result. See [verification](README.md#verification) for the required run evidence.
 
 - Client pin: [test/acceptance/clients/swift.Dockerfile](../../test/acceptance/clients/swift.Dockerfile).
-- Evidence: [migration/artifacts/ecosystem/swift/http/swift_test.go](../../migration/artifacts/ecosystem/swift/http/swift_test.go).
-- Evidence: [migration/artifacts/ecosystem/swift/http/remote_test.go](../../migration/artifacts/ecosystem/swift/http/remote_test.go).
-- Evidence: [migration/access/core/authn/token_test.go](../../migration/access/core/authn/token_test.go).
+- Evidence: [internal/artifacts/ecosystem/swift/http/swift_test.go](../../internal/artifacts/ecosystem/swift/http/swift_test.go).
+- Evidence: [internal/artifacts/ecosystem/swift/http/remote_test.go](../../internal/artifacts/ecosystem/swift/http/remote_test.go).
+- Evidence: [internal/access/core/authn/token_test.go](../../internal/access/core/authn/token_test.go).

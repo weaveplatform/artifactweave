@@ -74,7 +74,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 These are the pinned client definitions and executable evidence from which this recipe was reviewed. Their [fingerprints](evidence-lock.json) detect subsequent source changes; a fingerprint alone is not a native-client test result. See [verification](README.md#verification) for the required run evidence.
 
-- Client pin: [migration/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go](../../migration/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go).
-- Evidence: [migration/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go](../../migration/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go).
+- Client pin: [internal/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go](../../internal/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go).
+- Evidence: [internal/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go](../../internal/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go).
 - Evidence: [test/acceptance/features/bazelmodules.feature](../../test/acceptance/features/bazelmodules.feature).
 - Evidence: [test/acceptance/features/bazel_recipes.feature](../../test/acceptance/features/bazel_recipes.feature).

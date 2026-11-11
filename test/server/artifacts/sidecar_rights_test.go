@@ -7,23 +7,26 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // sidecarGetStore fails reading the item at one path.
 type sidecarGetStore struct {
-	store.Store
+	harness.Store
 	path *string
 }
 
-func (s sidecarGetStore) Items() store.ItemStore { return sidecarGets{s.Store.Items(), s.path} }
+func (s sidecarGetStore) Items() port.ItemStore { return sidecarGets{s.Store.Items(), s.path} }
 
 type sidecarGets struct {
-	store.ItemStore
+	port.ItemStore
 	path *string
 }
 
@@ -33,9 +36,9 @@ func (s sidecarGets) Get(
 	key string,
 	cached bool,
 	p string,
-) (types.Item, error) {
+) (artmodel.Item, error) {
 	if p == *s.path {
-		return types.Item{}, errBoom
+		return artmodel.Item{}, errBoom
 	}
 	return s.ItemStore.Get(ctx, key, cached, p)
 }
@@ -52,13 +55,13 @@ func sidecarWorld(t *testing.T) (*itemWorld, *string) {
 	if err := w.db.Repos().Create(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Permissions().Create(ctx, types.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "deploy-charts",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"deployer": types.ActionRead | types.ActionWrite,
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
+				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]types.Target{"charts": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"charts": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

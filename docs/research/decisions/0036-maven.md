@@ -71,7 +71,7 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
   with `maven-plugin` packaging gets `artifactory.maven.mavenPlugin=true`.
 - **Defaults.** `suppressPomConsistencyChecks` defaults to `false` for `maven` and `true` for
   `gradle`, `ivy` and `sbt`, as the Terraform provider and Artifactory's UI do.
-  `migration/artifacts/api/repo/defaults.go` sets them so, locally and remotely (#278).
+  `internal/artifacts/api/repo/defaults.go` sets them so, locally and remotely (#278).
 
 **Uploaded metadata and checksums:**
 - **Snapshot level.** Under `unique` and `non-unique`, in a repository with the Maven
@@ -364,7 +364,7 @@ These assignments describe planned work, not current runtime support.
   upstream is offline. Runtime tests cover raw metadata/index separation, policies,
   layout/permission denials, durable companion restart/revocation and cached retention.
 
-- Index, deploy-rule and metadata tests in `migration/artifacts/ecosystem/maven` against
+- Index, deploy-rule and metadata tests in `internal/artifacts/ecosystem/maven` against
   the `formattest` contract on every store (#276, #278, #279), with golden XML for each
   level.
 - Snapshot naming with Maven's and the JFrog extractor's upload orders: two snapshot deploys

@@ -14,7 +14,7 @@ CONFORMANCE_ENV = \
   ARTIFACTWEAVE_TEST_GCS_ACCESS_ID=$$($(TERRAFORM) -chdir=$(CURDIR) output -raw service_account) \
   GOOGLE_APPLICATION_CREDENTIALS=$(CURDIR)/.local/gcp-credentials.json
 CONFORMANCE_RUN := TestAccContractOnRealGCS|TestAccRealGCSProbes
-CONFORMANCE_PKG := ./migration/platform/blob/gcs/
+CONFORMANCE_PKG := ./internal/platform/blob/gcs/
 # The service account and provider variables come from deploy/ci/terraform/gcp.
 GITHUB_VARS := \
   CONFORMANCE_GCS_BUCKET=bucket

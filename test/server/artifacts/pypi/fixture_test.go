@@ -7,13 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -23,7 +24,7 @@ var (
 	cheapHash = support.CheapHash
 )
 
-func cheapSeed(t *testing.T, db store.Store)        { t.Helper(); support.Seed(t, db) }
+func cheapSeed(t *testing.T, db *inmem.Store)       { t.Helper(); support.Seed(t, db) }
 func basic(user, password string) map[string]string { return support.Basic(user, password) }
 func bearerAuth(value string) map[string]string     { return support.Bearer(value) }
 func contentTypeOf(body string) (string, string) {
@@ -76,13 +77,13 @@ func pypiServer(
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(t.Context(), types.User{Name: "user", PasswordHash: cheapHash}); err != nil {
+		Create(t.Context(), accesstest.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Repos().Create(t.Context(), *repo.Defaults(&pypiRepos[0])); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Instance().Init(t.Context(), types.InstanceIdentity{
+	if err := db.Instance().Init(t.Context(), instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -120,7 +121,7 @@ func statusFixture(t *testing.T, anonymous bool, tune ...harness.Tune) http.Hand
 		pypiStatusPart.seed(t, c.Store, c.Blobs)
 		if anonymous {
 			if err := c.Store.Settings().
-				Put(t.Context(), types.SettingAnonymousAccess, true); err != nil {
+				Put(t.Context(), settings.SettingAnonymousAccess, true); err != nil {
 				t.Fatal(err)
 			}
 		}

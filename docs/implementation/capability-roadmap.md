@@ -21,7 +21,7 @@ migration evidence. `stub` describes a current response, not a permanent scope c
 
 The audit uses the [previous scope inventory](../research/10-scope-and-tiers.md),
 [open questions](../research/12-open-questions.md), all decision records,
-[`migration/artifacts/api/repo`](../../migration/artifacts/api/repo/repo.go), the [format selector](../../migration/artifacts/ecosystem/registry.go),
+[`internal/artifacts/api/repo`](../../internal/artifacts/api/repo/repo.go), the [format selector](../../internal/artifacts/ecosystem/registry.go),
 the authored/generated APIs, handwritten routes and
 [`api/parity-baseline.json`](../../api/parity-baseline.json).
 
@@ -115,7 +115,7 @@ when its first implementation is in an earlier phase.
 ### Repository type and class checklist
 
 This table accounts for the original 44 types accepted by
-[`AllowedPackageTypes`](../../migration/artifacts/api/repo/packagetypes.go). **L/R/V/F mean
+[`AllowedPackageTypes`](../../internal/artifacts/api/repo/packagetypes.go). **L/R/V/F mean
 configuration acceptance** for local/remote/virtual/federated repositories; they do not claim native
 protocol support, upstream resolution or peer convergence. P20 and each format phase
 revalidate this source-union matrix against the target contract. A class the target

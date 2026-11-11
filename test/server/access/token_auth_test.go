@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 )
 
 // tokenHandler is the router over a seeded store whose authenticator
@@ -19,7 +20,7 @@ func tokenHandler(t *testing.T) (http.Handler, *token.Service) {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -46,7 +47,7 @@ func TestAccTokenAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	groups, err := types.ParseScope("applied-permissions/groups:readers")
+	groups, err := kernel.ParseScope("applied-permissions/groups:readers")
 	if err != nil {
 		t.Fatal(err)
 	}

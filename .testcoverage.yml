@@ -11,30 +11,33 @@ exclude:
     # Binary entry points: thin shims over internal/.
     - ^cmd/
     # oapi-codegen output (decision 0002): regenerated, never hand-edited.
-    - ^migration/platform/gen/
+    - ^internal/platform/gen/
     - ^pkg/client/
-    # Developer tools: thin main packages over migration/devtools/ (specoracle).
+    # Developer tools: thin main packages over internal/devtools/ (specoracle).
     - ^tools/
     # Contract-suite harnesses (decision 0015): their remaining branches are
     # the t.Fatal paths taken only when a backend violates the contract.
-    - ^migration/platform/blob/blobtest/
-    - ^pkg/store/storetest/
-    - ^migration/artifacts/core/formattest/
+    - ^internal/platform/blob/blobtest/
+    - ^internal/artifacts/core/formattest/
+    # The backends that the composition root hands the format contract: the
+    # same t.Fatal paths, of a store that cannot be opened.
+    - ^internal/app/apptest/
     # Assertions the store contract suites share: the same t.Fatal paths.
-    - ^migration/platform/testkit/storekit/
+    - ^internal/platform/testkit/storekit/
     # Per-module store contract suites (decision 0015); their remaining
     # branches are t.Fatal paths taken only when a backend breaks the contract.
-    - ^migration/[a-z]+/adapters/storetest/
+    - ^internal/[a-z]+/adapters/storetest/
     # The platform's store contract suite (decision 0015), in platform/store
     # rather than an adapters directory: the same t.Fatal paths.
-    - ^migration/platform/store/storetest/
-    # The composite store's SQL contract suites; their remaining branches are
-    # t.Fatal paths taken only when a backend breaks the contract.
-    - ^internal/sqlstore/sqltest/
+    - ^internal/platform/store/storetest/
+    # The composite stores' contract suite (decision 0015) and their SQL
+    # suites; their remaining branches are t.Fatal paths taken only when a
+    # backend breaks the contract.
+    - ^internal/app/storetest/
     # Module SQL harness: its remaining branches are t.Fatal paths of a
     # container or database that fails to start, migrate or clean up, and the
     # ARTIFACTWEAVE_TEST_POSTGRES_DSN branch, which CI does not set.
-    - ^migration/platform/sql/sqltest/
+    - ^internal/platform/sql/sqltest/
     # Server protocol test fixture: remaining branches abort on invalid setup
     # or simulate signing failures; production server coverage remains gated.
     - ^test/server/support/registryfixture/
@@ -47,12 +50,12 @@ exclude:
     - ^test/server/support/agentcommon/
     # Upstream transport test fixture: its remaining branches are t.Fatal
     # paths on invalid setup, while the transport itself
-    # (migration/artifacts/adapters/upstream) stays in the per-package gate.
-    - ^migration/artifacts/adapters/upstream/upstreamtest/
+    # (internal/artifacts/adapters/upstream) stays in the per-package gate.
+    - ^internal/artifacts/adapters/upstream/upstreamtest/
     # Item kit test fixture: its remaining branches are t.Fatal paths of a
     # store or blob directory that fails to seed, while the kit itself
-    # (migration/artifacts/adapters/http/itemkit) stays in the per-package gate.
-    - ^migration/artifacts/adapters/http/itemkit/kittest/
+    # (internal/artifacts/adapters/http/itemkit) stays in the per-package gate.
+    - ^internal/artifacts/adapters/http/itemkit/kittest/
     # Skips container tests where Docker cannot run Linux containers; its
     # branches are the skip paths of other platforms.
     - ^pkg/containertest/

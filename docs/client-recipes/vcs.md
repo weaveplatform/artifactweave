@@ -64,6 +64,6 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/server/artifacts/vcs/vcs_legacy_test.go](../../test/server/artifacts/vcs/vcs_legacy_test.go).
 - Evidence: [docs/research/39-vcs-legacy.md](../../docs/research/39-vcs-legacy.md).
 - Evidence: [test/acceptance/vcs_legacy_steps_test.go](../../test/acceptance/vcs_legacy_steps_test.go).
-- Evidence: [migration/artifacts/ecosystem/vcs/http/archive_git_test.go](../../migration/artifacts/ecosystem/vcs/http/archive_git_test.go).
-- Evidence: [migration/artifacts/ecosystem/vcs/http/testdata/git-archives.json](../../migration/artifacts/ecosystem/vcs/http/testdata/git-archives.json).
+- Evidence: [internal/artifacts/ecosystem/vcs/http/archive_git_test.go](../../internal/artifacts/ecosystem/vcs/http/archive_git_test.go).
+- Evidence: [internal/artifacts/ecosystem/vcs/http/testdata/git-archives.json](../../internal/artifacts/ecosystem/vcs/http/testdata/git-archives.json).
 - Evidence: [test/server/artifacts/vcs/vcs_delivery_test.go](../../test/server/artifacts/vcs/vcs_delivery_test.go).

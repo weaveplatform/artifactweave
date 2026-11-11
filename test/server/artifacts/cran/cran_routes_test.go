@@ -13,17 +13,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
 func cranFixtureBytes(t *testing.T, name string) []byte {
 	t.Helper()
-	return repopath.Read(t, "migration/artifacts/ecosystem/cran/testdata/"+name)
+	return repopath.Read(t, "internal/artifacts/ecosystem/cran/testdata/"+name)
 }
 
 func TestUnitCRANRemoteIndexPackageAndInvalidMetadata(t *testing.T) {
@@ -54,15 +56,15 @@ func TestUnitCRANRemoteIndexPackageAndInvalidMetadata(t *testing.T) {
 						return source.Result{}, source.ErrUnavailable
 					}
 					if badCachedArchive {
-						return source.Result{Item: &types.Item{
+						return source.Result{Item: &artmodel.Item{
 							RepoKey: "cran-proxy", Cached: true, Path: "src/contrib",
 							Name:   "assertthat_0.2.1.tar.gz",
-							Actual: types.Checksums{MD5: strings.Repeat("0", 32)},
+							Actual: kernel.Checksums{MD5: strings.Repeat("0", 32)},
 						}}, nil
 					}
 					body = archive
 				default:
-					return source.Result{}, store.ErrNotFound
+					return source.Result{}, kernel.ErrNotFound
 				}
 				return source.Result{Stream: &source.Stream{
 					Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
@@ -278,7 +280,7 @@ func TestUnitCRANRemoteIndexRejectsRevokedPackageAuthority(t *testing.T) {
 }
 
 func TestUnitCRANOfflineCachedIndexAndArchive(t *testing.T) {
-	items := map[string]types.Item{}
+	items := map[string]artmodel.Item{}
 	sources := &source.Service{
 		Resolve: sourceIdentity,
 		Cache: sourceBackend(
@@ -289,7 +291,7 @@ func TestUnitCRANOfflineCachedIndexAndArchive(t *testing.T) {
 				}
 				it, ok := items[q.Resource.Path]
 				if !ok {
-					return source.Result{}, store.ErrNotFound
+					return source.Result{}, kernel.ErrNotFound
 				}
 				return source.Result{Item: &it}, nil
 			},
@@ -318,10 +320,10 @@ func TestUnitCRANOfflineCachedIndexAndArchive(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		items[tc.path] = types.Item{
+		items[tc.path] = artmodel.Item{
 			RepoKey: "cran-cache", Cached: true, Path: path.Dir(tc.path),
 			Name: path.Base(tc.path), Size: int64(len(body)),
-			Actual: types.Checksums{
+			Actual: kernel.Checksums{
 				SHA256: info.Digests.SHA256, MD5: info.Digests.MD5,
 			},
 		}
@@ -429,11 +431,11 @@ func TestUnitCRANPOSTUploadRefusalsAndVirtualTarget(t *testing.T) {
 	}
 	// A grant that reaches the feed folder does not authorize a different
 	// package filename inferred from the archive's own DESCRIPTION.
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "other-cran-upload",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionWrite}},
-			Targets: map[string]types.Target{"cran-post": {
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionWrite}},
+			Targets: map[string]accesstest.Target{"cran-post": {
 				Include: []string{"src/contrib/other_1.0.tar.gz"},
 			}},
 		}},
@@ -469,7 +471,7 @@ func TestUnitCRANPOSTUploadRefusalsAndVirtualTarget(t *testing.T) {
 	w.h.ServeHTTP(rec, req)
 	wantStatus(t, rec, http.StatusBadRequest)
 	if _, err := w.db.Items().Get(t.Context(), "cran-post-failed", false,
-		"src/contrib/assertthat_0.2.1.tar.gz"); !errors.Is(err, store.ErrNotFound) {
+		"src/contrib/assertthat_0.2.1.tar.gz"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("failed upload committed a package: %v", err)
 	}
 	// Even a valid archive must not be committed when a spool file cannot be created.

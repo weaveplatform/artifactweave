@@ -13,7 +13,7 @@ ARG VERSION=devel
 ARG COMMIT=unknown
 RUN MODULE=$(go list -m) && \
     go build -trimpath -tags disable_grpc_modules \
-      -ldflags "-s -w -X ${MODULE}/migration/platform/buildinfo.version=${VERSION} -X ${MODULE}/migration/platform/buildinfo.commit=${COMMIT}" \
+      -ldflags "-s -w -X ${MODULE}/internal/platform/buildinfo.version=${VERSION} -X ${MODULE}/internal/platform/buildinfo.commit=${COMMIT}" \
       -o /out/artifactweave ./cmd/artifactweave
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab

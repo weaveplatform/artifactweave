@@ -8,13 +8,22 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/platform/apilimit"
-	artgen "github.com/weaveplatform/artifactweave/migration/platform/gen/artifactory"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/apilimit"
+	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 )
+
+// budgets is the request budget store of the in-memory composite that
+// newItemWorld builds the router over. The router's store leaves budgets out,
+// because the router never reads them: the application builds the limits.
+func budgets(c *Config) apilimit.Store {
+	return c.Store.(*inmem.Store) //nolint:forcetypeassert // fixture
+}
 
 func TestAccAPIRestrictionRecovery(t *testing.T) {
 	var limits *apilimit.Service
@@ -31,7 +40,7 @@ func TestAccAPIRestrictionRecovery(t *testing.T) {
 		o := apilimit.Default()
 		o.GlobalPerMinute, o.PrincipalPerMinute = 1, 1
 		o.MaxConcurrent, o.ExpensiveConcurrent, o.ExpensivePrincipalConcurrent = 1, 1, 1
-		limits, err = apilimit.New(c.Store, o, nil)
+		limits, err = apilimit.New(budgets(c), o, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -115,13 +124,13 @@ func TestAccAPIProjectQuotaUsesRepositoryOwner(t *testing.T) {
 		o := apilimit.Default()
 		o.ProjectPerMinute = 1
 		var err error
-		c.RequestLimits, err = apilimit.New(c.Store, o, nil)
+		c.RequestLimits, err = apilimit.New(budgets(c), o, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, project := range []string{"alpha", "beta"} {
 			if err := c.Store.Projects().
-				Create(t.Context(), types.Project{Key: project}); err != nil {
+				Create(t.Context(), accesstest.Project{Key: project}); err != nil {
 				t.Fatal(err)
 			}
 			if err := c.Store.Repos().
@@ -156,14 +165,14 @@ func TestAccAPIRecoveryRequiresMatchingEscapedRoute(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := w.db.Permissions().
-		Create(ctx, types.Permission{Name: "encoded-api", Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Actions: types.Grants{
-					Users: map[string]types.Actions{
-						"deployer": types.ActionRead | types.ActionWrite,
+		Create(ctx, accesstest.Permission{Name: "encoded-api", Resources: map[api.ResourceType]accesstest.Resource{
+			api.ResourceArtifact: {
+				Actions: accesstest.Grants{
+					Users: map[string]api.Actions{
+						"deployer": api.ActionRead | api.ActionWrite,
 					},
 				},
-				Targets: map[string]types.Target{"api": {Include: []string{"**"}}},
+				Targets: map[string]accesstest.Target{"api": {Include: []string{"**"}}},
 			},
 		}}); err != nil {
 		t.Fatal(err)
@@ -182,7 +191,7 @@ func TestAccAPIRecoveryRequiresMatchingEscapedRoute(t *testing.T) {
 	if _, err := w.db.Items().
 		Get(ctx, "api", false, "artifactweave/api-restrictions/target"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatalf("restricted upload mutated state: %v", err)
 	}

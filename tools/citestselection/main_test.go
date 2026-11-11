@@ -41,12 +41,12 @@ func TestUnitClassify(t *testing.T) {
 		{"deleted docs", []change{{status: "D", path: "docs/old.md"}}, "docs"},
 		{
 			"source rename into docs",
-			[]change{{status: "R100", old: "internal/server/x.go", path: "docs/x.md"}},
+			[]change{{status: "R100", old: "internal/app/x.go", path: "docs/x.md"}},
 			"full",
 		},
 		{
 			"docs rename into source",
-			[]change{{status: "R100", old: "docs/x.md", path: "internal/server/x.go"}},
+			[]change{{status: "R100", old: "docs/x.md", path: "internal/app/x.go"}},
 			"full",
 		},
 		{"evidence json", []change{{status: "A", path: "docs/testing/evidence/run.json"}}, "docs"},
@@ -159,10 +159,11 @@ func TestAccChangedPathsUsesMergeBase(t *testing.T) {
 		t.Fatalf("release PR with docs-only diff profile = %q", got)
 	}
 	git("checkout", "-qb", "format", base)
-	if err := os.MkdirAll(filepath.Join(dir, "internal", "format", "npm"), 0o755); err != nil {
+	npmDir := filepath.Join(dir, "internal", "artifacts", "ecosystem", "npm")
+	if err := os.MkdirAll(npmDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "internal", "format", "npm", "handler.go"),
+	if err := os.WriteFile(filepath.Join(npmDir, "handler.go"),
 		[]byte("package npm\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

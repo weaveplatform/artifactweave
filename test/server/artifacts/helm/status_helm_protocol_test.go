@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	helmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/helm"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	helmfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/helm"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/work"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const (
@@ -26,7 +26,7 @@ var helmProtocolStatusPart = statusPart{
 		helmDownload:     true,
 		helmDownloadHead: true,
 	},
-	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
+	seed: func(t *testing.T, db harness.Store, blobs blob.Store) {
 		t.Helper()
 		items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 		seedHelm(t, items, db, "helm-local", true, "protocol/web-1.0.0.tgz")
@@ -59,7 +59,7 @@ func seedHelmIndex(t *testing.T, items *item.Service) {
 	if err := (helmfmt.Handler{}).Work(
 		context.Background(),
 		items.Env(),
-		types.WorkItem{Kind: helmfmt.KindIndex, Key: "helm-local"},
+		work.WorkItem{Kind: helmfmt.KindIndex, Key: "helm-local"},
 	); err != nil {
 		t.Fatal(err)
 	}

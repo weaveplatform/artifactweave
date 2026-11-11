@@ -8,13 +8,16 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
@@ -87,7 +90,7 @@ func NewItemWorld(t *testing.T, anonymous bool, tune ...Tune) *ItemWorld {
 	db := inmem.New()
 	support.Seed(t, db)
 	hash := support.CheapHash
-	for _, u := range []types.User{
+	for _, u := range []accesstest.User{
 		{Name: "reader", PasswordHash: hash, Groups: []string{authn.ReadersGroup}},
 		{Name: "deployer", PasswordHash: hash},
 		{Name: "user", PasswordHash: hash},
@@ -96,30 +99,32 @@ func NewItemWorld(t *testing.T, anonymous bool, tune ...Tune) *ItemWorld {
 			t.Fatal(err)
 		}
 	}
-	if err := db.Permissions().Create(ctx, types.Permission{
+	if err := db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "deploy-libs",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"deployer": types.ActionRead | types.ActionWrite,
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
+				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]types.Target{"libs-local": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"libs-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if anonymous {
-		if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+		if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 			t.Fatal(err)
 		}
 		// The seeded Any Remote grants anonymous nothing (#383), so anonymous
 		// reads remotes through a permission of its own, as JFrog advises.
-		if err := db.Permissions().Create(ctx, types.Permission{
+		if err := db.Permissions().Create(ctx, accesstest.Permission{
 			Name: AnonymousRemotes,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					kernel.AnonymousUser: types.ActionRead,
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{
+					kernel.AnonymousUser: api.ActionRead,
 				}},
-				Targets: map[string]types.Target{types.TargetAnyRemote: {Include: []string{"**"}}},
+				Targets: map[string]accesstest.Target{
+					api.TargetAnyRemote: {Include: []string{"**"}},
+				},
 			}},
 		}); err != nil {
 			t.Fatal(err)
@@ -187,7 +192,7 @@ func (w *ItemWorld) Do(
 // Item returns the item at the full path p in the repository key, or in that
 // remote repository's cache when cached is true. It fails the test when the
 // store cannot return the item.
-func (w *ItemWorld) Item(key string, cached bool, p string) types.Item {
+func (w *ItemWorld) Item(key string, cached bool, p string) artmodel.Item {
 	w.T.Helper()
 	it, err := w.DB.Items().Get(context.Background(), key, cached, p)
 	if err != nil {

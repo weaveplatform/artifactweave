@@ -56,14 +56,14 @@
       ]
     },
     {
-      "path": "migration/app/conan_client_test.go",
+      "path": "test/server/artifacts/conan/conan_client_remote_test.go",
       "contains": [
         "TestAccConanRemoteClient",
         "\"download\", \"hello/1.0\", \"-r\", \"proxy\""
       ]
     },
     {
-      "path": "migration/access/core/authn/token.go",
+      "path": "internal/access/core/authn/token.go",
       "contains": [
         "A Basic user name must name the token's subject",
         "password of a Basic credential"

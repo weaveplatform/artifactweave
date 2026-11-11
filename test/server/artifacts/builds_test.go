@@ -12,9 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/build"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/build"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 const vendorJSON = "application/vnd.org.jfrog.artifactory+json"
@@ -50,7 +52,7 @@ func documentPath(name, number, started string) string {
 	if err != nil {
 		panic(err)
 	}
-	_, p := types.Build{Name: name, Number: number, Started: t}.DocumentItem()
+	_, p := artmodel.Build{Name: name, Number: number, Started: t}.DocumentItem()
 	return p
 }
 
@@ -62,7 +64,7 @@ func (w *itemWorld) publish(doc string) {
 func (w *itemWorld) hasItem(key, p string) bool {
 	w.t.Helper()
 	_, err := w.db.Items().Get(context.Background(), key, false, p)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 		w.t.Fatal(err)
 	}
 	return err == nil
@@ -118,7 +120,7 @@ func TestAccBuildPublishAndRead(t *testing.T) {
 		if !strings.HasPrefix(p, "team%2Fapp/1-") {
 			t.Fatalf("document path %s", p)
 		}
-		if it := w.item(types.BuildInfoRepository, false, p); it.Actual.SHA256 != sha256Hex(doc) {
+		if it := w.item(api.BuildInfoRepository, false, p); it.Actual.SHA256 != sha256Hex(doc) {
 			t.Errorf("item %s holds %s, want the document", p, it.Actual.SHA256)
 		}
 	}
@@ -196,7 +198,7 @@ func TestAccBuildOverwrite(t *testing.T) {
 	if runs := w.runsOf("app"); fmt.Sprint(runs) != fmt.Sprint(want) {
 		t.Errorf("runs %v, want %v", runs, want)
 	}
-	if w.hasItem(types.BuildInfoRepository, documentPath("app", "1", startedAt(0))) {
+	if w.hasItem(api.BuildInfoRepository, documentPath("app", "1", startedAt(0))) {
 		t.Error("the deleted run's document item is still there")
 	}
 
@@ -223,7 +225,7 @@ func TestAccBuildOverwrite(t *testing.T) {
 		t.Errorf("message %q", got)
 	}
 	wantStatus(t, w.do(http.MethodGet, buildsPath+"/app", "admin", ""), 404)
-	if w.hasItem(types.BuildInfoRepository, "app") {
+	if w.hasItem(api.BuildInfoRepository, "app") {
 		t.Error("the build's folder outlived its last document")
 	}
 }
@@ -279,7 +281,7 @@ func TestAccBuildAppend(t *testing.T) {
 			`{"id":"m2","type":"generic","extra":"kept"}]`) {
 		t.Errorf("appended document %s", doc)
 	}
-	it := w.item(types.BuildInfoRepository, false, documentPath("app", "1", testStarted))
+	it := w.item(api.BuildInfoRepository, false, documentPath("app", "1", testStarted))
 	if it.Actual.SHA256 != sha256Hex(doc) {
 		t.Error("the document item was not rewritten")
 	}
@@ -308,8 +310,8 @@ func TestAccBuildRename(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `"buildInfo":`+moved) {
 		t.Errorf("renamed run %s", rec.Body)
 	}
-	if !w.hasItem(types.BuildInfoRepository, documentPath("team/new", "2", startedAt(1))) ||
-		w.hasItem(types.BuildInfoRepository, "old") {
+	if !w.hasItem(api.BuildInfoRepository, documentPath("team/new", "2", startedAt(1))) ||
+		w.hasItem(api.BuildInfoRepository, "old") {
 		t.Error("the document items did not move")
 	}
 	// A rename to the same name changes nothing.
@@ -364,22 +366,22 @@ func TestAccBuildDeleteArtifacts(t *testing.T) {
 func TestAccBuildPermissions(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
-	grant := func(name, user string, a types.Actions, include string) {
+	grant := func(name, user string, a api.Actions, include string) {
 		t.Helper()
-		if err := w.db.Permissions().Create(ctx, types.Permission{
+		if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceBuild: {
-				Actions: types.Grants{Users: map[string]types.Actions{user: a}},
-				Targets: map[string]types.Target{
-					types.BuildInfoRepository: {Include: []string{include}},
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceBuild: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{user: a}},
+				Targets: map[string]accesstest.Target{
+					api.BuildInfoRepository: {Include: []string{include}},
 				},
 			}},
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	grant("deploy-app", "deployer", types.ActionRead|types.ActionWrite, "app/**")
-	grant("delete-builds", "user", types.ActionRead|types.ActionDelete, "**")
+	grant("deploy-app", "deployer", api.ActionRead|api.ActionWrite, "app/**")
+	grant("delete-builds", "user", api.ActionRead|api.ActionDelete, "**")
 	put := func(as, doc string) int {
 		return w.do(http.MethodPut, buildsPath, as, doc, "Content-Type", "application/json").Code
 	}
@@ -434,7 +436,7 @@ func TestAccBuildInfoWithoutDocument(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.db.Builds().Put(context.Background(), types.Build{
+	if _, err := w.db.Builds().Put(context.Background(), artmodel.Build{
 		Name: "bare", Number: "1", Started: started,
 	}); err != nil {
 		t.Fatal(err)

@@ -6,13 +6,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -26,7 +28,7 @@ func nugetServer(t *testing.T, tune ...harness.Tune) (http.Handler, *inmem.Store
 	cheapSeed(t, db)
 	for _, name := range []string{"dev", "user"} {
 		if err := db.Users().
-			Create(ctx, types.User{Name: name, PasswordHash: cheapHash}); err != nil {
+			Create(ctx, accesstest.User{Name: name, PasswordHash: cheapHash}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -42,7 +44,7 @@ func nugetServer(t *testing.T, tune ...harness.Tune) (http.Handler, *inmem.Store
 			t.Fatal(err)
 		}
 	}
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -165,7 +167,7 @@ func TestAccNuGetClientWrites(t *testing.T) {
 func TestAccNuGetForceAuthentication(t *testing.T) {
 	h, db, _ := nugetServer(t)
 	if err := db.Settings().
-		Put(context.Background(), types.SettingAnonymousAccess, true); err != nil {
+		Put(context.Background(), settings.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range []string{

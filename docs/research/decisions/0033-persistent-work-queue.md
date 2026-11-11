@@ -217,17 +217,18 @@ These assignments describe planned work, not current runtime support.
 
 ## Verification
 
-- `migration/platform/store/storetest/work.go`: the contract on the in-memory, SQLite and
+- `internal/platform/store/storetest/work.go`: the contract on the in-memory, SQLite and
   PostgreSQL stores, including concurrent leasing, coalescing, fencing, crash recovery and
   transactions.
-- `migration/platform/store/sql/work_test.go`: driver-failure paths.
-- `migration/platform/work/work_test.go`: the worker pool, retries, parking, panics,
+- `internal/platform/store/sql/work_test.go`: driver-failure paths.
+- `internal/platform/work/work_test.go`: the worker pool, retries, parking, panics,
   heartbeats, lost leases, shutdown, `EnsureFresh`, `WaitIdle` and the metrics;
   `periodic_test.go`: periodic kinds, their timer and `RunDue`.
-- `migration/artifacts/ecosystem/npm/work_test.go` and `internal/server/npm_operations_test.go`:
-  npm's queued reindex and conversion, a conversion that fails and is parked, and its resume.
-- `migration/artifacts/core/item/work_test.go`: the reindex kinds, through any format, of a
+- `internal/artifacts/ecosystem/npm/work_test.go` and
+  `test/server/artifacts/npm/npm_operations_test.go`: npm's queued reindex and conversion, a
+  conversion that fails and is parked, and its resume.
+- `internal/artifacts/core/item/work_test.go`: the reindex kinds, through any format, of a
   whole repository and of a path. `test/server/artifacts/reindex_test.go` and
-  `internal/server/reindex_internal_test.go`: each P8 reindex operation's permission, classes,
+  `internal/app/reindex_internal_test.go`: each P8 reindex operation's permission, classes,
   timing and answer through a test-only format, and its 501 without one;
   `status_reindex_test.go` and `matrix_reindex_test.go`: their rows.

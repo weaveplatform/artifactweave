@@ -66,4 +66,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [.github/actions/registry-clients/action.yml](../../.github/actions/registry-clients/action.yml).
 - Evidence: [test/acceptance/features/registry_clients.feature](../../test/acceptance/features/registry_clients.feature).
 - Evidence: [test/acceptance/features/docker.feature](../../test/acceptance/features/docker.feature).
-- Evidence: [migration/access/adapters/http/authn_middleware.go](../../migration/access/adapters/http/authn_middleware.go).
+- Evidence: [internal/access/adapters/http/authn_middleware.go](../../internal/access/adapters/http/authn_middleware.go).

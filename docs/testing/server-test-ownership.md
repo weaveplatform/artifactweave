@@ -1,47 +1,164 @@
-# Server test ownership after Phase 9b extraction
+# Server test ownership
 
-`tools/citestselection/test_ownership.json` is the machine-checked package inventory
-for the selective CI planner in #673. Version 2 keys everything by directory, so
-tests can leave `internal/server` and `migration/app` over many changes without a
-new schema:
+`tools/citestselection/test_ownership.json` records who owns each directory of
+server tests. The CI test selector
+([#673](https://github.com/weaveplatform/artifactweave/issues/673)) embeds it to
+decide whether a change to one format can run a narrow profile, and which tests
+that profile runs; the [CI guide](ci.md) describes the profiles. Ownership is
+drawn by Go package, and file by file in the shared directories that list their
+files; within those boundaries the CI lanes pick tests by their `TestUnit` and
+`TestAcc` names. The [server test package guide](server-test-packages.md)
+describes the suites themselves.
 
-- `packages` maps every directory with server tests to its owner: a format, or
-  `shared`.
-- `shared_files` lists, by file name, every test file in a shared directory whose
-  files are reviewed one by one. Today these are `internal/server`,
-  `migration/app` and the module suites `test/server/access`,
-  `test/server/artifacts` and `test/server/configuration`.
-- `format_dependencies` maps a format to the repository paths of the shared test
-  files that exercise it.
+## The inventory
 
-The `tools/citestselection` inventory test compares the inventory with the working
-tree. A new server test file, a moved test, or an unmapped test package selects full CI
-until its ownership has been reviewed. Format ownership uses Go package and
-reviewed shared-directory file boundaries; the CI lanes use `TestUnit` and
-`TestAcc` names within those boundaries.
+The file is version 2 and keys everything by directory, so a test that moves is
+recorded by editing paths, never by a new field. The selector rejects any other
+key, and anything after the object.
+
+- `packages` maps every directory that holds server tests to its owner: a
+  format, or `shared`.
+- `shared_files` lists, for a shared directory whose files are reviewed one by
+  one, the bare name of every test file in it. A test file in such a directory
+  that the list leaves out has no owner. The keys today are `internal/app`; the
+  HTTP adapters `internal/access/adapters/http`,
+  `internal/artifacts/adapters/http`,
+  `internal/artifacts/adapters/http/itemkit` and
+  `internal/configuration/adapters/http`; and the module suites
+  `test/server/access`, `test/server/artifacts` and `test/server/configuration`.
+- `format_dependencies` maps a format to the repository paths of the shared
+  test files that exercise it. Each path must name a file that its directory's
+  `shared_files` list holds.
+
+`go test ./tools/citestselection` checks the inventory against the tree: every
+test file in an owned test directory needs an owner, every `packages` key must
+hold tests, and every listed shared file and dependency path must exist. It
+fails until the inventory and the tree agree.
 
 ## Owned test directories
 
-The selector treats a `_test.go` file as a server test, which needs a reviewed
-owner, when it lies in one of these directories. `<root>` is `migration` or
-`internal`, because staged code under `migration/` becomes `internal/` at the end
-of P9d:
+`ownership.OwnedTestDir`, in `tools/citestselection/ownership`, decides which
+`_test.go` files are server tests that need a reviewed owner: those in one of
+these directories.
 
-- `internal/server` and everything below it;
-- `test/server` and everything below it, including `test/server/artifacts/<type>`;
-- `<root>/app`;
-- `<root>/artifacts/ecosystem/<type>/http` and everything below it;
-- `<root>/<module>/adapters/http` and everything below it.
+- `test/server` and everything below it;
+- `internal/app`;
+- `internal/<module>/adapters/http` and everything below it;
+- `internal/artifacts/ecosystem/<type>/http` and everything below it.
 
-Every `packages` key must be one of these directories. A test in a format's
-directory (`internal/server/<type>`, `test/server/artifacts/<type>` or
-`<root>/artifacts/ecosystem/<type>/http`) counts as that format's code on a
+Every `packages` key must be one of these directories, written in clean form. A
+test in a format's directory (`test/server/artifacts/<type>` or
+`internal/artifacts/ecosystem/<type>/http`) counts as that format's code on a
 narrow PR only when its package owner is that format; any other owner, `shared`
 included, selects full CI.
 
+## Package boundaries
+
+The owners and their test packages, as `packages` records them:
+
+| Owner | Test packages |
+| --- | --- |
+| `agentpackages` | `test/server/artifacts/agentpackages` |
+| `agentplugins` | `internal/artifacts/ecosystem/agentplugins/http`, `test/server/artifacts/agentplugins` |
+| `aieditorextensions` | `internal/artifacts/ecosystem/aieditorextensions/http` |
+| `alpine` | `internal/artifacts/ecosystem/alpine/http` |
+| `ansible` | `internal/artifacts/ecosystem/ansible/http` |
+| `bazelmodules` | `internal/artifacts/ecosystem/bazelmodules/http` |
+| `bower` | `internal/artifacts/ecosystem/bower/http` |
+| `cargo` | `internal/artifacts/ecosystem/cargo/http` |
+| `chef` | `internal/artifacts/ecosystem/chef/http`, `test/server/artifacts/chef` |
+| `cocoapods` | `internal/artifacts/ecosystem/cocoapods/http` |
+| `composer` | `internal/artifacts/ecosystem/composer/http` |
+| `conan` | `internal/artifacts/ecosystem/conan/http`, `test/server/artifacts/conan` |
+| `conda` | `internal/artifacts/ecosystem/conda/http`, `test/server/artifacts/conda` |
+| `cran` | `internal/artifacts/ecosystem/cran/http`, `test/server/artifacts/cran` |
+| `debian` | `internal/artifacts/ecosystem/debian/http`, `test/server/artifacts/debian` |
+| `docker` | `internal/artifacts/ecosystem/docker/http`, `test/server/artifacts/docker` |
+| `gems` | `internal/artifacts/ecosystem/gems/http`, `test/server/artifacts/gems` |
+| `gitlfs` | `internal/artifacts/ecosystem/gitlfs/http` |
+| `golang` | `internal/artifacts/ecosystem/golang/http`, `test/server/artifacts/golang` |
+| `helm` | `internal/artifacts/ecosystem/helm/http`, `test/server/artifacts/helm` |
+| `helmoci` | `test/server/artifacts/helmoci` |
+| `hex` | `internal/artifacts/ecosystem/hex/http`, `test/server/artifacts/hex` |
+| `huggingface` | `internal/artifacts/ecosystem/huggingface/http`, `test/server/artifacts/huggingface` |
+| `jetbrainsplugins` | `internal/artifacts/ecosystem/jetbrainsplugins/http` |
+| `luarocks` | `internal/artifacts/ecosystem/luarocks/http` |
+| `machinelearning` | `internal/artifacts/ecosystem/machinelearning/http` |
+| `maven` | `internal/artifacts/ecosystem/maven/http`, `test/server/artifacts/maven` |
+| `nimmodel` | `internal/artifacts/ecosystem/nimmodel/http` |
+| `nix` | `internal/artifacts/ecosystem/nix/http`, `test/server/artifacts/nix` |
+| `npm` | `internal/artifacts/ecosystem/npm/http`, `test/server/artifacts/npm` |
+| `nuget` | `internal/artifacts/ecosystem/nuget/http`, `test/server/artifacts/nuget` |
+| `opkg` | `internal/artifacts/ecosystem/opkg/http`, `test/server/artifacts/opkg` |
+| `p2` | `internal/artifacts/ecosystem/p2/http`, `test/server/artifacts/p2` |
+| `pub` | `internal/artifacts/ecosystem/pub/http` |
+| `puppet` | `internal/artifacts/ecosystem/puppet/http`, `test/server/artifacts/puppet` |
+| `pypi` | `internal/artifacts/ecosystem/pypi/http`, `test/server/artifacts/pypi` |
+| `rpm` | `internal/artifacts/ecosystem/rpm/http`, `test/server/artifacts/rpm` |
+| `skills` | `internal/artifacts/ecosystem/skills/http` |
+| `swift` | `internal/artifacts/ecosystem/swift/http` |
+| `terraform` | `internal/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
+| `terraformbackend` | `internal/artifacts/ecosystem/terraformbackend/http`, `test/server/artifacts/terraformbackend` |
+| `vagrant` | `internal/artifacts/ecosystem/vagrant/http` |
+| `vcs` | `internal/artifacts/ecosystem/vcs/http`, `test/server/artifacts/vcs` |
+| `shared` | `internal/access/adapters/http`, `internal/app`, `internal/artifacts/adapters/http`, `internal/artifacts/adapters/http/itemkit`, `internal/artifacts/adapters/http/pkgroute`, `internal/configuration/adapters/http`, `test/server/access`, `test/server/artifacts`, `test/server/artifacts/generic`, `test/server/configuration` |
+
+A narrow PR for a format runs the owner's packages, the packages of the format's
+code that the selector's format table names, and the shared tests that
+`format_dependencies` lists for it. Docker's also runs
+`test/server/artifacts/helmoci` and `internal/artifacts/ecosystem/nimmodel/http`,
+which exercise the same registry protocol stack. No format owns the generic
+remote repository, so `test/server/artifacts/generic` is shared and runs in the
+full profile only.
+
+`test/server/support` and the packages below it (`harness`, `agentcommon` and
+`registryfixture`) hold fixtures and helpers, not tests, so the inventory has no
+key for them. A change to one of them selects full CI, as does a change to
+shared server code, authentication, routing, stores or registrations.
+
+## Shared guard dependencies
+
+Some tests in shared directories exercise one format's code: whole-router guards
+in `internal/app` that hold a format's rows or call its rules, and module suites
+that use a format's fixtures. `format_dependencies` lists them by repository
+path, and in each shared directory a narrow PR runs only the `TestUnit` and
+`TestAcc` entry points of the files listed for its format:
+
+| Format | Listed shared tests | What they cover |
+| --- | --- | --- |
+| `agentpackages`, `agentplugins`, `hex`, `luarocks`, `nimmodel` | `test/server/artifacts/repositories_format_class_test.go` | The repository classes each of these formats accepts |
+| `cargo` | `internal/app/spec_test.go` | The specification checks, among them that every Cargo operation the package router owns is served |
+| `chef` | `internal/app/status_chef_test.go` | Chef's rows of the status table and route matrix |
+| `composer` | `internal/app/server_test.go` | The whole-router checks, among them that the native Composer routes avoid the handwritten stubs |
+| `cran` | `internal/app/status_cran_archive_test.go` | The CRAN archive rows of the status table and route matrix |
+| `docker` | `internal/app/registry_shared_test.go` | The registry's refusal of a request without a permission decider, and the content type that the shared middleware keeps |
+| `helm` | `internal/app/reindex_internal_test.go`, `test/server/artifacts/reindex_test.go`, `test/server/artifacts/sidecar_rights_test.go` | Reindex and its refusals, and the rights a copy of a chart's sidecar needs |
+| `huggingface` | `internal/app/status_huggingface_xet_test.go` | The statuses of the Xet routes |
+| `machinelearning` | `internal/app/status_machinelearning_test.go` | The machine learning rows of the status table and route matrix |
+| `maven` | `test/server/artifacts/searches_upstream_test.go`, `test/server/artifacts/searches_upstream_mapped_test.go` | Upstream search and cache mapping with Maven coordinates |
+| `nix` | `internal/app/status_nix_test.go` | Nix's rows of the status table and route matrix |
+| `npm` | `internal/app/error_profiles_p8_test.go` | Error envelope selection, whose rules call npm's path predicates |
+| `nuget` | `test/server/artifacts/repositories_test.go` | Repository configuration, with NuGet contexts |
+| `puppet` | `internal/app/status_puppet_test.go` | Puppet's rows of the status table and route matrix |
+| `pypi` | `internal/app/reindex_internal_test.go`, `test/server/artifacts/reindex_test.go` | Reindex and its refusals |
+| `terraform` | `test/server/access/keypairs_test.go`, `test/server/access/permissions_test.go`, `test/server/artifacts/storage_list_test.go` | The key pair, permission and storage list APIs with Terraform fixtures |
+| `vcs` | `internal/app/vcs_tables_test.go` | The VCS REST rows of the status table and route matrix |
+
+Six of these files hold only a format's rows: `status_chef_test.go`,
+`status_cran_archive_test.go`, `status_machinelearning_test.go`,
+`status_nix_test.go`, `status_puppet_test.go` and `vcs_tables_test.go`. The
+status table in `status_test.go` and the route matrix in `matrix_test.go` run
+those rows, and the six files declare no entry point of their own, so a narrow
+PR runs none of them; they run in the full profile.
+
+A change to a test file in a shared directory selects full CI, and so does a
+new, removed or moved server test, or a test file that no `packages` key or
+`shared_files` list covers, until its ownership has been reviewed and recorded
+in the inventory.
+
 ## Moving a root test
 
-When a test file leaves a shared directory such as `internal/server`:
+When a test file leaves a shared directory such as `internal/app` on its own:
 
 1. Remove its name from that directory's `shared_files` list. When the list is
    empty and no tests remain there, remove the key and its `packages` entry.
@@ -54,104 +171,3 @@ When a test file leaves a shared directory such as `internal/server`:
    file name.
 
 `go test ./tools/citestselection` fails until the inventory and the tree agree.
-
-## Final package boundaries
-
-| Owner | Independently runnable server test packages |
-| --- | --- |
-| Agent Packages | `test/server/artifacts/agentpackages` |
-| Agent Plugins | `test/server/artifacts/agentplugins` |
-| Chef | `migration/artifacts/ecosystem/chef/http`, `test/server/artifacts/chef` |
-| Conan | `migration/artifacts/ecosystem/conan/http`, `test/server/artifacts/conan` |
-| Conda | `migration/artifacts/ecosystem/conda/http`, `test/server/artifacts/conda` |
-| CRAN | `migration/artifacts/ecosystem/cran/http`, `test/server/artifacts/cran` |
-| Debian | `migration/artifacts/ecosystem/debian/http`, `test/server/artifacts/debian` |
-| Docker/OCI | `migration/artifacts/ecosystem/docker/http`, `test/server/artifacts/docker` |
-| Go modules | `migration/artifacts/ecosystem/golang/http`, `test/server/artifacts/golang` |
-| Helm | `migration/artifacts/ecosystem/helm/http`, `test/server/artifacts/helm` |
-| Helm OCI | `test/server/artifacts/helmoci` |
-| Hex | `migration/artifacts/ecosystem/hex/http`, `test/server/artifacts/hex` |
-| Hugging Face | `migration/artifacts/ecosystem/huggingface/http`, `test/server/artifacts/huggingface` |
-| LuaRocks | `migration/artifacts/ecosystem/luarocks/http` |
-| Maven | `test/server/artifacts/maven` |
-| NIM model | `migration/artifacts/ecosystem/nimmodel/http` |
-| npm | `migration/artifacts/ecosystem/npm/http`, `test/server/artifacts/npm` |
-| NuGet | `migration/artifacts/ecosystem/nuget/http`, `test/server/artifacts/nuget` |
-| Opkg | `migration/artifacts/ecosystem/opkg/http`, `test/server/artifacts/opkg` |
-| P2 | `migration/artifacts/ecosystem/p2/http`, `test/server/artifacts/p2` |
-| PyPI | `migration/artifacts/ecosystem/pypi/http`, `test/server/artifacts/pypi` |
-| RPM | `migration/artifacts/ecosystem/rpm/http`, `test/server/artifacts/rpm` |
-| Dart pub | `migration/artifacts/ecosystem/pub/http` |
-| RubyGems | `migration/artifacts/ecosystem/gems/http`, `test/server/artifacts/gems` |
-| Skills | `migration/artifacts/ecosystem/skills/http` |
-| Terraform registry | `migration/artifacts/ecosystem/terraform/http`, `test/server/artifacts/terraform` |
-| Terraform backend | `migration/artifacts/ecosystem/terraformbackend/http`, `test/server/artifacts/terraformbackend` |
-| VCS | `migration/artifacts/ecosystem/vcs/http`, `test/server/artifacts/vcs` |
-| Shared | `internal/server`, `migration/artifacts/adapters/http/pkgroute`, `test/server/access`, `test/server/artifacts`, `test/server/configuration` |
-
-`test/server/support` and the packages under it (`harness`, `agentcommon` and
-`registryfixture`) contain fixtures and helpers, not test suites. A change
-to one of them must select its dependent test packages. A change to shared
-server code, authentication, routing, store contracts, or registrations must
-select every affected owner. #673 implements those reverse dependencies and
-CI profiles; this inventory supplies the package boundary.
-
-## Residual root test audit
-
-The 75 direct root test files cover shared server APIs and registration:
-authentication, the in-package parts of the access, artifacts management and
-ecosystem suites (`<name>_internal_test.go`), AQL relations and transitive
-searches, request limits, the format tests that move with their code,
-OpenAPI, status and principal matrices. The file names are explicit in the inventory.
-A new direct root test cannot be treated as format-owned without review.
-
-Some shared API tests use a format-specific fixture. The inventory's
-`format_dependencies` records the link from a format to such a test as the
-test's repository path (`internal/server/<file>`, or `test/server/access/<file>`
-and `test/server/artifacts/<file>` for the module suites') so #673 can include
-those tests when that format changes:
-
-| Shared tests | Shared behavior exercised |
-| --- | --- |
-| `test/server/access`: `keypairs_test.go`, `permissions_test.go`; `test/server/artifacts`: `storage_list_test.go` | Keypair, permission and storage APIs using Terraform fixtures |
-| `test/server/artifacts`: `searches_upstream_test.go`, `searches_upstream_mapped_test.go` | Generic upstream search and cache mapping using Maven coordinates |
-| `test/server/artifacts`: `reindex_test.go`; root: `reindex_internal_test.go` | Generic reindex orchestration using PyPI and Helm cases |
-| `test/server/artifacts`: `repositories_test.go` | Repository settings using NuGet contexts |
-| `test/server/artifacts`: `repositories_format_class_test.go` | Repository class validation across LuaRocks, NIM and Agent formats |
-| root: `error_profiles_p8_test.go` | Error envelope selection, whose rules call npm's path predicates for its JFrog operations |
-| root: `registry_shared_test.go`; `test/server/artifacts`: `sidecar_rights_test.go` | Shared registry content type and sidecar permission rules using Docker and Helm |
-
-These tests use shared APIs or private server helpers. A format-only change
-that could affect one of them must include the package that holds it, the root
-package or a module suite; #673 may widen that selection further based on Go
-reverse dependencies. Unknown ownership selects full qualification.
-
-## Application acceptance dependencies
-
-Some native format tests live in the mixed `migration/app` package because they
-exercise application startup, remote cache and source policy through a running
-server. The inventory lists every `migration/app` test file under `shared_files`,
-and `format_dependencies` maps the format-specific ones to format owners as
-`migration/app/<file>` paths. A narrow format PR selects only the mapped app files
-and runs their `TestAcc` entries in the Go acceptance lane. The current map covers
-the Conda, Docker registry, Maven, Nix and Puppet remote tests and the NuGet
-reindex tests. New format app tests must be added to the map after ownership
-review; an app test change itself selects full CI until then.
-
-## Comparison and local timings
-
-Immediately after #793, `go test -list . ./internal/server` listed 374 root
-tests. After the Terraform registry, Terraform backend, Agent Packages and
-Agent Plugins moves, it lists 367. The seven removed names all appear in
-their corresponding new packages: `TestAccJFTerraformPublish`,
-`TestAccTerraformModuleInit`, `TestAccTerraformProviderInstall`,
-`TestAccTerraformTypeOnTheRepositoriesAPI`,
-`TestAccTerraformBackendThroughTheItemRoutes`,
-`TestAccAgentPackagesAPMProtocolAndLifecycle`, and
-`TestAccAgentPluginMarketplacesTrackTreeAndPermissions`. The status and principal
-matrix route rows moved into format packages while their shared root guards
-remain. Each package's full `go test` run passed independently with the root
-package during its PR. The new format package runs took roughly 0.5–4 seconds
-locally; the root package took 33–43 seconds in those paired runs. These are
-local measurements, not CI runner budgets. #673 owns the measured selective
-CI rollout, coverage policy, and full release gate.

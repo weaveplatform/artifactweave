@@ -2,7 +2,7 @@
 Feature: JFrog CLI round trip
   P3's exit criterion: the JFrog CLI uploads, searches, downloads, copies,
   moves, sets and deletes properties on, and deletes a tree, unchanged. The
-  tree mirrors the seeds in migration/artifacts/core/aql/aqltest, so the AQL
+  tree mirrors the seeds in internal/artifacts/core/aql/aqltest, so the AQL
   the CLI sends here is what make capture-aql saves as that package's
   fixtures.
 
@@ -94,7 +94,7 @@ Feature: JFrog CLI round trip
     And the output does not contain "util-2.0.jar"
     And the output contains "libs-local/org/acme/app-1.0.jar"
 
-  # The file-spec shapes of migration/artifacts/core/aql/aqltest/testdata,
+  # The file-spec shapes of internal/artifacts/core/aql/aqltest/testdata,
   # one command each, so make capture-aql refreshes every fixture from the
   # CLI's own queries.
   Scenario: the query shapes the fixtures capture
@@ -145,7 +145,7 @@ Feature: JFrog CLI round trip
     When I run jf "rt cp libs-local/org/acme/app-1.0.jar libs-copy/ --url {url} --user admin --password {password}"
     Then the command succeeds
     # The --build shapes: the jar and the pom become app/1's artifacts, as
-    # they are in migration/artifacts/core/aql/aqltest's build seeds.
+    # they are in internal/artifacts/core/aql/aqltest's build seeds.
     When I run jf "rt u org/acme/app-1.0.* libs-local/org/acme/ --flat --build-name=app --build-number=1 --url {url} --user admin --password {password}"
     Then the command succeeds
     When I run jf "rt bp app 1 --url {url} --user admin --password {password}"

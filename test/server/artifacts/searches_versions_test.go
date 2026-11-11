@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 func TestAccLatestVersionByProperties(t *testing.T) {
@@ -81,9 +81,9 @@ func TestAccLatestVersionByProperties(t *testing.T) {
 
 // TestAccLatestVersionByPropertiesStoreErrors: a failing store answers 500.
 func TestAccLatestVersionByPropertiesStoreErrors(t *testing.T) {
-	for name, wrap := range map[string]func(store.Store) store.Store{
-		"search": func(s store.Store) store.Store { return failingSearchStore{s} },
-		"repositories": func(s store.Store) store.Store {
+	for name, wrap := range map[string]func(harness.Store) harness.Store{
+		"search": func(s harness.Store) harness.Store { return failingSearchStore{s} },
+		"repositories": func(s harness.Store) harness.Store {
 			return faultyStore{Store: s.(*inmem.Store), fail: map[string]bool{"list": true}}
 		},
 	} {

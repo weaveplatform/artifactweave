@@ -7,14 +7,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	npmfmt "github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/npm"
-	"github.com/weaveplatform/artifactweave/migration/platform/work"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	npmfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/work"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -48,11 +49,11 @@ func npmOpsWorld(t *testing.T) (*itemWorld, *work.Queue) {
 			t.Fatal(err)
 		}
 	}
-	if err := w.db.Permissions().Create(ctx, types.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "manage-npm",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"deployer": types.ActionManage}},
-			Targets: map[string]types.Target{"npm-local": {Include: []string{"**"}}},
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}},
+			Targets: map[string]accesstest.Target{"npm-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -63,7 +64,7 @@ func npmOpsWorld(t *testing.T) (*itemWorld, *work.Queue) {
 func (w *itemWorld) npmPackages() []string {
 	w.t.Helper()
 	pkgs, _, err := w.db.Packages().List(context.Background(), "npm-local",
-		store.Page{Limit: store.MaxLimit})
+		kernel.Page{Limit: kernel.MaxLimit})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -167,7 +168,7 @@ func TestAccNpmConversion(t *testing.T) {
 	park(t, w.db, npmfmt.KindConvert, "npm-local")
 	wantStatus(t, w.do("POST", base+"npm-local/resume", "deployer", ""), http.StatusAccepted)
 	it, err = w.db.WorkQueue().Get(ctx, npmfmt.KindConvert, "npm-local")
-	if err != nil || it.State != types.WorkPending {
+	if err != nil || it.State != work.WorkPending {
 		t.Fatalf("resumed %+v %v", it, err)
 	}
 	for _, c := range []struct {
@@ -186,7 +187,7 @@ func TestAccNpmConversion(t *testing.T) {
 
 // park parks the work item of kind on key, as the queue does once an
 // item's retries run out.
-func park(t *testing.T, st store.Store, kind, key string) {
+func park(t *testing.T, st harness.Store, kind, key string) {
 	t.Helper()
 	ctx := context.Background()
 	now := time.Now()
@@ -194,13 +195,13 @@ func park(t *testing.T, st store.Store, kind, key string) {
 	if err := q.Enqueue(ctx, kind, key, nil, now); err != nil {
 		t.Fatal(err)
 	}
-	it, took, err := q.LeaseKey(ctx, kind, key, store.WorkLease{
+	it, took, err := q.LeaseKey(ctx, kind, key, work.WorkLease{
 		Holder: "test", Until: now.Add(time.Minute), Now: now,
 	})
 	if err != nil || !took {
 		t.Fatalf("lease %v %v", took, err)
 	}
-	if err := q.Fail(ctx, kind, key, it.Generation, store.WorkFailure{
+	if err := q.Fail(ctx, kind, key, it.Generation, work.WorkFailure{
 		Error: "spent", Park: true, RetryAt: now, Now: now,
 	}); err != nil {
 		t.Fatal(err)

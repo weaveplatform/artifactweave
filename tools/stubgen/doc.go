@@ -1,12 +1,12 @@
 // Command stubgen writes
-// migration/platform/gen/<service>/unimplemented.gen.go from the generated
+// internal/platform/gen/<service>/unimplemented.gen.go from the generated
 // strict server interface (make generate).
 //
 // # Role
 //
 // Command, with the repository tooling under tools/: not part of the server
 // binary, and it keeps its path through the modular-monolith migration. The
-// work is migration/devtools/stubgen.
+// work is internal/devtools/stubgen.
 //
 // # Inputs
 //

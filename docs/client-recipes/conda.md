@@ -74,4 +74,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/conda.Dockerfile](../../test/acceptance/clients/conda.Dockerfile).
 - Evidence: [test/acceptance/conda_steps_test.go](../../test/acceptance/conda_steps_test.go).
 - Evidence: [test/acceptance/features/conda.feature](../../test/acceptance/features/conda.feature).
-- Evidence: [migration/access/core/authn/token.go](../../migration/access/core/authn/token.go).
+- Evidence: [internal/access/core/authn/token.go](../../internal/access/core/authn/token.go).

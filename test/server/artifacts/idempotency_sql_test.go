@@ -13,12 +13,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
-	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/sql/postgres"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/sql/sqlite"
+	appstoretest "github.com/weaveplatform/artifactweave/internal/app/storetest"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	pgdrv "github.com/weaveplatform/artifactweave/internal/platform/sql/postgres"
+	platsqltest "github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 	artclient "github.com/weaveplatform/artifactweave/pkg/client/artifactory"
 )
 
@@ -29,11 +31,11 @@ func TestAccAppendReplayDurability(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "replays.db")
 			dsn := ""
 			if backend == "postgres" {
-				dsn = sqltest.PostgresDSN(t)
+				dsn = platsqltest.PostgresDSN(t)
 			}
-			open := func() *sqlcommon.Store {
+			open := func() *appsql.Store {
 				t.Helper()
-				var s *sqlcommon.Store
+				var s *appsql.Store
 				var err error
 				if backend == "sqlite" {
 					s, err = sqlite.Open(ctx, path, sqlite.Options{})
@@ -48,14 +50,14 @@ func TestAccAppendReplayDurability(t *testing.T) {
 			}
 			first := open()
 			if backend == "postgres" {
-				sqltest.Reset(t, first.DB(), postgres.Dialect)
+				appstoretest.Reset(t, first.DB(), pgdrv.Dialect)
 			}
 			cheapSeed(t, first)
 			blobs, err := fs.New(t.TempDir())
 			if err != nil {
 				t.Fatal(err)
 			}
-			handler := func(s *sqlcommon.Store) http.Handler {
+			handler := func(s *appsql.Store) http.Handler {
 				t.Helper()
 				a, err := authn.NewAuthenticator(
 					s.Users(),

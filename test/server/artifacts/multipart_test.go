@@ -12,17 +12,17 @@ import (
 	"testing"
 	"time"
 
-	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
-	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	accessmodule "github.com/weaveplatform/artifactweave/internal/access"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/multipart"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // restrictionsOver is the access module's API restriction check over st, the
 // store a test's multipart service shares with its server, as the runtime
 // binds it.
-func restrictionsOver(t *testing.T, st store.Store) accessapi.Restrictions {
+func restrictionsOver(t *testing.T, st harness.Store) accessapi.Restrictions {
 	t.Helper()
 	m, err := accessmodule.New(accessmodule.Deps{Store: st})
 	if err != nil {
@@ -276,11 +276,13 @@ func TestAccMultipartChecksumToken(t *testing.T) {
 		}
 	})
 	// user may deploy to libs-local, but read nothing.
-	if err := w.db.Permissions().Create(context.Background(), types.Permission{
+	if err := w.db.Permissions().Create(context.Background(), accesstest.Permission{
 		Name: "user-deploys",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionWrite}},
-			Targets: map[string]types.Target{"libs-local": {Include: []string{"**"}}},
+		Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+			Actions: accesstest.Grants{
+				Users: map[string]accessapi.Actions{"user": accessapi.ActionWrite},
+			},
+			Targets: map[string]accesstest.Target{"libs-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)

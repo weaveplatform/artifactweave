@@ -3,7 +3,7 @@
 Detailed layout for option 3 (clean architecture); the other options are the
 sibling documents in this folder. Greenfield stance: no existing decision record,
 gate or import rule is treated as a constraint. The roadmap in
-[plan.md](../docs/implementation/plan.md) (P10 to P41) is scope. Tree annotations:
+[plan.md](../../implementation/plan.md) (P10 to P41) is scope. Tree annotations:
 `← today/path` names the origin of code that exists now, `(P17)` marks a roadmap
 addition, a line with neither is new structure for today's code.
 

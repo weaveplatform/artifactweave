@@ -3,7 +3,7 @@ Feature: JFrog CLI multipart upload
   The JFrog CLI uploads a file of --min-split MiB or more in parts when
   /api/v1/uploads/config says it may: create, a signed URL per part, the parts
   PUT concurrently, complete, a status poll, then a checksum deploy that
-  stores the item (migration/artifacts/core/multipart).
+  stores the item (internal/artifacts/core/multipart).
 
   Scenario: a large file is uploaded in parts and downloads unchanged
     Given the registry is running

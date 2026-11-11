@@ -18,23 +18,23 @@
 //   - The production router from test/server/support/harness, over in-memory
 //     stores seeded by test/server/support: the admin user, whose password is
 //     "pw", and the users, permissions and repositories each world adds.
-//   - The worlds of fixture_test.go, which keep the names the tests had in
-//     internal/server: the harness's item world (newItemWorld); the root
-//     status fixture's users, repositories and fixture files, with a token
-//     service and the multipart upload service (statusFixture), without
-//     what only the root's format, build, search, overwrite, key pair,
-//     permission and token rows need; the repository world over a store whose
-//     repository index can be made to fail (newRepoWorld); and the identity
-//     world (newIdentityWorld). The router's paths, media types, limits and
-//     messages that the tests name are constants there, spelled as
-//     internal/server spells them.
+//   - The worlds of fixture_test.go, which keep the names of the router
+//     guards' fixtures in internal/app: the harness's item world
+//     (newItemWorld); the guards' status fixture's users, repositories and
+//     fixture files, with a token service and the multipart upload service
+//     (statusFixture), without what only the guards' format, build, search,
+//     overwrite, key pair, permission and token rows need; the repository
+//     world over a store whose repository index can be made to fail
+//     (newRepoWorld); and the identity world (newIdentityWorld). The router's
+//     paths, media types, limits and messages that the tests name are
+//     constants there, spelled as the router and its handlers spell them.
 //   - The worlds that some files build for themselves: builds and their
 //     promotion (aql_builds_test.go), searches (searches_test.go), Maven
 //     layouts (searches_layout_test.go), a Maven upstream behind a fake
 //     server (searches_upstream_test.go), reindex with a recording format
 //     (reindex_test.go) and remote sources over stub backends
 //     (source_test.go).
-//   - PostgreSQL through internal/sqlstore/sqltest for the cases that run on
+//   - PostgreSQL through internal/app/storetest for the cases that run on
 //     it too (idempotency_sql_test.go, properties_long_test.go); they skip
 //     without Docker.
 //
@@ -92,12 +92,12 @@
 //
 // # Status
 //
-// Implemented P3 (repositories, items, storage, copy and move, the trash
-// can, the CLI's AQL and, with issue 91, multipart uploads), the mirror
+// Implemented P3 (repositories, items, storage, copy and move, the trash can,
+// the CLI's AQL and, with issue 91, multipart uploads), the mirror
 // administration of P2b, P4b (download redirects), P5 (full AQL, searches and
 // build-info), P8 (reindex) and P9 (remote sources, browsing, cache
 // maintenance and upstream searches), with the idempotent build appends of
-// decision 0043 in P9c. P9d moved the router-level tests out of
-// internal/server (TST-05); the tests that call unexported server code stay
-// there as <name>_internal_test.go.
+// decision 0043 in P9c. P9d moved the router-level tests out of the server
+// root (TST-05); the tests that call unexported router code stay beside the
+// router in internal/app as <name>_internal_test.go.
 package artifacts

@@ -1,12 +1,11 @@
 package artifacts_test
 
-// This file holds the artifacts management suites' fixtures: adapters,
-// under the names the tests had in internal/server, over
+// This file holds the artifacts management suites' fixtures: adapters, under
+// the names of the router guards' fixtures in internal/app, over
 // test/server/support/harness and test/server/support, and copies of the
-// worlds and helpers that root files staying in internal/server define,
-// which the root keeps for its own tests and guard tables. Every router here
-// is harness.Router, so a change to the router's assembly reaches these
-// tests without an edit here.
+// worlds and helpers those fixtures define, which app keeps for its guard
+// tables. Every router here is harness.Router, so a change to the router's
+// assembly reaches these tests without an edit here.
 
 import (
 	"bytes"
@@ -20,25 +19,28 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 
-	accessmodule "github.com/weaveplatform/artifactweave/migration/access"
-	accessapi "github.com/weaveplatform/artifactweave/migration/access/api"
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	artifactshttp "github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/pkgroute"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/multipart"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/search"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	accessmodule "github.com/weaveplatform/artifactweave/internal/access"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	artifactshttp "github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/multipart"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/search"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -69,7 +71,7 @@ var (
 	admin     = basic("admin", "pw")
 )
 
-func cheapSeed(t *testing.T, db store.Store) {
+func cheapSeed(t *testing.T, db support.SeedStore) {
 	t.Helper()
 	support.Seed(t, db)
 }
@@ -124,7 +126,7 @@ func (w *itemWorld) do(
 	return w.world().Do(method, path, as, body, headers...)
 }
 
-func (w *itemWorld) item(key string, cached bool, p string) types.Item {
+func (w *itemWorld) item(key string, cached bool, p string) artmodel.Item {
 	w.t.Helper()
 	return w.world().Item(key, cached, p)
 }
@@ -196,8 +198,8 @@ func target(c repo.Config) accessapi.Repo {
 }
 
 // The router's paths, media types, limits and messages that the tests name,
-// spelled as internal/server spells them, so that a change there fails a
-// test here.
+// spelled as the router and its handlers spell them, so that a change there
+// fails a test here.
 const (
 	buildsPath = "/artifactory/api/build"
 	aqlTrimmed = "AQL query reached the search hard limit, results are trimmed. " +
@@ -296,16 +298,16 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(ctx, types.User{Name: "user", PasswordHash: cheapHash}); err != nil {
+		Create(ctx, accesstest.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Users().Create(ctx, types.User{
-		Name: "locked", PasswordHash: cheapHash, Status: types.UserLocked,
+	if err := db.Users().Create(ctx, accesstest.User{
+		Name: "locked", PasswordHash: cheapHash, Status: accesstest.UserLocked,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if anonymous {
-		if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+		if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -345,11 +347,11 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Settings().Put(ctx, types.SettingFolderDownload,
-		types.FolderDownloadSettings{Enabled: true}); err != nil {
+	if err := db.Settings().Put(ctx, settings.SettingFolderDownload,
+		artmodel.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -394,7 +396,7 @@ func newRepoWorld(t *testing.T) *repoWorld {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	reader := types.User{
+	reader := accesstest.User{
 		Name:         "reader",
 		PasswordHash: cheapHash,
 		Groups:       []string{authn.ReadersGroup},
@@ -466,7 +468,7 @@ func newIdentityWorld(t *testing.T) identityWorld {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
-	if err := db.Instance().Init(ctx, types.InstanceIdentity{
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -491,7 +493,7 @@ func (w identityWorld) bearer(t *testing.T, user string, scope string) map[strin
 	t.Helper()
 	req := token.Request{Username: user, ByAdmin: true}
 	if scope != "" {
-		sc, err := types.ParseScope(scope)
+		sc, err := kernel.ParseScope(scope)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -510,8 +512,8 @@ const testStarted = "2026-10-15T09:30:00.000+0000"
 // allowBuilds lets a fixture publish builds without a caller.
 type allowBuilds struct{}
 
-func (allowBuilds) Build(string, string, bool, types.Actions) bool { return true }
-func (allowBuilds) Item(repo.Config, string, types.Actions) bool   { return true }
+func (allowBuilds) Build(string, string, bool, accessapi.Actions) bool { return true }
+func (allowBuilds) Item(repo.Config, string, accessapi.Actions) bool   { return true }
 
 // buildDoc is a build-info document of one run without modules.
 func buildDoc(name, number, started string) string {

@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -136,7 +136,7 @@ func TestAccAuthentication(t *testing.T) {
 	// anonymous; handlers decide what anonymous may do. The seeded Any
 	// Remote grant covers no repository here, so the list is empty.
 	if err := db.Settings().
-		Put(context.Background(), types.SettingAnonymousAccess, true); err != nil {
+		Put(context.Background(), settings.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)
 	}
 	if rec := do(t, h, "GET", protected, nil, ""); rec.Code != http.StatusOK ||

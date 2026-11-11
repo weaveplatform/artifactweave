@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 )
 
 type catalog struct {

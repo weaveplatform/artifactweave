@@ -1,0 +1,14 @@
+package inmem_test
+
+import (
+	"testing"
+
+	"github.com/weaveplatform/artifactweave/internal/platform/tx/memtx"
+	retinmem "github.com/weaveplatform/artifactweave/internal/retention/adapters/inmem"
+	retstoretest "github.com/weaveplatform/artifactweave/internal/retention/adapters/storetest"
+	"github.com/weaveplatform/artifactweave/internal/retention/core/port"
+)
+
+func TestUnitContract(t *testing.T) {
+	retstoretest.Run(t, func(*testing.T) port.Store { return retinmem.New(memtx.New()) })
+}

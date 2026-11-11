@@ -24,7 +24,7 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 )
 
 func (w *world) registerRemoteNuGet(sc *godog.ScenarioContext) {

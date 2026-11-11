@@ -49,7 +49,7 @@ Signed publication is refused until archive signature validation is implemented;
 ## Evidence
 
 - [`swift.feature`](../../test/acceptance/features/swift.feature) exercises native metadata and reindex against the full server.
-- [`TestAccSwiftPMAnonymousPublish` and `TestAccSwiftPMRemoteVirtualAndOffline`](../../migration/artifacts/ecosystem/swift/http/swift_test.go) run a real SwiftPM client against local, federated, remote and virtual repositories, with redirect and offline cache checks. CI uses the [digest-pinned Swift image](ci-client-images.md); local opt-in runs the installed SwiftPM client.
+- [`TestAccSwiftPMAnonymousPublish` and `TestAccSwiftPMRemoteVirtualAndOffline`](../../internal/artifacts/ecosystem/swift/http/swift_test.go) run a real SwiftPM client against local, federated, remote and virtual repositories, with redirect and offline cache checks. CI uses the [digest-pinned Swift image](ci-client-images.md); local opt-in runs the installed SwiftPM client.
 - [JFrog Swift repository guide](https://docs.jfrog.com/artifactory/docs/swift-repositories) and the [Swift Package Registry specification](https://github.com/swiftlang/swift-package-manager/blob/main/Documentation/PackageRegistry/Registry.md) provide the client and protocol contracts.
 
 Guide and specification checked on 2026-10-25. The local real-client evidence used SwiftPM 6.4; the Linux CI image at that time pinned SwiftPM 6.0.3.

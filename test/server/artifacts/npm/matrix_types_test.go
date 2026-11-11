@@ -6,13 +6,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 const dockerA = "docker-a"
 
-func formatGrants(under string, actions types.Actions) []matrixGrant {
+func formatGrants(under string, actions api.Actions) []matrixGrant {
 	return []matrixGrant{
 		{"npm-local", under, actions},
 		{"npm-releases", under, actions},
@@ -25,7 +25,7 @@ func formatGrants(under string, actions types.Actions) []matrixGrant {
 // repository under a prefix ("" is all of it; repo "*" is every repository).
 type matrixGrant struct {
 	repo, under string
-	actions     types.Actions
+	actions     api.Actions
 }
 
 // matrixPrincipal is one caller, and what the permission model says it is.
@@ -51,7 +51,7 @@ type matrixPrincipal struct {
 	// identity: the token's identity when its user need not be stored: an
 	// OIDC exchange's, which a registry token keeps, or a transient user's
 	// an administrator minted for a name that is no stored user.
-	identity types.TokenIdentity
+	identity kernel.TokenIdentity
 	// admin: acts as an administrator.
 	admin bool
 	// resources: holds the Manage Resources role, which manages every
@@ -67,9 +67,9 @@ type matrixPrincipal struct {
 }
 
 const (
-	rwd        = types.ActionRead | types.ActionWrite | types.ActionDelete
-	rawd       = rwd | types.ActionAnnotate
-	allContent = rawd | types.ActionManage
+	rwd        = api.ActionRead | api.ActionWrite | api.ActionDelete
+	rawd       = rwd | api.ActionAnnotate
+	allContent = rawd | api.ActionManage
 )
 
 // matrixPrincipals are the callers. The fixture gives each what its grants
@@ -93,13 +93,13 @@ var matrixPrincipals = []matrixPrincipal{
 	},
 	// Grants on artifactory-build-info are the build resource's (#165).
 	{name: "reader", user: "reader", grants: slices.Concat([]matrixGrant{
-		{"libs-local", "", types.ActionRead},
-		{types.BuildInfoRepository, "", types.ActionRead},
-		{dockerA, "", types.ActionRead},
-	}, formatGrants("", types.ActionRead))},
+		{"libs-local", "", api.ActionRead},
+		{api.BuildInfoRepository, "", api.ActionRead},
+		{dockerA, "", api.ActionRead},
+	}, formatGrants("", api.ActionRead))},
 	{name: "writer", user: "writer", grants: slices.Concat([]matrixGrant{
 		{"libs-local", "work/", rwd},
-		{types.BuildInfoRepository, "", types.ActionRead | types.ActionWrite},
+		{api.BuildInfoRepository, "", api.ActionRead | api.ActionWrite},
 		{dockerA, "work/", rwd},
 	}, formatGrants("work/", rwd))},
 	// charter reads, deploys and deletes Helm charts in helm-local but not
@@ -114,7 +114,7 @@ var matrixPrincipals = []matrixPrincipal{
 	// the CI user whose jf rt u, run again, replaces files with their own
 	// content (#400).
 	{name: "deployer", user: "deployer", grants: []matrixGrant{
-		{"libs-local", "work/", types.ActionRead | types.ActionWrite},
+		{"libs-local", "work/", api.ActionRead | api.ActionWrite},
 	}},
 	// member holds A and every build through its group, and reads B through
 	// a direct grant.
@@ -124,8 +124,8 @@ var matrixPrincipals = []matrixPrincipal{
 			"",
 			rawd,
 		},
-		{"libs-b", "", types.ActionRead},
-		{types.BuildInfoRepository, "", rwd},
+		{"libs-b", "", api.ActionRead},
+		{api.BuildInfoRepository, "", rwd},
 		{dockerA, "", rawd},
 	}, formatGrants("", rawd))},
 	// Anonymous with anonymous access on holds nothing: since 7.84.3
@@ -142,7 +142,7 @@ var matrixPrincipals = []matrixPrincipal{
 	{
 		name: "tok-groups", user: "member", token: true, scope: "applied-permissions/groups:team",
 		narrowed: true, grants: slices.Concat([]matrixGrant{
-			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd}, {dockerA, "", rawd},
+			{"libs-local", "", rawd}, {api.BuildInfoRepository, "", rwd}, {dockerA, "", rawd},
 		}, formatGrants("", rawd)),
 	},
 	// admin's token scoped to A: every action there, but no admin endpoint.
@@ -155,15 +155,15 @@ var matrixPrincipals = []matrixPrincipal{
 	// alone, as tok-groups does (#406).
 	{
 		name: "tok-transient", user: "ghost", token: true, scope: "applied-permissions/groups:team",
-		narrowed: true, identity: types.IdentityTransient, grants: slices.Concat([]matrixGrant{
-			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd}, {dockerA, "", rawd},
+		narrowed: true, identity: kernel.IdentityTransient, grants: slices.Concat([]matrixGrant{
+			{"libs-local", "", rawd}, {api.BuildInfoRepository, "", rwd}, {dockerA, "", rawd},
 		}, formatGrants("", rawd)),
 	},
 	// applied-permissions/admin for a name that is no stored user: an
 	// administrator all the same (#406).
 	{
 		name: "tok-admin-scope", user: "ghost-admin", token: true,
-		scope: "applied-permissions/admin", identity: types.IdentityTransient, admin: true,
+		scope: "applied-permissions/admin", identity: kernel.IdentityTransient, admin: true,
 		grants: []matrixGrant{{"*", "", allContent}},
 	},
 	// member's token scoped to the storage summary alone, which 7.x lets
@@ -186,7 +186,7 @@ var matrixPrincipals = []matrixPrincipal{
 	// not stored (#248): it answers exactly as tok-registry does.
 	{
 		name: "tok-registry-oidc", user: "ci-oidc", token: true, registry: true, narrowed: true,
-		identity: types.IdentityTransient,
+		identity: kernel.IdentityTransient,
 	},
 	// A transient user from an OIDC exchange whose mapping names it and
 	// member's group: it acts through team, as tok-transient does, but its
@@ -195,17 +195,17 @@ var matrixPrincipals = []matrixPrincipal{
 	{
 		name: "tok-transient-user", user: "ci-user", token: true,
 		scope:    "applied-permissions/groups:team applied-permissions/user",
-		identity: types.IdentityTransient, grants: slices.Concat([]matrixGrant{
-			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd}, {dockerA, "", rawd},
+		identity: kernel.IdentityTransient, grants: slices.Concat([]matrixGrant{
+			{"libs-local", "", rawd}, {api.BuildInfoRepository, "", rwd}, {dockerA, "", rawd},
 		}, formatGrants("", rawd)),
 	},
 }
 
-func (p matrixPrincipal) holds(repoKey, path string, want types.Actions) bool {
+func (p matrixPrincipal) holds(repoKey, path string, want api.Actions) bool {
 	if slices.ContainsFunc(p.excludes, func(s string) bool { return strings.HasSuffix(path, s) }) {
 		return false
 	}
-	var have types.Actions
+	var have api.Actions
 	for _, g := range p.grants {
 		if (g.repo == "*" || g.repo == repoKey) && strings.HasPrefix(path, g.under) {
 			have |= g.actions
@@ -230,7 +230,7 @@ func anyone(p matrixPrincipal) int {
 	return 0
 }
 
-func holds(repoKey, path string, want types.Actions) rule {
+func holds(repoKey, path string, want api.Actions) rule {
 	return func(p matrixPrincipal) int {
 		if p.holds(repoKey, path, want) {
 			return 0
@@ -244,7 +244,7 @@ func listsGo(repoKey, path string) rule {
 		if p.anonymous && !p.anonymousOn {
 			return http.StatusUnauthorized
 		}
-		if p.holds(repoKey, path, types.ActionRead) {
+		if p.holds(repoKey, path, api.ActionRead) {
 			return 0
 		}
 		return http.StatusNotFound

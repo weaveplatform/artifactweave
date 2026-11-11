@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
 )
 
 // nugetMatrixPart is NuGet's share of the route × principal matrix, which
@@ -32,7 +32,7 @@ var nugetMatrixPart = matrixPart{
 	},
 	rows: func() []matrixRow {
 		local := nugetV3 + "nuget-local/"
-		read := types.ActionRead
+		read := api.ActionRead
 		return append([]matrixRow{
 			row(nugetIndex, local+"index.json", "", anyone, 200),
 			row(
@@ -89,7 +89,7 @@ var nugetMatrixPart = matrixPart{
 // symbols push's (#545), and force authentication's.
 func nugetWriteMatrixRows() []matrixRow {
 	v2 := nugetV2 + "nuget-local/"
-	write, del := types.ActionWrite, types.ActionDelete
+	write, del := api.ActionWrite, api.ActionDelete
 	forced := nugetV3 + "nuget-forced/"
 	return []matrixRow{
 		// Deploy in work/, then at the canonical path there. Each principal
@@ -110,7 +110,7 @@ func nugetWriteMatrixRows() []matrixRow {
 				f.deploy(t, "nuget-local", "work/Del-"+p+".1.0.0.nupkg",
 					nugetPackage("Del-"+p, "1.0.0", ""))
 			}),
-		row(nugetRelist, v2+"Work/1.0.0", "", nugetActs(nugetWork, types.ActionAnnotate), 200),
+		row(nugetRelist, v2+"Work/1.0.0", "", nugetActs(nugetWork, api.ActionAnnotate), 200),
 		// Force authentication: anonymous is challenged whatever it may
 		// read, and anyone else answered as without it.
 		row(nugetIndex, forced+"index.json", "", challenged(anyone), 200),
@@ -133,7 +133,7 @@ func nugetLists(path string) rule { return listsGo("nuget-local", path) }
 // nugetActs: a delete or a relist finds the version only for a caller who
 // may read its .nupkg at path, 404 to any other, so a version the caller
 // may not read is not revealed; it then needs want there.
-func nugetActs(path string, want types.Actions) rule {
+func nugetActs(path string, want api.Actions) rule {
 	return func(p matrixPrincipal) int {
 		if s := listsGo("nuget-local", path)(p); s != 0 {
 			return s
@@ -167,7 +167,7 @@ func nugetV2MatrixRows() []matrixRow {
 		{nugetV2Find, nugetV2FindHead, "FindPackagesById()?id='Work'", anyone},
 		{nugetV2Search, nugetV2SearchHead, "Search()?searchTerm='work'", anyone},
 		{nugetV2Count, nugetV2CountHead, "Packages()/$count", anyone},
-		{nugetV2Download, nugetV2DownloadHead, "Download/Work/1.0", holds("nuget-local", nugetWork, types.ActionRead)},
+		{nugetV2Download, nugetV2DownloadHead, "Download/Work/1.0", holds("nuget-local", nugetWork, api.ActionRead)},
 	} {
 		for _, operation := range []string{route.get, route.head} {
 			rows = append(rows, row(operation, local+route.path, "", route.allow, 200))

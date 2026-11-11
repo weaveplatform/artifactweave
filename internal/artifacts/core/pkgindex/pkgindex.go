@@ -1,0 +1,114 @@
+package pkgindex
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+)
+
+// Store is the one store the index functions use: the package index. Its
+// calls join the transaction ctx carries, so a format's hooks link, prune
+// and reconcile as part of the operation that changed the item. A
+// format.Store is a Store, and so is each composite store in app.
+type Store interface {
+	Packages() port.PackageStore
+}
+
+// Stored is where c's package index finds its files: a remote repository's
+// cache, which alone holds a remote's items (decision 0018 indexes items
+// cached from a remote), or the repository's own items. A format's hooks and
+// its reindex both read here and only here, so a reindex rebuilds what the
+// hooks kept.
+func Stored(c repo.Config) aql.RepoRef {
+	return aql.RepoRef{Key: c.Key, Cached: c.Class == repo.Remote}
+}
+
+// Version names one version of a package in a repository.
+type Version struct {
+	RepoKey     string
+	PackageType repo.PackageType
+	Package     string
+	Version     string
+}
+
+// Link records that the item with itemID is a file of v, creating the
+// package and version when they are new.
+func Link(ctx context.Context, st Store, v Version, itemID int64, at time.Time) error {
+	p, err := st.Packages().Ensure(ctx, model.Package{
+		RepoKey: v.RepoKey, Name: v.Package, Type: v.PackageType, Created: at,
+	})
+	if err != nil {
+		return fmt.Errorf("pkgindex: package %s: %w", v.Package, err)
+	}
+	pv, err := st.Packages().Version(ctx, p.ID, v.Version)
+	if errors.Is(err, kernel.ErrNotFound) {
+		pv, err = st.Packages().PutVersion(ctx, model.PackageVersion{
+			PackageID: p.ID, Version: v.Version, Created: at,
+		})
+	}
+	if err != nil {
+		return fmt.Errorf("pkgindex: version %s of %s: %w", v.Version, v.Package, err)
+	}
+	if err := st.Packages().
+		LinkFile(ctx, model.VersionFile{VersionID: pv.ID, ItemID: itemID}); err != nil {
+		return fmt.Errorf("pkgindex: link %s %s: %w", v.Package, v.Version, err)
+	}
+	return nil
+}
+
+// VersionOf returns the version the item with itemID belongs to; ok is
+// false when it belongs to none.
+func VersionOf(
+	ctx context.Context,
+	st Store,
+	itemID int64,
+) (model.PackageVersion, bool, error) {
+	pv, err := st.Packages().VersionOf(ctx, itemID)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return pv, false, nil
+	}
+	if err != nil {
+		return pv, false, fmt.Errorf("pkgindex: version of item %d: %w", itemID, err)
+	}
+	return pv, true, nil
+}
+
+// Prune runs after items were deleted, which removes their file links with
+// them: each of versions left with no files is deleted, and with it a
+// package left with no versions.
+func Prune(ctx context.Context, st Store, versions []model.PackageVersion) error {
+	done := map[int64]bool{}
+	for _, pv := range versions {
+		if done[pv.ID] {
+			continue
+		}
+		done[pv.ID] = true
+		files, err := st.Packages().Files(ctx, pv.ID)
+		if err != nil {
+			return fmt.Errorf("pkgindex: files of version %d: %w", pv.ID, err)
+		}
+		if len(files) > 0 {
+			continue
+		}
+		if err := st.Packages().DeleteVersion(ctx, pv.ID); err != nil {
+			return fmt.Errorf("pkgindex: delete version %d: %w", pv.ID, err)
+		}
+		rest, err := st.Packages().Versions(ctx, pv.PackageID)
+		if err != nil {
+			return fmt.Errorf("pkgindex: versions of package %d: %w", pv.PackageID, err)
+		}
+		if len(rest) == 0 {
+			if err := st.Packages().Delete(ctx, pv.PackageID); err != nil {
+				return fmt.Errorf("pkgindex: delete package %d: %w", pv.PackageID, err)
+			}
+		}
+	}
+	return nil
+}

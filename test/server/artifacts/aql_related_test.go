@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // compactAQL runs query with ?compact=true and returns the status and the
@@ -94,24 +95,24 @@ func TestAccSearchAQLRelatedProperties(t *testing.T) {
 			t.Fatal(err)
 		}
 		at := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
-		if err := db.Items().SetProperties(ctx, jar.ID, types.Properties{"team": {"core"}},
+		if err := db.Items().SetProperties(ctx, jar.ID, model.Properties{"team": {"core"}},
 			at); err != nil {
 			t.Fatal(err)
 		}
 		if err := db.Items().
-			RecordDownload(ctx, jar.ID, store.Download{By: "dev", At: at}); err != nil {
+			RecordDownload(ctx, jar.ID, port.Download{By: "dev", At: at}); err != nil {
 			t.Fatal(err)
 		}
 		// dev reads the runs under app/** only: app/3's properties, not
 		// tool/2's.
-		file := types.BuildFile{Name: "app.jar", Checksums: types.Checksums{SHA1: jar.Actual.SHA1}}
+		file := model.BuildFile{Name: "app.jar", Checksums: kernel.Checksums{SHA1: jar.Actual.SHA1}}
 		for _, name := range []string{"app", "tool"} {
-			if _, err := db.Builds().Put(ctx, types.Build{
+			if _, err := db.Builds().Put(ctx, model.Build{
 				Name: name, Number: "9", Started: at, Created: at, CreatedBy: "ci",
-				Properties: types.Properties{"os": {name + "-os"}},
-				Modules: []types.BuildModule{{
-					ID: name, Properties: types.Properties{"java": {"17"}},
-					Artifacts: []types.BuildFile{file},
+				Properties: model.Properties{"os": {name + "-os"}},
+				Modules: []model.BuildModule{{
+					ID: name, Properties: model.Properties{"java": {"17"}},
+					Artifacts: []model.BuildFile{file},
 				}},
 			}); err != nil {
 				t.Fatal(err)
@@ -181,18 +182,18 @@ func TestAccSearchAQLEveryKey(t *testing.T) {
 		}
 		at := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
 		if err := c.Store.Items().SetProperties(ctx, jar.ID,
-			types.Properties{"team": {"core"}, "tier": {"1"}}, at); err != nil {
+			model.Properties{"team": {"core"}, "tier": {"1"}}, at); err != nil {
 			t.Fatal(err)
 		}
 		if err := c.Store.Items().
-			RecordDownload(ctx, jar.ID, store.Download{By: "dev", At: at}); err != nil {
+			RecordDownload(ctx, jar.ID, port.Download{By: "dev", At: at}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := c.Store.Builds().Put(ctx, types.Build{
+		if _, err := c.Store.Builds().Put(ctx, model.Build{
 			Name: "app", Number: "9", Started: at, Created: at, CreatedBy: "ci",
-			Properties: types.Properties{"os": {"linux"}},
-			Modules: []types.BuildModule{{ID: "app", Artifacts: []types.BuildFile{
-				{Name: "app.jar", Checksums: types.Checksums{SHA1: jar.Actual.SHA1}},
+			Properties: model.Properties{"os": {"linux"}},
+			Modules: []model.BuildModule{{ID: "app", Artifacts: []model.BuildFile{
+				{Name: "app.jar", Checksums: kernel.Checksums{SHA1: jar.Actual.SHA1}},
 			}}},
 		}); err != nil {
 			t.Fatal(err)

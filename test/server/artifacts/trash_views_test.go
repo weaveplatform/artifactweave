@@ -9,10 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/platform/httpkit"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const trashURL = "/artifactory/api/storage/auto-trashcan"
@@ -21,26 +26,26 @@ const trashURL = "/artifactory/api/storage/auto-trashcan"
 // at the times given, so the views' times are known.
 func seedTrash(
 	t *testing.T,
-	db store.Store,
+	db *inmem.Store,
 	repoKey, full string,
 	folder bool,
 	modified, deleted time.Time,
 ) {
 	t.Helper()
-	parent, name, depth, err := types.SplitItemPath(full)
+	parent, name, depth, err := kernel.SplitItemPath(full)
 	if err != nil {
 		t.Fatal(err)
 	}
-	it := types.Item{
+	it := artmodel.Item{
 		RepoKey: repoKey, Path: parent, Name: name, Depth: depth, Folder: folder,
 		Created: modified, Modified: modified, Updated: modified,
 	}
 	if !folder {
 		it.Size = int64(len(full))
-		it.Actual = types.Checksums{SHA1: sha1Hex(full), SHA256: sha256Hex(full)}
+		it.Actual = kernel.Checksums{SHA1: sha1Hex(full), SHA256: sha256Hex(full)}
 	}
-	if _, err := db.Trash().Add(context.Background(), types.TrashEntry{
-		Record:    types.TrashRecord{Item: it, PackageType: "generic"},
+	if _, err := db.Trash().Add(context.Background(), artmodel.TrashEntry{
+		Record:    artmodel.TrashRecord{Item: it, PackageType: "generic"},
 		DeletedAt: deleted, DeletedBy: "admin",
 	}); err != nil {
 		t.Fatal(err)
@@ -181,10 +186,10 @@ type trashFaults struct {
 	fail map[string]int
 }
 
-func (f trashFaults) Trash() store.TrashStore { return faultyTrash{f.Store.Trash(), f.fail} }
+func (f trashFaults) Trash() port.TrashStore { return faultyTrash{f.Store.Trash(), f.fail} }
 
 type faultyTrash struct {
-	store.TrashStore
+	port.TrashStore
 	fail map[string]int
 }
 
@@ -201,15 +206,18 @@ func (f faultyTrash) fails(op string) bool {
 func (f faultyTrash) List(
 	ctx context.Context,
 	repoKey, prefix string,
-	p store.Page,
-) ([]types.TrashEntry, string, error) {
+	p kernel.Page,
+) ([]artmodel.TrashEntry, string, error) {
 	if f.fails("list") {
 		return nil, "", errBoom
 	}
 	return f.TrashStore.List(ctx, repoKey, prefix, p) //nolint:wrapcheck // test double
 }
 
-func (f faultyTrash) Find(ctx context.Context, repoKey, full string) ([]types.TrashEntry, error) {
+func (f faultyTrash) Find(
+	ctx context.Context,
+	repoKey, full string,
+) ([]artmodel.TrashEntry, error) {
 	if f.fails("find") {
 		return nil, errBoom
 	}
@@ -240,7 +248,7 @@ func TestAccTrashStorageReadFailure(t *testing.T) {
 	}
 }
 
-func (f trashFaults) Settings() store.SettingsStore {
+func (f trashFaults) Settings() settings.SettingsStore {
 	return faultySettings{f.Store.Settings(), f.fail}
 }
 
@@ -248,22 +256,22 @@ func (f trashFaults) Settings() store.SettingsStore {
 // "settings"; the other settings, which every request's authentication
 // reads, still answer.
 type faultySettings struct {
-	store.SettingsStore
+	settings.SettingsStore
 	fail map[string]int
 }
 
 func (f faultySettings) Get(ctx context.Context, key string, into any) error {
-	if key == types.SettingTrashcan && f.fail["settings"] > 0 {
+	if key == settings.SettingTrashcan && f.fail["settings"] > 0 {
 		return errBoom
 	}
 	return f.SettingsStore.Get(ctx, key, into) //nolint:wrapcheck // test double
 }
 
 // setTrashcan turns the trash can on or off, with Artifactory's retention.
-func setTrashcan(t *testing.T, db store.Store, on bool) {
+func setTrashcan(t *testing.T, db harness.Store, on bool) {
 	t.Helper()
-	if err := db.Settings().Put(context.Background(), types.SettingTrashcan,
-		types.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
+	if err := db.Settings().Put(context.Background(), settings.SettingTrashcan,
+		artmodel.TrashcanSettings{Enabled: on, RetentionDays: 14}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -369,11 +377,11 @@ func TestAccTrashStorageViewsFiltered(t *testing.T) {
 	seedTrash(t, w.db, "libs-local", "a/one.txt", false, t0, t0)
 	seedTrash(t, w.db, "libs-local", "a/secret/two.txt", false, t0.Add(time.Hour), t0)
 	seedTrash(t, w.db, "other-local", "o/three.txt", false, t0.Add(2*time.Hour), t0)
-	if err := w.db.Permissions().Create(ctx, types.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "deploy-a",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionWrite}},
-			Targets: map[string]types.Target{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionWrite}},
+			Targets: map[string]accesstest.Target{
 				"libs-local": {Include: []string{"a/**"}, Exclude: []string{"a/secret/**"}},
 			},
 		}},

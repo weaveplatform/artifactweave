@@ -7,7 +7,7 @@ Status: Proposed
 ## Context
 
 Decision [0004](0004-storage-sql-metadata-and-blobs.md) defines the content-addressed blob
-contract (`migration/platform/blob`) with `fs` and `s3` backends. Artifactory also stores
+contract (`internal/platform/blob`) with `fs` and `s3` backends. Artifactory also stores
 binaries on Google Cloud Storage and Azure Blob Storage, and teams leaving it often run on
 those clouds.
 
@@ -29,7 +29,7 @@ SDK offer.
 
 **Shared session layer.**
 - The object-store backends (s3, gcs, azure) persist their sessions through one shared
-  layer, `migration/platform/blob/session`. It holds:
+  layer, `internal/platform/blob/session`. It holds:
   - the pending part buffer;
   - the saved `blob.Hasher` state;
   - the size and the declared digest;

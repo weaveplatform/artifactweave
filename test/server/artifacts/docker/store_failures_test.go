@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 )
 
 var errBoom = errors.New("boom")
@@ -16,12 +16,12 @@ type faultyStore struct {
 	fail map[string]bool
 }
 
-func (s faultyStore) Repos() store.RepoStore {
+func (s faultyStore) Repos() port.RepoStore {
 	return faultyRepos{RepoStore: s.Store.Repos(), fail: s.fail}
 }
 
 type faultyRepos struct {
-	store.RepoStore
+	port.RepoStore
 	fail map[string]bool
 }
 

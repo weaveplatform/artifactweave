@@ -31,9 +31,9 @@ These are availability states, not permanent scope cuts:
 
 Status codes below assume a valid, authenticated request where required. Authentication
 and request binding can reject a request before it reaches a stub. Current evidence is
-[`server.go`](../../internal/server/server.go),
-[`system.go`](../../migration/configuration/adapters/http/system.go),
-[`stub_test.go`](../../internal/server/stub_test.go), the format status registrations and
+[`server.go`](../../internal/app/router.go),
+[`system.go`](../../internal/configuration/adapters/http/system.go),
+[`stub_test.go`](../../internal/app/stub_test.go), the format status registrations and
 native acceptance features. A generated schema or a stored configuration field alone
 is not runtime support. Client contracts are recorded in
 [research 08](08-terraform-providers.md) and [09](09-jfrog-cli-compatibility.md).

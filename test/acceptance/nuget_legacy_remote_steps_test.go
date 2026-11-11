@@ -16,8 +16,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/nuget"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nuget"
 )
 
 func (w *world) registerLegacyRemoteNuGet(sc *godog.ScenarioContext) {

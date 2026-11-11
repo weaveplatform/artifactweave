@@ -8,15 +8,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/upstream/fakeupstream"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
@@ -27,9 +29,9 @@ func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc := &item.Service{Store: w.db, Blobs: w.blobs, Formats: ecosystem.For}
-	entries := map[string]types.RemoteCacheEntry{}
-	for p, kind := range map[string]types.RemoteKind{"allowed/index": types.RemoteMetadata, "allowed/a.jar": types.RemoteUnique, "outside/index": types.RemoteMetadata} {
-		key := types.RemoteCacheKey{RepoKey: c.Key, Path: p}
+	entries := map[string]artmodel.RemoteCacheEntry{}
+	for p, kind := range map[string]artmodel.RemoteKind{"allowed/index": artmodel.RemoteMetadata, "allowed/a.jar": artmodel.RemoteUnique, "outside/index": artmodel.RemoteMetadata} {
+		key := artmodel.RemoteCacheKey{RepoKey: c.Key, Path: p}
 		token, err := w.db.RemoteCache().Begin(ctx, key)
 		if err != nil {
 			t.Fatal(err)
@@ -50,7 +52,7 @@ func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
 		entries[p] = out.Entry
 	}
 	if err = w.db.Permissions().
-		Create(ctx, types.Permission{Name: "cache-maintenance", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionManage}}, Targets: map[string]types.Target{"up": {Include: []string{"allowed/**"}}}}}}); err != nil {
+		Create(ctx, accesstest.Permission{Name: "cache-maintenance", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionManage}}, Targets: map[string]accesstest.Target{"up": {Include: []string{"allowed/**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
@@ -83,7 +85,7 @@ func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
 	// Delete-only authorization is also sufficient, and a confirmed miss can
 	// be removed through either remote name without needing a stored item.
 	if err = w.db.Permissions().
-		Create(ctx, types.Permission{Name: "cache-delete", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"deployer": types.ActionDelete}}, Targets: map[string]types.Target{"up": {Include: []string{"allowed/**"}}}}}}); err != nil {
+		Create(ctx, accesstest.Permission{Name: "cache-delete", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionDelete}}, Targets: map[string]accesstest.Target{"up": {Include: []string{"allowed/**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	wantStatus(
@@ -92,7 +94,7 @@ func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
 		http.StatusOK,
 	)
 	for _, alias := range []string{"up", "up-cache"} {
-		key := types.RemoteCacheKey{RepoKey: c.Key, Path: "allowed/missing"}
+		key := artmodel.RemoteCacheKey{RepoKey: c.Key, Path: "allowed/missing"}
 		token, err := w.db.RemoteCache().Begin(ctx, key)
 		if err != nil {
 			t.Fatal(err)
@@ -110,7 +112,7 @@ func TestAccCacheMaintenancePermissionsAndAliases(t *testing.T) {
 			w.do(http.MethodDelete, "/artifactory/"+alias+"/allowed/missing", "deployer", ""),
 			http.StatusNoContent,
 		)
-		if _, err = w.db.RemoteCache().Read(ctx, key); !errors.Is(err, store.ErrNotFound) {
+		if _, err = w.db.RemoteCache().Read(ctx, key); !errors.Is(err, kernel.ErrNotFound) {
 			t.Fatal("negative remained", err)
 		}
 	}
@@ -132,7 +134,7 @@ func TestAccCacheMaintenanceHTTPNegativeRediscovery(t *testing.T) {
 			},
 		}
 		c.RemoteSources = &source.Service{
-			Resolve: func(ctx context.Context, r repo.Config) (types.SourceIdentity, error) {
+			Resolve: func(ctx context.Context, r repo.Config) (artmodel.SourceIdentity, error) {
 				return c.Store.RemoteCache().Source(ctx, r.Key)
 			},
 			HTTP: policy, Cache: policy,

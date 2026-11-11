@@ -12,15 +12,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/accesstest"
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/aql"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // peerAQLRow is a peer's AQL result row as the artifacts handlers decode
@@ -166,7 +166,7 @@ func transitiveFixture(t *testing.T) *transitiveWorld {
 					path = q.Resource.PermissionPath
 					allows = decider.AllowsFolder
 				}
-				if !allows(types.ResourceArtifact, itemkit.Target(q.Repo), path, types.ActionRead) {
+				if !allows(api.ResourceArtifact, itemkit.Target(q.Repo), path, api.ActionRead) {
 					return source.ErrDenied
 				}
 				return nil
@@ -217,7 +217,7 @@ func TestAccTransitiveAQLColdCacheAndDuplicatePrecedence(t *testing.T) {
 	if _, err := w.db.Items().
 		Get(t.Context(), "up", true, "fresh.txt"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("search persisted cache item", err)
 	}
@@ -385,12 +385,12 @@ func TestAccTransitiveCachedNonmatchSuppressesUpstreamMetadata(t *testing.T) {
 
 func TestAccTransitiveAQLFinalExactPathFence(t *testing.T) {
 	w := transitiveFixture(t)
-	permission := types.Permission{
+	permission := accesstest.Permission{
 		Name: "only-paths",
-		Resources: map[types.ResourceType]types.Resource{
-			types.ResourceArtifact: {
-				Targets: map[string]types.Target{"up": {Include: []string{"allowed/**"}}},
-				Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
+		Resources: map[api.ResourceType]accesstest.Resource{
+			api.ResourceArtifact: {
+				Targets: map[string]accesstest.Target{"up": {Include: []string{"allowed/**"}}},
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
 			},
 		},
 	}
@@ -415,9 +415,9 @@ func TestAccTransitiveAQLFinalExactPathFence(t *testing.T) {
 		if !changed && q.Resource.Kind == source.ResourceKindArtifact &&
 			q.Resource.Path == "allowed/b.bin" {
 			changed = true
-			resource := permission.Resources[types.ResourceArtifact]
-			resource.Targets["up"] = types.Target{Include: []string{"allowed/b.bin"}}
-			permission.Resources[types.ResourceArtifact] = resource
+			resource := permission.Resources[api.ResourceArtifact]
+			resource.Targets["up"] = accesstest.Target{Include: []string{"allowed/b.bin"}}
+			permission.Resources[api.ResourceArtifact] = resource
 			return w.db.Permissions().Update(t.Context(), permission)
 		}
 		return nil
@@ -438,7 +438,7 @@ func TestAccTransitiveAQLCacheArrivalBeforeDelivery(t *testing.T) {
 			q.Resource.Path == "second.txt" {
 			changed = true
 			_, err := w.db.Items().
-				Put(t.Context(), types.Item{RepoKey: "up", Cached: true, Path: ".", Name: "first.txt", Size: 999})
+				Put(t.Context(), artmodel.Item{RepoKey: "up", Cached: true, Path: ".", Name: "first.txt", Size: 999})
 			return err
 		}
 		return nil

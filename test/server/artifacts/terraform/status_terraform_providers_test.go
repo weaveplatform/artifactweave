@@ -5,12 +5,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/terraform/terraformtest"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraform/terraformtest"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const (
@@ -28,14 +28,14 @@ const (
 
 var providerTestKey = sync.OnceValues(terraformtest.NewKey)
 
-func seedRegistryProvider(t *testing.T, db store.Store, blobs blob.Store) {
+func seedRegistryProvider(t *testing.T, db harness.Store, blobs blob.Store) {
 	t.Helper()
 	k, err := providerTestKey()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err = db.Keys().
-		CreateKeypair(t.Context(), types.Keypair{Name: "tf-provider-key", Type: types.KeypairGPG, PublicKey: k.Public}); err != nil {
+		CreateKeypair(t.Context(), api.Keypair{Name: "tf-provider-key", Type: api.KeypairGPG, PublicKey: k.Public}); err != nil {
 		t.Fatal(err)
 	}
 	c, err := db.Repos().Get(t.Context(), "tf-provider-local")
@@ -109,7 +109,7 @@ var tfProviderMatrixPart = matrixPart{
 		read := holds(
 			"tf-provider-local",
 			"work/hashicorp/null/3.3.2/terraform-provider-null_3.3.2_linux_amd64.zip",
-			types.ActionRead,
+			api.ActionRead,
 		)
 		for route, path := range providerRoutePaths() {
 			for _, method := range []string{"GET", "HEAD"} {

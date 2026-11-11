@@ -824,7 +824,7 @@ components:
           description: Optional within this object. Totals over the content-addressed blob store and the items that
             reference it. Every value is a human-formatted string, such as `3.48 GB` or `125,726`.
         # The server writes blobMirrors from wire.StorageSummaryMirrors, embedded beside the generated type
-        # (summaryWithMirrors in migration/artifacts/adapters/http/storageinfo.go). A second field named
+        # (summaryWithMirrors in internal/artifacts/adapters/http/storageinfo.go). A second field named
         # blobMirrors at the same depth would make encoding/json drop both, so the generated field is json:"-"
         # and typed as the wire type.
         blobMirrors:
@@ -970,7 +970,7 @@ components:
           x-go-json-ignore: true
           x-go-type: '[]wire.BlobMirror'
           x-go-type-import:
-            path: github.com/weaveplatform/artifactweave/migration/kernel/wire
+            path: github.com/weaveplatform/artifactweave/internal/kernel/wire
         fileStoreSummary:
           allOf:
           - $ref: '#/components/schemas/FileStoreSummary'

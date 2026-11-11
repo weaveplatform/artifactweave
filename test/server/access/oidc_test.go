@@ -8,15 +8,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/idtoken/idtokentest"
-	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/idtoken/idtokentest"
+	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 )
 
 // oidcWorld is a server with a fake OIDC provider registered as ci, and two
@@ -38,19 +40,19 @@ func newOIDCWorld(t *testing.T) oidcWorld {
 			t.Fatal(err)
 		}
 	}
-	must(db.Groups().Create(ctx, types.Group{Name: "ci-team"}))
-	must(db.Groups().Create(ctx, types.Group{Name: "everyone", AutoJoin: true}))
+	must(db.Groups().Create(ctx, accesstest.Group{Name: "ci-team"}))
+	must(db.Groups().Create(ctx, accesstest.Group{Name: "everyone", AutoJoin: true}))
 	blobs, err := fs.New(t.TempDir())
 	must(err)
 	items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 	for key, group := range map[string]string{"team-local": "ci-team", "open-local": "everyone"} {
 		c := repo.Defaults(&repo.Config{Key: key, Class: repo.Local})
 		must(db.Repos().Create(ctx, *c))
-		must(db.Permissions().Create(ctx, types.Permission{
+		must(db.Permissions().Create(ctx, accesstest.Permission{
 			Name: "read-" + key,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Groups: map[string]types.Actions{group: types.ActionRead}},
-				Targets: map[string]types.Target{key: {Include: []string{"**"}}},
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Groups: map[string]api.Actions{group: api.ActionRead}},
+				Targets: map[string]accesstest.Target{key: {Include: []string{"**"}}},
 			}},
 		}))
 		_, err := items.Deploy(ctx, item.Deploy{
@@ -58,7 +60,7 @@ func newOIDCWorld(t *testing.T) oidcWorld {
 		})
 		must(err)
 	}
-	must(db.Instance().Init(ctx, types.InstanceIdentity{
+	must(db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}))
 	tokens, err := token.New(ctx, db, token.Options{KeyBits: 1024})

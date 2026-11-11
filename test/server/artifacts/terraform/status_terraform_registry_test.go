@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/item"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/migration/platform/crypt"
-	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 const (
@@ -29,7 +29,7 @@ const (
 	tfScopedBase         = "/artifactory/api/terraform/tf-registry-local/v1/modules/ns/name/aws/"
 )
 
-func seedRegistryModule(t *testing.T, db store.Store, blobs blob.Store) {
+func seedRegistryModule(t *testing.T, db harness.Store, blobs blob.Store) {
 	t.Helper()
 	c, err := db.Repos().Get(context.Background(), "tf-registry-local")
 	if err != nil {

@@ -8,8 +8,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
 )
 
 // HelmChart builds a minimal chart archive with the named version.
@@ -29,20 +29,20 @@ func HelmChart(name, version string) []byte {
 
 // SeedHelmCharter gives the chart-only caller rights on charts but not their
 // provenance sidecars. Root and independent Helm matrices use the same grant.
-func SeedHelmCharter(t *testing.T, db store.Store, passwordHash []byte) {
+func SeedHelmCharter(t *testing.T, db SeedStore, passwordHash []byte) {
 	t.Helper()
 	ctx := t.Context()
 	if err := db.Users().
-		Create(ctx, types.User{Name: "charter", PasswordHash: passwordHash}); err != nil {
+		Create(ctx, accesstest.User{Name: "charter", PasswordHash: passwordHash}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Permissions().Create(ctx, types.Permission{
+	if err := db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "helm-charter",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"charter": types.ActionRead | types.ActionWrite | types.ActionDelete,
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
+				"charter": api.ActionRead | api.ActionWrite | api.ActionDelete,
 			}},
-			Targets: map[string]types.Target{"helm-local": {
+			Targets: map[string]accesstest.Target{"helm-local": {
 				Include: []string{"**"}, Exclude: []string{"**/*.prov"},
 			}},
 		}},

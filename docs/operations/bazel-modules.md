@@ -2,7 +2,7 @@
 
 This recipe was verified with **Bazel 9.3.1** on 2026-10-25. The pinned
 client image is `gcr.io/bazel-public/bazel@sha256:d090e62af5f0190bef545f278677bab7175d7db9c028d1e492bb4bfb3e1975fa`.
-The [native acceptance test](../../migration/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go)
+The [native acceptance test](../../internal/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go)
 builds a controlled module through local, remote, virtual and one-node
 federated repositories. Cross-peer federation remains a separate P13 contract.
 

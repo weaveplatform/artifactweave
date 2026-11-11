@@ -75,5 +75,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/node-npm12/Dockerfile](../../test/acceptance/clients/node-npm12/Dockerfile).
 - Evidence: [test/acceptance/features/npm.feature](../../test/acceptance/features/npm.feature).
 - Evidence: [test/acceptance/features/npm_search_auth.feature](../../test/acceptance/features/npm_search_auth.feature).
-- Evidence: [migration/access/core/authn/token.go](../../migration/access/core/authn/token.go).
+- Evidence: [internal/access/core/authn/token.go](../../internal/access/core/authn/token.go).
 - Evidence: [test/acceptance/features/npm_remote.feature](../../test/acceptance/features/npm_remote.feature).

@@ -7,11 +7,15 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 func TestAccRemoteReindexRechecksCurrentAuthority(t *testing.T) {
@@ -36,7 +40,7 @@ func TestAccRemoteReindexRechecksCurrentAuthority(t *testing.T) {
 							t.Fatal(err)
 						}
 					} else {
-						u.Status = types.UserDisabled
+						u.Status = accesstest.UserDisabled
 					}
 					if err = st.Users().Update(ctx, u); err != nil {
 						t.Fatal(err)
@@ -49,7 +53,7 @@ func TestAccRemoteReindexRechecksCurrentAuthority(t *testing.T) {
 			if _, err := w.db.WorkQueue().
 				Get(t.Context(), format.KindReindex, "remote"); !errors.Is(
 				err,
-				store.ErrNotFound,
+				kernel.ErrNotFound,
 			) {
 				t.Fatal("revoked caller queued work", err)
 			}
@@ -70,7 +74,7 @@ func TestAccRemoteReindexCacheAliasDoesNotGrantManage(t *testing.T) {
 	if _, err := w.db.WorkQueue().
 		Get(t.Context(), format.KindReindex, "remote"); !errors.Is(
 		err,
-		store.ErrNotFound,
+		kernel.ErrNotFound,
 	) {
 		t.Fatal("alias-only grant queued work", err)
 	}
@@ -83,27 +87,30 @@ func createRemoteReindexGrant(t *testing.T, w *itemWorld, target string) {
 		t.Fatal(err)
 	}
 	if err := w.db.Permissions().
-		Create(t.Context(), types.Permission{Name: "manage-remote", Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {Actions: types.Grants{Users: map[string]types.Actions{"deployer": types.ActionManage}}, Targets: map[string]types.Target{target: {Include: []string{"**"}}}}}}); err != nil {
+		Create(t.Context(), accesstest.Permission{Name: "manage-remote", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}}, Targets: map[string]accesstest.Target{target: {Include: []string{"**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 }
 
 type reindexSourceStore struct {
-	store.Store
+	harness.Store
 	before func(context.Context)
 	once   sync.Once
 }
 
-func (s *reindexSourceStore) RemoteCache() store.RemoteCacheStore {
+func (s *reindexSourceStore) RemoteCache() port.RemoteCacheStore {
 	return reindexSourceCache{RemoteCacheStore: s.Store.RemoteCache(), s: s}
 }
 
 type reindexSourceCache struct {
-	store.RemoteCacheStore
+	port.RemoteCacheStore
 	s *reindexSourceStore
 }
 
-func (c reindexSourceCache) Source(ctx context.Context, key string) (types.SourceIdentity, error) {
+func (c reindexSourceCache) Source(
+	ctx context.Context,
+	key string,
+) (artmodel.SourceIdentity, error) {
 	c.s.once.Do(func() { c.s.before(ctx) })
 	return c.RemoteCacheStore.Source(ctx, key) //nolint:wrapcheck // authority-change barrier
 }

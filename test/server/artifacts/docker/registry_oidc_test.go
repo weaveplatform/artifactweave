@@ -8,9 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // A token from an OIDC exchange may name a user who is not stored (research
@@ -25,14 +27,17 @@ func TestAccRegistryTokenForOIDCUsers(t *testing.T) {
 	h := statusFixture(t, false, func(c *Config) {
 		db := c.Store
 		tokens = c.Tokens
-		if err := db.Groups().Create(ctx, types.Group{Name: "ci", AutoJoin: true}); err != nil {
+		if err := db.Groups().
+			Create(ctx, accesstest.Group{Name: "ci", AutoJoin: true}); err != nil {
 			t.Fatal(err)
 		}
-		if err := db.Permissions().Create(ctx, types.Permission{
+		if err := db.Permissions().Create(ctx, accesstest.Permission{
 			Name: "ci-pull",
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Groups: map[string]types.Actions{"ci": types.ActionRead}},
-				Targets: map[string]types.Target{"docker-blobs": {Include: []string{"app/**"}}},
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Groups: map[string]api.Actions{"ci": api.ActionRead}},
+				Targets: map[string]accesstest.Target{
+					"docker-blobs": {Include: []string{"app/**"}},
+				},
 			}},
 		}); err != nil {
 			t.Fatal(err)
@@ -44,15 +49,15 @@ func TestAccRegistryTokenForOIDCUsers(t *testing.T) {
 			t.Fatal(err)
 		}
 		c.Auth = a
-		groups, err := types.ParseScope("applied-permissions/groups:ci")
+		groups, err := kernel.ParseScope("applied-permissions/groups:ci")
 		if err != nil {
 			t.Fatal(err)
 		}
 		hour := time.Hour
 		for name, r := range map[string]token.Request{
-			"transient": {Username: "ci-robot", Identity: types.IdentityTransient},
+			"transient": {Username: "ci-robot", Identity: kernel.IdentityTransient},
 			"synthetic": {
-				Username: "oidc-github-ci", Scope: groups, Identity: types.IdentitySynthetic,
+				Username: "oidc-github-ci", Scope: groups, Identity: kernel.IdentitySynthetic,
 			},
 		} {
 			// Revocable, as an exchanged token above the revocable threshold is.

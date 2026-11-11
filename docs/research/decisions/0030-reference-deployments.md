@@ -263,7 +263,7 @@ ID comes from the `oid` claim of its access token, validated as a GUID, because 
 deployer cannot read the directory.
 
 **The `conformance/` prefix.** The real-cloud conformance tests write under `conformance/` in
-the `single-bucket` stores only (`migration/platform/blob/{s3,gcs,azure}/real_test.go`). Its
+the `single-bucket` stores only (`internal/platform/blob/{s3,gcs,azure}/real_test.go`). Its
 1-day expiry therefore reaches those stores alone, through the `single-bucket` Makefiles'
 `expiring_prefixes`, and no module or scenario carries it.
 

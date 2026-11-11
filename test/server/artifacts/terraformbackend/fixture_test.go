@@ -5,13 +5,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/access/core/token"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -24,7 +24,7 @@ var (
 	backendFixtureRepos = support.TerraformBackendRepos()
 )
 
-func cheapSeed(t *testing.T, db store.Store)        { t.Helper(); support.Seed(t, db) }
+func cheapSeed(t *testing.T, db *inmem.Store)       { t.Helper(); support.Seed(t, db) }
 func basic(user, password string) map[string]string { return support.Basic(user, password) }
 func bearerAuth(value string) map[string]string     { return support.Bearer(value) }
 func contentTypeOf(body string) (string, string)    { return "application/json", body }
@@ -47,10 +47,10 @@ func wantStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
 	}
 }
 
-func seedTokens(t *testing.T, db store.Store) *token.Service {
+func seedTokens(t *testing.T, db *inmem.Store) *token.Service {
 	t.Helper()
 	if err := db.Instance().
-		Init(t.Context(), types.InstanceIdentity{InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1}); err != nil {
+		Init(t.Context(), instance.InstanceIdentity{InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1}); err != nil {
 		t.Fatal(err)
 	}
 	svc, err := token.New(t.Context(), db, token.Options{KeyBits: 1024})
@@ -69,7 +69,7 @@ func backendServer(
 	db := inmem.New()
 	cheapSeed(t, db)
 	if err := db.Users().
-		Create(t.Context(), types.User{Name: "user", PasswordHash: cheapHash}); err != nil {
+		Create(t.Context(), accesstest.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Repos().

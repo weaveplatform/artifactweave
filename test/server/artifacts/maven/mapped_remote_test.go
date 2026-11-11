@@ -1,0 +1,189 @@
+package maven_test
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"testing"
+	"time"
+
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/layout"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
+)
+
+func TestAccMappedMavenDescriptorDownloadAndAliasDenial(t *testing.T) {
+	for _, noStore := range []bool{false, true} {
+		t.Run(fmt.Sprint("no-store=", noStore), func(t *testing.T) {
+			w := newMavenRemoteWorld(t)
+			w.c.RepoLayoutRef, w.c.RemoteRepoLayoutRef = "gradle-default", "maven-2-default"
+			w.c.StoreArtifactsLocally = new(!noStore)
+			w.update()
+			body := sourcePOM("app", "1.0")
+			mavenSource(w, "org/acme/app/1.0/app-1.0.pom", []byte(body), "application/xml")
+			got := w.request(
+				http.MethodGet,
+				"/artifactory/remote/org.acme/app/ivy-1.0.xml",
+				"reader",
+				"",
+			)
+			remoteStatus(t, got, http.StatusOK)
+			if got.Body.String() != body {
+				t.Fatal("descriptor bytes changed during layout projection")
+			}
+			before := len(w.up.Requests())
+			got = w.request(
+				http.MethodGet,
+				"/artifactory/remote/org.acme/app/1.0/app-1.0.pom",
+				"reader",
+				"",
+			)
+			if got.Code == http.StatusOK || len(w.up.Requests()) != before {
+				t.Fatal("alternate canonical descriptor alias reached upstream", got.Code)
+			}
+			mavenSource(w, "org/acme/app/2.0/app-2.0.pom", []byte("not a POM"), "application/xml")
+			got = w.request(
+				http.MethodGet,
+				"/artifactory/remote/org.acme/app/ivy-2.0.xml",
+				"reader",
+				"",
+			)
+			remoteStatus(t, got, http.StatusBadGateway)
+			if _, err := w.rt.Store.Items().
+				Get(t.Context(), w.c.Key, true, "org.acme/app/ivy-2.0.xml"); !errors.Is(
+				err,
+				kernel.ErrNotFound,
+			) {
+				t.Fatal("projected invalid POM admitted", err)
+			}
+		})
+	}
+}
+
+func mappedRuntimeRequest(
+	t *testing.T,
+	w *remoteWorld,
+) (context.Context, source.Request, *remote.Discovery) {
+	t.Helper()
+	p, err := w.rt.Auth.Basic(t.Context(), "reader", "pw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorizer := accesstest.Over(t, w.rt.Store).API().Authorizer
+	p, decider, err := authorizer.Authorize(t.Context(), p, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := remote.NewDiscovery(t.Context(), &item.Service{
+		Store: w.rt.Store, Formats: ecosystem.For,
+	}, w.c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return accessapi.WithCaller(
+		t.Context(),
+		p,
+		decider,
+	), source.Request{
+		Repo:    w.c,
+		Subject: accessapi.SubjectOf(p),
+		Access:  decider,
+	}, d
+}
+
+func TestAccMappedRootRuntimePublicationAndDeliveryFences(t *testing.T) {
+	for _, noStore := range []bool{false, true} {
+		for _, duringFetch := range []bool{false, true} {
+			t.Run(fmt.Sprint(noStore, "/fetch=", duringFetch), func(t *testing.T) {
+				w := newMavenRemoteWorld(t)
+				const custom = "filename-discovery"
+				if err := w.rt.Store.Configs().
+					Put(t.Context(), configdoc.ConfigDocument{Kind: configdoc.ConfigLayout, Key: custom, Document: json.RawMessage(`{"artifactPathPattern":"[org]/[module]-[baseRev].[ext]"}`)}); err != nil {
+					t.Fatal(err)
+				}
+				w.c.RepoLayoutRef, w.c.RemoteRepoLayoutRef = custom, "maven-2-default"
+				w.c.StoreArtifactsLocally = new(!noStore)
+				w.update()
+				ctx, q, d := mappedRuntimeRequest(t, w)
+				scope := d.Scopes(layout.Values{layout.TokenOrg: "org.acme", layout.TokenModule: "app"})[0]
+				if !scope.Root {
+					t.Fatal("fixture did not exercise root authority")
+				}
+				resource := fakeupstream.Resource{
+					Body:   []byte(`<a href="app-1.0.jar">jar</a>`),
+					Header: http.Header{"Content-Type": {"text/html"}},
+				}
+				gate := new(fakeupstream.Barrier)
+				t.Cleanup(gate.Release)
+				if duringFetch {
+					resource.Fault.BeforeBody = gate
+				}
+				w.up.Set("/org/acme/app/1.0/", resource)
+				var got remote.MappedFolderListing
+				done := make(chan error, 1)
+				go func() {
+					var err error
+					got, err = remote.ListMappedFolder(
+						ctx,
+						w.rt.Artifacts.RemoteSources(),
+						q,
+						d,
+						scope,
+						"org/acme/app/1.0",
+						new(remote.ListingBudget),
+					)
+					done <- err
+				}()
+				if duringFetch {
+					select {
+					case <-gate.Reached():
+					case <-time.After(10 * time.Second):
+						t.Fatal("mapped source did not start")
+					}
+				} else if err := <-done; err != nil {
+					t.Fatal(err)
+				}
+				permission, err := w.rt.Store.Permissions().Get(t.Context(), "remote-read")
+				if err != nil {
+					t.Fatal(err)
+				}
+				r := permission.Resources[accessapi.ResourceArtifact]
+				r.Targets[w.c.Key] = accesstest.Target{Include: []string{"org.acme/app-1.0.jar"}}
+				permission.Resources[accessapi.ResourceArtifact] = r
+				if err = w.rt.Store.Permissions().Update(t.Context(), permission); err != nil {
+					t.Fatal(err)
+				}
+				gate.Release()
+				if duringFetch {
+					if err = <-done; !errors.Is(err, source.ErrDenied) {
+						t.Fatal("revoked root grant published metadata", err)
+					}
+				} else if err = got.Revalidate(ctx); !errors.Is(err, source.ErrDenied) {
+					t.Fatal("surviving exact grant hid root revocation", err)
+				}
+				before := len(w.up.Requests())
+				if _, err = remote.ListMappedFolder(
+					ctx,
+					w.rt.Artifacts.RemoteSources(),
+					q,
+					d,
+					scope,
+					"org/acme/app/1.0",
+					new(remote.ListingBudget),
+				); !errors.Is(err, source.ErrDenied) ||
+					len(w.up.Requests()) != before {
+					t.Fatal("stale principal acquired mapped source after root revocation", err)
+				}
+			})
+		}
+	}
+}

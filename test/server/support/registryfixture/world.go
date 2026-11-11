@@ -8,13 +8,16 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -53,7 +56,7 @@ func New(t *testing.T, anonymous bool, tune ...harness.Tune) *World {
 	ctx := t.Context()
 	db := inmem.New()
 	support.Seed(t, db)
-	for _, user := range []types.User{
+	for _, user := range []accesstest.User{
 		{Name: "reader", PasswordHash: support.CheapHash, Groups: []string{authn.ReadersGroup}},
 		{Name: "deployer", PasswordHash: support.CheapHash},
 		{Name: "user", PasswordHash: support.CheapHash},
@@ -62,28 +65,30 @@ func New(t *testing.T, anonymous bool, tune ...harness.Tune) *World {
 			t.Fatal(err)
 		}
 	}
-	if err := db.Permissions().Create(ctx, types.Permission{
+	if err := db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "deploy-libs",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"deployer": types.ActionRead | types.ActionWrite,
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
+				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]types.Target{"libs-local": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"libs-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if anonymous {
-		if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+		if err := db.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 			t.Fatal(err)
 		}
-		if err := db.Permissions().Create(ctx, types.Permission{
+		if err := db.Permissions().Create(ctx, accesstest.Permission{
 			Name: "anonymous-remotes",
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					kernel.AnonymousUser: types.ActionRead,
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{
+					kernel.AnonymousUser: api.ActionRead,
 				}},
-				Targets: map[string]types.Target{types.TargetAnyRemote: {Include: []string{"**"}}},
+				Targets: map[string]accesstest.Target{
+					api.TargetAnyRemote: {Include: []string{"**"}},
+				},
 			}},
 		}); err != nil {
 			t.Fatal(err)
@@ -150,7 +155,7 @@ func (w *World) Do(method, path, as, body string, headers ...string) *httptest.R
 // Item returns the item at path in the repository key, from its remote cache
 // when cached is true, and fails the test when the store has no such item or
 // cannot read it.
-func (w *World) Item(key string, cached bool, path string) types.Item {
+func (w *World) Item(key string, cached bool, path string) artmodel.Item {
 	w.T.Helper()
 	it, err := w.DB.Items().Get(w.T.Context(), key, cached, path)
 	if err != nil {

@@ -23,10 +23,10 @@ var (
 	// The leading delimiter keeps a path relative to another directory, such
 	// as ../internal/x, from matching.
 	packageArgument = regexp.MustCompile(
-		`(?:^|[\s'"=,])(\./(?:api|cmd|internal|migration|pkg|test|tools)(?:/[A-Za-z0-9_-]+)*)(/\.\.\.)?/?`,
+		`(?:^|[\s'"=,])(\./(?:api|cmd|internal|pkg|test|tools)(?:/[A-Za-z0-9_-]+)*)(/\.\.\.)?/?`,
 	)
 	modulePackageArgument = regexp.MustCompile(
-		`\$\(MODULE\)/((?:internal|migration|pkg)(?:/[A-Za-z0-9_-]+)*)(/\.\.\.)?`,
+		`\$\(MODULE\)/((?:internal|pkg)(?:/[A-Za-z0-9_-]+)*)(/\.\.\.)?`,
 	)
 	runArgument = regexp.MustCompile(`(?:^|\s)-run(?:=|\s+)(?:'([^']*)'|"([^"]*)"|([^\s'"]+))`)
 	// A pattern built from a make or shell variable is known only at run time.
@@ -286,7 +286,7 @@ func packageRefs(text string) []packageRef {
 	for _, argument := range []*regexp.Regexp{packageArgument, modulePackageArgument} {
 		for _, m := range argument.FindAllStringSubmatchIndex(text, -1) {
 			// More path after the match, as in ./test/oci/run.sh or
-			// $(MODULE)/migration/platform/buildinfo.version, names a file or
+			// $(MODULE)/internal/platform/buildinfo.version, names a file or
 			// a symbol, not a package.
 			if m[1] < len(text) && !strings.ContainsRune(" \t'\",;)|&\\", rune(text[m[1]])) {
 				continue

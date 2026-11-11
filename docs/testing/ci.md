@@ -23,16 +23,14 @@ and native clients. A package or `_test.go` file may contain both kinds.
 Subtests inherit the kind of their top-level test; their display names need no
 prefix. Classifying a test changes its name only, not its assertions or
 fixtures. `make test-names` uses Go's parser to check all tracked application
-test files under `api/`, `internal/`, `migration/`, `pkg/`, `test/` and `tools/`, including
+test files under `api/`, `internal/`, `pkg/`, `test/` and `tools/`, including
 platform-specific and build-tagged sources; `go run ./tools/testnames -json`
 prints the complete inventory. `make test`, `make accept-go` and `make accept`
 run the guard. The `Select CI tests` job runs it before planning any profile.
 
-Go reserves `TestMain` for a package hook. Its four reviewed owners are
-`migration/access/core/authn` and `migration/devtools/pkgmove` (three-OS Go matrix; the
-pkgmove hook runs the test binary as a failing `git` for its fixture scripts),
-`test/acceptance` (Linux native acceptance), and `test/platform` (real-cloud
-platform scenarios). The four
+Go reserves `TestMain` for a package hook. Its three reviewed owners are
+`internal/access/core/authn` (three-OS Go matrix), `test/acceptance` (Linux native
+acceptance), and `test/platform` (real-cloud platform scenarios). The four
 `Fuzz...` entry points, `FuzzPatternMatch`, `FuzzXetWireParsing`, `FuzzPDBKey` and `FuzzParseScope`,
 retain Go's required names and run their seed corpora in the three-OS Go test
 matrix. The guard fails when an unclassified test or an unowned hook or fuzz
@@ -42,17 +40,18 @@ lane executes `^TestAcc`; native feature partitions execute the exact
 `TestAccFeatures` entry point and use godog tags to select format scenarios.
 The full core native job runs the other acceptance-harness `TestAcc` entry
 points once. The package selector uses reviewed ownership and the reverse
-import graph. In a shared directory of the [ownership inventory](server-test-ownership.md)
-(a `shared_files` key; today the mixed `internal/server` and `migration/app`
-packages), a narrow PR selects only entry points in the files that
-`format_dependencies` lists for the changed format. The impact job retains the exact
+import graph. In a shared directory of the [ownership inventory](server-test-ownership.md),
+one that is a `shared_files` key, a narrow PR selects only the entry points in
+the files that `format_dependencies` lists for the changed format. Today those
+files lie in `internal/app`, beside the router, and in the module suites
+`test/server/access` and `test/server/artifacts`. The impact job retains the exact
 selected test names as a `test-selection` artifact and reports selected and
 skipped lane reasons in its summary.
 
 The CI test selector reports the selected profile, changed paths and reasons in
 the job summary. The format profile combines reviewed test ownership with the
-current Go reverse import graph. It includes independent server test packages,
-root server and application tests that depend on the format, production importers, matching
+current Go reverse import graph. It includes the format's server test packages,
+the shared tests that `format_dependencies` lists for it, production importers, matching
 native acceptance tags and only their client inputs. Edits to registrations,
 package templates, test data, API generation, workflows, stores, auth or
 multiple owners run full. Deployment templates select the deployment checks.
@@ -253,7 +252,7 @@ token through a TLS reverse proxy and trusts only that scenario's certificate,
 as current APM rejects credentials over HTTP. Locally it skips
 when that binary is unset; set `ARTIFACTWEAVE_APM_BIN` to the pinned release
 binary to run it. The local and federated protocol, permission, fault and
-lifecycle cases also run in `internal/server` unit tests.
+lifecycle cases also run in the `test/server/artifacts/agentpackages` suite.
 
 ### Planned jobs
 
@@ -264,7 +263,7 @@ assigns the missing behaviors to phases through P41.
 
 | Planned job | Phase | Intended checks |
 |---|---|---|
-| `acceptance-peers` | P13–P15 | Two or three `-cover` instances on separate ports and data directories for federated repository convergence, partitions and full sync (P13), Access Federation and topology (P14), and release bundle distribution to an edge (P15). Separate from `acceptance` to preserve the per-PR budget; its `cover-accept-peers` artifact and coverage/gate dependencies are added with the job |
+| `acceptance-peers` | P13 to P15 | Two or three `-cover` instances on separate ports and data directories for federated repository convergence, partitions and full sync (P13), Access Federation and topology (P14), and release bundle distribution to an edge (P15). Separate from `acceptance` to preserve the per-PR budget; its `cover-accept-peers` artifact and coverage/gate dependencies are added with the job |
 
 ## Public upstream conformance (P9)
 
@@ -443,7 +442,7 @@ artifacts and join the required quality gate.
 
 ## Controlled upstream tests
 
-P9's [`migration/artifacts/adapters/upstream/fakeupstream`](../../migration/artifacts/adapters/upstream/fakeupstream/README.md)
+P9's [`internal/artifacts/adapters/upstream/fakeupstream`](../../internal/artifacts/adapters/upstream/fakeupstream/README.md)
 supplies chi HTTP/HTTPS fixtures for transport, cache and adapter tests. Its self-checks are
 `TestAcc` tests, so they run in the Go acceptance job (`make accept-go`, without the
 race detector or shuffle); the package remains in the normal merged coverage gate,
@@ -502,7 +501,7 @@ continues to exercise an image index. An `ubuntu-latest` runner update from Ubun
 scenarios; the explicit flags keep the client proof stable on either runner.
 
 The cross-cloud blob mirror scenario (`TestAccCrossCloud` in
-`migration/platform/blob/mirror`) is one of those unit suites. It runs MinIO,
+`internal/platform/blob/mirror`) is one of those unit suites. It runs MinIO,
 fake-gcs-server and Azurite side by side in the Linux unit job and skips on macOS and
 Windows; the emulator images are pinned in `pkg/containertest`.
 
@@ -801,7 +800,7 @@ Two failures came from the runners rather than the code, and each needed a manua
 
 | Failure | Response |
 |---|---|
-| `create container: reaper: … wait for reaper …: context deadline exceeded` | `quality-gate.yml` sets `TESTCONTAINERS_RYUK_DISABLED=true`, so testcontainers-go never starts its reaper (Ryuk). Hosted runners are discarded after each job, so nothing is left behind. The emulators terminate at the end of each test through `testcontainers.CleanupContainer`. The PostgreSQL container that `migration/platform/sql/sqltest` shares across a test binary stays up until the runner goes. Local runs keep the reaper, which removes that container when the binary exits |
+| `create container: reaper: … wait for reaper …: context deadline exceeded` | `quality-gate.yml` sets `TESTCONTAINERS_RYUK_DISABLED=true`, so testcontainers-go never starts its reaper (Ryuk). Hosted runners are discarded after each job, so nothing is left behind. The emulators terminate at the end of each test through `testcontainers.CleanupContainer`. The PostgreSQL container that `internal/platform/sql/sqltest` shares across a test binary stays up until the runner goes. Local runs keep the reaper, which removes that container when the binary exits |
 | `read "https://proxy.golang.org/…": stream error: … INTERNAL_ERROR` | Every Go job runs `.github/actions/go-mod-download` straight after `actions/setup-go`. It runs `go mod download`, retrying twice with 15 s and 30 s pauses, so lint, tests, `go tool` and golangci-lint then read the module cache and never fetch. Only the download is retried: a failing test or lint step still fails |
 
 ## Real-cloud conformance (manual)
@@ -848,17 +847,17 @@ make gcp-conformance     # or, by hand, after make gcp-credentials (writes .loca
 ARTIFACTWEAVE_TEST_GCS_BUCKET=$(terraform -chdir=deploy/platform/terraform/gcp/single-bucket output -raw bucket) \
 ARTIFACTWEAVE_TEST_GCS_ACCESS_ID=$(terraform -chdir=deploy/platform/terraform/gcp/single-bucket output -raw service_account) \
 GOOGLE_APPLICATION_CREDENTIALS=deploy/platform/terraform/gcp/single-bucket/.local/gcp-credentials.json \
-  go test -count=1 -v -run 'TestAccContractOnRealGCS|TestAccRealGCSProbes' ./migration/platform/blob/gcs/
+  go test -count=1 -v -run 'TestAccContractOnRealGCS|TestAccRealGCSProbes' ./internal/platform/blob/gcs/
 
 make aws-conformance     # or, by hand, after aws login:
 ARTIFACTWEAVE_TEST_S3_BUCKET=$(terraform -chdir=deploy/platform/terraform/aws/single-bucket output -raw bucket) \
 ARTIFACTWEAVE_TEST_S3_REGION=eu-west-2 \
-  go test -count=1 -v -run 'TestAccContractOnRealS3|TestAccRealS3Probes' ./migration/platform/blob/s3/
+  go test -count=1 -v -run 'TestAccContractOnRealS3|TestAccRealS3Probes' ./internal/platform/blob/s3/
 
 make azure-conformance   # or, by hand, after az login:
 ARTIFACTWEAVE_TEST_AZURE_ACCOUNT=$(terraform -chdir=deploy/platform/terraform/azure/single-bucket output -raw account) \
 ARTIFACTWEAVE_TEST_AZURE_CONTAINER=artifactweave \
-  go test -count=1 -v -run 'TestAccContractOnRealAzure|TestAccRealAzureProbes' ./migration/platform/blob/azure/
+  go test -count=1 -v -run 'TestAccContractOnRealAzure|TestAccRealAzureProbes' ./internal/platform/blob/azure/
 ```
 
 The GCS run acts as the conformance service account through the impersonated credentials
@@ -1142,7 +1141,7 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
      checks. Sensitive repository values are redacted and persistent bytes contain no
      plaintext fixture credentials. A remote `terraformbackend` request must fail validation.
      Upstream URLs use the fixture server; this proves management only, with native content
-     evidence owned by #624–#633. Provider `artifactory_proxy` CRUD still requires P12/#303
+     evidence owned by #624 to #633. Provider `artifactory_proxy` CRUD still requires P12/#303
      XML descriptor reads; the fixture removes its proxy through PATCH after destroy.
 4. Require `terraform plan -detailed-exitcode` to exit 0.
 5. Destroy.
@@ -1257,7 +1256,7 @@ scenario starts from a copy of one that passes, and its README from
 
 ## AQL fixtures from the JFrog CLI
 
-`migration/artifacts/core/aql/aqltest/testdata` holds the AQL the pinned `jf` sends, one
+`internal/artifacts/core/aql/aqltest/testdata` holds the AQL the pinned `jf` sends, one
 file per command shape. With `ARTIFACTWEAVE_JF_BIN` pointing at the pinned binary,
 `make capture-aql`:
 1. runs the acceptance scenario "the query shapes the fixtures capture", with the server
@@ -1266,7 +1265,7 @@ file per command shape. With `ARTIFACTWEAVE_JF_BIN` pointing at the pinned binar
 2. copies each query over its fixture.
 
 Run it whenever the pinned `jf` changes, then check that the expected rows in
-`migration/artifacts/core/aql/aqltest` still hold.
+`internal/artifacts/core/aql/aqltest` still hold.
 
 ## Releases
 
@@ -1281,7 +1280,7 @@ mode on the existing release (#507):
 
 - `artifactweave` for linux, darwin and windows on amd64 and arm64, built as `make build`
   builds it: `CGO_ENABLED=0`, `GOWORK=off`, `-trimpath`, the `disable_grpc_modules` tag, and
-  `migration/platform/buildinfo`'s version, commit and date stamped with `-X`;
+  `internal/platform/buildinfo`'s version, commit and date stamped with `-X`;
 - a `tar.gz` archive per platform (`zip` for Windows), a SHA-256 checksum file, and an SPDX
   SBOM per archive (syft);
 - a keyless cosign signature over the checksum file, in a Sigstore bundle. The
@@ -1479,4 +1478,4 @@ mismatches, source edits/delete-recreate, concurrent admission/overwrite/deletio
 user annotations, and current Manage/credential revocation before execution and publication.
 PostgreSQL runs on Linux CI; a local Docker-unavailable skip is not PostgreSQL evidence.
 
-The Conda `@conda` partition includes the opt-in `@conda_shards` scenarios. They use the same [digest-pinned micromamba client](ci-client-images.md), explicitly enable `MAMBA_USE_SHARDED_REPODATA`, and assert successful shard-index and content-shard GETs with no classic repodata requests. `XDG_CACHE_HOME` is isolated under the removable client root so the virtual/offline proof cannot pass using a prior client shard cache. Conda's application-level source/cache/revision tests are owned by `migration/app/conda_remote_test.go` in the selector inventory.
+The Conda `@conda` partition includes the opt-in `@conda_shards` scenarios. They use the same [digest-pinned micromamba client](ci-client-images.md), explicitly enable `MAMBA_USE_SHARDED_REPODATA`, and assert successful shard-index and content-shard GETs with no classic repodata requests. `XDG_CACHE_HOME` is isolated under the removable client root so the virtual/offline proof cannot pass using a prior client shard cache. Conda's application-level source/cache/revision tests are in `test/server/artifacts/conda/conda_remote_test.go`, which the selector inventory gives to Conda with the rest of that package.

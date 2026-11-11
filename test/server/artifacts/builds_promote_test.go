@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 )
 
 const promotionType = "application/vnd.org.jfrog.artifactory.build.PromotionRequest+json"
@@ -194,13 +196,15 @@ func TestAccBuildRetention(t *testing.T) {
 func TestAccBuildPublishRetention(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
-	if err := w.db.Permissions().Create(ctx, types.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "deploy-builds",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceBuild: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"deployer": types.ActionRead | types.ActionWrite,
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceBuild: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
+				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]types.Target{types.BuildInfoRepository: {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{
+				api.BuildInfoRepository: {Include: []string{"**"}},
+			},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -221,7 +225,7 @@ func TestAccBuildPublishRetention(t *testing.T) {
 	}
 }
 
-func (w *itemWorld) props(key, path string) types.Properties {
+func (w *itemWorld) props(key, path string) artmodel.Properties {
 	w.t.Helper()
 	ctx := context.Background()
 	it := w.item(key, false, path)

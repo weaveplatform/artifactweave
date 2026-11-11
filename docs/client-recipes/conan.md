@@ -64,5 +64,5 @@ These are the pinned client definitions and executable evidence from which this 
 
 - Client pin: [.github/workflows/quality-gate.yml](../../.github/workflows/quality-gate.yml).
 - Evidence: [test/server/artifacts/conan/conan_client_test.go](../../test/server/artifacts/conan/conan_client_test.go).
-- Evidence: [migration/app/conan_client_test.go](../../migration/app/conan_client_test.go).
-- Evidence: [migration/access/core/authn/token.go](../../migration/access/core/authn/token.go).
+- Evidence: [test/server/artifacts/conan/conan_client_remote_test.go](../../test/server/artifacts/conan/conan_client_remote_test.go).
+- Evidence: [internal/access/core/authn/token.go](../../internal/access/core/authn/token.go).

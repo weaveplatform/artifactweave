@@ -12,9 +12,9 @@ per-disclosed-path checks. Operational behavior is documented in
 
 ## Contracts and ownership
 
-`migration/artifacts/core/remote/source` imports no server package and does not
+`internal/artifacts/core/remote/source` imports no server package and does not
 receive a transaction or format write-hook environment.
-`migration/artifacts/core/model/source.go` defines durable, secret-free
+`internal/artifacts/core/model/source.go` defines durable, secret-free
 `RepositoryIncarnation`, `SourceGeneration` and tagged
 `SourceIdentity` records; [#619](https://github.com/weaveplatform/artifactweave/issues/619)
 owns allocation, persistence and atomic publication fences. Reusing a repository key or
@@ -98,13 +98,13 @@ protocol adapters. Docker retains its separate routing seam; P10 must compose so
 permissions and intent deliberately, and P11
 adds project graph and sharing checks without administrator loopback HTTP.
 
-Tests in `migration/artifacts/core/remote/source/source_test.go`,
-`test/server/artifacts/source_test.go` and `migration/artifacts/adapters/http/pkgroute/source_test.go` exercise
+Tests in `internal/artifacts/core/remote/source/source_test.go`,
+`test/server/artifacts/source_test.go` and `internal/artifacts/adapters/http/pkgroute/source_test.go` exercise
 the service and router through injected backends: permission/pattern/path refusals
 before work, explicit intent, representation validation, generation/revocation races,
 safe protocol errors, stream ownership, local/federated preservation, cache/virtual
 isolation and an unrelated store write completing while a fetch is blocked. These prove the boundary, not a production
-fetcher by themselves. `migration/app/remote_test.go` and the generic remote acceptance
+fetcher by themselves. `test/server/artifacts/generic/remote_test.go` and the generic remote acceptance
 feature additionally prove production wiring, native curl/JFrog CLI downloads, restart
 identity, signed delivery, cache visibility and revocation before publication.
 

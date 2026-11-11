@@ -1,6 +1,6 @@
 package support
 
-import "github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
+import "github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 
 // TerraformRegistryRepos are the module registry fixture repositories shared
 // by the root cross-format suite and the standalone Terraform route suite.

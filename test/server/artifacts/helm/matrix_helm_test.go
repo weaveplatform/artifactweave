@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
 )
 
 // helmMatrixPart is Helm's share of the route × principal matrix (#548): a
@@ -25,7 +25,7 @@ var helmMatrixPart = matrixPart{
 			bare  = "work/{p}/bare-1.0.0.tgz"
 			to    = "work/{p}-to/web-1.0.0.tgz"
 		)
-		read, write, del3 := types.ActionRead, types.ActionWrite, types.ActionDelete
+		read, write, del3 := api.ActionRead, api.ActionWrite, api.ActionDelete
 		withProv := helmSeeded(true, chart)
 		return []matrixRow{
 			row(del, "/artifactory/helm-local/"+chart, "",
@@ -58,7 +58,7 @@ func helmSeeded(prov bool, paths ...string) seeder {
 }
 
 // holdsAll: a caller holding every action in want at each path in repoKey.
-func holdsAll(repoKey string, want types.Actions, paths ...string) rule {
+func holdsAll(repoKey string, want api.Actions, paths ...string) rule {
 	return func(p matrixPrincipal) int {
 		for _, path := range paths {
 			if s := holds(repoKey, path, want)(p); s != 0 {

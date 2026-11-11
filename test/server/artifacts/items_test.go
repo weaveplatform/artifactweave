@@ -18,12 +18,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/adapters/http/itemkit"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/kernel"
-	"github.com/weaveplatform/artifactweave/migration/platform/blob"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
 func sha1Hex(s string) string {
@@ -346,7 +347,7 @@ func TestAccChecksumDeployNeedsRead(t *testing.T) {
 		t.Fatalf("an unreadable hit %q differs from a miss %q", stolen.Body, miss.Body)
 	}
 	if _, err := w.db.Items().
-		Get(ctx, "libs-local", false, "stolen.bin"); !errors.Is(err, store.ErrNotFound) {
+		Get(ctx, "libs-local", false, "stolen.bin"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("a refused checksum deploy stored the item: %v", err)
 	}
 	// One file it may read is enough, whatever other repositories hold.
@@ -443,12 +444,12 @@ func TestAccRepositoryClasses(t *testing.T) {
 	}
 
 	// A remote repository serves its cache; nothing is fetched upstream yet.
-	if _, err := w.db.Items().Put(ctx, types.Item{
+	if _, err := w.db.Items().Put(ctx, artmodel.Item{
 		RepoKey: "up",
 		Cached:  true,
 		Name:    "cached.txt",
 		Size:    1,
-		Actual: types.Checksums{
+		Actual: kernel.Checksums{
 			SHA256: sha256Hex("c"),
 			SHA1:   sha1Hex("c"),
 			MD5:    "4a8a08f09d37b73795649038408b5f33",
@@ -465,7 +466,7 @@ func TestAccRepositoryClasses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.db.Blobs().Ref(ctx, types.Blob{Checksums: types.Checksums{
+	if _, err := w.db.Blobs().Ref(ctx, blob.Blob{Checksums: kernel.Checksums{
 		SHA256: info.Digests.SHA256, SHA1: info.Digests.SHA1, MD5: info.Digests.MD5,
 	}, Size: 1}, 1); err != nil {
 		t.Fatal(err)
@@ -521,7 +522,7 @@ func TestAccDeleteItem(t *testing.T) {
 	)
 	wantStatus(t, w.do("DELETE", "/artifactory/libs-local/d", "deployer", ""), http.StatusForbidden)
 	wantStatus(t, w.do("DELETE", "/artifactory/libs-local/d", "admin", ""), http.StatusNoContent)
-	if entries, _, _ := w.db.Trash().List(ctx, "libs-local", "", store.Page{}); len(entries) != 2 {
+	if entries, _, _ := w.db.Trash().List(ctx, "libs-local", "", kernel.Page{}); len(entries) != 2 {
 		t.Fatalf("trash %v", entries)
 	}
 	wantStatus(
@@ -627,13 +628,13 @@ func TestAccDeployIdenticalContent(t *testing.T) {
 
 	// Under server-generated-checksums the declaration is not checked, so
 	// only the stored bytes can show the content is the file's.
-	if err := w.db.Permissions().Create(ctx, types.Permission{
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 		Name: "deploy-server",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{
-				"deployer": types.ActionRead | types.ActionWrite,
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
+				"deployer": api.ActionRead | api.ActionWrite,
 			}},
-			Targets: map[string]types.Target{"server-local": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"server-local": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -1029,12 +1030,12 @@ func TestAccSearchAQLSecondaryDomains(t *testing.T) {
 	}
 	x := w.item("libs-local", false, "x.jar")
 	at := time.Date(2026, 2, 3, 4, 5, 6, 0, time.UTC)
-	if err := w.db.Items().PutStats(ctx, x.ID, types.ItemStats{
+	if err := w.db.Items().PutStats(ctx, x.ID, artmodel.ItemStats{
 		DownloadCount: 3, LastDownloaded: at, LastDownloadedBy: "admin",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.db.Items().SetProperties(ctx, x.ID, types.Properties{
+	if err := w.db.Items().SetProperties(ctx, x.ID, artmodel.Properties{
 		"keep": {"1"}, "drop": {"2"},
 	}, at); err != nil {
 		t.Fatal(err)
@@ -1084,8 +1085,8 @@ func TestAccSearchAQLRemoteAndVirtualKeys(t *testing.T) {
 		wantStatus(t, w.do("PUT", "/artifactory/"+p, "admin", p), http.StatusCreated)
 	}
 	// Nothing deploys into a cache, so the cached item is stored directly.
-	if _, err := w.db.Items().Put(ctx, types.Item{
-		RepoKey: "up", Cached: true, Path: types.RootPath, Name: "c.jar",
+	if _, err := w.db.Items().Put(ctx, artmodel.Item{
+		RepoKey: "up", Cached: true, Path: kernel.RootPath, Name: "c.jar",
 	}); err != nil {
 		t.Fatal(err)
 	}

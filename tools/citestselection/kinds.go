@@ -20,9 +20,7 @@ import (
 // scanRoots must list every directory that holds Go tests: CI's unit and
 // acceptance jobs take their package lists from this scan alone, while
 // -coverpkg still counts every package's statements against the gate.
-// migration/ holds the staged future internal/ (decision 0044) and is scanned
-// before it exists, so a missing root is skipped rather than failing the walk.
-var scanRoots = []string{"api", "internal", "migration", "pkg", "test", "tools"}
+var scanRoots = []string{"api", "internal", "pkg", "test", "tools"}
 
 // kindSelection is source-based so build-tagged and platform-specific tests
 // remain visible to the impact planner. Go still decides which files compile

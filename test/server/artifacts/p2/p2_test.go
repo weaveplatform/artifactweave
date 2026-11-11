@@ -9,12 +9,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/migration/artifacts/ecosystem/p2"
-	"github.com/weaveplatform/artifactweave/migration/platform/testkit/repopath"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/p2"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
 func TestAccP2ArchiveSuffixIsBoundedAndPermissionChecked(t *testing.T) {
@@ -139,7 +141,7 @@ func TestAccP2ArchiveSuffixIsBoundedAndPermissionChecked(t *testing.T) {
 
 func p2Fixture(t *testing.T, name string) []byte {
 	t.Helper()
-	return repopath.Read(t, "migration/artifacts/ecosystem/p2/testdata/"+name)
+	return repopath.Read(t, "internal/artifacts/ecosystem/p2/testdata/"+name)
 }
 
 func TestAccP2RemoteAndVirtualWirePaths(t *testing.T) {
@@ -159,7 +161,7 @@ func TestAccP2RemoteAndVirtualWirePaths(t *testing.T) {
 			case "content.jar":
 				body = content
 			default:
-				return source.Result{}, store.ErrNotFound
+				return source.Result{}, kernel.ErrNotFound
 			}
 			if err := q.Resource.ValidateMetadata(
 				t.Context(),
@@ -354,7 +356,7 @@ func TestAccP2ArchiveReadsCachedBlobAndRejectsMissingBlob(t *testing.T) {
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)
 	}
-	var cached types.Item
+	var cached artmodel.Item
 	var used int
 	backend := sourceBackend(
 		func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
@@ -406,11 +408,11 @@ func TestAccP2VirtualFiltersMembersAndDeniesUnpermittedChild(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := w.db.Permissions().Create(t.Context(), types.Permission{
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "p2-child-path-limited",
-		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
-			Targets: map[string]types.Target{
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
 				"p2-parent": {Include: []string{"**"}},
 				"p2-child":  {Include: []string{"plugins/**"}},
 			},

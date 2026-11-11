@@ -10,9 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/migration/access/core/authn"
-	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // actionWorld is an item world with two more users, both readers of every
@@ -23,22 +25,24 @@ func actionWorld(t *testing.T, tune ...func(*Config)) *itemWorld {
 	ctx := context.Background()
 	w := newItemWorld(t, false, tune...)
 	for name, grant := range map[string]struct {
-		actions types.Actions
+		actions api.Actions
 		include string
 	}{
-		"cleaner":   {types.ActionRead | types.ActionDelete, "a/**"},
-		"annotator": {types.ActionRead | types.ActionAnnotate, "a/*.jar"},
+		"cleaner":   {api.ActionRead | api.ActionDelete, "a/**"},
+		"annotator": {api.ActionRead | api.ActionAnnotate, "a/*.jar"},
 	} {
-		if err := w.db.Users().Create(ctx, types.User{
+		if err := w.db.Users().Create(ctx, accesstest.User{
 			Name: name, PasswordHash: cheapHash, Groups: []string{authn.ReadersGroup},
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if err := w.db.Permissions().Create(ctx, types.Permission{
+		if err := w.db.Permissions().Create(ctx, accesstest.Permission{
 			Name: name,
-			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{name: grant.actions}},
-				Targets: map[string]types.Target{"libs-local": {Include: []string{grant.include}}},
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{name: grant.actions}},
+				Targets: map[string]accesstest.Target{
+					"libs-local": {Include: []string{grant.include}},
+				},
 			}},
 		}); err != nil {
 			t.Fatal(err)
@@ -93,10 +97,10 @@ func TestAccAQLDelete(t *testing.T) {
 	// A remote's items are deleted from its cache. Nothing of a virtual
 	// repository's own, or of a repository no longer configured, is
 	// touched; nothing deploys there, so those items are stored directly.
-	for _, it := range []types.Item{
-		{RepoKey: "up", Cached: true, Path: types.RootPath, Name: "c.tmp"},
-		{RepoKey: "virt", Path: types.RootPath, Name: "v.tmp"},
-		{RepoKey: "gone", Path: types.RootPath, Name: "g.tmp"},
+	for _, it := range []artmodel.Item{
+		{RepoKey: "up", Cached: true, Path: kernel.RootPath, Name: "c.tmp"},
+		{RepoKey: "virt", Path: kernel.RootPath, Name: "v.tmp"},
+		{RepoKey: "gone", Path: kernel.RootPath, Name: "g.tmp"},
 	} {
 		if _, err := w.db.Items().Put(ctx, it); err != nil {
 			t.Fatal(err)
@@ -107,7 +111,7 @@ func TestAccAQLDelete(t *testing.T) {
 	if !slices.Equal(rows, []string{"up-cache/./c.tmp"}) {
 		t.Fatalf("remote and virtual %v", rows)
 	}
-	if _, err := w.db.Items().Get(ctx, "up", true, "c.tmp"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := w.db.Items().Get(ctx, "up", true, "c.tmp"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("cached item: %v", err)
 	}
 	w.item("virt", false, "v.tmp")
@@ -151,13 +155,13 @@ func TestAccAQLUpdateProperties(t *testing.T) {
 	} {
 		wantStatus(t, w.do("PUT", "/artifactory/"+p, "admin", p), http.StatusCreated)
 	}
-	set := func(it types.Item, props types.Properties) {
+	set := func(it artmodel.Item, props artmodel.Properties) {
 		t.Helper()
 		if err := w.db.Items().SetProperties(ctx, it.ID, props, time.Now()); err != nil {
 			t.Fatal(err)
 		}
 	}
-	has := func(it types.Item, want types.Properties) {
+	has := func(it artmodel.Item, want artmodel.Properties) {
 		t.Helper()
 		got, err := w.db.Items().Properties(ctx, it.ID)
 		if err != nil || !maps.EqualFunc(got, want, slices.Equal) {
@@ -167,10 +171,10 @@ func TestAccAQLUpdateProperties(t *testing.T) {
 	x := w.item("libs-local", false, "a/x.jar")
 	y := w.item("libs-local", false, "b/y.jar")
 	z := w.item("other-local", false, "z.jar")
-	set(x, types.Properties{"status": {"old"}, "keep": {"k"}})
-	set(y, types.Properties{"status": {"old1", "old2"}})
-	set(w.item("libs-local", false, "a"), types.Properties{"status": {"f"}})
-	set(z, types.Properties{"status": {"old"}})
+	set(x, artmodel.Properties{"status": {"old"}, "keep": {"k"}})
+	set(y, artmodel.Properties{"status": {"old1", "old2"}})
+	set(w.item("libs-local", false, "a"), artmodel.Properties{"status": {"f"}})
+	set(z, artmodel.Properties{"status": {"old"}})
 
 	const libs = `properties.update({"item.repo":"libs-local"}).keys("status","absent")` +
 		`.newValue("approved")`
@@ -180,7 +184,7 @@ func TestAccAQLUpdateProperties(t *testing.T) {
 	if rows := aqlUpdates(t, w, "annotator", libs); !slices.Equal(rows, xRow) {
 		t.Fatalf("dry run %v", rows)
 	}
-	has(x, types.Properties{"status": {"old"}, "keep": {"k"}})
+	has(x, artmodel.Properties{"status": {"old"}, "keep": {"k"}})
 	if rows := aqlUpdates(t, w, "deployer", libs+`.dryRun("false")`); len(rows) != 0 {
 		t.Fatalf("deployer %v", rows)
 	}
@@ -188,8 +192,8 @@ func TestAccAQLUpdateProperties(t *testing.T) {
 		t.Fatalf("annotator %v", rows)
 	}
 	// Only the keys an item has change; absent is not added.
-	has(x, types.Properties{"status": {"approved"}, "keep": {"k"}})
-	has(y, types.Properties{"status": {"old1", "old2"}})
+	has(x, artmodel.Properties{"status": {"approved"}, "keep": {"k"}})
+	has(y, artmodel.Properties{"status": {"old1", "old2"}})
 
 	// Folders carry properties too, and every value of a key is replaced.
 	rows := aqlUpdates(
@@ -204,23 +208,23 @@ func TestAccAQLUpdateProperties(t *testing.T) {
 	}) {
 		t.Fatalf("admin %v", rows)
 	}
-	has(y, types.Properties{"status": {"done"}})
-	has(z, types.Properties{"status": {"old"}})
+	has(y, artmodel.Properties{"status": {"done"}})
+	has(z, artmodel.Properties{"status": {"old"}})
 
 	// A remote's properties live on its cache; a virtual repository's own
 	// items, and a repository no longer configured, are not touched.
-	stored := map[string]types.Item{}
-	for _, it := range []types.Item{
-		{RepoKey: "up", Cached: true, Path: types.RootPath, Name: "c.jar"},
-		{RepoKey: "up", Path: types.RootPath, Name: "u.jar"},
-		{RepoKey: "virt", Path: types.RootPath, Name: "v.jar"},
-		{RepoKey: "gone", Path: types.RootPath, Name: "g.jar"},
+	stored := map[string]artmodel.Item{}
+	for _, it := range []artmodel.Item{
+		{RepoKey: "up", Cached: true, Path: kernel.RootPath, Name: "c.jar"},
+		{RepoKey: "up", Path: kernel.RootPath, Name: "u.jar"},
+		{RepoKey: "virt", Path: kernel.RootPath, Name: "v.jar"},
+		{RepoKey: "gone", Path: kernel.RootPath, Name: "g.jar"},
 	} {
 		put, err := w.db.Items().Put(ctx, it)
 		if err != nil {
 			t.Fatal(err)
 		}
-		set(put, types.Properties{"status": {"old"}})
+		set(put, artmodel.Properties{"status": {"old"}})
 		stored[it.Name] = put
 	}
 	rows = aqlUpdates(t, w, "admin", `properties.update({"$or":[{"item.name":"c.jar"},`+
@@ -229,9 +233,9 @@ func TestAccAQLUpdateProperties(t *testing.T) {
 	if !slices.Equal(rows, []string{"up-cache/./c.jar status=cached"}) {
 		t.Fatalf("remote and virtual %v", rows)
 	}
-	has(stored["c.jar"], types.Properties{"status": {"cached"}})
+	has(stored["c.jar"], artmodel.Properties{"status": {"cached"}})
 	for _, name := range []string{"u.jar", "v.jar", "g.jar"} {
-		has(stored[name], types.Properties{"status": {"old"}})
+		has(stored[name], artmodel.Properties{"status": {"old"}})
 	}
 }
 

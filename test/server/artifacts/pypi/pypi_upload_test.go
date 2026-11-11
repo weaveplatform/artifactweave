@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/migration/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -45,7 +45,7 @@ func TestAccPypiPutUsesItemDeploy(t *testing.T) {
 			Create(context.Background(), *repo.Defaults(&repo.Config{Key: "pypi-local", Class: repo.Local, PackageType: repo.PyPI})); err != nil {
 			t.Fatal(err)
 		}
-		grant(t, w, "pypi-write", "deployer", "pypi-local", types.ActionRead|types.ActionWrite)
+		grant(t, w, "pypi-write", "deployer", "pypi-local", api.ActionRead|api.ActionWrite)
 		const base = "/artifactory/api/pypi/pypi-local/"
 		wantStatus(t, w.do("PUT", base+"data.txt;k=value", "admin", "content"), 201)
 		item := w.item("pypi-local", false, "data.txt")
