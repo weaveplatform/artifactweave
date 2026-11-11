@@ -2,16 +2,22 @@ package main
 
 import (
 	"context"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"gopkg.in/yaml.v3"
 )
+
+// unitJobs are the quality gate's Go unit test jobs, one per runner OS.
+var unitJobs = []string{"unit-linux", "unit-macos", "unit-windows"}
 
 func TestUnitNativeImageFailureSurvivesUnwritableRunnerStatus(t *testing.T) {
 	if runtime.GOOS != "linux" {
@@ -204,13 +210,11 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 			t.Errorf("%s is not gated by the full impact profile", name)
 		}
 	}
-	for name, other := range map[string]string{
-		"unit": "format", "lint": "format",
-	} {
+	for _, name := range append([]string{"lint"}, unitJobs...) {
 		job := workflow.Jobs[name]
 		if !contains(job.Needs, "impact") || !strings.Contains(job.If, "profile == 'full'") ||
-			!strings.Contains(job.If, "profile == '"+other+"'") {
-			t.Errorf("%s is not gated by full or %s", name, other)
+			!strings.Contains(job.If, "profile == 'format'") {
+			t.Errorf("%s is not gated by full or format", name)
 		}
 	}
 	for name, flag := range map[string]string{
@@ -227,25 +231,29 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 		!strings.HasPrefix(job.Name, "Go acceptance tests") {
 		t.Error("mixed-package TestAcc checks need a distinct selected Linux job")
 	}
-	if job := workflow.Jobs["unit"]; !strings.HasPrefix(job.Name, "Go unit tests") {
-		t.Error("unit checks must expose their test kind")
-	} else if !strings.Contains(job.If, "has_unit == 'true'") {
-		t.Error("an acceptance-only format must skip the unit matrix explicitly")
+	for _, name := range unitJobs {
+		job := workflow.Jobs[name]
+		if !strings.HasPrefix(job.Name, "Go unit tests") {
+			t.Errorf("%s: unit checks must expose their test kind", name)
+		} else if !strings.Contains(job.If, "has_unit == 'true'") {
+			t.Errorf("%s: an acceptance-only format must skip the unit jobs explicitly", name)
+		}
+		for _, step := range job.Steps {
+			if step.Name == "Unit tests (race, shuffle, coverage)" {
+				if _, overwritesDefault := step.Env["COVERPKG"]; overwritesDefault ||
+					step.Env["FORMAT_COVERPKG"] == "" ||
+					!strings.Contains(step.Run, `COVERPKG="$FORMAT_COVERPKG"`) {
+					t.Errorf(
+						"%s: full unit job must retain whole-module coverage; format job sets scoped coverage",
+						name,
+					)
+				}
+			}
+		}
 	}
 	if !strings.HasPrefix(workflow.Jobs["terraform"].Name, "Terraform provider conformance") ||
 		!strings.HasPrefix(workflow.Jobs["deploy-terraform"].Name, "Terraform deployment checks") {
 		t.Error("the two Terraform checks need distinct visible names")
-	}
-	for _, step := range workflow.Jobs["unit"].Steps {
-		if step.Name == "Unit tests (race, shuffle, coverage)" {
-			if _, overwritesDefault := step.Env["COVERPKG"]; overwritesDefault ||
-				step.Env["FORMAT_COVERPKG"] == "" ||
-				!strings.Contains(step.Run, `COVERPKG="$FORMAT_COVERPKG"`) {
-				t.Error(
-					"full unit job must retain whole-module coverage; format job sets scoped coverage",
-				)
-			}
-		}
 	}
 	for _, name := range []string{"acceptance", "acceptance-conan", "acceptance-nuget"} {
 		job := workflow.Jobs[name]
@@ -317,12 +325,19 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 		t.Error("full coverage does not depend on the impact plan")
 	}
 	affected := workflow.Jobs["affected-coverage"]
-	if !contains(affected.Needs, "unit") || !contains(affected.Needs, "acceptance-go") ||
+	if !contains(affected.Needs, "acceptance-go") ||
 		!contains(affected.Needs, "acceptance") ||
 		!contains(affected.Needs, "acceptance-conan") ||
 		!contains(affected.Needs, "acceptance-nuget") ||
 		!strings.Contains(affected.If, "profile == 'format'") {
 		t.Error("affected coverage lacks selected same-run sources")
+	}
+	for _, name := range unitJobs {
+		for _, consumer := range []string{"coverage", "affected-coverage"} {
+			if !contains(workflow.Jobs[consumer].Needs, name) {
+				t.Errorf("%s does not wait for the %s coverage it merges", consumer, name)
+			}
+		}
 	}
 	gate := workflow.Jobs["gate"]
 	if gate.If != "always()" || !contains(gate.Needs, "impact") ||
@@ -333,7 +348,11 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 		!contains(gate.Needs, "affected-coverage") {
 		t.Error("stable required gate is missing a profile dependency")
 	}
-	for _, name := range append(fullJobs, "unit", "lint", "acceptance", "acceptance-conan", "acceptance-nuget", "terraform", "deploy-terraform") {
+	required := slices.Concat(fullJobs, unitJobs, []string{
+		"lint", "acceptance", "acceptance-conan", "acceptance-nuget",
+		"terraform", "deploy-terraform",
+	})
+	for _, name := range required {
 		if name != "acceptance-gradle" && !contains(gate.Needs, name) {
 			t.Errorf("required gate does not await %s", name)
 		}
@@ -382,6 +401,82 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 	}
 }
 
+// When the concurrency group cancels a run before its jobs start, each job
+// reports a cancelled check under its literal name, and only a check of the
+// same name from the run that replaces it clears it from the pull request. A
+// matrix job, or a name built from an expression, has a literal name that no
+// replacing check shares.
+func TestUnitWorkflowCheckNamesSurviveACancelledRun(t *testing.T) {
+	data, err := os.ReadFile("../../.github/workflows/quality-gate.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			Name     string   `yaml:"name"`
+			RunsOn   any      `yaml:"runs-on"`
+			Needs    []string `yaml:"needs"`
+			If       string   `yaml:"if"`
+			Strategy struct {
+				Matrix any `yaml:"matrix"`
+			} `yaml:"strategy"`
+			Steps []map[string]any `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	if err := yaml.Unmarshal(data, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	for id, job := range workflow.Jobs {
+		if job.Name == "" || strings.Contains(job.Name, "${{") {
+			t.Errorf("%s: job name %q is not a fixed string", id, job.Name)
+		}
+		if job.Strategy.Matrix != nil {
+			t.Errorf(
+				"%s: a matrix job cancelled before it expands keeps a check no later run replaces",
+				id,
+			)
+		}
+	}
+	first := workflow.Jobs[unitJobs[0]]
+	runners := map[string]bool{}
+	artifacts := map[string]bool{}
+	for _, id := range unitJobs {
+		job, ok := workflow.Jobs[id]
+		if !ok {
+			t.Fatalf("unit job %s is missing", id)
+		}
+		runner, _ := job.RunsOn.(string)
+		if runner == "" || runners[runner] {
+			t.Errorf("%s: runs-on %v must name a runner of its own", id, job.RunsOn)
+		}
+		runners[runner] = true
+		if want := "Go unit tests (" + runner + ")"; job.Name != want {
+			t.Errorf("%s: name = %q, want %q", id, job.Name, want)
+		}
+		if job.If != first.If || !reflect.DeepEqual(job.Needs, first.Needs) ||
+			!reflect.DeepEqual(job.Steps, first.Steps) {
+			t.Errorf("%s: the unit jobs must share one condition and one step list", id)
+		}
+		for _, step := range job.Steps {
+			uses, _ := step["uses"].(string)
+			if !strings.HasPrefix(uses, "actions/upload-artifact@") {
+				continue
+			}
+			with, _ := step["with"].(map[string]any)
+			name, _ := with["name"].(string)
+			name = strings.ReplaceAll(name, "${{ github.job }}", id)
+			if !strings.HasPrefix(name, "cover-unit-") || strings.Contains(name, "${{") ||
+				artifacts[name] {
+				t.Errorf("%s: coverage artifact %q needs a cover-unit- name of its own", id, name)
+			}
+			artifacts[name] = true
+		}
+	}
+	if len(artifacts) != len(unitJobs) {
+		t.Errorf("unit coverage artifacts = %d, want one per unit job", len(artifacts))
+	}
+}
+
 func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the Actions Bash gate is exercised on Linux and macOS")
@@ -405,8 +500,8 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 		t.Fatal("required gate shell step is missing")
 	}
 	base := map[string]string{
-		"PROFILE": "docs", "IMPACT": "success", "DOCS": "skipped",
-		"UNIT": "skipped", "HAS_UNIT": "false",
+		"PROFILE": "docs", "IMPACT": "success", "DOCS": "skipped", "HAS_UNIT": "false",
+		"UNIT_LINUX": "skipped", "UNIT_MACOS": "skipped", "UNIT_WINDOWS": "skipped",
 		"GO_ACCEPTANCE": "skipped", "HAS_ACCEPTANCE": "false",
 		"LINT": "skipped", "VULN": "skipped", "BUILD": "skipped",
 		"ACCEPTANCE": "skipped", "CONAN": "skipped", "NUGET": "skipped", "COVERAGE": "skipped",
@@ -414,87 +509,114 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 		"TERRAFORM": "skipped", "PROVIDER_SELECTED": "false", "OCI": "skipped",
 		"DEPLOY": "skipped", "DEPLOY_SELECTED": "false",
 	}
+	full := map[string]string{
+		"PROFILE": "full", "HAS_UNIT": "true", "GO_ACCEPTANCE": "success",
+		"HAS_ACCEPTANCE": "true", "LINT": "success", "VULN": "success",
+		"BUILD": "success", "ACCEPTANCE": "success", "CONAN": "success", "NUGET": "success",
+		"JVM":      "success",
+		"COVERAGE": "success", "PARITY": "success", "TERRAFORM": "success",
+		"PROVIDER_SELECTED": "true", "OCI": "success", "DEPLOY": "success",
+		"DEPLOY_SELECTED": "true",
+	}
+	fullWith := func(key, value string) map[string]string {
+		values := maps.Clone(full)
+		values[key] = value
+		return values
+	}
 	for _, tc := range []struct {
-		name      string
+		name string
+		// unit is the result of every unit job; an override can then set
+		// one OS's job apart from the other two.
+		unit      string
 		overrides map[string]string
 		pass      bool
 	}{
-		{"docs", map[string]string{"DOCS": "success"}, true},
-		{"provider fixture only", map[string]string{
+		{"docs", "", map[string]string{"DOCS": "success"}, true},
+		{"docs rejects an unexpected unit job", "", map[string]string{
+			"DOCS": "success", "UNIT_WINDOWS": "success",
+		}, false},
+		{"provider fixture only", "", map[string]string{
 			"PROFILE": "deployment", "PROVIDER_SELECTED": "true", "TERRAFORM": "success",
 		}, true},
-		{"deployment root only", map[string]string{
+		{"deployment root only", "", map[string]string{
 			"PROFILE": "deployment", "DEPLOY_SELECTED": "true", "DEPLOY": "success",
 		}, true},
-		{"shared Terraform tooling", map[string]string{
+		{"deployment rejects an unexpected unit job", "", map[string]string{
+			"PROFILE": "deployment", "DEPLOY_SELECTED": "true", "DEPLOY": "success",
+			"UNIT_MACOS": "success",
+		}, false},
+		{"shared Terraform tooling", "", map[string]string{
 			"PROFILE": "deployment", "PROVIDER_SELECTED": "true", "TERRAFORM": "success",
 			"DEPLOY_SELECTED": "true", "DEPLOY": "success",
 		}, true},
-		{"release full gate", map[string]string{
-			"PROFILE": "full", "UNIT": "success", "HAS_UNIT": "true",
-			"GO_ACCEPTANCE":  "success",
-			"HAS_ACCEPTANCE": "true", "LINT": "success", "VULN": "success",
-			"BUILD": "success", "ACCEPTANCE": "success", "CONAN": "success", "NUGET": "success",
-			"JVM":      "success",
-			"COVERAGE": "success", "PARITY": "success", "TERRAFORM": "success",
-			"PROVIDER_SELECTED": "true", "OCI": "success", "DEPLOY": "success",
-			"DEPLOY_SELECTED": "true",
-		}, true},
-		{"cancelled release package acceptance", map[string]string{
-			"PROFILE": "full", "UNIT": "success", "HAS_UNIT": "true",
-			"GO_ACCEPTANCE":  "cancelled",
-			"HAS_ACCEPTANCE": "true", "LINT": "success", "VULN": "success",
-			"BUILD": "success", "ACCEPTANCE": "success", "CONAN": "success", "NUGET": "success",
-			"JVM":      "success",
-			"COVERAGE": "success", "PARITY": "success", "TERRAFORM": "success",
-			"PROVIDER_SELECTED": "true", "OCI": "success", "DEPLOY": "success",
-			"DEPLOY_SELECTED": "true",
-		}, false},
-		{"affected format without package TestAcc", map[string]string{
-			"PROFILE": "format", "UNIT": "success", "HAS_UNIT": "true",
+		{"release full gate", "success", full, true},
+		{
+			"cancelled release package acceptance", "success",
+			fullWith("GO_ACCEPTANCE", "cancelled"), false,
+		},
+		{
+			"release full gate rejects one cancelled unit job", "success",
+			fullWith("UNIT_WINDOWS", "cancelled"), false,
+		},
+		{
+			"release full gate rejects one skipped unit job", "success",
+			fullWith("UNIT_LINUX", "skipped"), false,
+		},
+		{"affected format without package TestAcc", "success", map[string]string{
+			"PROFILE": "format", "HAS_UNIT": "true",
 			"LINT":       "success",
 			"ACCEPTANCE": "success", "AFFECTED_COVERAGE": "success",
 		}, true},
-		{"affected format with package TestAcc", map[string]string{
+		{"affected format rejects one failed unit job", "success", map[string]string{
+			"PROFILE": "format", "HAS_UNIT": "true", "UNIT_MACOS": "failure",
+			"LINT":       "success",
+			"ACCEPTANCE": "success", "AFFECTED_COVERAGE": "success",
+		}, false},
+		{"affected format with package TestAcc", "success", map[string]string{
 			"PROFILE": "format", "HAS_ACCEPTANCE": "true", "GO_ACCEPTANCE": "success",
-			"UNIT": "success", "HAS_UNIT": "true", "LINT": "success",
+			"HAS_UNIT": "true", "LINT": "success",
 			"ACCEPTANCE":        "success",
 			"AFFECTED_COVERAGE": "success",
 		}, true},
-		{"Conan format requires separate clients", map[string]string{
-			"PROFILE": "format", "OWNER": "conan", "UNIT": "success", "HAS_UNIT": "true",
+		{"Conan format requires separate clients", "success", map[string]string{
+			"PROFILE": "format", "OWNER": "conan", "HAS_UNIT": "true",
 			"LINT": "success", "ACCEPTANCE": "success", "CONAN": "success",
 			"AFFECTED_COVERAGE": "success",
 		}, true},
-		{"Conan format rejects cancelled client job", map[string]string{
-			"PROFILE": "format", "OWNER": "conan", "UNIT": "success", "HAS_UNIT": "true",
+		{"Conan format rejects cancelled client job", "success", map[string]string{
+			"PROFILE": "format", "OWNER": "conan", "HAS_UNIT": "true",
 			"LINT": "success", "ACCEPTANCE": "success", "CONAN": "cancelled",
 			"AFFECTED_COVERAGE": "success",
 		}, false},
-		{"other format rejects unexpected Conan job", map[string]string{
-			"PROFILE": "format", "UNIT": "success", "HAS_UNIT": "true",
+		{"other format rejects unexpected Conan job", "success", map[string]string{
+			"PROFILE": "format", "HAS_UNIT": "true",
 			"LINT": "success", "ACCEPTANCE": "success", "CONAN": "success",
 			"AFFECTED_COVERAGE": "success",
 		}, false},
-		{"missing selected package TestAcc", map[string]string{
+		{"missing selected package TestAcc", "success", map[string]string{
 			"PROFILE": "format", "HAS_ACCEPTANCE": "true", "GO_ACCEPTANCE": "skipped",
-			"UNIT": "success", "HAS_UNIT": "true", "LINT": "success",
+			"HAS_UNIT": "true", "LINT": "success",
 			"ACCEPTANCE":        "success",
 			"AFFECTED_COVERAGE": "success",
 		}, false},
-		{"acceptance-only format skips unit", map[string]string{
+		{"acceptance-only format skips unit", "", map[string]string{
 			"PROFILE": "format", "HAS_ACCEPTANCE": "true", "GO_ACCEPTANCE": "success",
 			"LINT": "success", "ACCEPTANCE": "success", "AFFECTED_COVERAGE": "success",
 		}, true},
-		{"acceptance-only format rejects unexpected unit", map[string]string{
-			"PROFILE": "format", "UNIT": "success", "HAS_ACCEPTANCE": "true",
+		{"acceptance-only format rejects unexpected unit", "success", map[string]string{
+			"PROFILE": "format", "HAS_ACCEPTANCE": "true",
 			"GO_ACCEPTANCE": "success", "LINT": "success", "ACCEPTANCE": "success",
 			"AFFECTED_COVERAGE": "success",
 		}, false},
-		{"cancelled selected provider", map[string]string{
+		{"acceptance-only format rejects one unexpected unit job", "", map[string]string{
+			"PROFILE": "format", "HAS_ACCEPTANCE": "true", "UNIT_LINUX": "success",
+			"GO_ACCEPTANCE": "success", "LINT": "success", "ACCEPTANCE": "success",
+			"AFFECTED_COVERAGE": "success",
+		}, false},
+		{"cancelled selected provider", "", map[string]string{
 			"PROFILE": "deployment", "PROVIDER_SELECTED": "true", "TERRAFORM": "cancelled",
 		}, false},
-		{"unexpected provider on deployment only", map[string]string{
+		{"unexpected provider on deployment only", "", map[string]string{
 			"PROFILE": "deployment", "DEPLOY_SELECTED": "true", "DEPLOY": "success",
 			"TERRAFORM": "success",
 		}, false},
@@ -503,6 +625,11 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 			values := map[string]string{}
 			for key, value := range base {
 				values[key] = value
+			}
+			if tc.unit != "" {
+				for _, key := range []string{"UNIT_LINUX", "UNIT_MACOS", "UNIT_WINDOWS"} {
+					values[key] = tc.unit
+				}
 			}
 			for key, value := range tc.overrides {
 				values[key] = value
