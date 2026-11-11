@@ -37,7 +37,7 @@
   "test/acceptance/clients/dotnet-11.Dockerfile": "41955c2b8cee6d7bf26782f5faa610f900cb7b4ee90d9f6b53a7561587c7db37",
   "test/acceptance/clients/dotnet.Dockerfile": "9bfd9a97d97b07f1f6d3448969a6345624bc09ec2ee7c01bbf053c02cd327c37",
   "test/acceptance/clients/fedora.Dockerfile": "306ae4f4df207ae4d4489ef7db74bbe127c400a1db989c355dba7775a29d30dc",
-  "test/acceptance/clients/frogml/Dockerfile": "7c578106fa0bf50941158b3019b4d57df406a74df9a6feb72d7085d278383196",
+  "test/acceptance/clients/frogml/Dockerfile": "8fccce7562aeab51e507d3c19e55f1f324e224f6c6b8e5c11616b0d6ef494569",
   "test/acceptance/clients/git-lfs.Dockerfile": "bb25363970ccbe79cfff23f03846660a607d52537476d73dbef24f551db6ceb4",
   "test/acceptance/clients/hex.Dockerfile": "fc7cf99d0e9095a0a3386273ce030a9c16dc41cf0abece9c76e589f821b69b0a",
   "test/acceptance/clients/jetbrains.Dockerfile": "b29f0e8fc52707c766466d3d922b67aea11749eebaa84e5b9975f7c4b1bc09ef",
