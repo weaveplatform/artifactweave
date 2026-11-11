@@ -63,6 +63,17 @@
 //     SHA-256. A virtual repository renders them from its members in order:
 //     the first member to list a path supplies it, the caller must be able
 //     to read it in both repositories, and a member cycle is refused (400).
+//   - The download policy, after read permission: a blacked-out local or
+//     federated repository refuses its spec index files, quick gemspecs
+//     and compact index with the blackout's 404, and a pattern on a spec
+//     index file's or gemspec's own path refuses it, as 7.x refuses those
+//     stored files; the JSON API and search keep their answers.
+//     A virtual repository's own patterns refuse a spec index file or
+//     gemspec, and its indexes leave out a blacked-out member and, for a
+//     spec index file or gemspec, a member whose patterns reject that
+//     path. A pattern on one gem leaves the gem listed. A virtual gem
+//     download passes over a member that is blacked out or refuses the
+//     gem. A remote's own index reads check only its blackout.
 //   - A listing is bounded: more than 10,000 stored files, or upstream gem
 //     names, fails as an invalid result.
 //   - Statuses and error texts stay byte-identical.
@@ -106,7 +117,8 @@
 // the whole server: local, federated and virtual reads, push and its
 // permissions, refused requests, yank, token authentication, a virtual
 // repository's member filtering and cycles, stored gems that fail closed,
-// the remote's index checks, cache, offline reads and redirects, and the
+// the remote's index checks, cache, offline reads and redirects, the
+// download policy on local, virtual and remote reads, and the
 // gem and Bundler clients installing a pinned rake
 // (TestAccRubyClientsInstallPinnedRake, which skips unless gem and bundle
 // are installed). The @gems acceptance scenarios drive gem and Bundler
