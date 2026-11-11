@@ -1108,3 +1108,52 @@ func TestAccOpkgVirtualKeepsPackagesThePatternsReject(t *testing.T) {
 	wantError(t, w.do(http.MethodGet, "/artifactory/opkg-picky/"+opkgXlat, "admin", ""),
 		http.StatusNotFound, "No repository found to serve the request for opkg-picky:"+opkgXlat)
 }
+
+// TestAccOpkgVirtualIPKChecksAMemberAtTheIPKsPath: a virtual IPK GET checks
+// each member at the IPK's own path, never at the feed it reads to find the
+// IPK. A local or remote member, or a nested virtual one, whose patterns
+// reject only its feed serves the IPK, while the virtual feed still leaves
+// that member out; a blacked-out member, which refuses every file, takes no
+// part.
+func TestAccOpkgVirtualIPKChecksAMemberAtTheIPKsPath(t *testing.T) {
+	index, ipk := opkgUpstreamFixture(t)
+	w := newItemWorld(t, withSource(feedOf(t, index, ipk)))
+	w.opkgRepos(
+		repo.Config{Key: "opkg-feedless", Class: repo.Local, ExcludesPattern: new("**/Packages*")},
+		repo.Config{Key: "opkg-remote", Class: repo.Remote, ExcludesPattern: new("**/Packages*")},
+		repo.Config{Key: "opkg-dark", Class: repo.Local, BlackedOut: new(true)},
+		repo.Config{Key: "opkg-local", Class: repo.Local},
+		repo.Config{
+			Key: "opkg-closed", Class: repo.Virtual, Repositories: []string{"opkg-local"},
+			ExcludesPattern: new("**/Packages*"),
+		},
+		repo.Config{
+			Key: "opkg-over-feedless", Class: repo.Virtual, Repositories: []string{"opkg-feedless"},
+		},
+		repo.Config{Key: "opkg-over-remote", Class: repo.Virtual, Repositories: []string{"opkg-remote"}},
+		repo.Config{Key: "opkg-over-dark", Class: repo.Virtual, Repositories: []string{"opkg-dark"}},
+		repo.Config{Key: "opkg-over-closed", Class: repo.Virtual, Repositories: []string{"opkg-closed"}},
+	)
+	for _, key := range []string{"opkg-feedless", "opkg-dark", "opkg-local"} {
+		w.put(key, opkgFeed, index)
+		w.put(key, opkgXlat, ipk)
+	}
+	for _, key := range []string{
+		"opkg-over-feedless", "opkg-over-remote", "opkg-over-dark", "opkg-over-closed",
+	} {
+		rec := w.do(http.MethodGet, "/artifactory/"+key+"/"+opkgFeed, "admin", "")
+		if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), "464xlat") {
+			t.Errorf("%s feed answered %d %s, want the refusing member left out",
+				key, rec.Code, rec.Body)
+		}
+	}
+	for _, key := range []string{"opkg-over-feedless", "opkg-over-remote", "opkg-over-closed"} {
+		rec := w.do(http.MethodGet, "/artifactory/"+key+"/"+opkgXlat, "admin", "")
+		if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), ipk) {
+			t.Errorf("%s IPK answered %d with %d bytes, want the member's IPK",
+				key, rec.Code, rec.Body.Len())
+		}
+	}
+	wantError(t, w.do(http.MethodGet, "/artifactory/opkg-over-dark/"+opkgXlat, "admin", ""),
+		http.StatusNotFound, "Could not find resource")
+}

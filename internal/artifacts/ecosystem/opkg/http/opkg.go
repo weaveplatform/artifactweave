@@ -272,12 +272,13 @@ func (s opkgItems) readOpkgBlob(ctx context.Context, sha string) ([]byte, error)
 }
 
 // opkgCandidates walks ordered virtual members. A duplicate path belongs to
-// the first readable member. A member that refuses its feed takes no part.
-// With download false, for the feed, a row stays when the member's or the
-// virtual repository's patterns reject its file, which the feed keeps as
-// 7.x's virtual indexes do (RTFACT-30656). With download true, for an IPK
-// GET, such a row is left out, so the GET passes over that member to the
-// next one that lists the path.
+// the first readable member. A member whose download policy refuses its
+// feed takes no part in the feed, and only a blacked-out one in an IPK GET
+// (opkgMemberRefusesFeed). With download false, for the feed, a row stays
+// when the member's or the virtual repository's patterns reject its file,
+// which the feed keeps as 7.x's virtual indexes do (RTFACT-30656). With
+// download true, for an IPK GET, such a row is left out, so the GET passes
+// over that member to the next one that lists the path.
 func (s opkgItems) opkgCandidates(
 	ctx context.Context, st itemkit.Store, c repo.Config, indexPath string,
 	p kernel.Principal, acc itemkit.Access, download bool, seen map[string]bool,
@@ -302,7 +303,7 @@ func (s opkgItems) opkgCandidates(
 		}
 		if !acc.Folder(member, indexPath, accessapi.ActionRead) ||
 			!acc.File(member, indexPath, accessapi.ActionRead) ||
-			generic.CheckDownload(member, indexPath, false) != nil {
+			opkgMemberRefusesFeed(member, indexPath, download) {
 			continue
 		}
 		var entries []opkgCandidate
@@ -350,6 +351,22 @@ func (s opkgItems) opkgCandidates(
 		}
 	}
 	return out, nil
+}
+
+// opkgMemberRefusesFeed reports whether a virtual repository's member takes
+// no part because its download policy refuses the feed at indexPath. The
+// virtual feed leaves out a member that refuses the document. An IPK GET
+// checks each member at the IPK's own path, as 6.20's
+// VirtualRepoDownloadStrategy does and as the patterns FAQ puts it
+// ("artifacts that match an exclude pattern are not resolved from that
+// repository"), so there the feed is only the lookup that finds the file: a
+// blacked-out member, which refuses every file, takes no part, and patterns
+// that reject only the feed leave the member's IPKs served.
+func opkgMemberRefusesFeed(member repo.Config, indexPath string, download bool) bool {
+	if !download {
+		return generic.CheckDownload(member, indexPath, false) != nil
+	}
+	return member.Class != repo.Virtual && generic.CheckBlackedOut(member, indexPath) != nil
 }
 
 func (s opkgItems) serveOpkgPackage(

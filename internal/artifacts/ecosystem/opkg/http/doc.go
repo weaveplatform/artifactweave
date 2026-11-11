@@ -57,7 +57,10 @@
 //   - A missing member, or one whose feed is unpublished, unreadable to the
 //     caller or refused by the member's download policy, is skipped; a
 //     member of another package type, a member cycle or a chain of more
-//     than eight nested repositories is refused.
+//     than eight nested repositories is refused. A virtual IPK's GET checks
+//     a member's policy at the IPK's own path, never at the feed it reads
+//     to find the IPK, so there only a blacked-out member is skipped for
+//     its feed.
 //   - An IPK is served only when a feed the caller can see lists it, and
 //     only with the SHA-256 that feed gives.
 //   - A feed is read up to 36 MiB, a remote's is validated before it is
@@ -106,9 +109,10 @@
 // cached size; callers who may not read refused first, and feeds and
 // remote or virtual IPKs the download policy refuses answering its 404; an
 // IPK the patterns reject kept in a local, remote or virtual feed while
-// its GET is refused or passed over to the next member; and remote feed
-// and IPK reads on a server built without remote sources. Its item GETs
-// run through the kit with TryOpkgItem as the only overlay. The route
+// its GET is refused or passed over to the next member; a virtual IPK
+// served from a member whose patterns reject only its feed; and remote
+// feed and IPK reads on a server built without remote sources. Its item
+// GETs run through the kit with TryOpkgItem as the only overlay. The route
 // suite test/server/artifacts/opkg checks through the router that a
 // virtual feed is signed only with the configured GPG key, and the @opkg
 // acceptance partition (test/acceptance/features/opkg.feature) is the
