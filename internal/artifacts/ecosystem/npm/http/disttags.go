@@ -54,7 +54,7 @@ func (h handler) listTags(w http.ResponseWriter, r *http.Request) {
 		h.remotePackage(w, r, name, "", true)
 		return
 	}
-	p, ok := h.load(w, r, name)
+	p, ok := h.loadDocument(w, r, name)
 	if !ok {
 		return
 	}
