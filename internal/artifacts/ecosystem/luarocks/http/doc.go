@@ -66,6 +66,18 @@
 //     (405 when none is set, 400 when it is missing or not local) that the
 //     caller may also write to (403).
 //   - Remote and virtual reads take no query (400).
+//   - The download policy (decision 0032) is checked after Read permission
+//     at the path a client asks for. A local or federated manifest is a
+//     stored document 7.x reads through the download path, so a blackout,
+//     or patterns that reject the manifest's own path, refuse it, while a
+//     rock the patterns reject stays listed and only its download is
+//     refused. A remote applies its own policy at the manifest or rock
+//     asked for; the manifest lookup behind a rock download takes the
+//     blackout alone. A virtual repository's own patterns refuse the
+//     manifest or a rock with "No repository found to serve the request";
+//     its manifest leaves out a member that is blacked out or whose
+//     patterns reject the manifest, and a rock request passes over a
+//     member that refuses the rock.
 //   - Statuses and error texts stay byte-identical.
 //
 // # References
@@ -123,6 +135,10 @@
 //     failing manifests, member changes at request time and store faults.
 //   - virtual_test.go: the virtual source's refusal of a single-item
 //     lookup, and manifest merging in member order.
+//   - policy_test.go (external): the download policy on the local, remote
+//     and virtual manifests and rocks: blackout, patterns on the manifest
+//     and on one rock, members passed over or left out, and the virtual
+//     repository's own patterns.
 //
 // The @luarocks acceptance scenarios drive the luarocks client against
 // local, federated, remote and virtual repositories.

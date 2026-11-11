@@ -137,6 +137,14 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, path string
 		h.k.Error(w, r, err)
 		return
 	}
+	// The virtual repository's own patterns leave it no member to search,
+	// which 6.20's VirtualRepoDownloadStrategy answers "No repository found
+	// to serve the request" (decision 0032, rulings R5), not the "Could not
+	// find resource" of a rock no member holds.
+	if err := h.k.CheckDownload(r, path); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	for _, mr := range members {
 		if !h.k.Can(mr, path, api.ActionRead) {
 			continue
@@ -174,7 +182,7 @@ func (h handler) memberManifest(
 	r *http.Request, path string,
 ) (remoteManifest, func(context.Context) error, error) {
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
-		metadata, manifest, err := h.upstreamManifest(r, path)
+		metadata, manifest, err := h.upstreamManifest(r, path, false)
 		if err != nil {
 			return remoteManifest{}, nil, err
 		}
@@ -183,12 +191,14 @@ func (h handler) memberManifest(
 				return remoteManifest{}, nil, fmt.Errorf("luarocks manifest authority: %w", err)
 			}
 		}
+		// A rock whose file the member's patterns reject stays in the merge
+		// (rulings R3, R5), so the rows take Read permission alone.
 		filtered, paths, err := filteredMemberManifest(
 			r.Context(),
 			r,
 			h.k,
 			manifest,
-			metadata.CheckRead,
+			metadata.CheckPermission,
 		)
 		if err != nil {
 			return remoteManifest{}, nil, err
@@ -199,9 +209,9 @@ func (h handler) memberManifest(
 					return fmt.Errorf("luarocks virtual manifest authority: %w", err)
 				}
 			}
-			if metadata.CheckRead != nil {
+			if metadata.CheckPermission != nil {
 				for _, path := range paths {
-					if err := metadata.CheckRead(ctx, path); err != nil {
+					if err := metadata.CheckPermission(ctx, path); err != nil {
 						return fmt.Errorf("luarocks virtual package authority: %w", err)
 					}
 				}
@@ -263,7 +273,15 @@ func (h handler) virtualManifest(w http.ResponseWriter, r *http.Request, path st
 	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
-	members, err := h.virtualMembers(r)
+	if _, err := h.virtualMembers(r); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	// The virtual repository's own patterns rejecting the manifest refuse
+	// it, and a member that is blacked out or whose patterns reject the
+	// manifest's path is left out, remote members included: 7.x ignores a
+	// blacked-out repository when it resolves (rulings R5).
+	members, err := h.k.MergeMembers(r, path)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return

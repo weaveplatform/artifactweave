@@ -46,7 +46,8 @@ func TestAccRemoteRockRechecksManifestAndFileAuthorityAtDelivery(t *testing.T) {
 					return nil
 				},
 			}
-			fenceDisclosures(&result, metadata, []string{"visible-1.0-1.rockspec"})
+			fenceDisclosures(&result, metadata.Revalidate, metadata.CheckRead,
+				[]string{"visible-1.0-1.rockspec"})
 			err := result.Revalidate(t.Context())
 			if tc.expected == "" && err != nil || tc.expected != "" &&
 				(err == nil || !strings.Contains(err.Error(), tc.expected)) {
