@@ -53,6 +53,15 @@
 //     archive answers 502.
 //   - A virtual repository reads its members in order, and the first member
 //     that holds a version supplies it.
+//   - The download policy (decision 0032) refuses a package's versions
+//     document at .pub/<name>.json, where 7.x keeps it, with the policy's
+//     404, after read permission: a blacked-out repository's, a remote's
+//     included, and one whose patterns reject that path. A pattern on one
+//     archive leaves the release listed and refuses only the archive. A
+//     virtual repository's own patterns refuse what they reject with "No
+//     repository found to serve the request"; it leaves a blacked-out
+//     member out, and one whose patterns reject the document, and passes
+//     an archive a member refuses on to the next member that holds it.
 //   - A remote reads an upstream version document only when it names the
 //     package, holds 1 to 4,096 distinct valid versions whose pubspecs name
 //     them, and gives archive URLs over http or https without credentials or
@@ -102,6 +111,8 @@
 //     oversized bodies, and the archive size limit at its boundary.
 //   - remote_test.go: untrusted upstream version documents and the
 //     same-origin archive link rule.
+//   - download_policy_test.go: the download policy on local, federated,
+//     virtual and remote repositories.
 //
 // The @pub acceptance scenarios, with the native Dart client, drive it
 // through the whole server.

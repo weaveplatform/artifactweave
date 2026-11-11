@@ -108,15 +108,20 @@ func validArchiveURL(u *url.URL) bool {
 		u.Host != "" && u.User == nil && u.Fragment == "" && u.Opaque == ""
 }
 
-func (h handler) remoteVersions(r *http.Request, name string) ([]release, error) {
+func (h handler) remoteVersions(r *http.Request, name string, file bool) ([]release, error) {
 	path := "api/packages/" + name
 	resource := source.Resource{
-		Kind:                 source.ResourceKindMetadata,
-		Path:                 path,
-		UpstreamPath:         path,
-		Method:               http.MethodGet,
-		PermissionFolder:     true,
-		PermissionPath:       name,
+		Kind:             source.ResourceKindMetadata,
+		Path:             path,
+		UpstreamPath:     path,
+		Method:           http.MethodGet,
+		PermissionFolder: true,
+		PermissionPath:   name,
+		// The remote's own policy, at the path 7.x caches the document at;
+		// the lookup an archive download makes is refused by the blackout
+		// alone (lookup).
+		PolicyPath:           documentPath(name),
+		BlackoutOnly:         file,
 		Variant:              "dart-pub-v2-versions-v1",
 		ExpectedContentTypes: []string{mediaType, "application/json"},
 		ValidateMetadata: func(_ context.Context, body io.ReadSeeker, _ int64, meta source.MetadataResponse) error {
@@ -155,7 +160,10 @@ func (h handler) remoteVersions(r *http.Request, name string) ([]release, error)
 		if !h.k.Can(r, rel.meta.Path, api.ActionRead) {
 			continue
 		}
-		if err := result.CheckRead(r.Context(), rel.meta.Path); err != nil {
+		// A release whose archive the remote's patterns reject stays
+		// listed, and only its archive is refused (R3, RTFACT-24940).
+		if err := result.CheckRead(r.Context(), rel.meta.Path); err != nil &&
+			!pkgroute.IsRefusal(err) {
 			if errors.Is(err, source.ErrDenied) {
 				continue
 			}
