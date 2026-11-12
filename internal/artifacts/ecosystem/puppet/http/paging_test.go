@@ -2,6 +2,8 @@ package puppethttp_test
 
 import (
 	"fmt"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
@@ -70,11 +72,76 @@ func TestUnitOneModuleReleaseListPages(t *testing.T) {
 	} {
 		wantError(t, f.do("GET", base+route+query, "admin"), 400, message)
 	}
-	// sort_by and exclude_fields are accepted and leave the order and the
-	// fields as they are, and the links name only module, limit and offset
-	// [I].
-	wantBody(t, f.do("GET", base+route+"&sort_by=version&exclude_fields=readme&limit=2", "admin"),
-		listJSON(route, 2, 0, 45, releasesJSON(rels[:2])...))
+}
+
+// exclude_fields leaves the top-level record fields it names out of a
+// release list, separated by commas as the Puppet client sends them
+// (PUP-9364) or by spaces as the Forge's v3 API description gives them, and
+// the links keep sort_by and exclude_fields after the module, so every page
+// answers as the first did (#1327) [I]. sort_by=version leaves the order as
+// it is, newest first.
+func TestUnitReleaseListExcludeFields(t *testing.T) {
+	f := newFixture(t, repo.Local)
+	rels := f.deployReleases(f.c, 3)
+	// The Puppet client's MODULE_RELEASE_EXCLUSIONS, as forge.rb sends them.
+	const client = "readme,changelog,license,uri,module,tags,supported,file_size," +
+		"downloads,created_at,updated_at,deleted_at"
+	clientRecord := func(rel listRelease) string {
+		slug := rel.name + "-" + rel.version
+		return fmt.Sprintf(
+			`{"slug":"%[1]s","version":"%[2]s","metadata":%[3]s,`+
+				`"file_uri":"/v3/files/%[1]s.tar.gz","file_md5":"%[4]s","file_sha256":"%[5]s"}`,
+			slug,
+			rel.version,
+			metadataJSON(rel.name, rel.version, rel.name+" "+rel.version, "[]", ""),
+			rel.item.Actual.MD5,
+			sum(rel.data),
+		)
+	}
+	noTexts := func(rel listRelease) string {
+		return strings.Replace(
+			releaseJSON(rel),
+			`"readme":null,"changelog":null,"license":null,`,
+			"",
+			1,
+		)
+	}
+	for _, tc := range []struct {
+		name, query, links string
+		record             func(listRelease) string
+	}{{
+		"the Puppet client's fields",
+		"&sort_by=version&exclude_fields=" + client,
+		"&sort_by=version&exclude_fields=" + url.QueryEscape(client),
+		clientRecord,
+	}, {
+		"names separated by spaces",
+		"&exclude_fields=readme+changelog%20license",
+		"&exclude_fields=readme+changelog+license",
+		noTexts,
+	}, {
+		"names separated by commas and spaces",
+		"&exclude_fields=readme,+changelog,license",
+		"&exclude_fields=readme%2C+changelog%2Clicense",
+		noTexts,
+	}, {
+		"a field no record has",
+		"&exclude_fields=reference",
+		"&exclude_fields=reference",
+		func(rel listRelease) string { return releaseJSON(rel) },
+	}, {
+		"no field",
+		"&exclude_fields=&sort_by=version",
+		"&sort_by=version&exclude_fields=",
+		func(rel listRelease) string { return releaseJSON(rel) },
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			const route = "/v3/releases?module=acme-alpha"
+			want := []string{tc.record(rels[1])}
+			wantBody(t, f.do("GET", base+route+tc.query+"&limit=1&offset=1", "admin"),
+				listJSON(route+tc.links, 1, 1, 3, want...))
+		})
+	}
 }
 
 // The module search pages as the lists do, under the Forge's pagination

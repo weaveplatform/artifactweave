@@ -56,13 +56,21 @@ type Dependency struct {
 
 // Metadata is what the package index keeps for a module version, as JSON,
 // and what the protocol answers from: the module's name and version, its
-// validated manifest, the manifest's links, and the stored archive's item
-// path, SHA-256 and size. ReadArchive fills all but the path and SHA-256,
-// which Deployed and Reindex take from the stored item.
+// validated manifest, the whole metadata.json, the manifest's links, and
+// the stored archive's item path, SHA-256 and size. ReadArchive fills all
+// but the path and SHA-256, which Deployed and Reindex take from the stored
+// item.
 type Metadata struct {
 	Name     string   `json:"name"`
 	Version  string   `json:"version"`
 	Manifest Manifest `json:"manifest"`
+	// Document is the archive's metadata.json, compacted, which a release
+	// record answers as its metadata (#1325): 7.x answers the file's other
+	// fields beside the validated ones (RTFACT-19130). It is at most
+	// MaxManifestBytes, since ReadArchive reads no larger manifest, and
+	// Manifest validated it, so it is one JSON object whose keys do not
+	// repeat.
+	Document json.RawMessage `json:"document,omitempty"`
 	// ProjectPage and IssuesURL are metadata.json's project_page and
 	// issues_url (ManifestLinks), which a module record answers as its
 	// homepage_url and issues_url. They stay out of Manifest so that the
@@ -227,8 +235,11 @@ func ReadArchive(r io.Reader, size int64) (Metadata, error) {
 		return Metadata{}, ErrArchive
 	}
 	page, issues := ManifestLinks(manifest)
+	var document bytes.Buffer
+	// Manifest decoded the same bytes, so they compact.
+	_ = json.Compact(&document, manifest)
 	return Metadata{
-		Name: m.Name, Version: m.Version, Manifest: m,
+		Name: m.Name, Version: m.Version, Manifest: m, Document: document.Bytes(),
 		ProjectPage: page, IssuesURL: issues, Size: size,
 	}, nil
 }

@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/ulikunitz/xz"
+
+	"github.com/weaveplatform/artifactweave/internal/platform/xzfile"
 )
 
 // EditComposite reads any supported composite metadata representation, calls
@@ -28,7 +30,7 @@ func EditComposite(name string, body []byte, replace func(string) (string, error
 	case strings.HasSuffix(name, ".xml"):
 		xmlBody = body
 	case strings.HasSuffix(name, ".xml.xz"):
-		r, err := xz.NewReader(bytes.NewReader(body))
+		r, err := xzfile.NewReader(bytes.NewReader(body), MaxMetadata+1)
 		if err != nil {
 			return nil, ErrInvalid
 		}
