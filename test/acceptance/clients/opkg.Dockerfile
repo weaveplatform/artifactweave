@@ -9,9 +9,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcurl4-gnutls-dev libssl-dev libgpgme-dev ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL https://downloads.yoctoproject.org/releases/opkg/opkg-0.10.0.tar.gz \
-      -o /tmp/opkg.tar.gz \
-    && echo '4d099e010a5d262b34184fee4766bc60a8c7439741fb210aa11d51704afd04d1  /tmp/opkg.tar.gz' | sha256sum -c - \
+# When the Yocto host does not answer, the tarball comes from kernel.org's copy
+# of its releases directory, the Yocto Project mirror that mirrors.kernel.org
+# lists, the same bytes (#1322).
+COPY fetch-pinned.sh /usr/local/bin/fetch-pinned
+RUN fetch-pinned 4d099e010a5d262b34184fee4766bc60a8c7439741fb210aa11d51704afd04d1 /tmp/opkg.tar.gz \
+      https://downloads.yoctoproject.org/releases/opkg/opkg-0.10.0.tar.gz \
+      https://mirrors.kernel.org/yocto/opkg/opkg-0.10.0.tar.gz \
     && tar -xzf /tmp/opkg.tar.gz -C /tmp \
     && cmake -S /tmp/opkg-0.10.0 -B /tmp/opkg-build \
          -DCMAKE_INSTALL_PREFIX=/usr/local -DUSE_SOLVER_LIBSOLV=ON \

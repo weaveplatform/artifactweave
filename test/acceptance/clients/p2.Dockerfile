@@ -6,6 +6,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openjdk-21-jre-headless libgtk-3-0 libxtst6 ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
+# archive.eclipse.org keeps every release, so it stays first. It is an alias of
+# download.eclipse.org, so the second source is OSU Open Source Lab, a mirror on
+# Eclipse's own mirror list (#1322). A mirror holds only the releases that
+# download.eclipse.org still holds: it covers a current pin, not an old one.
+COPY fetch-pinned.sh /usr/local/bin/fetch-pinned
 ARG TARGETARCH
 RUN case "$TARGETARCH" in \
       amd64) archive=eclipse-platform-4.41-linux-gtk-x86_64.tar.gz; \
@@ -14,10 +19,10 @@ RUN case "$TARGETARCH" in \
         sha512=1f735ab3858536cdb5818628798bc445a19406a2ca841624a6f53af1152d4e6ddaf72bd8e917adf48f124169b43b9a8b4f2d4f38b37a5911e6d5509aadeb4036 ;; \
       *) exit 1 ;; \
     esac \
-    && curl -fsSL --retry 3 \
-      "https://archive.eclipse.org/eclipse/downloads/drops4/R-4.41-202608281142/$archive" \
-      -o /tmp/eclipse-platform.tar.gz \
-    && echo "$sha512  /tmp/eclipse-platform.tar.gz" | sha512sum -c - \
+    && drop=eclipse/downloads/drops4/R-4.41-202608281142 \
+    && fetch-pinned "$sha512" /tmp/eclipse-platform.tar.gz \
+      "https://archive.eclipse.org/$drop/$archive" \
+      "https://ftp2.osuosl.org/pub/eclipse/$drop/$archive" \
     && mkdir -p /opt \
     && tar -xzf /tmp/eclipse-platform.tar.gz -C /opt \
     && rm /tmp/eclipse-platform.tar.gz
