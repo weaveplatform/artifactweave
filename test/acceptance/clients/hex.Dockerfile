@@ -3,7 +3,7 @@
 # Hex is pinned separately because it ships as an archive. Dependabot cannot
 # list hexpm/elixir's tags, so deps-refresh.yml moves this base with
 # tools/depsync/hex_image.py.
-FROM hexpm/elixir:1.20.5-erlang-29.1.2-alpine-3.24.3@sha256:d4a56ccb80b8aeedcb7d9d4a56b4b5b229ec684aaea537dfac39cd146fb3aea5
+FROM hexpm/elixir:1.20.5-erlang-29.1.2-alpine-3.24.4@sha256:fdc3e2838224d974d854eb5c0ec4cd790da31761ebebf5fbdd22113f19eb0002
 ENV MIX_ARCHIVES=/usr/local/share/mix/archives
 RUN mix local.hex 2.6.0 --force
 
