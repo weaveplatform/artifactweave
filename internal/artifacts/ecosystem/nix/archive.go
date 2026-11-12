@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/ulikunitz/xz"
 )
 
 // Archive describes both the transport bytes and the uncompressed NAR.
@@ -28,8 +27,10 @@ type Archive struct {
 // the SHA-256, as lowercase hex, and size of both. The NAR must keep the
 // grammar and zero padding, name its directory entries safely and in
 // strictly increasing order, and stay within MaxNarBytes, 100,000 nodes
-// and a depth of 128; decoders are bounded to 64 MiB of memory. Every
-// refusal, a size outside 1 to MaxArchiveBytes included, is ErrInvalid.
+// and a depth of 128; decoders are bounded to 64 MiB of memory. An xz file
+// must be whole, every stream ending in its index and footer, as Nix's
+// decompressor requires (#1297). Every refusal, a size outside 1 to
+// MaxArchiveBytes included, is ErrInvalid.
 func ReadArchive(input io.Reader, size int64, compression string) (Archive, error) {
 	var out Archive
 	if size <= 0 || size > MaxArchiveBytes {
@@ -43,7 +44,7 @@ func ReadArchive(input io.Reader, size int64, compression string) (Archive, erro
 	case "none":
 		reader = raw
 	case "xz":
-		r, err := (xz.ReaderConfig{DictCap: 64 << 20}).NewReader(raw)
+		r, err := newXZReader(raw)
 		if err != nil {
 			return out, ErrInvalid
 		}

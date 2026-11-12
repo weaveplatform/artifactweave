@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -112,10 +113,10 @@ func handlerFixture(t *testing.T) (format.Env, repo.Config, model.Item, model.It
 			WorkQueue: db.WorkQueue(),
 			Blobs:     blobs,
 		}, c, put(
-			fixturePath,
+			InfoItem(info.Hash(), false),
 			info.Encode(info.URL),
 		), put(
-			info.URL,
+			ArchiveItem(info.Hash(), info.URL, false),
 			archive,
 		), info
 }
@@ -166,7 +167,7 @@ func TestUnitNixAdmissionAndGenericReadFences(t *testing.T) {
 		t.Context(),
 		env,
 		c,
-		format.Download{Path: "00000000000000000000000000000000.narinfo"},
+		format.Download{Path: InfoItem(strings.Repeat("0", 32), false)},
 	); !errors.Is(
 		err,
 		kernel.ErrNotFound,
@@ -222,9 +223,9 @@ func TestUnitNixAdmissionAndGenericReadFences(t *testing.T) {
 	if _, err = env.Store.Items().Put(t.Context(), archive); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{fixturePath, "nix-cache-info", info.URL} {
+	for _, path := range []string{fixturePath, meta.FullPath(), "nix-cache-info", info.URL, archive.FullPath()} {
 		want := format.ClassMetadata
-		if path == info.URL {
+		if path == info.URL || path == archive.FullPath() {
 			want = format.ClassUnique
 		}
 		if h.Classify(c, path) != want {
@@ -245,7 +246,7 @@ func TestUnitNixStorageFailuresRemainFailures(t *testing.T) {
 			if _, err := ReferencedArchive(t.Context(), env, c, info, false); err == nil {
 				t.Fatal("archive failure swallowed")
 			}
-			for _, path := range []string{fixturePath, info.URL, "nix-cache-info"} {
+			for _, path := range []string{meta.FullPath(), info.URL, "nix-cache-info"} {
 				if _, err := h.Inspect(
 					t.Context(),
 					env,
@@ -265,7 +266,7 @@ func TestUnitNixStorageFailuresRemainFailures(t *testing.T) {
 				t.Context(),
 				env,
 				c,
-				format.Download{Path: fixturePath},
+				format.Download{Path: meta.FullPath()},
 			); err == nil {
 				t.Fatal("generic metadata failure swallowed")
 			}

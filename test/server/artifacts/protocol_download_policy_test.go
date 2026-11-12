@@ -572,7 +572,7 @@ func protocolDocuments() []protocolDocument {
 		{
 			name: "nix narinfo", repo: local("nix-local", repo.Nix),
 			route:    "api/nix/nix-local/" + narinfo,
-			document: narinfo, stored: true, virtual: true,
+			document: "binary-cache/" + narinfo[:32] + "/" + narinfo, stored: true, virtual: true,
 		},
 		{
 			name: "puppet module", repo: local("puppet-local", repo.Puppet),

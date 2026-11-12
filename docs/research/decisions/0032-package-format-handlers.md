@@ -483,6 +483,13 @@ Nix 2.35.4 copy/substitution in fresh stores provides L/R/V/F evidence. The
 [contract and limits](../../testing/nix.md) document trust configuration, bounded
 parsing, lifecycle behavior and the binary-cache scope of this inventory row.
 
+A hosted repository stores a store path's narinfo and NAR in one folder,
+`binary-cache/<store hash>/` (#1296), where `jf nix` finds them with AQL
+(jfrog-cli-artifactory `artifactory/commands/nix/command.go`). Nix still
+uploads to `nar/<file>` and `<hash>.narinfo`: the NAR is held at `nar/<file>`
+until its narinfo arrives, then both are stored in the folder and the held
+upload is released [I]. A remote cache keeps the upstream's paths [I].
+
 Channels (#1263) follow the shape `nix-channel --update` expects of
 `channels.nixos.org`: `channels/<name>` answers 302 to the newest snapshot,
 `<flavor>/<snapshot>`, whose folder answers a page and holds
@@ -714,8 +721,8 @@ types blacked out in P19 [I], and a deviation is registered only if 7.x serves t
   with 403 "Conda index is not readable".
 - **The refusal names the path Artifactory checks:** a document's R1 path, a VCS remote
   repository's `<owner>/<name>/gitrefs` (RTFACT-30171, RTFACT-30743), a Docker tag's
-  `<image>/<tag>/manifest.json` (R11), and [I] a Nix NAR's own `nar/<file>` and a Helm remote
-  repository's `index.yaml`.
+  `<image>/<tag>/manifest.json` (R11), and [I] a Nix NAR's stored `binary-cache/<hash>/<file>`
+  and a Helm remote repository's `index.yaml`.
 - **Cargo answers every refusal in Artifactory's envelope,** remote refusals included, as 7.x
   refused `index/config.json` in it
   ([RTFACT-29873](https://jfrog.atlassian.net/browse/RTFACT-29873)).
@@ -803,7 +810,7 @@ keeps a release whose file the patterns reject (R3).
 | Swift | none | release list `<scope>/<name>`; release info `<v>`, `<v>.json`, `<v>/Package.swift` | Archive at `<scope>/<name>/<name>-<v>.zip`, refused with no archive headers. A remote repository names the package folder `<scope>/<name>` [I]. |
 | Terraform | a remote repository's documents under `.terraform/modules/` and `.terraform/providers/` [I] | module `versions`; provider `versions`, package metadata, mirror `index.json` and `<v>.json` | A module's `<v>/download` answers as a GET of its archive would (R9): `<ns>/<name>/<system>/<v>.zip` in a local repository, its cache path in a remote. A remote caches a provider file at its URL path below the Providers URL, else at `external/<host>/<path>`, and a GitHub module at its VCS tag path (#1260, decision 0040). Signed files pass the policy's message on. |
 | Git LFS | none | none | A transfer is checked at `objects/<xx>/<yy>/<oid>`. A download batch answers a caller who may not read 403 per object. Locks are unchanged. |
-| Nix | `nix-cache-info`, `<hash>.narinfo` | `channels/<name>`, a snapshot's page `channels/<name>/<flavor>/<snapshot>` [I] | A NAR is checked at its own `nar/<file>`, so patterns on the NARs leave the narinfo served. A channel tarball is checked at `channels/<name>/<flavor>/<snapshot>/nixexprs.tar.xz` [I], and the channel still names a snapshot whose tarball the patterns reject. |
+| Nix | `nix-cache-info`, `binary-cache/<hash>/<hash>.narinfo` (a remote cache's `<hash>.narinfo` [I]) | `channels/<name>`, a snapshot's page `channels/<name>/<flavor>/<snapshot>` [I] | A NAR is checked at its stored `binary-cache/<hash>/<file>` (a remote cache's at `nar/<file>`), so patterns on the NARs leave the narinfo served. A channel tarball is checked at `channels/<name>/<flavor>/<snapshot>/nixexprs.tar.xz` [I], and the channel still names a snapshot whose tarball the patterns reject. |
 | VCS | a remote repository's refs at `<owner>/<name>/gitrefs` | none | Read permission stays on the project folder. `downloadCommit` reads no refs. |
 | Puppet | a remote repository's `.puppet/<m>/releases.json` [I] | `v3/releases`, with or without `module`; `v3/releases/<slug>`; `v3/modules/<m>`; `v3/modules` without `query` | Module search (`v3/modules?query=`) kept (R2b). The lists of every release and module keep a release whose archive the patterns reject (R3); 7.x writes Puppet's listings as stored documents, an `all.json` among them (RTFACT-26143). Archive at `<m>/<m>-<v>.tar.gz`. |
 | Vagrant | none | the box catalog `<box>`, to a caller who could see one of its boxes | Other callers get "Vagrant box not found" as before. The catalog leaves out an entry whose box the patterns reject until P19 [I]. A box file is checked at its own `<path>.box` (#1259). |

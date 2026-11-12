@@ -6,8 +6,6 @@ import (
 	"io"
 	"regexp"
 	"strings"
-
-	"github.com/ulikunitz/xz"
 )
 
 const (
@@ -80,10 +78,11 @@ func IsChannelPath(path string) bool {
 	return ok
 }
 
-// ReadChannel checks that input, exactly size bytes, is an xz stream
-// holding one tar archive and nothing more, as nix-channel unpacks it: the
-// documentation requires nixexprs.tar.xz, so a gzip or bzip2 tarball, or an
-// xz stream of anything else, is refused. The tarball must have an entry,
+// ReadChannel checks that input, exactly size bytes, is a whole xz file,
+// every stream ending in its index and footer, holding one tar archive and
+// nothing more, as nix-channel unpacks it: the documentation requires
+// nixexprs.tar.xz, so a gzip or bzip2 tarball, or an xz stream of anything
+// else, is refused. The tarball must have an entry,
 // stay within MaxChannelBytes expanded, and size must be 1 to
 // MaxArchiveBytes; the decoder is bounded to 64 MiB of memory. Every
 // refusal is ErrInvalid.
@@ -92,7 +91,7 @@ func ReadChannel(input io.Reader, size int64) error {
 		return ErrInvalid
 	}
 	compressed := &io.LimitedReader{R: input, N: size + 1}
-	r, err := (xz.ReaderConfig{DictCap: 64 << 20}).NewReader(compressed)
+	r, err := newXZReader(compressed)
 	if err != nil {
 		return ErrInvalid
 	}

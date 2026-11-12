@@ -99,6 +99,14 @@
       "missing response 200 property upstreamProjectKey",
       "missing response 200 property upstreamRepoKey"
     ],
+    "POST /artifactory/api/deb/reindex/{}": [
+      "query parameter async lacks enum value 0",
+      "query parameter async lacks enum value 1"
+    ],
+    "POST /artifactory/api/opkg/reindex/{}": [
+      "query parameter async lacks enum value 0",
+      "query parameter async lacks enum value 1"
+    ],
     "POST /artifactory/api/repositories/{}": [
       "missing request property projectScopedReadUpstream",
       "missing request property upstreamProjectKey",
@@ -108,6 +116,10 @@
       "missing request property [].projectScopedReadUpstream",
       "missing request property [].upstreamProjectKey",
       "missing request property [].upstreamRepoKey"
+    ],
+    "POST /artifactory/api/yum/{}": [
+      "query parameter async lacks enum value 0",
+      "query parameter async lacks enum value 1"
     ],
     "PUT /artifactory/api/repositories/{}": [
       "missing request property projectScopedReadUpstream",

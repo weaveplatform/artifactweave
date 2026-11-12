@@ -40,7 +40,16 @@ import (
 const (
 	infoPath = "fyli4q2yj6vh01bs0jxqbvj5hir5zvqc.narinfo"
 	prefix   = "/artifactory/api/nix/local/"
+	// storedInfo is where a hosted repository stores the narinfo the client
+	// uploads to infoPath.
+	storedInfo = "binary-cache/fyli4q2yj6vh01bs0jxqbvj5hir5zvqc/" + infoPath
 )
+
+// storedNAR is where a hosted repository stores the NAR of the fixture's
+// narinfo, which the client uploads to f.info.URL.
+func (f *fixture) storedNAR() string {
+	return nixfmt.ArchiveItem(infoPath[:32], f.info.URL, false)
+}
 
 // serverStore is the one store the router kit serves and the access API is
 // bound over, as a server binds both.
@@ -224,10 +233,20 @@ func TestAccNixNativePublishSignAndLifecycle(t *testing.T) {
 	}
 	status(t, f.do("HEAD", prefix+transport, nil, ""), 200)
 	status(t, f.do("POST", prefix+"reindex", nil, ""), 200)
-	status(t, f.do("DELETE", prefix+f.info.URL, nil, ""), 204)
+	// The NAR is deleted at the URL the narinfo serves, which names its
+	// store path; nar/<file> names only an upload not yet published.
+	status(t, f.do("DELETE", prefix+f.info.URL, nil, ""), 404)
+	status(t, f.do("DELETE", prefix+transport, nil, ""), 204)
 	status(t, f.do("GET", prefix+infoPath, nil, ""), 404)
 	status(t, f.do("PUT", prefix+f.info.URL, f.data, ""), 201)
+	status(t, f.do("GET", prefix+infoPath, nil, ""), 404)
+	status(t, f.do("PUT", prefix+infoPath, f.meta, ""), 201)
 	status(t, f.do("GET", prefix+infoPath, nil, ""), 200)
+	status(t, f.do("DELETE", prefix+infoPath, nil, ""), 204)
+	status(t, f.do("GET", prefix+infoPath, nil, ""), 404)
+	if _, err := f.db.Items().Get(t.Context(), "local", false, f.storedNAR()); err != nil {
+		t.Fatalf("deleting the narinfo took its NAR: %v", err)
+	}
 }
 
 func TestAccNixDenialsAndMalformedPublication(t *testing.T) {

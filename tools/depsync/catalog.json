@@ -358,7 +358,7 @@
     },
     "p2": {
       "path": "test/acceptance/clients/p2.Dockerfile",
-      "pattern": "https://archive.eclipse.org/eclipse/downloads/drops4/R-([0-9.]+)-[0-9]+/"
+      "pattern": "drop=eclipse/downloads/drops4/R-([0-9.]+)-[0-9]+"
     },
     "puppet": {
       "path": "test/acceptance/clients/puppet/Dockerfile",
@@ -426,7 +426,7 @@
     },
     "hexeditor": {
       "path": ".github/actions/ai-editor-assets/action.yml",
-      "pattern": "/hexeditor/([0-9.]+)/"
+      "pattern": "gallerycdn\\.vsassets\\.io/extensions/ms-vscode/hexeditor/([0-9.]+)/"
     },
     "hf-hub": {
       "path": ".github/workflows/quality-gate.yml",
@@ -595,6 +595,16 @@
       "replacement": "# Client pins: Composer {{composer2}}; Composer {{composer1}} local compatibility."
     },
     {
+      "path": "test/acceptance/clients/composer.Dockerfile",
+      "pattern": "(github\\.com/composer/composer/releases/download/)2(?:\\.[0-9]+)+(/composer\\.phar)",
+      "replacement": "\\g<1>{{composer2}}\\g<2>"
+    },
+    {
+      "path": "test/acceptance/clients/composer.Dockerfile",
+      "pattern": "(github\\.com/composer/composer/releases/download/)1(?:\\.[0-9]+)+(/composer\\.phar)",
+      "replacement": "\\g<1>{{composer1}}\\g<2>"
+    },
+    {
       "path": "test/acceptance/clients/conda.Dockerfile",
       "pattern": "\\A#[^\\n]*",
       "replacement": "# Client pins: micromamba {{conda.version}} (Conda package protocol)."
@@ -752,13 +762,23 @@
       "path": "test/acceptance/clients/maven.Dockerfile",
       "pattern": "(ivy-)[0-9]+(?:\\.[0-9]+)*(\\.jar)",
       "replacement": "\\g<1>{{ivy}}\\g<2>",
-      "count": 1
+      "count": 2
+    },
+    {
+      "path": "test/acceptance/clients/maven.Dockerfile",
+      "pattern": "(storage-download\\.googleapis\\.com/maven2/org/apache/ivy/ivy/)[0-9]+(?:\\.[0-9]+)*(/)",
+      "replacement": "\\g<1>{{ivy}}\\g<2>"
     },
     {
       "path": "test/acceptance/clients/maven.Dockerfile",
       "pattern": "(gradle-)[0-9]+(?:\\.[0-9]+)*",
       "replacement": "\\g<1>{{gradle}}",
-      "count": 3
+      "count": 4
+    },
+    {
+      "path": "test/acceptance/clients/maven.Dockerfile",
+      "pattern": "(gradle-distributions/releases/download/v)[0-9]+(?:\\.[0-9]+)*(/)",
+      "replacement": "\\g<1>{{gradle}}\\g<2>"
     },
     {
       "path": "test/acceptance/clients/maven.Dockerfile",
@@ -770,7 +790,7 @@
       "path": "test/acceptance/clients/opkg.Dockerfile",
       "pattern": "(opkg-)[0-9]+(?:\\.[0-9]+)*",
       "replacement": "\\g<1>{{opkg}}",
-      "count": 3
+      "count": 4
     },
     {
       "path": "test/acceptance/clients/sbt.Dockerfile",
@@ -788,7 +808,7 @@
       "path": "test/acceptance/clients/vagrant.Dockerfile",
       "pattern": "(vagrant_)[0-9]+(?:\\.[0-9]+)*(-1_amd64.deb)",
       "replacement": "\\g<1>{{vagrant}}\\g<2>",
-      "count": 1
+      "count": 2
     },
     {
       "path": "test/acceptance/clients/vagrant.Dockerfile",
@@ -873,6 +893,11 @@
       "path": "docs/operations/machinelearning.md",
       "pattern": "python -m pip install frogml==[0-9.]+",
       "replacement": "python -m pip install frogml=={{frogml}}"
+    },
+    {
+      "path": ".github/actions/ai-editor-assets/action.yml",
+      "pattern": "(/extension/hexeditor/)[0-9]+(?:\\.[0-9]+)*(/assetbyname)",
+      "replacement": "\\g<1>{{hexeditor}}\\g<2>"
     }
   ],
   "images": [
