@@ -408,6 +408,10 @@ func (h handler) module(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
+	if len(releases) == 0 && pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.unlistedModule(w, r, name)
+		return
+	}
 	if len(releases) == 0 {
 		h.k.Error(w, r, apierror.New(404, "Puppet module not found"))
 		return
@@ -440,9 +444,84 @@ func (h handler) moduleDetails(
 	u use,
 ) (moduleDetails, bool, error) {
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
-		return h.remoteModule(r, name, u)
+		read, found, err := h.remoteModule(r, name, u)
+		return read.details, found, err
 	}
 	return derivedModule(releases), true, nil
+}
+
+// unlistedModule answers v3/modules/<m> on a remote whose upstream's
+// release pages list no release of module name the caller may read, from
+// the upstream's own record of the module (#1370) [I]. RTFACT-19130
+// reports a 6.8.6 remote answering 404 for puppetlabs-sqlserver, a Puppet
+// Enterprise module the Forge's module record served, and names that 404
+// as the fault; the Forge's v3 API description says its module list holds
+// only the base group unless module_groups names others, "unless
+// requesting modules by their slugs". r10k reads this record for a
+// module's current release before it installs, so the record answers the
+// module. Its releases are the versions the record lists that the caller
+// may read (recordReleases), checked as a release page's are, and its
+// current release is the newest one's own record, v3/releases/<slug>
+// (remoteRelease); both are read under the release pages' authority, Read
+// on the module folder and the download policy at
+// .puppet/<m>/releases.json (DV-057). A record the upstream does not hold,
+// or that lists no release the caller may read, answers 404 as before; a
+// listed release whose own record the upstream does not hold is invalid
+// upstream metadata. The release list and the search still answer from the
+// release pages, as the Forge's own search leaves out a module of another
+// group (it found puppetlabs-sqlserver only with module_groups on
+// 2026-11-12).
+func (h handler) unlistedModule(w http.ResponseWriter, r *http.Request, name string) {
+	read, found, err := h.remoteModule(r, name, listing)
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	if !found {
+		h.k.Error(w, r, apierror.New(404, "Puppet module not found"))
+		return
+	}
+	versions, err := recordReleases(read.releases)
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	if read.checkPermission == nil {
+		h.k.Error(w, r, fmt.Errorf(
+			"puppet: missing authority: %w",
+			pkgroute.SourceError(source.ErrInvalidResult, false),
+		))
+		return
+	}
+	var releases []release
+	for _, v := range versions {
+		path := puppetfmt.Path(name, v)
+		if !h.k.Can(r, path, api.ActionRead) {
+			continue
+		}
+		if err = read.checkPermission(r.Context(), path); err != nil {
+			if errors.Is(err, source.ErrDenied) {
+				continue
+			}
+			h.k.Error(w, r, fmt.Errorf("puppet: authority: %w", pkgroute.SourceError(err, false)))
+			return
+		}
+		releases = append(releases, release{meta: puppetfmt.Metadata{Name: name, Version: v}})
+	}
+	if len(releases) == 0 {
+		h.k.Error(w, r, apierror.New(404, "Puppet module not found"))
+		return
+	}
+	current, found, err := h.remoteRelease(r, name, releases[0].meta.Version, listing)
+	if err == nil && !found {
+		err = invalidUpstream()
+	}
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	releases[0] = current
+	writeJSON(w, r, 200, newModuleRecord(releases, read.details))
 }
 
 // modules answers v3/modules: the whole-repository list when the query

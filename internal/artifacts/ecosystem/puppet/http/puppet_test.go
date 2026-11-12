@@ -139,7 +139,10 @@ type metadataSource struct {
 	moduleNoRevalidate    bool
 	moduleNoStream        bool
 	moduleRevalidateError error
-	metadataBase          string
+	// moduleNoAuthority leaves a module record read without the source's
+	// check of a release it lists.
+	moduleNoAuthority bool
+	metadataBase      string
 	// pagesAtURL answers a release page from the address the remote asked
 	// for, as moduleRecord answers a module record, rather than from
 	// metadataBase, for remotes over more than one upstream.
@@ -222,7 +225,7 @@ func (s metadataSource) Read(
 			Revalidate: revalidate,
 		}, nil
 	}
-	if resource.Variant == "puppet-forge-v3-module-v1" {
+	if resource.Variant == "puppet-forge-v3-module-v2" {
 		return s.moduleRecord(r, resource)
 	}
 	if resource.Variant == "puppet-forge-v3-release-v1" {
@@ -317,7 +320,8 @@ func (s metadataSource) moduleRecord(
 		Stream: &source.Stream{
 			Body: io.NopCloser(strings.NewReader(body)), Status: 200, Size: int64(len(body)),
 		},
-		Metadata: source.MetadataResponse{BaseURL: at.String()},
+		Metadata:        source.MetadataResponse{BaseURL: at.String()},
+		CheckPermission: s.check,
 	}
 	if s.moduleBase != "" {
 		result.Metadata.BaseURL = s.moduleBase
@@ -327,6 +331,9 @@ func (s metadataSource) moduleRecord(
 	}
 	if s.moduleNoStream {
 		result.Stream = nil
+	}
+	if s.moduleNoAuthority {
+		result.CheckPermission = nil
 	}
 	if !s.skipMetadataValidation {
 		if err := resource.ValidateMetadata(

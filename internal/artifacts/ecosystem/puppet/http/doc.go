@@ -104,9 +104,14 @@
 //     value of another type as a hosted release would. A hosted or virtual
 //     module record takes its downloads, dates, owner and links from its
 //     releases [I]. A remote's relays those of the upstream's own record,
-//     v3/modules/<m>, asked without its current release and release list
-//     and read under the release pages' authority, and answers 404, and
-//     an empty search, when the upstream answers 404 for it (#1326) [I].
+//     v3/modules/<m>, asked without its current release and read under
+//     the release pages' authority, and answers 404, and an empty search,
+//     when the upstream answers 404 for it (#1326) [I]. A module whose
+//     release pages list no release the caller may read is answered from
+//     that record's own release list, leaving out the releases it marks
+//     deleted, with the newest one's own record as its current release
+//     (#1370) [I]; its release list and search still answer from the
+//     pages.
 //   - A remote builds each Forge query itself (module, limit, offset,
 //     sort_by and exclude_fields), never forwards a client's, module_groups
 //     included, never
@@ -182,8 +187,9 @@
 //     https://github.com/weaveplatform/artifactweave/issues/1326,
 //     https://github.com/weaveplatform/artifactweave/issues/1327,
 //     https://github.com/weaveplatform/artifactweave/issues/1343,
-//     https://github.com/weaveplatform/artifactweave/issues/1344 and
-//     https://github.com/weaveplatform/artifactweave/issues/1369
+//     https://github.com/weaveplatform/artifactweave/issues/1344,
+//     https://github.com/weaveplatform/artifactweave/issues/1369 and
+//     https://github.com/weaveplatform/artifactweave/issues/1370
 //
 // # Status
 //
@@ -219,6 +225,10 @@
 //     upstream's record holds, through a remote and a virtual repository,
 //     the record read's authority, the archive checked against the record,
 //     member order and the members passed over, and the failures.
+//   - unlisted_module_test.go: a remote's module record for a module its
+//     release pages leave out, from the upstream's module record and the
+//     newest release's own record, read permission, the failures, and a
+//     listed module that never reads the record's release list.
 //   - groups_test.go: module_groups on one module's release list and the
 //     module search answering as without it on every repository class, a
 //     remote's upstream queries without it, and the refusals it leaves

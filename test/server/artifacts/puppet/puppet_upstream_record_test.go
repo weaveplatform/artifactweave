@@ -81,3 +81,51 @@ func TestAccPuppetVirtualReleaseOnlyAnUpstreamRecordHolds(t *testing.T) {
 		t.Fatalf("local member's release: %d %s", r.Code, r.Body.String())
 	}
 }
+
+// A remote answers v3/modules/<m> for a module its Forge's release list
+// leaves out, a Puppet Enterprise module's here, from the Forge's own
+// record of the module, with the releases that record lists and the newest
+// one's own record as its current release, as r10k reads it before it
+// installs (#1370) [I]. RTFACT-19130 names a 6.8.6 remote's 404 here as
+// the fault. The release list and the search still answer from the Forge's
+// release list, and Read is checked before the Forge is asked.
+func TestAccPuppetRemoteModuleTheForgeListLeavesOut(t *testing.T) {
+	const remote = "/artifactory/api/puppet/remote"
+	up := newGroupedForge(t)
+	w := groupedRemote(t, up, nil)
+	current := strings.TrimSuffix(encodeAnswer(t, up.want("acme-pe-1.0.0")), "\n")
+	want := `{"uri":"/v3/modules/acme-pe","slug":"acme-pe","name":"pe","downloads":0,` +
+		`"created_at":null,"updated_at":null,"supported":false,"endorsement":null,` +
+		`"module_group":"pe_only","owner":{"uri":"/v3/users/acme","slug":"acme",` +
+		`"username":"acme","gravatar_id":null},"current_release":` + current + `,` +
+		`"releases":[{"uri":"/v3/releases/acme-pe-1.0.0","version":"1.0.0"}],` +
+		`"homepage_url":null,"issues_url":null}` + "\n"
+	r := w.request("GET", remote+"/v3/modules/acme-pe", "reader", "")
+	if r.Code != 200 || r.Body.String() != want {
+		t.Fatalf("module: %d %s\nwant 200 %s", r.Code, r.Body.String(), want)
+	}
+	asked := up.requests()
+	for _, path := range []string{
+		"/v3/modules/acme-pe?exclude_fields=current_release",
+		"/v3/releases/acme-pe-1.0.0?exclude_fields=reference+tasks+plans+pdk+validation_score+" +
+			"malware_scan+deleted_for",
+	} {
+		if !slices.Contains(asked, path) {
+			t.Fatalf("the Forge was not asked %s: %q", path, asked)
+		}
+	}
+	r = w.request("GET", remote+"/v3/modules?query=acme-pe", "reader", "")
+	if empty := encodeAnswer(t, struct {
+		Pagination pageObject `json:"pagination"`
+		Results    []any      `json:"results"`
+	}{newPageObject("/v3/modules", "query=acme-pe", 20, 0, 0), []any{}}); r.Code != 200 ||
+		r.Body.String() != empty {
+		t.Fatalf("search: %d %s\nwant 200 %s", r.Code, r.Body.String(), empty)
+	}
+	up.requests()
+	remoteStatus(t, w.request("GET", remote+"/v3/modules/acme-pe", "denied", ""), 403)
+	if asked := up.requests(); len(asked) != 0 {
+		t.Fatalf("a denied caller reached the Forge: %q", asked)
+	}
+	remoteStatus(t, w.request("GET", remote+"/v3/modules/acme-none", "reader", ""), 404)
+}

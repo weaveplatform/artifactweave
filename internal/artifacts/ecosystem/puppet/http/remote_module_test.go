@@ -145,7 +145,7 @@ func TestUnitRemoteModuleTheUpstreamDoesNotServe(t *testing.T) {
 
 // A remote asks its upstream for 20 releases a page without the fields no
 // record answers (#1300), and for the module's record without its current
-// release and release list, under the release pages' authority: Read on
+// release (#1370), under the release pages' authority: Read on
 // the module folder, the download policy at .puppet/<m>/releases.json for
 // v3/modules/<m>, and the blackout alone for the search. The release list
 // reads no module record.
@@ -190,9 +190,9 @@ func TestUnitRemoteAsksTheUpstream(t *testing.T) {
 			got.PermissionPath, got.NoCrossOriginAuth, got.PolicyPath, got.BlackoutOnly,
 		}
 		wantFields := []any{
-			"https://example.com/puppet/v3/modules/acme-widget?exclude_fields=current_release+releases",
+			"https://example.com/puppet/v3/modules/acme-widget?exclude_fields=current_release",
 			"v3/modules/acme-widget",
-			"puppet-forge-v3-module-v1",
+			"puppet-forge-v3-module-v2",
 			source.ResourceKindMetadata,
 			true,
 			"acme-widget",
