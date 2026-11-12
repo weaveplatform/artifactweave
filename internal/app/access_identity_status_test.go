@@ -272,6 +272,16 @@ func TestAccReplaceGroupAnswers(t *testing.T) {
 		{put, ops, admin, `{"name":"ops","auto_join":true}`, 200, reset},
 		{get, ops, admin, "", 200, reset},
 		{put, ops, admin, `{"name":"","members":["user"]}`, 200, withUser},
+		// The create body has no realm, so one sent is ignored, as Create a
+		// Group ignores it, and the group keeps its own.
+		{
+			put,
+			ops,
+			admin,
+			`{"realm":"ldap","realm_attributes":"x","members":["user"]}`,
+			200,
+			withUser,
+		},
 		{put, ops, admin, `{"name":"Ops"}`, 400, mismatch},
 		{put, ops, admin, ldap, 400, noLDAP},
 		{put, ops, admin, `{"import_from_ldap_group_setting":"corp","members":[]}`, 400, exclusive},
