@@ -42,6 +42,11 @@ type FetchOptions struct {
 	UserAgent string
 	// Retries is the number of attempts on 429 and 5xx responses (default 3).
 	Retries int
+	// Known maps a family slug to page URLs an earlier good fetch found for
+	// that family. When the family's own index fails, they pick its section
+	// of the parent index (see fetchFamily); without them a failed index
+	// leaves the family missing.
+	Known map[string][]string
 }
 
 // ManifestEntry records one page of one index.
@@ -59,9 +64,12 @@ type ManifestEntry struct {
 
 // Manifest is written as manifest.json and lists what the cache holds.
 type Manifest struct {
-	FetchedAt time.Time       `json:"fetched_at"`
-	UserAgent string          `json:"user_agent"`
-	Entries   []ManifestEntry `json:"entries"`
+	FetchedAt time.Time `json:"fetched_at"`
+	UserAgent string    `json:"user_agent"`
+	// Families has one record per index Fetch was given, so a family that
+	// yielded no page is still on record (Missing, CheckFamilies).
+	Families []FamilyRecord  `json:"families"`
+	Entries  []ManifestEntry `json:"entries"`
 }
 
 // Blocks returns the number of entries with a cached OpenAPI block.
@@ -79,6 +87,7 @@ func (m Manifest) Blocks() int {
 var (
 	errNoIndexes  = errors.New("specoracle: no indexes given")
 	errNoCacheDir = errors.New("specoracle: CacheDir is required")
+	errEmptyIndex = errors.New("specoracle: index lists no page")
 	// ErrBadStatus is wrapped around unexpected HTTP statuses.
 	ErrBadStatus = errors.New("specoracle: unexpected http status")
 )
@@ -87,6 +96,8 @@ var (
 // embedded OpenAPI block and writes it into CacheDir. Pages without a block
 // and transport failures are recorded in the manifest rather than aborting,
 // because the docs site changes and a single bad page must not hide the rest.
+// A family whose index fails is recorded in Families, and its pages come from
+// the parent index where Known identifies them.
 func Fetch(ctx context.Context, opts FetchOptions) (Manifest, error) {
 	if len(opts.Indexes) == 0 {
 		return Manifest{}, errNoIndexes
@@ -99,15 +110,10 @@ func Fetch(ctx context.Context, opts FetchOptions) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("specoracle: create cache dir: %w", err)
 	}
 	var entries []ManifestEntry
+	families := make([]FamilyRecord, 0, len(opts.Indexes))
 	for _, index := range opts.Indexes {
-		got, err := f.fetchIndex(ctx, index)
-		if err != nil {
-			entries = append(
-				entries,
-				ManifestEntry{Index: index, Family: FamilySlug(index), Error: err.Error()},
-			)
-			continue
-		}
+		family, got := f.fetchFamily(ctx, index, opts.Known[FamilySlug(index)])
+		families = append(families, family)
 		entries = append(entries, got...)
 	}
 	sort.Slice(entries, func(i, j int) bool {
@@ -116,7 +122,12 @@ func Fetch(ctx context.Context, opts FetchOptions) (Manifest, error) {
 		}
 		return entries[i].URL < entries[j].URL
 	})
-	m := Manifest{FetchedAt: time.Now().UTC(), UserAgent: f.userAgent, Entries: entries}
+	m := Manifest{
+		FetchedAt: time.Now().UTC(),
+		UserAgent: f.userAgent,
+		Families:  families,
+		Entries:   entries,
+	}
 	data, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		return m, fmt.Errorf("specoracle: encode manifest: %w", err)
@@ -134,6 +145,10 @@ type fetcher struct {
 	delay       time.Duration
 	userAgent   string
 	retries     int
+	// parents keeps each parent index read for a fallback, because the
+	// families of one docs project share it. Families are fetched one after
+	// another, so it needs no lock.
+	parents map[string]parentIndex
 }
 
 func newFetcher(opts FetchOptions) *fetcher {
@@ -144,6 +159,7 @@ func newFetcher(opts FetchOptions) *fetcher {
 		delay:       opts.Delay,
 		userAgent:   opts.UserAgent,
 		retries:     opts.Retries,
+		parents:     map[string]parentIndex{},
 	}
 	if f.client == nil {
 		f.client = &http.Client{Timeout: 60 * time.Second}
@@ -177,7 +193,42 @@ func ParseIndex(body string) [][2]string {
 	return out
 }
 
-func (f *fetcher) fetchIndex(ctx context.Context, index string) ([]ManifestEntry, error) {
+// fetchFamily fetches the pages one family index lists. When that index
+// fails, the family's section of the parent index stands in for it (#1308).
+// docs.jfrog.com has renamed families, and the family's llms.txt moved to
+// the new name while the parent kept listing the same pages under the new
+// heading. Before this, Load then found nothing for the family, so it
+// dropped out of the comparison without a failure: its regressions passed
+// and its baseline entries read as improvements.
+func (f *fetcher) fetchFamily(
+	ctx context.Context,
+	index string,
+	known []string,
+) (FamilyRecord, []ManifestEntry) {
+	rec := FamilyRecord{Index: index, Family: FamilySlug(index), Source: index}
+	links, err := f.indexLinks(ctx, index)
+	if err != nil {
+		rec.Source = ""
+		rec.Error = err.Error()
+		parent, section, found, ferr := f.parentLinks(ctx, index, known)
+		if ferr != nil {
+			rec.Error += "; " + ferr.Error()
+			return rec, nil
+		}
+		rec.Source, rec.Section, links = parent, section, found
+	}
+	if err := os.MkdirAll(filepath.Join(f.cacheDir, rec.Family), 0o750); err != nil {
+		rec.Source = ""
+		rec.Error = fmt.Sprintf("specoracle: create family dir: %v", err)
+		return rec, nil
+	}
+	return rec, f.fetchPages(ctx, index, rec.Family, links)
+}
+
+// indexLinks reads the page links of one llms.txt. An index that answers
+// 200 but lists no page counts as failed: a soft 404 would otherwise drop the
+// family as quietly as an error status did.
+func (f *fetcher) indexLinks(ctx context.Context, index string) ([][2]string, error) {
 	body, status, err := f.get(ctx, index)
 	if err != nil {
 		return nil, err
@@ -186,10 +237,17 @@ func (f *fetcher) fetchIndex(ctx context.Context, index string) ([]ManifestEntry
 		return nil, fmt.Errorf("index %s: status %d: %w", index, status, ErrBadStatus)
 	}
 	links := ParseIndex(string(body))
-	family := FamilySlug(index)
-	if err := os.MkdirAll(filepath.Join(f.cacheDir, family), 0o750); err != nil {
-		return nil, fmt.Errorf("specoracle: create family dir: %w", err)
+	if len(links) == 0 {
+		return nil, fmt.Errorf("index %s: %w", index, errEmptyIndex)
 	}
+	return links, nil
+}
+
+func (f *fetcher) fetchPages(
+	ctx context.Context,
+	index, family string,
+	links [][2]string,
+) []ManifestEntry {
 	entries := make([]ManifestEntry, len(links))
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, f.concurrency)
@@ -203,7 +261,7 @@ func (f *fetcher) fetchIndex(ctx context.Context, index string) ([]ManifestEntry
 		}(i, link[0], link[1])
 	}
 	wg.Wait()
-	return entries, nil
+	return entries
 }
 
 func (f *fetcher) fetchPage(

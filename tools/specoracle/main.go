@@ -19,6 +19,13 @@ import (
 // Indexes are the llms.txt files of every API family in scope (research 01).
 // Families that are stubbed or ignored are still fetched so the baseline
 // records them as missing explicitly rather than by omission.
+//
+// Since 2026-11-12 two of these answer 404, repositories-api and
+// jfrog-artifactory-builds-api: JFrog renamed both families, to
+// jfrog-artifactory-repositories-api and jfrog-artifactory-build-api. Fetch
+// takes their pages from the parent index (#1308). Moving to the new URLs
+// would also rename the families' slugs, which api/oracle-inventory.json and
+// research 14 use, so it belongs with a refresh of the inventory.
 var Indexes = []string{
 	"https://docs.jfrog.com/artifactory/reference/artifacts-storage-api/llms.txt",
 	"https://docs.jfrog.com/artifactory/reference/package-type-specific-apis/llms.txt",
@@ -42,13 +49,19 @@ var Indexes = []string{
 	"https://docs.jfrog.com/integrations/reference/jfrog-platform-webhooks-api/llms.txt",
 	"https://docs.jfrog.com/integrations/reference/jfrog-artifactory-live-logs-api/llms.txt",
 	// The Builds API (build-info publish, promotion, retention, deletion).
-	// docs.jfrog.com also lists the same pages under jfrog-artifactory-build-api
-	// with "-1" slugs; fetching both would only duplicate every operation.
+	// docs.jfrog.com also lists the same pages under jfrog-artifactory-build-api,
+	// with "-1" slugs until 2026-11-12; fetching both would only duplicate
+	// every operation.
 	"https://docs.jfrog.com/integrations/reference/jfrog-artifactory-builds-api/llms.txt",
 }
 
 // BaselineFile is the committed list of accepted gaps, relative to -api.
 const BaselineFile = "parity-baseline.json"
+
+// InventoryFile is the committed fact inventory, relative to -api. fetch also
+// reads it for the pages each family had, which pick the family's section of
+// the parent index when the family's own index fails.
+const InventoryFile = "oracle-inventory.json"
 
 // serviceBases maps each service under srcDir (one directory per service,
 // each with an info.yaml) to the prefix its servers[0].url declares, so adding
@@ -95,10 +108,13 @@ var (
 	errUsage = errors.New(
 		"usage: specoracle fetch|report|baseline|inventory|scaffold [flags]",
 	)
-	errUnknownService = errors.New("scaffold: -service must name a directory under -src")
-	errNoServer       = errors.New("info.yaml declares no servers[0].url")
-	errScaffoldOut    = errors.New("scaffold: -out is required")
-	errBaselineUpdate = errors.New("baseline: pass -update to rewrite")
+	errUnknownService  = errors.New("scaffold: -service must name a directory under -src")
+	errNoServer        = errors.New("info.yaml declares no servers[0].url")
+	errScaffoldOut     = errors.New("scaffold: -out is required")
+	errBaselineUpdate  = errors.New("baseline: pass -update to rewrite")
+	errIncompleteCache = errors.New(
+		"the oracle cache lacks an API family; run make oracle-fetch again",
+	)
 )
 
 func main() {
@@ -130,11 +146,17 @@ func run(args []string) error {
 	}
 	switch args[0] {
 	case "inventory":
+		// The inventory is committed and fetch reads it for the pages each
+		// family had, so one written without a family would also take that
+		// family's fallback away.
+		if err := specoracle.CheckFamilies(*cache); err != nil {
+			return fmt.Errorf("%w\n%w", errIncompleteCache, err)
+		}
 		inv, err := specoracle.BuildInventory(*cache)
 		if err != nil {
 			return err
 		}
-		jsonPath := filepath.Join(*api, "oracle-inventory.json")
+		jsonPath := filepath.Join(*api, InventoryFile)
 		if err := inv.WriteJSON(jsonPath); err != nil {
 			return err
 		}
@@ -181,13 +203,33 @@ func run(args []string) error {
 		}
 		return nil
 	case "fetch":
+		known, err := specoracle.KnownPages(filepath.Join(*api, InventoryFile))
+		if err != nil {
+			return err
+		}
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()
-		m, err := specoracle.Fetch(ctx, specoracle.FetchOptions{Indexes: Indexes, CacheDir: *cache})
+		m, err := specoracle.Fetch(ctx, specoracle.FetchOptions{
+			Indexes:  Indexes,
+			CacheDir: *cache,
+			Known:    known,
+		})
 		if err != nil {
 			return err
 		}
 		failed := 0
+		for _, fam := range m.Families {
+			if fam.Error == "" {
+				continue
+			}
+			failed++
+			if fam.Source != "" {
+				fmt.Fprintf(os.Stderr, "  %s: %s; took its pages from %q in %s\n",
+					fam.Family, fam.Error, fam.Section, fam.Source)
+				continue
+			}
+			fmt.Fprintf(os.Stderr, "  %s: %s\n", fam.Family, fam.Error)
+		}
 		for _, e := range m.Entries {
 			if e.Error != "" {
 				failed++
@@ -201,19 +243,33 @@ func run(args []string) error {
 			failed,
 			*cache,
 		)
+		// The cache is kept so it can be looked at, and the parity test
+		// fails on it, naming the same families.
+		if err := specoracle.CheckFamilies(*cache); err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+		}
 		return nil
 	case "report", "baseline":
+		families := specoracle.CheckFamilies(*cache)
 		report, err := compare(*cache, *api)
 		if err != nil {
 			return err
 		}
 		if args[0] == "report" {
+			if families != nil {
+				fmt.Fprintf(os.Stderr, "%v\n%v\n", errIncompleteCache, families)
+			}
 			fmt.Print(report.String())
 			return nil
 		}
 		path := filepath.Join(*api, BaselineFile)
 		if !*update {
 			return fmt.Errorf("%w: %s", errBaselineUpdate, path)
+		}
+		// Rewriting the baseline from such a cache would delete every gap
+		// it records for the missing family.
+		if families != nil {
+			return fmt.Errorf("%w\n%w", errIncompleteCache, families)
 		}
 		if err := report.WriteBaseline(path); err != nil {
 			return err
