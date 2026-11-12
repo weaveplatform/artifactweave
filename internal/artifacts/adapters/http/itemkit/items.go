@@ -785,10 +785,11 @@ func SplitRepoPath(escaped string) (key, p string, folder bool, err error) {
 }
 
 // getArchiveEntry serves one entry of an archive file: the part of an item
-// path after "!/" (decision 0002). An archive that cannot be read, such as
-// one whose blob is lost, answers 500 as the archive's own download does,
-// where returning without a write would send an empty 200. Once the entry's
-// status is sent, a failure can only be logged.
+// path after "!/" (decision 0002). An archive whose blob is lost answers
+// 500, as its own download does, and so does one whose blob fails a read
+// before the entry's status is sent, where returning without a write would
+// send an empty 200. Once the entry's status is sent, a failure can only be
+// logged.
 func (s *Kit) getArchiveEntry(
 	w http.ResponseWriter,
 	r *http.Request,

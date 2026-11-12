@@ -307,6 +307,83 @@ func TestUnitExplodeReadFailures(t *testing.T) {
 	}
 }
 
+var errWrite = errors.New("write failed")
+
+// unwritable is a store whose uploads read what they are given and then
+// fail to write it, as a full disk or a dropped connection to an object
+// store does.
+type unwritable struct{ blob.Store }
+
+func (u unwritable) BeginUpload(ctx context.Context, o ...blob.UploadOption) (blob.Upload, error) {
+	up, err := u.Store.BeginUpload(ctx, o...)
+	return writeFailure{up}, err
+}
+
+type writeFailure struct{ blob.Upload }
+
+func (writeFailure) Append(_ context.Context, r io.Reader) (int64, error) {
+	if _, err := io.Copy(io.Discard, r); err != nil {
+		return 0, err
+	}
+	return 0, errWrite
+}
+
+// A store that fails to write an entry is the server's fault, not the
+// archive's: explode returns the store's error, never ErrBadArchive, for a
+// zip, a tar and a tar.gz, atomic or not, and stores nothing.
+func TestUnitExplodeStoreWriteFailure(t *testing.T) {
+	ctx := context.Background()
+	sample := entry{name: "a.txt", body: "a"}
+	for name, body := range map[string][]byte{
+		"zip":    zipOf(t, sample),
+		"tar":    tarOf(t, false, sample),
+		"tar.gz": tarOf(t, true, sample),
+	} {
+		for _, atomic := range []bool{false, true} {
+			w := newWorld(t)
+			w.svc.Blobs = unwritable{w.svc.Blobs}
+			_, err := w.explode("up/archive."+name, body, atomic)
+			if !errors.Is(err, errWrite) || errors.Is(err, ErrBadArchive) {
+				t.Errorf("%s atomic=%v: %v", name, atomic, err)
+			}
+			items, _, _ := w.db.Items().Descendants(ctx, w.loc.Key, false, "", noLimit)
+			if len(items) != 0 {
+				t.Errorf("%s atomic=%v: wrote %v", name, atomic, items)
+			}
+		}
+	}
+}
+
+// Explode's sniff of a spooled archive that cannot be read returns the
+// read's error, where archive.KindOf took the file for no archive, which
+// explode refused as unusable (400). Content shorter than
+// archive.SniffLen ends with io.EOF, on a store with ReadAt or one that
+// can only seek, and is sniffed as usual.
+func TestUnitExplodeSniffReadFailure(t *testing.T) {
+	body := zipOf(t, entry{name: "a.txt", body: "a"})
+	f, _, err := spool(bytes.NewReader(body), kernel.Checksums{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	for name, ra := range map[string]io.ReaderAt{
+		"spooled":   f,
+		"ReadAt":    bytes.NewReader(body),
+		"seek only": archive.ReaderAt(struct{ io.ReadSeeker }{bytes.NewReader(body)}),
+	} {
+		if kind, err := sniff(ra, "x/archive.bin"); err != nil || kind != Zip {
+			t.Fatalf("%s: %v %v", name, kind, err)
+		}
+	}
+	_ = f.Close()
+	if kind, err := sniff(f, "x/archive.bin"); !errors.Is(err, os.ErrClosed) {
+		t.Fatalf("closed spool: %v %v", kind, err)
+	}
+	if kind, err := sniff(&failing{}, "x/archive.zip"); !errors.Is(err, errRead) {
+		t.Fatalf("failed read: %v %v", kind, err)
+	}
+}
+
 func TestUnitExplodeChecksumsAndConflicts(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)

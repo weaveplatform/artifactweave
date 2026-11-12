@@ -79,6 +79,9 @@ func newFixtureWithProtocol(
 	r := chi.NewRouter()
 	r.Use(accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
 		name := r.Header.Get("X-User")
+		if name == kernel.AnonymousUser {
+			return kernel.Anonymous
+		}
 		return kernel.Principal{Name: name, Admin: name == "admin"}
 	}))
 	options := pkgroute.Options{
