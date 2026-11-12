@@ -98,8 +98,8 @@
 //     manifest is checked before it is cached, a foreign layer is fetched
 //     only under the repository's external dependency patterns and never
 //     with registry credentials or custom headers (decision 0007), and a
-//     listing joined from pages carries no-store when any page did or
-//     carried Vary.
+//     listing joined from pages carries Vary: *, which keeps it out of the
+//     cache, when any page carried Vary.
 //   - The cache variant registry-v1, the canonical manifest Accept list and
 //     the cache paths RegistryResource names stay byte-identical: a change
 //     would orphan every cached entry.
@@ -169,7 +169,8 @@
 //   - remote_content_test.go: registry path validation, listing pagination
 //     and its boundaries, descriptor integrity and the foreign layer
 //     policy; remote_path_test.go: the parser's name grammar against the
-//     transport's.
+//     transport's; remote_pages_test.go: the cache marker on a listing
+//     joined from pages.
 //   - test/server/artifacts/docker's registry remote tests drive the remote
 //     rules through the application's wiring, and core remote's
 //     smart_registry_test.go gives Smart Remote this package's parser.

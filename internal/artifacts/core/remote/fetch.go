@@ -121,7 +121,7 @@ func (p *Policy) fetch(
 		out.entry, err = p.revalidate(ctx, q, permit, opts.Revision, token, e, res)
 		return out, err
 	case http.StatusOK:
-		if MustNotStore(res.Header) {
+		if mustNotPersist(res.Header) {
 			// Complete the probe before recording recovery. Headers alone cannot
 			// establish that a body will survive validation or truncation.
 			candidate, cacheErr := p.cache(
@@ -443,9 +443,7 @@ func (p *Policy) upload(
 		),
 		ETag:         res.Header.Get("ETag"),
 		LastModified: res.Header.Get("Last-Modified"),
-		CacheControl: res.Header.Get(
-			"Cache-Control",
-		),
+		CacheControl: persistedCacheControl(res.Header.Get("Cache-Control")),
 		Vary:         res.Header.Get("Vary"),
 		By:           q.Subject.Name,
 		NoStore:      noStore,
@@ -594,6 +592,9 @@ func (p *Policy) revalidate(
 			*target = res.Header.Get(name)
 		}
 	}
+	// A 304 keeps the entry under the repository's period whatever no-store
+	// it carries, as a 200 does (persistedCacheControl).
+	e.CacheControl = persistedCacheControl(e.CacheControl)
 	if !cacheableVary(e.Vary) {
 		e.CacheControl = "no-store"
 	}

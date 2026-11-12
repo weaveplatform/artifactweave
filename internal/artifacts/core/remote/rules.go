@@ -61,9 +61,43 @@ func (r cacheRules) permitsStale() bool {
 // MustNotStore reports whether a response with header h may not be kept:
 // its Cache-Control says no-store, or its Vary names anything but Accept and
 // Accept-Encoding, so it could differ by request state that the cache
-// identity leaves out.
+// identity leaves out. The remote cache does not use it for what it stores
+// (mustNotPersist); the smart remote's discovery documents still do.
 func MustNotStore(h http.Header) bool {
 	return parseCacheRules(h.Get("Cache-Control")).mustNotStore || !cacheableVary(h.Get("Vary"))
+}
+
+// mustNotPersist reports whether the remote cache may not keep an upstream
+// answer with header h: only when its Vary names anything but Accept and
+// Accept-Encoding. An upstream Cache-Control: no-store does not stop it.
+// 6.20's remote fetch (HttpRepo) never reads the upstream's Cache-Control,
+// and 7.x sends no-store on every Docker manifest (RTFACT-27199, 7.33.12)
+// and on Maven metadata and snapshots (RTFACT-15016, RTFACT-6983) for the
+// proxies in front of it (RTFACT-17758), while a 7.x remote over a 7.x
+// upstream still caches them (RTFACT-30785, an edge's smart remote over its
+// main server). Honouring it here would leave a remote over artifactweave
+// or Artifactory with nothing to serve offline.
+func mustNotPersist(h http.Header) bool { return !cacheableVary(h.Get("Vary")) }
+
+// persistedCacheControl is the upstream Cache-Control value v as the remote
+// cache keeps it beside an entry: without no-store, for the reasons
+// mustNotPersist gives, so that the entry's freshness follows the
+// repository's retrieval cache period and a failed upstream may still be
+// answered from it. no-cache, must-revalidate and max-age are kept: they
+// stay [I] RC-3. The cache's own no-store marker for an uncacheable Vary is
+// written after this, on the stored entry.
+func persistedCacheControl(v string) string {
+	var kept []string
+	for _, field := range strings.Split(v, ",") {
+		name, _, _ := strings.Cut(strings.TrimSpace(field), "=")
+		if strings.EqualFold(strings.TrimSpace(name), "no-store") {
+			continue
+		}
+		if f := strings.TrimSpace(field); f != "" {
+			kept = append(kept, f)
+		}
+	}
+	return strings.Join(kept, ", ")
 }
 
 // Responses varying on state outside the representation identity cannot be

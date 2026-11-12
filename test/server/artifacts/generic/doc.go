@@ -38,6 +38,12 @@
 //   - head_range_test.go: a HEAD with Range answers 200 with the whole
 //     length on a local, redirecting, virtual, PyPI and remote file, where
 //     a GET still gets the range (#1338).
+//   - remote_upstream_nostore_test.go: a generic, Maven, npm and PyPI
+//     remote keeps the answers an upstream marks Cache-Control: no-store,
+//     serves them again without the upstream and once it is gone, and
+//     still refreshes mutable metadata under a zero retrieval cache
+//     period. The test repoints the remote world's repository at each
+//     package type in turn.
 //
 // # References
 //

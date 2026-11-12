@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
@@ -38,11 +37,12 @@ func (c *RegistryContent) pages(
 		if total > 16<<20 || page >= 128 {
 			return nil, remote.ErrRequest
 		}
-		// The assembled listing must not persist a page that upstream marked
-		// private to a request. Its validators no longer describe combined bytes.
-		if strings.Contains(strings.ToLower(res.Header.Get("Cache-Control")), "no-store") ||
-			res.Header.Get("Vary") != "" {
-			first.Header.Set("Cache-Control", "no-store")
+		// The assembled listing must not persist a page that varies by
+		// request. Its validators no longer describe combined bytes. Vary: *
+		// keeps it out of the cache, which no longer reads an upstream
+		// Cache-Control: no-store as a reason to (remote.mustNotPersist).
+		if res.Header.Get("Vary") != "" {
+			first.Header.Set("Vary", "*")
 		}
 		if operation == "tags" {
 			var listing struct {

@@ -321,7 +321,12 @@ func TestAccPolicyConcurrentMissCancellationAndIsolation(t *testing.T) {
 	}
 }
 
-func TestAccPolicyNoStoreLeavesNoEntriesAndHTTPNoStoreIsNotShared(t *testing.T) {
+// A repository that stores nothing fetches each read on its own and keeps
+// no entry. An upstream Cache-Control: no-store on the same file does not
+// stop a storing repository from keeping it: 6.20's remote fetch never reads
+// the upstream's Cache-Control, and a 7.x remote over a 7.x upstream, which
+// sends no-store on manifests and metadata, still caches them (RTFACT-30785).
+func TestAccPolicyNoStoreLeavesNoEntriesAndUpstreamNoStoreIsKept(t *testing.T) {
 	w := policyFixture(t)
 	w.up.Set(
 		"/private.txt",
@@ -365,12 +370,13 @@ func TestAccPolicyNoStoreLeavesNoEntriesAndHTTPNoStoreIsNotShared(t *testing.T) 
 	}
 	q.Repo.StoreArtifactsLocally = ptr(true)
 	w.mustRead(q, "private")
-	if _, err := w.db.Items().
-		Get(t.Context(), w.c.Key, true, "private.txt"); !errors.Is(
-		err,
-		kernel.ErrNotFound,
-	) {
-		t.Fatal(err)
+	if _, err := w.db.Items().Get(t.Context(), w.c.Key, true, "private.txt"); err != nil {
+		t.Fatal("upstream no-store not kept", err)
+	}
+	calls := w.up.Count("GET", "")
+	w.mustRead(q, "private")
+	if w.up.Count("GET", "") != calls {
+		t.Fatal("a kept no-store answer fetched again", w.up.Requests())
 	}
 }
 

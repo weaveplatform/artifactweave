@@ -427,6 +427,12 @@ func TestAccRemoteProviderCachedIndexDoesNotPublishIncompleteBundle(t *testing.T
 				expect(t, index, 200)
 			}
 			packageResponse = f.get("reader", remoteProviderBase+"1.0.0/download/linux/amd64")
+			if mode == "no-store" {
+				// The upstream no-store archive was kept like any other
+				// (remote.mustNotPersist), so the offline bundle is complete.
+				expect(t, packageResponse, 200)
+				return
+			}
 			if packageResponse.Code == 200 ||
 				strings.Contains(packageResponse.Body.String(), "?sig=") {
 				t.Fatal(

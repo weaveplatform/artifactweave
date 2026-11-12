@@ -47,8 +47,9 @@ The absence timestamp remains the time of the last successful observation during
 outage. An unknown state is never reported as confirmed absent. Metadata zap expires
 Smart observations while retaining binary bytes, local annotations and statistics;
 a subsequent normal read may refresh them. Full deletion/restore and source or
-credential changes fence old work. Artifact `no-store` and disabled local storage
-create no artifact synchronization jobs.
+credential changes fence old work. Disabled local storage, and an artifact answer whose
+`Vary` keeps it out of the cache, create no artifact synchronization jobs. An artifact
+answer marked `Cache-Control: no-store` is cached and synchronized like any other.
 
 The queue persists on SQLite and PostgreSQL. Each controller admits at most 256
 pending, leased or parked keys, with two workers, shared upstream concurrency limits,

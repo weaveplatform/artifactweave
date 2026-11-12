@@ -26,7 +26,10 @@ func TestAccRemoteProviderMirrorDescriptorUsesOneRevision(t *testing.T) {
 			f := newProviderFixture(t)
 			f.configure(func(c *repo.Config) {
 				c.TerraformRegistryURL = f.up.URL + "/smart"
-				if mode == "zero-ttl" {
+				// An upstream no-store document is kept like any other
+				// (remote.mustNotPersist), so it needs the zero period too for
+				// the corrected read below to fetch the replacement.
+				if mode == "zero-ttl" || mode == "upstream-no-store" {
 					c.RetrievalCachePeriodSecs = new(int)
 				}
 				if mode == "repository-no-store" {
@@ -90,8 +93,9 @@ func TestAccRemoteProviderMirrorDescriptorUsesOneRevision(t *testing.T) {
 				func(ctx context.Context, q source.Request, permit source.Permit) (source.Result, error) {
 					result, err := backend.Read(ctx, q, permit)
 					// Rotate after one admitted document has returned from the real backend.
-					// Unknown no-store responses can require a private refetch internally;
-					// both reads still belong to this same admitted representation.
+					// An unknown response that varies by request can require a private
+					// refetch internally; both reads still belong to this same admitted
+					// representation.
 					if err == nil && !rotated && q.Resource.Kind == source.ResourceKindMetadata &&
 						strings.HasSuffix(q.Resource.Path, "/1.0.0.json") {
 						rotated = true
@@ -126,12 +130,8 @@ func TestAccRemoteProviderMirrorDescriptorUsesOneRevision(t *testing.T) {
 				)
 			}
 			metadataReads := f.up.Count(http.MethodGet, upstream+"1.0.0.json")
-			wantReads := 1
-			if mode == "upstream-no-store" {
-				wantReads = 2
-			}
-			if metadataReads != wantReads {
-				t.Fatalf("version document fetched %d times, want %d", metadataReads, wantReads)
+			if metadataReads != 1 {
+				t.Fatalf("version document fetched %d times, want 1", metadataReads)
 			}
 			// A signed link cannot silently follow a later metadata revision.
 			expect(t, f.get("", entry.URL), 403)
