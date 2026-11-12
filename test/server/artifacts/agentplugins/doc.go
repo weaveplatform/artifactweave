@@ -18,6 +18,10 @@
 //   - TestAccAgentPluginMarketplacesTrackTreeAndPermissions: the marketplace
 //     files follow the plugins as they are deployed, copied and deleted, and
 //     each principal reads only what it may.
+//   - TestAccAgentPluginStandardLayoutIsServed: a bundle with an Agent
+//     Plugins Standard root plugin.json is admitted, typed and listed in the
+//     VS Code, Cursor and unified files, also after a reindex, while a root
+//     plugin.json that does not conform keeps its earlier answers.
 //
 // # References
 //

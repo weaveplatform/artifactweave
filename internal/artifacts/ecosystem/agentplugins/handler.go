@@ -21,7 +21,8 @@ func Serves(t repo.PackageType) bool { return t == repo.AgentPlugins }
 
 type (
 	// Handler is the Agent Plugins format's hooks: it admits a plugin bundle
-	// at its canonical path only when it carries a harness manifest, keeps
+	// at its canonical path only when it carries a harness manifest or a
+	// root plugin.json of the Agent Plugins Standard 1.0.0, keeps
 	// the package index and the agentplugins.* properties in step with the
 	// stored bundles, and keeps uploads off the marketplace file names. It
 	// embeds the generic hooks, so every path is classed as generic content
@@ -60,16 +61,17 @@ func (Handler) Inspect(
 // Admit refuses a write, other than a checksum deploy or a remote's cached
 // content, to a marketplace file name (409), since those files are rendered
 // for each reader and never stored, and a .zip that is not at a canonical
-// bundle path or whose bundle Inspect found invalid or without a harness
-// manifest (409). It then applies the generic blackout and include and
-// exclude checks, keeping their refusals as they are.
+// bundle path or whose bundle Inspect found invalid or with neither a
+// harness manifest nor a conforming root plugin.json (409). It then applies
+// the generic blackout and include and exclude checks, keeping their
+// refusals as they are.
 func (Handler) Admit(
 	_ context.Context,
 	env format.Env,
 	c repo.Config,
 	w format.Write,
 ) (format.Write, error) {
-	if w.Op != format.OpChecksum && !w.Cached && IsReservedMarketplace(w.Path) {
+	if w.Op != format.OpChecksum && !w.Cached && IsMarketplace(w.Path) {
 		return w, format.Rejectf(http.StatusConflict, "Agent Plugin marketplace path is reserved")
 	}
 	if w.Op != format.OpChecksum && !w.Cached && strings.HasSuffix(w.Path, ".zip") {
@@ -77,7 +79,7 @@ func (Handler) Admit(
 			return w, format.Rejectf(http.StatusConflict, "invalid Agent Plugin bundle path")
 		}
 		in, ok := env.Inspection.(*inspection)
-		if !ok || in.err != nil || len(in.meta.Harnesses) == 0 {
+		if !ok || in.err != nil || !in.meta.Indexed() {
 			return w, format.Rejectf(http.StatusConflict, "invalid Agent Plugin bundle")
 		}
 	}
@@ -95,9 +97,8 @@ func (Handler) Admit(
 // the agentplugins.* properties, dropping agentplugins.sha1 when the item
 // has no SHA-1, creates the plugin's package when it is new, and links the
 // version to the bundle, with its Metadata, named and versioned by the path,
-// as the version's metadata. A bundle without a harness manifest fails with
-// ErrArchive: the 7.161.32 target indexes harness manifests only, so a
-// root-only Agent Plugins Standard bundle is not indexed.
+// as the version's metadata. A bundle with neither a harness manifest nor a
+// conforming root plugin.json fails with ErrArchive.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || it.Cached || !strings.HasSuffix(it.FullPath(), ".zip") {
 		return nil
@@ -110,9 +111,9 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it m
 	if err != nil {
 		return err
 	}
-	if len(meta.Harnesses) == 0 {
+	if !meta.Indexed() {
 		return fmt.Errorf(
-			"agentplugins: root-only bundle unsupported on 7.161.32 at %s: %w",
+			"agentplugins: no harness manifest or Agent Plugins Standard manifest at %s: %w",
 			it.FullPath(), ErrArchive,
 		)
 	}
@@ -151,7 +152,7 @@ func setProperties(ctx context.Context, st format.Store, it model.Item, meta Met
 	}
 	wanted := model.Properties{
 		"agentplugins.name": {meta.Name}, "agentplugins.version": {meta.Version},
-		"agentplugins.type": meta.Harnesses, "agentplugins.sha256": {meta.SHA256},
+		"agentplugins.type": meta.Types(), "agentplugins.sha256": {meta.SHA256},
 	}
 	if meta.SHA1 != "" {
 		wanted["agentplugins.sha1"] = []string{meta.SHA1}
@@ -202,7 +203,8 @@ func index(
 // Reindex rebuilds repository c's package index from the bundles at
 // canonical paths of its own tree, setting each bundle's properties as
 // Deployed does, and fails with ErrArchive on the first bundle that cannot
-// be read or has no harness manifest.
+// be read or has neither a harness manifest nor a conforming root
+// plugin.json.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	var all []pkgindex.Indexed
 	byName := map[string]int{}
@@ -218,7 +220,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 				continue
 			}
 			meta, err := metadataOf(ctx, env, it)
-			if err != nil || len(meta.Harnesses) == 0 {
+			if err != nil || !meta.Indexed() {
 				return fmt.Errorf("agentplugins: inspect %s: %w", it.FullPath(), ErrArchive)
 			}
 			meta.Name, meta.Version, meta.Path = name, version, it.FullPath()

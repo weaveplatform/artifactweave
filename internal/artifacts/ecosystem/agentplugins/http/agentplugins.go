@@ -55,24 +55,18 @@ type AgentPluginItems struct{ *itemkit.Kit }
 
 // TryAgentMarketplaceItem is the item kit's overlay for the agent plugin
 // marketplace documents. In a local agent plugins repository, a request for
-// a reserved marketplace name without properties is answered here: a
-// marketplace serves the plugins the caller may read, and a reserved name
-// that is no marketplace answers 404. It answers false, leaving the request
-// to the overlays after it and the generic lookup, for anything else.
+// a marketplace name without properties is answered here, with the plugins
+// the caller may read. It answers false, leaving the request to the
+// overlays after it and the generic lookup, for anything else.
 func TryAgentMarketplaceItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
-	s := AgentPluginItems{k}
 	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local || cached ||
-		req.IsFolder || len(req.Props) != 0 || !agentplugins.IsReservedMarketplace(req.Path) {
+		req.IsFolder || len(req.Props) != 0 || !agentplugins.IsMarketplace(req.Path) {
 		return false
 	}
-	if !agentplugins.IsMarketplace(req.Path) {
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
-		return true
-	}
-	s.serveAgentMarketplace(w, r, st, c, req.Path, p, acc)
+	AgentPluginItems{k}.serveAgentMarketplace(w, r, st, c, req.Path, p, acc)
 	return true
 }
 
