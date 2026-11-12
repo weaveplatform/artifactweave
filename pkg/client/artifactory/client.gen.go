@@ -1882,6 +1882,21 @@ func (e CalculateOpkgRepositoryMetadataParamsWriteProps) Valid() bool {
 	}
 }
 
+// Defines values for GetPuppetReleasesParamsSortBy.
+const (
+	Version GetPuppetReleasesParamsSortBy = "version"
+)
+
+// Valid indicates whether the value is a known member of the GetPuppetReleasesParamsSortBy enum.
+func (e GetPuppetReleasesParamsSortBy) Valid() bool {
+	switch e {
+	case Version:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetAllBundlesParamsType.
 const (
 	Source GetAllBundlesParamsType = "source"
@@ -5441,6 +5456,225 @@ type PudTiming struct {
 	StartedAtMillis *int64 `json:"startedAtMillis,omitempty"`
 }
 
+// PuppetDependency One module a release depends on, from its metadata.json.
+type PuppetDependency struct {
+	// Name Required within this object. The module depended on, as `<owner>/<name>` or `<owner>-<name>`.
+	Name string `json:"name"`
+
+	// VersionRequirement Required within this object. The versions accepted, in Puppet's range syntax, for example `>= 1.0.0 < 2.0.0`.
+	VersionRequirement string `json:"version_requirement"`
+}
+
+// PuppetManifest The validated fields of a release's metadata.json.
+type PuppetManifest struct {
+	// Author Optional within this object. The module's author; omitted when metadata.json has none.
+	Author *string `json:"author,omitempty"`
+
+	// Dependencies Required within this object. The modules the release depends on; empty when it has none.
+	Dependencies []PuppetDependency `json:"dependencies"`
+
+	// License Optional within this object. The license name metadata.json gives; omitted when it gives none.
+	License *string `json:"license,omitempty"`
+
+	// Name Required within this object. The module's name, as `<owner>-<name>`.
+	Name string `json:"name"`
+
+	// Source Optional within this object. The module's source repository URL; omitted when metadata.json gives none.
+	Source *string `json:"source,omitempty"`
+
+	// Summary Optional within this object. One-line summary of the module; omitted when metadata.json gives none.
+	Summary *string `json:"summary,omitempty"`
+
+	// Version Required within this object. The release's semantic version.
+	Version string `json:"version"`
+}
+
+// PuppetModule A Puppet module, with its newest release and every release the caller may read.
+type PuppetModule struct {
+	// CreatedAt Required within this object. When the module's first release was published, as `YYYY-MM-DD hh:mm:ss ±hhmm`; null when no release gives a date in that form.
+	CreatedAt *string `json:"created_at"`
+
+	// CurrentRelease Required within this object. The module's newest release the caller may read.
+	CurrentRelease PuppetRelease `json:"current_release"`
+
+	// Downloads Required within this object. Downloads of the module's releases, summed.
+	Downloads int `json:"downloads"`
+
+	// Endorsement Required within this object. The module's endorsement; null.
+	Endorsement *string `json:"endorsement"`
+
+	// HomepageUrl Required within this object. The newest release's metadata.json `project_page`; null when it gives none.
+	HomepageUrl *string `json:"homepage_url"`
+
+	// IssuesUrl Required within this object. The newest release's metadata.json `issues_url`; null when it gives none.
+	IssuesUrl *string `json:"issues_url"`
+
+	// ModuleGroup Required within this object. The module's group, `base`.
+	ModuleGroup string `json:"module_group"`
+
+	// Name Required within this object. The module's name without its owner.
+	Name string `json:"name"`
+
+	// Owner Required within this object. The module's owner.
+	Owner PuppetOwner `json:"owner"`
+
+	// Releases Required within this object. Every release of the module the caller may read, newest version first.
+	Releases []PuppetReleaseLink `json:"releases"`
+
+	// Slug Required within this object. The module's name, as `<owner>-<name>`.
+	Slug string `json:"slug"`
+
+	// Supported Required within this object. Whether the newest release is a supported module; false unless a remote repository's upstream says otherwise.
+	Supported bool `json:"supported"`
+
+	// UpdatedAt Required within this object. When a release of the module last changed, as `YYYY-MM-DD hh:mm:ss ±hhmm`; null when no release gives a date in that form.
+	UpdatedAt *string `json:"updated_at"`
+
+	// Uri Required within this object. The module's path, `/v3/modules/<owner>-<name>`.
+	Uri string `json:"uri"`
+}
+
+// PuppetModulePage One page of Puppet modules.
+type PuppetModulePage struct {
+	// Pagination Required within this object. Where the page sits in the list, and the links to the pages around it.
+	Pagination PuppetPagination `json:"pagination"`
+
+	// Results Required within this object. The modules on this page.
+	Results []PuppetModule `json:"results"`
+}
+
+// PuppetOwner The owner of a Puppet module, the part of its name before the dash.
+type PuppetOwner struct {
+	// GravatarId Required within this object. The owner's Gravatar hash; null unless a remote repository's upstream gives one.
+	GravatarId *string `json:"gravatar_id"`
+
+	// Slug Required within this object. The owner's name.
+	Slug string `json:"slug"`
+
+	// Uri Required within this object. The owner's path, `/v3/users/<owner>`.
+	Uri string `json:"uri"`
+
+	// Username Required within this object. The owner's name.
+	Username string `json:"username"`
+}
+
+// PuppetPagination Where a page sits in a Puppet list. Each link is a path relative to the repository's Forge root that names the filter first, then `limit` and `offset`, for example `/v3/releases?module=puppetlabs-stdlib&limit=20&offset=20`.
+type PuppetPagination struct {
+	// Current Required within this object. Link to this page.
+	Current string `json:"current"`
+
+	// First Required within this object. Link to the first page.
+	First string `json:"first"`
+
+	// Limit Required within this object. Most entries a page holds.
+	Limit int `json:"limit"`
+
+	// Next Required within this object. Link to the next page; null on the last page.
+	Next *string `json:"next"`
+
+	// Offset Required within this object. Number of entries before this page.
+	Offset int `json:"offset"`
+
+	// Previous Required within this object. Link to the previous page; null on the first page.
+	Previous *string `json:"previous"`
+
+	// Total Required within this object. Number of entries in the whole list.
+	Total int `json:"total"`
+}
+
+// PuppetRelease A Puppet module release.
+type PuppetRelease struct {
+	// Changelog Required within this object. The release's changelog text; null unless a remote repository's upstream gives one.
+	Changelog *string `json:"changelog"`
+
+	// CreatedAt Required within this object. When the release was published, as `YYYY-MM-DD hh:mm:ss ±hhmm`, in UTC for a hosted release; a remote repository gives its upstream's value as it is.
+	CreatedAt *string `json:"created_at"`
+
+	// DeletedAt Required within this object. When the release was deleted upstream; null unless a remote repository's upstream gives a date.
+	DeletedAt *string `json:"deleted_at"`
+
+	// Downloads Required within this object. How many times the release's archive was downloaded from the repository; a remote repository gives its upstream's count.
+	Downloads int `json:"downloads"`
+
+	// FileMd5 Required within this object. MD5 of the archive in hex; null when none is known.
+	FileMd5 *string `json:"file_md5"`
+
+	// FileSha256 Required within this object. SHA-256 of the archive in hex, which the client checks the download against.
+	FileSha256 string `json:"file_sha256"`
+
+	// FileSize Required within this object. Size of the archive in bytes.
+	FileSize int `json:"file_size"`
+
+	// FileUri Required within this object. The archive's path, `/v3/files/<owner>-<name>-<version>.tar.gz`, relative to the repository's Forge root.
+	FileUri string `json:"file_uri"`
+
+	// License Required within this object. The release's license text; null unless a remote repository's upstream gives one.
+	License *string `json:"license"`
+
+	// Metadata Required within this object. The release's metadata.json, as validated.
+	Metadata PuppetManifest `json:"metadata"`
+
+	// Module Required within this object. The module the release belongs to.
+	Module PuppetReleaseModule `json:"module"`
+
+	// Readme Required within this object. The release's README text; null unless a remote repository's upstream gives one.
+	Readme *string `json:"readme"`
+
+	// Slug Required within this object. The release's name, as `<owner>-<name>-<version>`.
+	Slug string `json:"slug"`
+
+	// Supported Required within this object. Whether the release is a supported module; false unless a remote repository's upstream says otherwise.
+	Supported bool `json:"supported"`
+
+	// Tags Required within this object. The release's tags; empty.
+	Tags []string `json:"tags"`
+
+	// UpdatedAt Required within this object. When the release last changed, as `YYYY-MM-DD hh:mm:ss ±hhmm`, in UTC for a hosted release; a remote repository gives its upstream's value as it is.
+	UpdatedAt *string `json:"updated_at"`
+
+	// Uri Required within this object. The release's path, `/v3/releases/<owner>-<name>-<version>`.
+	Uri string `json:"uri"`
+
+	// Version Required within this object. The release's semantic version.
+	Version string `json:"version"`
+}
+
+// PuppetReleaseLink One release a Puppet module lists.
+type PuppetReleaseLink struct {
+	// Uri Required within this object. The release's path, `/v3/releases/<owner>-<name>-<version>`.
+	Uri string `json:"uri"`
+
+	// Version Required within this object. The release's semantic version.
+	Version string `json:"version"`
+}
+
+// PuppetReleaseModule The module a Puppet release belongs to.
+type PuppetReleaseModule struct {
+	// DeprecatedAt Required within this object. When the module was deprecated; null unless a remote repository's upstream gives a date.
+	DeprecatedAt *string `json:"deprecated_at"`
+
+	// Name Required within this object. The module's name without its owner.
+	Name string `json:"name"`
+
+	// Owner Required within this object. The module's owner.
+	Owner PuppetOwner `json:"owner"`
+
+	// Slug Required within this object. The module's name, as `<owner>-<name>`.
+	Slug string `json:"slug"`
+
+	// Uri Required within this object. The module's path, `/v3/modules/<owner>-<name>`.
+	Uri string `json:"uri"`
+}
+
+// PuppetReleasePage One page of Puppet module releases.
+type PuppetReleasePage struct {
+	// Pagination Required within this object. Where the page sits in the list, and the links to the pages around it.
+	Pagination PuppetPagination `json:"pagination"`
+
+	// Results Required within this object. The releases on this page.
+	Results []PuppetRelease `json:"results"`
+}
+
 // ReleaseBundleCleanupPolicyRequest Body for creating or replacing a release bundle cleanup policy, which deletes release bundle (v2) versions by name and age, optionally sparing promoted ones.
 type ReleaseBundleCleanupPolicyRequest struct {
 	// CronExp Optional within this object. Quartz cron expression (six or seven fields with seconds, ?, L, W, # and an optional year) for scheduled runs, evaluated in the server's time zone. Omitted or empty means the policy only runs when triggered through the run operation.
@@ -6768,7 +7002,7 @@ type GetCleanupPoliciesViewParamsItemTypes string
 
 // CalculateConanRepositoryMetadataParams defines parameters for CalculateConanRepositoryMetadata.
 type CalculateConanRepositoryMetadataParams struct {
-	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
+	// Async Optional query parameter. Accepted with either value; the work is always queued and the response returns once it is queued.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 }
 
@@ -7022,6 +7256,39 @@ type CalculatePubRepositoryMetadataParams struct {
 	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 }
+
+// GetPuppetModulesParams defines parameters for GetPuppetModules.
+type GetPuppetModulesParams struct {
+	// Query Optional query parameter. Exact name of the one module to answer, as `<owner>-<name>`, for example `puppetlabs-stdlib`. Any other search, a repeated parameter or a parameter other than `query`, `limit` and `offset` is rejected with 400.
+	Query *string `form:"query,omitempty" json:"query,omitempty"`
+
+	// Limit Optional query parameter. Most modules a page holds, at least 1. Defaults to 20; a value above 100 is served as 100.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Optional query parameter. Number of modules before the page, at least 0. Defaults to 0; an offset past the last module answers an empty page.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// GetPuppetReleasesParams defines parameters for GetPuppetReleases.
+type GetPuppetReleasesParams struct {
+	// Module Optional query parameter. Module whose releases to list, as `<owner>-<name>`, for example `puppetlabs-stdlib`. A repeated parameter, or a parameter other than `module`, `limit`, `offset`, `sort_by` and `exclude_fields`, is rejected with 400.
+	Module *string `form:"module,omitempty" json:"module,omitempty"`
+
+	// Limit Optional query parameter. Most releases a page holds, at least 1. Defaults to 20; a value above 100 is served as 100.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Optional query parameter. Number of releases before the page, at least 0, and with `module` at most 4,096. Defaults to 0; an offset past the last release answers an empty page.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// SortBy Optional query parameter. Accepted with `module` as `version`, the order the releases are listed in; any other value is rejected with 400.
+	SortBy *GetPuppetReleasesParamsSortBy `form:"sort_by,omitempty" json:"sort_by,omitempty"`
+
+	// ExcludeFields Optional query parameter. Accepted with `module`; every record keeps all its fields.
+	ExcludeFields *string `form:"exclude_fields,omitempty" json:"exclude_fields,omitempty"`
+}
+
+// GetPuppetReleasesParamsSortBy defines parameters for GetPuppetReleases.
+type GetPuppetReleasesParamsSortBy string
 
 // CalculatePypiRepositoryMetadataParams defines parameters for CalculatePypiRepositoryMetadata.
 type CalculatePypiRepositoryMetadataParams struct {
@@ -9723,12 +9990,12 @@ type ClientInterface interface {
 
 	// CalculateConanRepositoryMetadata performs a POST /api/conan/{repoKey}/reindex (the `CalculateConanRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the Conan ecosystem; answers 501.
+	// Queues a rebuild of the package index of a local or federated Conan repository from its completed recipe and package revisions, and returns once the work is queued. Requires Manage on the repository; other package types and classes are rejected with 400.
 	CalculateConanRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateConanRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateCondaRepositoryMetadata performs a POST /api/conda/{repoKey}/reindex (the `CalculateCondaRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the Conda ecosystem; answers 501.
+	// Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types and classes are rejected with 400.
 	CalculateCondaRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCondaRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetChecksumReplication performs a GET /api/config/storage/checksumReplication (the `GetChecksumReplication` operationId) request.
@@ -9750,7 +10017,7 @@ type ClientInterface interface {
 
 	// CalculateCranRepositoryMetadata performs a POST /api/cran/reindex/{repoKey} (the `CalculateCranRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the CRAN ecosystem; answers 501.
+	// Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400.
 	CalculateCranRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCranRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// MoveCranArchives performs a GET /api/cran/{repoKey}/move-archives (the `MoveCranArchives` operationId) request.
@@ -10248,22 +10515,22 @@ type ClientInterface interface {
 
 	// GetPuppetModules performs a GET /api/puppet/{repoKey}/v3/modules (the `GetPuppetModules` operationId) request.
 	//
-	// Not implemented for the Puppet ecosystem; answers 501.
-	GetPuppetModules(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// Lists the Puppet modules the caller may read, in pages. With `query` naming one module, the page holds that module when the caller may read a release of it, and is empty otherwise; local, federated, remote and virtual repositories answer it. Without `query`, the pages list every module a local or federated repository hosts, ordered by name; a virtual repository answers 404 and a remote repository 400. A page holds 20 modules unless `limit` asks for up to 100, and a larger `limit` is served as 100. Each module lists only the releases the caller may read.
+	GetPuppetModules(ctx context.Context, repoKey string, params *GetPuppetModulesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPuppetModuleInfo performs a GET /api/puppet/{repoKey}/v3/modules/{userModule} (the `GetPuppetModuleInfo` operationId) request.
 	//
-	// Not implemented for the Puppet ecosystem; answers 501.
+	// Returns one Puppet module, its newest release and the list of its releases the caller may read, from a local, federated, remote or virtual repository. A module with no release the caller may read answers 404. Any query parameter is rejected with 400.
 	GetPuppetModuleInfo(ctx context.Context, repoKey string, userModule string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPuppetReleases performs a GET /api/puppet/{repoKey}/v3/releases (the `GetPuppetReleases` operationId) request.
 	//
-	// Not implemented for the Puppet ecosystem; answers 501.
-	GetPuppetReleases(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// Lists the Puppet module releases the caller may read, in pages, newest version first. With `module`, the pages list that one module's releases; local, federated, remote and virtual repositories answer them. Without `module`, the pages list every release a local or federated repository hosts, by module name; a virtual repository answers 404 and a remote repository 400. A page holds 20 releases unless `limit` asks for up to 100, and a larger `limit` is served as 100.
+	GetPuppetReleases(ctx context.Context, repoKey string, params *GetPuppetReleasesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPuppetReleaseInfo performs a GET /api/puppet/{repoKey}/v3/releases/{userModuleVersion} (the `GetPuppetReleaseInfo` operationId) request.
 	//
-	// Not implemented for the Puppet ecosystem; answers 501.
+	// Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. Any query parameter is rejected with 400.
 	GetPuppetReleaseInfo(ctx context.Context, repoKey string, userModuleVersion string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculatePypiRepositoryMetadata performs a POST /api/pypi/{repoKey}/reindex (the `CalculatePypiRepositoryMetadata` operationId) request.
@@ -14034,7 +14301,7 @@ func (c *Client) CalculateCocoaPodsIndex(ctx context.Context, repoKey string, re
 
 // CalculateConanRepositoryMetadata performs a POST /api/conan/{repoKey}/reindex (the `CalculateConanRepositoryMetadata` operationId) request.
 //
-// Not implemented for the Conan ecosystem; answers 501.
+// Queues a rebuild of the package index of a local or federated Conan repository from its completed recipe and package revisions, and returns once the work is queued. Requires Manage on the repository; other package types and classes are rejected with 400.
 func (c *Client) CalculateConanRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateConanRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateConanRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -14049,7 +14316,7 @@ func (c *Client) CalculateConanRepositoryMetadata(ctx context.Context, repoKey s
 
 // CalculateCondaRepositoryMetadata performs a POST /api/conda/{repoKey}/reindex (the `CalculateCondaRepositoryMetadata` operationId) request.
 //
-// Not implemented for the Conda ecosystem; answers 501.
+// Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types and classes are rejected with 400.
 func (c *Client) CalculateCondaRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCondaRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateCondaRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -14111,7 +14378,7 @@ func (c *Client) ConfigureChecksumReplication(ctx context.Context, body Configur
 
 // CalculateCranRepositoryMetadata performs a POST /api/cran/reindex/{repoKey} (the `CalculateCranRepositoryMetadata` operationId) request.
 //
-// Not implemented for the CRAN ecosystem; answers 501.
+// Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400.
 func (c *Client) CalculateCranRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCranRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateCranRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -15283,9 +15550,9 @@ func (c *Client) CalculatePubRepositoryMetadata(ctx context.Context, repoKey str
 
 // GetPuppetModules performs a GET /api/puppet/{repoKey}/v3/modules (the `GetPuppetModules` operationId) request.
 //
-// Not implemented for the Puppet ecosystem; answers 501.
-func (c *Client) GetPuppetModules(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetPuppetModulesRequest(c.Server, repoKey)
+// Lists the Puppet modules the caller may read, in pages. With `query` naming one module, the page holds that module when the caller may read a release of it, and is empty otherwise; local, federated, remote and virtual repositories answer it. Without `query`, the pages list every module a local or federated repository hosts, ordered by name; a virtual repository answers 404 and a remote repository 400. A page holds 20 modules unless `limit` asks for up to 100, and a larger `limit` is served as 100. Each module lists only the releases the caller may read.
+func (c *Client) GetPuppetModules(ctx context.Context, repoKey string, params *GetPuppetModulesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetPuppetModulesRequest(c.Server, repoKey, params)
 	if err != nil {
 		return nil, err
 	}
@@ -15298,7 +15565,7 @@ func (c *Client) GetPuppetModules(ctx context.Context, repoKey string, reqEditor
 
 // GetPuppetModuleInfo performs a GET /api/puppet/{repoKey}/v3/modules/{userModule} (the `GetPuppetModuleInfo` operationId) request.
 //
-// Not implemented for the Puppet ecosystem; answers 501.
+// Returns one Puppet module, its newest release and the list of its releases the caller may read, from a local, federated, remote or virtual repository. A module with no release the caller may read answers 404. Any query parameter is rejected with 400.
 func (c *Client) GetPuppetModuleInfo(ctx context.Context, repoKey string, userModule string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPuppetModuleInfoRequest(c.Server, repoKey, userModule)
 	if err != nil {
@@ -15313,9 +15580,9 @@ func (c *Client) GetPuppetModuleInfo(ctx context.Context, repoKey string, userMo
 
 // GetPuppetReleases performs a GET /api/puppet/{repoKey}/v3/releases (the `GetPuppetReleases` operationId) request.
 //
-// Not implemented for the Puppet ecosystem; answers 501.
-func (c *Client) GetPuppetReleases(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetPuppetReleasesRequest(c.Server, repoKey)
+// Lists the Puppet module releases the caller may read, in pages, newest version first. With `module`, the pages list that one module's releases; local, federated, remote and virtual repositories answer them. Without `module`, the pages list every release a local or federated repository hosts, by module name; a virtual repository answers 404 and a remote repository 400. A page holds 20 releases unless `limit` asks for up to 100, and a larger `limit` is served as 100.
+func (c *Client) GetPuppetReleases(ctx context.Context, repoKey string, params *GetPuppetReleasesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetPuppetReleasesRequest(c.Server, repoKey, params)
 	if err != nil {
 		return nil, err
 	}
@@ -15328,7 +15595,7 @@ func (c *Client) GetPuppetReleases(ctx context.Context, repoKey string, reqEdito
 
 // GetPuppetReleaseInfo performs a GET /api/puppet/{repoKey}/v3/releases/{userModuleVersion} (the `GetPuppetReleaseInfo` operationId) request.
 //
-// Not implemented for the Puppet ecosystem; answers 501.
+// Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. Any query parameter is rejected with 400.
 func (c *Client) GetPuppetReleaseInfo(ctx context.Context, repoKey string, userModuleVersion string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPuppetReleaseInfoRequest(c.Server, repoKey, userModuleVersion)
 	if err != nil {
@@ -26362,7 +26629,7 @@ func NewCalculatePubRepositoryMetadataRequest(server string, repoKey string, par
 }
 
 // NewGetPuppetModulesRequest constructs an http.Request for the GetPuppetModules method
-func NewGetPuppetModulesRequest(server string, repoKey string) (*http.Request, error) {
+func NewGetPuppetModulesRequest(server string, repoKey string, params *GetPuppetModulesParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -26385,6 +26652,57 @@ func NewGetPuppetModulesRequest(server string, repoKey string) (*http.Request, e
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Query != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "query", *params.Query, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -26437,7 +26755,7 @@ func NewGetPuppetModuleInfoRequest(server string, repoKey string, userModule str
 }
 
 // NewGetPuppetReleasesRequest constructs an http.Request for the GetPuppetReleases method
-func NewGetPuppetReleasesRequest(server string, repoKey string) (*http.Request, error) {
+func NewGetPuppetReleasesRequest(server string, repoKey string, params *GetPuppetReleasesParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -26460,6 +26778,81 @@ func NewGetPuppetReleasesRequest(server string, repoKey string) (*http.Request, 
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Module != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "module", *params.Module, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.SortBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "sort_by", *params.SortBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ExcludeFields != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "exclude_fields", *params.ExcludeFields, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -36797,14 +37190,14 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateConanRepositoryMetadataWithResponse performs a POST /api/conan/{repoKey}/reindex (the `CalculateConanRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the Conan ecosystem; answers 501.
+	// Queues a rebuild of the package index of a local or federated Conan repository from its completed recipe and package revisions, and returns once the work is queued. Requires Manage on the repository; other package types and classes are rejected with 400.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateConanRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateConanRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateConanRepositoryMetadataResponse, error)
 
 	// CalculateCondaRepositoryMetadataWithResponse performs a POST /api/conda/{repoKey}/reindex (the `CalculateCondaRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the Conda ecosystem; answers 501.
+	// Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types and classes are rejected with 400.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateCondaRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCondaRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCondaRepositoryMetadataResponse, error)
@@ -36832,7 +37225,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateCranRepositoryMetadataWithResponse performs a POST /api/cran/reindex/{repoKey} (the `CalculateCranRepositoryMetadata` operationId) request.
 	//
-	// Not implemented for the CRAN ecosystem; answers 501.
+	// Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateCranRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCranRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCranRepositoryMetadataResponse, error)
@@ -37414,28 +37807,28 @@ type ClientWithResponsesInterface interface {
 
 	// GetPuppetModulesWithResponse performs a GET /api/puppet/{repoKey}/v3/modules (the `GetPuppetModules` operationId) request.
 	//
-	// Not implemented for the Puppet ecosystem; answers 501.
+	// Lists the Puppet modules the caller may read, in pages. With `query` naming one module, the page holds that module when the caller may read a release of it, and is empty otherwise; local, federated, remote and virtual repositories answer it. Without `query`, the pages list every module a local or federated repository hosts, ordered by name; a virtual repository answers 404 and a remote repository 400. A page holds 20 modules unless `limit` asks for up to 100, and a larger `limit` is served as 100. Each module lists only the releases the caller may read.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	GetPuppetModulesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetPuppetModulesResponse, error)
+	GetPuppetModulesWithResponse(ctx context.Context, repoKey string, params *GetPuppetModulesParams, reqEditors ...RequestEditorFn) (*GetPuppetModulesResponse, error)
 
 	// GetPuppetModuleInfoWithResponse performs a GET /api/puppet/{repoKey}/v3/modules/{userModule} (the `GetPuppetModuleInfo` operationId) request.
 	//
-	// Not implemented for the Puppet ecosystem; answers 501.
+	// Returns one Puppet module, its newest release and the list of its releases the caller may read, from a local, federated, remote or virtual repository. A module with no release the caller may read answers 404. Any query parameter is rejected with 400.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetPuppetModuleInfoWithResponse(ctx context.Context, repoKey string, userModule string, reqEditors ...RequestEditorFn) (*GetPuppetModuleInfoResponse, error)
 
 	// GetPuppetReleasesWithResponse performs a GET /api/puppet/{repoKey}/v3/releases (the `GetPuppetReleases` operationId) request.
 	//
-	// Not implemented for the Puppet ecosystem; answers 501.
+	// Lists the Puppet module releases the caller may read, in pages, newest version first. With `module`, the pages list that one module's releases; local, federated, remote and virtual repositories answer them. Without `module`, the pages list every release a local or federated repository hosts, by module name; a virtual repository answers 404 and a remote repository 400. A page holds 20 releases unless `limit` asks for up to 100, and a larger `limit` is served as 100.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	GetPuppetReleasesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetPuppetReleasesResponse, error)
+	GetPuppetReleasesWithResponse(ctx context.Context, repoKey string, params *GetPuppetReleasesParams, reqEditors ...RequestEditorFn) (*GetPuppetReleasesResponse, error)
 
 	// GetPuppetReleaseInfoWithResponse performs a GET /api/puppet/{repoKey}/v3/releases/{userModuleVersion} (the `GetPuppetReleaseInfo` operationId) request.
 	//
-	// Not implemented for the Puppet ecosystem; answers 501.
+	// Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. Any query parameter is rejected with 400.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetPuppetReleaseInfoWithResponse(ctx context.Context, repoKey string, userModuleVersion string, reqEditors ...RequestEditorFn) (*GetPuppetReleaseInfoResponse, error)
@@ -48357,60 +48750,31 @@ type GetPuppetModulesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		// Current Optional within this object. URL of the current page of results.
-		Current *string `json:"current,omitempty"`
-
-		// Limit Optional within this object. Page size the upstream Forge API applied.
-		Limit *int `json:"limit,omitempty"`
-
-		// Next Optional within this object. URL of the next page, or null on the last page.
-		Next *string `json:"next,omitempty"`
-
-		// Offset Optional within this object. Index of the first result on this page.
-		Offset *int `json:"offset,omitempty"`
-
-		// Previous Optional within this object. URL of the previous page, or null on the first page.
-		Previous *string `json:"previous,omitempty"`
-
-		// Results Optional within this object. Forge module or release records for this page.
-		Results *[]map[string]interface{} `json:"results,omitempty"`
-
-		// Total Optional within this object. Total number of records across all pages.
-		Total *int `json:"total,omitempty"`
-	}
+	JSON200 *PuppetModulePage
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+	// JSON502 the response for an HTTP 502 `application/json` response
+	JSON502 *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetPuppetModulesResponse) GetJSON200() *struct {
-	// Current Optional within this object. URL of the current page of results.
-	Current *string `json:"current,omitempty"`
-
-	// Limit Optional within this object. Page size the upstream Forge API applied.
-	Limit *int `json:"limit,omitempty"`
-
-	// Next Optional within this object. URL of the next page, or null on the last page.
-	Next *string `json:"next,omitempty"`
-
-	// Offset Optional within this object. Index of the first result on this page.
-	Offset *int `json:"offset,omitempty"`
-
-	// Previous Optional within this object. URL of the previous page, or null on the first page.
-	Previous *string `json:"previous,omitempty"`
-
-	// Results Optional within this object. Forge module or release records for this page.
-	Results *[]map[string]interface{} `json:"results,omitempty"`
-
-	// Total Optional within this object. Total number of records across all pages.
-	Total *int `json:"total,omitempty"`
-} {
+func (r GetPuppetModulesResponse) GetJSON200() *PuppetModulePage {
 	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetPuppetModulesResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -48423,9 +48787,24 @@ func (r GetPuppetModulesResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
 }
 
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetPuppetModulesResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetPuppetModulesResponse) GetJSON500() *ErrorResponse {
 	return r.JSON500
+}
+
+// GetJSON502 returns the response for an HTTP 502 `application/json` response
+func (r GetPuppetModulesResponse) GetJSON502() *ErrorResponse {
+	return r.JSON502
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetPuppetModulesResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -48461,7 +48840,9 @@ type GetPuppetModuleInfoResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *map[string]interface{}
+	JSON200 *PuppetModule
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -48470,11 +48851,20 @@ type GetPuppetModuleInfoResponse struct {
 	JSON404 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+	// JSON502 the response for an HTTP 502 `application/json` response
+	JSON502 *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetPuppetModuleInfoResponse) GetJSON200() *map[string]interface{} {
+func (r GetPuppetModuleInfoResponse) GetJSON200() *PuppetModule {
 	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetPuppetModuleInfoResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -48495,6 +48885,16 @@ func (r GetPuppetModuleInfoResponse) GetJSON404() *ErrorResponse {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetPuppetModuleInfoResponse) GetJSON500() *ErrorResponse {
 	return r.JSON500
+}
+
+// GetJSON502 returns the response for an HTTP 502 `application/json` response
+func (r GetPuppetModuleInfoResponse) GetJSON502() *ErrorResponse {
+	return r.JSON502
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetPuppetModuleInfoResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -48530,60 +48930,31 @@ type GetPuppetReleasesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		// Current Optional within this object. URL of the current page of results.
-		Current *string `json:"current,omitempty"`
-
-		// Limit Optional within this object. Page size the upstream Forge API applied.
-		Limit *int `json:"limit,omitempty"`
-
-		// Next Optional within this object. URL of the next page, or null on the last page.
-		Next *string `json:"next,omitempty"`
-
-		// Offset Optional within this object. Index of the first result on this page.
-		Offset *int `json:"offset,omitempty"`
-
-		// Previous Optional within this object. URL of the previous page, or null on the first page.
-		Previous *string `json:"previous,omitempty"`
-
-		// Results Optional within this object. Forge module or release records for this page.
-		Results *[]map[string]interface{} `json:"results,omitempty"`
-
-		// Total Optional within this object. Total number of records across all pages.
-		Total *int `json:"total,omitempty"`
-	}
+	JSON200 *PuppetReleasePage
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+	// JSON502 the response for an HTTP 502 `application/json` response
+	JSON502 *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetPuppetReleasesResponse) GetJSON200() *struct {
-	// Current Optional within this object. URL of the current page of results.
-	Current *string `json:"current,omitempty"`
-
-	// Limit Optional within this object. Page size the upstream Forge API applied.
-	Limit *int `json:"limit,omitempty"`
-
-	// Next Optional within this object. URL of the next page, or null on the last page.
-	Next *string `json:"next,omitempty"`
-
-	// Offset Optional within this object. Index of the first result on this page.
-	Offset *int `json:"offset,omitempty"`
-
-	// Previous Optional within this object. URL of the previous page, or null on the first page.
-	Previous *string `json:"previous,omitempty"`
-
-	// Results Optional within this object. Forge module or release records for this page.
-	Results *[]map[string]interface{} `json:"results,omitempty"`
-
-	// Total Optional within this object. Total number of records across all pages.
-	Total *int `json:"total,omitempty"`
-} {
+func (r GetPuppetReleasesResponse) GetJSON200() *PuppetReleasePage {
 	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetPuppetReleasesResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -48596,9 +48967,24 @@ func (r GetPuppetReleasesResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
 }
 
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetPuppetReleasesResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetPuppetReleasesResponse) GetJSON500() *ErrorResponse {
 	return r.JSON500
+}
+
+// GetJSON502 returns the response for an HTTP 502 `application/json` response
+func (r GetPuppetReleasesResponse) GetJSON502() *ErrorResponse {
+	return r.JSON502
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetPuppetReleasesResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -48634,7 +49020,9 @@ type GetPuppetReleaseInfoResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *map[string]interface{}
+	JSON200 *PuppetRelease
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -48643,11 +49031,20 @@ type GetPuppetReleaseInfoResponse struct {
 	JSON404 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+	// JSON502 the response for an HTTP 502 `application/json` response
+	JSON502 *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetPuppetReleaseInfoResponse) GetJSON200() *map[string]interface{} {
+func (r GetPuppetReleaseInfoResponse) GetJSON200() *PuppetRelease {
 	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetPuppetReleaseInfoResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -48668,6 +49065,16 @@ func (r GetPuppetReleaseInfoResponse) GetJSON404() *ErrorResponse {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetPuppetReleaseInfoResponse) GetJSON500() *ErrorResponse {
 	return r.JSON500
+}
+
+// GetJSON502 returns the response for an HTTP 502 `application/json` response
+func (r GetPuppetReleaseInfoResponse) GetJSON502() *ErrorResponse {
+	return r.JSON502
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetPuppetReleaseInfoResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -63449,7 +63856,7 @@ func (c *ClientWithResponses) CalculateCocoaPodsIndexWithResponse(ctx context.Co
 
 // CalculateConanRepositoryMetadataWithResponse performs a POST /api/conan/{repoKey}/reindex (the `CalculateConanRepositoryMetadata` operationId) request.
 //
-// Not implemented for the Conan ecosystem; answers 501.
+// Queues a rebuild of the package index of a local or federated Conan repository from its completed recipe and package revisions, and returns once the work is queued. Requires Manage on the repository; other package types and classes are rejected with 400.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateConanRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateConanRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateConanRepositoryMetadataResponse, error) {
@@ -63462,7 +63869,7 @@ func (c *ClientWithResponses) CalculateConanRepositoryMetadataWithResponse(ctx c
 
 // CalculateCondaRepositoryMetadataWithResponse performs a POST /api/conda/{repoKey}/reindex (the `CalculateCondaRepositoryMetadata` operationId) request.
 //
-// Not implemented for the Conda ecosystem; answers 501.
+// Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types and classes are rejected with 400.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateCondaRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCondaRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCondaRepositoryMetadataResponse, error) {
@@ -63514,7 +63921,7 @@ func (c *ClientWithResponses) ConfigureChecksumReplicationWithResponse(ctx conte
 
 // CalculateCranRepositoryMetadataWithResponse performs a POST /api/cran/reindex/{repoKey} (the `CalculateCranRepositoryMetadata` operationId) request.
 //
-// Not implemented for the CRAN ecosystem; answers 501.
+// Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateCranRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCranRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCranRepositoryMetadataResponse, error) {
@@ -64503,11 +64910,11 @@ func (c *ClientWithResponses) CalculatePubRepositoryMetadataWithResponse(ctx con
 
 // GetPuppetModulesWithResponse performs a GET /api/puppet/{repoKey}/v3/modules (the `GetPuppetModules` operationId) request.
 //
-// Not implemented for the Puppet ecosystem; answers 501.
+// Lists the Puppet modules the caller may read, in pages. With `query` naming one module, the page holds that module when the caller may read a release of it, and is empty otherwise; local, federated, remote and virtual repositories answer it. Without `query`, the pages list every module a local or federated repository hosts, ordered by name; a virtual repository answers 404 and a remote repository 400. A page holds 20 modules unless `limit` asks for up to 100, and a larger `limit` is served as 100. Each module lists only the releases the caller may read.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) GetPuppetModulesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetPuppetModulesResponse, error) {
-	rsp, err := c.GetPuppetModules(ctx, repoKey, reqEditors...)
+func (c *ClientWithResponses) GetPuppetModulesWithResponse(ctx context.Context, repoKey string, params *GetPuppetModulesParams, reqEditors ...RequestEditorFn) (*GetPuppetModulesResponse, error) {
+	rsp, err := c.GetPuppetModules(ctx, repoKey, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -64516,7 +64923,7 @@ func (c *ClientWithResponses) GetPuppetModulesWithResponse(ctx context.Context, 
 
 // GetPuppetModuleInfoWithResponse performs a GET /api/puppet/{repoKey}/v3/modules/{userModule} (the `GetPuppetModuleInfo` operationId) request.
 //
-// Not implemented for the Puppet ecosystem; answers 501.
+// Returns one Puppet module, its newest release and the list of its releases the caller may read, from a local, federated, remote or virtual repository. A module with no release the caller may read answers 404. Any query parameter is rejected with 400.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetPuppetModuleInfoWithResponse(ctx context.Context, repoKey string, userModule string, reqEditors ...RequestEditorFn) (*GetPuppetModuleInfoResponse, error) {
@@ -64529,11 +64936,11 @@ func (c *ClientWithResponses) GetPuppetModuleInfoWithResponse(ctx context.Contex
 
 // GetPuppetReleasesWithResponse performs a GET /api/puppet/{repoKey}/v3/releases (the `GetPuppetReleases` operationId) request.
 //
-// Not implemented for the Puppet ecosystem; answers 501.
+// Lists the Puppet module releases the caller may read, in pages, newest version first. With `module`, the pages list that one module's releases; local, federated, remote and virtual repositories answer them. Without `module`, the pages list every release a local or federated repository hosts, by module name; a virtual repository answers 404 and a remote repository 400. A page holds 20 releases unless `limit` asks for up to 100, and a larger `limit` is served as 100.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) GetPuppetReleasesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetPuppetReleasesResponse, error) {
-	rsp, err := c.GetPuppetReleases(ctx, repoKey, reqEditors...)
+func (c *ClientWithResponses) GetPuppetReleasesWithResponse(ctx context.Context, repoKey string, params *GetPuppetReleasesParams, reqEditors ...RequestEditorFn) (*GetPuppetReleasesResponse, error) {
+	rsp, err := c.GetPuppetReleases(ctx, repoKey, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -64542,7 +64949,7 @@ func (c *ClientWithResponses) GetPuppetReleasesWithResponse(ctx context.Context,
 
 // GetPuppetReleaseInfoWithResponse performs a GET /api/puppet/{repoKey}/v3/releases/{userModuleVersion} (the `GetPuppetReleaseInfo` operationId) request.
 //
-// Not implemented for the Puppet ecosystem; answers 501.
+// Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. Any query parameter is rejected with 400.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetPuppetReleaseInfoWithResponse(ctx context.Context, repoKey string, userModuleVersion string, reqEditors ...RequestEditorFn) (*GetPuppetReleaseInfoResponse, error) {
@@ -75213,32 +75620,18 @@ func ParseGetPuppetModulesResponse(rsp *http.Response) (*GetPuppetModulesRespons
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// Current Optional within this object. URL of the current page of results.
-			Current *string `json:"current,omitempty"`
-
-			// Limit Optional within this object. Page size the upstream Forge API applied.
-			Limit *int `json:"limit,omitempty"`
-
-			// Next Optional within this object. URL of the next page, or null on the last page.
-			Next *string `json:"next,omitempty"`
-
-			// Offset Optional within this object. Index of the first result on this page.
-			Offset *int `json:"offset,omitempty"`
-
-			// Previous Optional within this object. URL of the previous page, or null on the first page.
-			Previous *string `json:"previous,omitempty"`
-
-			// Results Optional within this object. Forge module or release records for this page.
-			Results *[]map[string]interface{} `json:"results,omitempty"`
-
-			// Total Optional within this object. Total number of records across all pages.
-			Total *int `json:"total,omitempty"`
-		}
+		var dest PuppetModulePage
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
@@ -75254,12 +75647,33 @@ func ParseGetPuppetModulesResponse(rsp *http.Response) (*GetPuppetModulesRespons
 		}
 		response.JSON403 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
@@ -75281,11 +75695,18 @@ func ParseGetPuppetModuleInfoResponse(rsp *http.Response) (*GetPuppetModuleInfoR
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest map[string]interface{}
+		var dest PuppetModule
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
@@ -75314,6 +75735,20 @@ func ParseGetPuppetModuleInfoResponse(rsp *http.Response) (*GetPuppetModuleInfoR
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
@@ -75335,79 +75770,18 @@ func ParseGetPuppetReleasesResponse(rsp *http.Response) (*GetPuppetReleasesRespo
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// Current Optional within this object. URL of the current page of results.
-			Current *string `json:"current,omitempty"`
-
-			// Limit Optional within this object. Page size the upstream Forge API applied.
-			Limit *int `json:"limit,omitempty"`
-
-			// Next Optional within this object. URL of the next page, or null on the last page.
-			Next *string `json:"next,omitempty"`
-
-			// Offset Optional within this object. Index of the first result on this page.
-			Offset *int `json:"offset,omitempty"`
-
-			// Previous Optional within this object. URL of the previous page, or null on the first page.
-			Previous *string `json:"previous,omitempty"`
-
-			// Results Optional within this object. Forge module or release records for this page.
-			Results *[]map[string]interface{} `json:"results,omitempty"`
-
-			// Total Optional within this object. Total number of records across all pages.
-			Total *int `json:"total,omitempty"`
-		}
+		var dest PuppetReleasePage
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetPuppetReleaseInfoResponse parses an HTTP response from a GetPuppetReleaseInfoWithResponse call
-func ParseGetPuppetReleaseInfoResponse(rsp *http.Response) (*GetPuppetReleaseInfoResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetPuppetReleaseInfoResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest map[string]interface{}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
@@ -75436,6 +75810,95 @@ func ParseGetPuppetReleaseInfoResponse(rsp *http.Response) (*GetPuppetReleaseInf
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetPuppetReleaseInfoResponse parses an HTTP response from a GetPuppetReleaseInfoWithResponse call
+func ParseGetPuppetReleaseInfoResponse(rsp *http.Response) (*GetPuppetReleaseInfoResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetPuppetReleaseInfoResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PuppetRelease
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
