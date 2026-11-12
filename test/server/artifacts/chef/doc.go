@@ -17,12 +17,20 @@
 //     request and seed helpers of test/server/support.
 //   - A remote Chef repository over a stub source (sourceIdentity,
 //     sourceBackend).
+//   - The harness's remote world (harness.NewRemoteWorld), its remote made
+//     a Chef remote over a fake Supermarket that serves at most 100
+//     cookbooks a catalog page whatever items asks
+//     (chef_remote_paging_test.go, cappedSupermarket).
 //
 // # Outputs
 //
 // Assertions only:
 //   - chef_item_test.go: cached metadata has no generic download bypass and
 //     cannot escape by transfer, checksum deploy or restore.
+//   - chef_remote_paging_test.go: a remote reads every page of an upstream
+//     catalog that serves 100 cookbooks a page, and its catalog and search
+//     list them all, through the remote and a virtual repository over it;
+//     a catalog of at most 100 and a short page keep their answers.
 //
 // # References
 //
@@ -37,6 +45,7 @@
 //   - docs/testing/server-test-ownership.md: how CI selection gives the
 //     package an owner.
 //   - https://github.com/weaveplatform/artifactweave/issues/1068
+//   - https://github.com/weaveplatform/artifactweave/issues/1298
 //
 // # Status
 //

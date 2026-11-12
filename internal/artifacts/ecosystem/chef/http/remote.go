@@ -22,7 +22,17 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
-const maxMetadataBytes = 4 << 20
+const (
+	maxMetadataBytes = 4 << 20
+	// upstreamPage is the page of cookbooks a remote asks its upstream
+	// Supermarket for. Supermarket serves at most API_ITEM_LIMIT a page, 100
+	// when that is not set, whatever items asks (chef/supermarket,
+	// v1_controller.rb, init_params and item_limit), and supermarket.chef.io
+	// answered items=1000 with 100 of its 4,078 cookbooks on 2026-11-12.
+	// Asking for more only makes every page short. What 7.x's remote asks
+	// is unknown [I].
+	upstreamPage = 100
+)
 
 type cookbookDocument struct {
 	Name          string   `json:"name"`
@@ -364,30 +374,50 @@ func (h handler) remoteVersions(r *http.Request, name string) ([]release, error)
 	return out, nil
 }
 
+// parseCatalog reads the upstream catalog page that starts at offset and
+// reports whether more cookbooks follow it.
+func parseCatalog(data []byte, offset int) (catalogDocument, bool, error) {
+	var doc catalogDocument
+	if decode(data, &doc) != nil || doc.Start != offset ||
+		doc.Total < offset+len(doc.Items) ||
+		doc.Total > maxVersions ||
+		len(doc.Items) > 1000 {
+		return doc, false, invalidUpstream()
+	}
+	more := offset+len(doc.Items) < doc.Total
+	// Supermarket's page states no limit, unlike the Forge's (#1285). A page
+	// with more after it that holds fewer cookbooks than the remote asked
+	// for may come from a smaller API_ITEM_LIMIT or may have left cookbooks
+	// out, and nothing on the page tells which, so it is refused (#1298). A
+	// page that holds more than was asked is not short: the next page starts
+	// after what it held.
+	if more && len(doc.Items) < upstreamPage {
+		return doc, false, invalidUpstream()
+	}
+	for _, entry := range doc.Items {
+		if !cheffmt.ValidName(entry.Name) {
+			return doc, false, invalidUpstream()
+		}
+	}
+	return doc, more, nil
+}
+
 func (h handler) remoteNames(r *http.Request) ([]string, error) {
 	names := []string{}
 	seen := map[string]bool{}
-	for offset := 0; offset < maxVersions; offset += 1000 {
+	// The next page starts after the cookbooks this one held, not after the
+	// page asked for: an upstream that ignores items may serve more.
+	for offset := 0; offset < maxVersions; {
 		var doc catalogDocument
+		var more bool
 		_, _, err := h.metadata(
 			r,
 			"/api/v1/cookbooks",
 			"",
-			url.Values{"start": {strconv.Itoa(offset)}, "items": {"1000"}},
-			func(data []byte) error {
-				if decode(data, &doc) != nil || doc.Start != offset ||
-					doc.Total < offset+len(doc.Items) ||
-					doc.Total > maxVersions ||
-					len(doc.Items) > 1000 ||
-					offset+len(doc.Items) < doc.Total && len(doc.Items) != 1000 {
-					return invalidUpstream()
-				}
-				for _, entry := range doc.Items {
-					if !cheffmt.ValidName(entry.Name) {
-						return invalidUpstream()
-					}
-				}
-				return nil
+			url.Values{"start": {strconv.Itoa(offset)}, "items": {strconv.Itoa(upstreamPage)}},
+			func(data []byte) (e error) {
+				doc, more, e = parseCatalog(data, offset)
+				return e
 			},
 		)
 		if err != nil {
@@ -400,9 +430,10 @@ func (h handler) remoteNames(r *http.Request) ([]string, error) {
 			seen[entry.Name] = true
 			names = append(names, entry.Name)
 		}
-		if offset+len(doc.Items) == doc.Total {
+		if !more {
 			return names, nil
 		}
+		offset += len(doc.Items)
 	}
 	return nil, invalidUpstream()
 }

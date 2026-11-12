@@ -191,6 +191,7 @@ var generatedRoutes = map[string]bool{
 	"POST /access/api/v2/groups":                                                     true,
 	"GET /access/api/v2/groups/{name}":                                               true,
 	"PATCH /access/api/v2/groups/{name}":                                             true,
+	"PUT /access/api/v2/groups/{name}":                                               true,
 	"DELETE /access/api/v2/groups/{name}":                                            true,
 	"PATCH /access/api/v2/groups/{name}/members":                                     true,
 	"GET /access/api/v1/config/security/authentication/basic_authentication_enabled": true,
