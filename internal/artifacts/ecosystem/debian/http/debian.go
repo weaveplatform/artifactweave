@@ -33,14 +33,15 @@ type DebianAPI struct{ *itemkit.Kit }
 
 // TryDebianItem is the overlay (itemkit.Overlay) that serves a Debian
 // repository's Packages and Sources indexes and their by-hash copies, and a
-// virtual repository's metadata under dists/ and its binary packages. It
-// ensures an index is never returned to a caller who cannot read every
-// package it advertises, which the ordinary item route cannot guarantee for
-// a cached or virtual metadata file. That rule is about permission: the
-// download policy is checked at the index's own path, and an index keeps a
-// package whose file the patterns reject. It reports whether it answered;
-// every other request, a folder among them, it leaves to the overlays after
-// it and the generic lookup.
+// virtual repository's files under dists/ and its binary packages: the
+// metadata the virtual repository composes from its members, and every other
+// file from the first member that holds it. It ensures an index is never
+// returned to a caller who cannot read every package it advertises, which
+// the ordinary item route cannot guarantee for a cached or virtual metadata
+// file. That rule is about permission: the download policy is checked at the
+// index's own path, and an index keeps a package whose file the patterns
+// reject. It reports whether it answered; every other request, a folder
+// among them, it leaves to the overlays after it and the generic lookup.
 func TryDebianItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
@@ -51,16 +52,22 @@ func TryDebianItem(
 	}
 	if c.Class == repo.Virtual && strings.HasPrefix(req.Path, "dists/") {
 		_, byHash := debian.ByHashMetadataPath(req.Path)
-		if debian.ReleaseMetadataPath(req.Path) ||
-			debian.PackagesIndexPath(req.Path) || byHash {
+		switch {
+		case debian.ReleaseMetadataPath(req.Path) || debian.PackagesIndexPath(req.Path) || byHash:
 			s.serveVirtualDebianMetadata(w, r, st, c, req, p, acc)
-		} else {
+		case len(req.Props) != 0 || r.URL.RawQuery != "":
+			// Such a path answered not found to every request before #1254,
+			// which asks for the plain read only. With a matrix parameter or
+			// a query it keeps that answer [I], where the composed files and
+			// the packages refuse one as forbidden.
 			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+		default:
+			s.serveVirtualDebianFile(w, r, st, c, req, p, acc, "file")
 		}
 		return true
 	}
 	if c.Class == repo.Virtual && debian.ValidBinaryPath(req.Path) {
-		s.serveVirtualDebianPackage(w, r, st, c, req, p, acc)
+		s.serveVirtualDebianFile(w, r, st, c, req, p, acc, "package")
 		return true
 	}
 	_, byHash := debian.ByHashMetadataPath(req.Path)
@@ -164,32 +171,57 @@ func (s DebianAPI) serveDebianIndex(
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "Debian index", err))
 		return
 	}
-	// Each listed package is checked for read permission alone. 7.x keeps a
-	// package whose file the patterns reject in its Debian metadata and
-	// refuses only that file's GET (RTFACT-30830), so the policy refusing a
-	// listed file neither refuses nor filters the index.
+	if err := s.debianIndexReadable(ctx, paths, checkPermission, p, acc, c); err != nil {
+		httpkit.WriteErr(w, r, err)
+		return
+	}
+	writeDebianIndex(w, r, req.Path, body, used)
+}
+
+// debianIndexReadable returns nil when the caller may read each of paths,
+// the files an index lists, in every one of repos and, for an index a
+// remote source returned, by that source's permission-only check
+// (checkPermission, nil for any other). Otherwise it returns the error to
+// answer: 403, 401 to an anonymous caller, or the check's own fault. Each
+// file is checked for read permission alone. 7.x keeps a package whose file
+// the patterns reject in its Debian metadata and refuses only that file's
+// GET (RTFACT-30830), so the policy refusing a listed file neither refuses
+// nor filters the index.
+func (s DebianAPI) debianIndexReadable(
+	ctx context.Context, paths []string, checkPermission func(context.Context, string) error,
+	p kernel.Principal, acc itemkit.Access, repos ...repo.Config,
+) error {
 	for _, path := range paths {
-		if !acc.File(c, path, accessapi.ActionRead) {
-			httpkit.WriteErr(w, r, httpkit.Denied(p))
-			return
-		}
-		if checkPermission != nil {
-			if err := checkPermission(ctx, path); err != nil {
-				if errors.Is(err, source.ErrDenied) {
-					httpkit.WriteErr(w, r, httpkit.Denied(p))
-				} else {
-					httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian package read authority", err))
-				}
-				return
+		for _, c := range repos {
+			if !acc.File(c, path, accessapi.ActionRead) {
+				return httpkit.Denied(p)
 			}
 		}
+		if checkPermission == nil {
+			continue
+		}
+		if err := checkPermission(ctx, path); errors.Is(err, source.ErrDenied) {
+			return httpkit.Denied(p)
+		} else if err != nil {
+			return s.ItemError(ctx, "Debian package read authority", err)
+		}
 	}
+	return nil
+}
+
+// writeDebianIndex serves body, the index at path. It was checked against
+// this caller's permissions, so no cache may keep it for another. used, when
+// it is not nil, records the delivery once the whole index was sent.
+func writeDebianIndex(
+	w http.ResponseWriter, r *http.Request, path string, body []byte,
+	used func(context.Context) error,
+) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "private, no-store")
 	sw := &itemkit.StatusWriter{ResponseWriter: w}
-	http.ServeContent(sw, r, req.Path, time.Time{}, bytes.NewReader(body))
+	http.ServeContent(sw, r, path, time.Time{}, bytes.NewReader(body))
 	if sw.Complete(r) && used != nil {
-		_ = used(ctx)
+		_ = used(r.Context())
 	}
 }
 
