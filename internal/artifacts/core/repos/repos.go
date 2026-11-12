@@ -134,8 +134,15 @@ func CheckKeypairs(ctx context.Context, keys accessapi.Keys, c repo.Config) erro
 // OwesReindex reports whether an update of stored to updated owes the
 // repository a reindex: one that gives a Terraform repository the
 // terraformType it lacked, so the files it stored before are indexed as
-// that type says (decision 0040).
+// that type says (decision 0040), or one that changes the primary key pair
+// of an npm local or federated repository, so every version is signed with
+// the new pair, as 7.x reindexes a repository and signs all its packages
+// when its ECDSA key is saved (decision 0034, "Signatures").
 func OwesReindex(stored, updated repo.Config) bool {
+	if updated.PackageType == repo.NPM &&
+		(updated.Class == repo.Local || updated.Class == repo.Federated) {
+		return stored.PrimaryKeyPairRef != updated.PrimaryKeyPairRef
+	}
 	return updated.PackageType == repo.Terraform && stored.TerraformType == "" &&
 		updated.TerraformType != ""
 }

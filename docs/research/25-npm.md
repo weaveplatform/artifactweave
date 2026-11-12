@@ -181,7 +181,7 @@ stale, so 7.x cannot refuse one either ([J] RTFACT-30472, RTFACT-29708).
 | A local repository writes each package's metadata to `.npm/<package>/package.json`: a 7.x reindex logs "write npm package metadata for repo 'npm-local' on path '.npm/lodash/package.json'" | [KB] 000005641 |
 | Package metadata sits at `.npm/<repo>/<package>`: an include pattern on a permission target must name those paths as well as the package's, or metadata requests through a virtual repository may fail | [D] npm-repositories, "npm Limitations" |
 | A copy or move to a path under `.npm/` is refused, so source metadata cannot overwrite the destination's generated files | [D] [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed), "npm metadata protection" |
-| A local repository can sign each version with an ECDSA key pair (the repository's `primaryKeyPairRef` and `secondaryKeyPairRef`): the version's `dist.signatures` holds `keyid` and `sig`, and `npm audit signatures` checks them against `GET /-/npm/v1/keys` | [D] npm-repositories, "Use npm Audit"; [research 04](04-package-protocols.md#url-layout-1) |
+| From 7.83.1 a local repository signs each version with the ECDSA key pair its page names under "ECDSA Key Pair > Primary Key Name": the version's `dist.signatures` holds `keyid` and `sig`, and `npm audit signatures` checks them against `GET /-/npm/v1/keys`. Saving the key makes "the repository ... automatically reindex and sign all the packages". The documentation's steps make the pair with `gpg --expert --full-generate-key` and upload its armored exports as an "ECDSA Keys" signing key. Its known issues: an include pattern must name `.npm/keys.json` for the audit to work, and a virtual repository holding an unsigned member fails the audit. It names no secondary pair for npm | [D] npm-repositories, "Use `npm audit signatures`"; [D] [security-keys-management](https://docs.jfrog.com/administration/docs/security-keys-management.md); [research 04](04-package-protocols.md#url-layout-1) |
 | Whether a local repository's tree shows `.npm/` items to the storage API and AQL | [I] |
 | A dist-tag is the multi-valued property `npm.disttag` on the tarball. `jf npm publish --tag <t>` sets it; creating or deleting it, and copying or moving a tarball, make Artifactory recompute the package's tags | [S] jfrog-cli-artifactory `publish.go:33`, `artifactoryupload.go:102-112`; OSS `NpmMetadataInterceptor.java:63-146,201-215` |
 | Artifactory validates a `.tgz`'s `package.json` when it is created, whichever API stored it | [S] `NpmMetadataInterceptor.java:72-75` |
@@ -384,8 +384,8 @@ issue that fixes it.
 - `GET /api/npm/auth` drops `always-auth` and `email` (section 4; decision 0034 amended, posted
   on [#292](https://github.com/weaveplatform/artifactweave/issues/292)).
 - Copy and move into `.npm/` are refused (section 5; DV-042 notes it).
-- ECDSA package signing with `dist.signatures` (section 5): artifactweave signs nothing, and
-  decision 0034 leaves it out of P7.
+- ECDSA package signing with `dist.signatures` (section 5): decision 0034 left it out of P7,
+  and its "Signatures" section adds it (#362).
 - Custom dist-tags in virtual repositories (section 7): an input for P10.
 - In remote and virtual repositories, a proxied boolean `deprecated` keeps its type rather
   than becoming the string `"false"` ([7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed),

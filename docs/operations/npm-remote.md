@@ -35,9 +35,12 @@ origin credentials to another authority. An allow pattern does not bypass that p
 
 P10 owns virtual-repository dependency-spec rewriting and
 `externalDependenciesRemoteRepo`, including Git shorthand dependencies. These are
-separate from the remote `dist.tarball` handling above. P28/#362 owns local ECDSA signing,
-key discovery and native signature verification, and P28 owns audit proxying. Audit
-requests do not receive a synthetic empty-success response. P21/#262 owns browser login;
+separate from the remote `dist.tarball` handling above. Local and federated repositories
+sign with ECDSA and serve `/-/npm/v1/keys` (#362, decision 0034). A remote relays its
+upstream's `dist.signatures` but not yet the upstream's keys, which is #1318, so
+`npm audit signatures` through a remote fails until then; virtual signature and key
+merging is #1319, and P28 owns audit proxying. Audit requests do not receive a synthetic
+empty-success response. P21/#262 owns browser login;
 legacy authentication remains available.
 
 `npm_remote.feature` runs npm 11 and npm 12: cold scoped/unscoped install, lockfile URLs

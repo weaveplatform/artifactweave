@@ -84,7 +84,7 @@ when its first implementation is in an earlier phase.
 | AppTrust applications/versions/package binding, Application Admin roles, Unified Policy, approvals and evaluations | Prefix stub or absent contract; no working governance engine | P25 |
 | Xray scanning, SBOMs, vulnerability/license intelligence, policies/watches/violations, reports; Catalog and OneModel GraphQL gateway/subgraphs | Xray prefix stub; Catalog/OneModel contract needs research and implementation | P26 |
 | Advanced Security, contextual analysis, Runtime/workload ingestion and Worker events, IDE/Frogbot integration, Curation, PTC/package rerouting and enforcement | No working analysis or admission service; `AFTER_WORKLOAD_STATE_CHANGE[_REQUEST]` producers remain absent | P27 |
-| npm ECDSA signatures (#362), audit proxy/API, NuGet upstream vulnerability-resource proxying (P27 security-data integration), Go sumdb and VCS-backed module remotes | Explicit omissions from the first eight-format implementation | P28 |
+| npm audit proxy/API, NuGet upstream vulnerability-resource proxying (P27 security-data integration), Go sumdb and VCS-backed module remotes | Explicit omissions from the first eight-format implementation | P28 |
 | Remaining NuGet v2 query/client behavior, Chocolatey/PowerShell/nuget.exe/JFrog acceptance, private-index PyPI XML-RPC search and legacy `/packages/<path>` alias | Bounded v2 and modern native clients work; broader behavior and legacy-route replacement are not proved | P28 |
 | NuGet non-normalized mode/migration, SemVer2 and authentication settings; Helm global enforcement; Docker list-overwrite cleanup/digest variants; global excludes and copy timestamps | Present settings/behavior are narrower; P12 owns descriptor plumbing and P36 migration support | P28 |
 | npm staged publication, token/profile/legacy-search contracts; provenance and trusted publishing | Missing routes or unverified target behavior; P21/P23 provide identity/evidence foundations | P28 |
@@ -186,7 +186,7 @@ to its native client, controlled fault evidence and final gate.
 | #487 | Design in P9; complete project sharing and security proof in P11 |
 | #262 | P21 shared browser approval/native login exit |
 | #303 | P12 anonymous-access configuration and native acceptance |
-| #362 | P28 npm signing and `npm audit signatures` proof |
+| #362 | Delivered: npm local and federated signing and the native `npm audit signatures` proof; remote key relay is #1318 and virtual signature merging #1319 |
 | #523 | P28 client-compatibility owner; retry when the upstream extractor fix is released, without waiting unnecessarily for that phase |
 | #216 | P19 first live comparison; P20 onward adds new capture work to its owning phases and P41 verifies the expanded result |
 

@@ -592,7 +592,11 @@ func (s *Kit) ServeFile(
 		h.Set("Content-Disposition", blob.Disposition(it.Name))
 	}
 	if it.Actual.SHA1 != "" {
+		// Quoted for ServeContent's comparisons; the client receives it
+		// bare, as 7.x sends it (bareETagWriter).
 		h.Set("ETag", `"`+it.Actual.SHA1+`"`)
+		w = &bareETagWriter{ResponseWriter: w, sha1: it.Actual.SHA1}
+		r = quoteETag(r, it.Actual.SHA1)
 	}
 	if s.redirect(w, r, st, f, p) {
 		return
