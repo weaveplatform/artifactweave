@@ -137,7 +137,7 @@ func TestAccNixRemoteRequiresValidatedAuthority(t *testing.T) {
 			if err := f.db.Repos().Create(t.Context(), c); err != nil {
 				t.Fatal(err)
 			}
-			it, err := f.db.Items().Get(t.Context(), "local", false, infoPath)
+			it, err := f.db.Items().Get(t.Context(), "local", false, storedInfo)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -227,7 +227,7 @@ func TestAccNixHostedAuthorityAndSigningFailures(t *testing.T) {
 					}
 				}}
 			case "bad stored metadata":
-				it, e := f.db.Items().Get(t.Context(), f.c.Key, false, infoPath)
+				it, e := f.db.Items().Get(t.Context(), f.c.Key, false, storedInfo)
 				if e != nil {
 					t.Fatal(e)
 				}
@@ -263,7 +263,7 @@ func TestAccNixPathAndVirtualPolicyFailures(t *testing.T) {
 			c.Repositories = nil
 		}
 		if kind == "excluded" {
-			p := "nar/**"
+			p := "binary-cache/**/*.nar.xz"
 			c.ExcludesPattern = &p
 		}
 		if kind == "wrong-member" {
@@ -308,7 +308,7 @@ func TestAccNixExactPathPermissionsAndRevocation(t *testing.T) {
 			}
 			targets := map[string]accesstest.Target{"local": {}, "virtual": {}}
 			if mode == "metadata-only" {
-				targets["local"] = accesstest.Target{Include: []string{infoPath}}
+				targets["local"] = accesstest.Target{Include: []string{storedInfo}}
 			}
 			if mode == "virtual-only" {
 				delete(targets, "local")

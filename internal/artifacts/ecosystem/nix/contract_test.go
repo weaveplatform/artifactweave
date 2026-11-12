@@ -21,8 +21,9 @@ import (
 // Nix's content-addressed archives are immutable, so this contract exercises
 // overwrite refusal explicitly instead of mutating bytes at a fixed hash path.
 func TestAccNixFormatLifecycle(t *testing.T) {
-	const path = "fyli4q2yj6vh01bs0jxqbvj5hir5zvqc.narinfo"
-	meta, err := os.ReadFile("testdata/cache/" + path)
+	const hash = "fyli4q2yj6vh01bs0jxqbvj5hir5zvqc"
+	path := nixfmt.InfoItem(hash, false)
+	meta, err := os.ReadFile("testdata/cache/" + hash + ".narinfo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,6 +31,7 @@ func TestAccNixFormatLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	stored := nixfmt.ArchiveItem(hash, info.URL, false)
 	archive, err := os.ReadFile("testdata/cache/" + info.URL)
 	if err != nil {
 		t.Fatal(err)
@@ -51,10 +53,12 @@ func TestAccNixFormatLifecycle(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			// The client's upload is held at nar/<file> until the narinfo
+			// that names it is published; it then goes, past the trash can.
 			for _, f := range []struct {
 				path string
 				body []byte
-			}{{info.URL, archive}, {path, meta}} {
+			}{{info.URL, archive}, {stored, archive}, {path, meta}} {
 				if _, err = items.Deploy(
 					t.Context(),
 					item.Deploy{
@@ -64,6 +68,17 @@ func TestAccNixFormatLifecycle(t *testing.T) {
 				); err != nil {
 					t.Fatal(err)
 				}
+			}
+			for _, gone := range []string{info.URL, "nar"} {
+				_, err = db.Items().Get(t.Context(), c.Key, false, gone)
+				if !errors.Is(err, kernel.ErrNotFound) {
+					t.Fatalf("%s kept after publication: %v", gone, err)
+				}
+			}
+			if _, err = trashSvc.Restore(
+				t.Context(), c.Key, info.URL, trash.Destination{Repo: c}, "admin", nil,
+			); err == nil {
+				t.Fatal("the released upload went to the trash can")
 			}
 			assertVersion := func(c repo.Config, want bool) {
 				t.Helper()
@@ -155,7 +170,7 @@ func TestAccNixFormatLifecycle(t *testing.T) {
 			if _, err = items.Deploy(
 				t.Context(),
 				item.Deploy{
-					Target: item.Target{Repo: c, Path: info.URL},
+					Target: item.Target{Repo: c, Path: stored},
 					Body:   bytes.NewReader([]byte("tampered")),
 				},
 			); err == nil {
@@ -164,7 +179,7 @@ func TestAccNixFormatLifecycle(t *testing.T) {
 			assertVersion(c, true)
 			if _, err = items.Delete(
 				t.Context(),
-				item.Target{Repo: c, Path: info.URL},
+				item.Target{Repo: c, Path: stored},
 				"admin",
 			); err != nil {
 				t.Fatal(err)
@@ -173,7 +188,7 @@ func TestAccNixFormatLifecycle(t *testing.T) {
 			if _, err = trashSvc.Restore(
 				t.Context(),
 				c.Key,
-				info.URL,
+				stored,
 				trash.Destination{Repo: c},
 				"admin",
 				nil,
@@ -201,8 +216,9 @@ func TestAccNixFormatLifecycle(t *testing.T) {
 }
 
 func TestAccNixConcurrentFirstPublicationKeepsOneIdentity(t *testing.T) {
-	const path = "fyli4q2yj6vh01bs0jxqbvj5hir5zvqc.narinfo"
-	meta, err := os.ReadFile("testdata/cache/" + path)
+	const hash = "fyli4q2yj6vh01bs0jxqbvj5hir5zvqc"
+	path := nixfmt.InfoItem(hash, false)
+	meta, err := os.ReadFile("testdata/cache/" + hash + ".narinfo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +245,7 @@ func TestAccNixConcurrentFirstPublicationKeepsOneIdentity(t *testing.T) {
 			if _, err = items.Deploy(
 				t.Context(),
 				item.Deploy{
-					Target: item.Target{Repo: c, Path: info.URL},
+					Target: item.Target{Repo: c, Path: nixfmt.ArchiveItem(hash, info.URL, false)},
 					Body:   bytes.NewReader(archive),
 				},
 			); err != nil {

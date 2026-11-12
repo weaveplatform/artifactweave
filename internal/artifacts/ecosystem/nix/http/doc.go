@@ -42,6 +42,13 @@
 //     to nar/<store hash>/<file> so that every archive download passes its
 //     narinfo's checks; the archive; and 201 for a publication, 204 for a
 //     deletion and 200 for a reindex.
+//   - Storage: a hosted repository stores the narinfo the client PUTs to
+//     <hash>.narinfo, and the NAR it names, in the store path's folder,
+//     binary-cache/<hash>/, as 7.x does. The NAR, which Nix uploads first
+//     to nar/<file> and which names no store path, is held there until the
+//     narinfo arrives, then stored in the folder from that upload, or from
+//     the same file stored for another store path. DELETE of <hash>.narinfo
+//     and nar/<hash>/<file> removes the stored files.
 //   - Channels: 302 from channels/<name> to the newest snapshot
 //     <flavor>/<snapshot> the caller may read, relative so the client's
 //     host and path prefix carry over; 200 with a page linking the tarball
@@ -64,8 +71,12 @@
 //     match the narinfo's hashes and sizes, and every upstream URL and
 //     redirect must stay beneath the remote's URL, on its origin.
 //   - The download policy (decision 0032) is checked after Read
-//     permission, at the path the client asked for alone: nix-cache-info,
-//     a narinfo, or a NAR at its stored path nar/<file>. A blacked-out
+//     permission, at the file the client asked for alone, where the
+//     repository stores it: nix-cache-info; a narinfo or a NAR in a hosted
+//     repository's binary-cache folder, so that patterns written for 7.x
+//     match; and in a remote's cache at <hash>.narinfo and nar/<file>. A
+//     virtual repository checks its own at a hosted repository's paths
+//     [I]. A blacked-out
 //     repository or a path its patterns reject answers 404 with the
 //     policy's message. Patterns rejecting only a NAR leave its narinfo
 //     served, and a NAR is not refused at the narinfo it is found
@@ -106,14 +117,21 @@
 //   - NixOS nix-channel, which follows the channel's redirect and downloads
 //     nixexprs.tar.xz below it:
 //     https://github.com/NixOS/nix/blob/master/src/nix/nix-channel/nix-channel.cc.
+//   - The binary-cache folder: the JFrog CLI's jf nix,
+//     jfrog-cli-artifactory artifactory/commands/nix/command.go
+//     (binaryCacheDirPrefix, lines 53-55, and its AQL, lines 526-580);
+//     Nix uploads a NAR before its narinfo: NixOS/nix
+//     src/libstore/binary-cache-store.cc (uploadData).
 //   - https://github.com/weaveplatform/artifactweave/issues/788,
-//     https://github.com/weaveplatform/artifactweave/issues/1037 and
-//     https://github.com/weaveplatform/artifactweave/issues/1263
+//     https://github.com/weaveplatform/artifactweave/issues/1037,
+//     https://github.com/weaveplatform/artifactweave/issues/1263 and
+//     https://github.com/weaveplatform/artifactweave/issues/1296
 //
 // # Status
 //
 // Implemented P9c, which delivered the plan's P33 group (issues #782 to
-// #788). Moved here in P9d. Channels added by #1263.
+// #788). Moved here in P9d. Channels added by #1263, the binary-cache
+// layout by #1296.
 //
 // # Testing
 //
@@ -130,6 +148,10 @@
 //     and remote repositories, Read permission first, and a virtual
 //     repository's own patterns and its pass-over of refusing local and
 //     remote members.
+//   - binary_cache_test.go: a publication's files in the store path's
+//     folder, a NAR shared by two store paths, the permissions a
+//     publication needs, deletion by the client's URLs, and faults while
+//     placing the NAR.
 //   - channel_test.go: channel publication and following, refused
 //     uploads, the answers kept outside channel paths, permission and
 //     policy, and virtual channels.
