@@ -25,7 +25,9 @@ func upstreamReleasePage(t *testing.T, offset, held, total, limit int, next bool
 			FileURI:    "/v3/files/acme-widget-" + v + ".tar.gz",
 			FileSHA256: strings.Repeat("a", 64),
 			FileSize:   100,
-			Metadata:   puppetfmt.Manifest{Name: "acme-widget", Version: v},
+			Metadata: upstreamManifest{
+				Manifest: puppetfmt.Manifest{Name: "acme-widget", Version: v},
+			},
 		})
 	}
 	page := map[string]any{"offset": offset, "total": total, "next": nil}

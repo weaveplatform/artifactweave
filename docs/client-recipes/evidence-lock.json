@@ -136,7 +136,7 @@
   "test/acceptance/opkg_steps_test.go": "1cfb75807f6eaea881b8b069f7b0885f181ea145c70637888b41e0a1fe1d499c",
   "test/acceptance/p2_steps_test.go": "bc40b967df32ac224f9d0f515f1588672bbaebf05fa14f9bd884508c829d4610",
   "test/acceptance/pub_steps_test.go": "60326d30e49d950c1f5afca1d38527f0c55d63313e624ac31af6cf156d08d1ce",
-  "test/acceptance/puppet_steps_test.go": "6d51418741115b10965e2d25d5761f413294b66bb04334ff44df72c01ba61ef0",
+  "test/acceptance/puppet_steps_test.go": "7294f45b9b2adf3f6992258c28eaf41f20cfc2e62c42ddedb15c7e6864f7906b",
   "test/acceptance/rpm_steps_test.go": "ca2213b98d80c8a36415f8fe4db53e6b54fbfe3c6ecbe19ba69148b9134eb573",
   "test/acceptance/sbt_steps_test.go": "63b23e378514265abfa6157da4e96ddcfdf905aea2d1cefe8fcbb82efe6d4a45",
   "test/acceptance/steps_test.go": "4028c546a769bd033a586ad034008fb13b010457be0be382bd60274c4ef6d602",

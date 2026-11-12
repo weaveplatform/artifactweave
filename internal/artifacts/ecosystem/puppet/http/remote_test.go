@@ -36,6 +36,7 @@ func TestUnitRemoteDocumentValidation(t *testing.T) {
 		{"missing next", strings.Replace(good, `"total":1`, `"total":1001`, 1), "https://forge.example/v3/releases", false},
 		{"extra next", strings.Replace(good, `"next":null`, `"next":"https://evil.example/"`, 1), "https://forge.example/v3/releases", false},
 		{"invalid json", "{", "https://forge.example/v3/releases", false},
+		{"metadata not an object", strings.Replace(good, `{"name":"acme-widget","version":"1.0.0","dependencies":[]}`, "5", 1), "https://forge.example/v3/releases", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, err := parseVersions([]byte(tc.body), "acme-widget", tc.base, 0)
@@ -69,12 +70,14 @@ func TestUnitRemoteDocumentValidation(t *testing.T) {
 				FileURI:    "/v3/files/file.tar.gz",
 				FileSHA256: strings.Repeat("a", 64),
 				FileSize:   100,
-				Metadata:   puppetfmt.Manifest{Name: "acme-widget", Version: v},
+				Metadata: upstreamManifest{
+					Manifest: puppetfmt.Manifest{Name: "acme-widget", Version: v},
+				},
 			},
 		)
 	}
 	next := "/v3/releases?offset=1000"
-	doc.Pagination = &pagination{Offset: 0, Total: 1001, Next: &next}
+	doc.Pagination = &upstreamPagination{Offset: 0, Total: 1001, Next: &next}
 	data, _ = json.Marshal(doc)
 	if got, more, err := parseVersions(
 		data,

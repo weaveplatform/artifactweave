@@ -33,6 +33,13 @@
 //     module through the generated Get Puppet Releases and Get Puppet
 //     Modules routes, with their permissions, and a virtual repository's
 //     404.
+//   - puppet_remote_paging_test.go: a remote over a Forge that serves
+//     fewer releases a page than it is asked for, as forgeapi.puppet.com
+//     serves at most 100, reads every page through the remote and through
+//     a virtual repository over it, and answers every route with the
+//     Forge's release fields relayed and 7.x's pagination; the answers
+//     kept for a module of at most 100 releases, and the 502 for a page
+//     short of what its upstream states.
 //
 // # References
 //

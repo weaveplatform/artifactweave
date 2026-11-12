@@ -86,8 +86,12 @@ func (f *fixture) create(c repo.Config) repo.Config {
 	return c
 }
 
-// emptySearch is the module search's answer when it finds nothing.
-const emptySearch = `{"pagination":{"limit":1000,"offset":0,"total":0,"next":null},"results":[]}`
+// emptySearch is the module search's answer for acme-widget when it finds
+// nothing.
+const emptySearch = `{"pagination":{"limit":20,"offset":0,` +
+	`"first":"/v3/modules?query=acme-widget&limit=20&offset=0","previous":null,` +
+	`"current":"/v3/modules?query=acme-widget&limit=20&offset=0","next":null,"total":0},` +
+	`"results":[]}`
 
 // searchVersions returns the release versions the module search's one
 // result lists, or none when it finds nothing.
