@@ -1,10 +1,9 @@
-# Nix binary caches
+# Nix binary caches and channels
 
-ArtifactWeave serves the Nix HTTP binary-cache protocol at
+ArtifactWeave serves the Nix HTTP binary-cache protocol and Nix channels at
 `/artifactory/api/nix/{repository}/` for local, remote, virtual and one-node
-federated repositories. This implements the binary-cache scope of #788; Nix
-channel publication is outside that inventory operation. Cross-peer federation
-remains P13.
+federated repositories. The binary cache is #788's scope and channels are
+#1263's. Cross-peer federation remains P13.
 
 The contract was checked on 2026-10-28 against the
 [JFrog Nix guide](https://docs.jfrog.com/artifactory/docs/nix-repositories),
@@ -56,6 +55,58 @@ references and 32 incoming signatures. Decoder dictionaries are bounded to
 narinfo and permission checks. Query parameters in HTTP requests are rejected;
 Nix store URL options such as `compression=xz` are consumed by the client.
 
+## Channels
+
+A channel is followed with `nix-channel`, as the JFrog guide shows, and a
+snapshot of it is uploaded with `curl`:
+
+```sh
+curl -X PUT -u <user>:<token> -T nixexprs.tar.xz \
+  https://registry.example/artifactory/api/nix/nix-local/channels/nixpkgs-25.11/nixpkgs/nixpkgs-25.11pre893393
+nix-channel --add \
+  https://registry.example/artifactory/api/nix/nix-local/channels/nixpkgs-25.11 nixpkgs
+nix-channel --update
+```
+
+The JFrog guide puts the credentials in the channel URL. Nix 2.35 sends
+those only with the first request: it drops them from the URL it then
+downloads `nixexprs.tar.xz` from, so that download is anonymous. For a
+repository that needs a login, give Nix the credentials in its netrc file
+(`netrc-file`, `/etc/nix/netrc` by default), as for the binary cache.
+
+The flavor is `nixpkgs` or `nixos`. The upload must be an xz-compressed tar
+archive with at least one entry; anything else is refused with 400 "invalid
+Nix channel archive". It is stored as
+`channels/<channel>/<flavor>/<snapshot>/nixexprs.tar.xz`, and a PUT to that
+path stores it there too. Publication needs a local or federated repository.
+
+`GET channels/<channel>` answers 302 to the newest snapshot the caller may
+read, with a relative `Location` (`<channel>/<flavor>/<snapshot>`), so the
+client keeps the URL's host and path. The newest snapshot is the one
+uploaded last, so uploading an older snapshot again rolls the channel back to
+it. The snapshot's folder answers a small HTML page linking the tarball, as
+`releases.nixos.org` does, and `nix-channel` then downloads
+`nixexprs.tar.xz` below it. Nix caches the channel for `tarball-ttl` seconds
+(an hour by default), so an `--update` within that time keeps the snapshot it
+has.
+
+Read permission comes first: a caller who may not read the channel or the
+tarball gets 403, or 401 when anonymous. The channel and a snapshot's page are
+computed, so a blacked-out repository refuses them with 404 at the path asked
+for and include and exclude patterns do not; patterns refuse the tarball at its
+own path, while the channel still names that snapshot.
+
+A remote repository resolves the channel name at the NixOS Channel Registry,
+`https://channels.nixos.org`, whatever its own URL (the binary cache), as the
+JFrog guide requires an official channel name. It redirects to the snapshot
+the registry names and caches that release's tarball from
+`https://releases.nixos.org`. Its cache period, offline mode and proxy apply;
+its credentials are never sent there. Only the snapshot the registry names now
+is served. A virtual repository redirects to the first member's newest
+snapshot in order, and serves a snapshot's page and tarball from the first
+member that holds it, passing over a member that is blacked out or refuses
+it.
+
 ## Remote, virtual and lifecycle
 
 A remote URL is an upstream binary-cache root. Configure its primary and/or
@@ -88,6 +139,9 @@ Manage; virtual reindex is rejected. Normal item reindex APIs also apply.
 `nix copy` to publish L/F content, then substitute into a fresh home and separate
 store. They verify signatures, reject an incorrect trusted key, resolve an
 ordered V, and substitute R again after the origin stops with offline enabled.
+A channel scenario uploads a snapshot with `curl`, follows the channel with
+`nix-channel --add` and `--update`, then uploads a newer snapshot and updates
+to it.
 The committed NAR fixture was produced by the same pinned native client; its
 [provenance](../../internal/artifacts/ecosystem/nix/testdata/README.md) records the command.
 Unit and package acceptance tests exercise malformed metadata and NARs, hashes,

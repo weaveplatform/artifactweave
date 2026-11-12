@@ -11,13 +11,19 @@
   "fresh_home": "Create a new AW_WORK with mktemp -d for every run; client configuration, downloads and caches in the commands stay under this directory. Do not reuse it to prove a fresh download. Remove the temporary directory after use.",
   "prerequisites": [
     "A disposable Nix environment; the acceptance container runs as root.",
-    "The exact /nix/store path to copy and an independently verified public signing key."
+    "The exact /nix/store path to copy and an independently verified public signing key.",
+    "For a channel, a nixexprs.tar.xz: an xz-compressed tar archive with one top-level folder, the channel name AW_NIX_CHANNEL and a new snapshot name AW_NIX_SNAPSHOT."
   ],
   "configure": [
     {
       "language": "sh",
       "code": "umask 077\nAW_WORK=$(mktemp -d)\nmkdir -p \"$AW_WORK/home\"\nAW_AUTH_URL=$(python3 - <<'PYCODE'\nimport os\nfrom urllib.parse import quote, urlsplit, urlunsplit\nu = urlsplit(os.environ[\"AW_URL\"])\nauth = quote(os.environ[\"AW_USER\"], safe=\"\") + \":\" + quote(os.environ[\"AW_TOKEN\"], safe=\"\")\nprint(urlunsplit((u.scheme, auth + \"@\" + u.netloc, u.path, \"\", \"\")))\nPYCODE\n)\nAW_NIX_URL=\"$AW_AUTH_URL/artifactory/api/nix/$AW_REPO\"",
       "note": "Run in a disposable pinned Nix container; Python 3 is only needed for URL encoding. Keep credential-bearing variables out of logs. Set AW_NIX_PUBLIC_KEY to the operator-verified cache signing key."
+    },
+    {
+      "language": "sh",
+      "code": "AW_HOST=$(python3 -c 'import os; from urllib.parse import urlsplit; print(urlsplit(os.environ[\"AW_URL\"]).hostname)')\nprintf 'machine %s login %s password %s\\n' \"$AW_HOST\" \"$AW_USER\" \"$AW_TOKEN\" > \"$AW_WORK/netrc\"\nexport NIX_CONFIG=\"netrc-file = $AW_WORK/netrc\"\nAW_CHANNEL_URL=\"$AW_URL/artifactory/api/nix/$AW_REPO/channels/$AW_NIX_CHANNEL\"",
+      "note": "Channels need the netrc file: Nix 2.35 drops credentials in a channel URL from the URL it downloads nixexprs.tar.xz from, so only the first request would carry them."
     }
   ],
   "publish": {
@@ -28,6 +34,11 @@
         "language": "sh",
         "code": "AW_STORE_PATH=$(nix-store --add ./payload)\nenv HOME=\"$AW_WORK/home\" nix --extra-experimental-features nix-command copy --to \"$AW_NIX_URL?compression=xz\" \"$AW_STORE_PATH\"",
         "note": "payload is a directory of files. The server must have its Nix signing key configured."
+      },
+      {
+        "language": "sh",
+        "code": "curl -fsS --netrc-file \"$AW_WORK/netrc\" -X PUT -T nixexprs.tar.xz \"$AW_CHANNEL_URL/nixpkgs/$AW_NIX_SNAPSHOT\"",
+        "note": "Publishes a channel snapshot, as the JFrog guide uploads it; the flavor segment is nixpkgs or nixos. The channel then names the snapshot uploaded last."
       }
     ]
   },
@@ -39,12 +50,18 @@
         "language": "sh",
         "code": "env HOME=\"$AW_WORK/home\" nix --extra-experimental-features nix-command --option require-sigs true --option trusted-public-keys \"$AW_NIX_PUBLIC_KEY\" copy --from \"$AW_NIX_URL\" --to \"local?root=$AW_WORK/consumer\" \"$AW_STORE_PATH\"",
         "note": "Supply the exact store path from the producer. A new local store root ensures substitution reaches the cache."
+      },
+      {
+        "language": "sh",
+        "code": "env HOME=\"$AW_WORK/home\" nix-channel --add \"$AW_CHANNEL_URL\" nixpkgs\nenv HOME=\"$AW_WORK/home\" nix-channel --update nixpkgs",
+        "note": "Follows the channel to its newest snapshot. Nix reuses a downloaded channel for tarball-ttl seconds (an hour by default); add tarball-ttl = 0 to NIX_CONFIG to see a newer snapshot at once. A remote repository resolves official channel names, such as nixos-25.05, at the NixOS Channel Registry."
       }
     ]
   },
   "limitations": [
     "Store signatures stay required; do not solve failures with require-sigs=false.",
-    "Federated behavior covers one node."
+    "Federated behavior covers one node.",
+    "A remote repository serves only the snapshot its channel names now."
   ],
   "evidence": [
     {
@@ -52,13 +69,17 @@
       "contains": [
         "copy --to \"$1?compression=xz\"",
         "--option require-sigs true --option trusted-public-keys",
-        "local?root=/tmp/nix-consumer"
+        "local?root=/tmp/nix-consumer",
+        "nix-channel --add \"$channel\" nixpkgs",
+        "NIX_CONFIG=netrc-file = /work/nix-netrc",
+        "-X PUT -T /work/first.tar.xz"
       ]
     },
     {
       "path": "test/acceptance/features/nix.feature",
       "contains": [
-        "Scenario Outline: native Nix publishes and verifies hosted binary cache signatures"
+        "Scenario Outline: native Nix publishes and verifies hosted binary cache signatures",
+        "Scenario: nix-channel follows a channel to the snapshot uploaded last"
       ]
     }
   ]
