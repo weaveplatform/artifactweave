@@ -54,7 +54,8 @@ copies in several regions that artifactweave writes itself.
   created or changed, a download larger than one of Front Door's 8 MiB chunks can stop after the
   first 8 MiB with a reset stream, even though the edge already answers. Smaller files are
   unaffected. Wait until a download of more than 8 MiB through the edge completes before sending
-  traffic; the scenario's own tests do exactly that before they start.
+  traffic; the scenario's own tests do that, and then wait until a run of new URLs is served,
+  before they start.
 - **Clients drop their credentials on the redirect** because the CDN host is never
   artifactweave's host or a subdomain of it; artifactweave refuses to start otherwise. With
   `domain_name`, choose a sibling of artifactweave's host, such as `cdn.example.com` beside
@@ -245,9 +246,13 @@ do the app identity and the DNS zone, which are not this scenario's.
   is the one network the account answers, runs `test/platform`, destroys the instance, and
   checks that nothing of the run remains. Before artifactweave starts,
   [`frontdoor_test.go`](../../../../../test/platform/frontdoor_test.go) approves the private
-  endpoint connection and waits until the runner can write to the account and the edge reaches
-  it. The generic checks' redirected downloads, whole and ranged, then go through Front Door,
-  and a URL without its SAS is refused. The CDN checks of
+  endpoint connection and waits until the runner can write to the account, the edge reaches it,
+  a download over 8 MiB completes through the edge, and twelve new URLs in a row, ten seconds
+  apart, are served through it. Every request to the edge asks for Front Door's debug headers,
+  and a check that gets an answer it did not expect logs the answer's `x-azure-ref`, `X-Cache`,
+  origin status, `x-ms-error-code` and the start of its body. The generic checks' redirected
+  downloads, whole and ranged, then go through Front Door, and a URL without its SAS is
+  refused. The CDN checks of
   [`cdn_test.go`](../../../../../test/platform/cdn_test.go) follow: `cdnRedirect` alone, the
   `S3` header landing on the account, filenames kept through the edge cache, an expired SAS
   refused, and `jf rt dl` across the edge. `frontdoor_test.go` adds the two only a real Front
