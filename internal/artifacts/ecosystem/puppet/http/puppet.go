@@ -59,7 +59,9 @@ func (virtualSource) Item(
 // /artifactory/api/puppet/{repoKey}: GET and HEAD of the release list of
 // one module (v3/releases?module=), a release (v3/releases/{slug}), a
 // module (v3/modules/{name}), the exact-name module search
-// (v3/modules?query=) and a release's archive (v3/files/{file}). Local and
+// (v3/modules?query=), a release's archive (v3/files/{file}), and the
+// lists of every release and module a local or federated repository
+// hosts (v3/releases and v3/modules with no query but a page). Local and
 // federated repositories are served from their package index, virtual
 // ones from their members in order, and remote ones through
 // o.RemoteSources when it is set; a class without a source answers 501.
@@ -168,6 +170,10 @@ func (h handler) releases(w http.ResponseWriter, r *http.Request) {
 			h.k.Error(w, r, apierror.New(400, "unsupported Puppet query"))
 			return
 		}
+	}
+	if pagingOnly(query) {
+		h.listReleases(w, r, query)
+		return
 	}
 	name := query.Get("module")
 	if !puppetfmt.ValidName(name) ||
@@ -300,6 +306,10 @@ func (h handler) module(w http.ResponseWriter, r *http.Request) {
 // Search is deliberately exact-name and bounded; it does not proxy arbitrary queries.
 func (h handler) modules(w http.ResponseWriter, r *http.Request) {
 	q, err := url.ParseQuery(r.URL.RawQuery)
+	if err == nil && pagingOnly(q) {
+		h.listModules(w, r, q)
+		return
+	}
 	if err != nil || len(q) != 1 || len(q["query"]) != 1 || !puppetfmt.ValidName(q.Get("query")) {
 		h.k.Error(w, r, apierror.New(400, "search requires an exact Puppet module name"))
 		return
@@ -470,27 +480,40 @@ func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	}
 	out := make([]release, 0, len(versions))
 	for _, v := range versions {
-		path := puppetfmt.Path(name, v.Version)
 		// A release whose archive the include and exclude patterns reject
 		// stays listed, and only the archive is refused (R3): 7.x
 		// writes Puppet's listings as stored documents (RTFACT-26143),
 		// which list such a release as the other formats' do.
-		if !h.k.Can(r, path, api.ActionRead) {
+		if !h.k.Can(r, puppetfmt.Path(name, v.Version), api.ActionRead) {
 			continue
 		}
-		var meta puppetfmt.Metadata
-		if json.Unmarshal(v.Metadata, &meta) != nil || meta.Name != name ||
-			meta.Version != v.Version || meta.Path != path {
-			return nil, apierror.New(http.StatusBadGateway, "invalid stored Puppet package index")
+		rel, err := h.stored(r, name, v)
+		if err != nil {
+			return nil, err
 		}
-		item, err := h.k.DB().Items().Get(r.Context(), q.Repo.Key, false, path)
-		if err != nil || item.Folder || meta.SHA256 == "" || meta.SHA256 != item.Actual.SHA256 {
-			return nil, apierror.New(http.StatusBadGateway, "invalid stored Puppet archive")
-		}
-		out = append(out, release{meta: meta, item: item})
+		out = append(out, rel)
 	}
 	sortReleases(out)
 	return out, nil
+}
+
+// stored returns the release of module name that the package index's
+// version v records, once the index entry and the stored archive agree; a
+// release whose entry or archive does not match fails with 502 rather than
+// being advertised.
+func (h handler) stored(r *http.Request, name string, v model.PackageVersion) (release, error) {
+	path := puppetfmt.Path(name, v.Version)
+	var meta puppetfmt.Metadata
+	if json.Unmarshal(v.Metadata, &meta) != nil || meta.Name != name ||
+		meta.Version != v.Version || meta.Path != path {
+		return release{}, apierror.New(http.StatusBadGateway, "invalid stored Puppet package index")
+	}
+	key := pkgroute.RequestFrom(r).Repo.Key
+	item, err := h.k.DB().Items().Get(r.Context(), key, false, path)
+	if err != nil || item.Folder || meta.SHA256 == "" || meta.SHA256 != item.Actual.SHA256 {
+		return release{}, apierror.New(http.StatusBadGateway, "invalid stored Puppet archive")
+	}
+	return release{meta: meta, item: item}, nil
 }
 
 func (h handler) virtual(r *http.Request, name string, u use) ([]release, error) {
@@ -554,13 +577,19 @@ func (h handler) virtual(r *http.Request, name string, u use) ([]release, error)
 }
 
 func sortReleases(out []release) {
-	slices.SortFunc(out, func(a, b release) int {
-		cmp := semver.Compare("v"+a.meta.Version, "v"+b.meta.Version)
-		if cmp != 0 {
-			return -cmp
-		}
-		return strings.Compare(a.meta.Version, b.meta.Version)
-	})
+	slices.SortFunc(
+		out,
+		func(a, b release) int { return newestFirst(a.meta.Version, b.meta.Version) },
+	)
+}
+
+// newestFirst orders Puppet versions from the highest semantic version
+// down, the order every release list answers in.
+func newestFirst(a, b string) int {
+	if cmp := semver.Compare("v"+a, "v"+b); cmp != 0 {
+		return -cmp
+	}
+	return strings.Compare(a, b)
 }
 
 func writeJSON(w http.ResponseWriter, r *http.Request, status int, doc any) {

@@ -36,8 +36,11 @@ func (w *world) registerRemoteNuGet(sc *godog.ScenarioContext) {
 	sc.Step(`^I run verified dotnet "([^"]*)"$`, w.runVerifiedDotnet)
 }
 
+// runVerifiedDotnet is runDotnet with signature verification on and the
+// scenario's signer trusted; --init is there for the reason runDotnet gives.
 func (w *world) runVerifiedDotnet(args string) error {
 	flags := []string{
+		"--init",
 		"--entrypoint",
 		"dotnet",
 		"-e",
@@ -58,13 +61,7 @@ func (w *world) runVerifiedDotnet(args string) error {
 			"nuget-signer.pem",
 		) + ":/etc/pki/ca-trust/extracted/pem/objsign-ca-bundle.pem:ro",
 	}
-	argv := w.clientArgs(args)
-	// The .NET 11 RC2 NativeAOT CLI also hangs in signing. Its documented
-	// managed fallback runs the same NuGet commands and cryptographic verifier.
-	if len(argv) >= 2 && argv[0] == "nuget" && (argv[1] == "sign" || argv[1] == "verify") {
-		flags = append(flags, "-e", "DOTNET_CLI_ENABLEAOT=false")
-	}
-	return w.runContainer(w.dotnetImage, flags, argv)
+	return w.runContainer(w.dotnetImage, flags, w.clientArgs(args))
 }
 
 func (w *world) signedNuGetUpstream() error {

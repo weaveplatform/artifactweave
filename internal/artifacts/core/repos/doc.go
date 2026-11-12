@@ -23,7 +23,8 @@
 //     store), the trash service
 //     (artifacts/core/trash), which keeps a deleted repository's content,
 //     and accessapi.Keys and accessapi.Projects, for the key pair and
-//     environment checks.
+//     environment checks; and the P2 format (artifacts/ecosystem/p2), whose
+//     p2Urls rules PlanP2Virtual applies.
 //
 // # Outputs
 //
@@ -32,6 +33,10 @@
 //     CheckMembers, CheckKeypairs, CheckEnvironments), a patch merged into
 //     a stored configuration (Merge), whether an update owes a reindex
 //     (OwesReindex) and whether a key may be deleted (Protected).
+//   - PlanP2Virtual: the members a P2 virtual repository's p2Urls need and
+//     the P2 remote repositories to create for them, for the repositories
+//     API alone; a YAML apply or configuration patch stores p2Urls as
+//     given and creates nothing.
 //   - Remove: the whole-repository delete.
 //   - Errors: apierror values that answer 400 with the message every entry
 //     point shares, the store's sentinels, and artifactsapi.ErrChanged.
@@ -65,8 +70,13 @@
 //     (the descriptor PATCH and config apply) and
 //     #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/1013 and
-//     https://github.com/weaveplatform/artifactweave/issues/1088
+//   - RTFACT-30256, which PlanP2Virtual follows: 7.x creates the P2
+//     remote repositories a P2 virtual repository's p2Urls need when the
+//     repositories API creates it, as its UI does, keyed by host and port:
+//     https://jfrog.atlassian.net/browse/RTFACT-30256.
+//   - https://github.com/weaveplatform/artifactweave/issues/1013,
+//     https://github.com/weaveplatform/artifactweave/issues/1088 and
+//     https://github.com/weaveplatform/artifactweave/issues/1257
 //
 // # Status
 //
@@ -81,4 +91,6 @@
 //     delete.
 //   - api_test.go: one TestUnitRepositories* test per Repositories method,
 //     each checking the binding answers as the direct call does.
+//   - p2_test.go: the members and remote repositories PlanP2Virtual plans,
+//     its keys, and the p2Urls entries it refuses.
 package repos

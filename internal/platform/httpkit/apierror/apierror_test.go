@@ -174,8 +174,9 @@ func TestUnitWriteText(t *testing.T) {
 // TestUnitDefaultCodes: in the Access, Grid and Pub envelopes, each status
 // that a handler, the middleware or a remote's upstream can send through them
 // carries a code of its own beside the status and message as given: its JAX-RS
-// name, INTERNAL_ERROR for 500 and for a status Go has no text for, and
-// UNSUPPORTED for 501.
+// name, INTERNAL_ERROR for 500 and for a status Go has no text for,
+// UNSUPPORTED for 501, and for a status JAX-RS has no name for, the letters
+// of Go's text alone (#1248).
 func TestUnitDefaultCodes(t *testing.T) {
 	codes := []struct {
 		status int
@@ -189,6 +190,7 @@ func TestUnitDefaultCodes(t *testing.T) {
 		{http.StatusConflict, "CONFLICT"},
 		{http.StatusRequestEntityTooLarge, "REQUEST_ENTITY_TOO_LARGE"},
 		{http.StatusUnsupportedMediaType, "UNSUPPORTED_MEDIA_TYPE"},
+		{http.StatusTeapot, "IM_A_TEAPOT"},
 		{http.StatusTooManyRequests, "TOO_MANY_REQUESTS"},
 		{http.StatusInternalServerError, "INTERNAL_ERROR"},
 		{http.StatusNotImplemented, "UNSUPPORTED"},
@@ -235,6 +237,51 @@ func TestUnitDefaultCodes(t *testing.T) {
 	}
 	if New(404, "m").Error() != "m" {
 		t.Fatal("Error() should return the message")
+	}
+}
+
+// TestUnitOCICodes: in the OCI envelope, an error built with New for a 401,
+// 403 or 429 carries the distribution specification's code, which Docker's
+// client reads, in place of its JAX-RS name, and so does one with no code. A
+// code a registry handler chose is kept, and a status the specification
+// names no single code for keeps its name. Rendering never changes the
+// error, so the Access envelope still reads FORBIDDEN after it (#1248).
+func TestUnitOCICodes(t *testing.T) {
+	for _, c := range []struct {
+		err  *Error
+		code string
+	}{
+		{New(http.StatusUnauthorized, "refused"), "UNAUTHORIZED"},
+		{New(http.StatusForbidden, "refused"), "DENIED"},
+		{New(http.StatusTooManyRequests, "refused"), "TOOMANYREQUESTS"},
+		{&Error{Status: http.StatusForbidden, Message: "refused"}, "DENIED"},
+		{&Error{Status: http.StatusTooManyRequests, Message: "refused"}, "TOOMANYREQUESTS"},
+		{&Error{Status: http.StatusForbidden, Code: "UNAUTHORIZED", Message: "refused"}, "UNAUTHORIZED"},
+		{&Error{Status: http.StatusNotFound, Code: "NAME_UNKNOWN", Message: "refused"}, "NAME_UNKNOWN"},
+		{New(http.StatusBadRequest, "refused"), "BAD_REQUEST"},
+		{New(http.StatusInternalServerError, "refused"), "INTERNAL_ERROR"},
+		{New(http.StatusBadGateway, "refused"), "BAD_GATEWAY"},
+		{New(http.StatusServiceUnavailable, "refused"), "SERVICE_UNAVAILABLE"},
+	} {
+		t.Run(fmt.Sprintf("%d %s", c.err.Status, c.code), func(t *testing.T) {
+			before := *c.err
+			rec := httptest.NewRecorder()
+			Write(rec, ProfileOCI, c.err)
+			want := `{"errors":[{"code":"` + c.code + `","message":"refused"}]}` + "\n"
+			if rec.Code != c.err.Status || rec.Body.String() != want {
+				t.Fatalf("%d %s, want %d %s", rec.Code, rec.Body, c.err.Status, want)
+			}
+			if *c.err != before {
+				t.Fatalf("rendering changed the error: %+v, was %+v", *c.err, before)
+			}
+		})
+	}
+	shared := New(http.StatusForbidden, "refused")
+	Write(httptest.NewRecorder(), ProfileOCI, shared)
+	rec := httptest.NewRecorder()
+	Write(rec, ProfileAccess, shared)
+	if got := rec.Body.String(); got != `{"errors":[{"code":"FORBIDDEN","message":"refused"}]}`+"\n" {
+		t.Fatalf("access envelope after OCI: %s", got)
 	}
 }
 

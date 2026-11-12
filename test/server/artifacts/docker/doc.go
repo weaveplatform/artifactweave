@@ -30,11 +30,12 @@
 //   - TestAcc results for the token flow, OIDC users, probe headers,
 //     listings, manifest redirects, blob downloads, subdomain and
 //     reverse-proxy routing, and multi-architecture deletes.
-//   - TestAcc results for registry remotes (registry_remote_test.go and
-//     registry_remote_fault_test.go): pulls through refresh and offline
-//     answers, indexes and referrers, no-store and native routes, invalid
-//     index children, integrity and denied paths, foreign layers and a
-//     revocation during a fetch.
+//   - TestAcc results for registry remotes (registry_remote_test.go,
+//     registry_remote_fault_test.go and registry_remote_errors_test.go):
+//     pulls through refresh and offline answers, indexes and referrers,
+//     no-store and native routes, invalid index children, integrity and
+//     denied paths, foreign layers, a revocation during a fetch, and the
+//     answers to an upstream's 401, 403, 429 and 502.
 //
 // # References
 //

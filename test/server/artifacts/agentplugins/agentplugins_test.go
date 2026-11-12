@@ -187,13 +187,11 @@ func TestAccAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 		got.Body.Len() != 0 {
 		t.Fatalf("HEAD: %d %q", got.Code, got.Body)
 	}
-	if got := w.Do(
-		http.MethodGet,
-		"/artifactory/plugins-local/vscode-marketplace.json",
-		"admin",
-		"",
-	); got.Code != http.StatusNotFound {
-		t.Fatalf("unsupported target index: %d %s", got.Code, got.Body)
+	// Harness bundles alone have no layout the VS Code file lists.
+	if got := read("/artifactory/plugins-local/vscode-marketplace.json", "admin")["plugins"].([]any); len(
+		got,
+	) != 0 {
+		t.Fatalf("VS Code file lists harness bundles: %+v", got)
 	}
 	wantStatus(
 		t,

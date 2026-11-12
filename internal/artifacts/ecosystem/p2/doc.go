@@ -4,7 +4,9 @@
 // cache or serve it (Validate, ExtractArchive), reads the checksums an
 // update site declares for an artifact (ArtifactChecksums), and checks and
 // rewrites the child locations of composite metadata (ValidChildLocation,
-// EditComposite), all within fixed bounds.
+// EditComposite), all within fixed bounds. It also reads a P2 virtual
+// repository's p2Urls entries and finds the member that serves each
+// (ParseSiteURL, Covers, SiteChild).
 //
 // # Role
 //
@@ -27,6 +29,10 @@
 //     site archive (ExtractArchive); and the item kit
 //     (artifacts/adapters/http/itemkit), whose remote source request checks
 //     upstream p2 content before a remote caches it (Classify, Validate).
+//     The protocol builds a virtual repository's composite from its
+//     p2Urls, and the repositories core (artifacts/core/repos) plans the
+//     members a P2 virtual repository's p2Urls need, with ParseSiteURL,
+//     Covers and SiteChild.
 //   - Driven: none. It reads only the bytes or reader it is given, with xz
 //     (github.com/ulikunitz/xz) for the .xml.xz metadata form, and keeps
 //     no state.
@@ -40,6 +46,8 @@
 //     KindArtifact, Classify, and ValidChildLocation.
 //   - The content rules: Validate, ExtractArchive, ArtifactChecksums and
 //     EditComposite, which fail with ErrInvalid.
+//   - The p2Urls rules: SiteURL and ParseSiteURL, which fails with
+//     ErrInvalid, Covers, Member and SiteChild.
 //   - The bounds: MaxMetadata, MaxArtifact, MaxChildren, MaxDepth and
 //     MaxChildURL.
 //
@@ -87,8 +95,13 @@
 //   - Plan: docs/implementation/plan.md#p31-native-build-and-plugin-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/773 and
-//     https://github.com/weaveplatform/artifactweave/issues/1043
+//   - RTFACT-29915, the local://<key>/<suffix> form of a p2Urls entry,
+//     and RTFACT-7631, a site served under its remote's key and sub-path:
+//     https://jfrog.atlassian.net/browse/RTFACT-29915 and
+//     https://jfrog.atlassian.net/browse/RTFACT-7631.
+//   - https://github.com/weaveplatform/artifactweave/issues/773,
+//     https://github.com/weaveplatform/artifactweave/issues/1043 and
+//     https://github.com/weaveplatform/artifactweave/issues/1257
 //
 // # Status
 //
@@ -107,6 +120,8 @@
 //     JAR's other members and fail closed, index and archive integrity,
 //     metadata read errors, declared and total expansion limits, and
 //     corrupt member bytes.
+//   - urls_test.go: the p2Urls entries ParseSiteURL accepts and refuses,
+//     and the member and child SiteChild gives each.
 //
 // testdata holds unmodified files of the published Eclipse GLSP 2.7.0 update
 // site (p2.index, the content and artifacts metadata as .jar and .xml.xz,

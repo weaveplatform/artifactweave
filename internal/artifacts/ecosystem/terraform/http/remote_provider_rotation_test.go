@@ -36,7 +36,10 @@ func TestAccRemoteProviderMirrorDescriptorUsesOneRevision(t *testing.T) {
 			permission, _ := f.db.Permissions().Get(t.Context(), "remote-read")
 			resource := permission.Resources[api.ResourceArtifact]
 			resource.Targets["remote"] = accesstest.Target{
-				Include: []string{"provider-mirrors/registry.terraform.io/hashicorp/null/**"},
+				Include: []string{
+					"provider-mirrors/registry.terraform.io/hashicorp/null/**",
+					"storage/**",
+				},
 			}
 			permission.Resources[api.ResourceArtifact] = resource
 			if err := f.db.Permissions().Update(t.Context(), permission); err != nil {

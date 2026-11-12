@@ -65,6 +65,20 @@ install after taking the upstream offline. The full release qualification must
 run all three LuaRocks scenarios and the merged coverage gate. Cross-peer
 federation is tracked separately in P13.
 
+The client asks for `manifest-<Lua version>.zip`, and for
+`manifest-<Lua version>.json` first under LuaJIT, before
+`manifest-<Lua version>`, and moves on to the next name when one fails
+([manif.lua](https://github.com/luarocks/luarocks/blob/v3.13.0/src/luarocks/manif.lua),
+luarocks 3.13.0). The JFrog guide names only the `manifest` and
+`manifest-<version>` index files, and the manifest work builds only
+`manifest` and `manifest-5.1` through `manifest-5.5`. A local or federated
+repository serves any other `manifest-5.` name only when that file is
+stored, and otherwise answers 404 "Could not find resource" without queuing
+the manifest work. No JFrog source says what 7.x answers for these names, so
+the 404 is [I] on #216. An uploaded rock or rockspec whose stored content
+fails a read while it is checked answers 500 and is not stored: only content
+that breaks the rules is refused 400.
+
 The JFrog guide documents the base URL, flat layout and automatic manifest
 recalculation. The upstream client source documents its upload request
 sequence and manifest structure. We have not captured Artifactory 7.161.32's
@@ -73,4 +87,5 @@ native upload response or property keys; these remain [I] on #216.
 - [JFrog LuaRocks guide](https://docs.jfrog.com/artifactory/docs/luarocks-repositories)
 - [LuaRocks manifest documentation](https://luarocks.org/docs)
 - [LuaRocks manifest writer](https://github.com/luarocks/luarocks/blob/main/src/luarocks/manif/writer.lua)
+- [LuaRocks manifest reader, luarocks 3.13.0](https://github.com/luarocks/luarocks/blob/v3.13.0/src/luarocks/manif.lua)
 - [LuaRocks upload client](https://github.com/luarocks/luarocks/blob/main/src/luarocks/cmd/upload.lua)

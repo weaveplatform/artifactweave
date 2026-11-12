@@ -192,14 +192,20 @@ func TestUnitCRANRemoteIndexFaults(t *testing.T) {
 		})
 	}
 	// A configured remote without a source service cannot serve its index.
+	// The missing service is the server's own fault, not the upstream's, so
+	// it answers 500 rather than the 502 of the upstream's faults above.
 	wNoSource := newItemWorld(t, false)
 	cranRepo(t, wNoSource, repo.Config{
 		Key: "cran-offline-remote", Class: repo.Remote,
 		PackageType: repo.Cran, URL: "https://up.example",
 	})
-	wantStatus(t, wNoSource.do(http.MethodGet,
-		"/artifactory/cran-offline-remote/src/contrib/PACKAGES", "admin", ""),
-		http.StatusBadGateway)
+	got := wNoSource.do(http.MethodGet,
+		"/artifactory/cran-offline-remote/src/contrib/PACKAGES", "admin", "")
+	wantStatus(t, got, http.StatusInternalServerError)
+	if strings.TrimSpace(got.Body.String()) !=
+		`{"errors":[{"message":"internal error","status":500}]}` {
+		t.Fatalf("remote index without a source service: %s", got.Body)
+	}
 }
 
 func TestUnitCRANRemoteIndexRechecksAuthorityBeforeDelivery(t *testing.T) {

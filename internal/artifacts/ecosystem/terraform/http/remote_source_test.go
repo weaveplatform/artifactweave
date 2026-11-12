@@ -56,13 +56,15 @@ func TestUnitRemoteGitHubModuleSources(t *testing.T) {
 	base := "https://registry.terraform.io/v1/modules/ns/name/aws/1.0.0/download"
 	for _, raw := range []string{"git::https://github.com/org/repo.git//modules/demo?ref=v1.0&depth=1", "github.com/org/repo//modules/demo?ref=v1.0"} {
 		s, e := parseModuleSource(raw, base, c)
+		// The cache path is the VCS tag path (vcs-default layout).
 		if e != nil || s.Target != "https://github.com/org/repo/archive/v1.0.tar.gz" ||
-			s.Subdir != "*/modules/demo" {
+			s.Subdir != "*/modules/demo" || s.Path != "org/repo/tags/v1.0/repo-v1.0.tar.gz" {
 			t.Fatal(s, e)
 		}
 	}
 	s, e := parseModuleSource("git::https://github.com/org/repo", base, c)
-	if e != nil || !strings.HasSuffix(s.Target, "/HEAD.tar.gz") || s.Subdir != "*" {
+	if e != nil || !strings.HasSuffix(s.Target, "/HEAD.tar.gz") || s.Subdir != "*" ||
+		s.Path != "org/repo/tags/HEAD/repo-HEAD.tar.gz" {
 		t.Fatal(s, e)
 	}
 	for _, raw := range []string{"git::http://github.com/org/repo", "git::https://github.com/org/repo/more", "git::https://github.com/org/.git", "git::https://github.com/org/repo?ref=../x", "git::https://github.com/org/repo?ref=-x", "git::https://github.com/org/repo?ref=x//y", "git::https://github.com/org/repo?depth=0", "git::https://github.com/org/repo?depth=no", "git::https://github.com/org/repo?depth=1&depth=2", "git::https://github.com/org/repo?other=1"} {

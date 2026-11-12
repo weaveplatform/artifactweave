@@ -102,6 +102,9 @@ func TestAccRemoteProviderRedirectsAndCredentials(t *testing.T) {
 		)
 		storage.Set("/packages/SHA256SUMS", fakeupstream.Resource{Body: f.sums})
 		storage.Set("/packages/SHA256SUMS.sig", fakeupstream.Resource{Body: f.signature})
+		// The files sit at the top of the Providers URL, so the remote
+		// caches them at the root.
+		f.grant("provider.zip", "SHA256SUMS", "SHA256SUMS.sig")
 		expect(t, f.get("reader", remoteProviderBase+"1.0.0/download/linux/amd64"), 200)
 		credential := "Basic " + base64.StdEncoding.EncodeToString(
 			[]byte("upstream-user:upstream-secret"),
@@ -216,7 +219,7 @@ func TestAccRemoteProviderCurrentDisclosureAndSource(t *testing.T) {
 	permission, _ := f.db.Permissions().Get(t.Context(), "remote-read")
 	resource := permission.Resources[api.ResourceArtifact]
 	resource.Targets["remote"] = accesstest.Target{
-		Include: []string{"hashicorp/null/**"},
+		Include: []string{"hashicorp/null/**", "storage/**"},
 		Exclude: []string{"**/*_arm64.zip"},
 	}
 	permission.Resources[api.ResourceArtifact] = resource

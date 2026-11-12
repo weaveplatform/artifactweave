@@ -66,4 +66,4 @@ Feature: NuGet clients restore and search through the v2 feed
     Examples:
       | dotnet  |
       | .NET    |
-      | .NET 11 |
+      | .NET 10 |

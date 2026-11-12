@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
@@ -42,6 +43,141 @@ func TestAccP8ErrorProfiles(t *testing.T) {
 	} {
 		if got := errorProfileFor(path); got != want {
 			t.Errorf("errorProfileFor(%s) = %v, want %v", path, got, want)
+		}
+	}
+}
+
+// The pub, Swift and Agent Packages paths answer every error in their
+// protocol's envelope, the middleware's included, and the JFrog reindex
+// operation beside pub and Swift keeps Artifactory's, on either route that
+// takes it: the generated one, even with an empty key, and pkgroute's
+// reserved one, which trims slashes. The bare prefix, which no protocol
+// route takes, keeps Artifactory's too (#1249).
+func TestAccProtocolErrorProfiles(t *testing.T) {
+	for path, want := range map[string]apierror.Profile{
+		"/artifactory/api/pub/r/api/packages/x":               apierror.ProfilePub,
+		"/artifactory/api/pub/r/packages/x/versions/1.tar.gz": apierror.ProfilePub,
+		"/artifactory/api/pub/r/reindex":                      apierror.ProfileArtifactory,
+		"/artifactory/api/pub/r/reindex/":                     apierror.ProfileArtifactory,
+		"/artifactory/api/pub/r/reindex/x":                    apierror.ProfilePub,
+		"/artifactory/api/pub//reindex":                       apierror.ProfileArtifactory,
+		"/artifactory/api/pub//reindex/":                      apierror.ProfilePub,
+		"/artifactory/api/pub/":                               apierror.ProfileArtifactory,
+		"/artifactory/api/pub//":                              apierror.ProfilePub,
+		"/artifactory/api/swift/":                             apierror.ProfileArtifactory,
+		"/artifactory/api/swift//reindex":                     apierror.ProfileArtifactory,
+		"/artifactory/api/agentpackages/":                     apierror.ProfileArtifactory,
+		"/artifactory/api/agentpackages//x":                   apierror.ProfileAPM,
+		"/artifactory/api/swift/r/acme/widget":                apierror.ProfileSwiftRegistry,
+		"/artifactory/api/swift/r/reindex":                    apierror.ProfileArtifactory,
+		"/artifactory/api/swift/r/acme/reindex":               apierror.ProfileSwiftRegistry,
+		"/artifactory/api/agentpackages/r/v1/search":          apierror.ProfileAPM,
+		"/artifactory/api/agentpackages/r/reindex":            apierror.ProfileAPM,
+	} {
+		if got := errorProfileFor(path); got != want {
+			t.Errorf("errorProfileFor(%s) = %v, want %v", path, got, want)
+		}
+	}
+}
+
+// The authentication middleware's 401 and 403 on the pub, Swift and Agent
+// Packages paths answer in the protocol's envelope with its content type, and
+// pub's 401 with the Bearer realm="pub" challenge dart pub reads (#1249).
+// Their reindex operations keep Artifactory's envelope and Basic challenge,
+// and so do the binder's 400 for a reindex with an empty key and the
+// router's 404 for a bare prefix, which no middleware writes. Under /v2 a
+// 403 carries the distribution specification's DENIED (#1248).
+func TestAccProtocolMiddlewareEnvelopes(t *testing.T) {
+	w := newItemWorld(t, false)
+	if err := w.db.Users().Create(t.Context(), accesstest.User{
+		Name: "locked", PasswordHash: cheapHash, Status: accesstest.UserLocked,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const (
+		pub      = "/artifactory/api/pub/libs-local/api/packages/widget"
+		swift    = "/artifactory/api/swift/libs-local/acme/widget"
+		apm      = "/artifactory/api/agentpackages/libs-local/v1/search"
+		locked   = `User is Locked.\nContact System Administrator to Unlock The Account.`
+		problem  = "application/problem+json; charset=utf-8"
+		pubType  = "application/vnd.pub.v2+json"
+		pubRealm = `Bearer realm="pub"`
+	)
+	for _, c := range []struct {
+		method, path                 string
+		headers                      map[string]string
+		status                       int
+		contentType, challenge, body string
+	}{
+		{
+			http.MethodGet, pub, nil, 401, pubType, pubRealm,
+			`{"error":{"code":"UNAUTHORIZED","message":"Authentication is required"}}`,
+		},
+		{
+			http.MethodGet, pub, basic("admin", "wrong"), 401, pubType, pubRealm,
+			`{"error":{"code":"UNAUTHORIZED","message":"Bad credentials"}}`,
+		},
+		{
+			http.MethodGet, pub, basic("locked", "pw"), 403, pubType, "",
+			`{"error":{"code":"FORBIDDEN","message":"` + locked + `"}}`,
+		},
+		{
+			http.MethodGet, swift, nil, 401, problem, apierror.BasicChallenge,
+			`{"detail":"Authentication is required","status":401,"title":"Unauthorized"}`,
+		},
+		{
+			http.MethodGet, swift, basic("reader", "wrong"), 401, problem, apierror.BasicChallenge,
+			`{"detail":"Bad credentials","status":401,"title":"Unauthorized"}`,
+		},
+		{
+			http.MethodGet, swift, basic("locked", "pw"), 403, problem, "",
+			`{"detail":"` + locked + `","status":403,"title":"Forbidden"}`,
+		},
+		{
+			http.MethodGet, apm, nil, 401, problem, apierror.BasicChallenge,
+			`{"detail":"Authentication is required","status":401,"title":"Unauthorized"}`,
+		},
+		{
+			http.MethodGet, apm, basic("deployer", "wrong"), 401, problem, apierror.BasicChallenge,
+			`{"detail":"Bad credentials","status":401,"title":"Unauthorized"}`,
+		},
+		{
+			http.MethodGet, apm, basic("locked", "pw"), 403, problem, "",
+			`{"detail":"` + locked + `","status":403,"title":"Forbidden"}`,
+		},
+		{
+			http.MethodPost, "/artifactory/api/pub/libs-local/reindex", nil, 401,
+			"application/json", apierror.BasicChallenge,
+			`{"errors":[{"message":"Authentication is required","status":401}]}`,
+		},
+		{
+			http.MethodPost, "/artifactory/api/swift/libs-local/reindex", nil, 401,
+			"application/json", apierror.BasicChallenge,
+			`{"errors":[{"message":"Authentication is required","status":401}]}`,
+		},
+		{
+			http.MethodPost, "/artifactory/api/pub//reindex", basic("admin", "pw"), 400,
+			"application/json", "",
+			`{"errors":[{"message":"Invalid format for parameter repoKey: parameter 'repoKey' is empty, can't bind its value","status":400}]}`,
+		},
+		{
+			http.MethodGet, "/artifactory/api/swift/", basic("admin", "pw"), 404,
+			"application/json", "",
+			`{"errors":[{"message":"not found: GET /artifactory/api/swift/","status":404}]}`,
+		},
+		{
+			http.MethodGet, "/v2/", basic("locked", "pw"), 403, "application/json", "",
+			`{"errors":[{"code":"DENIED","message":"` + locked + `"}]}`,
+		},
+	} {
+		rec := do(t, w.h, c.method, c.path, c.headers, "")
+		if rec.Code != c.status || rec.Body.String() != c.body+"\n" ||
+			rec.Header().Get("Content-Type") != c.contentType ||
+			rec.Header().Get("WWW-Authenticate") != c.challenge {
+			t.Errorf("%s %s %v: %d %q %q %s, want %d %q %q %s",
+				c.method, c.path, c.headers, rec.Code, rec.Header().Get("Content-Type"),
+				rec.Header().Get("WWW-Authenticate"), rec.Body,
+				c.status, c.contentType, c.challenge, c.body)
 		}
 	}
 }

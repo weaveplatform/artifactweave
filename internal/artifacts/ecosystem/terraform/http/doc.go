@@ -63,8 +63,11 @@
 //     whose file they reject stays listed. A remote checks its policy at
 //     the 7.x cache path of the registry document a client asks for, under
 //     .terraform/ (RTFACT-30802, RTFACT-31026), and each file at its cache
-//     path; the lookups on the way are refused by the blackout alone, and a
-//     listing keeps a release whose archive the patterns reject.
+//     path, which is 7.x's: a provider file's URL path below the
+//     Providers URL, or external/<host>/<path>, and a GitHub module's VCS
+//     tag path (remoteFilePath). The lookups on the way are refused by the
+//     blackout alone, and a listing keeps a release whose archive the
+//     patterns reject.
 //   - Errors are {"errors":[...]} (the Terraform registry profile), and
 //     statuses and messages stay byte-identical.
 //
@@ -117,4 +120,7 @@
 //   - policy_test.go: the download policy on local and remote module and
 //     provider routes: blackout, patterns on one archive, patterns on the
 //     .terraform/ metadata paths, and Read permission checked first.
+//   - remote_cache_path_test.go: a remote's 7.x cache paths, under JFrog's
+//     documented include patterns and RTFACT-30802's, and the refusals at
+//     them.
 package terraformhttp

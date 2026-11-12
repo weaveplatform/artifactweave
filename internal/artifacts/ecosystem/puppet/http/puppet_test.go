@@ -334,7 +334,7 @@ func TestAccHostedModuleRoutes(t *testing.T) {
 
 func TestAccInvalidRoutesAndQueries(t *testing.T) {
 	f := newFixture(t, repo.Local)
-	for _, path := range []string{"/v3/releases?module=%zz", "/v3/releases?module=" + strings.Repeat("a", 4097), "/v3/releases", "/v3/releases?module=../evil", "/v3/releases?module=acme-widget&limit=0", "/v3/releases?module=acme-widget&offset=-1", "/v3/releases?module=acme-widget&sort_by=bad", "/v3/releases?module=acme-widget&x=bad", "/v3/releases?module=acme-widget&module=acme-widget", "/v3/releases/bad", "/v3/modules/bad", "/v3/modules/acme-widget?bad=1", "/v3/modules?query=bad", "/v3/files/acme-widget-1.0.0.zip", "/v3/files/acme-widget-1.0.0.tar.gz?x=1"} {
+	for _, path := range []string{"/v3/releases?module=%zz", "/v3/releases?module=" + strings.Repeat("a", 4097), "/v3/releases?sort_by=version", "/v3/releases?module=../evil", "/v3/releases?module=acme-widget&limit=0", "/v3/releases?module=acme-widget&offset=-1", "/v3/releases?module=acme-widget&sort_by=bad", "/v3/releases?module=acme-widget&x=bad", "/v3/releases?module=acme-widget&module=acme-widget", "/v3/releases/bad", "/v3/modules/bad", "/v3/modules/acme-widget?bad=1", "/v3/modules?query=bad", "/v3/files/acme-widget-1.0.0.zip", "/v3/files/acme-widget-1.0.0.tar.gz?x=1"} {
 		if r := f.do("GET", base+path, "admin"); r.Code != 400 {
 			t.Errorf("%s: %d", path, r.Code)
 		}

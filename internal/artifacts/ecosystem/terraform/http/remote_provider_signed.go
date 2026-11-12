@@ -80,14 +80,6 @@ func (h handler) remoteSignedProvider(w http.ResponseWriter, r *http.Request, c 
 		h.k.Error(w, r, forbidden)
 		return
 	}
-	path := providerArchivePath(q)
-	if p.Kind != 0 {
-		path = providerCompanionPath(q, p.Kind == 2)
-	}
-	if path != c.Path {
-		h.k.Error(w, r, forbidden)
-		return
-	}
 	principal, err := h.o.Authenticator.RestoreDownload(r.Context(), c.Subject, *c.Credential)
 	var d accessapi.Decider
 	if err == nil {
@@ -107,11 +99,20 @@ func (h handler) remoteSignedProvider(w http.ResponseWriter, r *http.Request, c 
 		h.k.Error(w, r, forbidden)
 		return
 	}
+	// The file's cache path follows the URL the metadata names, so the
+	// metadata read now must name the URL's path for this file before any
+	// file is read.
+	admit := func(paths []string) error {
+		if paths[p.Kind] != c.Path {
+			return forbidden
+		}
+		return nil
+	}
 	var bundle providerBundle
 	if q.isUpstreamMirror {
-		bundle, err = h.providerMirrorBundle(r, q)
+		bundle, err = h.providerMirrorBundle(r, q, admit)
 	} else {
-		bundle, err = h.providerBundle(r, q)
+		bundle, err = h.providerBundle(r, q, admit)
 	}
 	if err != nil {
 		bundle.close()
@@ -135,7 +136,7 @@ func (h handler) remoteSignedProvider(w http.ResponseWriter, r *http.Request, c 
 			}
 		}
 	}()
-	result.Revalidate = combineModuleFences(bundle.results, readCheck, bundle.paths)
+	result.Revalidate = combineModuleFences(bundle.results, readCheck, bundle.disclosed())
 	result.Used = combineModuleUsage(bundle.results)
 	h.k.ServeResult(w, r, result)
 }

@@ -23,6 +23,9 @@ import (
 type remoteMirrorArchive struct {
 	URL    string   `json:"url"`
 	Hashes []string `json:"hashes,omitempty"`
+	// path is the archive's cache path, which its URL sets
+	// (providerFilePath).
+	path string
 }
 
 func parseMirrorVersions(body io.Reader, q providerOp) ([]string, error) {
@@ -95,6 +98,10 @@ func parseMirrorArchives(
 			return nil, err
 		}
 		entry.URL = target
+		var ok bool
+		if entry.path, ok = providerFilePath(c, target); !ok {
+			return nil, remoteProviderError("invalid mirror archive URL")
+		}
 		doc.Archives[platform] = entry
 	}
 	return doc.Archives, nil
@@ -152,7 +159,11 @@ func (h handler) mirrorArchives(
 	return archives, result, digest, err
 }
 
-func (h handler) providerMirrorBundle(r *http.Request, q providerOp) (providerBundle, error) {
+func (h handler) providerMirrorBundle(
+	r *http.Request,
+	q providerOp,
+	admit func(paths []string) error,
+) (providerBundle, error) {
 	archives, result, digest, err := h.mirrorArchives(r, q)
 	if err != nil {
 		return providerBundle{results: []source.Result{result}}, err
@@ -160,6 +171,11 @@ func (h handler) providerMirrorBundle(r *http.Request, q providerOp) (providerBu
 	entry, ok := archives[q.os+"_"+q.arch]
 	if !ok {
 		return providerBundle{results: []source.Result{result}}, missing()
+	}
+	if admit != nil {
+		if err = admit([]string{entry.path}); err != nil {
+			return providerBundle{results: []source.Result{result}}, err
+		}
 	}
 	return h.providerMirrorArchive(r, q, entry, result, digest)
 }
@@ -173,7 +189,7 @@ func (h handler) providerMirrorArchive(
 		q:       q,
 		digest:  digest,
 		results: []source.Result{metadata},
-		paths:   []string{providerArchivePath(q)},
+		paths:   []string{entry.path},
 	}
 	resource := pkgroute.Resource(r, b.paths[0], "")
 	resource.Method = http.MethodGet
@@ -315,7 +331,7 @@ func (h handler) remoteProviderMirrorUpstream(
 		}
 		for platform := range archives {
 			q.os, q.arch, _ = strings.Cut(platform, "_")
-			path := providerArchivePath(q)
+			path := providerListingPath(q)
 			if h.k.Can(r, path, api.ActionRead) {
 				out[version] = struct{}{}
 				paths = append(paths, path)
@@ -327,7 +343,7 @@ func (h handler) remoteProviderMirrorUpstream(
 		h.k.Error(w, r, missing())
 		return
 	}
-	h.serveProviderJSON(w, r, map[string]any{"versions": out}, results, paths)
+	h.serveProviderJSON(w, r, map[string]any{"versions": out}, results, within(index, paths...))
 }
 
 func (h handler) remoteMirrorArchives(
@@ -343,10 +359,10 @@ func (h handler) remoteMirrorArchives(
 	}
 	out := map[string]remoteMirrorArchive{}
 	results := []source.Result{index, metadata}
-	paths := []string{}
+	paths := []disclosed{}
 	for platform, entry := range archives {
 		q.os, q.arch, _ = strings.Cut(platform, "_")
-		if !h.k.Can(r, providerArchivePath(q), api.ActionRead) {
+		if !h.k.Can(r, providerListingPath(q), api.ActionRead) {
 			continue
 		}
 		bundle, e := h.providerMirrorArchive(r, q, entry, metadata, digest)
@@ -365,7 +381,7 @@ func (h handler) remoteMirrorArchives(
 		}
 		out[platform] = entry
 		results = append(results, bundle.results...)
-		paths = append(paths, bundle.paths...)
+		paths = append(paths, bundle.disclosed()...)
 	}
 	if len(out) == 0 {
 		h.k.Error(w, r, missing())
