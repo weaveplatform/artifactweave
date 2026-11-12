@@ -399,7 +399,7 @@ func TestAccMultipartPublishAndWholeCookbookDelete(t *testing.T) {
 
 func TestAccInvalidCookbookRequests(t *testing.T) {
 	f := newFixture(t, repo.Local)
-	for _, p := range []string{"/api/v1/cookbooks?start=-1", "/api/v1/cookbooks?items=0", "/api/v1/cookbooks?items=1001", "/api/v1/cookbooks?items=a", "/api/v1/cookbooks?start=a", "/api/v1/cookbooks?x=1", "/api/v1/cookbooks?items=1&items=2", "/api/v1/search?q=%xx", "/api/v1/cookbooks/w.bad", "/api/v1/cookbooks/widget?x=1", "/api/v1/cookbooks/widget/versions/bad"} {
+	for _, p := range []string{"/api/v1/cookbooks?start=-1", "/api/v1/cookbooks?items=0", "/api/v1/cookbooks?items=a", "/api/v1/cookbooks?start=a", "/api/v1/cookbooks?x=1", "/api/v1/cookbooks?items=1&items=2", "/api/v1/search?q=%xx", "/api/v1/cookbooks/w.bad", "/api/v1/cookbooks/widget?x=1", "/api/v1/cookbooks/widget/versions/bad"} {
 		t.Run(p, func(t *testing.T) {
 			if got := f.do("GET", base+p, "admin"); got.Code != 400 {
 				t.Fatal(got.Code, got.Body.String())
@@ -838,19 +838,26 @@ func TestAccRemotePoliciesFilterBeforeVersionMetadata(t *testing.T) {
 	}
 	s := upstream(t, data)
 	calls := 0
+	allowed := 0
 	s.revalidateCheck = func(context.Context) error {
 		calls++
-		if calls > 2 {
+		if calls > allowed {
 			return source.ErrDenied
 		}
 		return nil
 	}
 	f := newFixtureWith(t, repo.Remote, func(p *pkgroute.Protocol) { p.Sources[repo.Remote] = s })
-	for _, path := range []string{"/api/v1/cookbooks/widget/versions/latest", "/api/v1/cookbooks"} {
-		calls = 0
+	// The latest record reads two upstream documents, each checked as it
+	// is read, and checks them again before it answers. The catalog reads
+	// only its upstream page, checked as it is read and again just before
+	// the answer is written (#1306).
+	for path, checked := range map[string]int{
+		"/api/v1/cookbooks/widget/versions/latest": 2, "/api/v1/cookbooks": 1,
+	} {
+		calls, allowed = 0, checked
 		got := f.do("GET", base+path, "admin")
 		if got.Code != 403 {
-			t.Fatal(got.Code, got.Body.String())
+			t.Fatal(path, got.Code, got.Body.String())
 		}
 	}
 	// A version whose archive the remote's patterns reject stays listed

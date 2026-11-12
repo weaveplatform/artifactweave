@@ -256,7 +256,7 @@ func (f *fixture) member(key string, class repo.Class, url string) repo.Config {
 // newSourceFixture is newFixture whose remote repositories read through
 // the source boundary, which applies a remote's own download policy, and
 // data, widget 1.0.0's archive, which up, a fake upstream Supermarket
-// under /chef/, publishes with its catalog, cookbook and version
+// under /chef/, publishes with its catalog, search, cookbook and version
 // documents.
 func newSourceFixture(t *testing.T, class repo.Class) (*fixture, *fakeupstream.Server, []byte) {
 	t.Helper()
@@ -291,6 +291,7 @@ func newSourceFixture(t *testing.T, class repo.Class) (*fixture, *fakeupstream.S
 	root := up.URL + "/chef/api/v1/cookbooks/widget"
 	documents := map[string]string{
 		"/chef/api/v1/cookbooks": `{"total":1,"start":0,"items":[{"cookbook_name":"widget"}]}`,
+		"/chef/api/v1/search":    `{"total":1,"start":0,"items":[{"cookbook_name":"widget"}]}`,
 		"/chef/api/v1/cookbooks/widget": fmt.Sprintf(
 			`{"name":"widget","versions":[%q],"latest_version":%q}`,
 			root+"/versions/1_0_0", root+"/versions/1_0_0",
