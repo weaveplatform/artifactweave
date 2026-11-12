@@ -329,7 +329,8 @@
       "test/server/artifacts/repositories_format_class_test.go"
     ],
     "nix": [
-      "internal/app/status_nix_test.go"
+      "internal/app/status_nix_test.go",
+      "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "npm": [
       "internal/app/error_profiles_p8_test.go",
@@ -346,7 +347,8 @@
       "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "puppet": [
-      "internal/app/status_puppet_test.go"
+      "internal/app/status_puppet_test.go",
+      "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "pypi": [
       "internal/app/reindex_internal_test.go",
@@ -365,6 +367,7 @@
     "terraform": [
       "test/server/access/keypairs_test.go",
       "test/server/access/permissions_test.go",
+      "test/server/artifacts/protocol_download_policy_test.go",
       "test/server/artifacts/storage_list_test.go"
     ],
     "vcs": [

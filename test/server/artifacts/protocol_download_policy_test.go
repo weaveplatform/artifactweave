@@ -359,6 +359,9 @@ func protocolDocuments() []protocolDocument {
 		{"example.com/demo/@v/v1.0.0.mod", "module example.com/demo\n"},
 		{"example.com/demo/@v/v1.0.0.zip", "go module zip"},
 	}
+	// A narinfo's name is a store path's 32-character Nix base32 hash,
+	// which the route checks before anything else.
+	const narinfo = "fyli4q2yj6vh01bs0jxqbvj5hir5zvqc.narinfo"
 	return []protocolDocument{
 		{
 			name: "npm packument", repo: local("npm-local", repo.NPM),
@@ -532,6 +535,47 @@ func protocolDocuments() []protocolDocument {
 		{
 			name: "skills skill", repo: local("skills-local", repo.Skills),
 			route: "api/skills/skills-local/api/v1/skills/demo", document: "demo",
+		},
+		{
+			name: "luarocks manifest", repo: local("luarocks-local", repo.LuaRocks),
+			route: "api/luarocks/luarocks-local/manifest-5.4", document: "manifest-5.4",
+			stored: true, virtual: true,
+		},
+		{
+			name: "swift releases", repo: local("swift-local", repo.Swift),
+			route: "api/swift/swift-local/acme/Widget", document: "acme/Widget",
+		},
+		{
+			name: "terraform module versions",
+			repo: repo.Config{
+				Key: "terraform-local", PackageType: repo.Terraform,
+				TerraformType: repo.TerraformModule,
+			},
+			route:    "api/terraform/terraform-local/v1/modules/acme/demo/aws/versions",
+			document: "v1/modules/acme/demo/aws/versions",
+		},
+		{
+			name: "terraform provider versions",
+			repo: repo.Config{
+				Key: "terraform-local", PackageType: repo.Terraform,
+				TerraformType: repo.TerraformProvider,
+			},
+			route:    "api/terraform/terraform-local/v1/providers/acme/demo/versions",
+			document: "v1/providers/acme/demo/versions",
+		},
+		{
+			name: "nix cache info", repo: local("nix-local", repo.Nix),
+			route: "api/nix/nix-local/nix-cache-info", document: "nix-cache-info", stored: true,
+		},
+		{
+			name: "nix narinfo", repo: local("nix-local", repo.Nix),
+			route:    "api/nix/nix-local/" + narinfo,
+			document: narinfo, stored: true, virtual: true,
+		},
+		{
+			name: "puppet module", repo: local("puppet-local", repo.Puppet),
+			route:    "api/puppet/puppet-local/v3/modules/acme-widget",
+			document: "v3/modules/acme-widget",
 		},
 	}
 }
