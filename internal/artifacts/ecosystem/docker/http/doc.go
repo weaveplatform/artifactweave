@@ -84,8 +84,13 @@
 //   - Every registry response carries Docker-Distribution-API-Version, the
 //     401 included, and every 401 under a registry path carries the Bearer
 //     challenge Docker clients follow to the token endpoint (decision
-//     0005). A request without credentials is challenged on every registry
-//     path but the token endpoint, even while anonymous access is on.
+//     0005); a remote's relayed upstream 401 adds error="invalid_request",
+//     which ends containerd's retries (#1277). A request without
+//     credentials is challenged on every registry path but the token
+//     endpoint, even while anonymous access is on. A request the caller's
+//     permissions refuse, an anonymous caller's included, answers 403
+//     UNAUTHORIZED with 7.x's message and no challenge, before a registry
+//     token's grant is asked (#1276).
 //   - On a server that authenticates every request (Options.Authenticated),
 //     a request whose principal carries no decider is refused, never
 //     allowed.
@@ -114,8 +119,8 @@
 //     code, as the Docker client showed 7.x's answer to an upstream that
 //     refused its credentials (RTFACT-30467, #1248). That 401's message is
 //     7.x's "Invalid username/password configured for Remote Docker
-//     repository: <key>". The caller's own refusal keeps DENIED, or
-//     UNAUTHORIZED when anonymous.
+//     repository: <key>". The caller's own refusal answers as Require's
+//     does.
 //
 // # References
 //
@@ -192,6 +197,9 @@
 //     which keep their status; and a remote listing's final fence.
 //   - remote_error_test.go: the envelope and code of each failure a remote
 //     read answers, and kernel's shared errors left unchanged.
+//   - refusal_test.go: 7.x's refusal message for each kind and method, the
+//     permissions asked before a registry token's grant, and a request
+//     without a decider on an authenticated server.
 //   - The guard suites test/server/artifacts/docker and
 //     test/server/artifacts/helmoci, and the OCI conformance job, drive the
 //     registry through the whole server; the docker suite drives DockerAPI's

@@ -281,8 +281,15 @@ func (g *Registry) remoteError(w http.ResponseWriter, r *http.Request, q Request
 			refused.Message = "Invalid username/password configured for Remote Docker repository: " +
 				q.Repo.Key
 			answer = &refused
+			w.Header().Set("WWW-Authenticate", g.upstreamChallenge(r))
 		}
 		apierror.Write(w, apierror.ProfileArtifactory, answer)
+		return
+	}
+	if errors.Is(err, source.ErrDenied) {
+		// The source boundary found the caller's permission gone during the
+		// fetch, which Require would have refused before it.
+		Write(w, q.refuse(r.Method, p))
 		return
 	}
 	g.writeErr(w, r, answer)

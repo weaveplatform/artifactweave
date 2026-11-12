@@ -224,7 +224,7 @@ func TestAccReferrersPermissions(t *testing.T) {
 	target := "/v2/docker-local/app/referrers/" + digestOf("subject")
 	for who, want := range map[string]int{
 		"reader": http.StatusOK, "nobody": http.StatusForbidden,
-		kernel.AnonymousUser: http.StatusUnauthorized,
+		kernel.AnonymousUser: http.StatusForbidden,
 	} {
 		if rec := send(
 			principalAs(t, w.db, w.h, who),

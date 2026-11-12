@@ -10,14 +10,14 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
-	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
 // TestUnitRemoteErrorEnvelopes: a remote's failure to fetch, whether its
 // upstream's 401, 403, 429 or 5xx relayed or an upstream that is unreachable,
 // unusable or slow, answers in Artifactory's envelope under no registry code
-// (#1248), the 401 with 7.x's message naming the remote (RTFACT-30467). The
-// caller's own refusal answers the specification's code, and a
+// (#1248), the 401 with 7.x's message naming the remote (RTFACT-30467) and
+// a challenge that stops containerd's retries (#1277). The caller's own
+// refusal answers 7.x's 403 UNAUTHORIZED, as Require does (#1276), and a
 // request the source cannot serve or an operation it does not support keeps
 // its code. No refusal writes a code into kernel's shared errors.
 func TestUnitRemoteErrorEnvelopes(t *testing.T) {
@@ -34,6 +34,10 @@ func TestUnitRemoteErrorEnvelopes(t *testing.T) {
 		{
 			name: "upstream 401", err: &source.HTTPError{Status: 401}, status: 401,
 			body: `{"errors":[{"message":"Invalid username/password configured for Remote Docker repository: remote","status":401}]}`,
+			// No base URL resolver runs here, so the realm is relative and the
+			// service empty; the server suite checks the full value.
+			challenge: `Bearer realm="/artifactory/api/docker/remote/v2/token",service="",` +
+				`scope="repository:remote/image:pull",error="invalid_request"`,
 		},
 		{
 			name: "upstream 403", err: &source.HTTPError{Status: 403}, status: 403,
@@ -74,12 +78,11 @@ func TestUnitRemoteErrorEnvelopes(t *testing.T) {
 		},
 		{
 			name: "caller denied", err: source.ErrDenied, status: 403,
-			body: `{"errors":[{"code":"DENIED","message":"Forbidden"}]}`,
+			body: `{"errors":[{"code":"UNAUTHORIZED","message":"The client does not have permission for manifest: Download request for repo:path 'remote-cache:image/latest/manifest.json' is forbidden for user: 'reader'."}]}`,
 		},
 		{
-			name: "anonymous caller denied", err: source.ErrDenied, anonymous: true, status: 401,
-			body:      `{"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required"}]}`,
-			challenge: apierror.BasicChallenge,
+			name: "anonymous caller denied", err: source.ErrDenied, anonymous: true, status: 403,
+			body: `{"errors":[{"code":"UNAUTHORIZED","message":"The client does not have permission for manifest: Download request for repo:path 'remote-cache:image/latest/manifest.json' is forbidden for user: 'anonymous'."}]}`,
 		},
 		{
 			name: "invalid request", err: source.ErrInvalidRequest, status: 400,

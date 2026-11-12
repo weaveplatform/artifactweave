@@ -70,8 +70,8 @@ func TestAccRegistryTokenForOIDCUsers(t *testing.T) {
 		}
 	})
 	for name, exchange := range exchanged {
-		// A token for app alone: another image needs a token of its own,
-		// whatever the user may read there (the seeded readers group is
+		// A token for app alone: another image needs a token of its own
+		// where the user may read it (the seeded readers group is
 		// auto-join, so a transient user reads everything).
 		rec := do(t, h, http.MethodGet, "/v2/token?scope=repository:docker-blobs/app:pull",
 			bearerAuth(exchange), "")
@@ -94,9 +94,23 @@ func TestAccRegistryTokenForOIDCUsers(t *testing.T) {
 			t.Errorf("%s: pull the granted image: %d %s", name, rec.Code, rec.Body)
 		}
 		rec = do(t, h, http.MethodGet, "/v2/docker-blobs/other/manifests/v1", registry, "")
-		if rec.Code != http.StatusUnauthorized ||
-			!strings.Contains(rec.Header().Get("WWW-Authenticate"), "docker-blobs/other:pull") {
-			t.Errorf("%s: another image: %d %v", name, rec.Code, rec.Header())
+		switch name {
+		case "transient":
+			if rec.Code != http.StatusUnauthorized ||
+				!strings.Contains(rec.Header().Get("WWW-Authenticate"), "docker-blobs/other:pull") {
+				t.Errorf("%s: another image: %d %v", name, rec.Code, rec.Header())
+			}
+		default:
+			// The synthetic subject's ci group reads app alone: the
+			// permissions refuse it before the token's grant is asked, as
+			// 7.x refuses an OIDC token's user, token:<name> (RTFACT-30774).
+			if rec.Code != http.StatusForbidden || rec.Header().Get("WWW-Authenticate") != "" ||
+				rec.Body.String() != `{"errors":[{"code":"UNAUTHORIZED","message":"The client does `+
+					`not have permission for manifest: Download request for repo:path `+
+					`'docker-blobs:other/v1/manifest.json' is forbidden for user: `+
+					`'token:oidc-github-ci'."}]}`+"\n" {
+				t.Errorf("%s: another image: %d %v %s", name, rec.Code, rec.Header(), rec.Body)
+			}
 		}
 		if rec := do(
 			t,

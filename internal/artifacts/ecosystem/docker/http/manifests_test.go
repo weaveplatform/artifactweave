@@ -357,7 +357,7 @@ func TestAccListPushStrictOverwriteCoversPlatformTags(t *testing.T) {
 	expect(t, w.do(http.MethodPut, "/v2/docker-local/app/manifests/v2-linux-amd64", image("b"),
 		ociManifest), http.StatusCreated, "")
 	expect(t, send(deployer, http.MethodPut, "/v2/docker-local/app/manifests/v2", listBody, index),
-		http.StatusForbidden, CodeDenied)
+		http.StatusForbidden, CodeUnauthorized)
 	expect(t, w.do(http.MethodPut, "/v2/docker-local/app/manifests/v2", listBody, index),
 		http.StatusCreated, "")
 	rec := w.do(http.MethodGet, "/v2/docker-local/app/tags/list", "", nil)
@@ -507,14 +507,14 @@ func TestAccManifestPermissions(t *testing.T) {
 	}{
 		{"writer", "PUT", v1, first, 201, ""},
 		{"reader", "GET", v1, "", 200, ""},
-		{"nobody", "GET", v1, "", 403, CodeDenied},
-		{kernel.AnonymousUser, "GET", v1, "", 401, CodeUnauthorized},
-		{"reader", "PUT", "/v2/docker-local/app/manifests/v2", first, 403, CodeDenied},
-		{kernel.AnonymousUser, "PUT", "/v2/docker-local/app/manifests/v2", first, 401, CodeUnauthorized},
+		{"nobody", "GET", v1, "", 403, CodeUnauthorized},
+		{kernel.AnonymousUser, "GET", v1, "", 403, CodeUnauthorized},
+		{"reader", "PUT", "/v2/docker-local/app/manifests/v2", first, 403, CodeUnauthorized},
+		{kernel.AnonymousUser, "PUT", "/v2/docker-local/app/manifests/v2", first, 403, CodeUnauthorized},
 		// Repeating the push changes nothing, so Deploy is enough.
 		{"writer", "PUT", v1, first, 201, ""},
-		{"writer", "PUT", v1, second, 403, CodeDenied},
-		{"writer", "PUT", "/v2/docker-local/app/manifests/" + digestOf(second) + "?tag=v1", second, 403, CodeDenied},
+		{"writer", "PUT", v1, second, 403, CodeUnauthorized},
+		{"writer", "PUT", "/v2/docker-local/app/manifests/" + digestOf(second) + "?tag=v1", second, 403, CodeUnauthorized},
 		{"owner", "PUT", v1, second, 201, ""},
 	} {
 		rec := send(as(c.who), c.method, c.target, c.body, ociManifest)
@@ -669,7 +669,7 @@ func TestAccManifestPushWithRegistryTokens(t *testing.T) {
 	expect(t, send(push, http.MethodPut, v1, image("two"), ociManifest), http.StatusCreated, "")
 	// The writer's push token cannot replace it: the permissions refuse.
 	rec = send(tokenAs("writer", "pull", "push"), http.MethodPut, v1, image("one"), ociManifest)
-	if rec.Code != http.StatusForbidden || code(t, rec) != CodeDenied {
+	if rec.Code != http.StatusForbidden || code(t, rec) != CodeUnauthorized {
 		t.Fatalf("writer replacing: %d %s", rec.Code, rec.Body)
 	}
 }

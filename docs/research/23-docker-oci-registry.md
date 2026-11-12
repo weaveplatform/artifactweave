@@ -623,7 +623,8 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   ([#352](https://github.com/weaveplatform/artifactweave/issues/352), decision 0031 "Platform properties").
 - **Referrers need Read.** From [7.161.16](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716116-self-managed) (SaaS 7.164.0) the referrers API answers 403
   to a caller without Read on the subject image. Decision 0031 already requires Read on
-  `<name>/` and answers `DENIED` 403.
+  `<name>/`, and answers 403 with the code `UNAUTHORIZED` and 7.x's refusal message
+  (decision 0031, "A request the caller's permissions refuse").
 - **Digest mismatches.** [7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed) added a flag, off by default, that blocks a blob
   upload whose digest does not match its SHA-256. Without it Artifactory accepts the
   mismatch. artifactweave always refuses one with `DIGEST_INVALID`, as the distribution

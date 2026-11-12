@@ -257,9 +257,9 @@ func TestAccListingPermissions(t *testing.T) {
 	}
 	list(t, send(as("reader"), http.MethodGet, "/v2/docker-local/team/app/tags/list", "", nil))
 	expect(t, send(as("reader"), http.MethodGet, "/v2/docker-local/other/tags/list", "", nil),
-		http.StatusForbidden, CodeDenied)
+		http.StatusForbidden, CodeUnauthorized)
 	expect(t, send(as(kernel.AnonymousUser), http.MethodGet, "/v2/docker-local/other/tags/list",
-		"", nil), http.StatusUnauthorized, CodeUnauthorized)
+		"", nil), http.StatusForbidden, CodeUnauthorized)
 }
 
 // A tag delete removes the tag folder; the manifest stays readable by
@@ -344,12 +344,17 @@ func TestAccDeletePermissions(t *testing.T) {
 	}
 	as := func(name string) http.Handler { return principalAs(t, w.db, w.h, name) }
 	const v1 = "/v2/docker-local/app/manifests/v1"
-	expect(t, send(as("reader"), http.MethodDelete, v1, "", nil), http.StatusForbidden, CodeDenied)
+	expect(
+		t,
+		send(as("reader"), http.MethodDelete, v1, "", nil),
+		http.StatusForbidden,
+		CodeUnauthorized,
+	)
 	expect(t, send(as(kernel.AnonymousUser), http.MethodDelete, v1, "", nil),
-		http.StatusUnauthorized, CodeUnauthorized)
+		http.StatusForbidden, CodeUnauthorized)
 	// Unknown or not, a caller without Delete learns nothing.
 	expect(t, send(as("reader"), http.MethodDelete, "/v2/docker-local/app/manifests/v9", "", nil),
-		http.StatusForbidden, CodeDenied)
+		http.StatusForbidden, CodeUnauthorized)
 	expect(t, send(as("owner"), http.MethodDelete, v1, "", nil), http.StatusAccepted, "")
 }
 
