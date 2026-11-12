@@ -25,6 +25,15 @@ func TestAccSpecParity(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(cache, specoracle.ManifestFile)); err != nil {
 		t.Skip("no oracle cache: run make oracle-fetch")
 	}
+	// A family the fetch could not reach has nothing in the cache, so the
+	// comparison below would pass over its regressions and log its baseline
+	// entries as improvements (#1308). In CI the failure also keeps such a
+	// crawl out of the week's cache, which actions/cache saves only when the
+	// job succeeds.
+	if err := specoracle.CheckFamilies(cache); err != nil {
+		t.Errorf("the oracle cache cannot be compared in full; rerun make oracle-fetch, "+
+			"and never run make parity-baseline on this cache:\n%v", err)
+	}
 	theirs, err := specoracle.Load(cache)
 	if err != nil {
 		t.Fatal(err)

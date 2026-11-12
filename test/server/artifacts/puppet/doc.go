@@ -40,6 +40,12 @@
 //     Forge's release fields relayed and 7.x's pagination; the answers
 //     kept for a module of at most 100 releases, and the 502 for a page
 //     short of what its upstream states.
+//   - puppet_module_groups_test.go: a Puppet Enterprise client's
+//     module_groups on the release list and the search of a local and a
+//     remote repository, never passed upstream, and a
+//     remote's release that its upstream's release list leaves out,
+//     answered from the upstream's record after the caller's permission
+//     and the remote's policy.
 //
 // # References
 //
@@ -53,7 +59,9 @@
 //     suites).
 //   - docs/testing/server-test-ownership.md: how CI selection gives the
 //     package an owner.
-//   - https://github.com/weaveplatform/artifactweave/issues/1096
+//   - https://github.com/weaveplatform/artifactweave/issues/1096,
+//     https://github.com/weaveplatform/artifactweave/issues/1343 and
+//     https://github.com/weaveplatform/artifactweave/issues/1344
 //
 // # Status
 //

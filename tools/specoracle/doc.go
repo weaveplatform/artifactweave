@@ -12,7 +12,11 @@
 //
 // JFrog's published reference pages, on fetch, and the cache they are kept in
 // (.specoracle, gitignored: the definitions are JFrog's and are never
-// committed); api/*.openapi.yaml for the comparisons. The subcommands:
+// committed); api/*.openapi.yaml for the comparisons. fetch also reads
+// api/oracle-inventory.json for the pages each family had, which find the
+// family in its parent index when its own index fails (#1308). baseline and
+// inventory refuse a cache that lacks a family, and report warns of it. The
+// subcommands:
 //
 //	specoracle fetch    [-cache .specoracle]            download the documented blocks
 //	specoracle report   [-cache .specoracle] [-api api] print the comparison

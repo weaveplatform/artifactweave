@@ -7275,7 +7275,7 @@ type CalculatePubRepositoryMetadataParams struct {
 
 // GetPuppetModulesParams defines parameters for GetPuppetModules.
 type GetPuppetModulesParams struct {
-	// Query Optional query parameter. Exact name of the one module to answer, as `<owner>-<name>`, for example `puppetlabs-stdlib`. A remote repository answers the module only when its upstream serves the module's record. Any other search, a repeated parameter or a parameter other than `query`, `limit` and `offset` is rejected with 400.
+	// Query Optional query parameter. Exact name of the one module to answer, as `<owner>-<name>`, for example `puppetlabs-stdlib`. A remote repository answers the module only when its upstream serves the module's record. Any other search, a repeated parameter or a parameter other than `query`, `limit`, `offset` and `module_groups` is rejected with 400.
 	Query *string `form:"query,omitempty" json:"query,omitempty"`
 
 	// Limit Optional query parameter. Most modules a page holds, at least 1. Defaults to 20; a value above 100 is served as 100.
@@ -7283,11 +7283,14 @@ type GetPuppetModulesParams struct {
 
 	// Offset Optional query parameter. Number of modules before the page, at least 0. Defaults to 0; an offset past the last module answers an empty page.
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// ModuleGroups Optional query parameter. Accepted with `query`, as the Puppet client sends it on Puppet Enterprise (`base pe_only`). Any value leaves the page as it is, the page's links leave it out, and a remote repository does not pass it to its upstream.
+	ModuleGroups *string `form:"module_groups,omitempty" json:"module_groups,omitempty"`
 }
 
 // GetPuppetReleasesParams defines parameters for GetPuppetReleases.
 type GetPuppetReleasesParams struct {
-	// Module Optional query parameter. Module whose releases to list, as `<owner>-<name>`, for example `puppetlabs-stdlib`. A repeated parameter, or a parameter other than `module`, `limit`, `offset`, `sort_by` and `exclude_fields`, is rejected with 400.
+	// Module Optional query parameter. Module whose releases to list, as `<owner>-<name>`, for example `puppetlabs-stdlib`. A repeated parameter, or a parameter other than `module`, `limit`, `offset`, `sort_by`, `exclude_fields` and `module_groups`, is rejected with 400.
 	Module *string `form:"module,omitempty" json:"module,omitempty"`
 
 	// Limit Optional query parameter. Most releases a page holds, at least 1. Defaults to 20; a value above 100 is served as 100.
@@ -7301,6 +7304,9 @@ type GetPuppetReleasesParams struct {
 
 	// ExcludeFields Optional query parameter. Accepted with `module`. Each record leaves out the top-level fields it names, separated by commas, as the Puppet client sends them, or by spaces; a name no record has leaves nothing out. The page's links keep it.
 	ExcludeFields *string `form:"exclude_fields,omitempty" json:"exclude_fields,omitempty"`
+
+	// ModuleGroups Optional query parameter. Accepted with `module`, as the Puppet client sends it on Puppet Enterprise (`base pe_only`), and rejected with 400 without it. Any value leaves the page as it is, the page's links leave it out, and a remote repository does not pass it to its upstream.
+	ModuleGroups *string `form:"module_groups,omitempty" json:"module_groups,omitempty"`
 }
 
 // GetPuppetReleasesParamsSortBy defines parameters for GetPuppetReleases.
@@ -10744,7 +10750,7 @@ type ClientInterface interface {
 
 	// GetPuppetReleaseInfo performs a GET /api/puppet/{repoKey}/v3/releases/{userModuleVersion} (the `GetPuppetReleaseInfo` operationId) request.
 	//
-	// Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. Any query parameter is rejected with 400.
+	// Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. A remote repository answers a release its upstream's release list leaves out from the upstream's record of that release. Any query parameter is rejected with 400.
 	GetPuppetReleaseInfo(ctx context.Context, repoKey string, userModuleVersion string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculatePypiRepositoryMetadata performs a POST /api/pypi/{repoKey}/reindex (the `CalculatePypiRepositoryMetadata` operationId) request.
@@ -15809,7 +15815,7 @@ func (c *Client) GetPuppetReleases(ctx context.Context, repoKey string, params *
 
 // GetPuppetReleaseInfo performs a GET /api/puppet/{repoKey}/v3/releases/{userModuleVersion} (the `GetPuppetReleaseInfo` operationId) request.
 //
-// Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. Any query parameter is rejected with 400.
+// Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. A remote repository answers a release its upstream's release list leaves out from the upstream's record of that release. Any query parameter is rejected with 400.
 func (c *Client) GetPuppetReleaseInfo(ctx context.Context, repoKey string, userModuleVersion string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPuppetReleaseInfoRequest(c.Server, repoKey, userModuleVersion)
 	if err != nil {
@@ -26913,6 +26919,18 @@ func NewGetPuppetModulesRequest(server string, repoKey string, params *GetPuppet
 
 		}
 
+		if params.ModuleGroups != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "module_groups", *params.ModuleGroups, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -27054,6 +27072,18 @@ func NewGetPuppetReleasesRequest(server string, repoKey string, params *GetPuppe
 		if params.ExcludeFields != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "exclude_fields", *params.ExcludeFields, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ModuleGroups != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "module_groups", *params.ModuleGroups, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -38042,7 +38072,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPuppetReleaseInfoWithResponse performs a GET /api/puppet/{repoKey}/v3/releases/{userModuleVersion} (the `GetPuppetReleaseInfo` operationId) request.
 	//
-	// Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. Any query parameter is rejected with 400.
+	// Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. A remote repository answers a release its upstream's release list leaves out from the upstream's record of that release. Any query parameter is rejected with 400.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetPuppetReleaseInfoWithResponse(ctx context.Context, repoKey string, userModuleVersion string, reqEditors ...RequestEditorFn) (*GetPuppetReleaseInfoResponse, error)
@@ -65163,7 +65193,7 @@ func (c *ClientWithResponses) GetPuppetReleasesWithResponse(ctx context.Context,
 
 // GetPuppetReleaseInfoWithResponse performs a GET /api/puppet/{repoKey}/v3/releases/{userModuleVersion} (the `GetPuppetReleaseInfo` operationId) request.
 //
-// Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. Any query parameter is rejected with 400.
+// Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. A remote repository answers a release its upstream's release list leaves out from the upstream's record of that release. Any query parameter is rejected with 400.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetPuppetReleaseInfoWithResponse(ctx context.Context, repoKey string, userModuleVersion string, reqEditors ...RequestEditorFn) (*GetPuppetReleaseInfoResponse, error) {

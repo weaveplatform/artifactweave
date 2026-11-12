@@ -23,18 +23,25 @@ import (
 // proxies and caches it (#1273). A package is admitted by its own grammar
 // first, so a folder named by-hash or a file name that starts Packages does
 // not hide it. Any by-hash file is checked against the SHA-256 its name
-// gives, and an index apt reads by the name Packages or Sources, a Debian
-// installer's included, is validated as metadata. Every other path, a
+// gives, a Release file is checked as metadata, and an index apt reads by
+// the name Packages or Sources, a Debian installer's included, is metadata
+// cached as fetched (debianIndexSourceRequest). Every other path, a
 // translation or a Contents index for one, passes through unchecked; a
 // path in none of these shapes that only resembles one answers not found
 // without asking the upstream, as it did before.
+//
+// A query refuses no Release, index or by-hash file (#1349). 7.x reads a
+// remote Debian file through its generic remote download, as the ?trace of
+// RTFACT-18414 (6.7.1) and RTFACT-26349 (7.25.7) show, and passes a query to
+// the upstream only when the repository's Propagate Query Params is set,
+// which JFrog's Remote Repositories page lists among the settings of a
+// Generic remote repository (6.20 HttpRepo.addQueryParams). The source
+// boundary already applies that rule to q.Resource.Query, and the cache key
+// holds the query only then.
 func DebianSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
 	switch {
 	case debian.ReleaseMetadataPath(p):
-		if q.Resource.Query != "" {
-			return q, source.ErrInvalidRequest
-		}
 		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.Variant = "debian-release-v1"
 		q.Resource.ValidateMetadata = func(
@@ -66,16 +73,23 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 		}
 	case strings.Contains(p, "/by-hash/SHA256/"):
 		expected, ok := debian.ByHashPath(p)
-		if !ok || q.Resource.Query != "" {
+		if !ok {
 			return q, kernel.ErrNotFound
 		}
 		// The index route (TryDebianItem) reads a binary-<arch> or source
-		// index's copy whole, so that copy keeps the route's 64 MiB bound.
-		// Any other copy, of a Contents index for one, is hashed as it
-		// streams and bounded only as every remote file is.
+		// index's copy whole, so that copy keeps the route's 64 MiB bound,
+		// and checks every package it lists as it does for the index, so
+		// the source authorizes it against the repository as it does the
+		// index (PermissionFolder). Without that, the route's check of each
+		// listed package was scoped to the copy's own path and refused every
+		// caller, an administrator too, once the copy was fetched. Any other
+		// copy, of a Contents index for one, is hashed as it streams,
+		// bounded only as every remote file is, and read with the permission
+		// on its own path.
 		limit := int64(0)
 		if _, index := debian.ByHashMetadataPath(p); index {
 			limit = 64 << 20
+			q.Resource.PermissionFolder = true
 		}
 		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.Variant = "debian-by-hash-v1"
@@ -95,8 +109,17 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 }
 
 // debianIndexSourceRequest prepares the read of a file whose name starts
-// Packages or Sources: an index apt reads, validated as metadata, or not
-// found for any other such name.
+// Packages or Sources: an index apt reads, cached as metadata, or not found
+// for any other such name.
+//
+// The index is cached and served as the upstream sent it, whether or not it
+// decodes (#1356). RTFACT-27303 (open, 7.37.14) asks 7.x to check an
+// upstream Packages index against its Release before caching it, so 7.x
+// caches it as fetched today; a Sources index is treated alike [I]. What
+// the server derives from an index leaves out one it cannot decode
+// (debianhttp). A body short of the size the upstream declared, one of
+// unknown size, and one over the 64 MiB the index route reads whole still
+// answer 502.
 //
 // An installer's Packages index (debian.InstallerPackagesIndexPath) is
 // metadata, so the retrieval cache period renews it, as RTFACT-18414
@@ -108,30 +131,15 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 // composes or snapshots as an index [I].
 func debianIndexSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
-	var decodes func([]byte) bool
 	switch {
-	case q.Resource.Query != "":
-		return q, kernel.ErrNotFound
 	case debian.PackagesIndexPath(p):
 		q.Resource.PermissionFolder = true
 		q.Resource.Variant = "debian-packages-v2"
-		decodes = func(body []byte) bool {
-			_, err := debian.DecodePackagesIndex(body)
-			return err == nil
-		}
 	case debian.SourcesIndexPath(p):
 		q.Resource.PermissionFolder = true
 		q.Resource.Variant = "debian-sources-v2"
-		decodes = func(body []byte) bool {
-			_, err := debian.DecodeSourcesIndex(body)
-			return err == nil
-		}
 	case debian.InstallerPackagesIndexPath(p):
 		q.Resource.Variant = "debian-installer-packages-v1"
-		decodes = func(body []byte) bool {
-			_, err := debian.DecodeInstallerPackagesIndex(body)
-			return err == nil
-		}
 	default:
 		return q, kernel.ErrNotFound
 	}
@@ -145,8 +153,8 @@ func debianIndexSourceRequest(q source.Request) (source.Request, error) {
 				Kind:   source.FailureKindIntegrity,
 			}
 		}
-		body, err := io.ReadAll(io.LimitReader(r, 64<<20+1))
-		if err != nil || int64(len(body)) != size || !decodes(body) {
+		n, err := io.Copy(io.Discard, io.LimitReader(r, size+1))
+		if err != nil || n != size {
 			return &source.HTTPError{
 				Status: http.StatusBadGateway,
 				Kind:   source.FailureKindIntegrity,

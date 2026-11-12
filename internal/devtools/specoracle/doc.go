@@ -18,7 +18,10 @@
 //     lists, over HTTP. By default 4 pages at a time, each after a 200 ms
 //     pause, with up to 3 attempts on 429, 5xx and transport errors and a
 //     backoff that doubles from that pause, under a user agent that names
-//     this project.
+//     this project. When a family's index fails, the parent llms.txt one
+//     directory up, in the section that lists the most pages an earlier
+//     fetch found for the family (FetchOptions.Known, which tools/specoracle
+//     reads from api/oracle-inventory.json).
 //   - The cache directory, .specoracle by convention: one
 //     <family>/<page>.json file per block, and manifest.json (Load,
 //     BuildInventory, Scaffold).
@@ -28,7 +31,8 @@
 // # Outputs
 //
 //   - The cache and its Manifest: each page's file, status and checksum, or
-//     why it was skipped or failed.
+//     why it was skipped or failed, and each family's record: which index
+//     its pages came from, or why none did (CheckFamilies).
 //   - A Report: the operations JFrog documents that we do not define,
 //     divergent operations with their findings, matched operations and our
 //     extras, with a per-family Summary and a String that diffs cleanly.
@@ -52,6 +56,10 @@
 //   - One bad page never hides the rest: Fetch records a page that fails or
 //     has no block in the manifest, and Load records a block that does not
 //     parse in the oracle's Errors.
+//   - A whole family is never dropped without a failure: CheckFamilies names
+//     every family the cache holds no block of, with its index URL, and the
+//     parity test, the baseline and the inventory refuse such a cache
+//     (#1308).
 //   - A missing baseline file reads as an empty baseline, so a repository
 //     that forgot to commit it fails on every gap instead of passing.
 //   - TestAccSpecParity treats a cache without manifest.json as no cache and
@@ -84,6 +92,13 @@
 //     with a block are cached, a page without one, a 404 and an index that
 //     keeps failing are recorded, and a flaky page succeeds on retry.
 //     TestAccFetchErrors: no index, no cache directory, a cancelled context.
+//   - TestAccFetchTakesAFailedFamilyIndexFromItsParent,
+//     TestAccFetchRecordsEachFamilyNoSourceGave: against a chi model of
+//     docs.jfrog.com, a family whose index answers 404 or keeps failing is
+//     fetched from its parent section, and each way the fallback can fail
+//     leaves the family missing and named by CheckFamilies.
+//     TestUnitCheckFamiliesReadsTheManifest, TestUnitKnownPagesReadsTheInventory,
+//     TestUnitParentURLAndSections.
 //   - TestUnitLoadAndCompare, TestUnitLoadOursErrors,
 //     TestUnitAddMergesOperationsSharingAKey: both sides load through one
 //     normaliser, a broken block becomes a parse error while a spec that

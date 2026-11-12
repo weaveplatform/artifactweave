@@ -213,11 +213,24 @@ func (s DebianAPI) addDebianMemberIndexes(
 		if err != nil {
 			return fmt.Errorf("debian member %s Packages: %w", member.Key, err)
 		}
-		if int64(len(body)) != ref.Size ||
-			fmt.Sprintf("%x", sha256.Sum256(body)) != ref.SHA256 {
+		// A remote member caches its upstream's index as fetched, so one
+		// whose digest its Release does not give, or that does not decode,
+		// can reach the merge (RTFACT-27303, #1356). It is left out, as a
+		// member without the index is [I]: 7.x would have to check it to
+		// merge it, and it does not check it before caching. A local or
+		// federated member's index is the server's own, so either is a fault.
+		matches := int64(len(body)) == ref.Size &&
+			fmt.Sprintf("%x", sha256.Sum256(body)) == ref.SHA256
+		if !matches && member.Class == repo.Remote {
+			continue
+		}
+		if !matches {
 			return fmt.Errorf("debian member %s: %w", member.Key, errDebianReleaseDigestMismatch)
 		}
 		rows, err := debian.DecodePackagesIndex(body)
+		if err != nil && member.Class == repo.Remote {
+			continue
+		}
 		if err != nil {
 			return fmt.Errorf("debian member %s Packages: %w", member.Key, err)
 		}
@@ -354,9 +367,10 @@ func (s DebianAPI) serveVirtualDebianSources(
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	ctx := r.Context()
-	// A remote member's own GET of its index refuses a query or a matrix
-	// parameter (serveDebianIndex), so that member lacks the file here.
-	if member.Class == repo.Remote && (len(req.Props) != 0 || r.URL.RawQuery != "") {
+	// A remote member's own GET of its index refuses matrix parameters
+	// (serveDebianIndex), so that member lacks the file here. It takes a
+	// query, which it passes on as its own GET would (#1349).
+	if member.Class == repo.Remote && len(req.Props) != 0 {
 		return false
 	}
 	if member.Class != repo.Remote && len(req.Props) != 0 {
@@ -372,7 +386,8 @@ func (s DebianAPI) serveVirtualDebianSources(
 			return true
 		}
 	}
-	body, checkPermission, err := s.debianMemberBytes(ctx, st, member, req.Path, p, acc)
+	body, checkPermission, err := s.debianMemberRead(ctx, st, member, req.Path,
+		itemkit.RemoteResource(r, req.Path).Query, p, acc)
 	if errors.Is(err, kernel.ErrNotFound) || errors.Is(err, source.ErrDenied) {
 		return false
 	}
@@ -384,7 +399,7 @@ func (s DebianAPI) serveVirtualDebianSources(
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "Debian virtual index", errDebianIndexTooLarge))
 		return true
 	}
-	paths, err := debianIndexPaths(req.Path, body)
+	paths, err := remoteDebianIndexPaths(req.Path, body, member)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "Debian virtual index", err))
 		return true
@@ -494,6 +509,15 @@ func (s DebianAPI) debianMemberBytes(
 	ctx context.Context, st itemkit.Store, member repo.Config, path string,
 	p kernel.Principal, acc itemkit.Access,
 ) ([]byte, func(context.Context, string) error, error) {
+	return s.debianMemberRead(ctx, st, member, path, "", p, acc)
+}
+
+// debianMemberRead is debianMemberBytes for a request that carried query,
+// which a remote member passes to its upstream as its own GET would.
+func (s DebianAPI) debianMemberRead(
+	ctx context.Context, st itemkit.Store, member repo.Config, path, query string,
+	p kernel.Principal, acc itemkit.Access,
+) ([]byte, func(context.Context, string) error, error) {
 	if !acc.File(member, path, accessapi.ActionRead) {
 		return nil, nil, source.ErrDenied
 	}
@@ -509,6 +533,7 @@ func (s DebianAPI) debianMemberBytes(
 			Project: member.ProjectKey,
 			Resource: source.Resource{
 				Path: path, EscapedPath: httpkit.EscapePath(path), Method: http.MethodGet,
+				Query: query,
 			},
 		}
 		q, err := itemkit.DebianSourceRequest(q)

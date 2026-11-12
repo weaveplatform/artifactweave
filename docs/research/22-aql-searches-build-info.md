@@ -374,12 +374,13 @@ The cached definitions in `.specoracle/artifactory-searches-api/` match the spec
 ### 3.1 The API
 
 The Builds API pages carry OpenAPI 3.1 blocks. The spec oracle fetches them from the
-`jfrog-artifactory-builds-api` index (#162). docs.jfrog.com lists the same pages again under
-`jfrog-artifactory-build-api` with `-1` slugs, so only one index is fetched.
+`jfrog-artifactory-build-api` index (#162; renamed from `jfrog-artifactory-builds-api`, whose
+index answers 404 since 2026-11-12, #1308). The index lists each page once, under its plain
+slug (`uploadbuild`, `promotebuild`, ...).
 
 | Operation | Request | Documented response | What the CLI checks [S] |
 |---|---|---|---|
-| Build upload | `PUT /api/build[?buildRepo=&project=]`, JSON body | 204 with `X-Checksum-Sha256` in `uploadbuild-1`, 200 in its twin `uploadbuild`; [S] 6.20's `BuildResource.addBuild` answers 204 | 200, 201 or 204, and reads `X-Checksum-Sha256` from the response for `--detailed-summary` (`artifactory/services/buildinfo.go`, `PublishBuildInfo`) |
+| Build upload | `PUT /api/build[?buildRepo=&project=]`, JSON body | 200, 400, 401 and 403 in `uploadbuild` (2026-11-12; the `uploadbuild-1` twin that documented 204 with `X-Checksum-Sha256` is no longer listed); [S] 6.20's `BuildResource.addBuild` answers 204 | 200, 201 or 204, and reads `X-Checksum-Sha256` from the response for `--detailed-summary` (`artifactory/services/buildinfo.go`, `PublishBuildInfo`) |
 | All builds | `GET /api/build[?project=]` | 200 `{uri, builds[{uri:"/<name>", lastStarted}]}`; no 404 listed | not called |
 | Build runs | `GET /api/build/{name}[?project=]` | 200 `{uri, buildsNumbers[{uri:"/<number>", started}]}`; 404 | 200; 404 means not found |
 | Build info | `GET /api/build/{name}/{number}[?started=&diff=&project=]` | 200 `{uri, buildInfo}`; 404. `diff` names "an older build to which you want to compare contents", for the Builds Diff | 200; 404 means not found; never sends `diff` |

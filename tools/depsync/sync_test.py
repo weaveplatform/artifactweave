@@ -7,6 +7,10 @@ import unittest
 
 import sync
 
+# A download URL as the Dockerfiles and actions write it, up to the space,
+# quote or backslash that ends it.
+URL = re.compile(r"https?://[^\s\"'\\]+")
+
 
 class ReferenceTests(unittest.TestCase):
     def setUp(self):
@@ -72,6 +76,86 @@ class ReferenceTests(unittest.TestCase):
         self.assertNotIn(self.values["gradle"], content)
         self.assertIn("/opt/gradle/gradle-99.9.0/bin/gradle", content)
         self.assertIn("grep -F 'Gradle 99.9.0'", content)
+
+    # The second sources of #1321 and #1322. A pin names only the first URL,
+    # so a reference rule moves the second. A rule that wrote a fixed version
+    # would pass --check and leave the second URL on the old release, whose
+    # bytes the pinned digest then refuses: that shows only on the day the
+    # first source is down.
+    def assert_downloads_follow(self, path, pins, urls):
+        old = [self.values[name] for name in pins]
+        for name, value in pins.items():
+            self.set_pin(name, value)
+        sync.sync(self.root)
+        found = URL.findall(self.read(path))
+        for url in urls:
+            self.assertIn(url, found)
+        for version in old:
+            self.assertEqual([], [url for url in found if version in url], "a URL kept " + version)
+        self.assertEqual([], sync.sync(self.root, check=True))
+
+    def test_composer_second_sources_follow_both_pins(self):
+        self.assert_downloads_follow("test/acceptance/clients/composer.Dockerfile",
+                                     {"composer2": "2.99.1", "composer1": "1.99.2"}, [
+            "https://getcomposer.org/download/2.99.1/composer.phar",
+            "https://github.com/composer/composer/releases/download/2.99.1/composer.phar",
+            "https://getcomposer.org/download/1.99.2/composer.phar",
+            "https://github.com/composer/composer/releases/download/1.99.2/composer.phar",
+        ])
+
+    def test_ivy_second_source_follows_the_pin(self):
+        self.assert_downloads_follow("test/acceptance/clients/maven.Dockerfile", {"ivy": "2.99.0"}, [
+            "https://repo.maven.apache.org/maven2/org/apache/ivy/ivy/2.99.0/ivy-2.99.0.jar",
+            "https://maven-central.storage-download.googleapis.com/maven2/org/apache/ivy/ivy/2.99.0/ivy-2.99.0.jar",
+        ])
+
+    def test_hex_editor_second_source_follows_the_pin(self):
+        action = ".github/actions/ai-editor-assets/action.yml"
+        base = re.search(r"hexeditor/[0-9.]+/([0-9]+)", self.read(action))[1]
+        self.assert_downloads_follow(action, {"hexeditor": "1.99.0"}, [
+            "https://ms-vscode.gallerycdn.vsassets.io/extensions/ms-vscode/hexeditor/1.99.0/" + base,
+            "https://ms-vscode.gallery.vsassets.io/_apis/public/gallery/publisher/ms-vscode/extension/hexeditor/1.99.0/assetbyname",
+        ])
+
+    def test_eclipse_second_source_follows_the_pin(self):
+        # Both URLs are built from $drop and $archive, so those carry the
+        # version for both sources.
+        old = self.values["p2"]
+        self.set_pin("p2", "4.99")
+        sync.sync(self.root)
+        image = self.read("test/acceptance/clients/p2.Dockerfile")
+        self.assertIn('"https://archive.eclipse.org/$drop/$archive"', image)
+        self.assertIn('"https://ftp2.osuosl.org/pub/eclipse/$drop/$archive"', image)
+        parts = re.findall(r"(?:drop|archive)=(\S+?);? ", image)
+        self.assertEqual(3, len(parts), parts)
+        for part in parts:
+            self.assertIn("-4.99-", part)
+            self.assertNotIn(old, part)
+        self.assertEqual([], sync.sync(self.root, check=True))
+
+    def test_opkg_second_source_follows_the_pin(self):
+        self.assert_downloads_follow("test/acceptance/clients/opkg.Dockerfile", {"opkg": "0.99.0"}, [
+            "https://downloads.yoctoproject.org/releases/opkg/opkg-0.99.0.tar.gz",
+            "https://mirrors.kernel.org/yocto/opkg/opkg-0.99.0.tar.gz",
+        ])
+
+    def test_vagrant_second_source_follows_the_pin(self):
+        self.assert_downloads_follow("test/acceptance/clients/vagrant.Dockerfile", {"vagrant": "2.99.0"}, [
+            "https://releases.hashicorp.com/vagrant/2.99.0/vagrant_2.99.0-1_amd64.deb",
+            "https://apt.releases.hashicorp.com/pool/amd64/main/vagrant_2.99.0-1_amd64.deb",
+        ])
+
+    def test_lua_second_source_follows_the_pin(self):
+        self.assert_downloads_follow("test/acceptance/clients/luarocks.Dockerfile", {"lua": "5.99.0"}, [
+            "https://www.lua.org/ftp/lua-5.99.0.tar.gz",
+            "https://www.tecgraf.puc-rio.br/lua/ftp/lua-5.99.0.tar.gz",
+        ])
+
+    def test_luarocks_second_source_follows_the_pin(self):
+        self.assert_downloads_follow("test/acceptance/clients/luarocks.Dockerfile", {"luarocks": "3.99.0"}, [
+            "https://luarocks.org/releases/luarocks-3.99.0.tar.gz",
+            "https://luarocks.github.io/luarocks/releases/luarocks-3.99.0.tar.gz",
+        ])
 
     def test_workflow_versions_update_current_inventory_but_not_history(self):
         self.set_pin("hf-hub", "99.4.0")

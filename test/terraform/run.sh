@@ -67,6 +67,12 @@ platform="$(go env GOOS)_$(go env GOARCH)"
 
 # mirror_provider fetches one provider's zip into the packed mirror layout,
 # <mirror>/<host>/<namespace>/<type>/<zip>, checking its pinned SHA-256.
+#
+# The zip has one source (#1341). JFrog publishes its providers only as
+# GitHub release assets, and the download APIs of registry.terraform.io and
+# registry.opentofu.org both point at that same asset, so no second host
+# serves the bytes. When GitHub is down the job fails, which the maintainer
+# accepts (#1322).
 mirror_provider() {
 	local name=$1 version=$2 sum dir zip
 	sum=$(provider_sha256 "$name" "$platform")

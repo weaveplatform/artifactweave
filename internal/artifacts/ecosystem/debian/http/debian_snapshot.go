@@ -337,6 +337,16 @@ func (s DebianAPI) debianSnapshotFiles(
 		}
 		if debian.PackagesIndexPath(ref.Path) || debian.SourcesIndexPath(ref.Path) {
 			paths, err := debianIndexPaths(ref.Path, body)
+			if err != nil && c.Class == repo.Remote {
+				// A remote caches an index it cannot decode as fetched
+				// (#1356), but a snapshot copies only indexes whose
+				// packages it can check, and it cannot leave one out that
+				// the copied Release lists. It is refused with the 502 the
+				// remote's read of such an index gave before [I].
+				return nil, fmt.Errorf("snapshot index %s: %w", ref.Path, &source.HTTPError{
+					Status: http.StatusBadGateway, Kind: source.FailureKindIntegrity,
+				})
+			}
 			if err != nil {
 				return nil, err
 			}

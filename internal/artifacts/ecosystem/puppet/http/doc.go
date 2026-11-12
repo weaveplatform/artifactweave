@@ -59,8 +59,11 @@
 //     7.x writes first in its order (RTFACT-19130, #1325) [I]; archives.
 //     One module's release list leaves out the top-level record fields
 //     exclude_fields names, separated by commas or spaces, and its links
-//     keep sort_by and exclude_fields after the module (#1327) [I]. JSON
-//     answers write "<", ">" and "&" as they are, as 7.x does, and every
+//     keep sort_by and exclude_fields after the module (#1327) [I]. One
+//     module's release list and the module search take one module_groups,
+//     which a Puppet Enterprise client sends on every request, and answer
+//     as they do without it: no value narrows them and their links leave it
+//     out (#1343) [I]. JSON answers write "<", ">" and "&" as they are, as 7.x does, and every
 //     one is marked private, no-store.
 //
 // # Invariants
@@ -105,7 +108,8 @@
 //     and read under the release pages' authority, and answers 404, and
 //     an empty search, when the upstream answers 404 for it (#1326) [I].
 //   - A remote builds each Forge query itself (module, limit, offset,
-//     sort_by and exclude_fields), never forwards a client's, never
+//     sort_by and exclude_fields), never forwards a client's, module_groups
+//     included, never
 //     follows an upstream next link, and reads at most 16 MiB a page. It
 //     asks for 20 releases a page, the Forge's own default (RTFACT-14274),
 //     without the fields no record answers, REFERENCE.md's text among
@@ -122,6 +126,16 @@
 //     once its size, SHA-256, identity and manifest match the release that
 //     advertised it. A cache hit rechecks the source's authority and the
 //     caller's read permission.
+//   - A remote answers a release its upstream's release pages leave out,
+//     once they have been read, from the upstream's record of that
+//     release, v3/releases/<slug>, as RTFACT-19130 shows a 6.8.6 remote
+//     answering a Puppet Enterprise module's release (#1344) [I]. The
+//     record is read with the release pages' authority and policy path,
+//     without the fields no record answers, and validated as a page's
+//     release is; the upstream's 404 for it, or a caller the source
+//     denies, answers "Puppet release not found" as before. A listed
+//     release never reads it, and the lists, the module record and the
+//     archive route still answer from the pages alone.
 //   - A virtual repository resolves its members in order, leaving out a
 //     blacked-out member and, outside the search, a remote whose patterns
 //     reject its release pages. A version comes from the first member that holds it and whose
@@ -159,8 +173,10 @@
 //     https://github.com/weaveplatform/artifactweave/issues/1288,
 //     https://github.com/weaveplatform/artifactweave/issues/1300,
 //     https://github.com/weaveplatform/artifactweave/issues/1325,
-//     https://github.com/weaveplatform/artifactweave/issues/1326 and
-//     https://github.com/weaveplatform/artifactweave/issues/1327
+//     https://github.com/weaveplatform/artifactweave/issues/1326,
+//     https://github.com/weaveplatform/artifactweave/issues/1327,
+//     https://github.com/weaveplatform/artifactweave/issues/1343 and
+//     https://github.com/weaveplatform/artifactweave/issues/1344
 //
 // # Status
 //
@@ -188,6 +204,14 @@
 //     record relayed from the upstream's, the upstream's 404 for it, the
 //     queries a remote asks its upstream, and a module record's failures.
 //   - remote_paging_test.go: the page sizes a remote asks for and accepts.
+//   - remote_release_test.go: a remote's release that its release pages
+//     leave out answered from the upstream's record, the query and
+//     authority of that read, the upstream's 404 and a denied caller, and
+//     the record's failures.
+//   - groups_test.go: module_groups on one module's release list and the
+//     module search answering as without it on every repository class, a
+//     remote's upstream queries without it, and the refusals it leaves
+//     unchanged.
 //   - policy_test.go: the blackout on every hosted route and the module
 //     search's empty answer under it, a release whose archive the patterns
 //     reject kept listed, virtual members and patterns that refuse only an

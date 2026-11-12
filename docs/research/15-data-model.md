@@ -55,7 +55,7 @@ Column conventions in the tables: **Req** = required on create; **Own** = server
 
 ## 2. Wire entities
 
-### 2.1 Repository (`artifactory-repositories-api`)
+### 2.1 Repository (`artifactory-jfrog-artifactory-repositories-api`)
 
 One entity with four classes (`rclass`), serialised as `RepositoryConfiguration` on
 create (`PUT /api/repositories/{repoKey}`), update (`POST`), read (`GET`, `GET /api/v2/...`),

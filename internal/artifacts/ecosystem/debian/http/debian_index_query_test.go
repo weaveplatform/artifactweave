@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -144,16 +145,17 @@ func TestAccDebianVirtualPassesOverAMemberTheMatrixDoesNotMatch(t *testing.T) {
 
 // TestAccDebianVirtualSourcesWithAQueryOrMatrixParameters: a virtual
 // repository's Sources index comes from the first member that serves it.
-// A remote member's own GET of its index refuses a query or a matrix
-// parameter, so the virtual passes over it without asking its upstream,
-// and a local member's index is matched by the properties it carries.
+// A remote member serves its index for a query as it does without one
+// (#1349), so it still answers first. It refuses a matrix parameter, so the
+// virtual passes over it without asking its upstream, and a local member's
+// index is matched by the properties it carries.
 func TestAccDebianVirtualSourcesWithAQueryOrMatrixParameters(t *testing.T) {
 	for _, tc := range []struct {
 		name, suffix string
 		want         []byte
 	}{
 		{"no parameter", "", sourcesIndex("2.0-1")},
-		{"query", "?skipUpdateStats=true", sourcesIndex("1.0-1")},
+		{"query", "?skipUpdateStats=true", sourcesIndex("2.0-1")},
 		{"matrix parameter it matches", ";x=1", sourcesIndex("1.0-1")},
 		{"matrix parameter it does not match", ";x=2", nil},
 	} {
@@ -176,8 +178,9 @@ func TestAccDebianVirtualSourcesWithAQueryOrMatrixParameters(t *testing.T) {
 			w.withProperties(w.put("deb-local", debSources, false, sourcesIndex("1.0-1")),
 				model.Properties{"x": {"1"}})
 			rec := w.get("deb-virtual", debSources+tc.suffix, "admin")
-			if asked != (tc.suffix == "") {
-				t.Errorf("upstream asked %v, want %v", asked, tc.suffix == "")
+			remote := !strings.HasPrefix(tc.suffix, ";")
+			if asked != remote {
+				t.Errorf("upstream asked %v, want %v", asked, remote)
 			}
 			if tc.want == nil {
 				wantError(t, rec, http.StatusNotFound, "Could not find resource")

@@ -35,6 +35,11 @@ const (
 	PropArchitecture = "deb.architecture"
 	PropName         = "deb.name"
 	PropVersion      = "deb.version"
+	// PropIndexStatus is the property JFrog's Debian guide names for why a
+	// package failed validation and was left out of the index ("Use Debian
+	// Metadata Validation"). It holds ReadBinary's reason, whose wording is
+	// artifactweave's own: no 7.x source gives JFrog's [I].
+	PropIndexStatus = "deb.index.status"
 )
 
 // IndexedBinary binds a validated control record to the exact stored item

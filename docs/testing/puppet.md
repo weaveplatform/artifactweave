@@ -70,6 +70,20 @@ fields it names are left out, and a name no record has leaves nothing out. Its
 links then keep `sort_by` and `exclude_fields` after `module`, so every page
 answers as the first did. Both are [I] (#1327).
 
+A Puppet Enterprise client sends `module_groups=base%20pe_only` on every
+release list and search: the Puppet client adds its internal `module_groups`
+setting to both when it is set, and Puppet Enterprise sets it to
+`base+pe_only` (puppetlabs/puppet 23a8b7c241, PUP-1890).
+[PUP-8650](https://puppet.atlassian.net/browse/PUP-8650) shows a Puppet
+Enterprise server's `puppet module search` sending it to an Artifactory Puppet
+repository. One module's release list and the module search take one
+`module_groups` and answer as they do without it: no value narrows them, their
+links leave it out, and a remote does not pass it to its upstream (#1343). The
+Forge narrows its own lists to the groups named, but no source shows 7.x doing
+so; that 7.x ignores it is [I] (#216). A repeated `module_groups`, and one on a
+whole-repository list or a single release or module, is refused as any other
+unsupported query is.
+
 Release and module records carry the fields of JFrog's REST API reference for
 the four Forge operations (archived jfrog.com/help pages) with the ones 7.x's
 answers add: a release's `slug`, `module` (with its `owner` and
@@ -99,6 +113,20 @@ search finds nothing, while the release list still lists the module's releases
 (#1326) [I]. RTFACT-19130 reports a 6.8.6 remote answering 404 for a module the
 Forge served; that is the fault the report names, not an answer to keep.
 
+The same report shows that remote answering
+`v3/releases/puppetlabs-sqlserver-2.5.0`, a release of a Puppet Enterprise
+module that the Forge's lists leave out unless `module_groups` names its group.
+A remote therefore answers `v3/releases/<slug>` for a release its release pages
+leave out from the upstream's own record of that release, `v3/releases/<slug>`
+asked with the same `exclude_fields` as the pages (#1344) [I]. The record is
+read only after the pages lack the release, with their authority: Read on the
+module folder and the download policy at `.puppet/<m>/releases.json`. It is
+validated as a page's release is, and the upstream's 404 for it answers
+"Puppet release not found" as before. The release list, the search, the module
+record and the archive route still answer from the pages alone. Where 7.x
+caches the record, and whether its remote asks for it in this order, is [I]
+(#216).
+
 `GET .../v3/releases` and `GET .../v3/modules` with no query list every release
 and module a local or federated repository hosts that the caller may read, as
 7.x's [Get Puppet Releases](https://docs.jfrog.com/artifactory/reference/getpuppetreleases)
@@ -118,8 +146,9 @@ Delete and trash restore use the normal item APIs and update the native view.
 `POST /artifactory/api/puppet/{repo}/reindex` is the Artifactweave maintenance
 endpoint for rebuilding hosted module indexes from archives. It requires Manage
 and runs the existing persistent reindex worker. Remote metadata refresh uses
-`POST /artifactory/api/zap/{repo}-cache/v3/releases` (and `.../v3/modules` for
-the module records); the ordinary source policy
+`POST /artifactory/api/zap/{repo}-cache/v3/releases` (which also holds the
+release records a remote reads, under `v3/releases/<slug>`) and
+`.../v3/modules` for the module records; the ordinary source policy
 controls TTL, offline access, and fallback to complete cached metadata during a
 transient upstream outage. A cold upstream failure cannot create a release.
 
