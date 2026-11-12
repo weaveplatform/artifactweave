@@ -11,8 +11,8 @@ defaults, persistence, failure modes and administrative recovery contract.
 
 [operations.json](operations.json) joins **all seven bundled specifications** with
 the tested implementation map and every binding in the production chi router.
-It currently contains 1081 distinct method/path bindings: 642 specified operations
-and 439 additional handwritten aliases or dispatch bindings. A wildcard binding
+It currently contains 1084 distinct method/path bindings: 643 specified operations
+and 441 additional handwritten aliases or dispatch bindings. A wildcard binding
 represents a protocol dispatcher, not a claim that every URL matching it works.
 Some aliases describe the same operation through different route patterns.
 
@@ -20,7 +20,7 @@ Each entry includes the operation ID, served contract, actual implementation
 state, handler, direct source calls where a generated operation has a concrete
 method, effect/retry classification, incoming cost policy, declared pagination
 controls, response collection locations, persistence review family and evidence.
-The 383 generated stub operations are explicitly marked 501 with no business
+The 365 generated stub operations are explicitly marked 501 with no business
 query or effect. Their schemas do not establish implementation. Partial entries
 retain unsupported modes and native dispatch limitations; neither repository CRUD
 nor a mounted wildcard proves full native support.
@@ -30,7 +30,11 @@ an implementation change, refresh the retained evidence with `make api-ledger`.
 This refresh is not a substitute for reviewing semantics: source method presence
 does not establish idempotency or bounded execution. The status and principal
 matrices separately verify served behavior; `TestAccUnimplementedOperationsAnswer501`
-proves the stub classification against the router.
+proves the stub classification against the router. It calls every operation the ledger
+records as a stub as an administrator of a seeded server, so a served operation left out
+of the implemented table answers its own status and fails it, where a router without a
+store would answer 501 for it too. The ledger test fails when a generated operation it
+records as served carries `x-tier: stub` in its spec.
 
 ## Effects and retry decisions
 
