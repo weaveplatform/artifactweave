@@ -67,12 +67,13 @@ func buildIndex(ctx context.Context, env format.Env, c repo.Config) error {
 		if err != nil {
 			return err
 		}
-		compressed, err := GzipIndex(index)
+		forms, err := IndexForms(index, c.OptionalIndexCompressionFormats)
 		if err != nil {
 			return err
 		}
 		base := folder.component + "/binary-" + folder.architecture + "/Packages"
-		for _, artifact := range []ReleaseEntry{{Path: base, Body: index}, {Path: base + ".gz", Body: compressed}} {
+		for _, form := range forms {
+			artifact := ReleaseEntry{Path: base + form.Suffix, Body: form.Body}
 			p := "dists/" + folder.distribution + "/" + artifact.Path
 			generated[p] = artifact.Body
 			byDistribution[folder.distribution] = append(
@@ -95,12 +96,17 @@ func buildIndex(ctx context.Context, env format.Env, c repo.Config) error {
 		if err != nil {
 			return err
 		}
-		compressed, err := GzipIndex(index)
+		// The JFrog guide's optionalIndexCompressionFormats names "the index
+		// file formats" without saying whether a Sources index takes them,
+		// and no 7.x source does, so Sources keeps its plain and gzip forms
+		// [I] while each Packages index takes the setting.
+		forms, err := IndexForms(index, nil)
 		if err != nil {
 			return err
 		}
 		base := folder.component + "/source/Sources"
-		for _, artifact := range []ReleaseEntry{{Path: base, Body: index}, {Path: base + ".gz", Body: compressed}} {
+		for _, form := range forms {
+			artifact := ReleaseEntry{Path: base + form.Suffix, Body: form.Body}
 			generated["dists/"+folder.distribution+"/"+artifact.Path] = artifact.Body
 			byDistribution[folder.distribution] = append(
 				byDistribution[folder.distribution],
