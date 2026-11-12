@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -98,9 +97,13 @@ func Protocol(o Options) pkgroute.Protocol {
 }
 
 type release struct {
-	meta   puppetfmt.Metadata
-	item   model.Item
-	member *http.Request
+	meta puppetfmt.Metadata
+	item model.Item
+	// details are the record's fields that the archive's metadata does not
+	// give: a hosted release's from its archive item, a remote's as its
+	// upstream gave them.
+	details details
+	member  *http.Request
 	// refused marks a virtual repository's release whose archive every
 	// member holding it refuses: it stays listed, and the archive route
 	// does not serve it.
@@ -112,37 +115,6 @@ type release struct {
 	// policy too, before the archive is fetched.
 	checkPermission func(context.Context, string) error
 	checkRead       func(context.Context, string) error
-}
-
-type versionRecord struct {
-	URI        string             `json:"uri"`
-	Slug       string             `json:"slug"`
-	Version    string             `json:"version"`
-	FileURI    string             `json:"file_uri"`
-	FileSHA256 string             `json:"file_sha256"`
-	FileSize   int64              `json:"file_size"`
-	Metadata   puppetfmt.Manifest `json:"metadata"`
-	Tags       []string           `json:"tags"`
-}
-type pagination struct {
-	Limit  int     `json:"limit"`
-	Offset int     `json:"offset"`
-	Total  int     `json:"total"`
-	Next   *string `json:"next"`
-}
-
-func record(meta puppetfmt.Metadata) versionRecord {
-	slug := meta.Name + "-" + meta.Version
-	return versionRecord{
-		URI:        "/v3/releases/" + slug,
-		Slug:       slug,
-		Version:    meta.Version,
-		FileURI:    "/v3/files/" + slug + ".tar.gz",
-		FileSHA256: meta.SHA256,
-		FileSize:   meta.Size,
-		Metadata:   meta.Manifest,
-		Tags:       []string{},
-	}
 }
 
 func splitSlug(slug string) (string, string, bool) {
@@ -181,19 +153,16 @@ func (h handler) releases(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(400, "invalid Puppet module"))
 		return
 	}
-	limit, offset := 1000, 0
-	if query.Has("limit") {
-		limit, err = strconv.Atoi(query.Get("limit"))
+	// The list pages as the whole-repository lists do: 20 a page unless
+	// limit asks for up to 100 (parsePage), as RTFACT-14557 quotes 7.x
+	// answering a release list and as the Forge pages. An offset beyond the
+	// most releases a module may list keeps its 400.
+	limit, offset, err := parsePage(query)
+	if err == nil && offset > maxVersions {
+		err = apierror.New(http.StatusBadRequest, "invalid Puppet offset")
 	}
-	if err != nil || limit < 1 || limit > 1000 {
-		h.k.Error(w, r, apierror.New(400, "invalid Puppet limit"))
-		return
-	}
-	if query.Has("offset") {
-		offset, err = strconv.Atoi(query.Get("offset"))
-	}
-	if err != nil || offset < 0 || offset > maxVersions {
-		h.k.Error(w, r, apierror.New(400, "invalid Puppet offset"))
+	if err != nil {
+		h.k.Error(w, r, err)
 		return
 	}
 	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
@@ -208,24 +177,15 @@ func (h handler) releases(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	out := []versionRecord{}
-	end := min(offset+limit, len(releases))
-	for i := offset; i < end; i++ {
-		out = append(out, record(releases[i].meta))
+	start, end := window(offset, limit, len(releases))
+	out := make([]releaseRecord, 0, end-start)
+	for _, rel := range releases[start:end] {
+		out = append(out, record(rel))
 	}
-	page := pagination{Limit: limit, Offset: offset, Total: len(releases)}
-	if end < len(releases) {
-		next := "/v3/releases?module=" + name + "&limit=" + strconv.Itoa(
-			limit,
-		) + "&offset=" + strconv.Itoa(
-			end,
-		)
-		page.Next = &next
-	}
-	writeJSON(w, r, 200, struct {
-		Results    []versionRecord `json:"results"`
-		Pagination pagination      `json:"pagination"`
-	}{out, page})
+	writeJSON(w, r, http.StatusOK, struct {
+		Pagination listPage        `json:"pagination"`
+		Results    []releaseRecord `json:"results"`
+	}{newListPage("/v3/releases", "module="+name, limit, offset, len(releases)), out})
 }
 
 func (h handler) release(w http.ResponseWriter, r *http.Request) {
@@ -248,34 +208,11 @@ func (h handler) release(w http.ResponseWriter, r *http.Request) {
 				h.k.Error(w, r, err)
 				return
 			}
-			writeJSON(w, r, 200, record(rel.meta))
+			writeJSON(w, r, 200, record(rel))
 			return
 		}
 	}
 	h.k.Error(w, r, apierror.New(404, "Puppet release not found"))
-}
-
-func moduleRecord(releases []release) map[string]any {
-	name := releases[0].meta.Name
-	owner, module, _ := strings.Cut(name, "-")
-	versions := make([]map[string]string, 0, len(releases))
-	for _, rel := range releases {
-		versions = append(
-			versions,
-			map[string]string{
-				"version": rel.meta.Version,
-				"uri":     "/v3/releases/" + name + "-" + rel.meta.Version,
-			},
-		)
-	}
-	return map[string]any{
-		"name":            module,
-		"slug":            name,
-		"uri":             "/v3/modules/" + name,
-		"owner":           map[string]string{"username": owner},
-		"current_release": record(releases[0].meta),
-		"releases":        versions,
-	}
 }
 
 func (h handler) module(w http.ResponseWriter, r *http.Request) {
@@ -300,18 +237,29 @@ func (h handler) module(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	writeJSON(w, r, 200, moduleRecord(releases))
+	writeJSON(w, r, 200, newModuleRecord(releases))
 }
 
-// Search is deliberately exact-name and bounded; it does not proxy arbitrary queries.
+// modules answers v3/modules: the whole-repository list when the query
+// names nothing but a page, else the module search. The search is
+// deliberately exact-name and bounded, and does not proxy arbitrary
+// queries: it answers the one module named, paged as the lists are. 7.x
+// pages it too, since its own virtual repository asks a member's upstream
+// for "v3/modules?query=...&limit=100" (RTFACT-13687), and the Forge pages
+// its search the same way, keeping query in each link.
 func (h handler) modules(w http.ResponseWriter, r *http.Request) {
 	q, err := url.ParseQuery(r.URL.RawQuery)
 	if err == nil && pagingOnly(q) {
 		h.listModules(w, r, q)
 		return
 	}
-	if err != nil || len(q) != 1 || len(q["query"]) != 1 || !puppetfmt.ValidName(q.Get("query")) {
+	if err != nil || !searchQuery(q) {
 		h.k.Error(w, r, apierror.New(400, "search requires an exact Puppet module name"))
+		return
+	}
+	limit, offset, err := parsePage(q)
+	if err != nil {
+		h.k.Error(w, r, err)
 		return
 	}
 	name := q.Get("query")
@@ -327,16 +275,26 @@ func (h handler) modules(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	out := []map[string]any{}
+	found := []moduleRecord{}
 	if len(releases) > 0 {
-		out = append(out, moduleRecord(releases))
+		found = append(found, newModuleRecord(releases))
 	}
-	writeJSON(
-		w,
-		r,
-		200,
-		map[string]any{"results": out, "pagination": pagination{Limit: 1000, Total: len(out)}},
-	)
+	start, end := window(offset, limit, len(found))
+	writeJSON(w, r, http.StatusOK, struct {
+		Pagination listPage       `json:"pagination"`
+		Results    []moduleRecord `json:"results"`
+	}{newListPage("/v3/modules", "query="+name, limit, offset, len(found)), found[start:end]})
+}
+
+// searchQuery reports whether q is a module search: one valid module name
+// as query, and at most one limit and one offset.
+func searchQuery(q url.Values) bool {
+	for key, values := range q {
+		if len(values) != 1 || key != "query" && key != "limit" && key != "offset" {
+			return false
+		}
+	}
+	return puppetfmt.ValidName(q.Get("query"))
 }
 
 func (h handler) archive(w http.ResponseWriter, r *http.Request) {
@@ -513,7 +471,11 @@ func (h handler) stored(r *http.Request, name string, v model.PackageVersion) (r
 	if err != nil || item.Folder || meta.SHA256 == "" || meta.SHA256 != item.Actual.SHA256 {
 		return release{}, apierror.New(http.StatusBadGateway, "invalid stored Puppet archive")
 	}
-	return release{meta: meta, item: item}, nil
+	stats, err := h.k.DB().Items().Stats(r.Context(), item.ID)
+	if err != nil {
+		return release{}, fmt.Errorf("puppet: statistics of %s/%s: %w", key, path, err)
+	}
+	return release{meta: meta, item: item, details: hostedDetails(item, stats)}, nil
 }
 
 func (h handler) virtual(r *http.Request, name string, u use) ([]release, error) {
@@ -592,11 +554,18 @@ func newestFirst(a, b string) int {
 	return strings.Compare(a, b)
 }
 
+// writeJSON answers doc as JSON, writing "&", "<" and ">" as they are
+// rather than as &, < and >, as 7.x writes them: in its
+// links (RTFACT-14557) and in a release's dependency requirements, such as
+// ">= 4.13.1 < 6.0.0" (RTFACT-19130). The JSON is the same either way; the
+// bytes are 7.x's.
 func writeJSON(w http.ResponseWriter, r *http.Request, status int, doc any) {
 	w.Header().Set("Content-Type", mediaType)
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.WriteHeader(status)
 	if r.Method != http.MethodHead {
-		_ = json.NewEncoder(w).Encode(doc)
+		enc := json.NewEncoder(w)
+		enc.SetEscapeHTML(false)
+		_ = enc.Encode(doc)
 	}
 }

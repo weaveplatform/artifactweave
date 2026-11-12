@@ -46,8 +46,10 @@
 //   - The puppet.name, puppet.version and puppet.sha256 item properties
 //     (PropName, PropVersion, PropSHA256) on each archive.
 //   - The rules the protocol shares: Manifest, Dependency, Metadata,
-//     ValidateManifest, ReadArchive, ValidName, ValidVersion, Path,
-//     ParsePath, ErrArchive and the archive bounds.
+//     ValidateManifest, ReadArchive, ManifestLinks (a manifest's
+//     project_page and issues_url, which a module record answers),
+//     ValidName, ValidVersion, Path, ParsePath, ErrArchive and the archive
+//     bounds.
 //
 // # Invariants
 //
@@ -97,6 +99,8 @@
 //   - archive_test.go: whole-archive validation, names, paths and version
 //     requirements, ambiguous manifests, and folders, padding and oversized
 //     manifests.
+//   - links_test.go: the project_page and issues_url a manifest gives,
+//     read only as strings under exactly those keys.
 //   - handler_test.go: admission against the archive's identity and the
 //     repository class, and stale or invalid content at deploy and reindex.
 //   - contract_test.go: the format contract suite (formattest), which

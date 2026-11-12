@@ -56,16 +56,42 @@ type Dependency struct {
 
 // Metadata is what the package index keeps for a module version, as JSON,
 // and what the protocol answers from: the module's name and version, its
-// validated manifest, and the stored archive's item path, SHA-256 and
-// size. ReadArchive fills all but the path and SHA-256, which Deployed and
-// Reindex take from the stored item.
+// validated manifest, the manifest's links, and the stored archive's item
+// path, SHA-256 and size. ReadArchive fills all but the path and SHA-256,
+// which Deployed and Reindex take from the stored item.
 type Metadata struct {
 	Name     string   `json:"name"`
 	Version  string   `json:"version"`
 	Manifest Manifest `json:"manifest"`
-	Path     string   `json:"path"`
-	SHA256   string   `json:"sha256"`
-	Size     int64    `json:"size"`
+	// ProjectPage and IssuesURL are metadata.json's project_page and
+	// issues_url (ManifestLinks), which a module record answers as its
+	// homepage_url and issues_url. They stay out of Manifest so that the
+	// release's metadata answers as it did.
+	ProjectPage string `json:"project_page,omitempty"`
+	IssuesURL   string `json:"issues_url,omitempty"`
+	Path        string `json:"path"`
+	SHA256      string `json:"sha256"`
+	Size        int64  `json:"size"`
+}
+
+// ManifestLinks returns a metadata.json's project_page and issues_url, each
+// "" unless the manifest gives it as a JSON string under exactly that key.
+// The Forge answers a module's homepage_url and issues_url from them; a
+// link of another type is left out rather than refusing the archive, since
+// the Puppet client reads neither.
+func ManifestLinks(manifest []byte) (string, string) {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(manifest, &fields) != nil {
+		return "", ""
+	}
+	text := func(key string) string {
+		var s string
+		if json.Unmarshal(fields[key], &s) != nil {
+			return ""
+		}
+		return s
+	}
+	return text("project_page"), text("issues_url")
 }
 
 // ValidateManifest rejects invalid identities and dependency constraints before
@@ -200,7 +226,11 @@ func ReadArchive(r io.Reader, size int64) (Metadata, error) {
 	if root != m.Name+"-"+m.Version {
 		return Metadata{}, ErrArchive
 	}
-	return Metadata{Name: m.Name, Version: m.Version, Manifest: m, Size: size}, nil
+	page, issues := ManifestLinks(manifest)
+	return Metadata{
+		Name: m.Name, Version: m.Version, Manifest: m,
+		ProjectPage: page, IssuesURL: issues, Size: size,
+	}, nil
 }
 
 func readTarManifest(plain []byte) ([]byte, string, error) {

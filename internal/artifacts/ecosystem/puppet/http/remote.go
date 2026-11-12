@@ -37,15 +37,93 @@ const (
 )
 
 type upstreamVersion struct {
-	Version    string             `json:"version"`
-	FileURI    string             `json:"file_uri"`
-	FileSHA256 string             `json:"file_sha256"`
-	FileSize   int64              `json:"file_size"`
-	Metadata   puppetfmt.Manifest `json:"metadata"`
+	Version    string           `json:"version"`
+	FileURI    string           `json:"file_uri"`
+	FileSHA256 string           `json:"file_sha256"`
+	FileSize   int64            `json:"file_size"`
+	Metadata   upstreamManifest `json:"metadata"`
+	// The rest are relayed to the remote's records as the upstream gave
+	// them, as 7.x relays the Forge's (RTFACT-19130 quotes a 6.8 remote's
+	// release record carrying the Forge's module owner, gravatar_id and
+	// deprecated_at). Each is read raw, so a value of another type leaves
+	// that field as a hosted release has it rather than refusing the page.
+	Module    json.RawMessage `json:"module"`
+	Supported json.RawMessage `json:"supported"`
+	FileMD5   json.RawMessage `json:"file_md5"`
+	Downloads json.RawMessage `json:"downloads"`
+	Readme    json.RawMessage `json:"readme"`
+	Changelog json.RawMessage `json:"changelog"`
+	License   json.RawMessage `json:"license"`
+	CreatedAt json.RawMessage `json:"created_at"`
+	UpdatedAt json.RawMessage `json:"updated_at"`
+	DeletedAt json.RawMessage `json:"deleted_at"`
 }
+
+// upstreamManifest is an upstream release's metadata: the validated
+// manifest, and the project_page and issues_url a module record answers.
+type upstreamManifest struct {
+	puppetfmt.Manifest
+	projectPage, issuesURL string
+}
+
+// UnmarshalJSON decodes the manifest as an archive's is decoded, and reads
+// its links beside it.
+func (m *upstreamManifest) UnmarshalJSON(data []byte) error {
+	if err := json.Unmarshal(data, &m.Manifest); err != nil {
+		return fmt.Errorf("puppet: upstream manifest: %w", err)
+	}
+	m.projectPage, m.issuesURL = puppetfmt.ManifestLinks(data)
+	return nil
+}
+
+type upstreamPagination struct {
+	Limit  int     `json:"limit"`
+	Offset int     `json:"offset"`
+	Total  int     `json:"total"`
+	Next   *string `json:"next"`
+}
+
 type upstreamDocument struct {
-	Results    []upstreamVersion `json:"results"`
-	Pagination *pagination       `json:"pagination"`
+	Results    []upstreamVersion   `json:"results"`
+	Pagination *upstreamPagination `json:"pagination"`
+}
+
+// relayed returns the details of upstream release v.
+func (v upstreamVersion) relayed() details {
+	d := details{
+		readme: rawText(v.Readme), changelog: rawText(v.Changelog), license: rawText(v.License),
+		created: rawText(v.CreatedAt), updated: rawText(v.UpdatedAt), deleted: rawText(v.DeletedAt),
+	}
+	_ = json.Unmarshal(v.Supported, &d.supported)
+	// A count is relayed only as a whole number that is not negative.
+	var downloads int64
+	if json.Unmarshal(v.Downloads, &downloads) == nil && downloads > 0 {
+		d.downloads = downloads
+	}
+	if md5 := rawText(v.FileMD5); md5 != nil && validHex(*md5, 32) {
+		d.md5 = md5
+	}
+	var module struct {
+		DeprecatedAt json.RawMessage `json:"deprecated_at"`
+		Owner        struct {
+			GravatarID json.RawMessage `json:"gravatar_id"`
+		} `json:"owner"`
+	}
+	if json.Unmarshal(v.Module, &module) == nil {
+		d.deprecatedAt = rawText(module.DeprecatedAt)
+		d.gravatarID = rawText(module.Owner.GravatarID)
+	}
+	return d
+}
+
+// rawText returns raw's string when raw is a JSON string, and null for
+// anything else, null included.
+func rawText(raw json.RawMessage) *string {
+	var s *string
+	if json.Unmarshal(raw, &s) != nil {
+		return nil
+	}
+	return s
 }
 
 func invalidUpstream() error {
@@ -69,7 +147,7 @@ func parseVersions(data []byte, name, responseBase string, offset int) ([]releas
 	out := make([]release, 0, len(doc.Results))
 	seen := map[string]bool{}
 	for _, v := range doc.Results {
-		if !puppetfmt.ValidateManifest(v.Metadata) || v.Metadata.Name != name ||
+		if !puppetfmt.ValidateManifest(v.Metadata.Manifest) || v.Metadata.Name != name ||
 			v.Version != v.Metadata.Version ||
 			seen[v.Version] ||
 			!validSHA256(v.FileSHA256) ||
@@ -90,13 +168,16 @@ func parseVersions(data []byte, name, responseBase string, offset int) ([]releas
 			out,
 			release{
 				meta: puppetfmt.Metadata{
-					Name:     name,
-					Version:  v.Version,
-					Path:     puppetfmt.Path(name, v.Version),
-					SHA256:   v.FileSHA256,
-					Size:     v.FileSize,
-					Manifest: v.Metadata,
+					Name:        name,
+					Version:     v.Version,
+					Path:        puppetfmt.Path(name, v.Version),
+					SHA256:      v.FileSHA256,
+					Size:        v.FileSize,
+					Manifest:    v.Metadata.Manifest,
+					ProjectPage: v.Metadata.projectPage,
+					IssuesURL:   v.Metadata.issuesURL,
 				},
+				details:   v.relayed(),
 				remoteURL: u.String(),
 			},
 		)
@@ -119,8 +200,11 @@ func parseVersions(data []byte, name, responseBase string, offset int) ([]releas
 	return out, more, nil
 }
 
-func validSHA256(value string) bool {
-	if len(value) != 64 || strings.ToLower(value) != value {
+func validSHA256(value string) bool { return validHex(value, 64) }
+
+// validHex reports whether value is a lowercase hex digest of n digits.
+func validHex(value string, n int) bool {
+	if len(value) != n || strings.ToLower(value) != value {
 		return false
 	}
 	_, err := hex.DecodeString(value)

@@ -37,10 +37,12 @@
 //     plain text under ProfileText) and the profile's content type:
 //     application/json, application/vnd.api+json for the Terraform backend,
 //     application/problem+json for APM and the Swift registry, and
-//     application/vnd.pub.v2+json for Dart pub. A 401 gets a challenge,
-//     BasicChallenge or, under ProfilePub, Bearer realm="pub", unless the
-//     error sets NoChallenge or the response has one already. A positive
-//     RetryAfterSeconds sets Retry-After.
+//     application/vnd.pub.v2+json for Dart pub. A Swift registry error also
+//     carries Content-Version: 1, without which SwiftPM does not show its
+//     detail (#1278). A 401 gets a challenge, BasicChallenge or, under
+//     ProfilePub, Bearer realm="pub", unless the error sets NoChallenge or
+//     the response has one already. A positive RetryAfterSeconds sets
+//     Retry-After.
 //   - Profile and its sixteen values; Error, with New, NotSupported and
 //     ErrNotImplemented; and BasicChallenge, Artifactory's realm.
 //
@@ -126,7 +128,7 @@
 // (P9c, #766 and #765). Moved here in P9d. New takes the code from the
 // status's name (#1236). The OCI envelope gives a 401, 403 or 429 the
 // specification's code, and a code keeps only letters and underscores
-// (#1248).
+// (#1248). A Swift registry error carries Content-Version: 1 (#1278).
 //
 // # Testing
 //
@@ -146,11 +148,14 @@
 //   - TestUnitOCICodes: the OCI envelope's code for an error built with New,
 //     one with no code and one a handler gave a code, and that rendering
 //     leaves the error unchanged.
+//   - TestUnitProfileHeaders: the exact headers of every profile for a 404,
+//     and for a 401 with Retry-After: the content type, the challenge, Basic
+//     or pub's Bearer, Retry-After, and Content-Version: 1 under the Swift
+//     registry profile and no other.
 //
-// These tests leave the APM and Swift registry problem JSON, the Dart pub
-// Bearer challenge, and Retry-After to the tests of the routes that write
-// them: the Agent Packages suite, the Swift and pub format tests and the
-// remote source tests. Over HTTP, the server's
+// These tests leave the APM and Swift registry problem JSON bodies to the
+// tests of the routes that write them: the Agent Packages suite and the
+// Swift format tests. Over HTTP, the server's
 // TestAccStubsAndEnvelopes checks the 501 and 404 envelopes of the stubbed
 // products and of unknown paths on each surface, and
 // TestAccUnimplementedOperationsAnswer501 checks that every specified

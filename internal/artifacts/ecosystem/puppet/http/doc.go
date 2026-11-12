@@ -48,13 +48,15 @@
 //     /artifactory/api/puppet/{repoKey}/reindex, which refuses any query
 //     with 400, answers its text once the reindex has run, and writes
 //     errors in the Artifactory envelope.
-//   - Answers: one module's release list with Forge pagination, at most
-//     1,000 releases a page; release and module records; search results;
-//     archives; and the whole-repository lists, v3/releases without module
-//     and v3/modules without query (list.go), 20 a page unless limit asks
-//     for up to 100, under the Forge's pagination object with first,
-//     previous, current and next links. Every JSON answer is marked
-//     private, no-store.
+//   - Answers: one module's release list, the module search and the
+//     whole-repository lists, v3/releases without module and v3/modules
+//     without query (list.go), each 20 a page unless limit asks for up to
+//     100, a larger limit served as 100 (RTFACT-30529), under the Forge's
+//     pagination object with first, previous, current and next links
+//     before the results (RTFACT-14557); release and module records with
+//     the fields of JFrog's reference and 7.x's answers (record.go);
+//     archives. JSON answers write "<", ">" and "&" as they are, as 7.x
+//     does, and every one is marked private, no-store.
 //
 // # Invariants
 //
@@ -84,9 +86,24 @@
 //     caller's read permission, as 7.x does (RTFACT-15072); a remote one
 //     keeps the 400 it gave before they were served, since no source shows
 //     what a remote lists.
+//   - A hosted release's record takes its file_md5 from the archive item,
+//     its downloads from the item's download count and its dates from the
+//     item's creation and last update, in the Forge's form in UTC; its
+//     readme, changelog and license are null. A remote relays the
+//     upstream's values of those fields and of supported and the module's
+//     owner gravatar_id and deprecated_at (RTFACT-19130), and answers a
+//     value of another type as a hosted release would. A module record
+//     takes its downloads, dates, owner and links from its releases [I].
 //   - A remote builds each Forge query itself (module, limit, offset and
 //     sort_by), never follows an upstream next link, and reads at most
-//     16 MiB a page. Metadata and archive URLs must stay under the
+//     16 MiB a page. It asks for 100 releases a page, since the Forge
+//     serves at most 100 whatever limit is asked (it answered limit=1000
+//     with "limit": 100 on 2026-11-12) and so do 7.x's own lists
+//     (RTFACT-30529); what 7.x's remote asks is [I] (#216). Each page
+//     starts after the releases the last one held, and a page short of 100
+//     with more after it is accepted only when the upstream's
+//     pagination.limit equals what the page held; short for any other
+//     reason, it answers 502. Metadata and archive URLs must stay under the
 //     configured Forge origin and path, and an archive enters the cache only
 //     once its size, SHA-256, identity and manifest match the release that
 //     advertised it. A cache hit rechecks the source's authority and the
@@ -122,8 +139,10 @@
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
 //   - https://github.com/weaveplatform/artifactweave/issues/784,
 //     https://github.com/weaveplatform/artifactweave/issues/1045,
-//     https://github.com/weaveplatform/artifactweave/issues/1086 and
-//     https://github.com/weaveplatform/artifactweave/issues/1089
+//     https://github.com/weaveplatform/artifactweave/issues/1086,
+//     https://github.com/weaveplatform/artifactweave/issues/1089,
+//     https://github.com/weaveplatform/artifactweave/issues/1287 and
+//     https://github.com/weaveplatform/artifactweave/issues/1288
 //
 // # Status
 //
@@ -138,8 +157,14 @@
 //     permissions and changes, store failures and late read revocation.
 //   - list_test.go: the whole-repository lists' pages, links and limits,
 //     read permission, the blackout and patterns, the virtual and remote
-//     answers, the one-module routes they leave unchanged, and store
-//     failures.
+//     answers, the one-module list's refusals they leave unchanged, and
+//     store failures.
+//   - paging_test.go: the one-module list's and the module search's pages,
+//     links, limits and refusals.
+//   - record_test.go: a hosted release's and module's exact records on
+//     every route that answers them, directly and through a virtual
+//     repository, and a remote's relayed fields and their defaults.
+//   - remote_paging_test.go: the page sizes a remote asks for and accepts.
 //   - policy_test.go: the blackout on every hosted route and the module
 //     search's empty answer under it, a release whose archive the patterns
 //     reject kept listed, virtual members and patterns that refuse only an

@@ -106,10 +106,9 @@ func TestAccDebianVirtualServesItsMembersOtherDistsFiles(t *testing.T) {
 // and holds it. A member that is absent, blacked out, or whose patterns
 // reject the file is passed over, as decision 0032 passes over a member
 // that refuses (R5), and so are a member that holds a folder there and a
-// remote member whose upstream lacks the file. A remote member's Debian
-// source request cannot name an installer's Packages index or a
-// translation's by-hash copy, so that member lacks them, as its own GET
-// answers, and is passed over without asking its upstream.
+// remote member whose upstream lacks the file, which is asked for each of
+// them, an installer's Packages index and a translation's by-hash copy
+// among them (#1273).
 func TestAccDebianVirtualDistsFileFromTheFirstMemberThatServesIt(t *testing.T) {
 	for _, path := range []string{
 		debTranslation, debSources,
@@ -154,9 +153,8 @@ func TestAccDebianVirtualDistsFileFromTheFirstMemberThatServesIt(t *testing.T) {
 			if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), first) {
 				t.Errorf("answered %d %q, want 200 and deb-first's file", rec.Code, rec.Body)
 			}
-			named := path == debTranslation || path == debSources
-			if asked[path] != named {
-				t.Errorf("deb-remote's upstream asked: %t, want %t", asked[path], named)
+			if !asked[path] {
+				t.Error("deb-remote's upstream was not asked")
 			}
 		})
 	}
