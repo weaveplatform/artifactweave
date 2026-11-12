@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-15T12:03:04.62016Z",
+  "generated_at": "2026-11-12T18:06:13.684096Z",
   "pages": 648,
   "schemas": [
     {
@@ -139,7 +139,7 @@
         }
       ],
       "variants": 1,
-      "used_by": 55
+      "used_by": 52
     },
     {
       "family": "administration-jfrog-artifactory-security-api",
@@ -235,7 +235,7 @@
         }
       ],
       "variants": 1,
-      "used_by": 2
+      "used_by": 1
     },
     {
       "family": "administration-jfrog-artifactory-security-api",
@@ -1922,7 +1922,7 @@
         }
       ],
       "variants": 1,
-      "used_by": 1
+      "used_by": 2
     },
     {
       "family": "administration-jfrog-platform-rest-apis",
@@ -1988,7 +1988,7 @@
         }
       ],
       "variants": 1,
-      "used_by": 3
+      "used_by": 4
     },
     {
       "family": "administration-jfrog-platform-rest-apis",
@@ -4311,6 +4311,7 @@
         {
           "name": "total",
           "type": "integer",
+          "format": "int32",
           "required": true
         }
       ],
@@ -4379,7 +4380,9 @@
           "type": "string",
           "enum": [
             "Connected",
-            "Disconnected"
+            "Disconnected",
+            "Partially Connected",
+            "Pending Removal"
           ]
         },
         {
@@ -4863,7 +4866,7 @@
       "name": "WorkerExecutionResult",
       "type": "object",
       "variants": 1,
-      "used_by": 5
+      "used_by": 4
     },
     {
       "family": "administration-jfrog-platform-rest-apis",
@@ -7571,6 +7574,1292 @@
       "used_by": 1
     },
     {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "ArtifactDeleteFailure",
+      "type": "object",
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "integer",
+          "required": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "BatchRepositoryConfigurationArray",
+      "type": "array",
+      "variants": 1,
+      "used_by": 2
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "ChecksumPolicyType",
+      "type": "string",
+      "fields": [
+        {
+          "name": "(value)",
+          "type": "string",
+          "enum": [
+            "client-checksums",
+            "server-generated-checksums"
+          ]
+        }
+      ],
+      "variants": 1,
+      "used_by": 7
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "ConnectableReposResponse",
+      "type": "object",
+      "fields": [
+        {
+          "name": "repos",
+          "type": "array",
+          "items": "object"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "ErrorResponse",
+      "type": "object",
+      "fields": [
+        {
+          "name": "errors",
+          "type": "array",
+          "items": "object",
+          "required": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 15
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "FederatedRepositoryConfiguration",
+      "type": "object",
+      "fields": [
+        {
+          "name": "archiveBrowsingEnabled",
+          "type": "boolean"
+        },
+        {
+          "name": "blackedOut",
+          "type": "boolean"
+        },
+        {
+          "name": "blockPushingSchema1",
+          "type": "string"
+        },
+        {
+          "name": "calculateYumMetadata",
+          "type": "boolean"
+        },
+        {
+          "name": "cdnRedirect",
+          "type": "string"
+        },
+        {
+          "name": "checksumPolicyType",
+          "type": "string",
+          "ref": "ChecksumPolicyType",
+          "enum": [
+            "client-checksums",
+            "server-generated-checksums"
+          ]
+        },
+        {
+          "name": "debianTrivialLayout",
+          "type": "boolean"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "disableProxy",
+          "type": "boolean"
+        },
+        {
+          "name": "dockerApiVersion",
+          "type": "string",
+          "enum": [
+            "V2"
+          ]
+        },
+        {
+          "name": "downloadRedirect",
+          "type": "string"
+        },
+        {
+          "name": "enableFileListsIndexing",
+          "type": "string"
+        },
+        {
+          "name": "environments",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "excludesPattern",
+          "type": "string"
+        },
+        {
+          "name": "handleReleases",
+          "type": "boolean"
+        },
+        {
+          "name": "handleSnapshots",
+          "type": "boolean"
+        },
+        {
+          "name": "includesPattern",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "maxUniqueSnapshots",
+          "type": "integer"
+        },
+        {
+          "name": "maxUniqueTags",
+          "type": "integer"
+        },
+        {
+          "name": "members",
+          "type": "array",
+          "items": "object"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        },
+        {
+          "name": "optionalIndexCompressionFormats",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "packageType",
+          "type": "string",
+          "ref": "PackageTypeFederated",
+          "enum": [
+            "alpine",
+            "ansible",
+            "bower",
+            "cargo",
+            "chef",
+            "cocoapods",
+            "composer",
+            "conan",
+            "conda",
+            "cran",
+            "debian",
+            "docker",
+            "gems",
+            "generic",
+            "gitlfs",
+            "go",
+            "gradle",
+            "helm",
+            "helmoci",
+            "huggingfaceml",
+            "ivy",
+            "maven",
+            "npm",
+            "nuget",
+            "oci",
+            "opkg",
+            "puppet",
+            "pypi",
+            "rpm",
+            "sbt",
+            "vagrant"
+          ]
+        },
+        {
+          "name": "primaryKeyPairRef",
+          "type": "string"
+        },
+        {
+          "name": "priorityResolution",
+          "type": "boolean"
+        },
+        {
+          "name": "projectKey",
+          "type": "string"
+        },
+        {
+          "name": "propertySets",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "proxy",
+          "type": "string"
+        },
+        {
+          "name": "rclass",
+          "type": "string",
+          "enum": [
+            "federated"
+          ],
+          "required": true
+        },
+        {
+          "name": "repoLayoutRef",
+          "type": "string"
+        },
+        {
+          "name": "secondaryKeyPairRef",
+          "type": "string"
+        },
+        {
+          "name": "snapshotVersionBehavior",
+          "type": "string",
+          "enum": [
+            "deployer",
+            "non-unique",
+            "unique"
+          ]
+        },
+        {
+          "name": "suppressPomConsistencyChecks",
+          "type": "boolean"
+        },
+        {
+          "name": "xrayIndex",
+          "type": "boolean"
+        },
+        {
+          "name": "yumRootDepth",
+          "type": "integer"
+        }
+      ],
+      "variants": 1,
+      "used_by": 7
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "LocalRepositoryConfiguration",
+      "type": "object",
+      "fields": [
+        {
+          "name": "archiveBrowsingEnabled",
+          "type": "boolean"
+        },
+        {
+          "name": "blackedOut",
+          "type": "boolean"
+        },
+        {
+          "name": "blockPushingSchema1",
+          "type": "string"
+        },
+        {
+          "name": "calculateYumMetadata",
+          "type": "boolean"
+        },
+        {
+          "name": "cdnRedirect",
+          "type": "string"
+        },
+        {
+          "name": "checksumPolicyType",
+          "type": "string",
+          "ref": "ChecksumPolicyType",
+          "enum": [
+            "client-checksums",
+            "server-generated-checksums"
+          ]
+        },
+        {
+          "name": "contentSynchronisation",
+          "type": "object"
+        },
+        {
+          "name": "debianTrivialLayout",
+          "type": "boolean"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "dockerApiVersion",
+          "type": "string",
+          "enum": [
+            "V2"
+          ]
+        },
+        {
+          "name": "downloadRedirect",
+          "type": "string"
+        },
+        {
+          "name": "enableFileListsIndexing",
+          "type": "string"
+        },
+        {
+          "name": "encryptStates",
+          "type": "boolean"
+        },
+        {
+          "name": "environments",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "excludesPattern",
+          "type": "string"
+        },
+        {
+          "name": "forceConanAuthentication",
+          "type": "boolean"
+        },
+        {
+          "name": "forceNugetAuthentication",
+          "type": "boolean"
+        },
+        {
+          "name": "forceP2Authentication",
+          "type": "boolean"
+        },
+        {
+          "name": "handleReleases",
+          "type": "boolean"
+        },
+        {
+          "name": "handleSnapshots",
+          "type": "boolean"
+        },
+        {
+          "name": "includesPattern",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "maxUniqueSnapshots",
+          "type": "integer"
+        },
+        {
+          "name": "maxUniqueTags",
+          "type": "integer"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        },
+        {
+          "name": "optionalIndexCompressionFormats",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "packageType",
+          "type": "string",
+          "ref": "PackageTypeLocal",
+          "enum": [
+            "alpine",
+            "ansible",
+            "bower",
+            "cargo",
+            "chef",
+            "cocoapods",
+            "composer",
+            "conan",
+            "conda",
+            "cran",
+            "debian",
+            "docker",
+            "gems",
+            "generic",
+            "gitlfs",
+            "go",
+            "gradle",
+            "helm",
+            "helmoci",
+            "huggingfaceml",
+            "ivy",
+            "maven",
+            "npm",
+            "nuget",
+            "oci",
+            "opkg",
+            "pub",
+            "puppet",
+            "pypi",
+            "rpm",
+            "sbt",
+            "swift",
+            "terraform",
+            "terraformbackend",
+            "vagrant"
+          ]
+        },
+        {
+          "name": "primaryKeyPairRef",
+          "type": "string"
+        },
+        {
+          "name": "priorityResolution",
+          "type": "string"
+        },
+        {
+          "name": "projectKey",
+          "type": "string"
+        },
+        {
+          "name": "propertySets",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "rclass",
+          "type": "string",
+          "enum": [
+            "local"
+          ],
+          "required": true
+        },
+        {
+          "name": "repoLayoutRef",
+          "type": "string"
+        },
+        {
+          "name": "secondaryKeyPairRef",
+          "type": "string"
+        },
+        {
+          "name": "snapshotVersionBehavior",
+          "type": "string",
+          "enum": [
+            "deployer",
+            "non-unique",
+            "unique"
+          ]
+        },
+        {
+          "name": "suppressPomConsistencyChecks",
+          "type": "boolean"
+        },
+        {
+          "name": "terraformType",
+          "type": "string",
+          "enum": [
+            "MODULE",
+            "PROVIDER"
+          ]
+        },
+        {
+          "name": "xrayIndex",
+          "type": "boolean"
+        },
+        {
+          "name": "yumRootDepth",
+          "type": "integer"
+        }
+      ],
+      "variants": 1,
+      "used_by": 7
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "PackageTypeFederated",
+      "type": "string",
+      "fields": [
+        {
+          "name": "(value)",
+          "type": "string",
+          "enum": [
+            "alpine",
+            "ansible",
+            "bower",
+            "cargo",
+            "chef",
+            "cocoapods",
+            "composer",
+            "conan",
+            "conda",
+            "cran",
+            "debian",
+            "docker",
+            "gems",
+            "generic",
+            "gitlfs",
+            "go",
+            "gradle",
+            "helm",
+            "helmoci",
+            "huggingfaceml",
+            "ivy",
+            "maven",
+            "npm",
+            "nuget",
+            "oci",
+            "opkg",
+            "puppet",
+            "pypi",
+            "rpm",
+            "sbt",
+            "vagrant"
+          ]
+        }
+      ],
+      "variants": 1,
+      "used_by": 7
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "PackageTypeLocal",
+      "type": "string",
+      "fields": [
+        {
+          "name": "(value)",
+          "type": "string",
+          "enum": [
+            "alpine",
+            "ansible",
+            "bower",
+            "cargo",
+            "chef",
+            "cocoapods",
+            "composer",
+            "conan",
+            "conda",
+            "cran",
+            "debian",
+            "docker",
+            "gems",
+            "generic",
+            "gitlfs",
+            "go",
+            "gradle",
+            "helm",
+            "helmoci",
+            "huggingfaceml",
+            "ivy",
+            "maven",
+            "npm",
+            "nuget",
+            "oci",
+            "opkg",
+            "pub",
+            "puppet",
+            "pypi",
+            "rpm",
+            "sbt",
+            "swift",
+            "terraform",
+            "terraformbackend",
+            "vagrant"
+          ]
+        }
+      ],
+      "variants": 1,
+      "used_by": 7
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "PackageTypeRemote",
+      "type": "string",
+      "fields": [
+        {
+          "name": "(value)",
+          "type": "string",
+          "enum": [
+            "alpine",
+            "ansible",
+            "bower",
+            "cargo",
+            "chef",
+            "cocoapods",
+            "composer",
+            "conan",
+            "conda",
+            "cran",
+            "debian",
+            "docker",
+            "gems",
+            "generic",
+            "gitlfs",
+            "go",
+            "gradle",
+            "helm",
+            "helmoci",
+            "huggingfaceml",
+            "ivy",
+            "maven",
+            "npm",
+            "nuget",
+            "oci",
+            "opkg",
+            "pub",
+            "puppet",
+            "pypi",
+            "rpm",
+            "sbt",
+            "swift",
+            "terraform"
+          ]
+        }
+      ],
+      "variants": 1,
+      "used_by": 7
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "PackageTypeVirtual",
+      "type": "string",
+      "fields": [
+        {
+          "name": "(value)",
+          "type": "string",
+          "enum": [
+            "alpine",
+            "ansible",
+            "bower",
+            "chef",
+            "composer",
+            "conan",
+            "conda",
+            "cran",
+            "debian",
+            "docker",
+            "gems",
+            "generic",
+            "gitlfs",
+            "go",
+            "gradle",
+            "helm",
+            "helmoci",
+            "huggingfaceml",
+            "ivy",
+            "maven",
+            "npm",
+            "nuget",
+            "oci",
+            "pub",
+            "puppet",
+            "pypi",
+            "rpm",
+            "sbt",
+            "swift",
+            "terraform"
+          ]
+        }
+      ],
+      "variants": 1,
+      "used_by": 7
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "PomRepositoryReferencesCleanupPolicy",
+      "type": "string",
+      "fields": [
+        {
+          "name": "(value)",
+          "type": "string",
+          "enum": [
+            "discard_active_reference",
+            "discard_any_reference",
+            "nothing"
+          ]
+        }
+      ],
+      "variants": 1,
+      "used_by": 7
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "ProjectScopedConsumersResponse",
+      "type": "object",
+      "fields": [
+        {
+          "name": "consumers",
+          "type": "array",
+          "items": "object"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "RemoteRepoChecksumPolicyType",
+      "type": "string",
+      "fields": [
+        {
+          "name": "(value)",
+          "type": "string",
+          "enum": [
+            "fail",
+            "generate-if-absent",
+            "ignore-and-generate",
+            "pass-thru"
+          ]
+        }
+      ],
+      "variants": 1,
+      "used_by": 7
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "RemoteRepositoryConfiguration",
+      "type": "object",
+      "fields": [
+        {
+          "name": "allowAnyHostAuth",
+          "type": "boolean"
+        },
+        {
+          "name": "assumedOfflinePeriodSecs",
+          "type": "integer"
+        },
+        {
+          "name": "blackedOut",
+          "type": "boolean"
+        },
+        {
+          "name": "blockMismatchingMimeTypes",
+          "type": "boolean"
+        },
+        {
+          "name": "contentSynchronisation",
+          "type": "object"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "disableProxy",
+          "type": "boolean"
+        },
+        {
+          "name": "enableCookieManagement",
+          "type": "boolean"
+        },
+        {
+          "name": "enableTokenAuthentication",
+          "type": "boolean"
+        },
+        {
+          "name": "environments",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "excludesPattern",
+          "type": "string"
+        },
+        {
+          "name": "fetchJarsEagerly",
+          "type": "boolean"
+        },
+        {
+          "name": "fetchSourcesEagerly",
+          "type": "boolean"
+        },
+        {
+          "name": "handleReleases",
+          "type": "boolean"
+        },
+        {
+          "name": "handleSnapshots",
+          "type": "boolean"
+        },
+        {
+          "name": "hardFail",
+          "type": "boolean"
+        },
+        {
+          "name": "includesPattern",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "localAddress",
+          "type": "string"
+        },
+        {
+          "name": "maxUniqueSnapshots",
+          "type": "integer"
+        },
+        {
+          "name": "missedRetrievalCachePeriodSecs",
+          "type": "integer"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        },
+        {
+          "name": "offline",
+          "type": "boolean"
+        },
+        {
+          "name": "packageType",
+          "type": "string",
+          "ref": "PackageTypeRemote",
+          "enum": [
+            "alpine",
+            "ansible",
+            "bower",
+            "cargo",
+            "chef",
+            "cocoapods",
+            "composer",
+            "conan",
+            "conda",
+            "cran",
+            "debian",
+            "docker",
+            "gems",
+            "generic",
+            "gitlfs",
+            "go",
+            "gradle",
+            "helm",
+            "helmoci",
+            "huggingfaceml",
+            "ivy",
+            "maven",
+            "npm",
+            "nuget",
+            "oci",
+            "opkg",
+            "pub",
+            "puppet",
+            "pypi",
+            "rpm",
+            "sbt",
+            "swift",
+            "terraform"
+          ]
+        },
+        {
+          "name": "password",
+          "type": "string"
+        },
+        {
+          "name": "projectKey",
+          "type": "string"
+        },
+        {
+          "name": "projectScopedReadUpstream",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "propertySets",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "proxy",
+          "type": "string"
+        },
+        {
+          "name": "rclass",
+          "type": "string",
+          "enum": [
+            "remote"
+          ],
+          "required": true
+        },
+        {
+          "name": "remoteRepoChecksumPolicyType",
+          "type": "string",
+          "ref": "RemoteRepoChecksumPolicyType",
+          "enum": [
+            "fail",
+            "generate-if-absent",
+            "ignore-and-generate",
+            "pass-thru"
+          ]
+        },
+        {
+          "name": "remoteRepoLayoutRef",
+          "type": "string"
+        },
+        {
+          "name": "repoLayoutRef",
+          "type": "string"
+        },
+        {
+          "name": "retrievalCachePeriodSecs",
+          "type": "integer"
+        },
+        {
+          "name": "shareConfiguration",
+          "type": "boolean"
+        },
+        {
+          "name": "socketTimeoutMillis",
+          "type": "integer"
+        },
+        {
+          "name": "storeArtifactsLocally",
+          "type": "boolean"
+        },
+        {
+          "name": "suppressPomConsistencyChecks",
+          "type": "boolean"
+        },
+        {
+          "name": "synchronizeProperties",
+          "type": "boolean"
+        },
+        {
+          "name": "unusedArtifactsCleanupPeriodHours",
+          "type": "integer"
+        },
+        {
+          "name": "upstreamProjectKey",
+          "type": "string"
+        },
+        {
+          "name": "upstreamRepoKey",
+          "type": "string"
+        },
+        {
+          "name": "url",
+          "type": "string",
+          "format": "uri"
+        },
+        {
+          "name": "username",
+          "type": "string"
+        },
+        {
+          "name": "xrayIndex",
+          "type": "boolean"
+        }
+      ],
+      "variants": 1,
+      "used_by": 7
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "RemoveRepositoryFailureReport",
+      "type": "object",
+      "fields": [
+        {
+          "name": "deleteArtifactsFailureCount",
+          "type": "integer",
+          "format": "int64",
+          "required": true
+        },
+        {
+          "name": "deletedArtifactsCount",
+          "type": "integer",
+          "format": "int64",
+          "required": true
+        },
+        {
+          "name": "errors",
+          "type": "array",
+          "items": "ArtifactDeleteFailure",
+          "required": true
+        },
+        {
+          "name": "repoKey",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "statusMsg",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "success",
+          "type": "boolean",
+          "enum": [
+            "false"
+          ],
+          "required": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "RemoveRepositorySuccessReport",
+      "type": "object",
+      "fields": [
+        {
+          "name": "deletedArtifactsCount",
+          "type": "integer",
+          "format": "int64",
+          "required": true
+        },
+        {
+          "name": "repoKey",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "statusMsg",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "success",
+          "type": "boolean",
+          "enum": [
+            "true"
+          ],
+          "required": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "RepoBulkRemovalFailFastReport",
+      "type": "object",
+      "fields": [
+        {
+          "name": "statusMessage",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "RepoBulkRemovalReport",
+      "type": "object",
+      "fields": [
+        {
+          "name": "reports",
+          "type": "array",
+          "required": true
+        },
+        {
+          "name": "statusMessage",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "RepositoryConfiguration",
+      "type": "oneOf",
+      "composed": [
+        "oneOf:LocalRepositoryConfiguration",
+        "oneOf:RemoteRepositoryConfiguration",
+        "oneOf:VirtualRepositoryConfiguration",
+        "oneOf:FederatedRepositoryConfiguration"
+      ],
+      "variants": 1,
+      "used_by": 7
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "SharedRemoteRepositoryConfiguration",
+      "type": "object",
+      "fields": [
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "url",
+          "type": "string",
+          "format": "uri"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "name": "VirtualRepositoryConfiguration",
+      "type": "object",
+      "fields": [
+        {
+          "name": "artifactoryRequestsCanRetrieveRemoteArtifacts",
+          "type": "boolean"
+        },
+        {
+          "name": "debianDefaultArchitectures",
+          "type": "string"
+        },
+        {
+          "name": "debianTrivialLayout",
+          "type": "boolean"
+        },
+        {
+          "name": "defaultDeploymentRepo",
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "environments",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "excludesPattern",
+          "type": "string"
+        },
+        {
+          "name": "externalDependenciesEnabled",
+          "type": "boolean"
+        },
+        {
+          "name": "externalDependenciesPatterns",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "externalDependenciesRemoteRepo",
+          "type": "string"
+        },
+        {
+          "name": "forceMavenAuthentication",
+          "type": "boolean"
+        },
+        {
+          "name": "includesPattern",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "keyPair",
+          "type": "string"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        },
+        {
+          "name": "optionalIndexCompressionFormats",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "packageType",
+          "type": "string",
+          "ref": "PackageTypeVirtual",
+          "enum": [
+            "alpine",
+            "ansible",
+            "bower",
+            "chef",
+            "composer",
+            "conan",
+            "conda",
+            "cran",
+            "debian",
+            "docker",
+            "gems",
+            "generic",
+            "gitlfs",
+            "go",
+            "gradle",
+            "helm",
+            "helmoci",
+            "huggingfaceml",
+            "ivy",
+            "maven",
+            "npm",
+            "nuget",
+            "oci",
+            "pub",
+            "puppet",
+            "pypi",
+            "rpm",
+            "sbt",
+            "swift",
+            "terraform"
+          ]
+        },
+        {
+          "name": "pomRepositoryReferencesCleanupPolicy",
+          "type": "string",
+          "ref": "PomRepositoryReferencesCleanupPolicy",
+          "enum": [
+            "discard_active_reference",
+            "discard_any_reference",
+            "nothing"
+          ]
+        },
+        {
+          "name": "primaryKeyPairRef",
+          "type": "string"
+        },
+        {
+          "name": "projectKey",
+          "type": "string"
+        },
+        {
+          "name": "rclass",
+          "type": "string",
+          "enum": [
+            "virtual"
+          ],
+          "required": true
+        },
+        {
+          "name": "repoLayoutRef",
+          "type": "string"
+        },
+        {
+          "name": "repositories",
+          "type": "array",
+          "items": "string",
+          "required": true
+        },
+        {
+          "name": "secondaryKeyPairRef",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 7
+    },
+    {
       "family": "artifactory-jfrog-distribution-api",
       "name": "DeleteReleaseBundleRequest",
       "type": "object",
@@ -8366,1252 +9655,6 @@
       "used_by": 6
     },
     {
-      "family": "artifactory-repositories-api",
-      "name": "ArtifactDeleteFailure",
-      "type": "object",
-      "fields": [
-        {
-          "name": "message",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "status",
-          "type": "integer",
-          "required": true
-        }
-      ],
-      "variants": 1,
-      "used_by": 2
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "BatchRepositoryConfigurationArray",
-      "type": "array",
-      "variants": 1,
-      "used_by": 2
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "ChecksumPolicyType",
-      "type": "string",
-      "fields": [
-        {
-          "name": "(value)",
-          "type": "string",
-          "enum": [
-            "client-checksums",
-            "server-generated-checksums"
-          ]
-        }
-      ],
-      "variants": 1,
-      "used_by": 7
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "ErrorResponse",
-      "type": "object",
-      "fields": [
-        {
-          "name": "errors",
-          "type": "array",
-          "items": "object",
-          "required": true
-        }
-      ],
-      "variants": 1,
-      "used_by": 13
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "FederatedRepositoryConfiguration",
-      "type": "object",
-      "fields": [
-        {
-          "name": "archiveBrowsingEnabled",
-          "type": "boolean"
-        },
-        {
-          "name": "blackedOut",
-          "type": "boolean"
-        },
-        {
-          "name": "blockPushingSchema1",
-          "type": "string"
-        },
-        {
-          "name": "calculateYumMetadata",
-          "type": "boolean"
-        },
-        {
-          "name": "cdnRedirect",
-          "type": "string"
-        },
-        {
-          "name": "checksumPolicyType",
-          "type": "string",
-          "ref": "ChecksumPolicyType",
-          "enum": [
-            "client-checksums",
-            "server-generated-checksums"
-          ]
-        },
-        {
-          "name": "debianTrivialLayout",
-          "type": "boolean"
-        },
-        {
-          "name": "description",
-          "type": "string"
-        },
-        {
-          "name": "disableProxy",
-          "type": "boolean"
-        },
-        {
-          "name": "dockerApiVersion",
-          "type": "string",
-          "enum": [
-            "V2"
-          ]
-        },
-        {
-          "name": "downloadRedirect",
-          "type": "string"
-        },
-        {
-          "name": "enableFileListsIndexing",
-          "type": "string"
-        },
-        {
-          "name": "environments",
-          "type": "array",
-          "items": "string"
-        },
-        {
-          "name": "excludesPattern",
-          "type": "string"
-        },
-        {
-          "name": "handleReleases",
-          "type": "boolean"
-        },
-        {
-          "name": "handleSnapshots",
-          "type": "boolean"
-        },
-        {
-          "name": "includesPattern",
-          "type": "string"
-        },
-        {
-          "name": "key",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "maxUniqueSnapshots",
-          "type": "integer"
-        },
-        {
-          "name": "maxUniqueTags",
-          "type": "integer"
-        },
-        {
-          "name": "members",
-          "type": "array",
-          "items": "object"
-        },
-        {
-          "name": "notes",
-          "type": "string"
-        },
-        {
-          "name": "optionalIndexCompressionFormats",
-          "type": "array",
-          "items": "string"
-        },
-        {
-          "name": "packageType",
-          "type": "string",
-          "ref": "PackageTypeFederated",
-          "enum": [
-            "alpine",
-            "ansible",
-            "bower",
-            "cargo",
-            "chef",
-            "cocoapods",
-            "composer",
-            "conan",
-            "conda",
-            "cran",
-            "debian",
-            "docker",
-            "gems",
-            "generic",
-            "gitlfs",
-            "go",
-            "gradle",
-            "helm",
-            "helmoci",
-            "huggingfaceml",
-            "ivy",
-            "maven",
-            "npm",
-            "nuget",
-            "oci",
-            "opkg",
-            "puppet",
-            "pypi",
-            "rpm",
-            "sbt",
-            "vagrant"
-          ]
-        },
-        {
-          "name": "primaryKeyPairRef",
-          "type": "string"
-        },
-        {
-          "name": "priorityResolution",
-          "type": "boolean"
-        },
-        {
-          "name": "projectKey",
-          "type": "string"
-        },
-        {
-          "name": "propertySets",
-          "type": "array",
-          "items": "string"
-        },
-        {
-          "name": "proxy",
-          "type": "string"
-        },
-        {
-          "name": "rclass",
-          "type": "string",
-          "enum": [
-            "federated"
-          ],
-          "required": true
-        },
-        {
-          "name": "repoLayoutRef",
-          "type": "string"
-        },
-        {
-          "name": "secondaryKeyPairRef",
-          "type": "string"
-        },
-        {
-          "name": "snapshotVersionBehavior",
-          "type": "string",
-          "enum": [
-            "deployer",
-            "non-unique",
-            "unique"
-          ]
-        },
-        {
-          "name": "suppressPomConsistencyChecks",
-          "type": "boolean"
-        },
-        {
-          "name": "xrayIndex",
-          "type": "boolean"
-        },
-        {
-          "name": "yumRootDepth",
-          "type": "integer"
-        }
-      ],
-      "variants": 1,
-      "used_by": 7
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "LocalRepositoryConfiguration",
-      "type": "object",
-      "fields": [
-        {
-          "name": "archiveBrowsingEnabled",
-          "type": "boolean"
-        },
-        {
-          "name": "blackedOut",
-          "type": "boolean"
-        },
-        {
-          "name": "blockPushingSchema1",
-          "type": "string"
-        },
-        {
-          "name": "calculateYumMetadata",
-          "type": "boolean"
-        },
-        {
-          "name": "cdnRedirect",
-          "type": "string"
-        },
-        {
-          "name": "checksumPolicyType",
-          "type": "string",
-          "ref": "ChecksumPolicyType",
-          "enum": [
-            "client-checksums",
-            "server-generated-checksums"
-          ]
-        },
-        {
-          "name": "contentSynchronisation",
-          "type": "object"
-        },
-        {
-          "name": "debianTrivialLayout",
-          "type": "boolean"
-        },
-        {
-          "name": "description",
-          "type": "string"
-        },
-        {
-          "name": "dockerApiVersion",
-          "type": "string",
-          "enum": [
-            "V2"
-          ]
-        },
-        {
-          "name": "downloadRedirect",
-          "type": "string"
-        },
-        {
-          "name": "enableFileListsIndexing",
-          "type": "string"
-        },
-        {
-          "name": "encryptStates",
-          "type": "boolean"
-        },
-        {
-          "name": "environments",
-          "type": "array",
-          "items": "string"
-        },
-        {
-          "name": "excludesPattern",
-          "type": "string"
-        },
-        {
-          "name": "forceConanAuthentication",
-          "type": "boolean"
-        },
-        {
-          "name": "forceNugetAuthentication",
-          "type": "boolean"
-        },
-        {
-          "name": "forceP2Authentication",
-          "type": "boolean"
-        },
-        {
-          "name": "handleReleases",
-          "type": "boolean"
-        },
-        {
-          "name": "handleSnapshots",
-          "type": "boolean"
-        },
-        {
-          "name": "includesPattern",
-          "type": "string"
-        },
-        {
-          "name": "key",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "maxUniqueSnapshots",
-          "type": "integer"
-        },
-        {
-          "name": "maxUniqueTags",
-          "type": "integer"
-        },
-        {
-          "name": "notes",
-          "type": "string"
-        },
-        {
-          "name": "optionalIndexCompressionFormats",
-          "type": "array",
-          "items": "string"
-        },
-        {
-          "name": "packageType",
-          "type": "string",
-          "ref": "PackageTypeLocal",
-          "enum": [
-            "alpine",
-            "ansible",
-            "bower",
-            "cargo",
-            "chef",
-            "cocoapods",
-            "composer",
-            "conan",
-            "conda",
-            "cran",
-            "debian",
-            "docker",
-            "gems",
-            "generic",
-            "gitlfs",
-            "go",
-            "gradle",
-            "helm",
-            "helmoci",
-            "huggingfaceml",
-            "ivy",
-            "maven",
-            "npm",
-            "nuget",
-            "oci",
-            "opkg",
-            "pub",
-            "puppet",
-            "pypi",
-            "rpm",
-            "sbt",
-            "swift",
-            "terraform",
-            "terraformbackend",
-            "vagrant"
-          ]
-        },
-        {
-          "name": "primaryKeyPairRef",
-          "type": "string"
-        },
-        {
-          "name": "priorityResolution",
-          "type": "string"
-        },
-        {
-          "name": "projectKey",
-          "type": "string"
-        },
-        {
-          "name": "propertySets",
-          "type": "array",
-          "items": "string"
-        },
-        {
-          "name": "rclass",
-          "type": "string",
-          "enum": [
-            "local"
-          ],
-          "required": true
-        },
-        {
-          "name": "repoLayoutRef",
-          "type": "string"
-        },
-        {
-          "name": "secondaryKeyPairRef",
-          "type": "string"
-        },
-        {
-          "name": "snapshotVersionBehavior",
-          "type": "string",
-          "enum": [
-            "deployer",
-            "non-unique",
-            "unique"
-          ]
-        },
-        {
-          "name": "suppressPomConsistencyChecks",
-          "type": "boolean"
-        },
-        {
-          "name": "terraformType",
-          "type": "string",
-          "enum": [
-            "MODULE",
-            "PROVIDER"
-          ]
-        },
-        {
-          "name": "xrayIndex",
-          "type": "boolean"
-        },
-        {
-          "name": "yumRootDepth",
-          "type": "integer"
-        }
-      ],
-      "variants": 1,
-      "used_by": 7
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "PackageTypeFederated",
-      "type": "string",
-      "fields": [
-        {
-          "name": "(value)",
-          "type": "string",
-          "enum": [
-            "alpine",
-            "ansible",
-            "bower",
-            "cargo",
-            "chef",
-            "cocoapods",
-            "composer",
-            "conan",
-            "conda",
-            "cran",
-            "debian",
-            "docker",
-            "gems",
-            "generic",
-            "gitlfs",
-            "go",
-            "gradle",
-            "helm",
-            "helmoci",
-            "huggingfaceml",
-            "ivy",
-            "maven",
-            "npm",
-            "nuget",
-            "oci",
-            "opkg",
-            "puppet",
-            "pypi",
-            "rpm",
-            "sbt",
-            "vagrant"
-          ]
-        }
-      ],
-      "variants": 1,
-      "used_by": 7
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "PackageTypeLocal",
-      "type": "string",
-      "fields": [
-        {
-          "name": "(value)",
-          "type": "string",
-          "enum": [
-            "alpine",
-            "ansible",
-            "bower",
-            "cargo",
-            "chef",
-            "cocoapods",
-            "composer",
-            "conan",
-            "conda",
-            "cran",
-            "debian",
-            "docker",
-            "gems",
-            "generic",
-            "gitlfs",
-            "go",
-            "gradle",
-            "helm",
-            "helmoci",
-            "huggingfaceml",
-            "ivy",
-            "maven",
-            "npm",
-            "nuget",
-            "oci",
-            "opkg",
-            "pub",
-            "puppet",
-            "pypi",
-            "rpm",
-            "sbt",
-            "swift",
-            "terraform",
-            "terraformbackend",
-            "vagrant"
-          ]
-        }
-      ],
-      "variants": 1,
-      "used_by": 7
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "PackageTypeRemote",
-      "type": "string",
-      "fields": [
-        {
-          "name": "(value)",
-          "type": "string",
-          "enum": [
-            "alpine",
-            "ansible",
-            "bower",
-            "cargo",
-            "chef",
-            "cocoapods",
-            "composer",
-            "conan",
-            "conda",
-            "cran",
-            "debian",
-            "docker",
-            "gems",
-            "generic",
-            "gitlfs",
-            "go",
-            "gradle",
-            "helm",
-            "helmoci",
-            "huggingfaceml",
-            "ivy",
-            "maven",
-            "npm",
-            "nuget",
-            "oci",
-            "opkg",
-            "pub",
-            "puppet",
-            "pypi",
-            "rpm",
-            "sbt",
-            "swift",
-            "terraform"
-          ]
-        }
-      ],
-      "variants": 1,
-      "used_by": 7
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "PackageTypeVirtual",
-      "type": "string",
-      "fields": [
-        {
-          "name": "(value)",
-          "type": "string",
-          "enum": [
-            "alpine",
-            "ansible",
-            "bower",
-            "chef",
-            "composer",
-            "conan",
-            "conda",
-            "cran",
-            "debian",
-            "docker",
-            "gems",
-            "generic",
-            "gitlfs",
-            "go",
-            "gradle",
-            "helm",
-            "helmoci",
-            "huggingfaceml",
-            "ivy",
-            "maven",
-            "npm",
-            "nuget",
-            "oci",
-            "pub",
-            "puppet",
-            "pypi",
-            "rpm",
-            "sbt",
-            "swift",
-            "terraform"
-          ]
-        }
-      ],
-      "variants": 1,
-      "used_by": 7
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "PomRepositoryReferencesCleanupPolicy",
-      "type": "string",
-      "fields": [
-        {
-          "name": "(value)",
-          "type": "string",
-          "enum": [
-            "discard_active_reference",
-            "discard_any_reference",
-            "nothing"
-          ]
-        }
-      ],
-      "variants": 1,
-      "used_by": 7
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "RemoteRepoChecksumPolicyType",
-      "type": "string",
-      "fields": [
-        {
-          "name": "(value)",
-          "type": "string",
-          "enum": [
-            "fail",
-            "generate-if-absent",
-            "ignore-and-generate",
-            "pass-thru"
-          ]
-        }
-      ],
-      "variants": 1,
-      "used_by": 7
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "RemoteRepositoryConfiguration",
-      "type": "object",
-      "fields": [
-        {
-          "name": "allowAnyHostAuth",
-          "type": "boolean"
-        },
-        {
-          "name": "assumedOfflinePeriodSecs",
-          "type": "integer"
-        },
-        {
-          "name": "blackedOut",
-          "type": "boolean"
-        },
-        {
-          "name": "blockMismatchingMimeTypes",
-          "type": "boolean"
-        },
-        {
-          "name": "contentSynchronisation",
-          "type": "object"
-        },
-        {
-          "name": "description",
-          "type": "string"
-        },
-        {
-          "name": "disableProxy",
-          "type": "boolean"
-        },
-        {
-          "name": "enableCookieManagement",
-          "type": "boolean"
-        },
-        {
-          "name": "enableTokenAuthentication",
-          "type": "boolean"
-        },
-        {
-          "name": "environments",
-          "type": "array",
-          "items": "string"
-        },
-        {
-          "name": "excludesPattern",
-          "type": "string"
-        },
-        {
-          "name": "fetchJarsEagerly",
-          "type": "boolean"
-        },
-        {
-          "name": "fetchSourcesEagerly",
-          "type": "boolean"
-        },
-        {
-          "name": "handleReleases",
-          "type": "boolean"
-        },
-        {
-          "name": "handleSnapshots",
-          "type": "boolean"
-        },
-        {
-          "name": "hardFail",
-          "type": "boolean"
-        },
-        {
-          "name": "includesPattern",
-          "type": "string"
-        },
-        {
-          "name": "key",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "localAddress",
-          "type": "string"
-        },
-        {
-          "name": "maxUniqueSnapshots",
-          "type": "integer"
-        },
-        {
-          "name": "missedRetrievalCachePeriodSecs",
-          "type": "integer"
-        },
-        {
-          "name": "notes",
-          "type": "string"
-        },
-        {
-          "name": "offline",
-          "type": "boolean"
-        },
-        {
-          "name": "packageType",
-          "type": "string",
-          "ref": "PackageTypeRemote",
-          "enum": [
-            "alpine",
-            "ansible",
-            "bower",
-            "cargo",
-            "chef",
-            "cocoapods",
-            "composer",
-            "conan",
-            "conda",
-            "cran",
-            "debian",
-            "docker",
-            "gems",
-            "generic",
-            "gitlfs",
-            "go",
-            "gradle",
-            "helm",
-            "helmoci",
-            "huggingfaceml",
-            "ivy",
-            "maven",
-            "npm",
-            "nuget",
-            "oci",
-            "opkg",
-            "pub",
-            "puppet",
-            "pypi",
-            "rpm",
-            "sbt",
-            "swift",
-            "terraform"
-          ]
-        },
-        {
-          "name": "password",
-          "type": "string"
-        },
-        {
-          "name": "projectKey",
-          "type": "string"
-        },
-        {
-          "name": "propertySets",
-          "type": "array",
-          "items": "string"
-        },
-        {
-          "name": "proxy",
-          "type": "string"
-        },
-        {
-          "name": "rclass",
-          "type": "string",
-          "enum": [
-            "remote"
-          ],
-          "required": true
-        },
-        {
-          "name": "remoteRepoChecksumPolicyType",
-          "type": "string",
-          "ref": "RemoteRepoChecksumPolicyType",
-          "enum": [
-            "fail",
-            "generate-if-absent",
-            "ignore-and-generate",
-            "pass-thru"
-          ]
-        },
-        {
-          "name": "remoteRepoLayoutRef",
-          "type": "string"
-        },
-        {
-          "name": "repoLayoutRef",
-          "type": "string"
-        },
-        {
-          "name": "retrievalCachePeriodSecs",
-          "type": "integer"
-        },
-        {
-          "name": "shareConfiguration",
-          "type": "boolean"
-        },
-        {
-          "name": "socketTimeoutMillis",
-          "type": "integer"
-        },
-        {
-          "name": "storeArtifactsLocally",
-          "type": "boolean"
-        },
-        {
-          "name": "suppressPomConsistencyChecks",
-          "type": "boolean"
-        },
-        {
-          "name": "synchronizeProperties",
-          "type": "boolean"
-        },
-        {
-          "name": "unusedArtifactsCleanupPeriodHours",
-          "type": "integer"
-        },
-        {
-          "name": "url",
-          "type": "string",
-          "format": "uri",
-          "required": true
-        },
-        {
-          "name": "username",
-          "type": "string"
-        },
-        {
-          "name": "xrayIndex",
-          "type": "boolean"
-        }
-      ],
-      "variants": 1,
-      "used_by": 7
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "RemoveRepositoryFailureReport",
-      "type": "object",
-      "fields": [
-        {
-          "name": "deleteArtifactsFailureCount",
-          "type": "integer",
-          "format": "int64",
-          "required": true
-        },
-        {
-          "name": "deletedArtifactsCount",
-          "type": "integer",
-          "format": "int64",
-          "required": true
-        },
-        {
-          "name": "errors",
-          "type": "array",
-          "items": "ArtifactDeleteFailure",
-          "required": true
-        },
-        {
-          "name": "repoKey",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "statusMsg",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "success",
-          "type": "boolean",
-          "enum": [
-            "false"
-          ],
-          "required": true
-        }
-      ],
-      "variants": 1,
-      "used_by": 2
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "RemoveRepositorySuccessReport",
-      "type": "object",
-      "fields": [
-        {
-          "name": "deletedArtifactsCount",
-          "type": "integer",
-          "format": "int64",
-          "required": true
-        },
-        {
-          "name": "repoKey",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "statusMsg",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "success",
-          "type": "boolean",
-          "enum": [
-            "true"
-          ],
-          "required": true
-        }
-      ],
-      "variants": 1,
-      "used_by": 2
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "RepoBulkRemovalFailFastReport",
-      "type": "object",
-      "fields": [
-        {
-          "name": "statusMessage",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "variants": 1,
-      "used_by": 1
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "RepoBulkRemovalReport",
-      "type": "object",
-      "fields": [
-        {
-          "name": "reports",
-          "type": "array",
-          "required": true
-        },
-        {
-          "name": "statusMessage",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "variants": 1,
-      "used_by": 1
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "RepositoryConfiguration",
-      "type": "oneOf",
-      "composed": [
-        "oneOf:LocalRepositoryConfiguration",
-        "oneOf:RemoteRepositoryConfiguration",
-        "oneOf:VirtualRepositoryConfiguration",
-        "oneOf:FederatedRepositoryConfiguration"
-      ],
-      "variants": 1,
-      "used_by": 7
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "SharedRemoteRepositoryConfiguration",
-      "type": "object",
-      "fields": [
-        {
-          "name": "key",
-          "type": "string"
-        },
-        {
-          "name": "url",
-          "type": "string",
-          "format": "uri"
-        }
-      ],
-      "variants": 1,
-      "used_by": 1
-    },
-    {
-      "family": "artifactory-repositories-api",
-      "name": "VirtualRepositoryConfiguration",
-      "type": "object",
-      "fields": [
-        {
-          "name": "artifactoryRequestsCanRetrieveRemoteArtifacts",
-          "type": "boolean"
-        },
-        {
-          "name": "debianDefaultArchitectures",
-          "type": "string"
-        },
-        {
-          "name": "debianTrivialLayout",
-          "type": "boolean"
-        },
-        {
-          "name": "defaultDeploymentRepo",
-          "type": "string"
-        },
-        {
-          "name": "description",
-          "type": "string"
-        },
-        {
-          "name": "environments",
-          "type": "array",
-          "items": "string"
-        },
-        {
-          "name": "excludesPattern",
-          "type": "string"
-        },
-        {
-          "name": "externalDependenciesEnabled",
-          "type": "boolean"
-        },
-        {
-          "name": "externalDependenciesPatterns",
-          "type": "array",
-          "items": "string"
-        },
-        {
-          "name": "externalDependenciesRemoteRepo",
-          "type": "string"
-        },
-        {
-          "name": "forceMavenAuthentication",
-          "type": "boolean"
-        },
-        {
-          "name": "includesPattern",
-          "type": "string"
-        },
-        {
-          "name": "key",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "keyPair",
-          "type": "string"
-        },
-        {
-          "name": "notes",
-          "type": "string"
-        },
-        {
-          "name": "optionalIndexCompressionFormats",
-          "type": "array",
-          "items": "string"
-        },
-        {
-          "name": "packageType",
-          "type": "string",
-          "ref": "PackageTypeVirtual",
-          "enum": [
-            "alpine",
-            "ansible",
-            "bower",
-            "chef",
-            "composer",
-            "conan",
-            "conda",
-            "cran",
-            "debian",
-            "docker",
-            "gems",
-            "generic",
-            "gitlfs",
-            "go",
-            "gradle",
-            "helm",
-            "helmoci",
-            "huggingfaceml",
-            "ivy",
-            "maven",
-            "npm",
-            "nuget",
-            "oci",
-            "pub",
-            "puppet",
-            "pypi",
-            "rpm",
-            "sbt",
-            "swift",
-            "terraform"
-          ]
-        },
-        {
-          "name": "pomRepositoryReferencesCleanupPolicy",
-          "type": "string",
-          "ref": "PomRepositoryReferencesCleanupPolicy",
-          "enum": [
-            "discard_active_reference",
-            "discard_any_reference",
-            "nothing"
-          ]
-        },
-        {
-          "name": "primaryKeyPairRef",
-          "type": "string"
-        },
-        {
-          "name": "projectKey",
-          "type": "string"
-        },
-        {
-          "name": "rclass",
-          "type": "string",
-          "enum": [
-            "virtual"
-          ],
-          "required": true
-        },
-        {
-          "name": "repoLayoutRef",
-          "type": "string"
-        },
-        {
-          "name": "repositories",
-          "type": "array",
-          "items": "string",
-          "required": true
-        },
-        {
-          "name": "secondaryKeyPairRef",
-          "type": "string"
-        }
-      ],
-      "variants": 1,
-      "used_by": 7
-    },
-    {
       "family": "artifactory-repository-replication-api",
       "name": "ChecksumReplicationConfig",
       "type": "object",
@@ -10331,7 +10374,7 @@
       "used_by": 5
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "AffectedIssue",
       "type": "object",
       "fields": [
@@ -10356,7 +10399,7 @@
       "used_by": 2
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "Agent",
       "type": "object",
       "fields": [
@@ -10373,7 +10416,7 @@
       "used_by": 2
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "AllBuildsResponse",
       "type": "object",
       "fields": [
@@ -10391,7 +10434,7 @@
       "used_by": 1
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "Artifact",
       "type": "object",
       "fields": [
@@ -10428,7 +10471,7 @@
       "used_by": 3
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "BuildAgent",
       "type": "object",
       "fields": [
@@ -10445,7 +10488,7 @@
       "used_by": 2
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "BuildInfo",
       "type": "object",
       "fields": [
@@ -10538,7 +10581,7 @@
       "used_by": 2
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "BuildInfoResponse",
       "type": "object",
       "fields": [
@@ -10556,7 +10599,7 @@
       "used_by": 1
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "BuildModule",
       "type": "object",
       "fields": [
@@ -10587,7 +10630,7 @@
       "used_by": 3
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "BuildNumber",
       "type": "object",
       "fields": [
@@ -10605,7 +10648,7 @@
       "used_by": 1
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "BuildPromotionRequest",
       "type": "object",
       "fields": [
@@ -10679,7 +10722,7 @@
       "used_by": 1
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "BuildPromotionResponse",
       "type": "object",
       "fields": [
@@ -10693,7 +10736,7 @@
       "used_by": 1
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "BuildRetention",
       "type": "object",
       "fields": [
@@ -10720,7 +10763,7 @@
       "used_by": 2
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "BuildRetentionRequest",
       "type": "object",
       "fields": [
@@ -10747,7 +10790,7 @@
       "used_by": 1
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "BuildRunsResponse",
       "type": "object",
       "fields": [
@@ -10765,7 +10808,7 @@
       "used_by": 1
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "BuildSummary",
       "type": "object",
       "fields": [
@@ -10783,7 +10826,7 @@
       "used_by": 1
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "DeleteBuildsRequest",
       "type": "object",
       "fields": [
@@ -10816,7 +10859,7 @@
       "used_by": 1
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "Dependency",
       "type": "object",
       "fields": [
@@ -10855,7 +10898,7 @@
       "used_by": 3
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "DockerPromotionRequest",
       "type": "object",
       "fields": [
@@ -10891,7 +10934,7 @@
       "used_by": 1
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "Issues",
       "type": "object",
       "fields": [
@@ -10918,7 +10961,7 @@
       "used_by": 2
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "LicenseControl",
       "type": "object",
       "fields": [
@@ -10947,7 +10990,7 @@
       "used_by": 2
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "PromotionMessage",
       "type": "object",
       "fields": [
@@ -10969,7 +11012,7 @@
       "used_by": 1
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "Tracker",
       "type": "object",
       "fields": [
@@ -10986,7 +11029,7 @@
       "used_by": 2
     },
     {
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "name": "VcsInfo",
       "type": "object",
       "fields": [
@@ -12457,55 +12500,6 @@
       }
     },
     {
-      "key": "DELETE /artifactory/api/security/permissions/{}",
-      "family": "administration-jfrog-artifactory-security-api",
-      "tag": "Permissions",
-      "id": "deletePermissionTarget",
-      "method": "DELETE",
-      "path": "/artifactory/api/security/permissions/{permissionTargetName}",
-      "source": "https://docs.jfrog.com/administration/reference/deletepermissiontarget.md",
-      "params": [
-        {
-          "name": "permissionTargetName",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "text/plain",
-            "schema": "string"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "404": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      }
-    },
-    {
       "key": "DELETE /artifactory/api/system/security/certificates/{}",
       "family": "administration-jfrog-artifactory-security-api",
       "tag": "Certificates",
@@ -13050,45 +13044,6 @@
           {
             "media": "application/json",
             "schema": "[]string"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      }
-    },
-    {
-      "key": "GET /artifactory/api/security/permissions",
-      "family": "administration-jfrog-artifactory-security-api",
-      "tag": "Permissions",
-      "id": "getPermissionTargets",
-      "method": "GET",
-      "path": "/artifactory/api/security/permissions",
-      "source": "https://docs.jfrog.com/administration/reference/getpermissiontargets.md",
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "[]object"
-          },
-          {
-            "media": "application/vnd.org.jfrog.artifactory.security.PermissionTargets+json",
-            "schema": "[]object"
           }
         ],
         "401": [
@@ -14564,53 +14519,6 @@
         ]
       },
       "deprecated": true
-    },
-    {
-      "key": "PUT /artifactory/api/security/configuration/passwordExpirationPolicy",
-      "family": "administration-jfrog-artifactory-security-api",
-      "tag": "Password Management",
-      "id": "setPasswordExpirationPolicy",
-      "method": "PUT",
-      "path": "/artifactory/api/security/configuration/passwordExpirationPolicy",
-      "source": "https://docs.jfrog.com/administration/reference/setpasswordexpirationpolicy.md",
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "PasswordExpirationPolicy"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "PasswordExpirationPolicy"
-          }
-        ],
-        "400": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      }
     },
     {
       "key": "PUT /artifactory/api/security/keypair",
@@ -18138,7 +18046,19 @@
           "name": "entity_type",
           "in": "query",
           "required": true,
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "environments",
+            "groups",
+            "permissions",
+            "projectGroups",
+            "projectResources",
+            "projectUsers",
+            "projects",
+            "roles",
+            "tokens",
+            "users"
+          ]
         },
         {
           "name": "page_token",
@@ -18285,7 +18205,19 @@
           "name": "entity_type",
           "in": "path",
           "required": true,
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "environments",
+            "groups",
+            "permissions",
+            "projectGroups",
+            "projectResources",
+            "projectUsers",
+            "projects",
+            "roles",
+            "tokens",
+            "users"
+          ]
         },
         {
           "name": "key",
@@ -21248,7 +21180,7 @@
         "200": [
           {
             "media": "application/json",
-            "schema": "WorkerExecutionResult"
+            "schema": "object"
           }
         ],
         "400": null,
@@ -21814,6 +21746,47 @@
         "401": null,
         "403": null,
         "415": null
+      }
+    },
+    {
+      "key": "PUT /access/api/v2/groups/{}",
+      "family": "administration-jfrog-platform-rest-apis",
+      "tag": "Groups",
+      "id": "replaceGroup",
+      "method": "PUT",
+      "path": "/access/api/v2/groups/{name}",
+      "source": "https://docs.jfrog.com/administration/reference/replacegroup.md",
+      "params": [
+        {
+          "name": "name",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "GroupCreateRequest"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "GroupDetails"
+          }
+        ],
+        "201": [
+          {
+            "media": "application/json",
+            "schema": "GroupDetails"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
       }
     },
     {
@@ -28012,6 +27985,1011 @@
       }
     },
     {
+      "key": "DELETE /artifactory/api/repositories/{}",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "deleteRepository",
+      "method": "DELETE",
+      "path": "/artifactory/api/repositories/{repoKey}",
+      "source": "https://docs.jfrog.com/artifactory/reference/deleterepository.md",
+      "params": [
+        {
+          "name": "repoKey",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "RemoveRepositorySuccessReport"
+          }
+        ],
+        "202": [
+          {
+            "media": "application/json",
+            "schema": "RemoveRepositorySuccessReport"
+          }
+        ],
+        "207": [
+          {
+            "media": "application/json",
+            "schema": "RemoveRepositoryFailureReport"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "RemoveRepositoryFailureReport"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "RemoveRepositoryFailureReport"
+          }
+        ],
+        "404": [
+          {
+            "media": "application/json",
+            "schema": "RemoveRepositorySuccessReport"
+          }
+        ],
+        "409": [
+          {
+            "media": "application/json",
+            "schema": "RemoveRepositoryFailureReport"
+          }
+        ],
+        "424": [
+          {
+            "media": "application/json",
+            "schema": "RemoveRepositoryFailureReport"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "RemoveRepositoryFailureReport"
+          }
+        ]
+      }
+    },
+    {
+      "key": "DELETE /artifactory/api/v2/repositories/batch",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "deleteRepositories",
+      "method": "DELETE",
+      "path": "/artifactory/api/v2/repositories/batch",
+      "source": "https://docs.jfrog.com/artifactory/reference/deleterepositories.md",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "[]string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "RepoBulkRemovalReport"
+          }
+        ],
+        "207": [
+          {
+            "media": "application/json",
+            "schema": "RepoBulkRemovalReport"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "RepoBulkRemovalFailFastReport"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json"
+          }
+        ],
+        "409": [
+          {
+            "media": "application/json",
+            "schema": "RepoBulkRemovalReport"
+          }
+        ],
+        "424": [
+          {
+            "media": "application/json",
+            "schema": "RepoBulkRemovalReport"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "RepoBulkRemovalReport"
+          }
+        ]
+      }
+    },
+    {
+      "key": "GET /artifactory/api/admin/projects/{}/connectableRepos",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "getConnectableRepositories",
+      "method": "GET",
+      "path": "/artifactory/api/admin/projects/{projectKey}/connectableRepos",
+      "source": "https://docs.jfrog.com/artifactory/reference/getconnectablerepositories.md",
+      "params": [
+        {
+          "name": "projectKey",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "keySearch",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "type": "integer"
+        },
+        {
+          "name": "targetPackageType",
+          "in": "query",
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "ConnectableReposResponse"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "503": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ]
+      }
+    },
+    {
+      "key": "GET /artifactory/api/admin/repositories/{}/projectScopedConsumers",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "getProjectScopedConsumers",
+      "method": "GET",
+      "path": "/artifactory/api/admin/repositories/{repoKey}/projectScopedConsumers",
+      "source": "https://docs.jfrog.com/artifactory/reference/getprojectscopedconsumers.md",
+      "params": [
+        {
+          "name": "repoKey",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "type": "integer"
+        },
+        {
+          "name": "projectKey",
+          "in": "query",
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "ProjectScopedConsumersResponse"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "503": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ]
+      }
+    },
+    {
+      "key": "GET /artifactory/api/repositories",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "getRepositoriesByTypeAndProject",
+      "method": "GET",
+      "path": "/artifactory/api/repositories",
+      "source": "https://docs.jfrog.com/artifactory/reference/getrepositoriesbytypeandproject.md",
+      "params": [
+        {
+          "name": "limit",
+          "in": "query",
+          "type": "integer"
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "type": "integer"
+        },
+        {
+          "name": "packageType",
+          "in": "query",
+          "type": "string",
+          "enum": [
+            "bower",
+            "cargo",
+            "chef",
+            "cocoapods",
+            "composer",
+            "conan",
+            "cran",
+            "debian",
+            "docker",
+            "gems",
+            "generic",
+            "gitlfs",
+            "go",
+            "gradle",
+            "helm",
+            "ivy",
+            "maven",
+            "nuget",
+            "opkg",
+            "p2",
+            "pub",
+            "puppet",
+            "pypi",
+            "rpm",
+            "sbt",
+            "swift",
+            "terraform",
+            "vagrant",
+            "yum"
+          ]
+        },
+        {
+          "name": "project",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "in": "query",
+          "type": "string",
+          "enum": [
+            "distribution",
+            "federated",
+            "local",
+            "remote",
+            "virtual"
+          ]
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "[]object"
+          },
+          {
+            "media": "application/vnd.org.jfrog.artifactory.repositories.RepositoryDetailsList+json",
+            "schema": "[]object"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ]
+      }
+    },
+    {
+      "key": "GET /artifactory/api/repositories/configurations",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "getAllRepositoryConfigurations",
+      "method": "GET",
+      "path": "/artifactory/api/repositories/configurations",
+      "source": "https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md",
+      "params": [
+        {
+          "name": "packageType",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "repoType",
+          "in": "query",
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          },
+          {
+            "media": "application/vnd.org.jfrog.artifactory.repositories.RepositoryConfigurationsList+json",
+            "schema": "object"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ]
+      }
+    },
+    {
+      "key": "GET /artifactory/api/repositories/existence",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "checkIfRepositoryExists",
+      "method": "GET",
+      "path": "/artifactory/api/repositories/existence",
+      "source": "https://docs.jfrog.com/artifactory/reference/checkifrepositoryexists.md",
+      "params": [
+        {
+          "name": "projectKey",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "in": "query",
+          "type": "array"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ]
+      }
+    },
+    {
+      "key": "GET /artifactory/api/repositories/{}",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "getRepositoryConfiguration",
+      "method": "GET",
+      "path": "/artifactory/api/repositories/{repoKey}",
+      "source": "https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md",
+      "params": [
+        {
+          "name": "repoKey",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "RepositoryConfiguration"
+          },
+          {
+            "media": "application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json",
+            "schema": "FederatedRepositoryConfiguration"
+          },
+          {
+            "media": "application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json",
+            "schema": "LocalRepositoryConfiguration"
+          },
+          {
+            "media": "application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json",
+            "schema": "RemoteRepositoryConfiguration"
+          },
+          {
+            "media": "application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json",
+            "schema": "VirtualRepositoryConfiguration"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "404": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ]
+      }
+    },
+    {
+      "key": "GET /artifactory/api/repositories/{}/configuration",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "getRemoteRepositoryConfiguration",
+      "method": "GET",
+      "path": "/artifactory/api/repositories/{remoteRepoName}/configuration",
+      "source": "https://docs.jfrog.com/artifactory/reference/getremoterepositoryconfiguration.md",
+      "params": [
+        {
+          "name": "remoteRepoName",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "SharedRemoteRepositoryConfiguration"
+          },
+          {
+            "media": "application/vnd.org.jfrog.artifactory.repositories.SharedRemoteRepositoryConfiguration+json",
+            "schema": "SharedRemoteRepositoryConfiguration"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "404": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ]
+      },
+      "deprecated": true
+    },
+    {
+      "key": "GET /artifactory/api/v2/repositories/batch",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "getBatchOfRepositoriesByName",
+      "method": "GET",
+      "path": "/artifactory/api/v2/repositories/batch",
+      "source": "https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md",
+      "params": [
+        {
+          "name": "names",
+          "in": "query",
+          "required": true,
+          "type": "array"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ]
+      }
+    },
+    {
+      "key": "GET /artifactory/api/v2/repositories/{}",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "getRepositoryConfigurationV2",
+      "method": "GET",
+      "path": "/artifactory/api/v2/repositories/{repoKey}",
+      "source": "https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md",
+      "params": [
+        {
+          "name": "repoKey",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "RepositoryConfiguration"
+          },
+          {
+            "media": "application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json",
+            "schema": "FederatedRepositoryConfiguration"
+          },
+          {
+            "media": "application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json",
+            "schema": "LocalRepositoryConfiguration"
+          },
+          {
+            "media": "application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json",
+            "schema": "RemoteRepositoryConfiguration"
+          },
+          {
+            "media": "application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json",
+            "schema": "VirtualRepositoryConfiguration"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "404": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ]
+      }
+    },
+    {
+      "key": "POST /artifactory/api/repositories/{}",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "updateRepositoryConfiguration",
+      "method": "POST",
+      "path": "/artifactory/api/repositories/{repoKey}",
+      "source": "https://docs.jfrog.com/artifactory/reference/updaterepositoryconfiguration.md",
+      "params": [
+        {
+          "name": "repoKey",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "RepositoryConfiguration"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json",
+          "schema": "FederatedRepositoryConfiguration"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json",
+          "schema": "LocalRepositoryConfiguration"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json",
+          "schema": "RemoteRepositoryConfiguration"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json",
+          "schema": "VirtualRepositoryConfiguration"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "404": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ]
+      }
+    },
+    {
+      "key": "POST /artifactory/api/v2/repositories/batch",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "updateMultipleRepositories",
+      "method": "POST",
+      "path": "/artifactory/api/v2/repositories/batch",
+      "source": "https://docs.jfrog.com/artifactory/reference/updatemultiplerepositories.md",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "BatchRepositoryConfigurationArray"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json",
+          "schema": "BatchRepositoryConfigurationArray"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json",
+          "schema": "BatchRepositoryConfigurationArray"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json",
+          "schema": "BatchRepositoryConfigurationArray"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json",
+          "schema": "BatchRepositoryConfigurationArray"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "string"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "404": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ]
+      }
+    },
+    {
+      "key": "PUT /artifactory/api/repositories/{}",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "createRepository",
+      "method": "PUT",
+      "path": "/artifactory/api/repositories/{repoKey}",
+      "source": "https://docs.jfrog.com/artifactory/reference/createrepository.md",
+      "params": [
+        {
+          "name": "repoKey",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "RepositoryConfiguration"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json",
+          "schema": "FederatedRepositoryConfiguration"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json",
+          "schema": "LocalRepositoryConfiguration"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json",
+          "schema": "RemoteRepositoryConfiguration"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json",
+          "schema": "VirtualRepositoryConfiguration"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ]
+      }
+    },
+    {
+      "key": "PUT /artifactory/api/v2/repositories/batch",
+      "family": "artifactory-jfrog-artifactory-repositories-api",
+      "tag": "Repositories",
+      "id": "createMultipleRepositories",
+      "method": "PUT",
+      "path": "/artifactory/api/v2/repositories/batch",
+      "source": "https://docs.jfrog.com/artifactory/reference/createmultiplerepositories.md",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "BatchRepositoryConfigurationArray"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json",
+          "schema": "BatchRepositoryConfigurationArray"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json",
+          "schema": "BatchRepositoryConfigurationArray"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json",
+          "schema": "BatchRepositoryConfigurationArray"
+        },
+        {
+          "media": "application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json",
+          "schema": "BatchRepositoryConfigurationArray"
+        }
+      ],
+      "responses": {
+        "201": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "409": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "500": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ]
+      }
+    },
+    {
       "key": "DELETE /distribution/api/v1/export/release_bundle/{}/{}",
       "family": "artifactory-jfrog-distribution-api",
       "tag": "Export and Import Release Bundle V1",
@@ -32140,7 +33118,11 @@
         {
           "name": "async",
           "in": "query",
-          "type": "boolean"
+          "type": "integer",
+          "enum": [
+            "0",
+            "1"
+          ]
         },
         {
           "name": "writeProps",
@@ -32631,7 +33613,11 @@
         {
           "name": "async",
           "in": "query",
-          "type": "boolean"
+          "type": "integer",
+          "enum": [
+            "0",
+            "1"
+          ]
         },
         {
           "name": "writeProps",
@@ -32870,7 +33856,11 @@
         {
           "name": "async",
           "in": "query",
-          "type": "boolean"
+          "type": "integer",
+          "enum": [
+            "0",
+            "1"
+          ]
         },
         {
           "name": "path",
@@ -33239,860 +34229,6 @@
           }
         ],
         "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      }
-    },
-    {
-      "key": "DELETE /artifactory/api/repositories/{}",
-      "family": "artifactory-repositories-api",
-      "tag": "Repositories",
-      "id": "deleteRepository",
-      "method": "DELETE",
-      "path": "/artifactory/api/repositories/{repoKey}",
-      "source": "https://docs.jfrog.com/artifactory/reference/deleterepository.md",
-      "params": [
-        {
-          "name": "repoKey",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "RemoveRepositorySuccessReport"
-          }
-        ],
-        "202": [
-          {
-            "media": "application/json",
-            "schema": "RemoveRepositorySuccessReport"
-          }
-        ],
-        "207": [
-          {
-            "media": "application/json",
-            "schema": "RemoveRepositoryFailureReport"
-          }
-        ],
-        "400": [
-          {
-            "media": "application/json",
-            "schema": "RemoveRepositoryFailureReport"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "RemoveRepositoryFailureReport"
-          }
-        ],
-        "404": [
-          {
-            "media": "application/json",
-            "schema": "RemoveRepositorySuccessReport"
-          }
-        ],
-        "409": [
-          {
-            "media": "application/json",
-            "schema": "RemoveRepositoryFailureReport"
-          }
-        ],
-        "424": [
-          {
-            "media": "application/json",
-            "schema": "RemoveRepositoryFailureReport"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "RemoveRepositoryFailureReport"
-          }
-        ]
-      }
-    },
-    {
-      "key": "DELETE /artifactory/api/v2/repositories/batch",
-      "family": "artifactory-repositories-api",
-      "tag": "Repositories",
-      "id": "deleteRepositories",
-      "method": "DELETE",
-      "path": "/artifactory/api/v2/repositories/batch",
-      "source": "https://docs.jfrog.com/artifactory/reference/deleterepositories.md",
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "[]string"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "RepoBulkRemovalReport"
-          }
-        ],
-        "207": [
-          {
-            "media": "application/json",
-            "schema": "RepoBulkRemovalReport"
-          }
-        ],
-        "400": [
-          {
-            "media": "application/json",
-            "schema": "RepoBulkRemovalFailFastReport"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json"
-          }
-        ],
-        "409": [
-          {
-            "media": "application/json",
-            "schema": "RepoBulkRemovalReport"
-          }
-        ],
-        "424": [
-          {
-            "media": "application/json",
-            "schema": "RepoBulkRemovalReport"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "RepoBulkRemovalReport"
-          }
-        ]
-      }
-    },
-    {
-      "key": "GET /artifactory/api/repositories",
-      "family": "artifactory-repositories-api",
-      "tag": "Repositories",
-      "id": "getRepositoriesByTypeAndProject",
-      "method": "GET",
-      "path": "/artifactory/api/repositories",
-      "source": "https://docs.jfrog.com/artifactory/reference/getrepositoriesbytypeandproject.md",
-      "params": [
-        {
-          "name": "packageType",
-          "in": "query",
-          "type": "string",
-          "enum": [
-            "bower",
-            "cargo",
-            "chef",
-            "cocoapods",
-            "composer",
-            "conan",
-            "cran",
-            "debian",
-            "docker",
-            "gems",
-            "generic",
-            "gitlfs",
-            "go",
-            "gradle",
-            "helm",
-            "ivy",
-            "maven",
-            "nuget",
-            "opkg",
-            "p2",
-            "pub",
-            "puppet",
-            "pypi",
-            "rpm",
-            "sbt",
-            "swift",
-            "terraform",
-            "vagrant",
-            "yum"
-          ]
-        },
-        {
-          "name": "project",
-          "in": "query",
-          "type": "string"
-        },
-        {
-          "name": "type",
-          "in": "query",
-          "type": "string",
-          "enum": [
-            "distribution",
-            "federated",
-            "local",
-            "remote",
-            "virtual"
-          ]
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "[]object"
-          },
-          {
-            "media": "application/vnd.org.jfrog.artifactory.repositories.RepositoryDetailsList+json",
-            "schema": "[]object"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      }
-    },
-    {
-      "key": "GET /artifactory/api/repositories/configurations",
-      "family": "artifactory-repositories-api",
-      "tag": "Repositories",
-      "id": "getAllRepositoryConfigurations",
-      "method": "GET",
-      "path": "/artifactory/api/repositories/configurations",
-      "source": "https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md",
-      "params": [
-        {
-          "name": "packageType",
-          "in": "query",
-          "type": "string"
-        },
-        {
-          "name": "repoType",
-          "in": "query",
-          "type": "string"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          },
-          {
-            "media": "application/vnd.org.jfrog.artifactory.repositories.RepositoryConfigurationsList+json",
-            "schema": "object"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      }
-    },
-    {
-      "key": "GET /artifactory/api/repositories/existence",
-      "family": "artifactory-repositories-api",
-      "tag": "Repositories",
-      "id": "checkIfRepositoryExists",
-      "method": "GET",
-      "path": "/artifactory/api/repositories/existence",
-      "source": "https://docs.jfrog.com/artifactory/reference/checkifrepositoryexists.md",
-      "params": [
-        {
-          "name": "projectKey",
-          "in": "query",
-          "type": "string"
-        },
-        {
-          "name": "type",
-          "in": "query",
-          "type": "array"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      }
-    },
-    {
-      "key": "GET /artifactory/api/repositories/{}",
-      "family": "artifactory-repositories-api",
-      "tag": "Repositories",
-      "id": "getRepositoryConfiguration",
-      "method": "GET",
-      "path": "/artifactory/api/repositories/{repoKey}",
-      "source": "https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md",
-      "params": [
-        {
-          "name": "repoKey",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "RepositoryConfiguration"
-          },
-          {
-            "media": "application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json",
-            "schema": "FederatedRepositoryConfiguration"
-          },
-          {
-            "media": "application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json",
-            "schema": "LocalRepositoryConfiguration"
-          },
-          {
-            "media": "application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json",
-            "schema": "RemoteRepositoryConfiguration"
-          },
-          {
-            "media": "application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json",
-            "schema": "VirtualRepositoryConfiguration"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "404": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      }
-    },
-    {
-      "key": "GET /artifactory/api/repositories/{}/configuration",
-      "family": "artifactory-repositories-api",
-      "tag": "Repositories",
-      "id": "getRemoteRepositoryConfiguration",
-      "method": "GET",
-      "path": "/artifactory/api/repositories/{remoteRepoName}/configuration",
-      "source": "https://docs.jfrog.com/artifactory/reference/getremoterepositoryconfiguration.md",
-      "params": [
-        {
-          "name": "remoteRepoName",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "SharedRemoteRepositoryConfiguration"
-          },
-          {
-            "media": "application/vnd.org.jfrog.artifactory.repositories.SharedRemoteRepositoryConfiguration+json",
-            "schema": "SharedRemoteRepositoryConfiguration"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "404": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      },
-      "deprecated": true
-    },
-    {
-      "key": "GET /artifactory/api/v2/repositories/batch",
-      "family": "artifactory-repositories-api",
-      "tag": "Repositories",
-      "id": "getBatchOfRepositoriesByName",
-      "method": "GET",
-      "path": "/artifactory/api/v2/repositories/batch",
-      "source": "https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md",
-      "params": [
-        {
-          "name": "names",
-          "in": "query",
-          "required": true,
-          "type": "array"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "400": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      }
-    },
-    {
-      "key": "GET /artifactory/api/v2/repositories/{}",
-      "family": "artifactory-repositories-api",
-      "tag": "Repositories",
-      "id": "getRepositoryConfigurationV2",
-      "method": "GET",
-      "path": "/artifactory/api/v2/repositories/{repoKey}",
-      "source": "https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md",
-      "params": [
-        {
-          "name": "repoKey",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "RepositoryConfiguration"
-          },
-          {
-            "media": "application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json",
-            "schema": "FederatedRepositoryConfiguration"
-          },
-          {
-            "media": "application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json",
-            "schema": "LocalRepositoryConfiguration"
-          },
-          {
-            "media": "application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json",
-            "schema": "RemoteRepositoryConfiguration"
-          },
-          {
-            "media": "application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json",
-            "schema": "VirtualRepositoryConfiguration"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "404": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      }
-    },
-    {
-      "key": "POST /artifactory/api/repositories/{}",
-      "family": "artifactory-repositories-api",
-      "tag": "Repositories",
-      "id": "updateRepositoryConfiguration",
-      "method": "POST",
-      "path": "/artifactory/api/repositories/{repoKey}",
-      "source": "https://docs.jfrog.com/artifactory/reference/updaterepositoryconfiguration.md",
-      "params": [
-        {
-          "name": "repoKey",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "RepositoryConfiguration"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json",
-          "schema": "FederatedRepositoryConfiguration"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json",
-          "schema": "LocalRepositoryConfiguration"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json",
-          "schema": "RemoteRepositoryConfiguration"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json",
-          "schema": "VirtualRepositoryConfiguration"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "text/plain",
-            "schema": "string"
-          }
-        ],
-        "400": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "404": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      }
-    },
-    {
-      "key": "POST /artifactory/api/v2/repositories/batch",
-      "family": "artifactory-repositories-api",
-      "tag": "Repositories",
-      "id": "updateMultipleRepositories",
-      "method": "POST",
-      "path": "/artifactory/api/v2/repositories/batch",
-      "source": "https://docs.jfrog.com/artifactory/reference/updatemultiplerepositories.md",
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "BatchRepositoryConfigurationArray"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json",
-          "schema": "BatchRepositoryConfigurationArray"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json",
-          "schema": "BatchRepositoryConfigurationArray"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json",
-          "schema": "BatchRepositoryConfigurationArray"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json",
-          "schema": "BatchRepositoryConfigurationArray"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "string"
-          }
-        ],
-        "400": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "404": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      }
-    },
-    {
-      "key": "PUT /artifactory/api/repositories/{}",
-      "family": "artifactory-repositories-api",
-      "tag": "Repositories",
-      "id": "createRepository",
-      "method": "PUT",
-      "path": "/artifactory/api/repositories/{repoKey}",
-      "source": "https://docs.jfrog.com/artifactory/reference/createrepository.md",
-      "params": [
-        {
-          "name": "repoKey",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "RepositoryConfiguration"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json",
-          "schema": "FederatedRepositoryConfiguration"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json",
-          "schema": "LocalRepositoryConfiguration"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json",
-          "schema": "RemoteRepositoryConfiguration"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json",
-          "schema": "VirtualRepositoryConfiguration"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "text/plain",
-            "schema": "string"
-          }
-        ],
-        "400": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "500": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      }
-    },
-    {
-      "key": "PUT /artifactory/api/v2/repositories/batch",
-      "family": "artifactory-repositories-api",
-      "tag": "Repositories",
-      "id": "createMultipleRepositories",
-      "method": "PUT",
-      "path": "/artifactory/api/v2/repositories/batch",
-      "source": "https://docs.jfrog.com/artifactory/reference/createmultiplerepositories.md",
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "BatchRepositoryConfigurationArray"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json",
-          "schema": "BatchRepositoryConfigurationArray"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json",
-          "schema": "BatchRepositoryConfigurationArray"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json",
-          "schema": "BatchRepositoryConfigurationArray"
-        },
-        {
-          "media": "application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json",
-          "schema": "BatchRepositoryConfigurationArray"
-        }
-      ],
-      "responses": {
-        "201": [
-          {
-            "media": "text/plain",
-            "schema": "string"
-          }
-        ],
-        "400": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "409": [
           {
             "media": "application/json",
             "schema": "ErrorResponse"
@@ -36739,7 +36875,7 @@
     },
     {
       "key": "DELETE /artifactory/api/build/{}",
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "tag": "Builds",
       "id": "deleteBuilds",
       "method": "DELETE",
@@ -36793,7 +36929,7 @@
     },
     {
       "key": "GET /artifactory/api/build",
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "tag": "Builds",
       "id": "getAllBuilds",
       "method": "GET",
@@ -36819,7 +36955,7 @@
     },
     {
       "key": "GET /artifactory/api/build/{}",
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "tag": "Builds",
       "id": "getBuildRuns",
       "method": "GET",
@@ -36852,7 +36988,7 @@
     },
     {
       "key": "GET /artifactory/api/build/{}/{}",
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "tag": "Builds",
       "id": "getBuildInfo",
       "method": "GET",
@@ -36901,7 +37037,7 @@
     },
     {
       "key": "POST /artifactory/api/build/append/{}/{}",
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "tag": "Builds",
       "id": "appendBuild",
       "method": "POST",
@@ -36952,7 +37088,7 @@
     },
     {
       "key": "POST /artifactory/api/build/delete",
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "tag": "Builds",
       "id": "deleteBuildsMultiple",
       "method": "POST",
@@ -36978,7 +37114,7 @@
     },
     {
       "key": "POST /artifactory/api/build/promote/{}/{}",
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "tag": "Builds",
       "id": "promoteBuild",
       "method": "POST",
@@ -37023,7 +37159,7 @@
     },
     {
       "key": "POST /artifactory/api/build/rename/{}",
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "tag": "Builds",
       "id": "renameBuild",
       "method": "POST",
@@ -37063,7 +37199,7 @@
     },
     {
       "key": "POST /artifactory/api/build/retention/{}",
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "tag": "Builds",
       "id": "controlBuildRetention",
       "method": "POST",
@@ -37099,7 +37235,7 @@
     },
     {
       "key": "POST /artifactory/api/docker/{}/v2/promote",
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "tag": "Builds",
       "id": "promoteDockerImage",
       "method": "POST",
@@ -37134,7 +37270,7 @@
     },
     {
       "key": "PUT /artifactory/api/build",
-      "family": "integrations-jfrog-artifactory-builds-api",
+      "family": "integrations-jfrog-artifactory-build-api",
       "tag": "Builds",
       "id": "uploadBuild",
       "method": "PUT",

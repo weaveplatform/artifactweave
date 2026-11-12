@@ -99,6 +99,8 @@ verify_sums() {
 }
 
 # fetch_sums downloads and checks one release's SHA256SUMS into a directory.
+# The SHA256SUMS, its signature and the zips come from the provider's GitHub
+# release, the only place JFrog publishes them, as in run.sh (#1341).
 fetch_sums() {
 	local name=$1 version=$2 dir=$3 base sums
 	base="https://github.com/jfrog/terraform-provider-$name/releases/download/v$version"

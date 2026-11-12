@@ -231,7 +231,7 @@ tests run as part of `make deploy-check`.
 | `acceptance-nuget` | `ubuntu-latest` | P9 | Runs all `@nuget` scenarios with the pinned .NET 10 LTS and newest .NET SDK images and JFrog CLI, then prints each image's SDK version. Uploads `cover-accept-nuget` |
 | `acceptance-jvm` | `ubuntu-latest` | P9c | Full runs execute the 13 Ivy, direct Gradle and sbt recipe scenarios in parallel with the core suite. Uploads required `cover-accept-jvm`; narrow Maven runs retain these scenarios in `acceptance` |
 | `acceptance-gradle` | `ubuntu-latest` | P9 | Runs the `@gradle` scenario independently as informational evidence, records its outcome and uploads `cover-gradle` when available. Its outcome does not gate merge |
-| `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestAccSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline records unimplemented product contracts and explicitly assigned gaps, including the project-scoped remote fields and admin endpoints in [#487](https://github.com/weaveplatform/artifactweave/issues/487). Passing parity means no unrecorded drift, not that every operation is implemented. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes |
+| `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestAccSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline records unimplemented product contracts and explicitly assigned gaps, including the project-scoped remote fields and admin endpoints in [#487](https://github.com/weaveplatform/artifactweave/issues/487). Passing parity means no unrecorded drift, not that every operation is implemented. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes. When a family's own `llms.txt` fails, the fetch takes the family's pages from the section of its parent index that lists the pages `api/oracle-inventory.json` records for it. A family that still has no page in the cache fails `TestAccSpecParity`, which names the family and its index URL, and `make parity-baseline` and `make oracle-inventory` refuse that cache; `actions/cache` saves only after a passing job, so such a crawl is not kept for the week ([#1308](https://github.com/weaveplatform/artifactweave/issues/1308)) |
 | `oci-conformance` (`OCI conformance`) | `ubuntu-latest` | P6 | Builds `opencontainers/distribution-spec`'s conformance suite at the commit of tag `v1.1.1`, starts one `-cover` binary on SQLite and the fs blob store with two local `docker` repositories and a user with Read, Deploy and Delete on both, and runs the categories switched on in the Makefile; see [OCI conformance](#oci-conformance). Uploads the JUnit and HTML reports as `oci-conformance-report` and the coverage as `cover-oci` |
 | `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity, oidc, cdn-repositories and remote-repositories. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
 | `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check`: the `prove-matrix` table test and the reference-deployment contract lint, then over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
@@ -1119,7 +1119,10 @@ identity, OIDC, CDN repositories and remote repositories references in `deploy/a
 the driver.
 - It downloads `terraform-provider-artifactory_<version>_<os>_<arch>.zip` and
   `terraform-provider-platform_<version>_<os>_<arch>.zip` once into a filesystem mirror,
-  checking each against the SHA-256 pinned in the script.
+  checking each against the SHA-256 pinned in the script. The zips come from JFrog's GitHub
+  releases only: the Terraform and OpenTofu registries point at the same assets, so there
+  is no second source, and the job fails when GitHub is down
+  ([#1341](https://github.com/weaveplatform/artifactweave/issues/1341)).
 - It points `TF_CLI_CONFIG_FILE` at a CLI configuration that installs both providers only
   from that mirror.
 - For each scenario it runs `terraform init -lockfile=readonly` and `terraform validate`.
@@ -1247,7 +1250,12 @@ The script fetches terraform (unless the one on `PATH` is the pinned version), t
 trivy and terraform-docs into the gitignored `.tools/` directory and checks each archive
 against the SHA-256 from its release, so a laptop and CI run the same versions. To move a
 tool, change its version and its four checksums (linux and darwin, amd64 and arm64) in
-`deploy/check.sh`. The rulesets' versions live in `.tflint.hcl`.
+`deploy/check.sh`. The rulesets' versions live in `.tflint.hcl`. Each archive has one
+source, because none of these projects publishes it anywhere else: Terraform's zip is only
+on `releases.hashicorp.com`, and tflint, Trivy, terraform-docs and the tflint rulesets only
+on their GitHub releases. Third-party mirrors of `releases.hashicorp.com` are not used,
+since no HashiCorp page names them. A source that is down fails the job
+([#1341](https://github.com/weaveplatform/artifactweave/issues/1341)).
 
 Each root's `.terraform.lock.hcl` holds `h1:` hashes for linux and darwin on amd64 and
 arm64. The script shares a provider plugin cache across roots, and Terraform refuses a

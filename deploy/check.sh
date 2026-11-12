@@ -78,6 +78,19 @@ esac
 
 # fetch downloads one release archive into .tools/<name>-<version>,
 # checks its pinned SHA-256 and unpacks it there.
+#
+# Each archive has one source, because none of these projects publishes it
+# anywhere else (#1341), so a source that is down fails the job, which the
+# maintainer accepts (#1322). releases.hashicorp.com is the only first-party
+# host of the Terraform zip: the hashicorp/terraform GitHub release has no
+# assets, and HashiCorp's apt and yum repositories hold .deb and .rpm
+# packages, which are other bytes. Third-party mirrors of it serve the same
+# zip, but no HashiCorp page names them, so they are not used, as for the
+# workflows' Terraform step (#1335). tflint, Trivy and terraform-docs publish
+# their archives only as GitHub release assets, and get.trivy.dev only
+# redirects to Trivy's. Where a second host serves the same bytes, the
+# pattern is test/acceptance/clients/fetch-pinned.sh's: try each in turn and
+# keep the first whose SHA-256 matches.
 fetch() {
 	local name=$1 version=$2 url=$3 dir sum
 	dir=$tools/$name-$version
@@ -170,6 +183,8 @@ echo "== terraform fmt"
 terraform fmt -check -recursive -diff deploy test/terraform || fail "terraform fmt (run terraform fmt -recursive deploy test/terraform)"
 
 echo "== terraform validate"
+# init installs the hashicorp providers from releases.hashicorp.com, where the
+# registry sends it and their only first-party host (#1341).
 for r in $cloud_roots; do
 	echo "-- $r"
 	tfin "$r" init -backend=false -lockfile=readonly >/dev/null || {
@@ -185,6 +200,8 @@ fi
 
 echo "== tflint"
 export TFLINT_PLUGIN_DIR=$tools/tflint-plugins
+# The rulesets .tflint.hcl pins come from their GitHub releases, their only
+# source (#1341).
 tflint --init --config "$root/.tflint.hcl" >/dev/null
 for r in $roots; do
 	echo "-- $r"

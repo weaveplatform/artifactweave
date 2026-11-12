@@ -281,13 +281,14 @@ func TestAccFetchWritesCacheAndManifest(t *testing.T) {
 		t.Fatalf("flaky should succeed after retry: %+v", e)
 	}
 	dead := false
-	for _, e := range m.Entries {
-		if e.Index == server.URL+"/dead/llms.txt" && strings.Contains(e.Error, "giving up") {
+	for _, fam := range m.Families {
+		if fam.Index == server.URL+"/dead/llms.txt" && strings.Contains(fam.Error, "giving up") &&
+			fam.Source == "" {
 			dead = true
 		}
 	}
 	if !dead {
-		t.Fatal("dead index should be recorded with an error")
+		t.Fatalf("dead index should be recorded with an error: %+v", m.Families)
 	}
 	if _, err := os.Stat(filepath.Join(dir, ManifestFile)); err != nil {
 		t.Fatal(err)
