@@ -374,7 +374,11 @@ func TestAccRemoteV2ServiceSchemaAdmission(t *testing.T) {
 	}
 }
 
-func TestAccRemoteV2UpstreamNoStoreFeedIsNeverReused(t *testing.T) {
+// An upstream Cache-Control: no-store does not keep a v2 feed out of the
+// cache. The kept feed answers until the repository's retrieval cache period
+// ends, then the upstream's new one does, as 7.x's remote keeps the no-store
+// answers an Artifactory upstream sends (remote.mustNotPersist).
+func TestAccRemoteV2UpstreamNoStoreFeedIsKept(t *testing.T) {
 	f := newLegacyFixture(t)
 	first := f.legacyPackage("Acme.Mixed", "1.0.0")
 	set := func(entries string) {
@@ -394,17 +398,25 @@ func TestAccRemoteV2UpstreamNoStoreFeedIsNeverReused(t *testing.T) {
 	set(first + f.legacyPackage("Acme.Mixed", "2.0.0"))
 	rec := f.do("GET", remoteV2+"Packages", "reader")
 	wantStatus(t, rec, 200)
-	if !strings.Contains(rec.Body.String(), "2.0.0") {
-		t.Fatal("no-store feed reused")
+	if strings.Contains(rec.Body.String(), "2.0.0") {
+		t.Fatal("kept feed not reused")
 	}
 	entries, _, err := f.db.RemoteCache().List(t.Context(), "nuget-remote", "", kernel.Page{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	kept := false
 	for _, e := range entries {
-		if e.Blob.Checksums.SHA256 != "" {
-			t.Fatal("no-store XML persisted")
-		}
+		kept = kept || e.Blob.Checksums.SHA256 != ""
+	}
+	if !kept {
+		t.Fatal("no-store XML not kept")
+	}
+	f.clock.Advance(6 * time.Second)
+	rec = f.do("GET", remoteV2+"Packages", "reader")
+	wantStatus(t, rec, 200)
+	if !strings.Contains(rec.Body.String(), "2.0.0") {
+		t.Fatal("expired feed not refreshed")
 	}
 }
 

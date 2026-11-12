@@ -50,7 +50,10 @@ func (g *Registry) registerBlobs() {
 // download (Options.ServeBlob), which streams it, or redirects a GET to a
 // signed URL when the repository's download redirect says so (decision
 // 0029). A HEAD gets the headers the GET sends, ETag and X-Checksum-* among
-// them, as 7.x sends them since RTFACT-29977, and is never redirected.
+// them, as 7.x sends them since RTFACT-29977, and is never redirected. Both
+// answer with the whole blob whatever Range asks for (wholeRequest), and
+// name it as the Docker API does (setFileHeaders): the download keeps a
+// Content-Disposition already set.
 func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
 	if err := q.Require(r, q.Name+"/", api.ActionRead); err != nil {
 		Write(w, err)
@@ -77,26 +80,26 @@ func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
 		return
 	}
 	w.Header().Set(contentDigestHeader, "sha256:"+hex)
+	setFileHeaders(w.Header(), it.Name)
+	r = wholeRequest(r)
 	if r.Method == http.MethodHead {
 		r = headRequest(r)
 	}
 	g.serveBlob(w, r, q.Repo, it)
 }
 
-// headRequest is r without the headers Artifactory's download leaves
+// headRequest is r without the preconditions Artifactory's download leaves
 // unevaluated on a HEAD, so that a blob HEAD answers only If-None-Match and
 // If-Modified-Since with 304, as 6.20's download does
 // (DownloadServiceImpl.isNotModified), and otherwise 200 with the whole
-// length. A HEAD sends no range (RequestResponseHelper.sendHeadResponse, and
-// RFC 9110 defines range handling for GET only), and the download evaluates
-// neither If-Match nor If-Unmodified-Since (RTFACT-17259; #1314 for the
-// GET). Without this, a HEAD with Range would answer 206 and one with a
-// stale If-Match 412, where the HEAD answered 200 before it went through the
-// download.
+// length. The download evaluates neither If-Match nor If-Unmodified-Since
+// (RTFACT-17259; #1314 for the GET). Without this, a HEAD with a stale
+// If-Match would answer 412, where the HEAD answered 200 before it went
+// through the download. Range has already gone (wholeRequest).
 func headRequest(r *http.Request) *http.Request {
 	out := r.WithContext(r.Context())
 	out.Header = r.Header.Clone()
-	for _, k := range []string{"Range", "If-Range", "If-Match", "If-Unmodified-Since"} {
+	for _, k := range []string{"If-Match", "If-Unmodified-Since"} {
 		out.Header.Del(k)
 	}
 	return out
@@ -130,9 +133,9 @@ func (g *Registry) findBlob(ctx context.Context, q Request, hex string) (model.I
 	return model.Item{}, refused //nolint:wrapcheck // the RejectionError is the answer
 }
 
-// streamBlob serves a blob's content from the blob store, ranges and
-// conditional requests included: the registry's own download, for a
-// server that sets no Options.ServeBlob.
+// streamBlob serves a blob's content from the blob store, conditional
+// requests included: the registry's own download, for a server that sets
+// no Options.ServeBlob.
 func (g *Registry) streamBlob(
 	w http.ResponseWriter,
 	r *http.Request,

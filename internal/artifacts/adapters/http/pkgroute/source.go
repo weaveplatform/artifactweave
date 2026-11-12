@@ -228,6 +228,16 @@ func (e *sourceRefusal) Unwrap() []error { return []error{e.answer, e.rejection}
 // unknown-length body must not look like a successfully completed artifact.
 func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error {
 	defer func() { _ = s.Body.Close() }()
+	if r.Method == http.MethodHead {
+		// A HEAD answers 200 with the whole length, never 206 or 416, as the
+		// item kit's ServeFile answers one. 6.20's download answers a HEAD
+		// through RequestResponseHelper.sendHeadResponse, which never reads
+		// Range, and RFC 9110 section 14.2 has a server ignore Range on a
+		// method range handling is not defined for, which is every method
+		// but GET; http.ServeContent applies it whatever the method. No 7.x
+		// capture shows a HEAD with Range [I].
+		r = WithoutRange(r)
+	}
 	h := w.Header()
 	if s.MediaType != "" {
 		h.Set("Content-Type", s.MediaType)
@@ -266,6 +276,20 @@ func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error
 		return source.ErrUnavailable
 	}
 	return nil
+}
+
+// WithoutRange is r without Range and If-Range, so http.ServeContent serves
+// the whole representation. If-Range only ever narrows what Range asks for,
+// so it goes with it. The copy leaves the caller's request as it was sent.
+func WithoutRange(r *http.Request) *http.Request {
+	if len(r.Header.Values("Range")) == 0 && len(r.Header.Values("If-Range")) == 0 {
+		return r
+	}
+	out := r.WithContext(r.Context())
+	out.Header = r.Header.Clone()
+	out.Header.Del("Range")
+	out.Header.Del("If-Range")
+	return out
 }
 
 // checkedContent exposes a read failure which ServeContent cannot return.

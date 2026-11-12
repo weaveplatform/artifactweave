@@ -573,8 +573,9 @@ func (s *Kit) getSidecar(
 }
 
 // ServeFile streams a file's content with the headers the JFrog CLI reads
-// (Content-Length, Accept-Ranges and the X-Checksum headers); ranges and
-// conditional requests are http.ServeContent's.
+// (Content-Length, Accept-Ranges and the X-Checksum headers); ranges on a
+// GET and conditional requests are http.ServeContent's. A Content-Disposition
+// already in w's headers is kept, so a protocol can send its own form.
 func (s *Kit) ServeFile(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -584,6 +585,12 @@ func (s *Kit) ServeFile(
 ) {
 	ctx := r.Context()
 	it := f.Item
+	if r.Method == http.MethodHead {
+		// A HEAD answers 200 with the file's whole length, never 206 or
+		// 416, for the reasons pkgroute.ServeStream gives (6.20's
+		// sendHeadResponse; RFC 9110 section 14.2) [I].
+		r = pkgroute.WithoutRange(r)
+	}
 	h := w.Header()
 	pkgroute.SetChecksums(h, it.Actual)
 	h.Set("X-Artifactory-Filename", it.Name)

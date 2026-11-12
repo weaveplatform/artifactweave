@@ -92,8 +92,9 @@
 //     listing_smart_test.go cover discovery and listings. helpers_test.go
 //     holds their small helpers, and export_test.go opens the policy's
 //     unexported parts to them.
-//   - flight_test.go, rules_test.go, listing_parse_test.go,
-//     protocol_test.go and smart_peer_test.go are in-package unit tests of
-//     the flight group and the admission, the cache rules, the listing
+//   - flight_test.go, rules_test.go, rules_nostore_test.go,
+//     listing_parse_test.go, protocol_test.go and smart_peer_test.go are
+//     in-package unit tests of the flight group and the admission, the
+//     cache rules and the upstream no-store the cache keeps, the listing
 //     parsers, the protocol paths and the Smart peer parser.
 package remote

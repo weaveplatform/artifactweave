@@ -134,10 +134,12 @@ only the explicit `allowAnyHostAuth` HTTPS policy widens that credential scope.
 Repository freshness and negative-cache settings govern metadata. Checksum and
 signature artifacts are refreshable, with validation bound to the current package
 metadata. Offline mode serves only a complete validated cached bundle; it cannot
-manufacture a missing archive or companion. Repository no-store and upstream
-`Cache-Control: no-store` retain the same verification and delivery checks using
-transient bytes. A no-store component that cannot be fetched during an outage
-makes its bundle unavailable. Rejections identify the failing metadata, checksum,
+manufacture a missing archive or companion. Repository no-store retains the same
+verification and delivery checks using transient bytes. An upstream
+`Cache-Control: no-store` answer is cached like any other, as the
+[retrieval contract](../implementation/remote-retrieval-contract.md) explains. A
+no-store component that cannot be fetched during an outage makes its bundle
+unavailable. Rejections identify the failing metadata, checksum,
 signature or archive stage using server-owned descriptions; upstream response text,
 URLs and credentials remain private.
 

@@ -256,34 +256,44 @@ func TestAccSmartDiscoveryThrottlePersistsAcrossCalls(t *testing.T) {
 	}
 }
 
-func TestAccSmartNoStoreLeavesNoSynchronizationState(t *testing.T) {
-	w := smartFixture(t)
-	w.reply = func(rw http.ResponseWriter, r *http.Request) bool {
-		if r.URL.Path != "/artifactory/source/file.bin" {
-			return false
+// A smart remote keeps an upstream answer that carries Cache-Control:
+// no-store, with the synchronization state an answer without it gets: an edge
+// over its 7.x main server caches what the server marks no-store
+// (RTFACT-30785), and 6.20's remote fetch never reads the upstream's
+// Cache-Control.
+func TestAccSmartKeepsAnUpstreamNoStoreAnswer(t *testing.T) {
+	jobs := map[bool]any{}
+	for _, noStore := range []bool{false, true} {
+		w := smartFixture(t)
+		w.reply = func(rw http.ResponseWriter, r *http.Request) bool {
+			if r.URL.Path != "/artifactory/source/file.bin" {
+				return false
+			}
+			if noStore {
+				rw.Header().Set("Cache-Control", "no-store")
+			}
+			rw.Header().Set("Content-Type", "application/octet-stream")
+			_, _ = io.WriteString(rw, "artifact body")
+			return true
 		}
-		rw.Header().Set("Cache-Control", "no-store")
-		rw.Header().Set("Content-Type", "application/octet-stream")
-		_, _ = io.WriteString(rw, "artifact body")
-		return true
+		result, err := w.service.Read(w.ctx, w.smartRequest())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if w.bytes(result) != "artifact body" {
+			t.Fatal("content")
+		}
+		if _, err = w.db.Items().Get(w.ctx, w.c.Key, true, "file.bin"); err != nil {
+			t.Fatal("no-store answer not kept", noStore, err)
+		}
+		stats, err := w.db.WorkQueue().Stats(w.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		jobs[noStore] = len(stats)
 	}
-	result, err := w.service.Read(w.ctx, w.smartRequest())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if w.bytes(result) != "artifact body" {
-		t.Fatal("transient content")
-	}
-	if _, err = w.db.Items().
-		Get(w.ctx, w.c.Key, true, "file.bin"); !errors.Is(
-		err,
-		kernel.ErrNotFound,
-	) {
-		t.Fatal("private bytes persisted", err)
-	}
-	stats, err := w.db.WorkQueue().Stats(w.ctx)
-	if err != nil || len(stats) != 0 {
-		t.Fatal("transient sync jobs", stats, err)
+	if jobs[true] != jobs[false] {
+		t.Fatal("synchronization differs", jobs)
 	}
 }
 

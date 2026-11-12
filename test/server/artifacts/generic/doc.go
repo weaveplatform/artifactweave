@@ -22,7 +22,8 @@
 //     openRuntime over the harness's configuration and costs), and a blob
 //     store that signs CDN URLs.
 //   - The harness's item world (harness.NewItemWorld) with a Vagrant local
-//     repository, for the download headers.
+//     repository, for the download headers, and with a PyPI local
+//     repository, for a HEAD with Range.
 //
 // # Outputs
 //
@@ -34,6 +35,15 @@
 //   - download_headers_test.go: a file's ETag, the bare SHA-1, and the
 //     conditional requests that send it back, and a box's media type, on
 //     the item route and the Vagrant box file route (#1266, #1267).
+//   - head_range_test.go: a HEAD with Range answers 200 with the whole
+//     length on a local, redirecting, virtual, PyPI and remote file, where
+//     a GET still gets the range (#1338).
+//   - remote_upstream_nostore_test.go: a generic, Maven, npm and PyPI
+//     remote keeps the answers an upstream marks Cache-Control: no-store,
+//     serves them again without the upstream and once it is gone, and
+//     still refreshes mutable metadata under a zero retrieval cache
+//     period. The test repoints the remote world's repository at each
+//     package type in turn.
 //
 // # References
 //

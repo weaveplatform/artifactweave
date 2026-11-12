@@ -970,9 +970,13 @@ func TestAccRemoteProviderNoStoreAndRotation(t *testing.T) {
 			if got.Code != 200 {
 				t.Fatalf("transient download %d %s", got.Code, got.Body)
 			}
-			if _, err := f.db.Items().
-				Get(t.Context(), "remote", true, fixtureArchivePath); err == nil {
-				t.Fatal("no-store archive was persisted")
+			// Only the repository's setting keeps the archive transient. An
+			// upstream no-store answer is kept like any other, as 7.x's remote
+			// keeps the no-store answers an Artifactory upstream sends
+			// (remote.mustNotPersist).
+			_, err := f.db.Items().Get(t.Context(), "remote", true, fixtureArchivePath)
+			if kept := err == nil; kept != (transient == "upstream") {
+				t.Fatalf("%s no-store archive kept: %v", transient, kept)
 			}
 		})
 	}

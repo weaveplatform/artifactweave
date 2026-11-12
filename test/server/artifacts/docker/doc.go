@@ -36,6 +36,10 @@
 //     no-store and native routes, invalid index children, integrity and
 //     denied paths, foreign layers, a revocation during a fetch, and the
 //     answers to an upstream's 401, 403, 429 and 502.
+//   - TestAcc results for download headers and ranges
+//     (registry_download_headers_test.go): the file headers of a local and a
+//     remote manifest and blob, and the whole content a GET or HEAD with
+//     Range gets through the Docker API (issues 1336, 1337 and 1338).
 //
 // # References
 //

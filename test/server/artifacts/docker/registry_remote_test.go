@@ -111,9 +111,11 @@ func TestAccRegistryRemotePullRefreshAndOffline(t *testing.T) {
 		t.Fatal("warm HEAD used network")
 	}
 	blobPath := "/v2/remote/team/image/blobs/" + registryDigest(layer)
+	// The Docker API answers a range with the whole blob, as 7.71.4 does
+	// (RTFACT-30157, #1337).
 	ranged := w.request("GET", blobPath, "reader", "", "Range", "bytes=2-6")
-	remoteStatus(t, ranged, 206)
-	if ranged.Body.String() != string(layer[2:7]) {
+	remoteStatus(t, ranged, 200)
+	if ranged.Body.String() != string(layer) {
 		t.Fatal("range changed bytes")
 	}
 	// Pull and retain the original immutable address before moving its tag.
@@ -270,8 +272,9 @@ func TestAccRegistryRemoteNoStoreAndNativeRoutes(t *testing.T) {
 		"Range",
 		"bytes=1-4",
 	)
-	remoteStatus(t, got, 206)
-	if got.Body.String() != string(layer[1:5]) {
+	// The whole blob, as on a cached one (RTFACT-30157, #1337).
+	remoteStatus(t, got, 200)
+	if got.Body.String() != string(layer) {
 		t.Fatal("transient range changed")
 	}
 	entries, _, err := w.rt.Store.RemoteCache().List(t.Context(), "remote", "", kernel.Page{})

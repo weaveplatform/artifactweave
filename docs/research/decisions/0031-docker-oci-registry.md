@@ -145,21 +145,37 @@ its status alone.
 - **Existence.** A blob is in `<repo>/<name>` when one of the image's own folders (a tag
   folder, a digest folder or `_uploads/`, each a direct child of `<name>/`) holds
   `sha256__<hex>` with its digest. `GET` and `HEAD` go through the server's file download:
-  `GET` streams from the blob store, honours `Range`, and goes through
+  `GET` streams the whole blob from the blob store and goes through
   the download redirect policy of decision [0029](0029-cdn-delivery-and-download-redirect.md),
   which Artifactory applies to Docker too (research 19). `HEAD` never redirects. Both send
   `Docker-Content-Digest` and the headers of a file download: `Content-Length`,
-  `Accept-Ranges: bytes`, `Last-Modified`, `X-Artifactory-Filename`, `Content-Disposition`,
-  `X-Checksum-Md5`, `X-Checksum-Sha1`, `X-Checksum-Sha256`, and the bare SHA-1 as `ETag`,
-  equal to `X-Checksum-Sha1`, as 7.x answers a blob `GET` on a local and a remote repository
-  ([RTFACT-29977](https://jfrog.atlassian.net/browse/RTFACT-29977) on 7.55.8,
-  [RTFACT-30157](https://jfrog.atlassian.net/browse/RTFACT-30157) on 7.71.4) and a `HEAD`
-  since RTFACT-29977's fix (amended 2026-11-12, #1317). `If-None-Match` takes that SHA-1 bare,
-  quoted, weak or in a list, as on the item route, and `If-Range` takes it bare or quoted. A
-  local blob's `HEAD` answers `If-None-Match` and `If-Modified-Since` with 304, as 6.20's
-  download does, and ignores `Range`, `If-Range`, `If-Match` and `If-Unmodified-Since`, which
-  that download does not evaluate on a `HEAD` **[I]**. A remote repository's blob, on its
-  first fetch and from the cache, carries the same `ETag` and checksums.
+  `Accept-Ranges: bytes`, `Last-Modified`, `X-Artifactory-Filename: sha256__<hex>`,
+  `Content-Disposition: attachment; filename="sha256__<hex>"`, the quoted name alone with no
+  `filename*` part, `X-Checksum-Md5`, `X-Checksum-Sha1`, `X-Checksum-Sha256`, and the bare
+  SHA-1 as `ETag`, equal to `X-Checksum-Sha1`, as 7.x answers a blob `GET` on a local and a
+  remote repository ([RTFACT-29977](https://jfrog.atlassian.net/browse/RTFACT-29977) on
+  7.55.8, [RTFACT-30157](https://jfrog.atlassian.net/browse/RTFACT-30157) on 7.71.4) and a
+  `HEAD` since RTFACT-29977's fix (amended 2026-11-12, #1317, #1336). Neither capture shows
+  `X-Artifactory-Docker-Registry` on a blob, so a blob does not send it. The item route on the
+  same file keeps its `filename*` part, as 7.55.8 sent it on a Maven download. `If-None-Match`
+  takes that SHA-1 bare, quoted, weak or in a list, as on the item route. A local blob's
+  `HEAD` answers `If-None-Match` and `If-Modified-Since` with 304, as 6.20's download does,
+  and ignores `If-Match` and `If-Unmodified-Since`, which that download does not evaluate on
+  a `HEAD` **[I]**. A remote repository's blob, on its first fetch and from the cache,
+  carries the same `ETag`, checksums and file headers.
+- **`Range`.** A blob `GET` answers `Range` with 200 and the whole blob, still with
+  `Accept-Ranges: bytes`, and `If-Range` changes nothing: 7.71.4 answered a blob `GET` with
+  `Range: bytes=0-250` so ([RTFACT-30157](https://jfrog.atlassian.net/browse/RTFACT-30157),
+  open, no fix version), and [RTFACT-30847](https://jfrog.atlassian.net/browse/RTFACT-30847)
+  (open) still asks for partial pulls. The item route on the same file applies a range, as
+  7.57.0's does ([RTFACT-17182](https://jfrog.atlassian.net/browse/RTFACT-17182)). A ranged
+  `GET` is a whole download, so it is counted and redirected as one. A manifest answers
+  `Range` the same way, and so does a remote repository's blob or manifest, stored or not
+  **[I]**: no capture shows either asked for a range (amended 2026-11-12, #1337). A `HEAD`
+  with `Range` answers 200 with the whole length, on the Docker API and the item route alike,
+  since 6.20's `RequestResponseHelper.sendHeadResponse` never reads `Range` and RFC 9110
+  section 14.2 has a server ignore it on any method but `GET` **[I]** (amended 2026-11-12,
+  #1338).
 - **Uploads.** `POST .../blobs/uploads/` opens a session in `internal/platform/blob/session`
   recorded in the `uploads` store, and answers 202 with an absolute `Location` from the
   base-URL resolver, `Range: 0-0` and `Docker-Upload-UUID`. `OCI-Chunk-Min-Length` is sent
@@ -306,7 +322,17 @@ its status alone.
   take it as a blob's do (amended 2026-11-12, #1317). A remote repository's manifest keeps
   its digest as `ETag`, since no capture shows a remote one's **[I]**.
   `X-Artifactory-Docker-Registry` names the repository that holds the manifest, by its
-  stored key, which `jf docker push` and `pull` read (R23 6). A
+  stored key, which `jf docker push` and `pull` read (R23 6). A manifest also sends the
+  headers of a file download, as 7.33.12 answered a local manifest `HEAD` (RTFACT-27199)
+  and 7.5.7 a `HEAD` from containerd (RTFACT-23106): `X-Checksum-Md5`, `X-Checksum-Sha1`,
+  `X-Checksum-Sha256`, `X-Artifactory-Filename` with the stored file's name
+  (`manifest.json`, or `list.manifest.json` for an index or list),
+  `Content-Disposition: attachment; filename="<name>"` and `Cache-Control: no-store`. A
+  redirected `GET`'s 302 keeps the checksums and the name, as a blob's does. A remote
+  repository's manifest sends the same, named by its media type, on its first fetch and from
+  the cache: 6.11.3 sent a remote manifest's checksums
+  ([RTFACT-19842](https://jfrog.atlassian.net/browse/RTFACT-19842)), and no 7.x capture
+  shows the rest **[I]** (amended 2026-11-12, #1336). A
   manifest is never converted: a request whose `Accept` lists manifest types but not the
   stored one answers 404 `MANIFEST_UNKNOWN`, and no `Accept` or a wildcard gets the stored
   type. A reference that is neither a valid
