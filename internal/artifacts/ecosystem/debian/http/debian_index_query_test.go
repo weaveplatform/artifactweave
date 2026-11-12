@@ -43,17 +43,23 @@ func (w *itemWorld) withProperties(it model.Item, props model.Properties) {
 // repository's package or Sources index from a local member, and a remote
 // member's cached package answer 500 when a matrix parameter asks for the
 // file's properties and they cannot be read, rather than serving a file the
-// parameters may not match. Without a matrix parameter nothing reads them,
-// so the same requests serve the file.
+// parameters may not match. Without a matrix parameter nothing reads an
+// index's properties, so an index is served; a package's download reads
+// them for its artifactory.content-type (#1380), as 7.x's getInfo reads
+// the properties of every file it downloads, so it answers 500 too.
 func TestUnitDebianIndexMatrixFailsClosed(t *testing.T) {
 	index := packagesIndex("alpha 1.0 " + debAlpha)
 	for _, tc := range []struct {
 		name, key, path string
+		plain           int // the answer without a matrix parameter
 	}{
-		{"local index", "deb-local", debPackages},
-		{"virtual package from a local member", "deb-virtual", debAlpha},
-		{"virtual Sources from a local member", "deb-virtual", debSources},
-		{"virtual package cached by a remote member", "deb-cached", debAlpha},
+		{"local index", "deb-local", debPackages, http.StatusOK},
+		{"virtual package from a local member", "deb-virtual", debAlpha, http.StatusInternalServerError},
+		{"virtual Sources from a local member", "deb-virtual", debSources, http.StatusOK},
+		{
+			"virtual package cached by a remote member", "deb-cached", debAlpha,
+			http.StatusInternalServerError,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var w *overlayWorld
@@ -77,8 +83,13 @@ func TestUnitDebianIndexMatrixFailsClosed(t *testing.T) {
 			w.put("deb-local", debAlpha, false, localDeb)
 			w.put("deb-local", debSources, false, sourcesIndex("1.0-1"))
 			w.put("deb-remote", debAlpha, true, remoteDeb)
-			if rec := w.get(tc.key, tc.path, "admin"); rec.Code != http.StatusOK {
-				t.Fatalf("without a matrix parameter answered %d %s, want 200", rec.Code, rec.Body)
+			if rec := w.get(tc.key, tc.path, "admin"); rec.Code != tc.plain {
+				t.Fatalf(
+					"without a matrix parameter answered %d %s, want %d",
+					rec.Code,
+					rec.Body,
+					tc.plain,
+				)
 			}
 			wantError(t, w.get(tc.key, tc.path+";x=1", "admin"),
 				http.StatusInternalServerError, "internal error")

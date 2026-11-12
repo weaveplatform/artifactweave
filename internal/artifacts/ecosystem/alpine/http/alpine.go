@@ -409,7 +409,7 @@ func (s alpineItems) serveVirtualAlpinePackage(
 			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
-		s.ServeFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
+		s.ServeItemFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
 		return
 	}
 	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
@@ -465,6 +465,6 @@ func (s alpineItems) serveRemoteAlpinePackage(
 		)
 		return
 	}
-	s.ServeFile(w, r, s.Store,
+	s.ServeItemFile(w, r, s.Store,
 		itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }

@@ -1,7 +1,9 @@
 @luarocks
 Feature: Native LuaRocks upload and install on a local repository
   A rockspec and source rock uploaded by LuaRocks appear in the manifest and
-  can be installed by the same client at a pinned or latest version.
+  can be installed by the same client at a pinned or latest version. The client
+  moves on to the next manifest name when one fails, so each install also checks
+  that the server answered none of its requests with 500.
 
   Scenario: native upload, pinned install and latest install
     Given the registry is running
@@ -18,8 +20,10 @@ Feature: Native LuaRocks upload and install on a local repository
     And the response body contains "src"
     When I run luarocks "install hello 1.0-1 --tree /work/installed-pinned"
     Then the command succeeds
+    And the server answered no request with 500 since the last luarocks command
     When I run luarocks "install hello --tree /work/installed-latest"
     Then the command succeeds
+    And the server answered no request with 500 since the last luarocks command
     And the file "installed-pinned/share/lua/5.5/hello.lua" exists
     And the file "installed-latest/share/lua/5.5/hello.lua" exists
 
@@ -37,4 +41,5 @@ Feature: Native LuaRocks upload and install on a local repository
     When within 10 seconds the body of GET "/artifactory/api/luarocks/rocks-fed/manifest-5.5" as admin contains "hello"
     When I run luarocks "install hello 1.0-1 --tree /work/installed-fed"
     Then the command succeeds
+    And the server answered no request with 500 since the last luarocks command
     And the file "installed-fed/share/lua/5.5/hello.lua" exists

@@ -10726,7 +10726,7 @@ type ClientInterface interface {
 
 	// CalculateNuGetRepositoryMetadata performs a POST /api/nuget/{repoKey}/reindex (the `CalculateNuGetRepositoryMetadata` operationId) request.
 	//
-	// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing remote repositories, remote caches and virtual repositories is not implemented and answers 501.
+	// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository, or from the verified cached packages of a remote repository, named by its key or its cache's. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing virtual repositories is not implemented and answers 501.
 	CalculateNuGetRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateOpkgRepositoryMetadata performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
@@ -15731,7 +15731,7 @@ func (c *Client) CalculateNpmRepositoryMetadata(ctx context.Context, repoKey str
 
 // CalculateNuGetRepositoryMetadata performs a POST /api/nuget/{repoKey}/reindex (the `CalculateNuGetRepositoryMetadata` operationId) request.
 //
-// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing remote repositories, remote caches and virtual repositories is not implemented and answers 501.
+// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository, or from the verified cached packages of a remote repository, named by its key or its cache's. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing virtual repositories is not implemented and answers 501.
 func (c *Client) CalculateNuGetRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateNuGetRepositoryMetadataRequest(c.Server, repoKey)
 	if err != nil {
@@ -38060,7 +38060,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateNuGetRepositoryMetadataWithResponse performs a POST /api/nuget/{repoKey}/reindex (the `CalculateNuGetRepositoryMetadata` operationId) request.
 	//
-	// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing remote repositories, remote caches and virtual repositories is not implemented and answers 501.
+	// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository, or from the verified cached packages of a remote repository, named by its key or its cache's. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing virtual repositories is not implemented and answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateNuGetRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateNuGetRepositoryMetadataResponse, error)
@@ -65161,7 +65161,7 @@ func (c *ClientWithResponses) CalculateNpmRepositoryMetadataWithResponse(ctx con
 
 // CalculateNuGetRepositoryMetadataWithResponse performs a POST /api/nuget/{repoKey}/reindex (the `CalculateNuGetRepositoryMetadata` operationId) request.
 //
-// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing remote repositories, remote caches and virtual repositories is not implemented and answers 501.
+// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository, or from the verified cached packages of a remote repository, named by its key or its cache's. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing virtual repositories is not implemented and answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateNuGetRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateNuGetRepositoryMetadataResponse, error) {

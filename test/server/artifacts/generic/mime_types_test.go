@@ -18,6 +18,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -268,22 +269,21 @@ func TestAccGenericRemoteMIMELabels(t *testing.T) {
 }
 
 // TestAccGenericRemoteMIMEBlocked: an HTML or XHTML label on a file whose
-// type is another is refused, and nothing is cached for it. The override
-// list replaces that block list (#1316): a label it names is refused, and
-// an HTML label is then cached. An HTML body is not read for its type, so
-// under a label off the list it is cached like any other bytes.
+// type is another is refused, 409 with 7.x's message (#1376), and nothing
+// is cached for it. The override list replaces that block list (#1316): a
+// label it names is refused, and an HTML label is then cached. An HTML
+// body is not read for its type, so under a label off the list it is
+// cached like any other bytes.
 func TestAccGenericRemoteMIMEBlocked(t *testing.T) {
 	w := newRemoteWorld(t)
-	const refused = `{"errors":[{"message":"Bad Gateway","status":502}]}` + "\n"
 	const page = "<!DOCTYPE html><html>login</html>"
 	wantRefused := func(path, label string) {
 		t.Helper()
 		upstream(w, path, label, page)
 		rec := w.request(http.MethodGet, "/artifactory/remote"+path, "reader", "")
-		remoteStatus(t, rec, http.StatusBadGateway)
-		if rec.Body.String() != refused {
-			t.Fatalf("%s under %q: %q", path, label, rec.Body)
-		}
+		typ := strings.TrimSpace(strings.Split(label, ";")[0])
+		message := refusalOf(w, path, item.MimeType(path), typ, path[1:])
+		wantRefusal(t, rec, http.MethodGet, message)
 		rec = w.request(http.MethodGet, "/artifactory/api/storage/remote-cache"+path, "reader", "")
 		remoteStatus(t, rec, http.StatusNotFound)
 	}
