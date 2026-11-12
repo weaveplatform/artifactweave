@@ -34,17 +34,40 @@ nix --extra-experimental-features nix-command \
 ```
 
 Use Nix's protected netrc configuration for authenticated caches. The native
-publication needs Write on both the archive and narinfo paths; replacing
-metadata additionally requires Delete. Metadata and archive reads require Read
-on both objects. Hosted responses add the configured Ed25519 signature over the
+publication needs Write on the paths below, where the NAR and the narinfo are
+stored; replacing metadata additionally requires Delete. Metadata and archive
+reads require Read on both objects. Hosted responses add the configured Ed25519 signature over the
 Nix store path, NAR SHA256, NAR size and sorted references. Without a hosted key,
 existing publisher signatures are retained. An unavailable configured key fails
 closed. Publisher `CA` assertions are omitted because the adapter does not
 independently prove their content-address claims.
 
+A hosted repository stores each store path in its own folder,
+`binary-cache/<store hash>/`, as Artifactory 7.x does and `jf nix` queries it
+([jfrog-cli-artifactory](https://github.com/jfrog/jfrog-cli-artifactory),
+`artifactory/commands/nix/command.go`): the narinfo as
+`binary-cache/<store hash>/<store hash>.narinfo` and the NAR under the file
+name the client gave it, `binary-cache/<store hash>/<file>`. The client keeps
+the URLs of a plain binary cache. `nix copy` uploads the NAR first, to
+`nar/<file>`, which names no store path, so the repository holds it there
+until the narinfo arrives at `<store hash>.narinfo`; it then stores the NAR in
+the store path's folder, from that upload or from the same file stored for
+another store path, stores the narinfo beside it and removes the held upload,
+past the trash can. The publisher needs Write on both paths in the folder. `DELETE <store hash>.narinfo` and
+`DELETE nar/<store hash>/<file>`, the URL the narinfo serves, remove the stored
+files; `DELETE nar/<file>` removes only an upload still held. The item API
+stores what it is sent where it is sent: a narinfo at the root of a hosted
+repository is refused, and one deployed to its folder needs the NAR there. A
+remote repository's cache keeps the paths the client asks for,
+`<store hash>.narinfo` and `nar/<file>`.
+
 The cache advertises `/nix/store`. It accepts narinfo metadata and immutable
-`nar/<SHA256>.nar[.xz|.bz2|.gz|.zst]` archives; compressed and expanded SHA256 and
-sizes must agree. A published store path keeps its signed fingerprint (path,
+`<SHA256>.nar[.xz|.bz2|.gz|.zst]` archives; compressed and expanded SHA256 and
+sizes must agree. An xz archive must be whole: every stream must end in an
+index that lists its blocks and a footer that matches it, as `xz -t` and Nix's
+decompressor require, so an upload cut short after its last block is refused
+with 400 "invalid Nix archive", and a channel tarball with 400 "invalid Nix
+channel archive". A published store path keeps its signed fingerprint (path,
 NAR hash/size and references); signatures, deriver and transport encoding can
 refresh without changing that identity. Concurrent publications serialize on the
 store hash. It validates the NAR grammar, zero padding, ordered directory
@@ -123,7 +146,12 @@ Generic remote item downloads are refused so they cannot bypass these checks.
 
 Virtual caches search readable concrete members in order. Missing members and
 missing store paths fall through; upstream faults fail closed. Both virtual and
-member permissions and patterns apply to narinfo and its archive. Configuration
+member permissions and patterns apply to narinfo and its archive. Permissions
+and the download policy are checked where each repository stores the file: a
+hosted repository's `binary-cache/<store hash>/` folder, so a pattern written
+for 7.x such as `binary-cache/**/*.nar.xz` refuses the NAR and leaves the
+narinfo served, and a remote's `<store hash>.narinfo` and `nar/<file>`. A
+virtual repository checks its own at a hosted repository's paths. Configuration
 and permissions are rechecked before delivery. Nested virtual members are
 rejected by the shared router contract.
 
@@ -144,6 +172,9 @@ ordered V, and substitute R again after the origin stops with offline enabled.
 A channel scenario uploads a snapshot with `curl`, follows the channel with
 `nix-channel --add` and `--update`, then uploads a newer snapshot and updates
 to it.
+[A layout scenario](../../test/acceptance/features/nix_binary_cache.feature)
+publishes with `nix copy` and finds both files in the store path's
+`binary-cache` folder through the storage API and `jf nix`'s AQL query.
 The committed NAR fixture was produced by the same pinned native client; its
 [provenance](../../internal/artifacts/ecosystem/nix/testdata/README.md) records the command.
 Unit and package acceptance tests exercise malformed metadata and NARs, hashes,

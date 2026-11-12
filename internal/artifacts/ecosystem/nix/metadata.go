@@ -53,9 +53,86 @@ type Info struct {
 }
 
 // IsInfoPath reports whether path is a narinfo path at the cache's root: a
-// 32-character store hash in Nix's base-32 alphabet, then .narinfo.
+// 32-character store hash in Nix's base-32 alphabet, then .narinfo. It is
+// the path the Nix client asks for and uploads to, and where a remote
+// repository caches the narinfo; a hosted repository stores it at InfoItem.
 func IsInfoPath(path string) bool {
 	return len(path) == 40 && strings.HasSuffix(path, ".narinfo") && validBase32(path[:32])
+}
+
+// BinaryCache is the folder of a hosted repository that holds one folder
+// per store path, named for its store hash, with the store path's narinfo
+// and archive in it. The JFrog CLI's jf nix command names it as 7.x lays
+// it out: "binaryCacheDirPrefix is the directory under an Artifactory Nix
+// repo where each store-path's artifacts (*.nar.xz, *.narinfo) live"
+// (jfrog-cli-artifactory artifactory/commands/nix/command.go, lines
+// 53-55), and it finds a NAR by AQL in binary-cache/<store hash> and
+// records the narinfo at binary-cache/<store hash>/<store hash>.narinfo.
+const BinaryCache = "binary-cache/"
+
+// InfoItem is where the narinfo of the store path whose hash is hash is
+// stored: in its binary-cache folder in a hosted repository, at the root
+// the client asks for in a remote's cache (cached). No source shows a 7.x
+// remote's cache, which keeps the upstream's own layout here [I].
+func InfoItem(hash string, cached bool) string {
+	if cached {
+		return hash + ".narinfo"
+	}
+	return BinaryCache + hash + "/" + hash + ".narinfo"
+}
+
+// ArchiveItem is where the archive a narinfo names by url, nar/<file>, is
+// stored for the store path whose hash is hash: binary-cache/<hash>/<file>
+// in a hosted repository, under the client's own file name, which jf nix
+// matches as *.nar.xz [I]; url itself in a remote's cache.
+func ArchiveItem(hash, url string, cached bool) string {
+	if cached {
+		return url
+	}
+	return BinaryCache + hash + "/" + strings.TrimPrefix(url, "nar/")
+}
+
+// infoHash returns the store hash of a narinfo path, either the root path
+// the client uses or a hosted repository's InfoItem, and whether path is
+// one of them.
+func infoHash(path string) (string, bool) {
+	if IsInfoPath(path) {
+		return path[:32], true
+	}
+	rest, ok := strings.CutPrefix(path, BinaryCache)
+	if !ok || len(rest) != 73 || rest[32] != '/' || !IsInfoPath(rest[33:]) ||
+		rest[:32] != rest[33:65] {
+		return "", false
+	}
+	return rest[:32], true
+}
+
+// IsInfoItem reports whether path is where a narinfo is stored: InfoItem
+// of some store hash, in a remote's cache when cached is set.
+func IsInfoItem(path string, cached bool) bool {
+	if cached {
+		return IsInfoPath(path)
+	}
+	_, ok := infoHash(path)
+	return ok && !IsInfoPath(path)
+}
+
+// IsArchiveItem reports whether path is where an archive is stored, an
+// ArchiveItem, and returns the compression its name gives.
+func IsArchiveItem(path string, cached bool) (string, bool) {
+	if cached {
+		return ArchivePath(path)
+	}
+	rest, ok := strings.CutPrefix(path, BinaryCache)
+	if !ok || len(rest) < 34 || rest[32] != '/' || !validBase32(rest[:32]) {
+		return "", false
+	}
+	return ArchivePath("nar/" + rest[33:])
+}
+
+// Hash is the store hash of i's store path, which Parse checked.
+func (i Info) Hash() string {
+	return strings.TrimPrefix(i.StorePath, "/nix/store/")[:32]
 }
 
 func validBase32(s string) bool {
@@ -98,9 +175,10 @@ func ArchivePath(path string) (string, bool) {
 	return "", false
 }
 
-// Parse reads the narinfo stored at path and checks it whole: known fields
-// only, each once, and at most 32 well-formed Ed25519 signatures; a store
-// path under /nix/store whose hash is path's; an archive URL that
+// Parse reads the narinfo stored at path, a root narinfo path or an
+// InfoItem, and checks it whole: known fields only, each once, and at most
+// 32 well-formed Ed25519 signatures; a store path under /nix/store whose
+// hash is path's; an archive URL that
 // ArchivePath accepts, whose compression is the Compression field's (bzip2
 // when absent) and whose hash is the FileHash; positive sizes within
 // MaxNarBytes and MaxArchiveBytes; at most 4,096 distinct valid
@@ -109,8 +187,8 @@ func ArchivePath(path string) (string, bool) {
 // ErrInvalid.
 func Parse(data []byte, path string) (Info, error) {
 	var info Info
-	if !IsInfoPath(path) || len(data) == 0 || len(data) > MaxMetadataBytes ||
-		data[len(data)-1] != '\n' {
+	hash, ok := infoHash(path)
+	if !ok || len(data) == 0 || len(data) > MaxMetadataBytes || data[len(data)-1] != '\n' {
 		return info, ErrInvalid
 	}
 	fields, signatures, err := parseFields(data)
@@ -120,7 +198,7 @@ func Parse(data []byte, path string) (Info, error) {
 	info.Signatures = signatures
 	info.StorePath = fields["StorePath"]
 	base, ok := strings.CutPrefix(info.StorePath, "/nix/store/")
-	if !ok || !storeName.MatchString(base) || base[:32]+".narinfo" != path {
+	if !ok || !storeName.MatchString(base) || base[:32] != hash {
 		return info, ErrInvalid
 	}
 	info.URL = fields["URL"]

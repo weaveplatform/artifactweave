@@ -55,31 +55,39 @@ func (f *fixture) wantArchive(path string) {
 	}
 }
 
-// The download policy is checked at the path the client asked for, after
-// Read permission: nix-cache-info refuses a caller who may not read with
-// 403, not the blackout's 404; a narinfo stays served when the patterns
-// reject only its NAR, as 7.x serves a stored document whose release's
-// file is refused; and a NAR request is checked at the NAR's path, so its
-// refusal names the NAR and patterns rejecting only the narinfo it was
-// found through leave it served.
+// The download policy is checked at the file the client asked for, after
+// Read permission, where the repository stores it: nix-cache-info refuses
+// a caller who may not read with 403, not the blackout's 404; a narinfo
+// stays served when the patterns reject only its NAR, as 7.x serves a
+// stored document whose release's file is refused; and a NAR request is
+// checked at the NAR, so its refusal names the NAR and patterns rejecting
+// only the narinfo it was found through leave it served. Both are stored
+// in the store path's binary-cache folder, as 7.x stores them, so the
+// refusals name those paths and patterns written for 7.x, such as
+// binary-cache/**/*.nar.xz, match them (#1296).
 func TestAccNixHostedPolicyChecksThePathAskedFor(t *testing.T) {
 	f := newFixture(t)
 	f.publish()
 	info, nar := prefix+infoPath, f.native("local")
 	on, off := true, false
-	excludeNAR, excludeInfo := "nar/**", "*.narinfo"
+	excludeNAR, excludeInfo := "binary-cache/**/*.nar.xz", "binary-cache/**/*.narinfo"
 	f.patch("local", func(c *repo.Config) { c.BlackedOut = &on })
 	status(t, f.do("GET", prefix+"nix-cache-info", nil, "denied"), 403)
 	wantBody(t, f.do("GET", prefix+"nix-cache-info", nil, ""), 404,
 		blackedOut("local", "nix-cache-info"))
-	wantBody(t, f.do("GET", info, nil, ""), 404, blackedOut("local", infoPath))
-	wantBody(t, f.do("GET", nar, nil, ""), 404, blackedOut("local", f.info.URL))
+	wantBody(t, f.do("GET", info, nil, ""), 404, blackedOut("local", storedInfo))
+	wantBody(t, f.do("GET", nar, nil, ""), 404, blackedOut("local", f.storedNAR()))
 	status(t, f.do("GET", nar, nil, "denied"), 403)
 	f.patch("local", func(c *repo.Config) { c.BlackedOut, c.ExcludesPattern = &off, &excludeNAR })
 	status(t, f.do("GET", info, nil, ""), 200)
-	wantBody(t, f.do("GET", nar, nil, ""), 404, rejected("local", f.info.URL))
+	wantBody(t, f.do("GET", nar, nil, ""), 404, rejected("local", f.storedNAR()))
 	f.patch("local", func(c *repo.Config) { c.ExcludesPattern = &excludeInfo })
-	wantBody(t, f.do("GET", info, nil, ""), 404, rejected("local", infoPath))
+	wantBody(t, f.do("GET", info, nil, ""), 404, rejected("local", storedInfo))
+	f.wantArchive(nar)
+	// Patterns written for the client's own paths match nothing stored.
+	clientPaths := "nar/**,*.narinfo"
+	f.patch("local", func(c *repo.Config) { c.ExcludesPattern = &clientPaths })
+	status(t, f.do("GET", info, nil, ""), 200)
 	f.wantArchive(nar)
 }
 
@@ -88,7 +96,8 @@ func TestAccNixHostedPolicyChecksThePathAskedFor(t *testing.T) {
 // refusal answered; a member whose patterns reject only the NAR keeps its
 // narinfo served, and its NAR comes from the next member. The virtual
 // repository's own patterns refuse only the path asked for, a NAR with
-// "No repository found to serve the request", not "Not Found".
+// "No repository found to serve the request", not "Not Found". Both check
+// the paths a hosted repository stores the files at.
 func TestAccNixVirtualPassesOverRefusingMembers(t *testing.T) {
 	f := newFixture(t)
 	f.publish()
@@ -120,7 +129,7 @@ func TestAccNixVirtualPassesOverRefusingMembers(t *testing.T) {
 	}
 	served(true)
 	on, off := true, false
-	excludeNAR, excludeInfo := "nar/**", "*.narinfo"
+	excludeNAR, excludeInfo := "binary-cache/**/*.nar.xz", "binary-cache/**/*.narinfo"
 	f.patch("first", func(c *repo.Config) { c.BlackedOut = &on })
 	served(false)
 	f.patch("first", func(c *repo.Config) { c.BlackedOut, c.ExcludesPattern = &off, &excludeInfo })
@@ -131,10 +140,10 @@ func TestAccNixVirtualPassesOverRefusingMembers(t *testing.T) {
 	f.patch("virtual", func(c *repo.Config) { c.ExcludesPattern = &excludeNAR })
 	status(t, f.do("GET", info, nil, ""), 200)
 	wantBody(t, f.do("GET", nar, nil, ""), 404,
-		"No repository found to serve the request for virtual:"+f.info.URL)
+		"No repository found to serve the request for virtual:"+f.storedNAR())
 	f.patch("virtual", func(c *repo.Config) { c.ExcludesPattern = &excludeInfo })
 	wantBody(t, f.do("GET", info, nil, ""), 404,
-		"No repository found to serve the request for virtual:"+infoPath)
+		"No repository found to serve the request for virtual:"+storedInfo)
 	f.wantArchive(nar)
 }
 
