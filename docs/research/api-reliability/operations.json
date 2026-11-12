@@ -14765,10 +14765,8 @@
     "handler": "internal/access/adapters/http/access_identity.go: AccessService.CreateGroup",
     "direct_calls": [
       "accessgen.CreateGroup201JSONResponse",
-      "apierror.New",
       "errors.Is",
       "httpkit.BadRequestf",
-      "httpkit.Deref",
       "httpkit.DerefSlice",
       "s.adminIdentity",
       "s.groupDetails",
@@ -20440,6 +20438,45 @@
     "evidence": [
       "internal/platform/gen/access/unimplemented.gen.go",
       "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+    ]
+  },
+  {
+    "route": "PUT /access/api/v2/groups/{name}",
+    "spec": "access.openapi.yaml",
+    "operation_id": "replaceGroup",
+    "state": "partial: handler enforces the contract's limitations",
+    "contract": "Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.",
+    "handler": "internal/access/adapters/http/access_identity.go: AccessService.ReplaceGroup",
+    "direct_calls": [
+      "accessgen.ReplaceGroup200JSONResponse",
+      "accessgen.ReplaceGroup201JSONResponse",
+      "errors.Is",
+      "httpkit.BadRequestf",
+      "httpkit.Deref",
+      "httpkit.DerefSlice",
+      "s.adminIdentity",
+      "s.groupDetails",
+      "s.identityErr",
+      "svc.ReplaceGroup"
+    ],
+    "review_family": "identity",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
+    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "response_collections": [
+      "200 application/json.members[]",
+      "201 application/json.members[]"
+    ],
+    "pagination_execution": "legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service",
+    "evidence": [
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
