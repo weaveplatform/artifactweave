@@ -154,6 +154,10 @@ func TestAccP2RemoteAndVirtualWirePaths(t *testing.T) {
 	sources := &source.Service{Resolve: sourceIdentity, HTTP: sourceBackend(
 		func(_ context.Context, q source.Request, permit source.Permit) (source.Result, error) {
 			calls = append(calls, q.Resource.Path)
+			if q.Resource.ExternalURL != "" {
+				t.Errorf("P2 read %s left the remote's URL for %q",
+					q.Resource.Path, q.Resource.ExternalURL)
+			}
 			if permit.Intent != source.RetrievalIntentMayFetch || !permit.UpstreamNetworkAllowed {
 				t.Fatalf("wrong P2 retrieval intent: %+v", permit)
 			}
@@ -225,7 +229,6 @@ func TestAccP2RemoteAndVirtualWirePaths(t *testing.T) {
 		expected           int
 	}{
 		{http.MethodGet, "/artifactory/p2-remote/arbitrary.txt", "admin", 404},
-		{http.MethodGet, "/artifactory/p2-remote/content.jar?url=https://attacker.example", "admin", 404},
 		{http.MethodGet, "/artifactory/p2-remote/content.jar", "user", 403},
 		{http.MethodGet, "/artifactory/p2-virtual/p2-other/content.jar", "admin", 404},
 		{http.MethodGet, "/artifactory/p2-virtual/__p2/0/content.jar", "admin", 404},
@@ -237,7 +240,16 @@ func TestAccP2RemoteAndVirtualWirePaths(t *testing.T) {
 			t.Errorf("%s %s as %s: %d, want %d", tc.method, tc.path, tc.user, res.Code, tc.expected)
 		}
 	}
-	if len(calls) != 2 || calls[0] != "content.jar" || calls[1] != "p2.index" {
+	// A query is taken as any remote file takes it (#1350): it never names
+	// the URL the file is fetched from, and the source policy passes it to
+	// the upstream only under Propagate Query Params, which p2-remote leaves
+	// off.
+	res := w.do(http.MethodGet, "/artifactory/p2-remote/content.jar?url=https://attacker.example",
+		"admin", "")
+	if res.Code != http.StatusOK || !bytes.Equal(res.Body.Bytes(), content) {
+		t.Errorf("content.jar with a query: %d, body size %d", res.Code, res.Body.Len())
+	}
+	if !slices.Equal(calls, []string{"content.jar", "p2.index", "content.jar"}) {
 		t.Errorf("unexpected remote reads: %v", calls)
 	}
 	if _, err := w.db.Repos().Get(t.Context(), "p2-remote"); err != nil {

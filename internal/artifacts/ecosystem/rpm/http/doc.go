@@ -67,8 +67,18 @@
 //     local member's stored file must match it, and a remote member's
 //     download is pinned to it.
 //   - Member repodata is read up to 36 MiB, and a remote's is validated
-//     before it is used. A request with matrix parameters or a query string
-//     answers 404.
+//     before it is used.
+//   - The repodata and package reads take a query and matrix parameters as
+//     any other file's GET does, once read permission and the download
+//     policy are settled (#1350): a query, such as skipUpdateStats
+//     (RTFACT-25636), changes nothing, and matrix parameters are matched
+//     against the file's properties (JFrog's guide, Using Properties in
+//     Deployment and Resolution). The composed repodata carries none [I],
+//     so only a mandatory key refuses it, and a package GET passes over a
+//     member whose file does not match to the next member that lists it
+//     [I]. A remote member's package matches the copy its cache holds
+//     before the upstream is asked, and passes the query, under Propagate
+//     Query Params, and the matrix parameters to the upstream (#1371).
 //   - The composed repodata is stamped with the Unix epoch, not the time of
 //     the request, so an unchanged view composes the same bytes each time.
 //     Its signature, by a GPG pair only, covers repomd.xml, never the

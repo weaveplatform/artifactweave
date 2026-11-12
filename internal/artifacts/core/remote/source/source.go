@@ -193,15 +193,25 @@ const (
 // question. Adapters resolve repository existence before constructing it.
 // Project and Visited retain the original consumer context for P11 and
 // future P10 sources; neither is taken from caller-supplied headers.
+//
+// Matrix is the request's matrix parameters as a download matches them.
+// MatrixParams is the same parameters as the upstream URL carries them
+// after its last segment: ";key=value" per value in request order, ";key+="
+// for a mandatory key, ";key" for a blank value, escaped, with "+" as %2B.
+// It is kept out of Resource on purpose: Resource's terms are the cache key
+// and the escaped path is checked against Path, while 7.x caches the file
+// at its bare path whatever properties a request asks for (HttpRepo
+// appends them to the URL only).
 type Request struct {
-	Repo      repo.Config
-	Subject   accessapi.Subject
-	Access    accessapi.Decider
-	Matrix    model.Matrix
-	Resource  Resource
-	CacheOnly bool
-	Project   string
-	Visited   []model.RepositoryIncarnation
+	Repo         repo.Config
+	Subject      accessapi.Subject
+	Access       accessapi.Decider
+	Matrix       model.Matrix
+	MatrixParams string
+	Resource     Resource
+	CacheOnly    bool
+	Project      string
+	Visited      []model.RepositoryIncarnation
 }
 
 // Permit is request-scoped authority. A future project backend may narrow

@@ -147,7 +147,13 @@ func (m *MavenBackend) PrepareUpload(
 	if err != nil {
 		return remote.PolicyError(err)
 	}
-	request := remote.TransportRequest(q, model.RemoteCacheEntry{})
+	// A checksum file is asked for at its own path without the request's
+	// matrix parameters, which TransportRequest would put after the
+	// artifact's name: 7.x reads it with downloadResource(path) and a null
+	// request context (RemoteRepoBase.getRemoteChecksumFromPath, 7.161.26).
+	bare := q
+	bare.MatrixParams = ""
+	request := remote.TransportRequest(bare, model.RemoteCacheEntry{})
 	request.Method, request.Metadata = http.MethodGet, true
 	request.Header = nil
 	algorithms := []item.Algorithm{item.SHA1, item.MD5}

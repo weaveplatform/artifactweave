@@ -138,11 +138,11 @@
 //     it, and a member whose file does not match is passed over for the
 //     next [I]. A remote repository's Release and index take a query as any
 //     remote file does, passing it to the upstream only under Propagate
-//     Query Params (#1349). Its index still answers 404 to a matrix
-//     parameter, after the read check, since 7.x appends them to the
-//     upstream URL (RTFACT-26349) and the remote read does not yet (#1371);
-//     a virtual repository passes over a remote member for its Sources
-//     index so.
+//     Query Params (#1349), and matrix parameters as any remote file does
+//     too (#1371): a copy its cache holds is matched before the upstream
+//     is asked, and the upstream is asked with them, as 7.x appends them
+//     to the remote request URL (RTFACT-26349). A virtual repository's
+//     remote member takes both for its Sources index and its other files.
 //   - A virtual repository's metadata is composed for each request from its
 //     members in order, at most 128. A member of another type, a virtual
 //     member or one with the trivial layout is refused, a member that
@@ -256,9 +256,11 @@
 //   - debian_index_query_test.go: matrix parameters on a stored index, a
 //     virtual package and a virtual Sources index failing closed when the
 //     file's properties cannot be read; a virtual repository passing over a
-//     member, a remote member's stream or cached file included, whose file
-//     they do not match; and its Sources index asking a remote member's
-//     upstream for a query and passing over it for a matrix parameter.
+//     member whose file they do not match, a remote member's copy cached
+//     before the request included, and serving a remote member's upstream
+//     answer, streamed or stored, unmatched; and its Sources index asking a
+//     remote member's upstream with a query or matrix parameters, or
+//     passing over a remote member whose cached copy does not match.
 //   - debian_operations_test.go: the rebuild that writes no properties, for
 //     an absent repository, an unreadable package it leaves out (#1355) and
 //     a queue that refuses it.
