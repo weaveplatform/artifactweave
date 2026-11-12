@@ -98,7 +98,7 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Then the command succeeds
     And the response body contains "Setting up alpha"
 
-  Scenario: invalid remote metadata and package bytes never enter cache
+  Scenario: a remote caches an invalid index as fetched but never invalid package bytes
     Given the registry is running
     When I create a Debian signing pair "deb-sign"
     Then the response status is 201
@@ -110,9 +110,11 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Then the response status is 200
     Given the Debian upstream publishes an invalid Packages index
     When I GET "/artifactory/deb-bad-remote/dists/stable/main/binary-amd64/Packages.gz" as admin
-    Then the response status is 502
+    Then the response status is 200
+    And the response body contains "invalid Packages index"
     When I GET "/artifactory/deb-bad-remote-cache/dists/stable/main/binary-amd64/Packages.gz" as admin
-    Then the response status is 404
+    Then the response status is 200
+    And the response body contains "invalid Packages index"
     Given the Debian upstream corrupts "alpha" at "1.0"
     When I GET "/artifactory/deb-bad-remote/pool/main/a/alpha/alpha_1.0_amd64.deb" as admin
     Then the response status is 502

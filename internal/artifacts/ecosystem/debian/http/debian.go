@@ -81,13 +81,17 @@ func (s DebianAPI) serveDebianIndex(
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
-	// Whether a remote repository passes a query or a matrix parameter on
-	// to its upstream is not settled, so a remote index keeps refusing one,
-	// now once read permission is settled (DV-057). A stored index takes
-	// both as every other file does: 7.x documents skipUpdateStats for a GET
-	// of any file (RTFACT-25636, 7.21.3), so a query changes nothing, and
-	// the matrix parameters are matched below.
-	if c.Class == repo.Remote && (len(req.Props) != 0 || r.URL.RawQuery != "") {
+	// A stored index takes a query and matrix parameters as every other
+	// file does: 7.x documents skipUpdateStats for a GET of any file
+	// (RTFACT-25636, 7.21.3), so a query changes nothing, and the matrix
+	// parameters are matched below. A remote index takes a query as any
+	// remote file does (itemkit.DebianSourceRequest, #1349). It still
+	// refuses matrix parameters once read permission is settled (DV-057):
+	// 7.x appends them to the upstream URL (6.20
+	// HttpRepo.downloadResource; "Appending matrix params to remote request
+	// URL" in the ?trace of RTFACT-26349, 7.25.7), which the generic remote
+	// read does not do for any format yet (#1371).
+	if c.Class == repo.Remote && len(req.Props) != 0 {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
@@ -131,7 +135,13 @@ func (s DebianAPI) serveDebianIndex(
 		query := source.Request{
 			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
 			CacheOnly: cached,
-			Resource:  source.Resource{Path: req.Path, Method: r.Method},
+			Resource: source.Resource{
+				Path: req.Path, Method: r.Method,
+				// The query less the server's own controls, which the
+				// source boundary passes on only under Propagate Query
+				// Params, as for any remote file.
+				Query: itemkit.RemoteResource(r, req.Path).Query,
+			},
 		}
 		query, err = itemkit.DebianSourceRequest(query)
 		if err != nil {
@@ -168,7 +178,7 @@ func (s DebianAPI) serveDebianIndex(
 		)
 		return
 	}
-	paths, err := debianIndexPaths(req.Path, body)
+	paths, err := remoteDebianIndexPaths(req.Path, body, c)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "Debian index", err))
 		return
@@ -225,6 +235,24 @@ func writeDebianIndex(
 	if sw.Complete(r) && used != nil {
 		_ = used(r.Context())
 	}
+}
+
+// remoteDebianIndexPaths is debianIndexPaths for the index at path that
+// repository c holds. A remote repository caches its upstream's index as
+// fetched, one that does not decode included (#1356): 7.x does not check an
+// upstream Packages index before caching it (RTFACT-27303, an open request
+// that it should). Such an index names no package the server can read, so
+// it lists none here, and a caller who may read the index's own path is
+// served it, as 7.x serves Debian metadata by path permission [I]. Apt
+// then refuses it, and any package GET is still checked on its own path. A
+// local or federated repository's index is the server's own, so one that
+// does not decode stays a fault.
+func remoteDebianIndexPaths(path string, body []byte, c repo.Config) ([]string, error) {
+	paths, err := debianIndexPaths(path, body)
+	if err != nil && c.Class == repo.Remote {
+		return nil, nil
+	}
+	return paths, err
 }
 
 func debianIndexPaths(path string, body []byte) ([]string, error) {

@@ -489,18 +489,20 @@ func TestUnitStatusWriterCountsWhatItWrites(t *testing.T) {
 // TestUnitDebianSourceRequestValidatesRemoteMetadata: a Release file, a
 // by-hash index and a Packages or Sources index are requested as metadata
 // whose validator refuses, as a 502 integrity failure, an empty Release file
-// or by-hash index, an index of unknown size, a body short of its size and
-// contents that do not parse or do not match their hash, and accepts an
-// empty Packages or Sources index; a query on a Release file is refused, and
-// a by-hash or index path apt never asks for is not found.
+// or by-hash index, an index of unknown size, a body short of its size, a
+// Release file that does not parse and a by-hash file that does not match
+// its hash, and accepts an empty Packages or Sources index and one that does
+// not parse, which a remote caches as fetched (#1356); a query on a Release
+// file is kept for the source boundary (#1349), and a by-hash or index path
+// apt never asks for is not found.
 func TestUnitDebianSourceRequestValidatesRemoteMetadata(t *testing.T) {
 	request := func(p, query string) (source.Request, error) {
 		return itemkit.DebianSourceRequest(source.Request{
 			Resource: source.Resource{Path: p, Query: query},
 		})
 	}
-	if _, err := request("dists/stable/Release", "x=1"); !errors.Is(err, source.ErrInvalidRequest) {
-		t.Errorf("query on a Release file: %v; want ErrInvalidRequest", err)
+	if q, err := request("dists/stable/Release", "x=1"); err != nil || q.Resource.Query != "x=1" {
+		t.Errorf("query on a Release file: %q, %v; want the query kept", q.Resource.Query, err)
 	}
 	for _, p := range []string{
 		"dists/stable/main/binary-amd64/by-hash/SHA256/abc",
@@ -528,7 +530,7 @@ func TestUnitDebianSourceRequestValidatesRemoteMetadata(t *testing.T) {
 		{"by-hash index", byHash, "debian-by-hash-v1", "index", 5, true},
 		{"Packages of unknown size", packages, "debian-packages-v2", "", -1, false},
 		{"Packages short of its size", packages, "debian-packages-v2", "x", 2, false},
-		{"unterminated Packages stanza", packages, "debian-packages-v2", "Package: a", 10, false},
+		{"unterminated Packages stanza", packages, "debian-packages-v2", "Package: a", 10, true},
 		{"empty Packages", packages, "debian-packages-v2", "", 0, true},
 		{"empty Sources", "dists/stable/main/source/Sources", "debian-sources-v2", "", 0, true},
 	} {

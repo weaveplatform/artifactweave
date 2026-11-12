@@ -79,7 +79,7 @@
   "test/acceptance/features/composer.feature": "7ee923144a907b85d6466d10872dd5b6ab78c4fac3783a49666868bc89fccbac",
   "test/acceptance/features/conda.feature": "74309a3249045d8cf65275a4c580b804f3ecd839441065f783280303b526a2c1",
   "test/acceptance/features/cran.feature": "92e79b03c2dd2efbdea4662187888c1eab7782aa286b69059607b5f1758e4d0c",
-  "test/acceptance/features/debian.feature": "6f5c2d8a7c0d1afd7fd648d21ffe72dc24f4f977476e6cbc9fe88cf0f9b0b14e",
+  "test/acceptance/features/debian.feature": "a8e35627f285b74bbf2b4ca4a488bbfae4ee6c303a662a84f9cfc326fdf6b2b7",
   "test/acceptance/features/docker.feature": "38918f5b38b4813c995811e304711b6b99188a6e7f299d0fcb974aea17e03f84",
   "test/acceptance/features/gems.feature": "3f0a45f7c0d1f8e4bba571b02c4e55d7a745da453584f611e2479dbd5e1bbcda",
   "test/acceptance/features/gitlfs.feature": "6ab52e368a2df894078c3d8802af063995de6133870555f2de40802f8b6c5c9f",

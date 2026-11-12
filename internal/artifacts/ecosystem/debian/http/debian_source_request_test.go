@@ -55,9 +55,9 @@ func (z *zeroBytes) Seek(int64, int) (int64, error) { return 0, nil }
 // TestUnitDebianSourceRequestNamesWhatAptReadsFromAnUpstream: a remote
 // Debian repository's source request admits the paths apt reads that it
 // answered not found before #1273, without asking the upstream: an
-// installer's Packages index, as metadata checked as an index of .udeb
-// files and read with the permission on its own path; any by-hash file,
-// as metadata checked against its name's SHA-256; a .lzma index; and a
+// installer's Packages index, as metadata read with the permission on its
+// own path; any by-hash file, as metadata checked against its name's
+// SHA-256; a .lzma index; and a
 // package under a folder named by-hash or whose name starts Packages, by
 // its own grammar. A translation still passes through unchecked.
 func TestUnitDebianSourceRequestNamesWhatAptReadsFromAnUpstream(t *testing.T) {
@@ -75,30 +75,33 @@ func TestUnitDebianSourceRequestNamesWhatAptReadsFromAnUpstream(t *testing.T) {
 		kind             source.ResourceKind
 		permissionFolder bool
 		valid            []byte
+		// asFetched is an index cached as the upstream sent it (#1356), so
+		// corrupt bytes of the size the upstream declared pass.
+		asFetched bool
 	}{
 		{
 			"installer index", "dists/stable/main/debian-installer/binary-amd64/Packages.gz",
-			"debian-installer-packages-v1", source.ResourceKindMetadata, false, udebIndex,
+			"debian-installer-packages-v1", source.ResourceKindMetadata, false, udebIndex, true,
 		},
 		{
 			"translation's by-hash copy", translationByHash, "debian-by-hash-v1",
-			source.ResourceKindMetadata, false, translation,
+			source.ResourceKindMetadata, false, translation, false,
 		},
 		{
 			"Contents index's by-hash copy", contentsByHash, "debian-by-hash-v1",
-			source.ResourceKindMetadata, false, translation,
+			source.ResourceKindMetadata, false, translation, false,
 		},
 		{
 			"LZMA index", "dists/stable/main/binary-amd64/Packages.lzma", "debian-packages-v2",
-			source.ResourceKindMetadata, true, lzmaIndex,
+			source.ResourceKindMetadata, true, lzmaIndex, true,
 		},
 		{
 			"package under a by-hash folder", "pool/main/by-hash/SHA256/alpha_1.0_amd64.deb",
-			"debian-binary-v1", 0, false, deb,
+			"debian-binary-v1", 0, false, deb, false,
 		},
 		{
 			"package whose name starts Packages", "pool/main/p/Packages-tool_1.0_amd64.deb",
-			"debian-binary-v1", 0, false, deb,
+			"debian-binary-v1", 0, false, deb, false,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -118,7 +121,11 @@ func TestUnitDebianSourceRequestNamesWhatAptReadsFromAnUpstream(t *testing.T) {
 				t.Errorf("upstream's own file: %v", err)
 			}
 			corrupt := append([]byte{0}, tc.valid[1:]...)
-			wantIntegrityFailure(t, "corrupt file", validate(corrupt, int64(len(corrupt))))
+			if err := validate(corrupt, int64(len(corrupt))); tc.asFetched && err != nil {
+				t.Errorf("corrupt index: %v; want it cached as fetched", err)
+			} else if !tc.asFetched {
+				wantIntegrityFailure(t, "corrupt file", err)
+			}
 			wantIntegrityFailure(t, "file short of its size",
 				validate(tc.valid, int64(len(tc.valid))+1))
 		})
@@ -132,18 +139,23 @@ func TestUnitDebianSourceRequestNamesWhatAptReadsFromAnUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantIntegrityFailure(t, "installer index naming a .deb", q.Resource.ValidateMetadata(
+	if err := q.Resource.ValidateMetadata(
 		t.Context(),
 		bytes.NewReader(debianStanza("pool/a.deb")),
 		int64(len(debianStanza("pool/a.deb"))),
 		source.MetadataResponse{},
-	))
+	); err != nil {
+		t.Errorf("installer index naming a .deb: %v; want it cached as fetched (#1356)", err)
+	}
 }
 
 // TestUnitDebianSourceRequestBoundsOnlyAnIndexCopy: a binary-<arch> or
 // source index's by-hash copy keeps the 64 MiB bound of the route that
-// reads it whole; any other by-hash file is hashed as it streams and may
-// be larger. An empty by-hash file is refused, as before.
+// reads it whole, and is authorized against the repository as the index is
+// (PermissionFolder), so the route's check of each package it lists is not
+// scoped to the copy's own path; any other by-hash file is hashed as it
+// streams, may be larger and is read with the permission on its own path.
+// An empty by-hash file is refused, as before.
 func TestUnitDebianSourceRequestBoundsOnlyAnIndexCopy(t *testing.T) {
 	const size = 64<<20 + 1
 	sum := sha256.New()
@@ -162,6 +174,10 @@ func TestUnitDebianSourceRequestBoundsOnlyAnIndexCopy(t *testing.T) {
 		q, err := debianRequest(tc.path, "")
 		if err != nil {
 			t.Fatal(err)
+		}
+		if q.Resource.PermissionFolder == tc.valid {
+			t.Errorf("%s: permission folder %t, want %t",
+				tc.path, q.Resource.PermissionFolder, !tc.valid)
 		}
 		err = q.Resource.ValidateMetadata(
 			t.Context(),
@@ -186,23 +202,55 @@ func TestUnitDebianSourceRequestBoundsOnlyAnIndexCopy(t *testing.T) {
 }
 
 // TestUnitDebianSourceRequestKeepsRefusingWhatItCannotName: a by-hash name
-// that is no SHA-256, a Packages name of no index apt reads, an index or
-// by-hash path with a query, and a package path its grammar refuses still
-// answer not found without asking the upstream.
+// that is no SHA-256, a Packages name of no index apt reads and a package
+// path its grammar refuses still answer not found without asking the
+// upstream, with a query or without one.
 func TestUnitDebianSourceRequestKeepsRefusingWhatItCannotName(t *testing.T) {
-	sum := strings.Repeat("a", 64)
 	for _, tc := range []struct{ path, query string }{
 		{"dists/stable/main/i18n/by-hash/SHA256/abc", ""},
-		{"dists/stable/main/i18n/by-hash/SHA256/" + sum, "x=1"},
+		{"dists/stable/main/i18n/by-hash/SHA256/abc", "x=1"},
 		{"dists/stable/main/debian-installer/binary-amd64/Packages.lz4", ""},
-		{"dists/stable/main/debian-installer/binary-amd64/Packages", "x=1"},
-		{"dists/stable/main/binary-amd64/Packages.lzma", "x=1"},
+		{"dists/stable/main/debian-installer/binary-amd64/Packages.lz4", "x=1"},
 		{"dists/stable/Packages", ""},
 		{"pool/bad name.deb", ""},
 		{"pool/../bad.dsc", ""},
 	} {
 		if _, err := debianRequest(tc.path, tc.query); !errors.Is(err, kernel.ErrNotFound) {
 			t.Errorf("%s?%s: %v; want ErrNotFound", tc.path, tc.query, err)
+		}
+	}
+}
+
+// TestUnitDebianSourceRequestKeepsTheQueryOfAnIndex (#1349): a Packages or
+// Sources index and a by-hash file asked for with a query are named as
+// without one, with the same checks, and keep the query, which the source
+// boundary passes to the upstream only under Propagate Query Params. Before,
+// each answered not found without asking the upstream.
+func TestUnitDebianSourceRequestKeepsTheQueryOfAnIndex(t *testing.T) {
+	for _, path := range []string{
+		"dists/stable/main/binary-amd64/Packages",
+		"dists/stable/main/binary-amd64/Packages.lzma",
+		"dists/stable/main/debian-installer/binary-amd64/Packages",
+		"dists/stable/main/source/Sources.gz",
+		"dists/stable/main/binary-amd64/by-hash/SHA256/" + strings.Repeat("a", 64),
+		"dists/stable/main/i18n/by-hash/SHA256/" + strings.Repeat("a", 64),
+	} {
+		plain, err := debianRequest(path, "")
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		got, err := debianRequest(path, "x=1")
+		if err != nil {
+			t.Errorf("%s?x=1: %v; want the request named", path, err)
+			continue
+		}
+		if got.Resource.Query != "x=1" ||
+			got.Resource.PermissionFolder != plain.Resource.PermissionFolder ||
+			got.Resource.Variant != plain.Resource.Variant ||
+			(got.Resource.ValidateMetadata == nil) != (plain.Resource.ValidateMetadata == nil) {
+			t.Errorf("%s?x=1: query %q, folder %v, variant %q; want x=1 and %v, %q as without it",
+				path, got.Resource.Query, got.Resource.PermissionFolder, got.Resource.Variant,
+				plain.Resource.PermissionFolder, plain.Resource.Variant)
 		}
 	}
 }

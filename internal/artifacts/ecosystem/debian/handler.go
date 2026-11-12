@@ -58,14 +58,19 @@ func Serves(t repo.PackageType) bool { return t == repo.Debian }
 // Handler is the Debian format's hooks: it checks every binary (.deb,
 // .ddeb) and source (.dsc) package written to a Debian repository and the
 // coordinates it is deployed with, keeps the package index and deb.name and
-// deb.version properties in step with the binaries, keeps snapshots
-// immutable, and derives a local or federated repository's apt metadata as
-// queued work (KindIndex), signed when the repository names a key pair.
+// deb.version properties in step with the binaries, marks a binary it
+// cannot read with deb.index.status and leaves it out of both, keeps
+// snapshots immutable, and derives a local or federated repository's apt
+// metadata as queued work (KindIndex), signed when the repository names a
+// key pair.
 type Handler struct{ generic.Handler }
 
+// inspection is a binary package read once per write. fault is why the
+// package is malformed, empty when binary holds its control data.
 type inspection struct {
 	sha, path string
 	binary    Binary
+	fault     string
 }
 
 type sourceInspection struct {
@@ -77,8 +82,9 @@ type sourceInspection struct {
 // .deb or .ddeb path, before the write's transaction, and returns the
 // parsed source or binary for Admit and Deployed, so a package is read
 // once per write. A checksum deploy and any other path inspect nothing. A
-// write with no content digest, or whose package is invalid, is refused
-// with 400.
+// write with no content digest, or whose source package is invalid, is
+// refused with 400; a binary package that cannot be read is kept as
+// malformed (readBinary).
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -98,11 +104,11 @@ func (Handler) Inspect(
 	if !isBinary(w.Path) {
 		return inspection{}, nil
 	}
-	binary, err := readStored(ctx, env.Blobs, w.Checksums.SHA256)
+	binary, fault, err := readBinary(ctx, env.Blobs, w.Checksums.SHA256)
 	if err != nil {
 		return nil, err
 	}
-	return inspection{sha: w.Checksums.SHA256, path: w.Path, binary: binary}, nil
+	return inspection{sha: w.Checksums.SHA256, path: w.Path, binary: binary, fault: fault}, nil
 }
 
 // Admit refuses (409) a write under snapshots/ that the server's snapshot
@@ -113,12 +119,14 @@ func (Handler) Inspect(
 // federated repository, which derives its own (409). A .dsc needs a valid
 // path in a repository without the trivial layout, and dsc.distribution and
 // dsc.component properties with valid values unless a remote caches it
-// without them (400). A .deb, or a .ddeb where ddebSupported is on, needs a
-// valid path, and its deb.distribution, deb.component and deb.architecture
-// properties must be all absent or all valid, each architecture the
-// package's own unless it is Architecture: all (400). Admit repeats
-// Inspect's checks unless Inspect already read the same content at the same
-// path. Any other file passes.
+// without them (400). A .deb, or a .ddeb where ddebSupported is on or that
+// a remote caches, needs a valid path, and its deb.distribution,
+// deb.component and deb.architecture properties must be all absent or all
+// valid, each architecture the package's own unless it is Architecture:
+// all (400). A malformed package passes with the architecture unchecked,
+// since it has none to compare. Admit repeats Inspect's checks unless
+// Inspect already read the same content at the same path. Any other file
+// passes.
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -163,23 +171,30 @@ func (Handler) Admit(
 	if !isBinary(w.Path) {
 		return w, nil
 	}
-	if strings.HasSuffix(w.Path, ".ddeb") && (c.DdebSupported == nil || !*c.DdebSupported) {
+	// ddebSupported is "Enable indexing with debug symbols (.ddeb)" in
+	// JFrog's Debian guide and Remote Repositories page: it is about
+	// indexing, and a remote repository indexes nothing, so its cache takes
+	// a .ddeb from the upstream whatever the setting says, as it takes a
+	// generated file (#1352). No source says 7.x refuses one by type [I].
+	if strings.HasSuffix(w.Path, ".ddeb") && !w.Cached &&
+		(c.DdebSupported == nil || !*c.DdebSupported) {
 		return w, format.Rejectf(http.StatusBadRequest, "Debian debug packages are disabled")
 	}
 	if !validPackagePath(w.Path) {
 		return w, format.Rejectf(http.StatusBadRequest, "Invalid Debian package path")
 	}
-	var binary Binary
-	if in, ok := env.Inspection.(inspection); ok &&
-		in.sha == w.Checksums.SHA256 && in.path == w.Path {
-		binary = in.binary
-	} else {
-		binary, err = readStored(ctx, env.Blobs, w.Checksums.SHA256)
+	in, ok := env.Inspection.(inspection)
+	if !ok || in.sha != w.Checksums.SHA256 || in.path != w.Path {
+		in.binary, in.fault, err = readBinary(ctx, env.Blobs, w.Checksums.SHA256)
 		if err != nil {
 			return w, err
 		}
 	}
-	if err := coordinates(w.Properties, binary); err != nil {
+	err = coordinates(w.Properties, in.binary)
+	if in.fault != "" {
+		err = coordinateValues(w.Properties)
+	}
+	if err != nil {
 		return w, format.Rejectf(http.StatusBadRequest, "%v", err)
 	}
 	return w, nil
@@ -190,8 +205,10 @@ func (Handler) Admit(
 // federated repository's own write, queues the metadata rebuild. A
 // version's files are every binary in the repository whose control data
 // gives that name and version, so Deployed reads them all rather than
-// trusting their paths. A source package file (a .dsc, .diff.gz or
-// .tar.* archive) only queues the rebuild, which lists the source once
+// trusting their paths. A malformed binary gets deb.index.status instead
+// and only queues the rebuild, which leaves it out, so a package it
+// replaced leaves the index too. A source package file (a .dsc, .diff.gz
+// or .tar.* archive) only queues the rebuild, which lists the source once
 // all its parts are stored. Folders and other files change nothing.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder {
@@ -203,15 +220,17 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it m
 	if !isBinary(it.FullPath()) {
 		return nil
 	}
-	b, err := packageFor(ctx, env, it)
+	b, fault, err := packageFor(ctx, env, it)
 	if err != nil {
 		return err
 	}
-	if err := setProperties(ctx, env.Store, it, b); err != nil {
+	if err := setProperties(ctx, env.Store, it, b, fault); err != nil {
 		return err
 	}
-	if err := syncVersion(ctx, env, c, b.Name, b.Version); err != nil {
-		return err
+	if fault == "" {
+		if err := syncVersion(ctx, env, c, b.Name, b.Version); err != nil {
+			return err
+		}
 	}
 	return queue(ctx, env, c, it.Cached)
 }
@@ -246,9 +265,12 @@ func (Handler) Deleted(
 		if !isBinary(it.FullPath()) {
 			continue
 		}
-		b, err := packageFor(ctx, env, it)
+		b, fault, err := packageFor(ctx, env, it)
 		if err != nil {
 			return err
+		}
+		if fault != "" {
+			continue // a malformed package was in no version
 		}
 		key := b.Name + "\x00" + b.Version
 		if seen[key] {
@@ -289,9 +311,10 @@ func (Handler) Classify(_ repo.Config, path string) format.Class {
 // Reindex rebuilds repository c's package index from its binaries (a
 // remote's from its cache): a package per name and a version per version,
 // whose files are its binaries and whose creation time is the oldest
-// file's. It reads every binary, failing on the first that is missing or
-// invalid, and restores the deb.name and deb.version properties. A local
-// or federated repository's metadata rebuild is then queued.
+// file's. It reads every binary, failing on the first that is missing,
+// and restores the deb.name and deb.version properties, or deb.index.status
+// on a malformed one, which it leaves out. A local or federated
+// repository's metadata rebuild is then queued.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	return reindex(ctx, env, c, true)
 }
@@ -306,14 +329,17 @@ func reindex(ctx context.Context, env format.Env, c repo.Config, writeProps bool
 		if !isBinary(it.FullPath()) {
 			continue
 		}
-		b, err := packageFor(ctx, env, it)
+		b, fault, err := packageFor(ctx, env, it)
 		if err != nil {
 			return err
 		}
 		if writeProps {
-			if err := setProperties(ctx, env.Store, it, b); err != nil {
+			if err := setProperties(ctx, env.Store, it, b, fault); err != nil {
 				return err
 			}
+		}
+		if fault != "" {
+			continue
 		}
 		if by[b.Name] == nil {
 			by[b.Name] = map[string][]model.Item{}
@@ -381,20 +407,37 @@ func (r readerAt) ReadAt(p []byte, off int64) (int, error) {
 	return io.ReadFull(r, p) //nolint:wrapcheck // adapting the blob read interface
 }
 
-func readStored(ctx context.Context, blobs format.Blobs, sha string) (Binary, error) {
+// readBinary reads the binary package stored as sha. One that ReadBinary
+// refuses is malformed: readBinary returns why as fault, with no error, and
+// the package is stored but never indexed (#1355). JFrog's Debian guide
+// ("Use Debian Metadata Validation") has 7.x keep a package that fails
+// validation out of the index and mark it with deb.index.status, and
+// refers to a property search to find such packages, so they are stored.
+// It names empty metadata fields; RTFACT-16378 (fixed in 6.1.0) shows an
+// unreadable control archive stored unindexed too, and JFrog's KB "How
+// Debian Repository metadata calculation works?" has a deploy queue the
+// indexing, which cannot refuse a deploy already made. So every fault is
+// treated alike [I]. A write with no content digest is still refused.
+func readBinary(ctx context.Context, blobs format.Blobs, sha string) (Binary, string, error) {
 	if sha == "" {
-		return Binary{}, format.Rejectf(http.StatusBadRequest, "Debian package content is missing")
+		return Binary{}, "", format.Rejectf(
+			http.StatusBadRequest,
+			"Debian package content is missing",
+		)
 	}
 	r, info, err := blobs.Open(ctx, sha)
 	if err != nil {
-		return Binary{}, fmt.Errorf("debian: open package: %w", err)
+		return Binary{}, "", fmt.Errorf("debian: open package: %w", err)
 	}
 	defer func() { _ = r.Close() }()
 	b, err := ReadBinary(ctx, readerAt{r}, info.Size)
-	if err != nil {
-		return Binary{}, format.Rejectf(http.StatusBadRequest, "Invalid Debian package: %v", err)
+	if errors.Is(err, errInvalidBinary) {
+		return Binary{}, err.Error(), nil
 	}
-	return b, nil
+	if err != nil {
+		return Binary{}, "", fmt.Errorf("debian: read package: %w", err)
+	}
+	return b, "", nil
 }
 
 func readStoredSource(ctx context.Context, blobs format.Blobs, sha string) (Source, error) {
@@ -439,15 +482,39 @@ func sourceCoordinates(props model.Properties, source Source, cached bool) error
 	return nil
 }
 
-func packageFor(ctx context.Context, env format.Env, it model.Item) (Binary, error) {
+// packageFor is the binary package it stores, as readBinary reads it.
+func packageFor(ctx context.Context, env format.Env, it model.Item) (Binary, string, error) {
 	if in, ok := env.Inspection.(inspection); ok &&
 		in.sha == it.Actual.SHA256 && in.path == it.FullPath() {
-		return in.binary, nil
+		return in.binary, in.fault, nil
 	}
-	return readStored(ctx, env.Blobs, it.Actual.SHA256)
+	return readBinary(ctx, env.Blobs, it.Actual.SHA256)
 }
 
+// coordinates checks a package's deb.distribution, deb.component and
+// deb.architecture properties (coordinateValues), and that each
+// architecture is b's own unless b is Architecture: all.
 func coordinates(props model.Properties, b Binary) error {
+	if err := coordinateValues(props); err != nil {
+		return err
+	}
+	for _, arch := range props[PropArchitecture] {
+		if b.Architecture != "all" && b.Architecture != arch {
+			return fmt.Errorf(
+				"%w: package architecture %q differs from layout %q",
+				errInvalidCoordinates,
+				b.Architecture,
+				arch,
+			)
+		}
+	}
+	return nil
+}
+
+// coordinateValues checks that a package's deb.distribution, deb.component
+// and deb.architecture properties are all absent or all present with valid
+// values.
+func coordinateValues(props model.Properties) error {
 	distributions, components, arches := props[PropDistribution], props[PropComponent], props[PropArchitecture]
 	if len(distributions)+len(components)+len(arches) == 0 {
 		return nil // stored without Debian coordinates; not indexed by apt
@@ -465,35 +532,43 @@ func coordinates(props model.Properties, b Binary) error {
 			}
 		}
 	}
-	for _, arch := range arches {
-		if b.Architecture != "all" && b.Architecture != arch {
-			return fmt.Errorf(
-				"%w: package architecture %q differs from layout %q",
-				errInvalidCoordinates,
-				b.Architecture,
-				arch,
-			)
-		}
-	}
 	return nil
 }
 
-func setProperties(ctx context.Context, st format.Store, it model.Item, b Binary) error {
+// setProperties gives the binary it stores its deb.name and deb.version
+// and drops deb.index.status, or, when fault says it is malformed, the
+// reason as deb.index.status in place of the other two. A good package
+// that replaces a malformed one loses the mark: an overwrite clears every
+// property (core/item settle), and an explicit property is dropped here.
+func setProperties(
+	ctx context.Context, st format.Store, it model.Item, b Binary, fault string,
+) error {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
 		return fmt.Errorf("debian: item properties: %w", err)
 	}
 	want := model.Properties{PropName: {b.Name}, PropVersion: {b.Version}}
+	drop := []string{PropIndexStatus}
+	if fault != "" {
+		want = model.Properties{PropIndexStatus: {fault}}
+		drop = []string{PropName, PropVersion}
+	}
 	set := model.Properties{}
 	for key, value := range want {
 		if !slices.Equal(props[key], value) {
 			set[key] = value
 		}
 	}
-	if len(set) == 0 {
+	var remove []string
+	for _, key := range drop {
+		if len(props[key]) > 0 {
+			remove = append(remove, key)
+		}
+	}
+	if len(set)+len(remove) == 0 {
 		return nil
 	}
-	return st.Items().PatchProperties(ctx, it.ID, set, nil, it.Updated) //nolint:wrapcheck
+	return st.Items().PatchProperties(ctx, it.ID, set, remove, it.Updated) //nolint:wrapcheck
 }
 
 func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, version string) error {
@@ -506,11 +581,11 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, versi
 		if !isBinary(it.FullPath()) {
 			continue
 		}
-		b, err := packageFor(ctx, env, it)
+		b, fault, err := packageFor(ctx, env, it)
 		if err != nil {
 			return err
 		}
-		if b.Name == name && b.Version == version {
+		if fault == "" && b.Name == name && b.Version == version {
 			selected = append(selected, it)
 		}
 	}

@@ -543,6 +543,35 @@ func TestUnitDebianSnapshotRechecksARemoteSourcesPackages(t *testing.T) {
 	}
 }
 
+// TestUnitDebianSnapshotOfARemoteRefusesAnIndexItCannotDecode (#1356): a
+// remote caches its upstream's index as fetched, one that does not decode
+// included, but a snapshot copies only an index whose packages it can
+// check and cannot leave out one the copied Release lists, so a snapshot
+// of such a remote fails with the 502 integrity failure the remote's read
+// of the index gave before, and copies nothing.
+func TestUnitDebianSnapshotOfARemoteRefusesAnIndexItCannotDecode(t *testing.T) {
+	index := []byte("Package alpha\n")
+	w := newOverlayWorld(t, withSources(upstream(map[string]func() (source.Result, error){
+		debRelease:  streamed(releaseFor(index), nil),
+		debPackages: streamed(index, nil),
+	})))
+	w.debRepos(
+		repo.Config{Key: snapshotJob.Source, Class: repo.Remote},
+		repo.Config{Key: snapshotJob.Target, Class: repo.Local},
+	)
+	err := DebianAPI{w.kit}.createDebianSnapshot(t.Context(), w.db, snapshotJob,
+		kittest.Admin, kittest.AdminAccess())
+	var failure *source.HTTPError
+	if !errors.As(err, &failure) || failure.Status != http.StatusBadGateway ||
+		failure.Kind != source.FailureKindIntegrity {
+		t.Errorf("snapshot returned %v, want a 502 integrity failure", err)
+	}
+	if _, err := w.db.Items().Get(t.Context(), snapshotJob.Target, false,
+		snapshotMarker+"/"+debRelease); !errors.Is(err, kernel.ErrNotFound) {
+		t.Errorf("refused snapshot copied its Release: %v", err)
+	}
+}
+
 // TestAccDebianSnapshotReadsNeedAStoreAndACaller: the snapshot read route
 // answers 501 on a server without a store and 401 without a caller,
 // before it looks for the snapshot.
