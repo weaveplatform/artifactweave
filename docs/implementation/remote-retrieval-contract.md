@@ -273,6 +273,13 @@ The following are artifactweave limits and decisions, not claimed vendor default
   duplicate names; [#617](https://github.com/weaveplatform/artifactweave/issues/617) tests order and escaping. Do not append credentials or unrelated
   client query parameters to metadata-provided signed download URLs. `propagateQueryParams`
   is opt-in; meaningful propagated query variants partition response identity.
+- A client request's matrix parameters follow the upstream path, after its last segment,
+  as Artifactory appends them to the remote request URL (#1371); an external or
+  metadata-provided URL takes none, and neither do the checksum files a Maven remote reads
+  beside an artifact. They do not partition response identity: the answer is cached at the
+  bare path, and a cached copy is matched against them before the upstream is asked. A
+  parameter string carrying `/`, `?`, `#`, `\` or a line break is left off whole rather
+  than moving the request elsewhere.
 - At most 10 redirects. Re-evaluate destination policy at every hop, DNS resolution and
   token realm. Explicit private upstream authorities may be configured; metadata may not
   grant itself loopback/link-local/metadata-service or arbitrary internal access. Default

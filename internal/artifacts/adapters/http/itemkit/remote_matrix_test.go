@@ -46,7 +46,12 @@ type copyItems struct {
 	err error
 }
 
-func (i copyItems) Get(ctx context.Context, key string, cached bool, path string) (model.Item, error) {
+func (i copyItems) Get(
+	ctx context.Context,
+	key string,
+	cached bool,
+	path string,
+) (model.Item, error) {
 	if i.err != nil {
 		return model.Item{}, i.err
 	}
