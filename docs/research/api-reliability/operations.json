@@ -7213,12 +7213,11 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getRepositoriesByTypeAndProject",
     "state": "implemented",
-    "contract": "Returns minimal details for every repository the caller may see, optionally filtered by class, package type and project. Admins, and tokens scoped artifact:*:r or system:info:r, see every repository; other callers see the repositories they can read. The type value is lower case here but upper case in the response. Remote caches are never listed.",
+    "contract": "Returns minimal details for every repository the caller may see, optionally filtered by class, package type and project. Admins, and tokens scoped artifact:*:r or system:info:r, see every repository; other callers see the repositories they can read. The type value is lower case here but upper case in the response. Remote caches are never listed. The list is ordered by key. limit and offset page it; without limit the whole list comes back with no paging headers.",
     "handler": "internal/artifacts/adapters/http/repositories.go: ArtifactoryAPI.GetRepositoriesByTypeAndProject",
     "direct_calls": [
-      "artgen.GetRepositoriesByTypeAndProject200ApplicationVndOrgJfrogArtifactoryRepositoriesRepositoryDetailsListPlusJSONResponse",
       "baseurl.From",
-      "httpkit.Accepts",
+      "page.of",
       "repo.Class",
       "repo.PackageTypeName",
       "s.InternalError",
@@ -7234,6 +7233,10 @@
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "declared_page_controls": [
+      "query limit: Optional query parameter. Page size, from 1 to 1000. With it the answer holds at most limit repositories from offset on, and carries X-Total-Count, X-Result-Offset and X-Result-Limit. Without it the whole filtered list is returned and those headers are not sent. A value outside 1 to 1000 answers 400.",
+      "query offset: Optional query parameter. Zero-based index into the filtered list of the first repository to return; 0 when omitted. It needs limit, and a negative value answers 400. An offset past the end gives an empty page."
+    ],
     "response_collections": [
       "200 application/json[]",
       "200 application/vnd.org.jfrog.artifactory.repositories.RepositoryDetailsList+json[]"
