@@ -25,7 +25,12 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
-const remoteProviderBase = prefix + "remote/v1/providers/hashicorp/null/"
+const (
+	remoteProviderBase = prefix + "remote/v1/providers/hashicorp/null/"
+	// fixtureArchivePath is where the remote caches the fixture's archive:
+	// its URL's path below the Providers URL, the upstream's root.
+	fixtureArchivePath = "storage/provider.zip"
+)
 
 type remoteProviderFixture struct {
 	*remoteFixture
@@ -45,7 +50,11 @@ func newProviderFixture(t *testing.T) *remoteProviderFixture {
 	}
 	permission, _ := f.db.Permissions().Get(t.Context(), "remote-read")
 	resource := permission.Resources[api.ResourceArtifact]
-	resource.Targets["remote"] = accesstest.Target{Include: []string{"hashicorp/null/**"}}
+	// A listing checks Read at hashicorp/null/..., and the files are read at
+	// their URLs' paths below the Providers URL.
+	resource.Targets["remote"] = accesstest.Target{
+		Include: []string{"hashicorp/null/**", "storage/**"},
+	}
 	permission.Resources[api.ResourceArtifact] = resource
 	if err := f.db.Permissions().Update(t.Context(), permission); err != nil {
 		t.Fatal(err)
@@ -298,7 +307,7 @@ func TestAccRemoteProviderRegistryRejectsMissingAndOversizedMaterial(t *testing.
 				)
 			}
 			if _, err := f.db.Items().
-				Get(t.Context(), "remote", true, providerArchivePath(f.q)); err == nil {
+				Get(t.Context(), "remote", true, fixtureArchivePath); err == nil {
 				t.Fatal("provider archive was published from an invalid bundle")
 			}
 		})
@@ -367,7 +376,10 @@ func TestAccRemoteProviderUpstreamMirror(t *testing.T) {
 			permission, _ := f.db.Permissions().Get(t.Context(), "remote-read")
 			resource := permission.Resources[api.ResourceArtifact]
 			resource.Targets["remote"] = accesstest.Target{
-				Include: []string{"provider-mirrors/registry.terraform.io/hashicorp/null/**"},
+				Include: []string{
+					"provider-mirrors/registry.terraform.io/hashicorp/null/**",
+					"storage/**",
+				},
 			}
 			permission.Resources[api.ResourceArtifact] = resource
 			if err := f.db.Permissions().Update(t.Context(), permission); err != nil {
@@ -445,7 +457,7 @@ func configureProviderMirrorFaultFixture(t *testing.T, f *remoteProviderFixture)
 	}
 	resource := permission.Resources[api.ResourceArtifact]
 	resource.Targets["remote"] = accesstest.Target{
-		Include: []string{"provider-mirrors/registry.terraform.io/hashicorp/null/**"},
+		Include: []string{"provider-mirrors/registry.terraform.io/hashicorp/null/**", "storage/**"},
 	}
 	permission.Resources[api.ResourceArtifact] = resource
 	if err := f.db.Permissions().Update(t.Context(), permission); err != nil {
@@ -744,6 +756,10 @@ func TestAccRemoteSignedProviderRejectsChangedClaimsAndMissingArchive(t *testing
 		{"missing source", func(c *claims) { c.Source = nil }},
 		{"invalid package kind", func(c *claims) { p := *c.Provider; p.Kind = 3; c.Provider = &p }},
 		{"different provider path", func(c *claims) { p := *c.Provider; p.Name = "hashicorp/other"; c.Provider = &p }},
+		{"invalid provider name", func(c *claims) { p := *c.Provider; p.Name = "null"; c.Provider = &p }},
+		// The cached metadata names each file's cache path, so a URL that
+		// names another file's path is refused before any file is read.
+		{"another file's cache path", func(c *claims) { c.Path = "storage/SHA256SUMS" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := base
@@ -955,7 +971,7 @@ func TestAccRemoteProviderNoStoreAndRotation(t *testing.T) {
 				t.Fatalf("transient download %d %s", got.Code, got.Body)
 			}
 			if _, err := f.db.Items().
-				Get(t.Context(), "remote", true, providerArchivePath(f.q)); err == nil {
+				Get(t.Context(), "remote", true, fixtureArchivePath); err == nil {
 				t.Fatal("no-store archive was persisted")
 			}
 		})

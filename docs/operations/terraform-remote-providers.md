@@ -96,12 +96,30 @@ and rechecks the original token scope/expiry/revocation, password revision or
 anonymous-access policy, plus current Read permission. Metadata and each disclosed
 file are checked again immediately before delivery.
 
-Provider registry cache paths use
-`<namespace>/<type>/<version>/terraform-provider-<type>_<version>_<os>_<arch>.zip`
-and the adjacent canonical SHA256SUMS/signature paths. Smart Remote mirror
-artifacts use `provider-mirrors/<hostname>/` before that path, keeping different
-origin identities separate. Permissions must cover the selected archive and,
-for registry bundles, both companions.
+Each file is cached where Artifactory 7.x caches it, so include and exclude
+patterns and permission targets written for 7.x apply unchanged (#1260). A file
+whose URL is below the repository's Providers URL is cached at the rest of its URL
+path: with the default `https://releases.hashicorp.com`, the archive
+`terraform-provider-null/3.2.1/terraform-provider-null_3.2.1_linux_amd64.zip` and
+its SHA256SUMS and signature beside it. Any other file is cached at
+`external/<host>/<path>`, such as
+`external/github.com/<owner>/terraform-provider-<type>/releases/download/...`.
+These are the paths JFrog's include pattern examples name
+(`**/terraform-provider-<type>/**` and
+`**/external/github.com/<owner>/terraform-provider-<type>/**`), and RTFACT-30802
+roots them at the cache's top. Registry documents are checked at their
+`.terraform/providers/<namespace>/<type>/...` paths, so an include list needs
+`.terraform/**` as well, which is JFrog's fix for RTFACT-30802. An upstream
+network mirror's archives follow the same rule. Permissions must cover the
+selected archive and, for registry bundles, both companions, at these paths; the
+version list and mirror documents still check Read at
+`<namespace>/<type>/<version>/...`.
+
+A cache filled before #1260 keeps its files at the earlier paths
+(`<namespace>/<type>/<version>/...` and `provider-mirrors/<hostname>/...`). They
+are not moved: the next request fetches each file again under the new paths, and
+the `<key>-cache` storage listing then shows those. The earlier files can be
+deleted from the cache.
 
 Configured registry/storage origin and path prefixes constrain initial targets
 and every redirect. Other advertised hosts require external-dependency allow

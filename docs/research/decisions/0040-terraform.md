@@ -617,7 +617,52 @@ Smart Remote mirrors retain their advertised strongest supported hash. Computing
 for a hashless mirror does not establish a signer. [D] JFrog names `terraformProvidersUrl`
 as provider storage and `terraformRegistryUrl` as registry/API-prefix configuration.
 
-[I] The exact target behavior for upstream mirror-prefix selection, per-host cache paths,
-optional-platform discovery bounds and complete-bundle visibility still requires P19/#216
-capture. Controlled fixtures and native clients establish this implementation only. JFrog
+[I] The exact target behavior for upstream mirror-prefix selection, optional-platform
+discovery bounds and complete-bundle visibility still requires P19/#216 capture. The cache
+paths follow "Remote cache paths (#1260)" below. Controlled fixtures and native clients establish this implementation only. JFrog
 provider repository CRUD proof remains separate from native package-content qualification.
+
+## Remote cache paths (#1260)
+
+A remote repository caches each file where Artifactory 7.x does, so include and exclude
+patterns and permission targets written for 7.x admit or refuse the same files. Before
+#1260 the files sat at the registry identity's paths
+(`<namespace>/<type>/<version>/terraform-provider-<type>_<version>_<os>_<arch>.zip`,
+`provider-mirrors/<hostname>/...` and `<namespace>/<name>/<system>/<version>.<ext>`), which
+no 7.x pattern names.
+
+[D] JFrog's [Terraform repositories page](https://docs.jfrog.com/artifactory/docs/terraform-opentofu-and-terraform-backend-repositories.md)
+gives the remote's include pattern examples: a HashiCorp provider's files at
+`**/terraform-provider-<type>/**`, which is their path below the default Providers URL
+`https://releases.hashicorp.com`, and another publisher's at
+`**/external/github.com/<owner>/terraform-provider-<type>/**`. RTFACT-30802 (7.90.10)
+roots the same paths at the cache's top (`terraform-provider-time/**/*`,
+`external/github.com/confluentinc/terraform-provider-confluent/**/*`), and JFrog's answer
+to its refused metadata is to add `.terraform/**`, where RTFACT-31026 shows the version
+document. RTFACT-29809 shows a 7.6x client download URL that embeds the cache path,
+`/api/terraform/<repo>/providers/external/https/github.com/...`, so the signed URLs embed
+it too.
+
+- A provider file whose URL is below the Providers URL (same scheme and host, case
+  ignored in the host) is cached at the rest of its URL path. Any other is cached at
+  `external/<host>/<path>`. An upstream network mirror's archives follow the same rule.
+- A GitHub module source is fetched as a tag: RTFACT-30340's trace runs from
+  `TerraformRemoteModuleHandler.moduleGitDownload` through `VcsRemoteHandler.downloadTag`,
+  and the VCS page's `vcs-default` layout keeps a tag at
+  `[orgPath]/[module]/tags/[baseRev]/[module]-[baseRev].[ext]`. The archive is cached at
+  `<owner>/<repo>/tags/<ref>/<repo>-<ref>.tar.gz`.
+- An HTTP module archive follows the provider rule against the repository's `url`.
+- Patterns and Read permission are checked at those paths before any file is fetched; a
+  file the caller may not read refuses the package metadata 403, as a file read does.
+- The version lists and mirror documents still check Read at the registry identity's
+  paths, since no 7.x source shows where 7.x checks a listing.
+
+[I] For P19/#216: the rest of each path; the scheme left out of `external/<host>/`,
+which the docs omit and RTFACT-29809's 7.6x URL carried; the query left out; the port
+kept in the host; the HTTP module rule; that a Terraform remote keeps the VCS tag layout
+and its extension (7.x asks GitHub for a zip, this adapter a tar.gz); the listing
+permission paths; and which file a refusal names when patterns refuse several (the
+SHA256SUMS, fetched first).
+
+Files cached before #1260 are not moved. The next request fetches each file again under
+its new path, and the `<key>-cache` storage listing then shows the new paths.
