@@ -111,9 +111,10 @@ func (p *Path) addMatrix(params string) error {
 // escaped to %2B as HttpUtils.escapePlusSymbol escapes it. A key and value
 // are decoded as ParsePath decodes them and escaped again. A value keeps a
 // comma, so ";k=a,b" reaches the upstream as it was sent. 7.x's
-// encodeQuery would leave "/", "?", "#" and ";" in a value as they are,
+// encodeQuery keeps the reserved "/", "?" and ";" in a value as they are,
 // which would move the rest of the value into another segment, the query or
-// another parameter; they are escaped here so the value arrives whole.
+// another parameter; they are escaped here, as "#" is, so the value
+// arrives whole.
 func UpstreamMatrix(escaped string) string {
 	var b strings.Builder
 	for _, seg := range strings.Split(escaped, "/") {

@@ -277,9 +277,12 @@ The following are artifactweave limits and decisions, not claimed vendor default
   as Artifactory appends them to the remote request URL (#1371); an external or
   metadata-provided URL takes none, and neither do the checksum files a Maven remote reads
   beside an artifact. They do not partition response identity: the answer is cached at the
-  bare path, and a cached copy is matched against them before the upstream is asked. A
-  parameter string carrying `/`, `?`, `#`, `\` or a line break is left off whole rather
-  than moving the request elsewhere.
+  bare path, and a cached copy is matched against them before the upstream is asked.
+  Every byte a path segment may not carry is percent-encoded, so `/`, `?`, `#` and a space
+  in a key or value travel as `%2F`, `%3F`, `%23` and `%20` rather than moving the request
+  elsewhere; an escape already made is kept and a stray `%` becomes `%25`. A string that
+  decodes to a backslash, NUL, line break or dot segment is left off whole and the bare
+  path asked for, since the transport refuses those in any outgoing URL (`CheckedURL`).
 - At most 10 redirects. Re-evaluate destination policy at every hop, DNS resolution and
   token realm. Explicit private upstream authorities may be configured; metadata may not
   grant itself loopback/link-local/metadata-service or arbitrary internal access. Default

@@ -2,9 +2,11 @@ package generic_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -209,5 +211,51 @@ func TestAccGenericRemoteServesTheUpstreamsAnswerUnmatched(t *testing.T) {
 				t.Errorf("a cached copy that does not match asked the upstream %q", paths)
 			}
 		})
+	}
+}
+
+// TestAccGenericRemoteEscapesMatrixParametersUpstream (#1371): a matrix
+// value that holds "/", "?", "#" or a space reaches the upstream
+// percent-encoded after the path, so it never ends the path or starts a
+// query or a fragment there, and a mandatory key keeps its "+" as %2B, as
+// 7.x's HttpRepo escapes the plus sign in the remote request URL
+// (HttpUtils.escapePlusSymbol, 7.161.26). A value that decodes to a
+// backslash, a line break or a dot segment, which the transport refuses in
+// any outgoing URL (remote.CheckedURL), is left off and the bare path asked
+// for, as before. Before, the parameters never reached the upstream.
+func TestAccGenericRemoteEscapesMatrixParametersUpstream(t *testing.T) {
+	w := newRemoteWorld(t)
+	var mu sync.Mutex
+	var uris []string
+	up := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		uris = append(uris, r.RequestURI)
+		mu.Unlock()
+		_, _ = rw.Write([]byte(matrixBody))
+	}))
+	t.Cleanup(up.Close)
+	w.c.URL = up.URL
+	w.update()
+	for i, tc := range []struct{ params, want string }{
+		{";x=a%2Fb%3Fc%23d%20e", ";x=a%2Fb%3Fc%23d%20e"},
+		{";x=c%2Bd;y%3F+=1", ";x=c%2Bd;y%3F%2B=1"},
+		{";x=a%5Cb", ""},
+		{";x=1%0D%0AHost:%20evil", ""},
+		{";x=1%2F..%2F..%2Fsecret", ""},
+	} {
+		path := fmt.Sprintf("/m%d/file.bin", i)
+		got := w.request(http.MethodGet, "/artifactory/remote"+path+tc.params, "reader", "")
+		if got.Code != http.StatusOK || got.Body.String() != matrixBody {
+			t.Errorf("GET %s answered %d %q, want 200 %q", path+tc.params, got.Code,
+				got.Body, matrixBody)
+		}
+		mu.Lock()
+		asked := uris
+		uris = nil
+		mu.Unlock()
+		if !onlyPath(asked, path+tc.want) {
+			t.Errorf("GET %s asked the upstream %q, want only %q", path+tc.params, asked,
+				path+tc.want)
+		}
 	}
 }

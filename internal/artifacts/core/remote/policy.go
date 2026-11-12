@@ -515,8 +515,8 @@ func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 	query := q.Resource.Query
 	if q.Resource.ExternalURL != "" {
 		path, query = "", ""
-	} else if upstreamMatrix(q.MatrixParams) {
-		path += q.MatrixParams
+	} else {
+		path += upstreamMatrix(q.MatrixParams)
 	}
 	headers := make(http.Header)
 	if q.Resource.Accept != "" {
@@ -549,13 +549,69 @@ func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 	}
 }
 
-// upstreamMatrix reports whether params may follow the upstream path: one
-// or more ";"-led parameters that cannot end the path or start a query or
-// a fragment. Anything else is left off, so a malformed value never moves
-// the request to another path; the item route builds only this form
-// (pkgroute.UpstreamMatrix).
-func upstreamMatrix(params string) bool {
-	return strings.HasPrefix(params, ";") && !strings.ContainsAny(params, "/?#\\\r\n")
+// upstreamMatrix returns params as they follow the upstream path: one or
+// more ";"-led parameters, with every byte that a path segment may not
+// carry percent-encoded, so that "/", "?", "#" or a space in a key or value
+// reaches the upstream as %2F, %3F, %23 or %20 rather than ending the path
+// or starting a query or a fragment. A "%" that starts a valid escape is
+// kept, since the item route hands over its parameters already escaped
+// (pkgroute.UpstreamMatrix); a stray one becomes %25.
+//
+// Two forms are left off whole, and the upstream is asked for the bare
+// path, as it was before parameters were passed on: a string that does
+// not start with ";", which appended as it is would join the last segment
+// and name another file; and one that decodes to a backslash, a NUL, a
+// line break or a "." or ".." segment. CheckedURL refuses every outgoing
+// URL whose decoded path holds one, so that an upstream that decodes
+// before it resolves the path never reads it as a separator, a header or a
+// step out of the repository URL; appended, they would turn the answer
+// into a 502.
+func upstreamMatrix(params string) string {
+	if !strings.HasPrefix(params, ";") {
+		return ""
+	}
+	const hex = "0123456789ABCDEF"
+	var b strings.Builder
+	b.Grow(len(params))
+	for i := 0; i < len(params); i++ {
+		c := params[i]
+		switch {
+		case c == '%' && i+2 < len(params) && isHex(params[i+1]) && isHex(params[i+2]):
+			b.WriteByte(c)
+		case c != '%' && segmentByte(c):
+			b.WriteByte(c)
+		default:
+			b.WriteByte('%')
+			b.WriteByte(hex[c>>4])
+			b.WriteByte(hex[c&0x0f])
+		}
+	}
+	out := b.String()
+	decoded, err := url.PathUnescape(out)
+	if err != nil || strings.ContainsAny(decoded, "\\\x00\r\n") {
+		return ""
+	}
+	for _, segment := range strings.Split(decoded, "/") {
+		if segment == "." || segment == ".." {
+			return ""
+		}
+	}
+	return out
+}
+
+// segmentByte reports whether c may stand unescaped in a URL path segment
+// (RFC 3986 pchar: unreserved, sub-delims, ":" and "@").
+func segmentByte(c byte) bool {
+	switch {
+	case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9':
+		return true
+	}
+	return strings.IndexByte("-._~!$&'()*+,;=:@", c) >= 0
+}
+
+// isHex reports whether c is a hexadecimal digit.
+func isHex(c byte) bool {
+	return '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F'
 }
 
 // PolicyError classifies a failure of the policy's own work for the source
