@@ -534,6 +534,10 @@ func (UnimplementedStrict) UpdateGroup(context.Context, UpdateGroupRequestObject
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) ReplaceGroup(context.Context, ReplaceGroupRequestObject) (ReplaceGroupResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) UpdateGroupMembers(context.Context, UpdateGroupMembersRequestObject) (UpdateGroupMembersResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }

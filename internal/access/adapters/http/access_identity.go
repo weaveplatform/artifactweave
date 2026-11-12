@@ -566,41 +566,13 @@ func (s AccessService) CreateGroup(
 	if b == nil || b.Name == "" {
 		return nil, httpkit.BadRequestf("a body with the group name is required")
 	}
-	if b.ImportFromLdapGroupSetting != nil {
-		if b.Members != nil {
-			return nil, httpkit.BadRequestf(
-				"members and import_from_ldap_group_setting are mutually exclusive",
-			)
-		}
-		return nil, httpkit.BadRequestf("LDAP group import is not available in artifactweave")
-	}
-	g := model.Group{
-		Name:            b.Name,
-		Description:     httpkit.Deref(b.Description),
-		AutoJoin:        httpkit.Deref(b.AutoJoin),
-		AdminPrivileges: httpkit.Deref(b.AdminPrivileges),
-		ExternalID:      httpkit.Deref(b.ExternalId),
-		Roles: model.RoleFlags{
-			WatchManager: httpkit.Deref(
-				b.WatchManager,
-			),
-			PolicyViewer: httpkit.Deref(b.PolicyViewer),
-			PolicyManager: httpkit.Deref(
-				b.PolicyManager,
-			),
-			ReportsManager: httpkit.Deref(b.ReportsManager),
-			ResourcesManager: httpkit.Deref(
-				b.ManageResources,
-			),
-			ManageWebhook: httpkit.Deref(b.ManageWebhook),
-		},
+	g, err := groupFromCreate(b.Name, *b)
+	if err != nil {
+		return nil, err
 	}
 	if err := svc.CreateGroup(ctx, g, httpkit.DerefSlice(b.Members)); err != nil {
 		if errors.Is(err, kernel.ErrNotFound) {
-			return nil, apierror.New(
-				http.StatusNotFound,
-				"One or more users in members were not found",
-			)
+			return nil, unknownMembers()
 		}
 		return nil, s.identityErr(ctx, "create group", groupExists(b.Name), err)
 	}
@@ -609,6 +581,87 @@ func (s AccessService) CreateGroup(
 		return nil, err
 	}
 	return accessgen.CreateGroup201JSONResponse(d), nil
+}
+
+// ReplaceGroup creates the group, or replaces it, for an administrator (PUT
+// /access/api/v2/groups/{name}): 201 with the group it created, 200 with the
+// group it replaced. The body is Create a Group's, so a replacement resets
+// every field it leaves out to the create default and replaces the members,
+// as JFrog's Create or Replace a Group page says.
+func (s AccessService) ReplaceGroup(
+	ctx context.Context,
+	req accessgen.ReplaceGroupRequestObject,
+) (accessgen.ReplaceGroupResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	name := string(req.Name)
+	b := httpkit.Deref(req.Body)
+	// The page lets name be left out. The schema still marks it required,
+	// so a generated client that cannot leave it out sends it empty, which
+	// is read as left out rather than as a name that differs from the path.
+	if b.Name != "" && b.Name != name {
+		return nil, httpkit.BadRequestf("the group name in the body must match the path")
+	}
+	g, err := groupFromCreate(name, b)
+	if err != nil {
+		return nil, err
+	}
+	created, err := svc.ReplaceGroup(ctx, g, httpkit.DerefSlice(b.Members))
+	if errors.Is(err, kernel.ErrNotFound) {
+		return nil, unknownMembers()
+	}
+	if err != nil {
+		return nil, s.identityErr(ctx, "replace group", "", err)
+	}
+	d, err := s.groupDetails(ctx, svc, name)
+	if err != nil {
+		return nil, err
+	}
+	if created {
+		return accessgen.ReplaceGroup201JSONResponse(d), nil
+	}
+	return accessgen.ReplaceGroup200JSONResponse(d), nil
+}
+
+// groupFromCreate is the group named name that a create body describes,
+// with Create a Group's default for every field the body leaves out. Until
+// LDAP lands (P12) an import answers 400, for a replacement too: JFrog
+// accepts one there only for a group imported from the same LDAP group,
+// and no group here was imported.
+func groupFromCreate(name string, b accessgen.GroupCreateRequest) (model.Group, error) {
+	if b.ImportFromLdapGroupSetting != nil {
+		if b.Members != nil {
+			return model.Group{}, httpkit.BadRequestf(
+				"members and import_from_ldap_group_setting are mutually exclusive",
+			)
+		}
+		return model.Group{}, httpkit.BadRequestf(
+			"LDAP group import is not available in artifactweave",
+		)
+	}
+	return model.Group{
+		Name:            name,
+		Description:     httpkit.Deref(b.Description),
+		AutoJoin:        httpkit.Deref(b.AutoJoin),
+		AdminPrivileges: httpkit.Deref(b.AdminPrivileges),
+		ExternalID:      httpkit.Deref(b.ExternalId),
+		Roles: model.RoleFlags{
+			WatchManager:     httpkit.Deref(b.WatchManager),
+			PolicyViewer:     httpkit.Deref(b.PolicyViewer),
+			PolicyManager:    httpkit.Deref(b.PolicyManager),
+			ReportsManager:   httpkit.Deref(b.ReportsManager),
+			ResourcesManager: httpkit.Deref(b.ManageResources),
+			ManageWebhook:    httpkit.Deref(b.ManageWebhook),
+		},
+	}, nil
+}
+
+// unknownMembers answers a create or replace that names a user who does not
+// exist, with the 404 JFrog documents for both.
+func unknownMembers() error {
+	return apierror.New(http.StatusNotFound, "One or more users in members were not found")
 }
 
 // GetGroupDetails returns a group to a caller that may read identities (GET
