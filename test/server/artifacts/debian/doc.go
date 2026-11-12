@@ -1,8 +1,9 @@
 // Package debian runs the Debian snapshot routes of the assembled server,
 // with their read guards and their refusals of unavailable or corrupt
 // indexes, a remote Debian repository's relay of upstream files, its .ddeb
-// cache, index reads with a query or matrix parameters, a malformed
-// package stored unindexed, and the async values of the Debian reindex.
+// cache, its indexes cached as fetched, index reads with a query or matrix
+// parameters, a malformed package stored unindexed, and the async values of
+// the Debian reindex.
 //
 // # Role
 //
@@ -34,10 +35,17 @@
 //     repository's indexes, and a virtual repository's other files, asked
 //     for with a query or matrix parameters by an administrator, a reader,
 //     a user without read and an anonymous caller (#1330).
-//   - debian_remote_query_test.go: a remote repository's indexes and
-//     by-hash file, and a virtual repository's over it, asked for with a
-//     query, served as without one with the upstream asked for the path
-//     alone, and a matrix parameter still refused without asking (#1349).
+//   - debian_remote_query_test.go: a remote repository's Release files,
+//     indexes and by-hash files, and a virtual repository's over it, asked
+//     for with a query, served as without one with the upstream asked for
+//     the path alone, or with the query under Propagate Query Params; a
+//     matrix parameter still refused without asking (#1349); and an index's
+//     by-hash copy served once cached to a caller who may read every
+//     package it lists.
+//   - debian_remote_as_fetched_test.go: a remote repository's index that
+//     does not decode served and cached as fetched, and left out by a
+//     virtual over it with one whose digest its Release does not give
+//     (#1356).
 //   - debian_remote_ddeb_test.go: a remote repository's .ddeb served and
 //     cached, and a local or federated .ddeb deploy refused without
 //     ddebSupported (#1352).
@@ -49,8 +57,9 @@
 //     with each async value, queued or run before it answers, or refused.
 //   - debian_xz_test.go: a package whose control.tar.xz or data.tar.xz,
 //     or a Packages.xz, lost its xz index and footer, stored unindexed at
-//     deploy (#1355), and refused from a remote's upstream and through a
-//     virtual over that remote (#1331).
+//     deploy (#1355), the package refused from a remote's upstream (#1331),
+//     and the index cached as fetched and left out by a virtual over that
+//     remote (#1356).
 //
 // # References
 //
@@ -68,8 +77,9 @@
 //     https://github.com/weaveplatform/artifactweave/issues/1273,
 //     https://github.com/weaveplatform/artifactweave/issues/1331,
 //     https://github.com/weaveplatform/artifactweave/issues/1349,
-//     https://github.com/weaveplatform/artifactweave/issues/1352 and
-//     https://github.com/weaveplatform/artifactweave/issues/1355
+//     https://github.com/weaveplatform/artifactweave/issues/1352,
+//     https://github.com/weaveplatform/artifactweave/issues/1355 and
+//     https://github.com/weaveplatform/artifactweave/issues/1356
 //
 // # Status
 //

@@ -87,14 +87,19 @@ func debOf(t *testing.T, control, data []byte) []byte {
 // upstream file.
 const badGateway = `{"errors":[{"message":"Bad Gateway","status":502}]}`
 
+// notFound is the body of the 404 the server answers for a path it holds
+// nothing at.
+const notFound = `{"errors":[{"message":"Could not find resource","status":404}]}`
+
 // A package whose control.tar.xz or data.tar.xz lost its index and footer,
 // which dpkg refuses, is stored at deploy and left unindexed with the reason
 // in deb.index.status, as any unreadable package is (#1355; RTFACT-16378
 // says 7.x stores a package whose control.tar.xz it cannot read and does not
 // index it), and a whole package that replaces it clears the reason. A
-// remote's upstream package or Packages.xz cut the same way answers the 502
-// of any invalid upstream file and is not served (#1331). The whole files
-// are still admitted.
+// remote's upstream package cut the same way answers the 502 of any invalid
+// upstream file and is not served (#1331), while a Packages.xz cut the same
+// way is served and cached as fetched, as any upstream index is (#1356;
+// RTFACT-27303). The whole files are still admitted.
 func TestAccDebianRefusesAnXZStreamWithoutItsIndex(t *testing.T) {
 	const control = "Package: hello\nVersion: 1.0-1\nArchitecture: amd64\n" +
 		"Maintainer: A <a@example.com>\nDescription: hello\n"
@@ -164,7 +169,7 @@ func TestAccDebianRefusesAnXZStreamWithoutItsIndex(t *testing.T) {
 		t.Errorf("whole package has properties %d %s, want no %s", r.Code, r.Body,
 			debian.PropIndexStatus)
 	}
-	for _, p := range []string{pkg, "pool/main/h/hello/hello_1.0-2_amd64.deb", "dists/stable/main/binary-amd64/Packages.xz"} {
+	for _, p := range []string{pkg, "pool/main/h/hello/hello_1.0-2_amd64.deb"} {
 		r := w.Request(http.MethodGet, "/artifactory/remote/"+p, "admin", "")
 		if r.Code != http.StatusBadGateway || strings.TrimSpace(r.Body.String()) != badGateway {
 			t.Errorf("upstream %s without its index answered %d with %d bytes, want 502 %s",
@@ -178,14 +183,25 @@ func TestAccDebianRefusesAnXZStreamWithoutItsIndex(t *testing.T) {
 			http.StatusOK,
 		)
 	}
+	for _, repoKey := range []string{"remote", "remote-cache"} {
+		r = w.Request(http.MethodGet,
+			"/artifactory/"+repoKey+"/dists/stable/main/binary-amd64/Packages.xz", "admin", "")
+		if r.Code != http.StatusOK || !bytes.Equal(r.Body.Bytes(), xzCut(t, packages)) {
+			t.Errorf("%s Packages.xz without its xz index answered %d with %d bytes, "+
+				"want 200 with the %d bytes fetched", repoKey, r.Code, r.Body.Len(),
+				len(xzCut(t, packages)))
+		}
+	}
 }
 
 // A virtual over a remote whose upstream Packages.xz lost its xz index and
-// footer answers that distribution's Release and Packages with the 502 the
-// remote gives the index, as it does for any invalid member index, where it
-// merged the cut index before (#1331). A distribution whose index is whole
-// is still merged.
-func TestAccDebianVirtualRefusesAMemberIndexWithoutItsXZIndex(t *testing.T) {
+// footer leaves that index out of what it merges, where it merged the cut
+// index before #1331 and answered 502 after it: the remote caches the index
+// as fetched (#1356), and a member index the virtual cannot decode is left
+// out as a missing one is [I]. With no other index for the distribution,
+// its Release and Packages are not found, as for a distribution no member
+// holds. A distribution whose index is whole is still merged.
+func TestAccDebianVirtualLeavesOutAMemberIndexWithoutItsXZIndex(t *testing.T) {
 	packages := xzOf(t, []byte(stanza("pool/main/a/alpha/alpha_1.0_amd64.deb", []byte("x"))))
 	files := map[string][]byte{}
 	for dist, body := range map[string][]byte{"stable": xzCut(t, packages), "other": packages} {
@@ -213,13 +229,13 @@ func TestAccDebianVirtualRefusesAMemberIndexWithoutItsXZIndex(t *testing.T) {
 		"main/binary-amd64/Packages": "Package: alpha",
 	} {
 		r := w.Request(http.MethodGet, "/artifactory/deb-virtual/dists/stable/"+p, "admin", "")
-		if r.Code != http.StatusBadGateway || strings.TrimSpace(r.Body.String()) != badGateway {
+		if r.Code != http.StatusNotFound || strings.TrimSpace(r.Body.String()) != notFound {
 			t.Errorf(
-				"virtual %s over a cut index answered %d %s, want 502 %s",
+				"virtual %s over a cut index answered %d %s, want 404 %s",
 				p,
 				r.Code,
 				r.Body,
-				badGateway,
+				notFound,
 			)
 		}
 		r = w.Request(http.MethodGet, "/artifactory/deb-virtual/dists/other/"+p, "admin", "")

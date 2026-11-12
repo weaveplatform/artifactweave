@@ -213,11 +213,24 @@ func (s DebianAPI) addDebianMemberIndexes(
 		if err != nil {
 			return fmt.Errorf("debian member %s Packages: %w", member.Key, err)
 		}
-		if int64(len(body)) != ref.Size ||
-			fmt.Sprintf("%x", sha256.Sum256(body)) != ref.SHA256 {
+		// A remote member caches its upstream's index as fetched, so one
+		// whose digest its Release does not give, or that does not decode,
+		// can reach the merge (RTFACT-27303, #1356). It is left out, as a
+		// member without the index is [I]: 7.x would have to check it to
+		// merge it, and it does not check it before caching. A local or
+		// federated member's index is the server's own, so either is a fault.
+		matches := int64(len(body)) == ref.Size &&
+			fmt.Sprintf("%x", sha256.Sum256(body)) == ref.SHA256
+		if !matches && member.Class == repo.Remote {
+			continue
+		}
+		if !matches {
 			return fmt.Errorf("debian member %s: %w", member.Key, errDebianReleaseDigestMismatch)
 		}
 		rows, err := debian.DecodePackagesIndex(body)
+		if err != nil && member.Class == repo.Remote {
+			continue
+		}
 		if err != nil {
 			return fmt.Errorf("debian member %s Packages: %w", member.Key, err)
 		}
@@ -386,7 +399,7 @@ func (s DebianAPI) serveVirtualDebianSources(
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "Debian virtual index", errDebianIndexTooLarge))
 		return true
 	}
-	paths, err := debianIndexPaths(req.Path, body)
+	paths, err := remoteDebianIndexPaths(req.Path, body, member)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "Debian virtual index", err))
 		return true

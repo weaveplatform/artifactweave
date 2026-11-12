@@ -9,13 +9,17 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -58,16 +62,36 @@ func (l *requestLog) take() []string {
 	return out
 }
 
-// queryArchive is the upstream archive of the query tests: a Packages index
-// and its gzipped form, a Sources index and a Contents index's by-hash copy.
+// queryArchive is the upstream archive of the query tests: a Release file,
+// its signed InRelease form, a Packages index, its gzipped form and its
+// by-hash copy, a Sources index and a Contents index's by-hash copy.
 func queryArchive(t *testing.T) (map[string][]byte, []string) {
 	t.Helper()
 	deb := repopath.Read(t, "internal/artifacts/ecosystem/debian/testdata/alpha_1.0_amd64_0.deb")
 	index := []byte(stanza("pool/main/a/alpha/alpha_1.0_amd64.deb", deb))
 	contents := []byte("usr/bin/alpha\tutils/alpha\n")
+	release, err := debian.Release("stable", []string{"main"}, []string{"amd64"},
+		[]debian.ReleaseEntry{
+			{Path: "main/binary-amd64/Packages", Body: index},
+			{Path: "main/binary-amd64/Packages.gz", Body: debianForm(t, index, ".gz")},
+		}, time.Unix(0, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := terraformtest.NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := debian.SignRelease(release, key.Private, "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	files := map[string][]byte{
+		"dists/stable/Release":                       release,
+		"dists/stable/InRelease":                     signed.InRelease,
 		"dists/stable/main/binary-amd64/Packages":    index,
 		"dists/stable/main/binary-amd64/Packages.gz": debianForm(t, index, ".gz"),
+		fmt.Sprintf("dists/stable/main/binary-amd64/by-hash/SHA256/%x", sha256.Sum256(index)): index,
 		"dists/stable/main/source/Sources": []byte(
 			"Package: alpha\nVersion: 1.0-1\nDirectory: pool/main/a/alpha\nFiles:\n " +
 				strings.Repeat("b", 32) + " 1 alpha_1.0-1.dsc\nChecksums-Sha256:\n " +
@@ -112,10 +136,14 @@ func queryRemote(t *testing.T, files map[string][]byte) (*harness.RemoteWorld, *
 }
 
 // TestAccDebianRemoteIndexServesAQueryAsWithoutOne (#1349): a remote
-// Debian repository's Packages index, its gzipped form, its Sources index
-// and a by-hash file, asked for with a query, answer as without one, where
-// each answered 404 "Could not find resource" without asking the upstream
-// before (the by-hash file only for a query other than skipUpdateStats).
+// Debian repository's Release and InRelease files, its Packages index, its
+// gzipped form, its Sources index and a by-hash file, asked for with a
+// query, answer as without one. Before, an index or a by-hash file answered
+// 404 "Could not find resource" without asking the upstream (a by-hash file
+// only for a query other than skipUpdateStats), a Release or InRelease
+// file 400 "Bad Request" for such a query, and the Packages index's by-hash
+// copy 403 to every caller, with a query or without one, once it was
+// fetched (its listed packages were checked on the copy's own path).
 // The upstream is asked for the path alone: 6.20's HttpRepo appends a
 // request's query to the upstream URL only when Propagate Query Params is
 // set, which JFrog's Remote Repositories page lists for a Generic remote
@@ -125,13 +153,15 @@ func queryRemote(t *testing.T, files map[string][]byte) (*harness.RemoteWorld, *
 // administrator get the upstream's bytes; a user without read permission is
 // refused 403 and an anonymous caller 401 before the upstream is asked
 // (DV-057). A virtual repository over the remote serves its Sources index
-// and by-hash file the same way, where it passed the remote over before.
+// and Contents by-hash file the same way, where it passed the remote over
+// before.
 func TestAccDebianRemoteIndexServesAQueryAsWithoutOne(t *testing.T) {
 	files, paths := queryArchive(t)
 	for _, key := range []string{"remote", "deb-virtual"} {
 		for _, p := range paths {
-			if key == "deb-virtual" && strings.Contains(p, "/Packages") {
-				continue // a virtual composes its Packages index (#1330)
+			if _, index := debian.ByHashMetadataPath(p); key == "deb-virtual" &&
+				(index || debian.ReleaseMetadataPath(p) || strings.Contains(p, "/Packages")) {
+				continue // a virtual composes these (#1330)
 			}
 			for _, query := range []string{"?skipUpdateStats=true", "?unknown=1"} {
 				t.Run(key+"/"+p+query, func(t *testing.T) {
@@ -172,15 +202,15 @@ func TestAccDebianRemoteIndexServesAQueryAsWithoutOne(t *testing.T) {
 // TestAccDebianRemoteIndexKeepsRefusingAMatrixParameter (#1349): 7.x
 // appends a request's matrix parameters to a remote repository's upstream
 // URL (RTFACT-26349), which artifactweave's remote read does not do for any
-// format, so a remote Debian index asked for with one still answers 404
-// "Could not find resource" to a caller who may read it, without asking the
-// upstream, and a virtual over it passes it over for its Sources index.
+// format (#1371), so a remote Debian index asked for with one still answers
+// 404 "Could not find resource" to a caller who may read it, without asking
+// the upstream, and a virtual over it passes it over for its Sources index.
 func TestAccDebianRemoteIndexKeepsRefusingAMatrixParameter(t *testing.T) {
 	files, paths := queryArchive(t)
 	w, up := queryRemote(t, files)
 	for _, p := range paths {
-		if strings.Contains(p, "/by-hash/") {
-			continue // a by-hash file is any other remote file (#1330)
+		if !debian.PackagesIndexPath(p) && !debian.SourcesIndexPath(p) {
+			continue // the item route serves these as any remote file (#1330)
 		}
 		for _, key := range []string{"remote", "deb-virtual"} {
 			if key == "deb-virtual" && strings.Contains(p, "/Packages") {
@@ -192,5 +222,91 @@ func TestAccDebianRemoteIndexKeepsRefusingAMatrixParameter(t *testing.T) {
 				t.Errorf("%s %s;x=1 asked the upstream for %q", key, p, got)
 			}
 		}
+	}
+}
+
+// TestAccDebianRemoteIndexPropagatesAQueryWhenSet (#1349): a remote
+// repository with Propagate Query Params set asks the upstream for a
+// Release file or an index with the request's query, as 6.20's HttpRepo
+// appends it then, and caches the answer apart from the one without it.
+func TestAccDebianRemoteIndexPropagatesAQueryWhenSet(t *testing.T) {
+	files, _ := queryArchive(t)
+	w, up := queryRemote(t, files)
+	w.Repo.PropagateQueryParams = new(true)
+	w.Update()
+	for _, p := range []string{
+		"dists/stable/Release", "dists/stable/main/binary-amd64/Packages.gz",
+		"dists/stable/main/source/Sources",
+	} {
+		for _, target := range []string{p + "?unknown=1", p} {
+			r := w.Request(http.MethodGet, "/artifactory/remote/"+target, "reader", "")
+			if r.Code != http.StatusOK || r.Body.String() != string(files[p]) {
+				t.Errorf("%s answered %d %q, want 200 and the upstream's bytes",
+					target, r.Code, r.Body)
+			}
+			if got := up.take(); !slices.Equal(got, []string{"/" + target}) {
+				t.Errorf("%s: the upstream was asked %q, want %q", target, got, "/"+target)
+			}
+		}
+	}
+}
+
+// TestAccDebianRemoteIndexByHashCopyNeedsReadOnEveryListedPackage: a
+// remote Debian repository's Packages and Sources indexes' by-hash copies
+// are served, once fetched, to a caller who may read every package they
+// list, from the cache and its -cache alias, where every caller, an
+// administrator too, was refused 403 once the copy was fetched (found while
+// fixing #1349). A caller who may read the remote but not the packages is
+// refused the copy as the index itself, 403.
+func TestAccDebianRemoteIndexByHashCopyNeedsReadOnEveryListedPackage(t *testing.T) {
+	files, _ := queryArchive(t)
+	sources := files["dists/stable/main/source/Sources"]
+	byHash := map[string][]byte{
+		"dists/stable/main/binary-amd64/Packages": files["dists/stable/main/binary-amd64/Packages"],
+		"dists/stable/main/source/Sources":        sources,
+	}
+	files[fmt.Sprintf("dists/stable/main/source/by-hash/SHA256/%x", sha256.Sum256(sources))] = sources
+	w, up := queryRemote(t, files)
+	if err := w.Runtime.Store.Users().Create(t.Context(), accesstest.User{
+		Name: "indexonly", PasswordHash: support.CheapHash,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Runtime.Store.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "index-only", Resources: map[api.ResourceType]accesstest.Resource{
+			api.ResourceArtifact: {
+				Actions: accesstest.Grants{
+					Users: map[string]api.Actions{"indexonly": api.ActionRead},
+				},
+				Targets: map[string]accesstest.Target{"remote": {
+					Include: []string{"**"}, Exclude: []string{"pool/**"},
+				}},
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for index, body := range byHash {
+		copyPath := fmt.Sprintf("%s/by-hash/SHA256/%x", index[:strings.LastIndex(index, "/")],
+			sha256.Sum256(body))
+		t.Run(copyPath, func(t *testing.T) {
+			up.take() // what an earlier subtest's refused caller fetched
+			for _, caller := range []string{"reader", "admin"} {
+				for _, key := range []string{"remote", "remote-cache"} {
+					r := w.Request(http.MethodGet, "/artifactory/"+key+"/"+copyPath, caller, "")
+					if r.Code != http.StatusOK || r.Body.String() != string(body) {
+						t.Errorf("%s %s answered %d %q, want 200 and the upstream's bytes",
+							caller, key, r.Code, r.Body)
+					}
+				}
+			}
+			if got := up.take(); !slices.Equal(got, []string{"/" + copyPath}) {
+				t.Errorf("the upstream was asked %q, want %q once", got, "/"+copyPath)
+			}
+			for _, target := range []string{copyPath, index} {
+				queryRefusal(t, w.Request(http.MethodGet, "/artifactory/remote/"+target,
+					"indexonly", ""), http.StatusForbidden, "Forbidden")
+			}
+		})
 	}
 }

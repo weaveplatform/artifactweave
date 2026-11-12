@@ -35,9 +35,9 @@
 //     WithSnapshotWrite, and queues KindReindexNoProps; the item kit
 //     (artifacts/adapters/http/itemkit), whose remote source request checks
 //     upstream metadata or a package before a remote caches it (the *Path
-//     predicates, ByHashPath, ValidateReleaseMetadata, DecodePackagesIndex,
-//     DecodeInstallerPackagesIndex, DecodeSourcesIndex, ReadBinary,
-//     ReadSource), and whose item GET sends a remote's downloads through
+//     predicates, ByHashPath, ValidateReleaseMetadata, ReadBinary,
+//     ReadSource) and caches an index as fetched (#1356), and whose item
+//     GET sends a remote's downloads through
 //     the remote source (Serves); and the
 //     artifacts module's item delete (artifacts/adapters/http), which permits
 //     a whole snapshot folder's delete (WithSnapshotDelete).
@@ -117,8 +117,9 @@
 //     digests, and its signatures bind them.
 //   - A local or federated repository's apt metadata under dists/ is
 //     derived, never uploaded, and never built for a remote from its
-//     partial cache: a remote caches the upstream's after the item kit's
-//     remote source request has checked it.
+//     partial cache: a remote caches the upstream's Release after the item
+//     kit's remote source request has checked it, and its indexes as
+//     fetched, as 7.x does until RTFACT-27303 is done (#1356).
 //   - Nothing under snapshots/ is written except by the server's own
 //     snapshot publication, or deleted except as a whole snapshot folder
 //     (409).

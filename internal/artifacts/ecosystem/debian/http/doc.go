@@ -97,11 +97,14 @@
 //     snapshot then reads, or a package an index lists, is refused as that
 //     first check refuses: 403, or 401 to an anonymous caller.
 //   - A Packages or Sources index, stored, cached, in a snapshot or passed
-//     through a virtual repository, reaches only a caller with Read
-//     permission on every package it lists, which the generic item route
-//     cannot check. A Debian installer's Packages index, which a remote
-//     repository relays as metadata, is read with the permission on its
-//     own path, as a translation or a Contents index is [I]. The download
+//     through a virtual repository, and its by-hash copy, reach only a
+//     caller with Read permission on every package it lists, which the
+//     generic item route cannot check. A remote repository caches its
+//     upstream's index as fetched (RTFACT-27303, #1356); one that does not
+//     decode lists no package the server can read, so it is read with the
+//     permission on its own path [I]. A Debian installer's Packages index,
+//     which a remote repository relays as metadata, is read so too, as a
+//     translation or a Contents index is [I]. The download
 //     policy does not filter or refuse an index for the packages it lists:
 //     a package whose file the include and exclude patterns reject stays
 //     listed and only its download is refused, as in Artifactory's indexes
@@ -133,19 +136,25 @@
 //     Properties in Deployment and Resolution). A virtual repository's
 //     composed metadata carries none [I], so only a mandatory key refuses
 //     it, and a member whose file does not match is passed over for the
-//     next [I]. A remote repository's index takes a query as any remote
-//     file does, passing it to the upstream only under Propagate Query
-//     Params (#1349). It still answers 404 to a matrix parameter, after the
-//     read check, since 7.x appends them to the upstream URL (RTFACT-26349)
-//     and the remote read does not yet [I]; a virtual repository passes over
-//     a remote member for its Sources index so.
+//     next [I]. A remote repository's Release and index take a query as any
+//     remote file does, passing it to the upstream only under Propagate
+//     Query Params (#1349). Its index still answers 404 to a matrix
+//     parameter, after the read check, since 7.x appends them to the
+//     upstream URL (RTFACT-26349) and the remote read does not yet (#1371);
+//     a virtual repository passes over a remote member for its Sources
+//     index so.
 //   - A virtual repository's metadata is composed for each request from its
 //     members in order, at most 128. A member of another type, a virtual
 //     member or one with the trivial layout is refused, a member that
 //     refuses its Release or index (blacked out, for one) is left out, and a
-//     package path belongs to the first member that lists it. A member's
-//     index must match the size and SHA-256 its Release gives, and only the
-//     packages the caller has Read permission on are listed. A key pair, GPG
+//     package path belongs to the first member that lists it. A local or
+//     federated member's index must match the size and SHA-256 its Release
+//     gives and decode; a remote member's index that does not is left out,
+//     as a missing one is, since the remote caches it as fetched (#1356)
+//     [I]. Only the packages the caller has Read permission on are listed.
+//   - A snapshot of a remote repository refuses an index that does not
+//     decode with the 502 its read gave before #1356, since it copies only
+//     an index whose packages it can check [I]. A key pair, GPG
 //     only, signs the Release as InRelease and Release.gpg.
 //   - A server built without a remote source service answers a remote
 //     index read, and a virtual repository's metadata or package read that
@@ -208,9 +217,11 @@
 //   - debian_source_request_test.go: the source request names what apt
 //     reads from an upstream (#1273): an installer's Packages index, any
 //     by-hash file, a .lzma index and a package under a by-hash folder,
-//     each checked as it streams, with the 64 MiB bound on an index's
-//     by-hash copy alone; names it cannot check stay not found; an index
-//     or by-hash file asked for with a query keeps it (#1349).
+//     each checked as it streams, with the 64 MiB bound and the
+//     repository-wide permission check on an index's by-hash copy alone; an
+//     index cached as fetched (#1356); names it cannot check stay not
+//     found; an index or by-hash file asked for with a query keeps it
+//     (#1349).
 //   - debian_upstream_paths_test.go: a remote repository asks its upstream
 //     for those paths and a virtual repository for its remote member's
 //     installer index; a virtual repository composes the forms its own
@@ -258,7 +269,8 @@
 //     jobs it cannot run; claims and snapshots failing closed on store,
 //     blob and permission faults, Release declarations that do not parse,
 //     a listed package the caller may not read, an unreadable InRelease and
-//     a package a remote source refuses; snapshots of a local or remote
+//     a package a remote source refuses, and a remote index that does not
+//     decode (#1356); snapshots of a local or remote
 //     source whose patterns reject a listed package keeping it listed, the
 //     snapshot's index still served once the source is blacked out; a
 //     snapshot's metadata refused by a blacked-out target or its patterns;
