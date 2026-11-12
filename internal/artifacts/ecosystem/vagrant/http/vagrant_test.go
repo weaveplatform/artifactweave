@@ -165,7 +165,7 @@ func TestAccCatalogAndDownloads(t *testing.T) {
 			provider := c.Versions[0].Providers[1]
 			sum := sha256.Sum256(body)
 			if provider.Name != "virtualbox" ||
-				provider.URL != "https://public.example/artifactory/boxes/arbitrary/release%20one.box" ||
+				provider.URL != "https://public.example/artifactory/api/vagrant/boxes/arbitrary/release%20one.box" ||
 				provider.ChecksumType != "sha256" ||
 				provider.Checksum != hex.EncodeToString(sum[:]) ||
 				provider.Architecture != "amd64" {
