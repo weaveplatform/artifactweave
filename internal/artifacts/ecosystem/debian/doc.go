@@ -48,10 +48,11 @@
 //     rebuild when the write commits; Derive and Underive write and remove
 //     the metadata; Now dates each Release; and Keys (access/api) reads
 //     the GPG signing pair, which the OpenPGP library
-//     (github.com/ProtonMail/go-crypto) unlocks and signs with. xz
-//     (github.com/ulikunitz/xz) and zstd (github.com/klauspost/compress)
-//     read a package's compressed control and data members; xz, its lzma
-//     package and bzip2 (github.com/dsnet/compress, as the standard
+//     (github.com/ProtonMail/go-crypto) unlocks and signs with. The shared
+//     xz reader (platform/xzfile), which reads a whole xz file as dpkg and
+//     apt do, and zstd (github.com/klauspost/compress) read a package's
+//     compressed control and data members; github.com/ulikunitz/xz, its
+//     lzma package and bzip2 (github.com/dsnet/compress, as the standard
 //     library only reads bzip2) write an index's optional forms. The generic
 //     deploy policy (artifacts/ecosystem/generic) is a check Admit
 //     applies.
@@ -173,6 +174,9 @@
 //     LZMA alone header check.
 //   - contract_test.go: the format contract suite (artifacts/core/formattest)
 //     with KindIndex as the repository's work.
+//   - xz_test.go: a package whose control.tar.xz or data.tar.xz, and a
+//     Packages, installer Packages or Sources index, whose xz stream lost
+//     its index and footer, refused (#1331).
 //
 // testdata holds the contract packages, the dpkg-source fixture alpha_1.0-1
 // and generate-source.sh, which builds it; the protocol's tests
