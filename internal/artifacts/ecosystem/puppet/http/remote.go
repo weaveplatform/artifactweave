@@ -188,45 +188,15 @@ func parseVersions(data []byte, name, responseBase string, offset int) ([]releas
 	out := make([]release, 0, len(doc.Results))
 	seen := map[string]bool{}
 	for _, v := range doc.Results {
-		if !puppetfmt.ValidateManifest(v.Metadata.Manifest) || v.Metadata.Name != name ||
-			v.Version != v.Metadata.Version ||
-			seen[v.Version] ||
-			!validSHA256(v.FileSHA256) ||
-			v.FileSize <= 0 ||
-			v.FileSize > puppetfmt.MaxArchiveBytes {
+		if seen[v.Version] {
 			return nil, false, invalidUpstream()
 		}
 		seen[v.Version] = true
-		u, err := url.Parse(v.FileURI)
-		if err != nil || v.FileURI == "" {
-			return nil, false, invalidUpstream()
+		rel, err := v.release(name, base, base)
+		if err != nil {
+			return nil, false, err
 		}
-		u = base.ResolveReference(u)
-		if !archiveWithinFeed(base, u) {
-			return nil, false, invalidUpstream()
-		}
-		// ValidateManifest has read a name and version from the document, so
-		// it is a JSON object.
-		metadata, _, _ := releaseMetadata(v.Metadata.document)
-		out = append(
-			out,
-			release{
-				meta: puppetfmt.Metadata{
-					Name:        name,
-					Version:     v.Version,
-					Path:        puppetfmt.Path(name, v.Version),
-					SHA256:      v.FileSHA256,
-					Size:        v.FileSize,
-					Manifest:    v.Metadata.Manifest,
-					Document:    v.Metadata.document,
-					ProjectPage: v.Metadata.projectPage,
-					IssuesURL:   v.Metadata.issuesURL,
-				},
-				metadata:  metadata,
-				details:   v.relayed(),
-				remoteURL: u.String(),
-			},
-		)
+		out = append(out, rel)
 	}
 	more := offset+len(out) < doc.Pagination.Total
 	// A page with more after it that holds fewer releases than the remote
@@ -244,6 +214,73 @@ func parseVersions(data []byte, name, responseBase string, offset int) ([]releas
 		return nil, false, invalidUpstream()
 	}
 	return out, more, nil
+}
+
+// release returns upstream release v of module name, read from base: a
+// release page, or one release's own record (parseRelease). feed is the
+// upstream's release list, v3/releases, under whose Forge root the archive
+// must be. A release whose manifest, identity, checksum, size or archive
+// address does not validate is invalid upstream metadata.
+func (v upstreamVersion) release(name string, base, feed *url.URL) (release, error) {
+	if !puppetfmt.ValidateManifest(v.Metadata.Manifest) || v.Metadata.Name != name ||
+		v.Version != v.Metadata.Version ||
+		!validSHA256(v.FileSHA256) ||
+		v.FileSize <= 0 ||
+		v.FileSize > puppetfmt.MaxArchiveBytes {
+		return release{}, invalidUpstream()
+	}
+	u, err := url.Parse(v.FileURI)
+	if err != nil || v.FileURI == "" {
+		return release{}, invalidUpstream()
+	}
+	u = base.ResolveReference(u)
+	if !archiveWithinFeed(feed, u) {
+		return release{}, invalidUpstream()
+	}
+	// ValidateManifest has read a name and version from the document, so it
+	// is a JSON object.
+	metadata, _, _ := releaseMetadata(v.Metadata.document)
+	return release{
+		meta: puppetfmt.Metadata{
+			Name:        name,
+			Version:     v.Version,
+			Path:        puppetfmt.Path(name, v.Version),
+			SHA256:      v.FileSHA256,
+			Size:        v.FileSize,
+			Manifest:    v.Metadata.Manifest,
+			Document:    v.Metadata.document,
+			ProjectPage: v.Metadata.projectPage,
+			IssuesURL:   v.Metadata.issuesURL,
+		},
+		metadata:  metadata,
+		details:   v.relayed(),
+		remoteURL: u.String(),
+	}, nil
+}
+
+// parseRelease returns the release version of module name that the
+// upstream's record of that one release, read from responseBase, gives. A
+// record that is not one JSON object of at most maxMetadataBytes, that
+// names another release, or that was read from anywhere but that release's
+// record is invalid upstream metadata (502), and so is one a release page
+// would refuse.
+func parseRelease(data []byte, name, version, responseBase string) (release, error) {
+	if len(data) == 0 || len(data) > maxMetadataBytes {
+		return release{}, invalidUpstream()
+	}
+	suffix := "/v3/releases/" + name + "-" + version
+	base, err := url.Parse(responseBase)
+	if err != nil || !validArchiveURL(base) || !strings.HasSuffix(base.Path, suffix) {
+		return release{}, invalidUpstream()
+	}
+	var v upstreamVersion
+	if json.Unmarshal(data, &v) != nil || v.Version != version {
+		return release{}, invalidUpstream()
+	}
+	feed := *base
+	feed.Path = strings.TrimSuffix(base.Path, "/"+name+"-"+version)
+	feed.RawPath = ""
+	return v.release(name, base, &feed)
 }
 
 func validSHA256(value string) bool { return validHex(value, 64) }
@@ -500,6 +537,105 @@ func (h handler) remoteModule(r *http.Request, name string, u use) (moduleDetail
 		)
 	}
 	return d, true, nil
+}
+
+// remoteRelease returns release version of module name as the remote's
+// upstream's record of that release, v3/releases/<slug>, gives it, and
+// false when the upstream answers 404 for it or the caller may not read it
+// (#1344). The release route asks for it only for a release the
+// upstream's release pages leave out, so a release they list answers as it
+// did. RTFACT-19130 shows a 6.8.6 remote answering
+// v3/releases/puppetlabs-sqlserver-2.5.0, a Puppet Enterprise module's
+// release, while it answered the module 404; the Forge's module list
+// leaves such modules out unless module_groups names them (its v3 API
+// description), and a remote does not ask for them (moduleGroups), so the
+// release came from a document no list filters, which is taken to be the
+// release's own record [I]. It is read with the release pages' authority,
+// Read on the module folder and the download policy at
+// .puppet/<m>/releases.json, without the fields no record answers
+// (releaseExclusions), which the Forge's description lets this operation
+// leave out too, and validated as a release page's record is. Where 7.x
+// caches it is [I].
+func (h handler) remoteRelease(r *http.Request, name, version string) (release, bool, error) {
+	c := pkgroute.RequestFrom(r).Repo
+	slug := name + "-" + version
+	// The remote has read its release pages first, from the same address,
+	// so the address is valid here.
+	external, _ := upstreamURL(c, "/v3/releases/"+slug, url.Values{
+		"exclude_fields": {strings.Join(releaseExclusions, " ")},
+	})
+	resource := source.Resource{
+		Kind:              source.ResourceKindMetadata,
+		Path:              "v3/releases/" + slug,
+		ExternalURL:       external,
+		NoCrossOriginAuth: true,
+		CheckURL: func(_ context.Context, target *url.URL) error {
+			return checkRegistryURL(c, target)
+		},
+		Method:              http.MethodGet,
+		PermissionFolder:    true,
+		PermissionPath:      name,
+		PolicyPath:          ".puppet/" + name + "/releases.json",
+		Variant:             "puppet-forge-v3-release-v1",
+		ExpectedContentType: mediaType,
+		ValidateMetadata: func(_ context.Context, body io.ReadSeeker, _ int64, meta source.MetadataResponse) error {
+			data, err := io.ReadAll(io.LimitReader(body, maxMetadataBytes+1))
+			if err != nil {
+				return invalidUpstream()
+			}
+			if _, _, ok := withinRegistry(c, meta.BaseURL); !ok {
+				return invalidUpstream()
+			}
+			_, err = parseRelease(data, name, version, meta.BaseURL)
+			return err
+		},
+	}
+	result, err := h.k.Read(r, resource)
+	if missingRecord(err) {
+		return release{}, false, nil
+	}
+	if err != nil {
+		return release{}, false, fmt.Errorf(
+			"puppet: release record: %w",
+			pkgroute.SourceError(err, false),
+		)
+	}
+	data, err := h.metadataBytes(r, result)
+	if err != nil {
+		return release{}, false, err
+	}
+	if result.CheckRead == nil || result.CheckPermission == nil || result.Revalidate == nil {
+		return release{}, false, fmt.Errorf(
+			"puppet: missing authority: %w",
+			pkgroute.SourceError(source.ErrInvalidResult, false),
+		)
+	}
+	if _, _, ok := withinRegistry(c, result.Metadata.BaseURL); !ok {
+		return release{}, false, invalidUpstream()
+	}
+	rel, err := parseRelease(data, name, version, result.Metadata.BaseURL)
+	if err != nil {
+		return release{}, false, err
+	}
+	if err = result.Revalidate(r.Context()); err != nil {
+		return release{}, false, fmt.Errorf(
+			"puppet: authority: %w",
+			pkgroute.SourceError(err, false),
+		)
+	}
+	// The release route has checked Read on the release's archive path; the
+	// source rechecks it as a release page's releases are rechecked, and a
+	// release it denies answers as one the upstream does not hold.
+	if err = result.CheckPermission(r.Context(), rel.meta.Path); err != nil {
+		if errors.Is(err, source.ErrDenied) {
+			return release{}, false, nil
+		}
+		return release{}, false, fmt.Errorf(
+			"puppet: authority: %w",
+			pkgroute.SourceError(err, false),
+		)
+	}
+	return rel, true, nil
 }
 
 // missingRecord reports whether err is the upstream's 404 for a record,

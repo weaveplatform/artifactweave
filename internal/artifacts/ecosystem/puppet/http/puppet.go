@@ -139,11 +139,14 @@ func (h handler) releases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for key, values := range query {
+		// module_groups is taken only beside module, since only one module's
+		// list is asked for it (moduleGroups); the whole-repository lists
+		// keep refusing it, as they did.
 		if len(values) != 1 ||
 			!slices.Contains(
 				[]string{"module", "sort_by", "exclude_fields", "limit", "offset"},
 				key,
-			) {
+			) && (key != moduleGroups || !query.Has("module")) {
 			h.k.Error(w, r, apierror.New(400, "unsupported Puppet query"))
 			return
 		}
@@ -304,6 +307,17 @@ func (h handler) release(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		rel, found, err := h.remoteRelease(r, name, version)
+		if err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+		if found {
+			writeJSON(w, r, 200, record(rel))
+			return
+		}
+	}
 	h.k.Error(w, r, apierror.New(404, "Puppet release not found"))
 }
 
@@ -412,15 +426,35 @@ func (h handler) modules(w http.ResponseWriter, r *http.Request) {
 }
 
 // searchQuery reports whether q is a module search: one valid module name
-// as query, and at most one limit and one offset.
+// as query, and at most one limit, one offset and one module_groups
+// (moduleGroups).
 func searchQuery(q url.Values) bool {
 	for key, values := range q {
-		if len(values) != 1 || key != "query" && key != "limit" && key != "offset" {
+		if len(values) != 1 ||
+			key != "query" && key != "limit" && key != "offset" && key != moduleGroups {
 			return false
 		}
 	}
 	return puppetfmt.ValidName(q.Get("query"))
 }
+
+// moduleGroups is the Forge's module_groups parameter, which one module's
+// release list and the module search accept and leave without effect
+// (#1343). The Puppet client adds it to both whenever its internal
+// module_groups setting is set (lib/puppet/forge.rb, fetch and search), and
+// Puppet Enterprise sets that to "base+pe_only", sent as
+// module_groups=base%20pe_only (puppetlabs/puppet 23a8b7c241, PUP-1890);
+// PUP-8650 shows a Puppet Enterprise server sending it to an Artifactory
+// Puppet repository. Refusing it would refuse every module such a node
+// installs, where JFrog's Puppet repositories page says the Puppet client
+// is served from every repository type. The Forge narrows its lists to the
+// groups named (its v3 API description), but no source shows 7.x doing so
+// or what its links keep, so every value is taken and none narrows a list,
+// the links leave it out, and a remote does not pass it on [I]. A remote
+// that passed it on would list Puppet Enterprise modules its upstream's
+// own lists leave out: without the parameter the Forge's module list holds
+// only the base group, its description says.
+const moduleGroups = "module_groups"
 
 func (h handler) archive(w http.ResponseWriter, r *http.Request) {
 	file := chi.URLParam(r, "file")
