@@ -27,11 +27,11 @@ func (zeros) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// TestAccDebianIndexRefusals: a Packages or Sources index with a query is
-// not found; one asked for by a caller who may not read it is refused first,
-// whatever the repository's settings (DV-057); and one in a blacked-out
-// repository, or whose own path the patterns reject, answers the download
-// policy's 404 and message before it is read, an administrator included.
+// TestAccDebianIndexRefusals: a Packages or Sources index asked for by a
+// caller who may not read it is refused first, whatever the repository's
+// settings (DV-057); and one in a blacked-out repository, or whose own path
+// the patterns reject, answers the download policy's 404 and message before
+// it is read, an administrator included.
 func TestAccDebianIndexRefusals(t *testing.T) {
 	w := newOverlayWorld(t)
 	w.debRepos(
@@ -47,10 +47,6 @@ func TestAccDebianIndexRefusals(t *testing.T) {
 		status              int
 		message             string
 	}{
-		{
-			"query", "deb-local", debPackages + "?x=1", "admin",
-			http.StatusNotFound, "Could not find resource",
-		},
 		{
 			"caller who may not read", "deb-local", debPackages, "user",
 			http.StatusForbidden, "Forbidden",

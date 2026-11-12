@@ -79,12 +79,17 @@ components:
           description: Optional within this object. How a client-supplied checksum that disagrees with the uploaded
             bytes is handled. client-checksums rejects, server-generated-checksums accepts and records both values.
         ddebSupported:
-          description: Optional within this object. When true a debian repository also indexes debug symbol packages
-            (.ddeb). Stored only.
+          # JFrog's Debian guide: "Enable indexing with debug symbols (.ddeb)".
+          description: Optional within this object. When true a Debian repository accepts debug symbol packages
+            (.ddeb), checks them and lists them in its Packages indexes as it does a .deb; when false or unset a
+            .ddeb deploy answers 400.
           type: boolean
         debianTrivialLayout:
-          description: Optional within this object. When true the Debian repository uses the trivial (flat) layout.
-            Stored only.
+          # JFrog's Debian guide: the trivial layout does not support source packages, and a
+          # virtual repository includes only repositories with the automatic layout.
+          description: Optional within this object. When true the Debian repository uses the deprecated trivial
+            layout, which takes no source packages, so a .dsc deploy answers 400, and which no virtual repository
+            may include.
           type: boolean
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server.
@@ -221,8 +226,11 @@ components:
             an empty string.
           type: string
         optionalIndexCompressionFormats:
-          description: Optional within this object. Additional compression formats generated for Debian index files, for
-            example bz2 or lzma. Stored only.
+          # JFrog's Debian guide, Optional Index Compression Formats; RTFACT-24246 (7.15.3) for a
+          # virtual repository. That a value other than bz2, lzma and xz adds nothing is inferred (#216).
+          description: Optional within this object. The forms besides plain and gzip, any of bz2, lzma and xz, that
+            a Debian repository writes each Packages index in, from its next index rebuild, and that its Release
+            lists. Other values add nothing.
           items:
             description: Optional within this object. A compression format name.
             type: string
@@ -403,12 +411,17 @@ components:
               type: object
           type: object
         ddebSupported:
-          description: Optional within this object. When true a debian repository also indexes debug symbol packages
-            (.ddeb). Stored only.
+          # JFrog's Debian guide: "Enable indexing with debug symbols (.ddeb)".
+          description: Optional within this object. When true a Debian repository accepts debug symbol packages
+            (.ddeb), checks them and lists them in its Packages indexes as it does a .deb; when false or unset a
+            .ddeb deploy answers 400.
           type: boolean
         debianTrivialLayout:
-          description: Optional within this object. When true the Debian repository uses the trivial (flat) layout.
-            Stored only.
+          # JFrog's Debian guide: the trivial layout does not support source packages, and a
+          # virtual repository includes only repositories with the automatic layout.
+          description: Optional within this object. When true the Debian repository uses the deprecated trivial
+            layout, which takes no source packages, so a .dsc deploy answers 400, and which no virtual repository
+            may include.
           type: boolean
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server.
@@ -521,8 +534,11 @@ components:
             an empty string.
           type: string
         optionalIndexCompressionFormats:
-          description: Optional within this object. Additional compression formats generated for Debian index files, for
-            example bz2 or lzma. Stored only.
+          # JFrog's Debian guide, Optional Index Compression Formats; RTFACT-24246 (7.15.3) for a
+          # virtual repository. That a value other than bz2, lzma and xz adds nothing is inferred (#216).
+          description: Optional within this object. The forms besides plain and gzip, any of bz2, lzma and xz, that
+            a Debian repository writes each Packages index in, from its next index rebuild, and that its Release
+            lists. Other values add nothing.
           items:
             description: Optional within this object. A compression format name.
             type: string
@@ -1420,8 +1436,10 @@ components:
             metadata. Stored only.
           type: string
         debianTrivialLayout:
-          description: Optional within this object. When true the Debian repository uses the trivial (flat) layout.
-            Stored only.
+          # JFrog's Debian guide: a virtual repository includes only repositories with the
+          # automatic layout, so the trivial layout is not one a virtual repository has.
+          description: Optional within this object. Stored only. A virtual Debian repository has no trivial layout of
+            its own; it refuses a member whose debianTrivialLayout is true.
           type: boolean
         defaultDeploymentRepo:
           description: Optional within this object. Key of the member that receives uploads sent to the virtual
@@ -1501,8 +1519,11 @@ components:
             an empty string.
           type: string
         optionalIndexCompressionFormats:
-          description: Optional within this object. Additional compression formats generated for Debian index files, for
-            example bz2 or lzma. Stored only.
+          # JFrog's Debian guide, Optional Index Compression Formats; RTFACT-24246 (7.15.3) for a
+          # virtual repository. That a value other than bz2, lzma and xz adds nothing is inferred (#216).
+          description: Optional within this object. The forms besides plain and gzip, any of bz2, lzma and xz, that
+            a virtual Debian repository composes each Packages index in, and that its Release lists. Other values
+            add nothing.
           items:
             description: Optional within this object. A compression format name.
             type: string

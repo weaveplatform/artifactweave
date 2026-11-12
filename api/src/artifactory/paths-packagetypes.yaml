@@ -483,14 +483,22 @@ paths:
           description: Key of the repository to act on. The repository's package type must match this
             operation's ecosystem; a mismatch is rejected with 400.
           type: string
-      - description: Optional query parameter. When true the server queues the work and returns at once; when
-          false or omitted the response waits for the work to finish.
+      - description: Optional query parameter. 1 queues the work and returns at once; 0 or omitted waits
+          for the work to finish. The strings "true" and "false" are accepted as 1 and 0.
         in: query
         name: async
         schema:
-          description: When true the server queues the work and returns at once; when false or omitted the
-            response waits for the work to finish.
-          type: boolean
+          description: 1 queues the work, 0 waits for it. The strings "true" and "false" are accepted as 1 and 0.
+          enum:
+          - 0
+          - 1
+          type: integer
+          # JFrog declares 0 and 1; its earlier REST API reference wrote false and true for the
+          # Debian and opkg operations, and 0 and 1 for YUM's. Bound as a Go bool:
+          # strconv.ParseBool reads 0 and 1 as it reads false and true, so both spellings work.
+          # It also reads t, f, TRUE and the like, kept until 7.x is compared (#216); any other
+          # value answers 400.
+          x-go-type: bool
       - description: Optional query parameter. 1 writes package coordinates as item properties during the
           rebuild (default); 0 rebuilds indexes without writing them.
         in: query
@@ -1330,14 +1338,22 @@ paths:
           description: Key of the repository to act on. The repository's package type must match this
             operation's ecosystem; a mismatch is rejected with 400.
           type: string
-      - description: Optional query parameter. When true the server queues the work and returns at once; when
-          false or omitted the response waits for the work to finish.
+      - description: Optional query parameter. 1 queues the work and returns at once; 0 or omitted waits
+          for the work to finish. The strings "true" and "false" are accepted as 1 and 0.
         in: query
         name: async
         schema:
-          description: When true the server queues the work and returns at once; when false or omitted the
-            response waits for the work to finish.
-          type: boolean
+          description: 1 queues the work, 0 waits for it. The strings "true" and "false" are accepted as 1 and 0.
+          enum:
+          - 0
+          - 1
+          type: integer
+          # JFrog declares 0 and 1; its earlier REST API reference wrote false and true for the
+          # Debian and opkg operations, and 0 and 1 for YUM's. Bound as a Go bool:
+          # strconv.ParseBool reads 0 and 1 as it reads false and true, so both spellings work.
+          # It also reads t, f, TRUE and the like, kept until 7.x is compared (#216); any other
+          # value answers 400.
+          x-go-type: bool
       - description: Optional query parameter. 1 writes package coordinates as item properties during the
           rebuild, 0 skips them.
         in: query
@@ -3552,14 +3568,22 @@ paths:
         schema:
           description: Sub-path to limit a virtual repository calculation to.
           type: string
-      - description: Optional query parameter. When true the server queues the work and returns at once; when
-          false or omitted the response waits for the work to finish.
+      - description: Optional query parameter. 1 queues the work and returns at once; 0 or omitted waits
+          for the work to finish. The strings "true" and "false" are accepted as 1 and 0.
         in: query
         name: async
         schema:
-          description: When true the server queues the work and returns at once; when false or omitted the
-            response waits for the work to finish.
-          type: boolean
+          description: 1 queues the work, 0 waits for it. The strings "true" and "false" are accepted as 1 and 0.
+          enum:
+          - 0
+          - 1
+          type: integer
+          # JFrog declares 0 and 1; its earlier REST API reference wrote false and true for the
+          # Debian and opkg operations, and 0 and 1 for YUM's. Bound as a Go bool:
+          # strconv.ParseBool reads 0 and 1 as it reads false and true, so both spellings work.
+          # It also reads t, f, TRUE and the like, kept until 7.x is compared (#216); any other
+          # value answers 400.
+          x-go-type: bool
       responses:
         '200':
           content:

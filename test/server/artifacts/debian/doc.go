@@ -1,6 +1,8 @@
 // Package debian runs the Debian snapshot routes of the assembled server,
 // with their read guards and their refusals of unavailable or corrupt
-// indexes, and a remote Debian repository's relay of upstream files.
+// indexes, a remote Debian repository's relay of upstream files, index
+// reads with a query or matrix parameters, and the async values of the
+// Debian reindex.
 //
 // # Role
 //
@@ -28,6 +30,12 @@
 //   - debian_remote_upstream_test.go: the files apt reads that a remote
 //     asks its upstream for and serves (#1273), and a by-hash file whose
 //     bytes do not match its name refused and not cached.
+//   - debian_index_query_test.go: a local, federated, remote and virtual
+//     repository's indexes, and a virtual repository's other files, asked
+//     for with a query or matrix parameters by an administrator, a reader,
+//     a user without read and an anonymous caller (#1330).
+//   - debian_reindex_async_test.go: Calculate Debian Repository Metadata
+//     with each async value, queued or run before it answers, or refused.
 //   - debian_xz_test.go: a package whose control.tar.xz or data.tar.xz,
 //     or a Packages.xz, lost its xz index and footer, refused at deploy,
 //     from a remote's upstream and through a virtual over that remote

@@ -7023,7 +7023,7 @@ type CalculateCranRepositoryMetadataParams struct {
 
 // CalculateDebianRepositoryMetadataParams defines parameters for CalculateDebianRepositoryMetadata.
 type CalculateDebianRepositoryMetadataParams struct {
-	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
+	// Async Optional query parameter. 1 queues the work and returns at once; 0 or omitted waits for the work to finish. The strings "true" and "false" are accepted as 1 and 0.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 
 	// WriteProps Optional query parameter. 1 writes package coordinates as item properties during the rebuild (default); 0 rebuilds indexes without writing them.
@@ -7244,7 +7244,7 @@ type ReindexMetadataServerParams struct {
 
 // CalculateOpkgRepositoryMetadataParams defines parameters for CalculateOpkgRepositoryMetadata.
 type CalculateOpkgRepositoryMetadataParams struct {
-	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
+	// Async Optional query parameter. 1 queues the work and returns at once; 0 or omitted waits for the work to finish. The strings "true" and "false" are accepted as 1 and 0.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 
 	// WriteProps Optional query parameter. 1 writes package coordinates as item properties during the rebuild, 0 skips them.
@@ -8061,7 +8061,7 @@ type CalculateYumRepositoryMetadataParams struct {
 	// Path Optional query parameter. Names a virtual repository's repodata directory. Local and federated repositories reject a nonempty path.
 	Path *string `form:"path,omitempty" json:"path,omitempty"`
 
-	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
+	// Async Optional query parameter. 1 queues the work and returns at once; 0 or omitted waits for the work to finish. The strings "true" and "false" are accepted as 1 and 0.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 }
 
@@ -24464,7 +24464,7 @@ func NewCalculateDebianRepositoryMetadataRequest(server string, repoKey string, 
 
 		if params.Async != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "async", *params.Async, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "async", *params.Async, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -26534,7 +26534,7 @@ func NewCalculateOpkgRepositoryMetadataRequest(server string, repoKey string, pa
 
 		if params.Async != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "async", *params.Async, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "async", *params.Async, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -36341,7 +36341,7 @@ func NewCalculateYumRepositoryMetadataRequest(server string, repoKey string, par
 
 		if params.Async != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "async", *params.Async, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "async", *params.Async, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
