@@ -255,10 +255,17 @@ func (s p2Items) serveP2Virtual(
 		body = []byte(
 			"version=1\nmetadata.repository.factory.order=compositeContent.xml,\\!\nartifact.repository.factory.order=compositeArtifacts.xml,\\!\n",
 		)
-	case "compositeContent.xml":
-		body = p2Composite("metadata", members)
-	case "compositeArtifacts.xml":
-		body = p2Composite("artifact", members)
+	case "compositeContent.xml", "compositeArtifacts.xml":
+		children, err := p2Children(r.Context(), st, c, members)
+		if err != nil {
+			httpkit.WriteErr(w, r, s.ItemError(r.Context(), "P2 virtual children", err))
+			return
+		}
+		kind := "metadata"
+		if req.Path == "compositeArtifacts.xml" {
+			kind = "artifact"
+		}
+		body = p2Composite(kind, children)
 	default:
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
@@ -315,7 +322,55 @@ func p2Members(ctx context.Context, st itemkit.Store, c repo.Config, acc itemkit
 	return out, nil
 }
 
-func p2Composite(kind string, members []repo.Config) []byte {
+// p2Children returns the composite children of the virtual repository c
+// for a caller to whom members, the members it may traverse, are listed, as
+// locations relative to c. Without p2Urls each listed member is a child at
+// its key. With them each entry is a child at the path 7.x serves its site
+// under (p2.SiteChild), as long as the member that serves it is listed for
+// the caller: that member is chosen among all configured members, so a
+// site's path is the same for every caller. A member no entry names is
+// left out [I], though its files stay readable under its key, and so is an
+// entry no member serves, which a YAML-applied configuration may hold [I].
+func p2Children(ctx context.Context, st itemkit.Store, c repo.Config, members []repo.Config,
+) ([]string, error) {
+	if len(c.P2URLs) == 0 {
+		out := make([]string, 0, len(members))
+		for _, m := range members {
+			out = append(out, url.PathEscape(m.Key))
+		}
+		return out, nil
+	}
+	configured := make([]p2.Member, 0, len(c.Repositories))
+	for _, key := range c.Repositories {
+		m, err := st.Repos().Get(ctx, key)
+		if errors.Is(err, kernel.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("p2 member %s: %w", key, err)
+		}
+		pm := p2.Member{Key: m.Key}
+		if m.Class == repo.Remote && m.PackageType == repo.P2 {
+			pm.URL = m.URL
+		}
+		configured = append(configured, pm)
+	}
+	var out []string
+	for _, raw := range c.P2URLs {
+		site, err := p2.ParseSiteURL(raw)
+		if err != nil {
+			continue
+		}
+		key, child, ok := p2.SiteChild(site, configured)
+		if ok && !slices.Contains(out, child) &&
+			slices.ContainsFunc(members, func(m repo.Config) bool { return m.Key == key }) {
+			out = append(out, child)
+		}
+	}
+	return out, nil
+}
+
+func p2Composite(kind string, children []string) []byte {
 	typ := "org.eclipse.equinox.internal.p2.metadata.repository.CompositeMetadataRepository"
 	if kind == "artifact" {
 		typ = "org.eclipse.equinox.internal.p2.artifact.repository.CompositeArtifactRepository"
@@ -332,14 +387,14 @@ func p2Composite(kind string, members []repo.Config) []byte {
 		"<repository name=\"artifactweave P2 virtual\" type=\"%s\" version=\"1.0.0\">\n",
 		typ,
 	)
-	fmt.Fprintf(&b, "<children size=\"%d\">\n", len(members))
-	for _, m := range members {
-		// The location is relative, so a client resolves it to the
-		// virtual's <member key>/ path. The key rules leave nothing to
-		// escape in a key such as download.eclipse.org; escaping keeps any
-		// key one path segment of a well-formed attribute all the same.
+	fmt.Fprintf(&b, "<children size=\"%d\">\n", len(children))
+	for _, child := range children {
+		// The location is relative, so a client resolves it under the
+		// virtual repository. A key is path-escaped and a site path holds
+		// only URL path characters (p2.ParseSiteURL), but either may hold
+		// & or ', which the attribute escapes.
 		b.WriteString("<child location=\"")
-		_ = xml.EscapeText(&b, []byte(url.PathEscape(m.Key)))
+		_ = xml.EscapeText(&b, []byte(child))
 		b.WriteString("\"/>\n")
 	}
 	b.WriteString("</children>\n</repository>\n")

@@ -70,6 +70,16 @@
 //     every caller and does not move when another member is left out. The
 //     kit's item GET serves it and checks the member's own permissions
 //     again; a key that names no listed member answers 404.
+//   - Without p2Urls a virtual repository's composite lists each of those
+//     members at its key. With them it lists, in their order and once
+//     each, the path 7.x serves each update site under (p2.SiteChild): a
+//     local://<key>[/<suffix>] entry at <key>[/<suffix>], an http or https
+//     one at the key of the first configured member remote whose url
+//     starts it and the rest of the URL. The member is chosen among all
+//     configured members, so a site's path does not depend on the caller,
+//     and the site is listed only when that member is listed for the
+//     caller. An entry no member serves, and a member no entry names, are
+//     left out of the composite [I]; the member's files stay readable.
 //   - The download policy refuses after the read permission, with a 404
 //     and its message, as on the generic item route: a remote's blackout
 //     and patterns refuse its archive entries, a virtual repository's
@@ -111,7 +121,9 @@
 //   - RTFACT-7631 and RTFACT-29198, whose P2 virtual requests name the
 //     member's key and the update site's sub-path:
 //     https://jfrog.atlassian.net/browse/RTFACT-7631 and
-//     https://jfrog.atlassian.net/browse/RTFACT-29198.
+//     https://jfrog.atlassian.net/browse/RTFACT-29198; RTFACT-29915, the
+//     local://<key>/<suffix> form of a p2Urls entry:
+//     https://jfrog.atlassian.net/browse/RTFACT-29915.
 //   - https://github.com/weaveplatform/artifactweave/issues/773,
 //     https://github.com/weaveplatform/artifactweave/issues/1084,
 //     https://github.com/weaveplatform/artifactweave/issues/1090,

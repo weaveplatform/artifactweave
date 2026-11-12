@@ -26,8 +26,12 @@
 // Assertions only:
 //   - p2_test.go: archive suffix bounds and permissions, the remote and
 //     virtual wire paths, invalid or changed cached representations,
-//     virtual member filtering and a virtual's member files under their
-//     keys.
+//     virtual member filtering, a virtual's member files under their
+//     keys, and its composite built from p2Urls.
+//   - p2_repositories_test.go: the members and P2 remote repositories a
+//     create or update through the repositories API gives a P2 virtual
+//     repository for its p2Urls, singly and in batches, and the writes it
+//     refuses.
 //   - p2_external_test.go, p2_external_error_test.go and
 //     p2_external_cache_integrity_test.go: external composite children,
 //     their depth, origins and authority, metadata fallback, archive
@@ -45,8 +49,9 @@
 //     suites).
 //   - docs/testing/server-test-ownership.md: how CI selection gives the
 //     package an owner.
-//   - https://github.com/weaveplatform/artifactweave/issues/1068 and
-//     https://github.com/weaveplatform/artifactweave/issues/1084
+//   - https://github.com/weaveplatform/artifactweave/issues/1068,
+//     https://github.com/weaveplatform/artifactweave/issues/1084 and
+//     https://github.com/weaveplatform/artifactweave/issues/1257
 //
 // # Status
 //

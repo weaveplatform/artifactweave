@@ -747,3 +747,106 @@ func TestAccP2VirtualServesMembersUnderTheirKeys(t *testing.T) {
 
 	refused("/artifactory/p2-virtual/__p2/0/releases/luna/p2.index", "Could not find resource")
 }
+
+// TestAccP2VirtualCompositeFollowsP2Urls: with p2Urls set, the composite
+// lists one child per update site at the path 7.x serves it under, a
+// remote's key and the rest of the URL, or a local repository's key and
+// suffix. A member no URL names is left out of the composite but its files
+// stay readable under its key, a URL no member covers is left out, and a
+// child whose member the caller may not read is left out for that caller.
+// The repositories are stored as a YAML apply leaves them, with nothing
+// created for the uncovered URL.
+func TestAccP2VirtualCompositeFollowsP2Urls(t *testing.T) {
+	index := p2Fixture(t, "p2.index")
+	backend := sourceBackend(
+		func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+			switch q.Repo.Key + ":" + q.Resource.Path {
+			case "download.eclipse.org:releases/juno/p2.index", "p2-extra:p2.index":
+			default:
+				return source.Result{}, kernel.ErrNotFound
+			}
+			return source.Result{Stream: &source.Stream{
+				Body: io.NopCloser(bytes.NewReader(index)), Status: http.StatusOK,
+				Representation: source.Representation{Size: int64(len(index))},
+			}}, nil
+		},
+	)
+	w := newItemWorld(t, false, func(c *Config) {
+		c.RemoteSources = &source.Service{Resolve: sourceIdentity, HTTP: backend}
+	})
+	for _, c := range []repo.Config{
+		{Key: "p2-local", Class: repo.Local, PackageType: repo.Generic},
+		{
+			Key: "download.eclipse.org", Class: repo.Remote, PackageType: repo.P2,
+			URL: "https://download.eclipse.org/",
+		},
+		{
+			Key: "p2-extra", Class: repo.Remote, PackageType: repo.P2,
+			URL: "https://extra.example/site/",
+		},
+		{
+			Key: "p2-virtual", Class: repo.Virtual, PackageType: repo.P2,
+			Repositories: []string{"p2-local", "download.eclipse.org", "p2-extra"},
+			P2URLs: []string{
+				"https://download.eclipse.org/releases/luna",
+				"https://download.eclipse.org/releases/juno",
+				"https://download.eclipse.org/releases/luna",
+				"local://p2-local/site",
+				"https://uncovered.example/site",
+				"ftp://not.a.site/",
+			},
+		},
+	} {
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if res := w.do(
+		http.MethodPut, "/artifactory/p2-local/site/p2.index", "admin", string(index),
+	); res.Code != http.StatusCreated {
+		t.Fatalf("publish p2.index: %d %s", res.Code, res.Body)
+	}
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "p2-virtual-without-local",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
+				"p2-virtual":           {Include: []string{"**"}},
+				"download.eclipse.org": {Include: []string{"**"}},
+			},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ as, name, children string }{
+		{"admin", "compositeContent.xml", "<children size=\"3\">\n" +
+			"<child location=\"download.eclipse.org/releases/luna\"/>\n" +
+			"<child location=\"download.eclipse.org/releases/juno\"/>\n" +
+			"<child location=\"p2-local/site\"/>\n</children>"},
+		{"admin", "compositeArtifacts.xml", "<children size=\"3\">\n" +
+			"<child location=\"download.eclipse.org/releases/luna\"/>\n" +
+			"<child location=\"download.eclipse.org/releases/juno\"/>\n" +
+			"<child location=\"p2-local/site\"/>\n</children>"},
+		{"user", "compositeContent.xml", "<children size=\"2\">\n" +
+			"<child location=\"download.eclipse.org/releases/luna\"/>\n" +
+			"<child location=\"download.eclipse.org/releases/juno\"/>\n</children>"},
+	} {
+		res := w.do(http.MethodGet, "/artifactory/p2-virtual/"+tc.name, tc.as, "")
+		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), tc.children) {
+			t.Errorf("%s as %s: %d %s, want %q", tc.name, tc.as, res.Code, res.Body, tc.children)
+		}
+	}
+	for _, path := range []string{
+		"/artifactory/p2-virtual/download.eclipse.org/releases/juno/p2.index",
+		"/artifactory/p2-virtual/p2-local/site/p2.index",
+		"/artifactory/p2-virtual/p2-extra/p2.index",
+	} {
+		res := w.do(http.MethodGet, path, "admin", "")
+		if res.Code != http.StatusOK || !bytes.Equal(res.Body.Bytes(), index) {
+			t.Errorf("%s: %d %.200s", path, res.Code, res.Body)
+		}
+	}
+	if _, err := w.db.Repos().Get(t.Context(), "uncovered.example"); err == nil {
+		t.Error("serving the composite created a repository")
+	}
+}

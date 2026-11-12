@@ -692,7 +692,7 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 | `useNamespaces` | `false` | Helm. |
 | `dockerApiVersion` | `V2` | |
 | `debianTrivialLayout`, `debianDefaultArchitectures`, `optionalIndexCompressionFormats` | | Accepted; effective Debian metadata behavior is planned in P29. |
-| `p2Urls` | | P2 virtual repositories: the update sites aggregated; `p2.urls` in the YAML form. Accepted and persisted. 7.x names a local member in it as `local://<key>/<suffix>`, creates a remote repository per host for the other URLs and serves each URL under `<repository key>/<sub-path>` (RTFACT-7631, RTFACT-29198, RTFACT-29915); artifactweave builds the composite from `repositories` and serves each member under its key (#1257). |
+| `p2Urls` | | P2 virtual repositories: the update sites aggregated; `p2.urls` in the YAML form. Each is `local://<key>[/<suffix>]`, 7.x's form for a local member and its path suffix (RTFACT-29915), or an http or https URL. The composite lists one child per site at the serving member's key and the rest of the URL, as 7.x serves `<repository key>/<sub-path>` (RTFACT-7631, RTFACT-29198); without `p2Urls` it lists each member at its key (#1257). A create, or an update that sends `p2Urls`, through the repositories API adds the P2 remote covering each URL, creating one keyed `<host>` or `<host>-<port>` when none does (RTFACT-30256), and the local repository a `local://` entry names; it never removes a member. A YAML apply stores them as given. |
 
 ## Federated fields
 
