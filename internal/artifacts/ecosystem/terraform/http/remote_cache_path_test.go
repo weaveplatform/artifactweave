@@ -244,6 +244,12 @@ func TestAccRemoteProviderExcludedFilesRefuseThePackage(t *testing.T) {
 		),
 	)
 	f.uncached("terraform-provider-null/1.0.0/terraform-provider-null_1.0.0_SHA256SUMS")
+
+	// A pattern on the registry identity's folder matches no 7.x path.
+	patchRepo(t, f.fixture, "remote", func(c *repo.Config) {
+		c.ExcludesPattern = new("hashicorp/null/**")
+	})
+	expect(t, f.get("reader", remoteProviderBase+"1.0.0/download/linux/amd64"), http.StatusOK)
 }
 
 // Read permission is checked at the files' cache paths: a caller who may
@@ -255,6 +261,9 @@ func TestAccRemoteProviderUnreadableFilesRefuseThePackage(t *testing.T) {
 	wantListed(t, f.get("reader", remoteProviderBase+"versions"), "1.0.0")
 	pkg := remoteProviderBase + "1.0.0/download/linux/amd64"
 	wantErrors(t, f.get("reader", pkg), 403, "Forbidden")
+	upstream, _ := url.Parse(f.up.URL)
+	mirror := prefix + "remote/providers/" + upstream.Host + "/hashicorp/null/1.0.0.json"
+	wantErrors(t, f.get("reader", mirror), 403, "Forbidden")
 	f.uncached("terraform-provider-null/1.0.0/terraform-provider-null_1.0.0_SHA256SUMS")
 
 	if err := f.db.Settings().Put(t.Context(), settings.SettingAnonymousAccess, true); err != nil {
