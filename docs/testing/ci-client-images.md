@@ -77,10 +77,6 @@ it.
 | [`vagrant.Dockerfile`](../../test/acceptance/clients/vagrant.Dockerfile) | Vagrant 2.4.9 `.deb` | `releases.hashicorp.com/vagrant/` | [HashiCorp's apt repository](https://apt.releases.hashicorp.com/pool/amd64/main/vagrant_2.4.9-1_amd64.deb) |
 | [`vscode.Dockerfile`](../../test/acceptance/clients/vscode.Dockerfile) | VS Code archive | `vscode.download.prss.microsoft.com` | None. `update.code.visualstudio.com` redirects to the same host |
 
-`luarocks.Dockerfile` keeps the fallback #1321 gave it, which came before
-`fetch-pinned.sh`: it tries the second host when curl fails on the first, then
-checks the SHA-256 of what it fetched.
-
 The Puppet image stays on Ruby 3.3 through a Dependabot entry of its own,
 because the pinned Puppet cannot extract a module archive on Ruby 3.4
 ([#1126](https://github.com/weaveplatform/artifactweave/issues/1126)). The
