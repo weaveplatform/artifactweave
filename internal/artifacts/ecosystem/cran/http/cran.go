@@ -475,7 +475,7 @@ func (s CranAPI) serveCranPackage(
 			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
-		s.ServeFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
+		s.ServeItemFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
 		return
 	}
 	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
@@ -525,6 +525,6 @@ func (s CranAPI) serveRemoteCranPackage(
 		httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
 		return
 	}
-	s.ServeFile(w, r, s.Store,
+	s.ServeItemFile(w, r, s.Store,
 		itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }

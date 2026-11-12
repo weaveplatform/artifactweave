@@ -191,7 +191,7 @@ func (s RPMAPI) serveVirtualRPMPackage(
 			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
-		s.ServeFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
+		s.ServeItemFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
 		return
 	}
 	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
@@ -257,7 +257,7 @@ func (s RPMAPI) serveVirtualRemoteRPMPackage(
 		httpkit.WriteErr(w, r, pkgroute.SourceError(itemkit.RPMSourceIntegrity(), p.Anonymous))
 		return
 	}
-	s.ServeFile(w, r, s.Store, itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
+	s.ServeItemFile(w, r, s.Store, itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }
 
 // rpmCandidates returns the packages the members of the virtual repository
