@@ -125,8 +125,18 @@
 //     it. A remote member's upstream is asked for any such file; the member
 //     lacks only a name its Debian source request refuses, such as a
 //     by-hash name that is no SHA-256, as its own GET answers.
-//     Such a path with a matrix parameter or a query answers 404, as every
-//     such path did before the virtual repository served them.
+//   - An index, a virtual repository's metadata, a virtual package and the
+//     other dists/ files take a query and matrix parameters as any other
+//     file's GET does, once read permission is settled: a query, such as
+//     skipUpdateStats (RTFACT-25636), changes nothing, and matrix parameters
+//     are matched against the file's properties (JFrog's guide, Using
+//     Properties in Deployment and Resolution). A virtual repository's
+//     composed metadata carries none [I], so only a mandatory key refuses
+//     it, and a member whose file does not match is passed over for the
+//     next [I]. A remote repository's index still answers 404 to a query or
+//     a matrix parameter, after the read check, since whether a remote
+//     passes them on to its upstream is unsettled; a virtual repository
+//     passes over a remote member for its Sources index so.
 //   - A virtual repository's metadata is composed for each request from its
 //     members in order, at most 128. A member of another type, a virtual
 //     member or one with the trivial layout is refused, a member that
@@ -204,8 +214,8 @@
 //     optionalIndexCompressionFormats names (#1274); a local .lzma index is
 //     read as an index; and a snapshot of a remote copies the installer and
 //     .lzma indexes its Release lists.
-//   - debian_index_test.go: Packages and Sources indexes refused with a
-//     query, to a caller who may not read them or a package they list, and
+//   - debian_index_test.go: Packages and Sources indexes refused to a
+//     caller who may not read them or a package they list, and
 //     with the download policy's 404 in a blacked-out repository, local or
 //     remote, or one whose patterns reject the index; a package the patterns
 //     reject kept listed while its GET is refused; repositories that have no
@@ -226,9 +236,15 @@
 //     the first member that serves it, past a remote member whose upstream
 //     lacks it; refused to a caller who may not read
 //     them, by the virtual repository's patterns and by an upstream fault,
-//     not found where no member holds them or with a query; and a member's
+//     not found where no member holds them; and a member's
 //     Sources index refused to a caller who may not read a file it lists,
 //     and failing closed when it cannot be read, parsed or checked.
+//   - debian_index_query_test.go: matrix parameters on a stored index, a
+//     virtual package and a virtual Sources index failing closed when the
+//     file's properties cannot be read; a virtual repository passing over a
+//     member, a remote member's stream or cached file included, whose file
+//     they do not match; and its Sources index passing over a remote member
+//     for a query or a matrix parameter without asking its upstream.
 //   - debian_operations_test.go: the rebuild that writes no properties, for
 //     an absent repository, an unreadable package and a queue that refuses
 //     it.
@@ -252,9 +268,9 @@
 //     once and through the work queue, also where patterns reject the
 //     index, and the target gets no snapshot.
 //
-// debian_index_test.go, debian_virtual_test.go and
-// debian_virtual_files_test.go serve their item GETs through the kit with
-// TryDebianItem as the only overlay (overlay_fixture_test.go).
+// debian_index_test.go, debian_index_query_test.go, debian_virtual_test.go
+// and debian_virtual_files_test.go serve their item GETs through the kit
+// with TryDebianItem as the only overlay (overlay_fixture_test.go).
 //
 // The route suite test/server/artifacts/debian checks the snapshot reads'
 // guards and a remote's relay of upstream files through the router, and
