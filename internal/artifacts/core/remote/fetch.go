@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
@@ -139,6 +140,9 @@ func (p *Policy) fetch(
 				); stateErr != nil {
 					return out, stateErr
 				}
+				if refused := mimeRefusal(q, res, cacheErr); refused != nil {
+					return out, refused
+				}
 				return p.fallback(q, key, e, failure)
 			}
 			_ = candidate.Body.Close()
@@ -157,6 +161,9 @@ func (p *Policy) fetch(
 		failure := PolicyError(err)
 		if stateErr := p.RecordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return out, stateErr
+		}
+		if refused := mimeRefusal(q, res, err); refused != nil {
+			return out, refused
 		}
 		return p.fallback(q, key, e, failure)
 	}
@@ -296,6 +303,9 @@ func (p *Policy) directOnce(
 		return source.Result{}, ResponseError(res, p.now())
 	}
 	if q.Resource.Method == http.MethodHead {
+		if refused := headMIME(q, res); refused != nil {
+			return source.Result{}, refused
+		}
 		claimed, parseErr := item.ParseChecksums(kernel.Checksums{
 			SHA256: res.Header.Get(
 				"X-Checksum-Sha256",
@@ -329,6 +339,9 @@ func (p *Policy) directOnce(
 		failure := PolicyError(err)
 		if stateErr := p.RecordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return source.Result{}, stateErr
+		}
+		if refused := mimeRefusal(q, res, err); refused != nil {
+			return source.Result{}, refused
 		}
 		return source.Result{}, failure
 	}
@@ -449,7 +462,62 @@ func (p *Policy) upload(
 		NoStore:      noStore,
 		MaxBytes:     limit,
 		CheckCurrent: func(ctx context.Context, _ item.Store) error { return p.Check(ctx, q, permit, revision) },
+		ClientAccept: clientAccept(q),
 	}
+}
+
+func clientAccept(q source.Request) []string {
+	if q.Resource.ClientMIME == nil {
+		return nil
+	}
+	return q.Resource.ClientMIME.Accept
+}
+
+// headMIME is the MIME check of an upstream HEAD for a resource with
+// ClientMIME and no format hint, as 7.x checks the label of its info
+// request before it downloads anything (HttpRepo.handleGetInfoResponse);
+// a HEAD otherwise relays the label unchecked.
+func headMIME(q source.Request, res *http.Response) error {
+	r := q.Resource
+	if r.ClientMIME == nil || r.ExpectedContentType != "" || len(r.ExpectedContentTypes) > 0 {
+		return nil
+	}
+	err := item.RefuseLabel(q.Repo, r.Path, res.Header.Get("Content-Type"), r.ClientMIME.Accept)
+	return mimeRefusal(q, res, err)
+}
+
+// mimeRefusal is 7.x's answer to a file whose upstream label err refuses,
+// for a resource with ClientMIME: 409 with the message of
+// HttpRepo.blockMismatchingMimeTypes, ended as
+// DownloadServiceImpl.respondResourceNotFound ends a refusal that the info
+// request met, with "; Path: '<repository>:<path>'". 7.x checks the label
+// of that HEAD before its GET, so a refusal here, where the GET's label is
+// checked, is answered as one it would have met there [I]. Nil for any
+// other error or resource.
+func mimeRefusal(q source.Request, res *http.Response, err error) error {
+	var refused *item.MIMERefusal
+	if q.Resource.ClientMIME == nil || !errors.As(err, &refused) {
+		return nil
+	}
+	return &source.MIMERefusal{RejectionError: &format.RejectionError{
+		Status: http.StatusConflict,
+		Message: refused.Message(requestURL(res)) +
+			"; Path: '" + q.Repo.Key + ":" + q.Resource.Path + "'",
+	}}
+}
+
+// requestURL is the URL 7.x names in a refusal: the one it asked for,
+// before any redirect, with its path decoded and without credentials, a
+// query or a fragment.
+func requestURL(res *http.Response) string {
+	req := res.Request
+	for req != nil && req.Response != nil && req.Response.Request != nil {
+		req = req.Response.Request
+	}
+	if req == nil || req.URL == nil {
+		return ""
+	}
+	return req.URL.Scheme + "://" + req.URL.Host + req.URL.Path
 }
 
 func (p *Policy) metadataLimit(kind model.RemoteKind) int64 {

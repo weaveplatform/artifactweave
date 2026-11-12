@@ -79,7 +79,15 @@ type Resource struct {
 	// ExpectedContentTypes is an exact metadata MIME allowlist for negotiated APIs.
 	// It requires complete body validation and cannot accompany the singular hint.
 	ExpectedContentTypes []string
-	Validate             func(context.Context, io.ReadSeeker, int64) error
+	// ClientMIME, when set, holds a download to 7.x's MIME check as its
+	// item route makes it: the client's Accept values are the requested
+	// types, and a refused label answers 409 with 7.x's message, which
+	// Service.Read then answers for the path until the repository's
+	// missedRetrievalCachePeriodSecs pass. Nil, as on a format route, keeps
+	// the check on the path's type and its 502. Accept here never reaches
+	// the upstream or the cache identity.
+	ClientMIME *ClientMIME
+	Validate   func(context.Context, io.ReadSeeker, int64) error
 	// ValidateMetadata validates complete metadata against the actual response
 	// base after redirects. It is exclusive with Validate and requires Variant.
 	ValidateMetadata func(context.Context, io.ReadSeeker, int64, MetadataResponse) error
@@ -145,6 +153,22 @@ type Resource struct {
 	IfNoneMatch     string
 	IfModifiedSince string
 }
+
+// ClientMIME is what 7.x's MIME check reads from the client's request: its
+// Accept values, none when it sent no Accept.
+type ClientMIME struct {
+	Accept []string
+}
+
+// MIMERefusal is a remote's refusal of an upstream file for its label on a
+// resource with ClientMIME: the 409 and message its RejectionError carries,
+// which a client is answered with as any rejection.
+type MIMERefusal struct {
+	*format.RejectionError
+}
+
+// Unwrap is the rejection, which pkgroute.SourceError answers.
+func (e *MIMERefusal) Unwrap() error { return e.RejectionError }
 
 // RetrievalIntent is computed from the authorized entry point, never from an
 // HTTP header or query parameter. CacheOnly cannot traverse a source or join a
@@ -305,6 +329,12 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 	if err = s.revalidate(ctx, q, p); err != nil {
 		return Result{}, err
 	}
+	remember := q.Resource.ClientMIME != nil && !q.CacheOnly
+	if remember {
+		if refused := remembered.get(q.Repo.Key, identity, q.Resource.Path); refused != nil {
+			return Result{}, refused
+		}
+	}
 	if backend == nil {
 		if q.CacheOnly {
 			return Result{}, kernel.ErrNotFound
@@ -312,6 +342,10 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 		return Result{}, ErrUnsupported
 	}
 	result, err := backend.Read(ctx, q, p)
+	var refused *MIMERefusal
+	if remember && errors.As(err, &refused) {
+		remembered.put(q.Repo, identity, q.Resource.Path, refused)
+	}
 	if err == nil {
 		err = validateResult(q, result)
 	}
@@ -346,6 +380,114 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 		}
 	}
 	return result, nil
+}
+
+// ForgetRefusals drops the remembered MIME refusals of repoKey at path and
+// below it, everywhere for an empty path, as 7.x's zap clears its
+// missed-retrieval cache (ZapServiceImpl, RemoteRepoBase.removeFromCaches).
+func (s *Service) ForgetRefusals(repoKey, path string) {
+	remembered.forget(repoKey, path)
+}
+
+// maxRefusals bounds the remembered refusals. 7.x's missed-retrieval cache
+// has no bound; a full memory first drops what has expired, then an
+// arbitrary refusal, which is fetched again on its next request.
+const maxRefusals = 4096
+
+// remembered is 7.x's missed-retrieval cache for MIME refusals
+// (RemoteRepoBase.addRejectedResourceToMissedCache): a refused path is
+// answered from memory, before any cached file, until the repository's
+// missedRetrievalCachePeriodSecs pass. 7.x holds it in each node's memory,
+// so this is held in the process's rather than the store's [I]. It is
+// shared by every Service, and by the copies Discovery makes of one, as
+// one remote's cache is shared by every route to it.
+var remembered = &refusals{}
+
+type refusals struct {
+	mu      sync.Mutex
+	now     func() time.Time
+	entries map[refusalKey]refusal
+}
+
+type refusalKey struct {
+	repo     string
+	identity model.SourceIdentity
+	path     string
+}
+
+type refusal struct {
+	err   *MIMERefusal
+	until time.Time
+}
+
+func (r *refusals) clock() time.Time {
+	if r.now != nil {
+		return r.now()
+	}
+	return time.Now()
+}
+
+func (r *refusals) get(repoKey string, identity model.SourceIdentity, path string) *MIMERefusal {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	key := refusalKey{repo: repoKey, identity: identity, path: path}
+	entry, ok := r.entries[key]
+	if !ok {
+		return nil
+	}
+	if !r.clock().Before(entry.until) {
+		delete(r.entries, key)
+		return nil
+	}
+	return entry.err
+}
+
+func (r *refusals) put(
+	c repo.Config,
+	identity model.SourceIdentity,
+	path string,
+	err *MIMERefusal,
+) {
+	seconds := repo.DefaultMissedRetrievalCachePeriodSecs
+	if c.MissedRetrievalCachePeriodSecs != nil {
+		seconds = *c.MissedRetrievalCachePeriodSecs
+	}
+	if seconds <= 0 {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	now := r.clock()
+	if r.entries == nil {
+		r.entries = map[refusalKey]refusal{}
+	}
+	if len(r.entries) >= maxRefusals {
+		for key, entry := range r.entries {
+			if !now.Before(entry.until) {
+				delete(r.entries, key)
+			}
+		}
+	}
+	if len(r.entries) >= maxRefusals {
+		for key := range r.entries {
+			delete(r.entries, key)
+			break
+		}
+	}
+	r.entries[refusalKey{repo: c.Key, identity: identity, path: path}] = refusal{
+		err: err, until: now.Add(time.Duration(seconds) * time.Second),
+	}
+}
+
+func (r *refusals) forget(repoKey, path string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for key := range r.entries {
+		if key.repo == repoKey &&
+			(path == "" || key.path == path || strings.HasPrefix(key.path, path+"/")) {
+			delete(r.entries, key)
+		}
+	}
 }
 
 func (s *Service) fenceDelivery(

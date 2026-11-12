@@ -564,12 +564,52 @@ func (s *Kit) getSidecar(
 			"Checksum not found for "+f.Item.FullPath()))
 		return
 	}
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Type", checksumType(r, p))
 	w.Header().Set("Last-Modified", f.Item.Modified.UTC().Format(http.TimeFormat))
 	w.WriteHeader(http.StatusOK)
 	if r.Method != http.MethodHead {
 		_, _ = io.WriteString(w, value)
 	}
+}
+
+// contentTypeProperty is the property whose first value, when not blank,
+// is the Content-Type a file downloads with (7.x's CONTENT_TYPE_PROP_KEY,
+// RTFACT-4653).
+const contentTypeProperty = "artifactory.content-type"
+
+// fileContentType is the Content-Type a file downloads with, GET and HEAD:
+// its contentTypeProperty value, as 7.x's DbStoringRepoMixin.setMimeType
+// puts it on the resource its download answers from, otherwise the type
+// recorded from its path. 7.x's storage info, deploy answer, archive
+// entries and signed URLs type a file by its path alone, and so do this
+// server's.
+func fileContentType(ctx context.Context, st Store, it model.Item) (string, error) {
+	props, err := st.Items().Properties(ctx, it.ID)
+	if errors.Is(err, kernel.ErrNotFound) {
+		// A file served without an item of its own, such as a remote
+		// file a format route describes from its cache, has no properties.
+		return it.MimeType, nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("properties of %s: %w", it.FullPath(), err)
+	}
+	if values := props[contentTypeProperty]; len(values) > 0 && strings.TrimSpace(values[0]) != "" {
+		return values[0], nil
+	}
+	return it.MimeType, nil
+}
+
+// checksumType is the Content-Type of the checksum file at name: the MIME
+// table's type of its path on a GET, which 7.x's sendBodyResponseForChecksum
+// sends, application/x-checksum for .sha1, .sha256 and .md5 and the
+// table's default for .sha512, which 7.x has no row for; and
+// application/x-checksum on a HEAD, ChecksumResource's type, for all four
+// [I for .sha512, which 7.x does not generate].
+func checksumType(r *http.Request, name string) string {
+	if r.Method == http.MethodHead {
+		return "application/x-checksum"
+	}
+	return item.MimeType(name)
 }
 
 // ServeFile streams a file's content with the headers the JFrog CLI reads
@@ -591,10 +631,15 @@ func (s *Kit) ServeFile(
 		// sendHeadResponse; RFC 9110 section 14.2) [I].
 		r = pkgroute.WithoutRange(r)
 	}
+	contentType, err := fileContentType(ctx, st, it)
+	if err != nil {
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "item properties", err))
+		return
+	}
 	h := w.Header()
 	pkgroute.SetChecksums(h, it.Actual)
 	h.Set("X-Artifactory-Filename", it.Name)
-	h.Set("Content-Type", it.MimeType)
+	h.Set("Content-Type", contentType)
 	if h.Get("Content-Disposition") == "" {
 		h.Set("Content-Disposition", blob.Disposition(it.Name))
 	}
