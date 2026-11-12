@@ -26,10 +26,14 @@ import (
 func (w *world) registerNPMSignatures(sc *godog.ScenarioContext) {
 	sc.Step(`^I create the ECDSA key pair "([^"]*)" with alias "([^"]*)" as admin$`,
 		w.createECDSAKeyPair)
-	sc.Step(`^I create the ECDSA key pair "([^"]*)" with alias "([^"]*)" from a gpg export as admin$`,
-		w.createGPGECDSAKeyPair)
-	sc.Step(`^the npm signature of "([^"]*)" at "([^"]*)" in "([^"]*)" is replaced by that of "([^"]*)"$`,
-		w.tamperNPMSignature)
+	sc.Step(
+		`^I create the ECDSA key pair "([^"]*)" with alias "([^"]*)" from a gpg export as admin$`,
+		w.createGPGECDSAKeyPair,
+	)
+	sc.Step(
+		`^the npm signature of "([^"]*)" at "([^"]*)" in "([^"]*)" is replaced by that of "([^"]*)"$`,
+		w.tamperNPMSignature,
+	)
 }
 
 // createECDSAKeyPair posts a freshly generated P-256 pair as PEM.

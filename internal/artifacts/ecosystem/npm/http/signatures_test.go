@@ -124,14 +124,17 @@ func TestAccSigningOffAnswersAsBefore(t *testing.T) {
 	keys404 := `{"error":"not found: GET ` + keysPath + `"}`
 	wantAnswer(t, before.do(http.MethodGet, keysPath, "reader"), http.StatusNotFound, keys404)
 	for k, a := range want {
-		if strings.HasPrefix(k, "GET ") && strings.Contains(k, "rich") && a.Status != http.StatusOK {
+		if strings.HasPrefix(k, "GET ") && strings.Contains(k, "rich") &&
+			a.Status != http.StatusOK {
 			t.Fatalf("%s: %+v", k, a)
 		}
 	}
 
 	gpg := accessapi.Keypair{Name: "gpg", Type: accessapi.KeypairGPG, PublicKey: "armored"}
 	ecdsaKey, _ := ecdsaPair(t, "ecdsa")
-	keys := &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{"gpg": gpg, "ecdsa": ecdsaKey}}
+	keys := &accessapitest.Keys{
+		Keypairs: map[string]accessapi.Keypair{"gpg": gpg, "ecdsa": ecdsaKey},
+	}
 	for name, refs := range map[string][2]string{
 		"no pairs":          {"", ""},
 		"GPG primary":       {"gpg", ""},

@@ -50,7 +50,11 @@ func pgpPair(
 	if err != nil {
 		t.Fatal(err)
 	}
-	public = armored(t, openpgp.PublicKeyType, func(w *bytes.Buffer) error { return e.Serialize(w) })
+	public = armored(
+		t,
+		openpgp.PublicKeyType,
+		func(w *bytes.Buffer) error { return e.Serialize(w) },
+	)
 	if passphrase == "" {
 		return armored(t, openpgp.PrivateKeyType, func(w *bytes.Buffer) error {
 			return e.SerializePrivate(w, nil)
@@ -111,7 +115,12 @@ func TestUnitECDSAKeyMaterial(t *testing.T) {
 	if err != nil || !parsed.PublicKey.Equal(parsedPub) {
 		t.Fatalf("OpenPGP halves: %v", err)
 	}
-	if err := keymaterial.CheckPair(keymaterial.ECDSA, pgpPriv, pkixPEM(t, parsedPub), ""); err != nil {
+	if err := keymaterial.CheckPair(
+		keymaterial.ECDSA,
+		pgpPriv,
+		pkixPEM(t, parsedPub),
+		"",
+	); err != nil {
 		t.Fatalf("OpenPGP private with PEM public: %v", err)
 	}
 
@@ -145,7 +154,8 @@ func TestUnitECDSAKeyMaterial(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			err := keymaterial.CheckPair(keymaterial.ECDSA, c.priv, c.pub, c.pass)
-			if !errors.Is(err, keymaterial.ErrInvalid) || !strings.Contains(err.Error(), c.expected) {
+			if !errors.Is(err, keymaterial.ErrInvalid) ||
+				!strings.Contains(err.Error(), c.expected) {
 				t.Fatalf("%v, want an invalid error mentioning %q", err, c.expected)
 			}
 		})

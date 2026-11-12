@@ -27,7 +27,11 @@ import (
 
 // ecdsaPair is a freshly generated ECDSA key pair called name, as the
 // security API stores one. Keys are generated, never committed.
-func ecdsaPair(t *testing.T, name string, curve elliptic.Curve) (accessapi.Keypair, *ecdsa.PrivateKey) {
+func ecdsaPair(
+	t *testing.T,
+	name string,
+	curve elliptic.Curve,
+) (accessapi.Keypair, *ecdsa.PrivateKey) {
 	t.Helper()
 	k, err := ecdsa.GenerateKey(curve, rand.Reader)
 	if err != nil {
@@ -86,7 +90,10 @@ func keyID(t *testing.T, pub *ecdsa.PublicKey) string {
 func TestUnitSignOnPublish(t *testing.T) {
 	w := newWorld(t)
 	pair, key := ecdsaPair(t, "npm-ecdsa", elliptic.P256())
-	w.signing(&accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{pair.Name: pair}}, pair.Name)
+	w.signing(
+		&accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{pair.Name: pair}},
+		pair.Name,
+	)
 	p := "@acme/left-pad/-/@acme/left-pad-1.3.0.tgz"
 	w.deploy(p, pkg("@acme/left-pad", "v1.3.0", ""), nil)
 	m := w.index()["@acme/left-pad"]["1.3.0"]
@@ -116,7 +123,9 @@ func TestUnitSignOnPublish(t *testing.T) {
 func TestUnitSignOff(t *testing.T) {
 	ecdsaKey, _ := ecdsaPair(t, "ecdsa", elliptic.P256())
 	gpg := accessapi.Keypair{Name: "gpg", Type: accessapi.KeypairGPG}
-	keys := &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{"ecdsa": ecdsaKey, "gpg": gpg}}
+	keys := &accessapitest.Keys{
+		Keypairs: map[string]accessapi.Keypair{"ecdsa": ecdsaKey, "gpg": gpg},
+	}
 	base := newWorld(t)
 	base.deploy(canonical("1.0.0"), pkg("left-pad", "1.0.0", ""), nil)
 	want := base.index()
@@ -170,7 +179,9 @@ func TestUnitReindexSigns(t *testing.T) {
 	unsigned := w.index()
 	first, firstKey := ecdsaPair(t, "first", elliptic.P256())
 	second, secondKey := ecdsaPair(t, "second", elliptic.P384())
-	keys := &accessapitest.Keys{Keypairs: map[string]accessapi.Keypair{"first": first, "second": second}}
+	keys := &accessapitest.Keys{
+		Keypairs: map[string]accessapi.Keypair{"first": first, "second": second},
+	}
 	reindex := func(primary string) map[string]map[string]npm.Metadata {
 		t.Helper()
 		w.signing(keys, primary)
@@ -185,8 +196,13 @@ func TestUnitReindexSigns(t *testing.T) {
 	}{{"first", firstKey}, {"second", secondKey}} {
 		got := reindex(step.primary)
 		for v, m := range got["left-pad"] {
-			if len(m.Dist.Signatures) != 1 || m.Dist.Signatures[0].KeyID != keyID(t, &step.key.PublicKey) ||
-				!verifies(&step.key.PublicKey, "left-pad@"+v+":"+m.Dist.Integrity, m.Dist.Signatures[0]) {
+			if len(m.Dist.Signatures) != 1 ||
+				m.Dist.Signatures[0].KeyID != keyID(t, &step.key.PublicKey) ||
+				!verifies(
+					&step.key.PublicKey,
+					"left-pad@"+v+":"+m.Dist.Integrity,
+					m.Dist.Signatures[0],
+				) {
 				t.Fatalf("%s: %s signatures %+v", step.primary, v, m.Dist.Signatures)
 			}
 		}
@@ -213,7 +229,11 @@ func TestUnitSignFaults(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			w := newWorld(t)
 			w.signing(keys, "broken")
-			if _, err := w.tryDeploy(canonical("1.0.0"), pkg("left-pad", "1.0.0", ""), nil); err == nil {
+			if _, err := w.tryDeploy(
+				canonical("1.0.0"),
+				pkg("left-pad", "1.0.0", ""),
+				nil,
+			); err == nil {
 				t.Fatal("deploy succeeded")
 			}
 			if len(w.index()) != 0 {
@@ -281,7 +301,12 @@ func TestUnitKeys(t *testing.T) {
 	for name, k := range map[string]*accessapitest.Keys{
 		"store": {Err: errors.New("boom")}, "public key": keys,
 	} {
-		c := repo.Config{Key: "n", Class: repo.Local, PackageType: repo.NPM, PrimaryKeyPairRef: "bad"}
+		c := repo.Config{
+			Key:               "n",
+			Class:             repo.Local,
+			PackageType:       repo.NPM,
+			PrimaryKeyPairRef: "bad",
+		}
 		if _, err := npm.Keys(ctx, k, c); err == nil || errors.Is(err, kernel.ErrNotFound) {
 			t.Fatalf("%s: %v", name, err)
 		}
