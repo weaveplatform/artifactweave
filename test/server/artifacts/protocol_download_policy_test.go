@@ -184,7 +184,9 @@ func (w *itemWorld) storeItem(key, p, body string, cached bool) {
 // that indexes it. Those that need a published package (Ansible,
 // CocoaPods, Composer, Conan, NuGet, Pub, Skills, Terraform) reach the same
 // kit helpers, which the kit's own tests cover; Bazel modules, Chef, Conda,
-// Nix, Puppet and Vagrant applied the policy themselves before the kit did.
+// Nix and Puppet applied the policy themselves before the kit did. Vagrant's
+// box files are served through Kit.ServeItem too, and the Vagrant package's
+// own tests check the policy on that route (#1259).
 func TestAccProtocolDownloadPolicy(t *testing.T) {
 	for _, c := range protocolDownloads() {
 		t.Run(c.name, func(t *testing.T) {
