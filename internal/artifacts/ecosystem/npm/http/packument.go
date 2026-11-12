@@ -383,9 +383,10 @@ func (p pkg) document(fields map[string]json.RawMessage, v version, base string)
 func (p pkg) complete(fields map[string]json.RawMessage, v version, base string) {
 	fields["version"] = jsonString(v.number)
 	fields["dist"] = encode(dist{
-		Tarball:   base + "/" + escapePath(npmfmt.CanonicalPath(p.name, v.number)),
-		Shasum:    v.meta.Dist.Shasum,
-		Integrity: v.meta.Dist.Integrity,
+		Tarball:    base + "/" + escapePath(npmfmt.CanonicalPath(p.name, v.number)),
+		Shasum:     v.meta.Dist.Shasum,
+		Integrity:  v.meta.Dist.Integrity,
+		Signatures: v.meta.Dist.Signatures,
 	})
 	delete(fields, "deprecated")
 	if v.meta.Deprecated != "" {
@@ -394,12 +395,15 @@ func (p pkg) complete(fields map[string]json.RawMessage, v version, base string)
 }
 
 // dist is a version's dist object as 7.x gives it (RTFACT-30472), in both
-// forms of the packument. [I] 7.x's abbreviated form has not been
-// captured (#216).
+// forms of the packument, with the signatures of a signing repository
+// last, as npm's registry places them after its other dist fields
+// (decision 0034, "Signatures"). [I] 7.x's abbreviated form has not been
+// captured, nor a signed version's dist (#216).
 type dist struct {
-	Tarball   string `json:"tarball"`
-	Shasum    string `json:"shasum"`
-	Integrity string `json:"integrity"`
+	Tarball    string             `json:"tarball"`
+	Shasum     string             `json:"shasum"`
+	Integrity  string             `json:"integrity"`
+	Signatures []npmfmt.Signature `json:"signatures,omitempty"`
 }
 
 // manifestFields is v's package.json as its fields.

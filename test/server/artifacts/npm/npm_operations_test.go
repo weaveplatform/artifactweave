@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/access"
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
@@ -21,7 +22,8 @@ import (
 
 // npmOpsWorld is an item world with npm repositories, a work queue that
 // runs the npm format's work only when a test asks, and deployer holding
-// Manage, and nothing else, on npm-local.
+// Manage, and nothing else, on npm-local. The work reads key pairs, as the
+// artifacts module's does, so a reindex signs.
 func npmOpsWorld(t *testing.T) (*itemWorld, *work.Queue) {
 	t.Helper()
 	var q *work.Queue
@@ -30,11 +32,16 @@ func npmOpsWorld(t *testing.T) (*itemWorld, *work.Queue) {
 		if q, err = work.New(cfg.Store, work.Options{}); err != nil {
 			t.Fatal(err)
 		}
+		m, err := access.New(access.Deps{Store: cfg.Store})
+		if err != nil {
+			t.Fatal(err)
+		}
 		derived := &item.Service{
 			Store:   cfg.Store,
 			Blobs:   cfg.Blobs,
 			Work:    q,
 			Formats: ecosystem.For,
+			Keys:    m.API().Keys,
 		}
 		if err := derived.RegisterWork(q); err != nil {
 			t.Fatal(err)

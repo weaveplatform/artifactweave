@@ -13,6 +13,8 @@ const (
 	KeypairRSA     KeypairType = "RSA"
 	KeypairGPG     KeypairType = "GPG"
 	KeypairEd25519 KeypairType = "Ed25519"
+	// KeypairECDSA signs npm packages (decision 0034, "Signatures").
+	KeypairECDSA KeypairType = "ECDSA"
 )
 
 // Keypair is a named signing key pair (the security API's pairName). The

@@ -20828,7 +20828,7 @@ components:
             - $ref: '#/components/schemas/PackageTypeFederated'
           description: Optional within this object. Package types a federated repository may serve. Every type is allowed except terraformbackend, vcs, p2, hex, aieditorextensions and jetbrainsplugins. Defaults to generic. A type without a package handler is stored and echoed only.
         primaryKeyPairRef:
-          description: Optional within this object. Name of the key pair used to sign metadata for formats that need it (Debian, RPM, Alpine, Terraform provider packages). Must name an existing key pair, a GPG pair on a Terraform repository whose terraformType is PROVIDER.
+          description: Optional within this object. Name of the key pair used to sign metadata for formats that need it (Debian, RPM, Alpine, Terraform provider packages). Must name an existing key pair, a GPG pair on a Terraform repository whose terraformType is PROVIDER. An ECDSA pair on an npm repository signs each version's dist.signatures, and changing it queues a reindex that signs every version again (decision 0034).
           type: string
         priorityResolution:
           description: Optional within this object. When true a virtual repository resolves this member before members without the flag. Defaults to false. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
@@ -21306,11 +21306,12 @@ components:
           description: Required within this object. Unique name of the pair; it is the identifier in every other key-pair operation and in a repository's primaryKeyPairRef and secondaryKeyPairRef fields.
           type: string
         pairType:
-          description: Required within this object. RSA for Alpine signing; GPG for Debian, RPM and Opkg metadata, Helm provenance and Terraform provider registries; Ed25519 for Nix binary caches.
+          description: Required within this object. RSA for Alpine signing; GPG for Debian, RPM and Opkg metadata, Helm provenance and Terraform provider registries; Ed25519 for Nix binary caches; ECDSA (P-256, P-384 or P-521, as PEM or gpg's ASCII-armored export) for npm package signatures (decision 0034). The REST spelling ECDSA is inferred from the Keys Management type.
           enum:
             - RSA
             - GPG
             - Ed25519
+            - ECDSA
           type: string
         passphrase:
           description: Optional within this object. Passphrase protecting privateKey, if any. Stored sealed and never returned.
@@ -21353,7 +21354,7 @@ components:
           description: Optional within this object. Pair name, the identifier.
           type: string
         pairType:
-          description: Optional within this object. RSA, GPG or Ed25519.
+          description: Optional within this object. RSA, GPG, Ed25519 or ECDSA.
           type: string
         publicKey:
           description: Optional within this object. The public key material.
@@ -21650,7 +21651,7 @@ components:
             - $ref: '#/components/schemas/PackageTypeLocal'
           description: Optional within this object. Package types a local repository may serve. Every type is allowed except vcs, p2, aieditorextensions and jetbrainsplugins. Defaults to generic. A type without a package handler is stored and echoed only.
         primaryKeyPairRef:
-          description: Optional within this object. Name of the key pair used to sign metadata for formats that need it (Debian, RPM, Alpine, Terraform provider packages). Must name an existing key pair, a GPG pair on a Terraform repository whose terraformType is PROVIDER.
+          description: Optional within this object. Name of the key pair used to sign metadata for formats that need it (Debian, RPM, Alpine, Terraform provider packages). Must name an existing key pair, a GPG pair on a Terraform repository whose terraformType is PROVIDER. An ECDSA pair on an npm repository signs each version's dist.signatures, and changing it queues a reindex that signs every version again (decision 0034).
           type: string
         priorityResolution:
           description: Optional within this object. When true a virtual repository resolves this member before members without the flag. Defaults to false. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
