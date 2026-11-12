@@ -52,6 +52,30 @@ return module and release metadata. Search currently supports an exact module
 name (`GET .../v3/modules?query=acme-widget`). Arbitrary search queries and nested
 virtual members are refused explicitly.
 
+The release list and the search page as the whole-repository lists below do: 20
+entries unless `limit` asks for up to 100, a larger `limit` served as 100, under
+the Forge's `pagination` object written before the results. Its links keep
+`module` (or `query`) first, then `limit` and `offset`, as 7.x's own answer does
+([RTFACT-14557](https://jfrog.atlassian.net/browse/RTFACT-14557):
+`"first" : "/v3/releases?module=sql&limit=20&offset=0"`), and every answer
+writes `&`, `<` and `>` as they are. The Puppet client follows `next`, and
+`puppet_forge` walks from `first`. Whether 7.x caps the release list and the
+search at 100 as it caps the modules list is [I] (#216).
+
+Release and module records carry the fields of JFrog's REST API reference for
+the four Forge operations (archived jfrog.com/help pages) with the ones 7.x's
+answers add: a release's `slug`, `module` (with its `owner` and
+`deprecated_at`), `supported`, `file_md5`, `file_sha256`, `downloads`,
+`readme`, `changelog`, `license` and dates, and a module's `downloads`, dates,
+`endorsement`, `module_group`, `owner` (with `slug` and `gravatar_id`),
+`homepage_url` and `issues_url`. A hosted release takes `file_md5`,
+`downloads` and its dates from its archive item, written in the Forge's form
+(`2017-07-16 12:07:00 +0000`) in UTC; its `readme`, `changelog` and `license`
+are null, since 7.x reads only an archive's metadata.json. A remote relays its
+upstream's values ([RTFACT-19130](https://jfrog.atlassian.net/browse/RTFACT-19130)).
+A module takes its downloads (summed), dates (earliest and latest) and links
+(the current release's `project_page` and `issues_url`) from its releases [I].
+
 `GET .../v3/releases` and `GET .../v3/modules` with no query list every release
 and module a local or federated repository hosts that the caller may read, as
 7.x's [Get Puppet Releases](https://docs.jfrog.com/artifactory/reference/getpuppetreleases)
@@ -85,6 +109,16 @@ archive entries and 256 dependencies. Release metadata is limited to 16 MiB per
 page and 4,096 releases overall; the adapter constructs each pagination request
 and never follows upstream pagination URLs.
 
+A remote asks its upstream for 100 releases a page. The Forge serves at most
+100 whatever `limit` asks (it answered `limit=1000` with `"limit": 100` on
+2026-11-12), and so do 7.x's own lists
+([RTFACT-30529](https://jfrog.atlassian.net/browse/RTFACT-30529)); what 7.x's
+remote asks is [I] (#216). Each page starts after the releases the last one
+held. A page short of 100 with more after it is accepted only when the
+upstream's `pagination.limit` equals what the page held; short for any other
+reason, it answers 502, since the remote cannot tell where the next page
+starts.
+
 Remote metadata and archive URLs must remain under the configured Forge origin
 and path. Every archive redirect is checked against that boundary. Download
 validation checks the advertised SHA-256, size, archive identity and dependency
@@ -98,6 +132,9 @@ Controlled root and helper modules are committed with their source metadata and
 archives. A fresh client installs both modules through L and one-node F, through
 R with an archive redirect followed by an offline install, and through V with
 the dependency in a second member. Each install uses a separate Puppet cache.
+[`puppet_paging.feature`](../../test/acceptance/features/puppet_paging.feature)
+installs the oldest of 25 releases of a local module, which the second page of
+its release list holds, so the client follows `pagination.next`.
 The Go format contract covers delete, restore, transfer and reindex. Protocol
 and full application acceptance cover denied reads/writes, invalid metadata,
 archive corruption, stale authority, source failure, cache refresh/offline,
