@@ -6,6 +6,22 @@ import (
 	"strings"
 )
 
+// BareETag gives a stored file served outside ServeFile the ETag ServeFile
+// gives it: its bare SHA-1. It sets the quoted "<sha1>" that
+// http.ServeContent compares as w's ETag, and returns w wrapped to send it
+// bare and r with sha1 quoted as quoteETag quotes it. The handler then
+// serves through ServeContent with the two it returns. The registry serves a
+// manifest and a remote blob this way, since neither goes through ServeFile.
+// sha1 must not be empty.
+func BareETag(
+	w http.ResponseWriter,
+	r *http.Request,
+	sha1 string,
+) (http.ResponseWriter, *http.Request) {
+	w.Header().Set("ETag", `"`+sha1+`"`)
+	return &bareETagWriter{ResponseWriter: w, sha1: sha1}, quoteETag(r, sha1)
+}
+
 // bareETagWriter sends the quoted ETag "<sha1>" in its header map without
 // the quotes, and quoteETag makes a request that sends the bare form back
 // match it.

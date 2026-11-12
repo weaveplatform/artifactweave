@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
@@ -83,14 +84,26 @@ func (g *Registry) serveRemote(w http.ResponseWriter, r *http.Request, q Request
 	}
 	digest := "sha256:" + stream.Checksums.SHA256
 	w.Header().Set(contentDigestHeader, digest)
-	w.Header().Set("ETag", `"`+digest+`"`)
 	w.Header().Set(RegistryHeader, q.Repo.Key)
-	stream.ETag = `"` + digest + `"`
+	out, req := w, r
 	if q.Kind == KindBlob {
 		stream.MediaType = "application/octet-stream"
+		// A remote blob's ETag is its bare SHA-1, equal to X-Checksum-Sha1,
+		// as 7.55.8 answered a remote blob GET (RTFACT-29977) and as a
+		// local blob's GET answers through ServeFile. The stream's
+		// checksums are always computed from the bytes, so the SHA-1 is
+		// there on a first fetch too.
+		out, req = itemkit.BareETag(w, r, stream.Checksums.SHA1)
+		stream.ETag = `"` + stream.Checksums.SHA1 + `"`
+	} else {
+		// A remote manifest keeps its digest as ETag. 7.x sends a local
+		// manifest's SHA-1 (manifests.go), but no capture shows a remote
+		// one's [I].
+		w.Header().Set("ETag", `"`+digest+`"`)
+		stream.ETag = `"` + digest + `"`
 	}
-	tracked := &remoteWriter{ResponseWriter: w}
-	if err = pkgroute.ServeStream(tracked, r, stream); err != nil {
+	tracked := &remoteWriter{ResponseWriter: out}
+	if err = pkgroute.ServeStream(tracked, req, stream); err != nil {
 		panic(http.ErrAbortHandler)
 	}
 	if result.Used != nil && r.Method == http.MethodGet &&
