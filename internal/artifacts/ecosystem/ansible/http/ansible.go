@@ -22,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	ansiblefmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/ansible"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
@@ -193,24 +194,155 @@ func (h handler) localVersions(r *http.Request, ns, name string) ([]release, err
 		if !h.k.Can(r, ansiblefmt.Path(ns, name, v.Version), api.ActionRead) {
 			continue
 		}
-		var m ansiblefmt.Metadata
-		if err := json.Unmarshal(v.Metadata, &m); err != nil ||
-			m.Namespace != ns || m.Name != name || m.Version != v.Version {
-			return nil, fmt.Errorf("ansible: corrupt package metadata: %w", ansiblefmt.ErrArchive)
-		}
-		it, err := h.k.StoredItem(r, ansiblefmt.Path(ns, name, v.Version))
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
+		rel, ok, err := h.localRelease(r, ns, name, v)
 		if err != nil {
-			return nil, fmt.Errorf("ansible: collection item: %w", err)
+			return nil, err
 		}
-		if it.Item.Folder || it.Item.Actual.SHA256 != m.SHA256 {
-			return nil, fmt.Errorf("ansible: corrupt indexed collection: %w", ansiblefmt.ErrArchive)
+		if ok {
+			out = append(out, rel)
 		}
-		out = append(out, release{Meta: m, At: v.Created, Req: r})
 	}
 	return out, nil
+}
+
+// localRelease returns the release that the package index's version v of
+// collection ns.name records, once the entry and the stored collection
+// agree; ok is false when the collection is no longer stored, which leaves
+// the version out.
+func (h handler) localRelease(
+	r *http.Request,
+	ns, name string,
+	v model.PackageVersion,
+) (release, bool, error) {
+	var m ansiblefmt.Metadata
+	if err := json.Unmarshal(v.Metadata, &m); err != nil ||
+		m.Namespace != ns || m.Name != name || m.Version != v.Version {
+		return release{}, false, fmt.Errorf(
+			"ansible: corrupt package metadata: %w", ansiblefmt.ErrArchive)
+	}
+	it, err := h.k.StoredItem(r, ansiblefmt.Path(ns, name, v.Version))
+	if errors.Is(err, kernel.ErrNotFound) {
+		return release{}, false, nil
+	}
+	if err != nil {
+		return release{}, false, fmt.Errorf("ansible: collection item: %w", err)
+	}
+	if it.Item.Folder || it.Item.Actual.SHA256 != m.SHA256 {
+		return release{}, false, fmt.Errorf(
+			"ansible: corrupt indexed collection: %w", ansiblefmt.ErrArchive)
+	}
+	return release{Meta: m, At: v.Created, Req: r}, true, nil
+}
+
+// versionList is a collection's version list: how many versions it holds,
+// a reader of the versions between two of its positions, and the check
+// made before it is answered.
+type versionList struct {
+	count  int
+	page   func(ctx context.Context, start, end int) ([]string, error)
+	finish func(context.Context) error
+}
+
+// versionList returns the version list releases gives the request's
+// repository. A local or federated repository's reads only the page it
+// answers (localVersionList); a remote or virtual repository's still
+// collects every release, as it must to merge its upstream's pages or its
+// members' lists, within the upstream traversal's bounds.
+func (h handler) versionList(r *http.Request, ns, name string) (versionList, error) {
+	switch pkgroute.RequestFrom(r).Repo.Class {
+	case repo.Local, repo.Federated:
+		return h.localVersionList(r, ns, name)
+	}
+	catalog, err := h.releases(r, ns, name, "")
+	if err != nil {
+		return versionList{}, err
+	}
+	return versionList{
+		count: len(catalog.items),
+		page: func(_ context.Context, start, end int) ([]string, error) {
+			out := make([]string, 0, end-start)
+			for _, rel := range catalog.items[start:end] {
+				out = append(out, rel.Meta.Version)
+			}
+			return out, nil
+		},
+		finish: catalog.finish,
+	}, nil
+}
+
+// localVersionList is the version list releases gives a local or federated
+// repository, read a page at a time (#1404). Read permission and the
+// list's order need only each version's name, so every version is counted
+// and ordered by its name alone, with the same unstable sort releases
+// makes over the versions in the same order, which leaves versions that
+// compare equal, as build metadata does, where releases leaves them. Only
+// the page's versions are then read and checked against their stored
+// collections (localRelease), in the index's order, as localVersions
+// checks them. A version deleted, or whose collection went, between the
+// count and the page leaves the page short.
+func (h handler) localVersionList(r *http.Request, ns, name string) (versionList, error) {
+	// An empty list until the collection's versions are counted.
+	list := versionList{
+		page:   func(context.Context, int, int) ([]string, error) { return nil, nil },
+		finish: func(context.Context) error { return nil },
+	}
+	// releases' read check on the collection's folder is checkIdentity's,
+	// which every version list has passed.
+	key := pkgroute.RequestFrom(r).Repo.Key
+	p, err := h.k.DB().Packages().Find(r.Context(), key, ns+"."+name)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return list, nil
+	}
+	if err != nil {
+		return versionList{}, fmt.Errorf("ansible: package: %w", err)
+	}
+	indexed, err := h.k.DB().Packages().VersionNames(r.Context(), p.ID)
+	if err != nil {
+		return versionList{}, fmt.Errorf("ansible: versions: %w", err)
+	}
+	indexed = slices.DeleteFunc(indexed, func(v string) bool {
+		return !h.k.Can(r, ansiblefmt.Path(ns, name, v), api.ActionRead)
+	})
+	listed := slices.Clone(indexed)
+	sort.Slice(listed, func(i, j int) bool {
+		return semver.Compare("v"+listed[i], "v"+listed[j]) > 0
+	})
+	list.count = len(listed)
+	list.page = func(ctx context.Context, start, end int) ([]string, error) {
+		onPage := make(map[string]bool, end-start)
+		for _, v := range listed[start:end] {
+			onPage[v] = true
+		}
+		stored := make(map[string]bool, end-start)
+		for _, version := range indexed {
+			if !onPage[version] {
+				continue
+			}
+			v, err := h.k.DB().Packages().Version(ctx, p.ID, version)
+			if errors.Is(err, kernel.ErrNotFound) {
+				continue
+			}
+			if err != nil {
+				return nil, fmt.Errorf("ansible: versions: %w", err)
+			}
+			if _, stored[version], err = h.localRelease(
+				r.WithContext(ctx),
+				ns,
+				name,
+				v,
+			); err != nil {
+				return nil, err
+			}
+		}
+		out := make([]string, 0, end-start)
+		for _, v := range listed[start:end] {
+			if stored[v] {
+				out = append(out, v)
+			}
+		}
+		return out, nil
+	}
+	return list, nil
 }
 
 func (h handler) memberRequests(r *http.Request) ([]*http.Request, error) {
@@ -345,36 +477,40 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request, ns, name strin
 	if !h.checkIdentity(w, r, ns, name) || !h.resolution(w, r) {
 		return
 	}
-	catalog, err := h.releases(r, ns, name, "")
-	rels := catalog.items
+	list, err := h.versionList(r, ns, name)
 	if err != nil {
 		h.fail(w, r, err)
 		return
 	}
-	offset, limit, err := pagination(r, len(rels))
+	offset, limit, err := pagination(r, list.count)
 	if err != nil {
 		h.fail(w, r, err)
 		return
 	}
-	end := min(offset+limit, len(rels))
-	data := make([]map[string]string, 0, end-offset)
-	for _, rel := range rels[offset:end] {
-		data = append(data, map[string]string{"version": rel.Meta.Version})
+	end := min(offset+limit, list.count)
+	listed, err := list.page(r.Context(), offset, end)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	data := make([]map[string]string, 0, len(listed))
+	for _, v := range listed {
+		data = append(data, map[string]string{"version": v})
 	}
 	var next *string
-	if end < len(rels) {
+	if end < list.count {
 		v := "/artifactory/api/ansible/" + url.PathEscape(pkgroute.RequestFrom(r).Repo.Key) +
 			"/api/v3/collections/" + ns + "/" + name + "/versions/?limit=" +
 			strconv.Itoa(limit) + "&offset=" + strconv.Itoa(end)
 		next = &v
 	}
-	if err := catalog.finish(r.Context()); err != nil {
+	if err := list.finish(r.Context()); err != nil {
 		h.fail(w, r, err)
 		return
 	}
 
 	writeJSON(w, r, http.StatusOK, map[string]any{
-		"meta":  map[string]int{"count": len(rels)},
+		"meta":  map[string]int{"count": list.count},
 		"links": map[string]any{"next": next, "previous": nil}, "data": data,
 	})
 }

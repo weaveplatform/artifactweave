@@ -322,4 +322,6 @@ type PackageStore interface {
 	VersionOf(ctx context.Context, itemID int64) (model.PackageVersion, error)
 	// RecordVersionDownload sets the version's LastDownloaded.
 	RecordVersionDownload(ctx context.Context, versionID int64, at time.Time) error
+
+	PackageVersionNames
 }

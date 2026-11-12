@@ -419,9 +419,10 @@ func TestUnitListsLeaveTheOneModuleRefusals(t *testing.T) {
 // listStore fails the package index reads a list makes, one at a time.
 type listStore struct {
 	pkgroute.Store
-	list, versions, version, huge, many bool
-	gone, items, paged                  bool
-	moduleGone                          string
+	list, names, versions, version bool
+	huge, many                     bool
+	gone, items, paged             bool
+	moduleGone                     string
 }
 
 func (s *listStore) Packages() port.PackageStore { return listPackages{s.Store.Packages(), s} }
@@ -474,6 +475,16 @@ func (p listPackages) Versions(ctx context.Context, id int64) ([]artmodel.Packag
 	return p.PackageStore.Versions(ctx, id)
 }
 
+func (p listPackages) VersionNames(ctx context.Context, id int64) ([]string, error) {
+	if p.s.names {
+		return nil, context.Canceled
+	}
+	if p.s.huge {
+		return make([]string, 4096), nil
+	}
+	return p.PackageStore.VersionNames(ctx, id)
+}
+
 func (p listPackages) Version(
 	ctx context.Context,
 	id int64,
@@ -524,6 +535,7 @@ func TestUnitHostedListsStoreFailures(t *testing.T) {
 		message     string
 	}{
 		{"list", "/v3/releases", func(s *listStore) { s.list = true }, 500, "internal error"},
+		{"names", "/v3/modules", func(s *listStore) { s.names = true }, 500, "internal error"},
 		{"versions", "/v3/modules", func(s *listStore) { s.versions = true }, 500, "internal error"},
 		{"version", "/v3/releases", func(s *listStore) { s.version = true }, 500, "internal error"},
 		{

@@ -663,6 +663,7 @@ type faultStore struct {
 	pkgroute.Store
 	find     bool
 	versions bool
+	version  bool
 	items    bool
 	repos    bool
 	huge     bool
@@ -694,6 +695,29 @@ func (f faultPackages) Versions(ctx context.Context, id int64) ([]artmodel.Packa
 		return make([]artmodel.PackageVersion, 4097), nil
 	}
 	return f.PackageStore.Versions(ctx, id)
+}
+
+// VersionNames fails as Versions does: a list reads the names and a
+// record the versions.
+func (f faultPackages) VersionNames(ctx context.Context, id int64) ([]string, error) {
+	if f.f.versions {
+		return nil, context.Canceled
+	}
+	if f.f.huge {
+		return make([]string, 4097), nil
+	}
+	return f.PackageStore.VersionNames(ctx, id)
+}
+
+func (f faultPackages) Version(
+	ctx context.Context,
+	id int64,
+	version string,
+) (artmodel.PackageVersion, error) {
+	if f.f.version {
+		return artmodel.PackageVersion{}, context.Canceled
+	}
+	return f.PackageStore.Version(ctx, id, version)
 }
 
 type faultItems struct {
@@ -731,7 +755,7 @@ func TestAccStoreFailuresDoNotAdvertiseModules(t *testing.T) {
 		tune   func(*faultStore)
 		status int
 	}{
-		{"find", func(f *faultStore) { f.find = true }, 500}, {"versions", func(f *faultStore) { f.versions = true }, 500}, {"items", func(f *faultStore) { f.items = true }, 502}, {"oversized index", func(f *faultStore) { f.huge = true }, 503},
+		{"find", func(f *faultStore) { f.find = true }, 500}, {"versions", func(f *faultStore) { f.versions = true }, 500}, {"version", func(f *faultStore) { f.version = true }, 500}, {"items", func(f *faultStore) { f.items = true }, 502}, {"oversized index", func(f *faultStore) { f.huge = true }, 503},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var faults *faultStore

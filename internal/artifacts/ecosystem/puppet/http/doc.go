@@ -89,6 +89,16 @@
 //   - A hosted or virtual module lists at most 4,096 releases (503 beyond),
 //     and a remote accepts no more from its upstream. A whole-repository
 //     list reads at most 4,096 modules and 65,536 releases (503 beyond).
+//   - A local or federated repository's release lists, one module's and
+//     the whole-repository ones, count and order every release by its
+//     version alone and read only the releases of the page they answer,
+//     and the module list the releases of its page's modules (#1404). So
+//     only those are checked against their archives: a release whose index
+//     entry or archive no longer matches fails a page that holds it and no
+//     other, and one deleted after the count leaves the page short. A
+//     remote's or virtual repository's list still collects every release
+//     to merge its upstream's pages or its members' lists, within the
+//     bounds above.
 //   - The whole-repository lists are served by local and federated
 //     repositories. A virtual repository answers them 404 after the
 //     caller's read permission, as 7.x does (RTFACT-15072); a remote one
@@ -208,6 +218,8 @@
 //     store failures.
 //   - paging_test.go: the one-module list's and the module search's pages,
 //     links, limits and refusals, and exclude_fields.
+//   - store_page_test.go: the local lists' pages read without reading the
+//     releases outside them, and the checks a page makes.
 //   - record_test.go: a hosted release's and module's exact records on
 //     every route that answers them, directly and through a virtual
 //     repository, and a remote's relayed fields and their defaults.

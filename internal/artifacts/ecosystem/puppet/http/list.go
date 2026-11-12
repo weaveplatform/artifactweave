@@ -281,10 +281,11 @@ type listed struct {
 
 // catalog returns the modules of the request's repository that the caller
 // may read a release of, in name order, and how many releases they list.
-// It reads the package index alone; the releases a page answers are
-// checked against their archives when they are answered (stored). Read
-// permission alone filters, so a release whose archive the patterns
-// reject stays listed (R3).
+// It reads only the names of the package index's modules and versions
+// (#1404); the releases a page answers are read, and checked against their
+// archives, when they are answered (stored). Read permission alone
+// filters, so a release whose archive the patterns reject stays listed
+// (R3).
 func (h handler) catalog(r *http.Request) ([]listed, int, error) {
 	ctx := r.Context()
 	key := pkgroute.RequestFrom(r).Repo.Key
@@ -302,7 +303,7 @@ func (h handler) catalog(r *http.Request) ([]listed, int, error) {
 			)
 		}
 		for _, p := range packages {
-			versions, err := h.k.DB().Packages().Versions(ctx, p.ID)
+			versions, err := h.k.DB().Packages().VersionNames(ctx, p.ID)
 			if err != nil {
 				return nil, 0, fmt.Errorf("puppet: package versions: %w", err)
 			}
@@ -314,8 +315,8 @@ func (h handler) catalog(r *http.Request) ([]listed, int, error) {
 			}
 			m := listed{id: p.ID, name: p.Name}
 			for _, v := range versions {
-				if h.k.Can(r, puppetfmt.Path(p.Name, v.Version), api.ActionRead) {
-					m.versions = append(m.versions, v.Version)
+				if h.k.Can(r, puppetfmt.Path(p.Name, v), api.ActionRead) {
+					m.versions = append(m.versions, v)
 				}
 			}
 			if len(m.versions) == 0 {
