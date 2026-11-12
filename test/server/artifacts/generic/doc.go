@@ -23,7 +23,8 @@
 //     store that signs CDN URLs.
 //   - The harness's item world (harness.NewItemWorld) with a Vagrant local
 //     repository, for the download headers, and with a PyPI local
-//     repository, for a HEAD with Range.
+//     repository, for a HEAD with Range; and as it is, for the media types
+//     a stored file downloads with.
 //
 // # Outputs
 //
@@ -35,6 +36,12 @@
 //   - download_headers_test.go: a file's ETag, the bare SHA-1, and the
 //     conditional requests that send it back, and a box's media type, on
 //     the item route and the Vagrant box file route (#1266, #1267).
+//   - mime_types_test.go: the 7.x type of every name 7.x's default MIME
+//     table types differently, on the item route, the deploy and storage
+//     info answers, a redirect's signed URL, an archive entry and the trash
+//     listing (#1315); and the upstream labels a remote caches a file under,
+//     refusing only the block list or the override list that replaces it
+//     (#1316).
 //   - head_range_test.go: a HEAD with Range answers 200 with the whole
 //     length on a local, redirecting, virtual, PyPI and remote file, where
 //     a GET still gets the range (#1338).

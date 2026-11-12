@@ -346,29 +346,73 @@ func remoteMIME(u CacheUpload, body *bufio.Reader) error {
 	return remoteExpectedMIME(u, body)
 }
 
-// remoteCheckedType is the type remoteExpectedMIME holds an upstream's
-// label of the file at p to. A .box is checked as the untyped file it was
-// before it had a type: an upstream other than Artifactory may label a box
-// as a tar, a gzip or binary/octet-stream file, which a check against the
-// box type would refuse, where Artifactory refuses only the labels on its
-// block list (HttpRepo.blockMismatchingMimeTypes in 6.20).
-func remoteCheckedType(p string) string {
-	expected, _, _ := mime.ParseMediaType(MimeType(p))
-	if expected == vagrantBoxType {
-		return "application/octet-stream"
-	}
-	return expected
-}
+// defaultBlockedMIME is 7.x's repo.remote.blockedMismatchingMimeTypes
+// (ConstantValues, the same in 6.20 and the 7.161.26 sources): the labels a
+// remote refuses on a mismatch when its mismatchingMimeTypesOverrideList is
+// blank.
+const defaultBlockedMIME = "text/html,application/xhtml+xml"
 
-func remoteExpectedMIME(u CacheUpload, body *bufio.Reader) error {
-	expected := remoteCheckedType(u.Token.Key.Path)
-	if u.ExpectedContentType != "" {
-		var err error
-		expected, _, err = mime.ParseMediaType(u.ExpectedContentType)
-		if u.Kind != model.RemoteMetadata || err != nil || !strings.Contains(expected, "/") ||
-			strings.Contains(expected, "*") {
+// blockedMIME is 7.x's HttpRepo.blockMismatchingMimeTypes (7.161.26
+// sources, unchanged since 6.20): an upstream's label refuses a file only
+// when it differs from the requested type and is on the block list. The
+// body is not read for its type, so a file an upstream labels as an archive
+// is cached whatever its bytes; an archive format's own validator still
+// reads them. Nothing is refused when the label is absent, */* or
+// application/octet-stream, or the requested type is
+// application/octet-stream, which no label can be said to mismatch.
+//
+// The override list is the block list itself, as the 7.x configuration
+// schema describes mismatchingMimeTypesOverrideList ("mime types that will
+// be blocked by this repo if the original request was for a different mime
+// type"), not types let through despite it.
+func blockedMIME(u CacheUpload, requested string) error {
+	got := mediaTypeOf(u.ContentType)
+	if got == "" || got == "*/*" || got == "application/octet-stream" ||
+		requested == "application/octet-stream" || got == requested {
+		return nil
+	}
+	blocked := u.Repo.MismatchingMimeTypesOverrideList
+	if strings.TrimSpace(blocked) == "" {
+		blocked = defaultBlockedMIME
+	}
+	for _, entry := range strings.Split(blocked, ",") {
+		if mediaTypeOf(entry) == got {
 			return ErrRemoteMIME
 		}
+	}
+	return nil
+}
+
+// mediaTypeOf is a Content-Type value's media type as 7.x reads a label or
+// a block-list entry: what comes before any ";", lowercased. 7.x trims a
+// block-list entry but not a label; both are trimmed here, since a label
+// with a space before its parameters names the same type.
+func mediaTypeOf(value string) string {
+	media, _, _ := strings.Cut(value, ";")
+	return strings.ToLower(strings.TrimSpace(media))
+}
+
+// remoteExpectedMIME holds a file with no format hint to 7.x's rule with
+// its path's type as the requested type. 7.x takes the requested type from
+// the client's Accept when one is sent, and skips the check on Accept: */*,
+// which its known issue RTDEV-46375 lists as a fault; the cache sees no
+// client header, so the path's type stands in for it [I].
+//
+// Raw metadata whose format adapter expects a type (ExpectedContentType)
+// is held to 7.x's rule with that type requested, and also to the
+// adapter's stricter check, which sniffs the body: the adapter parses the
+// bytes as that type, so an error page under any label stays out.
+func remoteExpectedMIME(u CacheUpload, body *bufio.Reader) error {
+	if u.ExpectedContentType == "" {
+		return blockedMIME(u, mediaTypeOf(MimeType(u.Token.Key.Path)))
+	}
+	expected, _, err := mime.ParseMediaType(u.ExpectedContentType)
+	if u.Kind != model.RemoteMetadata || err != nil || !strings.Contains(expected, "/") ||
+		strings.Contains(expected, "*") {
+		return ErrRemoteMIME
+	}
+	if err := blockedMIME(u, expected); err != nil {
+		return err
 	}
 	got := u.ContentType
 	if got != "" {
@@ -388,52 +432,17 @@ func remoteExpectedMIME(u CacheUpload, body *bufio.Reader) error {
 			(expected == "application/json" && strings.HasPrefix(typ, "application/") && strings.HasSuffix(typ, "+json")) {
 			continue
 		}
-		allowed := false
-		for _, override := range strings.Split(u.Repo.MismatchingMimeTypesOverrideList, ",") {
-			if strings.TrimSpace(override) == typ {
-				allowed = true
-			}
-		}
-		if allowed {
-			continue
-		}
-		// HTML error pages must never become archives, even when an upstream
-		// incorrectly labels them application/octet-stream or application/zip.
+		// An HTML error page must never become metadata the adapter does not
+		// read as HTML, whatever the upstream labels it.
 		if typ == "text/html" || typ == "application/xhtml+xml" {
 			return ErrRemoteMIME
 		}
-		// Linux and Windows MIME registries can label .tgz as a compressed
-		// tar or generic compressed file. Accept those labels only when both
-		// the path and actual bytes independently identify gzip.
-		if typ == got && compressedTarMIME(u, typ, expected, sniff) {
-			continue
-		}
 		if typ == got && expected != "application/octet-stream" &&
-			!strings.HasPrefix(typ, "text/plain") &&
-			!sameArchiveMIME(typ, expected) && !sameXMLMIME(typ, expected) {
+			!strings.HasPrefix(typ, "text/plain") && !sameXMLMIME(typ, expected) {
 			return ErrRemoteMIME
 		}
 	}
 	return nil
-}
-
-// Warehouse labels some gzip sdists binary/octet-stream. Only a trusted
-// artifact validator plus independently matching path and gzip bytes admits
-// this nonstandard label; metadata and generic uploads keep their MIME rules.
-func compressedTarMIME(u CacheUpload, got, expected, sniff string) bool {
-	label := got == "application/x-compressed-tar" || got == "application/x-compressed" ||
-		(got == "binary/octet-stream" && u.Kind != model.RemoteMetadata && u.Validate != nil)
-	return label && sameArchiveMIME(expected, "application/gzip") &&
-		sameArchiveMIME(sniff, "application/gzip")
-}
-
-func sameArchiveMIME(a, b string) bool {
-	// ZIP labels vary by upstream server and host MIME registry. These aliases
-	// still undergo the same sniffing and complete format validation.
-	return (a == "application/zip" || a == "application/java-archive" || a == "application/x-zip-compressed") &&
-		(b == "application/zip" || b == "application/java-archive" || b == "application/x-zip-compressed") ||
-		(a == "application/gzip" || a == "application/x-gzip") &&
-			(b == "application/gzip" || b == "application/x-gzip")
 }
 
 type transientCache struct{ *os.File }

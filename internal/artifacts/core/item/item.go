@@ -1048,33 +1048,83 @@ func (s *Service) affected(ctx context.Context, t Target, full string) ([]model.
 	}
 }
 
-// mimeTypes is a fixed table rather than mime.TypeByExtension, whose answer
-// depends on the host's mime.types and would differ between servers.
+// mimeTypes is Artifactory's default mimetypes.xml, version 17, as the 7.x
+// OSS sources ship it (7.161.26, base/config/.../META-INF/default) and a
+// fresh install from 7.157.0 reads it. Version 15, in the 7.38.8 and
+// 7.125.7 system exports, lacks only md and the xz row. It is a fixed table
+// rather than mime.TypeByExtension, whose answer depends on the host's
+// mime.types and would differ between servers.
+//
+// 7.x looks a name up by its last extension alone (NamingUtils.getMimeType),
+// so the table's two-part names tar.gz, tar.bz2, tar.xz, nar.xz and
+// jar.pack.gz never match: such a file takes its .gz, .bz2 or .xz row, and
+// a .jar.pack.gz is application/x-gzip, not the pack200 type its row names.
+//
+// A file written before a row was added keeps the type it was recorded
+// with.
 var mimeTypes = map[string]string{
-	".jar":  "application/java-archive",
-	".war":  "application/java-archive",
-	".pom":  "application/x-maven-pom+xml",
-	".xml":  "application/xml",
-	".yaml": "application/x-yaml",
-	".yml":  "application/x-yaml",
-	".json": "application/json",
-	".txt":  "text/plain",
-	".html": "text/html",
-	".zip":  "application/zip",
-	".gz":   "application/x-gzip",
-	".tgz":  "application/x-gzip",
-	".tar":  "application/x-tar",
-	// Artifactory's default MIME table gives a box this type (mimetypes.xml,
-	// the same in 7.38.8 and 7.125.7 system exports), and 7.37.15 answered
-	// the Vagrant box file route with it (RTFACT-27264). A box written before
-	// this row keeps the type it was recorded with.
-	".box": vagrantBoxType,
-}
+	// An upgraded 7.157 install types md as text/plain+md
+	// (MarkdownMimeTypeConverter); a fresh one, as here, as text/plain.
+	".txt": "text/plain", ".properties": "text/plain", ".mf": "text/plain",
+	".asc": "text/plain", ".log": "text/plain", ".yml": "text/plain",
+	".yaml": "text/plain", ".tf": "text/plain", ".md": "text/plain",
+	".htm": "text/html", ".html": "text/html",
+	".css": "text/css",
+	// xsl is in two rows, text/xsl and application/xml. 7.x fills its
+	// lookup from a HashSet of the rows, the later one winning, and
+	// text/xsl's hash puts it after application/xml.
+	".xsl":    "text/xsl",
+	".xslt":   "text/xslt",
+	".java":   "text/x-java-source",
+	".fx":     "text/x-javafx-source",
+	".groovy": "text/x-groovy-source", ".gradle": "text/x-groovy-source",
+	".h": "text/x-c", ".c": "text/x-c", ".cc": "text/x-c", ".cpp": "text/x-c",
+	".dtd":   "application/xml-dtd",
+	".xsd":   "application/xml-schema",
+	".ent":   "application/xml-external-parsed-entity",
+	".xhtml": "application/xhtml+xml",
+	".json":  "application/json",
+	".py":    "text/x-python",
 
-// vagrantBoxType is the media type of a .box file. It is Artifactory's own
-// name for the type, which is why remoteCheckedType leaves it out of a
-// remote's check.
-const vagrantBoxType = "application/x-vagrant-box"
+	".jardiff": "application/x-java-archive-diff",
+	".zip":     "application/zip",
+	".xz":      "application/x-xz",
+	".tar":     "application/x-tar",
+	".tgz":     "application/x-gzip", ".gz": "application/x-gzip",
+	".bz2":   "application/x-bzip2",
+	".7z":    "application/x-7z-compressed",
+	".nupkg": "application/x-nupkg",
+	".conda": "application/x-conda",
+	".rar":   "application/x-rar-compressed",
+	".apk":   "application/vnd.android.package-archive",
+	".rpm":   "application/x-rpm",
+	".gem":   "application/x-rubygems",
+	".rz":    "application/x-ruby-marshal",
+	".deb":   "application/x-debian-package", ".ddeb": "application/x-debian-package",
+	".box":  "application/x-vagrant-box",
+	".info": "application/json+info",
+	".mod":  "text/plain+mod",
+	// 7.x's row reads "text/x-swift " with a trailing space, which its own
+	// SwiftMimeTypeConverter does not have; the type is taken without it.
+	".swift": "text/x-swift",
+
+	".scala": "text/x-scala-source",
+	".rb":    "text/x-ruby-source",
+	".sh":    "text/x-script.sh",
+	".cs":    "text/x-csharp.sh",
+
+	".xml": "application/xml", ".xsi": "application/xml",
+	".pom":    "application/x-maven-pom+xml",
+	".ivy":    "application/x-ivy+xml",
+	".nuspec": "application/x-nuspec+xml",
+	".jnlp":   "application/x-java-jnlp-file",
+	".sha1":   "application/x-checksum", ".sha256": "application/x-checksum",
+	".md5": "application/x-checksum",
+	".jar": "application/java-archive", ".war": "application/java-archive",
+	".ear": "application/java-archive", ".sar": "application/java-archive",
+	".har": "application/java-archive", ".hpi": "application/java-archive",
+	".jpi": "application/java-archive",
+}
 
 // MimeType is the media type recorded for a file name.
 func MimeType(name string) string {

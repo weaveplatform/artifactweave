@@ -21,7 +21,11 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
-func TestUnitRemoteCompressedTarLabelsRequireGzipBytes(t *testing.T) {
+// TestUnitRemoteCompressedTarLabelsCache: the compressed-tar labels some
+// MIME registries give a .tgz are not on 7.x's block list, so the file is
+// cached under them whatever its bytes; the label is not checked against
+// the body (#1316).
+func TestUnitRemoteCompressedTarLabelsCache(t *testing.T) {
 	var compressed bytes.Buffer
 	gz := gzip.NewWriter(&compressed)
 	if _, err := gz.Write([]byte("payload")); err != nil {
@@ -45,22 +49,23 @@ func TestUnitRemoteCompressedTarLabelsRequireGzipBytes(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				_, err = w.svc.Cache(t.Context(), u)
-				if valid && err != nil {
+				result, err := w.svc.Cache(t.Context(), u)
+				if err != nil {
 					t.Fatal(err)
 				}
-				if !valid && !errors.Is(err, ErrRemoteMIME) {
-					t.Fatal("false compressed label accepted", err)
+				if result.Item.MimeType != "application/x-gzip" {
+					t.Fatalf("recorded as %q", result.Item.MimeType)
 				}
 			})
 		}
 	}
 }
 
-// Warehouse serves some source distributions as binary/octet-stream. This
-// compatibility case still requires independent gzip identification and the
-// trusted adapter's complete archive admission, including no-store responses.
-func TestUnitRemoteBinaryGzipRequiresArtifactValidator(t *testing.T) {
+// TestUnitRemoteBinaryOctetStreamLeavesBytesToValidator: Warehouse and S3
+// serve files as binary/octet-stream, which is not on 7.x's block list, so
+// the label refuses nothing whatever the path or bytes (#1316). An
+// adapter's validator still reads the bytes, and its refusal stands.
+func TestUnitRemoteBinaryOctetStreamLeavesBytesToValidator(t *testing.T) {
 	var body bytes.Buffer
 	gz := gzip.NewWriter(&body)
 	if _, err := gz.Write([]byte("payload")); err != nil {
@@ -104,20 +109,16 @@ func TestUnitRemoteBinaryGzipRequiresArtifactValidator(t *testing.T) {
 				t.Fatal(err)
 			}
 			result, err := w.svc.Cache(t.Context(), u)
-			if mode == "valid" || mode == "no-store" {
-				if err != nil || !validated {
-					t.Fatal("validated binary gzip rejected", err)
+			if mode != "validator-reject" {
+				if err != nil || validated != (u.Validate != nil) {
+					t.Fatal("binary/octet-stream label refused", err, validated)
 				}
 				if result.Body != nil {
 					_ = result.Body.Close()
 				}
 			} else {
-				want := ErrRemoteMIME
-				if mode == "validator-reject" {
-					want = errBoom
-				}
-				if !errors.Is(err, want) {
-					t.Fatalf("admission: %v, want %v", err, want)
+				if !errors.Is(err, errBoom) {
+					t.Fatalf("admission: %v, want %v", err, errBoom)
 				}
 				if _, err = w.db.RemoteCache().
 					Read(t.Context(), u.Token.Key); !errors.Is(
@@ -336,8 +337,6 @@ func TestUnitRemoteCacheRejectsIncompleteAndUnsafe(t *testing.T) {
 		{"disconnect", func(u *CacheUpload) {
 			u.Body = io.MultiReader(strings.NewReader("part"), iotest.ErrReader(io.ErrUnexpectedEOF))
 		}, io.ErrUnexpectedEOF},
-		{"html", func(u *CacheUpload) { u.Body = strings.NewReader("<!DOCTYPE HTML><html>login</html>"); u.Length = -1 }, ErrRemoteMIME},
-		{"badtype", func(u *CacheUpload) { u.ContentType = "invalid;" }, ErrRemoteMIME},
 		{"denied", func(u *CacheUpload) { u.CheckCurrent = func(context.Context, Store) error { return errBoom } }, errBoom},
 		{"wrongclass", func(u *CacheUpload) { u.Repo.Class = repo.Local }, kernel.ErrInvalid},
 		{"wrongkey", func(u *CacheUpload) { u.Repo.Key = "elsewhere" }, kernel.ErrInvalid},
@@ -644,13 +643,15 @@ func TestUnitRemoteMIMERules(t *testing.T) {
 				u.Body = strings.NewReader("<html>error</html>")
 				u.Length = -1
 			case "override":
-				u.Repo.MismatchingMimeTypesOverrideList = " text/html "
+				// The list replaces the default block list (#1316).
+				u.Repo.MismatchingMimeTypesOverrideList = " image/png "
+				u.Token.Key.Path = "a.json"
 				u.Body = strings.NewReader("<html>accepted</html>")
 				u.ContentType = "text/html"
 				u.Length = -1
 			case "mismatch":
 				u.Token.Key.Path = "a.json"
-				u.ContentType = "image/png"
+				u.ContentType = "text/html"
 			case "zip-alias":
 				u.Token.Key.Path = "a.jar"
 				u.ContentType = "application/zip"
@@ -683,19 +684,27 @@ func TestUnitRemoteMIMERules(t *testing.T) {
 // upstream cannot turn an artifact or JSON response into accepted HTML.
 func TestUnitRemoteExpectedMetadataMIME(t *testing.T) {
 	for _, tc := range []struct {
-		name, expected string
-		kind           model.RemoteKind
-		expectedErr    error
+		name, path, expected string
+		kind                 model.RemoteKind
+		expectedErr          error
 	}{
-		{"html-index", "text/html", model.RemoteMetadata, nil},
-		{"artifact-masquerade", "", model.RemoteUnique, ErrRemoteMIME},
-		{"json-masquerade", "application/json", model.RemoteMetadata, ErrRemoteMIME},
-		{"artifact-hint", "text/html", model.RemoteUnique, ErrRemoteMIME},
-		{"wildcard", "text/*", model.RemoteMetadata, ErrRemoteMIME},
-		{"invalid", "broken;", model.RemoteMetadata, ErrRemoteMIME},
+		{"html-index", "a.bin", "text/html", model.RemoteMetadata, nil},
+		{"artifact-masquerade", "a.jar", "", model.RemoteUnique, ErrRemoteMIME},
+		{"json-masquerade", "a.bin", "application/json", model.RemoteMetadata, ErrRemoteMIME},
+		{"artifact-hint", "a.bin", "text/html", model.RemoteUnique, ErrRemoteMIME},
+		{"wildcard", "a.bin", "text/*", model.RemoteMetadata, ErrRemoteMIME},
+		{"invalid", "a.bin", "broken;", model.RemoteMetadata, ErrRemoteMIME},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			w, u := remoteWorld(t)
+			if tc.path != u.Token.Key.Path {
+				var err error
+				u.Token, err = w.db.RemoteCache().
+					Begin(t.Context(), model.RemoteCacheKey{RepoKey: "remote", Path: tc.path})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
 			u.ExpectedContentType = tc.expected
 			u.Kind = tc.kind
 			u.ContentType = "text/html; charset=utf-8"

@@ -8,14 +8,14 @@ import (
 
 // TestUnitMimeTypeBox: a .box is recorded as application/x-vagrant-box, the
 // type Artifactory's default MIME table gives the extension, whatever its
-// case (#1266). Every other row answers as before.
+// case (#1266).
 func TestUnitMimeTypeBox(t *testing.T) {
 	for name, want := range map[string]string{
 		"focal.box":        "application/x-vagrant-box",
 		"dir/FOCAL.BOX":    "application/x-vagrant-box",
 		"focal.box.gz":     "application/x-gzip",
 		"app.jar":          "application/java-archive",
-		"index.yaml":       "application/x-yaml",
+		"index.yaml":       "text/plain",
 		"acme-1.0.0.tgz":   "application/x-gzip",
 		"layout.tar":       "application/x-tar",
 		"plain.bin":        "application/octet-stream",
@@ -30,10 +30,9 @@ func TestUnitMimeTypeBox(t *testing.T) {
 }
 
 // TestUnitRemoteBoxKeepsItsMIMECheck: a remote repository caches a .box
-// under whatever archive label its upstream sends, as it did while a box
-// had no type of its own, and records it with the box type it now
-// downloads with. Artifactory refuses only the labels on its block list, so
-// an HTML page is still refused.
+// under whatever archive label its upstream sends and records it with the
+// box type it downloads with. Artifactory refuses only the labels on its
+// block list, so an HTML page is still refused.
 func TestUnitRemoteBoxKeepsItsMIMECheck(t *testing.T) {
 	data := []byte("box archive bytes")
 	for label, refused := range map[string]bool{

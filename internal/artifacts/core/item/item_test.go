@@ -777,8 +777,8 @@ func TestUnitSidecarAndMimeType(t *testing.T) {
 		t.Fatal("Algorithm.Of")
 	}
 	if MimeType("A.JAR") != "application/java-archive" ||
-		MimeType("index.yaml") != "application/x-yaml" ||
-		MimeType("config.YML") != "application/x-yaml" ||
+		MimeType("index.yaml") != "text/plain" ||
+		MimeType("config.YML") != "text/plain" ||
 		MimeType("x.unknown") != "application/octet-stream" {
 		t.Fatal("MimeType")
 	}

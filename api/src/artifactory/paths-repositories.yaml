@@ -1092,7 +1092,10 @@ components:
             up. Defaults to 60.
           type: integer
         mismatchingMimeTypesOverrideList:
-          description: Optional within this object. Comma-separated media types allowed despite blockMismatchingMimeTypes.
+          description: Optional within this object. Comma-separated media types this remote refuses when an
+            upstream labels a file with one of them and the requested type is another, while
+            blockMismatchingMimeTypes is on. When set, it replaces the default list, text/html and
+            application/xhtml+xml.
           type: string
         missedRetrievalCachePeriodSecs:
           description: Optional within this object. Seconds a failed lookup is remembered so repeated requests for
