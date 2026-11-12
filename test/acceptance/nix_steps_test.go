@@ -1,6 +1,8 @@
 package acceptance
 
 import (
+	"archive/tar"
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
@@ -9,12 +11,14 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/cucumber/godog"
+	"github.com/ulikunitz/xz"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	nixfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nix"
@@ -28,6 +32,10 @@ func (w *world) registerNix(sc *godog.ScenarioContext) {
 		w.nixSubstitute,
 	)
 	sc.Step(`^the controlled signed Nix upstream is available$`, w.nixUpstream)
+	sc.Step(
+		`^I publish two Nix channel snapshots to "([^"]*)" and follow the channel with nix-channel$`,
+		w.nixChannel,
+	)
 }
 
 func (w *world) nixSigningKey() error {
@@ -189,4 +197,101 @@ func (w *world) nixUpstream() error {
 		return fmt.Errorf("Nix fixture store path: %w", err)
 	}
 	return nil
+}
+
+// nixChannelTarball writes /work/<name>.tar.xz: a nixexprs.tar.xz whose one
+// top-level folder, as nix-channel's unpack-channel requires, holds a
+// default.nix and a marker file naming the snapshot.
+func (w *world) nixChannelTarball(name string) error {
+	var archive bytes.Buffer
+	tw := tar.NewWriter(&archive)
+	if err := tw.WriteHeader(
+		&tar.Header{Name: "nixexprs/", Typeflag: tar.TypeDir, Mode: 0o755},
+	); err != nil {
+		return err
+	}
+	for file, body := range map[string]string{
+		"default.nix": "{ ... }: { }\n",
+		"marker":      "channel snapshot " + name + "\n",
+	} {
+		if err := tw.WriteHeader(&tar.Header{
+			Name: "nixexprs/" + file, Typeflag: tar.TypeReg, Mode: 0o644, Size: int64(len(body)),
+		}); err != nil {
+			return err
+		}
+		if _, err := tw.Write([]byte(body)); err != nil {
+			return err
+		}
+	}
+	if err := tw.Close(); err != nil {
+		return err
+	}
+	var out bytes.Buffer
+	xw, err := xz.NewWriter(&out)
+	if err != nil {
+		return err
+	}
+	if _, err = xw.Write(archive.Bytes()); err != nil {
+		return err
+	}
+	if err = xw.Close(); err != nil {
+		return err
+	}
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, name+".tar.xz"), out.Bytes(), 0o644)
+}
+
+// nixChannel uploads a snapshot with curl as the JFrog guide does, follows
+// the channel with nix-channel --add and --update, then uploads a newer
+// snapshot and updates again, checking the unpacked channel each time.
+// Credentials come from a netrc file: nix-channel appends nixexprs.tar.xz
+// to the effective URL libcurl reports, and libcurl 8.23.0, which this
+// image links, leaves a URL's user and password out of it (curl commit
+// 7a6bd027d0), so a channel URL's own credentials reach only the first
+// request whatever the server answers. Nix keeps a downloaded channel for
+// tarball-ttl seconds (an hour by default), so the second update sets it to
+// 0 to ask the registry again.
+func (w *world) nixChannel(key string) error {
+	for _, name := range []string{"first", "second"} {
+		if err := w.nixChannelTarball(name); err != nil {
+			return err
+		}
+	}
+	u, err := url.Parse(w.nixURL(key))
+	if err != nil {
+		return err
+	}
+	u.User = nil
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	netrc := fmt.Sprintf("machine %s login admin password %s\n", u.Hostname(), testAdminPassword)
+	if err = os.WriteFile(filepath.Join(dir, "nix-netrc"), []byte(netrc), 0o600); err != nil {
+		return err
+	}
+	script := `set -eu
+mkdir -p "$HOME"
+channel="$1/channels/nixpkgs-25.11"
+curl -fsS -o /dev/null --netrc-file /work/nix-netrc -X PUT -T /work/first.tar.xz "$channel/nixpkgs/nixpkgs-25.11pre1"
+nix-channel --add "$channel" nixpkgs
+nix-channel --update nixpkgs
+marker="$HOME/.nix-defexpr/channels/nixpkgs/marker"
+test "$(cat "$marker")" = 'channel snapshot first'
+curl -fsS -o /dev/null --netrc-file /work/nix-netrc -X PUT -T /work/second.tar.xz "$channel/nixpkgs/nixpkgs-25.11pre2"
+NIX_CONFIG="$NIX_CONFIG
+tarball-ttl = 0" nix-channel --update nixpkgs
+printf 'followed %s\n' "$(cat "$marker")"
+`
+	return w.runContainer(
+		w.nixImage,
+		[]string{
+			"--user", "0:0", "-e", "HOME=/tmp/nix-channel-home",
+			"-e", "NIX_CONFIG=netrc-file = /work/nix-netrc",
+		},
+		[]string{"sh", "-c", script, "nix-channel", u.String()},
+	)
 }
