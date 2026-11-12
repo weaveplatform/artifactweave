@@ -47,10 +47,12 @@
 //     registry tokens (TokenIssuer) and whose Identity reads a user's email;
 //     the registry's remote source service (Options.Sources), through which
 //     a remote repository's manifests, blobs, tags and referrers are read;
-//     and the server's download (Options.ServeBlob,
+//     the server's download (Options.ServeBlob,
 //     Options.RedirectManifest), which applies the download redirect policy
-//     (decision 0029) and counts downloads. DockerAPI runs over the item kit
-//     (artifacts/adapters/http/itemkit), which resolves the caller's access
+//     (decision 0029) and counts downloads; and the item kit's BareETag
+//     (artifacts/adapters/http/itemkit), which gives a local manifest and a
+//     remote blob the bare SHA-1 ETag the download gives a file. DockerAPI
+//     runs over the item kit, which resolves the caller's access
 //     and writes errors, and over its store (itemkit.Store), in which it
 //     finds repositories and over which it builds the registry service its
 //     deletes and promotions go through.
