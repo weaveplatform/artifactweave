@@ -226,17 +226,19 @@ func TestAccConanDownloadPolicyRemote(t *testing.T) {
 	w.up.Set(recipe+"/revisions/abc/files/conanfile.py",
 		fakeupstream.Resource{Body: []byte("remote recipe")})
 	local := "/artifactory/api/conan/conan-local" + recipe + "/revisions/abc/files/"
-	for file, body := range map[string]string{
-		"conanfile.py":      "local recipe",
-		"conanmanifest.txt": fmt.Sprintf("1\nconanfile.py: %s\n", md5Hex("local recipe")),
+	// The recipe goes up before the manifest that lists it: the server
+	// refuses a manifest naming content it does not hold with 422.
+	for _, f := range []struct{ file, body string }{
+		{"conanfile.py", "local recipe"},
+		{"conanmanifest.txt", fmt.Sprintf("1\nconanfile.py: %s\n", md5Hex("local recipe"))},
 	} {
 		if rec := w.request(
 			http.MethodPut,
-			local+file,
+			local+f.file,
 			"admin",
-			body,
+			f.body,
 		); rec.Code != http.StatusCreated {
-			t.Fatalf("PUT %s: %d %s", file, rec.Code, rec.Body)
+			t.Fatalf("PUT %s: %d %s", f.file, rec.Code, rec.Body)
 		}
 	}
 	get := func(key, route string) *httptest.ResponseRecorder {
