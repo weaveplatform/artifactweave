@@ -21,6 +21,8 @@ func (w *world) registerNuGet(sc *godog.ScenarioContext) {
 
 // JFrog runs the same SDK as the native scenario; mounting the pinned Linux
 // binary avoids another image and keeps configuration/build records isolated.
+// jf, not dotnet, is the container's PID 1, so the dotnet host it starts
+// exits without the init that runDotnet needs (#1241).
 func (w *world) runJFDotnet(args string) error {
 	if err := w.jfAvailable(); err != nil {
 		return err
@@ -29,8 +31,7 @@ func (w *world) runJFDotnet(args string) error {
 	if err != nil {
 		return err
 	}
-	argv := w.clientArgs(args)
-	flags := []string{
+	return w.runContainer(w.dotnetImage, []string{
 		"--entrypoint", "/usr/local/bin/jf",
 		"-v", bin + ":/usr/local/bin/jf:ro",
 		"-e", "JFROG_CLI_HOME_DIR=/work/.jfrog-cli",
@@ -44,13 +45,7 @@ func (w *world) runJFDotnet(args string) error {
 		"-e", "DOTNET_GENERATE_ASPNET_CERTIFICATE=false",
 		"-e", "NUGET_XMLDOC_MODE=skip",
 		"-e", "CI=true",
-	}
-	// JF delegates push to the same SDK command as runDotnet; retain its
-	// documented fallback for the pinned .NET 11 RC2 teardown hang.
-	if len(argv) >= 3 && argv[0] == "dotnet" && argv[1] == "nuget" && argv[2] == "push" {
-		flags = append(flags, "-e", "DOTNET_CLI_ENABLEAOT=false")
-	}
-	return w.runContainer(w.dotnetImage, flags, argv)
+	}, w.clientArgs(args))
 }
 
 // Read the lockfile itself, not NuGet's sidecar digest: this proves that the

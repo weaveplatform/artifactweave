@@ -141,10 +141,9 @@ func TestAccAgentPluginsMarketplaceHeadAnswersTheHeadersAlone(t *testing.T) {
 }
 
 // TestAccAgentPluginsMarketplaceAPIServesOnlyALocalRepositorysFiles: only a
-// local Agent Plugins repository has marketplace files, and only the names
-// the target version renders, so the API path answers 404 for anything
-// else; a key that names no repository is answered as the item routes
-// answer one.
+// local Agent Plugins repository has marketplace files, and only under
+// their own names, so the API path answers 404 for anything else; a key
+// that names no repository is answered as the item routes answer one.
 func TestAccAgentPluginsMarketplaceAPIServesOnlyALocalRepositorysFiles(t *testing.T) {
 	w := newItemWorld(t)
 	w.repos(pluginsRepo(pluginsLocal, repo.Local), pluginsRepo(pluginsRemote, repo.Remote))
@@ -158,10 +157,6 @@ func TestAccAgentPluginsMarketplaceAPIServesOnlyALocalRepositorysFiles(t *testin
 			"Could not find resource",
 		},
 		{"name of no marketplace file", pluginsLocal, "plugins.json", "Could not find resource"},
-		{
-			"reserved name the target version does not render", pluginsLocal,
-			"vscode-marketplace.json", "Could not find resource",
-		},
 		{
 			"absent repository", "absent", "marketplace.json",
 			"Repository 'absent' does not exist",
@@ -180,14 +175,14 @@ func TestAccAgentPluginsMarketplaceAPIServesOnlyALocalRepositorysFiles(t *testin
 
 // TestAccAgentPluginsMarketplaceOverlayLeavesOtherRequestsToTheLookup: at
 // the item path the overlay renders a marketplace file only for a request
-// without properties for a reserved name at the root of a local Agent
-// Plugins repository, and answers 404 for the reserved name it does not
-// render. Every other request reaches the generic lookup, which serves the
-// file stored at the path where the overlay would have rendered one.
+// without properties for a marketplace name at the root of a local Agent
+// Plugins repository, even where a file is stored under that name. Every
+// other request reaches the generic lookup, which serves the file stored
+// at the path where the overlay would have rendered one.
 func TestAccAgentPluginsMarketplaceOverlayLeavesOtherRequestsToTheLookup(t *testing.T) {
 	w := newItemWorld(t)
 	w.repos(pluginsRepo(pluginsLocal, repo.Local), pluginsRepo(pluginsRemote, repo.Remote))
-	// The format refuses uploads at the reserved names; these are stored
+	// The format refuses uploads at the marketplace names; these are stored
 	// past it, so that what the generic lookup serves tells it apart.
 	w.put(kittest.LocalKey, false, "marketplace.json", `{"stored":"generic"}`)
 	w.put(pluginsLocal, false, "marketplace.json", `{"stored":"root"}`)
@@ -229,16 +224,14 @@ func TestAccAgentPluginsMarketplaceOverlayLeavesOtherRequestsToTheLookup(t *test
 			}
 		})
 	}
-	t.Run("marketplace file", func(t *testing.T) {
-		got := listed(t, w.do(http.MethodGet, itemPath(pluginsLocal, "marketplace.json"), admin))
-		if len(got) != 0 {
-			t.Errorf("lists %v, want no plugins", got)
-		}
-	})
-	t.Run("reserved name the target version does not render", func(t *testing.T) {
-		rec := w.do(http.MethodGet, itemPath(pluginsLocal, "vscode-marketplace.json"), admin)
-		wantError(t, rec, http.StatusNotFound, "Could not find resource")
-	})
+	for _, file := range []string{"marketplace.json", "vscode-marketplace.json"} {
+		t.Run(file, func(t *testing.T) {
+			got := listed(t, w.do(http.MethodGet, itemPath(pluginsLocal, file), admin))
+			if len(got) != 0 {
+				t.Errorf("lists %v, want no plugins", got)
+			}
+		})
+	}
 }
 
 // TestUnitAgentPluginsOverlayDeclinesACacheAlias: only a remote repository

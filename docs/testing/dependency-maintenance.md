@@ -9,8 +9,11 @@ Dependabot PRs receive the companion commit automatically after their first
 Quality gate finishes, including when stale references made that gate fail.
 The repository App commits the generated changes to the dependency branch,
 triggering a new gate. Auto-merge checks the new head's result. Acceptance client
-updates still require an eligible review and manual merge. The scheduled Go and
-JFrog provider refresh jobs run the generator before opening their PRs.
+updates still require an eligible review and manual merge. The three scheduled
+jobs in `deps-refresh.yml` run the generator before opening their PRs: the Go
+refresh, the JFrog provider refresh and `hex-image`. Dependabot ignores
+`hexpm/elixir`, so `hex-image` is the only job that moves the Hex client image.
+It raises its PR on `deps/hex-image`, which `auto-merge.yml` never merges.
 
 `dependency-references.yml` also reconciles the current default branch after
 every push, including dependency merges. It regenerates from the merged tree

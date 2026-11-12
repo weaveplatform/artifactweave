@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	tf "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraform"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
@@ -29,7 +30,11 @@ var (
 )
 
 type claims struct {
-	Provider   *providerClaim             `json:"provider,omitempty"`
+	Provider *providerClaim `json:"provider,omitempty"`
+	// Module is the remote module version a remote module URL serves,
+	// <ns>/<name>/<system>/<version>: its archive's cache path follows the
+	// upstream location, so Path does not name it.
+	Module     string                     `json:"module,omitempty"`
 	Credential *kernel.DownloadCredential `json:"credential,omitempty"`
 	Source     *model.SourceIdentity      `json:"source,omitempty"`
 	Subject    string                     `json:"sub"`
@@ -227,6 +232,7 @@ func downloadPrefix(c repo.Config) string {
 
 func (h handler) remoteDownloadURL(
 	r *http.Request,
+	m tf.Module,
 	path, digest string,
 	identity model.SourceIdentity,
 	subdir, archive string,
@@ -246,6 +252,7 @@ func (h handler) remoteDownloadURL(
 		Expires:    now.Add(90 * time.Second).Unix(),
 		Source:     &identity,
 		Credential: &reference,
+		Module:     m.Package() + "/" + m.Version,
 	}
 	raw, err := h.signDownloadURL(r, c)
 	if err != nil {

@@ -938,19 +938,31 @@ func loadEmbeddedSpec(name string) (*openapi3.T, error) {
 // errorProfileRules select the error response contract from the request
 // path. Terraform providers join errors[] entries, Docker reads
 // errors[].code, npm prints error, and jfrog-client-go prints the body.
-// Order matters: the JFrog operations beside the npm and Terraform
-// registries must match before the registries' own prefixes, and the first
-// matching rule wins.
+// Order matters: the JFrog operations beside the npm, Terraform, pub and
+// Swift registries must match before the registries' own prefixes, and the
+// first matching rule wins.
 var errorProfileRules = []httpkit.ProfileRule{
 	{Match: pathPrefix("/xray/"), Profile: apierror.ProfileXray},
 	{
 		Match: func(path string) bool {
 			return npmhttp.NPMOperation(path) || npmhttp.IsNPMReindex(path) ||
-				terraformhttp.IsTerraformReindex(path)
+				terraformhttp.IsTerraformReindex(path) ||
+				reindexBeside(path, "/artifactory/api/pub/", "/artifactory/api/swift/")
 		},
 		Profile: apierror.ProfileArtifactory,
 	},
 	{Match: pathPrefix("/artifactory/api/npm/"), Profile: apierror.ProfileNPM},
+	{
+		// The middleware's errors (authentication, the request limiter) use
+		// the envelope the protocol's own handlers use, so a client meets one
+		// format on its paths: dart pub reads the pub v2 error document, and
+		// on a 401 or 403 only a Bearer realm="pub" challenge, and SwiftPM and
+		// APM read RFC 7807 problem JSON (research 10). 7.x's envelope here
+		// is unconfirmed [I].
+		Match: below("/artifactory/api/pub/"), Profile: apierror.ProfilePub,
+	},
+	{Match: below("/artifactory/api/swift/"), Profile: apierror.ProfileSwiftRegistry},
+	{Match: below("/artifactory/api/agentpackages/"), Profile: apierror.ProfileAPM},
 	{
 		Match: func(path string) bool {
 			return path == "/artifactory/api/terraform/remote/v2" ||
@@ -998,6 +1010,40 @@ var errorProfileRules = []httpkit.ProfileRule{
 // their 404 responses.
 func errorProfileFor(path string) apierror.Profile {
 	return httpkit.ProfileFor(errorProfileRules, path)
+}
+
+// reindexBeside reports whether path is JFrog's reindex operation beside
+// one of the protocols under prefixes, so that it keeps Artifactory's
+// envelope as npm's and Terraform's do. Two routes answer for it, and both
+// answer in that envelope: the generated <prefix>{repoKey}/reindex, which
+// chi matches even with an empty key and whose binder then answers 400, and
+// pkgroute's reserved {repoKey}/reindex, which trims slashes and answers the
+// operation's other methods 405. A path either route takes matches. The
+// rules see the unescaped path, so a key with an encoded slash, which no
+// repository key can hold, is missed here as in IsNPMReindex.
+func reindexBeside(path string, prefixes ...string) bool {
+	for _, p := range prefixes {
+		rest, ok := strings.CutPrefix(path, p)
+		if !ok {
+			continue
+		}
+		if _, op, _ := strings.Cut(rest, "/"); op == "reindex" {
+			return true
+		}
+		if key, op, _ := strings.Cut(strings.Trim(rest, "/"), "/"); key != "" && op == "reindex" {
+			return true
+		}
+	}
+	return false
+}
+
+// below matches a path strictly below prefix. The bare prefix names no
+// repository, so no protocol route takes it, and its 404 is the router's
+// catch-all's, in Artifactory's envelope like any path no route takes.
+func below(prefix string) func(path string) bool {
+	return func(path string) bool {
+		return len(path) > len(prefix) && strings.HasPrefix(path, prefix)
+	}
 }
 
 // pathPrefix matches a path that starts with any of prefixes.

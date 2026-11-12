@@ -189,7 +189,7 @@ Feature: The package clients reach artifactweave
     Examples:
       | dotnet  |
       | .NET    |
-      | .NET 11 |
+      | .NET 10 |
 
   # helm makes the chart and the index itself, offline: helm create, helm
   # package and helm repo index with the repository's URL, so the index's

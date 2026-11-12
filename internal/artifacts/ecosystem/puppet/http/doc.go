@@ -1,11 +1,12 @@
 // Package puppethttp serves the Forge v3 module protocol at
 // /artifactory/api/puppet/{repoKey}: a module's releases, one release and
-// its archive, a module record and an exact-name search, in the JSON the
-// Puppet client's Forge client reads. Every answer lists only the releases
-// the caller may read, so the client resolves dependencies behind the
-// repository's permissions. Archive validation and the module rules are the
-// format package's (artifacts/ecosystem/puppet); this package answers HTTP
-// with them.
+// its archive, a module record, an exact-name search, and a local or
+// federated repository's paged lists of every release and module it
+// hosts, in the JSON the Puppet client's and puppet_forge's Forge clients
+// read. Every answer lists only the releases the caller may read, so the
+// client resolves dependencies behind the repository's permissions.
+// Archive validation and the module rules are the format package's
+// (artifacts/ecosystem/puppet); this package answers HTTP with them.
 //
 // # Role
 //
@@ -47,9 +48,13 @@
 //     /artifactory/api/puppet/{repoKey}/reindex, which refuses any query
 //     with 400, answers its text once the reindex has run, and writes
 //     errors in the Artifactory envelope.
-//   - Answers: release lists with Forge pagination, at most 1,000 releases
-//     a page; release and module records; search results; and archives.
-//     Every JSON answer is marked private, no-store.
+//   - Answers: one module's release list with Forge pagination, at most
+//     1,000 releases a page; release and module records; search results;
+//     archives; and the whole-repository lists, v3/releases without module
+//     and v3/modules without query (list.go), 20 a page unless limit asks
+//     for up to 100, under the Forge's pagination object with first,
+//     previous, current and next links. Every JSON answer is marked
+//     private, no-store.
 //
 // # Invariants
 //
@@ -60,19 +65,25 @@
 //     being advertised.
 //   - The download policy (decision 0032) comes after Read permission. A
 //     blacked-out local or federated repository refuses every route but
-//     the module search with the blackout 404, a listing naming the
-//     request's own path before anything is computed (R2a, R9); the
-//     search, a native search route, keeps its answers and finds nothing
-//     (R2b). The archive route checks the archive's own path before the
-//     release is looked up, so it answers the blackout 404, the patterns
-//     404 or a virtual repository's own "No repository found" 404 (R6,
-//     R10). A remote's release pages are checked where 7.x caches them,
-//     .puppet/<m>/releases.json (RTFACT-13711), and for the blackout alone
-//     when they are read to find an archive (R4) or to answer the search,
-//     which a blacked-out remote refuses with the blackout 404 for the
-//     module folder (R2b).
+//     the module search with the blackout 404, a listing, the
+//     whole-repository lists included, naming the request's own path
+//     before anything is computed (R2a, R9); the search, a native search
+//     route, keeps its answers and finds nothing (R2b). The archive route
+//     checks the archive's own path before the release is looked up, so it
+//     answers the blackout 404, the patterns 404 or a virtual repository's
+//     own "No repository found" 404 (R6, R10). A remote's release pages
+//     are checked where 7.x caches them, .puppet/<m>/releases.json
+//     (RTFACT-13711), and for the blackout alone when they are read to find
+//     an archive (R4) or to answer the search, which a blacked-out remote
+//     refuses with the blackout 404 for the module folder (R2b).
 //   - A hosted or virtual module lists at most 4,096 releases (503 beyond),
-//     and a remote accepts no more from its upstream.
+//     and a remote accepts no more from its upstream. A whole-repository
+//     list reads at most 4,096 modules and 65,536 releases (503 beyond).
+//   - The whole-repository lists are served by local and federated
+//     repositories. A virtual repository answers them 404 after the
+//     caller's read permission, as 7.x does (RTFACT-15072); a remote one
+//     keeps the 400 it gave before they were served, since no source shows
+//     what a remote lists.
 //   - A remote builds each Forge query itself (module, limit, offset and
 //     sort_by), never follows an upstream next link, and reads at most
 //     16 MiB a page. Metadata and archive URLs must stay under the
@@ -125,6 +136,10 @@
 //   - puppet_test.go: hosted routes, invalid routes and queries, remote
 //     authority, integrity, pagination and failures, virtual member order,
 //     permissions and changes, store failures and late read revocation.
+//   - list_test.go: the whole-repository lists' pages, links and limits,
+//     read permission, the blackout and patterns, the virtual and remote
+//     answers, the one-module routes they leave unchanged, and store
+//     failures.
 //   - policy_test.go: the blackout on every hosted route and the module
 //     search's empty answer under it, a release whose archive the patterns
 //     reject kept listed, virtual members and patterns that refuse only an

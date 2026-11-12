@@ -1504,10 +1504,16 @@ components:
             type: string
           type: array
         p2Urls:
-          description: Optional within this object. URLs of the P2 update sites a p2 repository aggregates. Stored
-            only; P2 is not served.
+          description: Optional within this object. The update sites a P2 virtual repository aggregates, each
+            local://<key>[/<suffix>] or an http or https URL. Its composite lists each site at <member key>[/<rest>],
+            served by the local member with that key or the first member remote whose url starts the URL. A
+            create, or an update that sends p2Urls, adds to repositories the P2 remote that covers each URL,
+            creating one keyed by the URL's host (host-port with a port, then -1, -2 while taken) when none does,
+            and the local Generic or Maven repository a local:// URL names; it removes no member, and a URL it
+            cannot use answers 400. When empty, the composite lists each member at its key.
           items:
-            description: Optional within this object. A P2 update site URL.
+            description: Optional within this object. A P2 update site, local://<key>[/<suffix>] or an http or
+              https URL.
             type: string
           type: array
         packageType:

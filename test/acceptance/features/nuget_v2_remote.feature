@@ -43,4 +43,4 @@ Feature: NuGet v2 remote feeds retain native restore and bounded query behavior
     Examples:
       | dotnet  |
       | .NET    |
-      | .NET 11 |
+      | .NET 10 |

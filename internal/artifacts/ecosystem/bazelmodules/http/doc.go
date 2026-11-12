@@ -110,4 +110,7 @@
 //     selection and source revocation before delivery.
 //   - source_test.go: the source.json origin, integrity, patch and mirror
 //     policy, and metadata bounds.
+//   - read_fault_test.go: a deploy whose stored MODULE.bazel or archive
+//     fails a read answers 500 as the item routes answer it, and stores
+//     nothing, while invalid uploads are still refused 409.
 package bazelmoduleshttp

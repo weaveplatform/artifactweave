@@ -41,6 +41,9 @@ type remoteProviderPackage struct {
 		GPG []publicKey `json:"gpg_public_keys"`
 	} `json:"signing_keys"`
 	doc map[string]json.RawMessage
+	// paths are the cache paths of the archive, the SHA256SUMS and its
+	// signature, in that order, which their URLs set (providerFilePath).
+	paths []string
 }
 
 func remoteProviderError(message string) error {
@@ -55,17 +58,36 @@ func providerJSON(body io.Reader, doc any) error {
 	return nil
 }
 
-func providerArchivePath(q providerOp) string {
-	_, typ, _ := strings.Cut(q.name, "/")
-	return providerFolder(
-		q,
-	) + "/" + q.version + "/terraform-provider-" + typ + "_" + q.version + "_" + q.os + "_" + q.arch + ".zip"
+// providerListingPath is where a listing checks Read on a platform's
+// archive, before it reads the package metadata that sets the archive's
+// URL and so its cache path (providerFilePath): the archive's name in the
+// provider's own folder. Where 7.x checks a listing is [I], so a listing
+// filters as it did before the files moved to 7.x's paths.
+func providerListingPath(q providerOp) string {
+	return providerFolder(q) + "/" + q.version + "/" + providerArchiveName(q)
 }
 
+// providerArchiveName is the archive's name in a local provider
+// repository's layout (decision 0040).
+func providerArchiveName(q providerOp) string {
+	_, typ, _ := strings.Cut(q.name, "/")
+	return "terraform-provider-" + typ + "_" + q.version + "_" + q.os + "_" + q.arch + ".zip"
+}
+
+// validRemoteProvider checks q's name, version and platform by the rules
+// the index reads a local repository's archive by.
 func validRemoteProvider(q providerOp) bool {
-	file, ok := tf.ParseProviderPackageFile(providerArchivePath(q))
+	file, ok := tf.ParseProviderPackageFile(q.name + "/" + q.version + "/" + providerArchiveName(q))
 	return ok && file.Package() == q.name && file.Version == q.version && file.OS == q.os &&
 		file.Arch == q.arch
+}
+
+// providerFilePath is the cache path of a provider file at target: below
+// the remote's Providers URL, JFrog's "base URL of the provider's storage
+// API", where a HashiCorp release is, or under external/<host>/
+// (remoteFilePath).
+func providerFilePath(c repo.Config, target string) (string, bool) {
+	return remoteFilePath(c.TerraformProvidersURL, target)
 }
 
 func validProviderProtocols(protocols []string, required bool) bool {
@@ -203,6 +225,11 @@ func parseRemoteProviderPackage(
 			return result, e
 		}
 		*rawURL = target
+		path, ok := providerFilePath(c, target)
+		if !ok {
+			return result, remoteProviderError("invalid package URL")
+		}
+		result.paths = append(result.paths, path)
 	}
 	result.doc = raw
 	return result, nil

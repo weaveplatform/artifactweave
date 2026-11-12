@@ -412,7 +412,7 @@ Each item below is on #216 for the live comparison in P19:
 
 ## Native exit evidence (#547)
 
-The pinned .NET 10 and 11 SDK images run NuGet.Protocol through `dotnet`; neither
+The pinned .NET SDK images, on the 10.0 LTS and newest lines, run NuGet.Protocol through `dotnet`; neither
 image includes the separate `nuget.exe`/Mono runtime. Consequently `nuget.exe list`
 and `jf nuget restore` remain outside this native matrix, rather than being
 represented by a renamed dotnet command. Microsoft documents the Linux legacy

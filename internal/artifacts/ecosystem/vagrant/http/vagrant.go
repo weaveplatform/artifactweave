@@ -23,15 +23,21 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
 )
 
-// Protocol returns the Vagrant box catalog for the router kit, under
-// /artifactory/api/vagrant/{repoKey}: GET and HEAD of a box name, <name> or
-// <namespace>/<name>, optionally with matrix parameters that filter the
-// boxes by their properties, answer the box's catalog JSON. Only local and
-// federated repositories have a source; a remote or virtual repository
-// answers 501.
+// protocolName is the protocol's name, and so its prefix:
+// pkgroute.Mount serves it under /artifactory/api/vagrant/{repoKey}, where
+// downloadURL points each box.
+const protocolName = "vagrant"
+
+// Protocol returns the native Vagrant routes for the router kit, under
+// /artifactory/api/vagrant/{repoKey}. GET and HEAD of a box file's path,
+// <path>.box, serve the stored box as the item download does. GET and HEAD
+// of a box name, <name> or <namespace>/<name>, optionally with matrix
+// parameters that filter the boxes by their properties, answer the box's
+// catalog JSON. Only local and federated repositories have a source; a
+// remote or virtual repository answers 501.
 func Protocol() pkgroute.Protocol {
 	return pkgroute.Protocol{
-		Name:         "vagrant",
+		Name:         protocolName,
 		Types:        []repo.PackageType{repo.Vagrant},
 		ErrorProfile: apierror.ProfileArtifactory,
 		Sources: map[repo.Class]pkgroute.Source{
@@ -69,6 +75,19 @@ type provider struct {
 func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	rel := pkgroute.RequestFrom(r).Rest
 	p, err := pkgroute.ParsePath(rel)
+	if err == nil && len(rel) <= 4096 && boxFile(p) {
+		// 7.x serves box files on this route as well as catalogs: its
+		// catalogs link /api/vagrant/<repo>/<path>.box (RTFACT-17993), and
+		// clients download there (RTFACT-27264, RTFACT-13807). Telling a
+		// file from a name by the path alone [I] lets ServeItem check read
+		// permission before it looks anything up (DV-057), then the download
+		// policy, so a refusal says nothing of what is stored. The query is
+		// the item download's: 7.x served a box to a URL with one
+		// (RTFACT-27264), and an access_token in it authenticates nothing
+		// (DV-148). A Range answers 206; 7.x ignoring it is a bug.
+		h.k.ServeItem(w, r, p.String())
+		return
+	}
 	if err != nil || len(rel) > 4096 || p.Folder || !boxfmt.ValidName(p.String()) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Vagrant box name"))
 		return
@@ -234,12 +253,29 @@ func (h handler) providers(
 	return out, nil
 }
 
+// boxFile reports whether p names a box file rather than a box: a valid
+// item path at which a box may be stored (boxfmt.IsBoxPath). Matrix
+// parameters keep a path a catalog request, since they are the catalog's
+// filter and no source shows them on a box file [I].
+func boxFile(p pkgroute.Path) bool {
+	if p.Folder || len(p.Props) > 0 || !boxfmt.IsBoxPath(p.String()) {
+		return false
+	}
+	_, _, _, err := kernel.SplitItemPath(p.String())
+	return err == nil
+}
+
+// downloadURL is the box file route's URL for it, where 7.x's catalogs
+// point (RTFACT-17993, RTFACT-27264). It carries no token: Vagrant 2.4.9
+// sends its token as a Bearer header to any URL on its server's host
+// (add_downloader_authentication.rb), this one included.
 func downloadURL(r *http.Request, it model.Item) string {
 	parts := strings.Split(it.FullPath(), "/")
 	for i := range parts {
 		parts[i] = url.PathEscape(parts[i])
 	}
-	base := baseurl.From(r.Context()) + "/artifactory/" + url.PathEscape(it.RepoKey)
+	base := baseurl.From(r.Context()) + "/artifactory/api/" + protocolName + "/" +
+		url.PathEscape(it.RepoKey)
 	return base + "/" + strings.Join(parts, "/")
 }
 func notFound() error { return apierror.New(http.StatusNotFound, "Vagrant box not found") }

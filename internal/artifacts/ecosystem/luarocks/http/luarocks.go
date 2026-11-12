@@ -95,16 +95,28 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 			h.k.Error(w, r, err)
 			return
 		}
-		f, err := h.k.ResolveStoredItem(r, p.String())
-		if err != nil {
-			h.k.Error(w, r, err)
-			return
+		// Resolving a manifest file queues the manifest work, when none is
+		// queued, and waits for it, but the work writes only manifest and
+		// manifest-5.1 to manifest-5.5. Any other manifest-5. name, such as
+		// the manifest-5.4.zip, and the manifest-5.4.json under LuaJIT,
+		// that the client asks for before manifest-5.4, is looked up as
+		// stored: JFrog's docs name no such index file, so a missing one is
+		// a file not stored, which 7.x answers 404 [I], and the client then
+		// asks for the next name (luarocks 3.13.0 manif.lua).
+		derived := manifestPath(p.String())
+		lookup := h.k.StoredItem
+		if derived {
+			lookup = h.k.ResolveStoredItem
 		}
-		if f.Item.Folder {
+		f, err := lookup(r, p.String())
+		switch {
+		case errors.Is(err, kernel.ErrNotFound) && !derived, err == nil && f.Item.Folder:
 			h.k.Error(w, r, apierror.New(http.StatusNotFound, "Could not find resource"))
-			return
+		case err != nil:
+			h.k.Error(w, r, err)
+		default:
+			h.k.ServeFoundMetadata(w, r, f)
 		}
-		h.k.ServeFoundMetadata(w, r, f)
 		return
 	}
 	h.k.ServeItem(w, r, p.String())

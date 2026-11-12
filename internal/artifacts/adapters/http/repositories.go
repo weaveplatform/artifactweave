@@ -62,6 +62,12 @@ const (
 	msgBuildInfo  = "Deletion of Build Info repository %s is not allowed."
 )
 
+// errCreatedKeyTaken is a P2 remote repository planned with an update
+// finding its key taken when it is stored: another write created it after
+// the plan listed the repositories. The update answers as a create does
+// for a taken key, where any other store failure is a 500.
+var errCreatedKeyTaken = errors.New("repositories: a planned key was taken")
+
 // SlashCollections returns the artifacts collection that the Terraform
 // provider calls with a trailing slash, mapped to its path without one, for
 // the router's rewrite of collection paths: the provider lists repositories
@@ -542,7 +548,9 @@ func requestConfigs(bodies ...*[]repo.Config) []repo.Config {
 // CreateRepository creates one repository, for administrators only. Its
 // configuration gets its defaults and is checked, together with the
 // members, signing key pairs and environments it names, before anything is
-// stored; a key already taken answers 400.
+// stored; a key already taken answers 400. A P2 virtual repository also
+// gets the members its p2Urls need, and the P2 remote repositories it
+// needs are created with it (repos.PlanP2Virtual).
 func (s ArtifactoryAPI) CreateRepository(
 	ctx context.Context,
 	req artgen.CreateRepositoryRequestObject,
@@ -577,13 +585,17 @@ func (s ArtifactoryAPI) CreateRepository(
 	if err := repos.CheckMembers(c, existing); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
+	var created []repo.Config
+	if c, created, err = repos.PlanP2Virtual(c, existing); err != nil {
+		return nil, fmt.Errorf("repositories: %w", err)
+	}
 	if err := repos.CheckKeypairs(ctx, s.cfg.Access.Keys, c); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
 	if err := repos.CheckEnvironments(ctx, s.cfg.Access.Projects, &c); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	switch err := st.Repos().Create(ctx, c); {
+	switch err := createAll(ctx, st, append(created, c)); {
 	case errors.Is(err, kernel.ErrConflict):
 		return nil, httpkit.BadRequestf(msgKeyExists)
 	case err != nil:
@@ -596,7 +608,10 @@ func (s ArtifactoryAPI) CreateRepository(
 
 // CreateMultipleRepositories creates a batch of up to repoBatchLimit
 // repositories, all or none, for administrators only. A key already taken
-// answers 409, where CreateRepository answers 400.
+// answers 409, where CreateRepository answers 400. The P2 remote
+// repositories a P2 virtual repository's p2Urls need are created with the
+// batch, as CreateRepository creates them, and the answer names only the
+// repositories the batch asked for [I].
 func (s ArtifactoryAPI) CreateMultipleRepositories(
 	ctx context.Context,
 	req artgen.CreateMultipleRepositoriesRequestObject,
@@ -643,10 +658,20 @@ func (s ArtifactoryAPI) CreateMultipleRepositories(
 		prepared = append(prepared, c)
 		known = append(known, c)
 	}
+	var created []repo.Config
 	for i := range prepared {
 		if err := repos.CheckMembers(prepared[i], known); err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
+		// known grows by each plan's remotes, so a later virtual repository
+		// in the batch that needs the same site uses the remote an earlier
+		// one created instead of creating a second under <key>-1.
+		var made []repo.Config
+		if prepared[i], made, err = repos.PlanP2Virtual(prepared[i], known); err != nil {
+			return nil, fmt.Errorf("repositories: %w", err)
+		}
+		created = append(created, made...)
+		known = append(known, made...)
 		if err := repos.CheckKeypairs(ctx, s.cfg.Access.Keys, prepared[i]); err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
@@ -654,15 +679,7 @@ func (s ArtifactoryAPI) CreateMultipleRepositories(
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
 	}
-	err = st.Tx(ctx, func(ctx context.Context) error {
-		for _, c := range prepared {
-			if err := st.Repos().Create(ctx, c); err != nil {
-				return err //nolint:wrapcheck // classified below
-			}
-		}
-		return nil
-	})
-	switch {
+	switch err := createAll(ctx, st, append(created, prepared...)); {
 	case errors.Is(err, kernel.ErrConflict):
 		return nil, apierror.New(http.StatusConflict, msgKeyExists)
 	case err != nil:
@@ -673,6 +690,25 @@ func (s ArtifactoryAPI) CreateMultipleRepositories(
 		lines[i] = fmt.Sprintf("Successfully created repository '%s'", c.Key)
 	}
 	return artgen.CreateMultipleRepositories201TextResponse(strings.Join(lines, "\n")), nil
+}
+
+// createAll stores every one of cs in one transaction, so a P2 virtual
+// repository and the remote repositories it was planned with are created
+// together or not at all. A taken key stays kernel.ErrConflict under the
+// wrapping, for the caller to tell it from a failure.
+func createAll(ctx context.Context, st Store, cs []repo.Config) error {
+	err := st.Tx(ctx, func(ctx context.Context) error {
+		for _, c := range cs {
+			if err := st.Repos().Create(ctx, c); err != nil {
+				return fmt.Errorf("create %s: %w", c.Key, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("repositories: %w", err)
+	}
+	return nil
 }
 
 func batchSize(n int) error {
@@ -704,7 +740,9 @@ func updateBody(ctx context.Context, decoded any) ([]byte, error) {
 // stored repository (repos.Merge), for administrators only: a field left
 // out keeps its stored value and one sent as null returns to its default.
 // The reindex an update owes the repository (repos.OwesReindex) is queued
-// in the same transaction.
+// in the same transaction. An update that sends a P2 virtual repository's
+// p2Urls adds the members they need and creates the P2 remote
+// repositories they need, as CreateRepository does.
 func (s ArtifactoryAPI) UpdateRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.UpdateRepositoryConfigurationRequestObject,
@@ -742,10 +780,16 @@ func (s ArtifactoryAPI) UpdateRepositoryConfiguration(
 	if err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	if err := s.checkReferences(ctx, st, &updated); err != nil {
+	created, err := s.checkReferences(ctx, st, &updated, sendsP2URLs(patch), nil)
+	if err != nil {
 		return nil, err
 	}
-	if err := s.writeUpdates(ctx, st, []repo.Config{stored}, []repo.Config{updated}); err != nil {
+	switch err := s.writeUpdates(
+		ctx, st, created, []repo.Config{stored}, []repo.Config{updated},
+	); {
+	case errors.Is(err, errCreatedKeyTaken):
+		return nil, httpkit.BadRequestf(msgKeyExists)
+	case err != nil:
 		return nil, s.InternalError(ctx, "update repository", err)
 	}
 	return artgen.UpdateRepositoryConfiguration200TextResponse(
@@ -753,20 +797,28 @@ func (s ArtifactoryAPI) UpdateRepositoryConfiguration(
 	), nil
 }
 
-// writeUpdates stores each of updated, the update of stored's entry at the
-// same index, in one transaction, with the reindex an update owes its
-// repository (repos.OwesReindex), which is then asked for exactly when the
-// update commits.
+// writeUpdates creates each of created, then stores each of updated, the
+// update of stored's entry at the same index, in one transaction, with the
+// reindex an update owes its repository (repos.OwesReindex), which is then
+// asked for exactly when the update commits.
 func (s ArtifactoryAPI) writeUpdates(
 	ctx context.Context,
 	st Store,
-	stored, updated []repo.Config,
+	created, stored, updated []repo.Config,
 ) error {
 	var by string
 	if p, err := httpkit.Principal(ctx); err == nil {
 		by = p.Name
 	}
 	err := st.Tx(ctx, func(ctx context.Context) error {
+		for _, c := range created {
+			switch err := st.Repos().Create(ctx, c); {
+			case errors.Is(err, kernel.ErrConflict):
+				return fmt.Errorf("%w: %s", errCreatedKeyTaken, c.Key)
+			case err != nil:
+				return fmt.Errorf("create %s: %w", c.Key, err)
+			}
+		}
 		for i, c := range updated {
 			if err := st.Repos().Update(ctx, c); err != nil {
 				return fmt.Errorf("update %s: %w", c.Key, err)
@@ -787,29 +839,53 @@ func (s ArtifactoryAPI) writeUpdates(
 
 // checkReferences rejects an updated configuration whose signing key
 // pairs, environments or (for a virtual repository) members do not exist,
-// and rewrites its environments to their stored spelling.
+// and rewrites its environments to their stored spelling. With planP2 it
+// then gives a P2 virtual repository the members its p2Urls need
+// (repos.PlanP2Virtual) and returns the P2 remote repositories to create
+// for them. pending holds those an earlier entry of the same batch will
+// create, which count as existing.
 func (s ArtifactoryAPI) checkReferences(
 	ctx context.Context,
 	st Store,
 	c *repo.Config,
-) error {
+	planP2 bool,
+	pending []repo.Config,
+) ([]repo.Config, error) {
 	if err := repos.CheckKeypairs(ctx, s.cfg.Access.Keys, *c); err != nil {
-		return fmt.Errorf("repositories: %w", err)
+		return nil, fmt.Errorf("repositories: %w", err)
 	}
 	if err := repos.CheckEnvironments(ctx, s.cfg.Access.Projects, c); err != nil {
-		return fmt.Errorf("repositories: %w", err)
+		return nil, fmt.Errorf("repositories: %w", err)
 	}
 	if c.Class != repo.Virtual {
-		return nil
+		return nil, nil
 	}
 	known, err := st.Repos().List(ctx, port.RepoFilter{})
 	if err != nil {
-		return s.InternalError(ctx, "list repositories", err)
+		return nil, s.InternalError(ctx, "list repositories", err)
 	}
+	known = append(known, pending...)
 	if err := repos.CheckMembers(*c, known); err != nil {
-		return fmt.Errorf("repositories: %w", err)
+		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	return nil
+	if !planP2 {
+		return nil, nil
+	}
+	planned, created, err := repos.PlanP2Virtual(*c, known)
+	if err != nil {
+		return nil, fmt.Errorf("repositories: %w", err)
+	}
+	*c = planned
+	return created, nil
+}
+
+// sendsP2URLs reports whether an update sends p2Urls. Only such an update
+// plans the P2 members [I]: one that leaves p2Urls out, a description
+// change say, keeps the members it stored, even where p2Urls stored
+// through the YAML configuration name a site no member serves.
+func sendsP2URLs(patch map[string]json.RawMessage) bool {
+	_, ok := patch["p2Urls"]
+	return ok
 }
 
 // UpdateMultipleRepositories applies UpdateRepositoryConfiguration's merge
@@ -846,6 +922,7 @@ func (s ArtifactoryAPI) UpdateMultipleRepositories(
 	}
 	before := make([]repo.Config, 0, len(patches))
 	updated := make([]repo.Config, 0, len(patches))
+	var created []repo.Config
 	for i, patch := range patches {
 		var key string
 		if raw, ok := patch["key"]; ok {
@@ -865,13 +942,19 @@ func (s ArtifactoryAPI) UpdateMultipleRepositories(
 		if err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
-		if err := s.checkReferences(ctx, st, &c); err != nil {
+		made, err := s.checkReferences(ctx, st, &c, sendsP2URLs(patch), created)
+		if err != nil {
 			return nil, err
 		}
+		created = append(created, made...)
 		before = append(before, stored)
 		updated = append(updated, c)
 	}
-	if err := s.writeUpdates(ctx, st, before, updated); err != nil {
+	switch err := s.writeUpdates(ctx, st, created, before, updated); {
+	case errors.Is(err, errCreatedKeyTaken):
+		// The batch create's answer for a taken key.
+		return nil, apierror.New(http.StatusConflict, msgKeyExists)
+	case err != nil:
 		return nil, s.InternalError(ctx, "update repositories", err)
 	}
 	return artgen.UpdateMultipleRepositories200JSONResponse(

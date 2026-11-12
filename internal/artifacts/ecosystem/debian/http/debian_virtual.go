@@ -217,7 +217,7 @@ func (s DebianAPI) addDebianMemberIndexes(
 		// A row stays when the member's or the virtual repository's patterns
 		// reject its file: 7.x merges the members' indexes as they are and
 		// refuses only the file's GET (RTFACT-30830; RTFACT-30656 for a
-		// virtual RPM repository), which serveVirtualDebianPackage passes on
+		// virtual RPM repository), which serveVirtualDebianFile passes on
 		// to the next member. So the first member's row for a Filename is
 		// listed, with its own Size and SHA256, whatever the policy says.
 		for _, row := range rows {
@@ -240,9 +240,21 @@ func (s DebianAPI) addDebianMemberIndexes(
 	return nil
 }
 
-func (s DebianAPI) serveVirtualDebianPackage(
+// serveVirtualDebianFile serves a binary package, or a file under dists/
+// that the virtual repository c does not compose, from the first member, in
+// order, that may serve it and holds it; what names the file in the errors
+// the route logs. 7.x calculates a virtual repository's Release files,
+// Packages indexes and their by-hash copies (RTFACT-22893, RTFACT-31082,
+// RTFACT-29321), and a GET of another dists/ file reaches a member as a
+// package's does: a member's component Release (RTFACT-19086) and the
+// installer files of JFrog's workaround in RTFACT-30014 come through the
+// virtual repository. The members are asked in their configured order [I];
+// #1252 may change that order for every format. A member's Sources index is
+// read whole, so that it reaches only a caller who may read every file it
+// lists.
+func (s DebianAPI) serveVirtualDebianFile(
 	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
-	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
+	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access, what string,
 ) {
 	ctx := r.Context()
 	if len(req.Props) != 0 || r.URL.RawQuery != "" ||
@@ -251,7 +263,7 @@ func (s DebianAPI) serveVirtualDebianPackage(
 		return
 	}
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian virtual package download", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian virtual "+what+" download", err))
 		return
 	}
 	for _, key := range c.Repositories {
@@ -276,8 +288,14 @@ func (s DebianAPI) serveVirtualDebianPackage(
 			generic.CheckDownload(member, req.Path, false) != nil {
 			continue
 		}
+		if debian.SourcesIndexPath(req.Path) {
+			if s.serveVirtualDebianSources(w, r, st, c, member, req, p, acc) {
+				return
+			}
+			continue
+		}
 		if member.Class == repo.Remote {
-			if s.serveRemoteVirtualDebianPackage(w, r, member, req, p, acc) {
+			if s.serveRemoteVirtualDebianFile(w, r, member, req, p, acc, what) {
 				return
 			}
 			continue
@@ -287,7 +305,7 @@ func (s DebianAPI) serveVirtualDebianPackage(
 			continue
 		}
 		if err != nil {
-			httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian virtual package", err))
+			httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian virtual "+what, err))
 			return
 		}
 		if !it.Folder {
@@ -298,12 +316,55 @@ func (s DebianAPI) serveVirtualDebianPackage(
 	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 }
 
-// serveRemoteVirtualDebianPackage returns false only when a member lacks the
+// serveVirtualDebianSources answers member's Sources index through the
+// virtual repository c, as it is, and reports whether it answered: false,
+// for the next member, when the member lacks the index or refuses it. 7.x
+// composes no Sources index for a virtual repository: the JFrog guide
+// resolves source packages from local and remote repositories only, and in
+// RTFACT-7415, filed against a 3.x virtual repository, JFrog support said
+// Artifactory treats a Sources file as a regular file. So the index comes
+// from the member as any other dists/ file does [I]. As the member's own
+// index read does (serveDebianIndex), it reaches only a caller who may read
+// every file it lists, here in the member and in c, through which a client
+// would fetch those files. A caller who may not is refused, not passed to
+// the next member, since this member holds the index the walk selected.
+func (s DebianAPI) serveVirtualDebianSources(
+	w http.ResponseWriter, r *http.Request, st itemkit.Store, c, member repo.Config,
+	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
+) bool {
+	ctx := r.Context()
+	body, checkPermission, err := s.debianMemberBytes(ctx, st, member, req.Path, p, acc)
+	if errors.Is(err, kernel.ErrNotFound) || errors.Is(err, source.ErrDenied) {
+		return false
+	}
+	if err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian virtual index", err))
+		return true
+	}
+	if len(body) > debianIndexLimit {
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "Debian virtual index", errDebianIndexTooLarge))
+		return true
+	}
+	paths, err := debianIndexPaths(req.Path, body)
+	if err != nil {
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "Debian virtual index", err))
+		return true
+	}
+	if err := s.debianIndexReadable(ctx, paths, checkPermission, p, acc, member, c); err != nil {
+		httpkit.WriteErr(w, r, err)
+		return true
+	}
+	writeDebianIndex(w, r, req.Path, body, nil)
+	return true
+}
+
+// serveRemoteVirtualDebianFile returns false only when a member lacks the
 // path, allowing ordered fallback. Integrity, permissions and upstream faults
 // are terminal so the virtual path never disguises a failed selected member.
-func (s DebianAPI) serveRemoteVirtualDebianPackage(
+// what names the file in the errors the route logs.
+func (s DebianAPI) serveRemoteVirtualDebianFile(
 	w http.ResponseWriter, r *http.Request, member repo.Config, req itemkit.ItemRequest,
-	p kernel.Principal, acc itemkit.Access,
+	p kernel.Principal, acc itemkit.Access, what string,
 ) bool {
 	// The missing service is this server's fault, not the upstream's, so it
 	// answers 500 as the index read does rather than SourceError's 502.
@@ -317,8 +378,20 @@ func (s DebianAPI) serveRemoteVirtualDebianPackage(
 		Project: member.ProjectKey, Resource: itemkit.RemoteResource(r, req.Path),
 	}
 	q, err := itemkit.DebianSourceRequest(q)
+	if errors.Is(err, kernel.ErrNotFound) && strings.HasPrefix(req.Path, "dists/") {
+		// Under dists/ the request admits only the Release files and the
+		// indexes it can validate, so the member answers its own GET of an
+		// installer's Packages index or a translation's by-hash copy not
+		// found. It lacks the file, and the walk asks the next member, as
+		// 7.x passes over a member that does not serve a path (decision
+		// 0032, R5); otherwise a remote member listed first would hide the
+		// installer files a later local member holds (RTFACT-30014). A
+		// package path the request refuses keeps its answer from before
+		// #1254.
+		return false
+	}
 	if err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian virtual package", err))
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian virtual "+what, err))
 		return true
 	}
 	result, err := s.RemoteSources.Read(r.Context(), q)

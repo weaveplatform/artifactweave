@@ -59,10 +59,23 @@ archive paths. Larger discovery fails explicitly rather than returning a partial
 
 ## Authorization and delivery
 
-Versions disclose only readable actual archive paths, such as
+Versions disclose only versions whose archive the caller may read at
 `namespace/name/system/1.0.0.tar.gz`. Permission checks run again immediately before
 metadata or bytes leave the server. Archive URLs remain under the public artifactweave
 base; the upstream `X-Terraform-Get` value never becomes a client redirect.
+
+An archive is cached, and checked against the include and exclude patterns and Read
+permission, where Artifactory 7.x keeps it (#1260). A GitHub source is fetched as a
+tag and cached at the VCS tag path,
+`<owner>/<repo>/tags/<ref>/<repo>-<ref>.tar.gz`, following the trace in RTFACT-30340
+and the `vcs-default` layout. An HTTP archive whose URL is below the repository's
+`url` is cached at the rest of its URL path, and any other at `external/<host>/<path>`,
+the rule provider files follow. A version's `/download` and the version list are
+checked at `.terraform/modules/<namespace>/<name>/<system>/...`, so an include list
+needs `.terraform/**` as well (RTFACT-30802). Archives cached before #1260 at
+`namespace/name/system/<version>.<ext>` are not moved: the next download fetches the
+archive again under its new path, and the `<key>-cache` storage listing then shows
+that path.
 
 A signed URL lasts 90 seconds and binds the repository, path, archive SHA-256, source
 identity and original credential reference. Access-token identity, scope, expiry and
