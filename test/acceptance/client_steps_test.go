@@ -40,10 +40,11 @@ import (
 // removed afterwards.
 
 // clientImages maps each containerised client to the variable naming its
-// image. "npm" is the primary Node image's bundled client, "Maven" the primary Maven image
-// and ".NET" the SDK's LTS line; "npm 12", "Maven 3.9" and ".NET 11" are the
-// second runs, which a Scenario Outline selects by name. "Python" holds pip,
-// twine, uv and poetry.
+// image. "npm" is the primary Node image's bundled client, "Maven" the
+// primary Maven image and ".NET" the SDK's newest line; "npm 12", "Maven 3.9"
+// and ".NET 10" are the held lines' second runs, which a Scenario Outline
+// selects by name. A label names a version only where its image is held on
+// one line (#1241). "Python" holds pip, twine, uv and poetry.
 var clientImages = map[string]string{
 	"Puppet":     "ARTIFACTWEAVE_PUPPET_IMAGE",
 	"FrogML":     "ARTIFACTWEAVE_FROGML_IMAGE",
@@ -76,7 +77,7 @@ var clientImages = map[string]string{
 	"R":          "ARTIFACTWEAVE_R_IMAGE",
 	"Ansible":    "ARTIFACTWEAVE_ANSIBLE_IMAGE",
 	".NET":       "ARTIFACTWEAVE_DOTNET_IMAGE",
-	".NET 11":    "ARTIFACTWEAVE_DOTNET11_IMAGE",
+	".NET 10":    "ARTIFACTWEAVE_DOTNET10_IMAGE",
 }
 
 // clientBinaries maps each client the job installs as a pinned binary
@@ -92,7 +93,7 @@ const imageWait = 10 * time.Minute
 
 func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Git LFS|Opkg|P2|Chef|Puppet|Nix|Dart|CocoaPods|Vagrant|JetBrains|Conda|VS Code|R|Ansible|FrogML|\.NET|\.NET 11) client can reach the registry$`,
+		`^the (npm|npm 12|Maven|Maven 3\.9|Python|LuaRocks|Bower|Composer|Composer 1|Ruby|Hex|Alpine|Cargo|Debian|Fedora|Git LFS|Opkg|P2|Chef|Puppet|Nix|Dart|CocoaPods|Vagrant|JetBrains|Conda|VS Code|R|Ansible|FrogML|\.NET|\.NET 10) client can reach the registry$`,
 		w.clientReachable,
 	)
 	sc.Step(`^(helm|terraform) is available$`, w.binaryAvailable)
@@ -456,25 +457,26 @@ func (w *world) runJFPython(args string) error {
 // adds its own. Telemetry, the first-run banner, the workload update check
 // and the HTTPS development certificate are off: each would reach the
 // network or write outside the scenario.
+//
+// --init puts Docker's init, not dotnet, at PID 1. The NativeAOT dotnet
+// host, the default since .NET 11, prints a NuGet command's result and then
+// never exits when it is the container's PID 1 and HOME has no ~/.dotnet
+// first-use files, as in every new scenario. SDK 11.0.100 did so for nuget
+// push, sign and verify and package search, and exited at once under an
+// init, with a seeded HOME or with DOTNET_CLI_ENABLEAOT=false (#1241). An
+// init keeps the SDK's default host under test, where the
+// DOTNET_CLI_ENABLEAOT=false fallback the RC2 image used would swap it for
+// the managed one, and it holds for any command a scenario adds.
 func (w *world) runDotnet(args string) error {
-	argv := w.clientArgs(args)
-	flags := []string{
+	return w.runContainer(w.dotnetImage, []string{
+		"--init",
 		"--entrypoint", "dotnet",
 		"-e", "DOTNET_CLI_TELEMETRY_OPTOUT=1",
 		"-e", "DOTNET_NOLOGO=1",
 		"-e", "DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=1",
 		"-e", "DOTNET_GENERATE_ASPNET_CERTIFICATE=false",
 		"-e", "NUGET_XMLDOC_MODE=skip",
-	}
-	if len(argv) >= 2 && ((argv[0] == "package" && argv[1] == "search") ||
-		(argv[0] == "nuget" && argv[1] == "push")) {
-		// The pinned .NET 11 RC2 NativeAOT CLI prints successful search/push
-		// results but hangs on exit (push reproduced on ARM64). Its managed
-		// fallback preserves the real client request and exit-status assertion:
-		// https://github.com/dotnet/core/blob/main/release-notes/11.0/preview/preview7/sdk.md
-		flags = append(flags, "-e", "DOTNET_CLI_ENABLEAOT=false")
-	}
-	return w.runContainer(w.dotnetImage, flags, argv)
+	}, w.clientArgs(args))
 }
 
 // runHelm runs the pinned helm in the scenario's files, with its

@@ -57,7 +57,7 @@ Feature: NuGet snapshot retention and JFrog build records
     Examples:
       | dotnet  |
       | .NET    |
-      | .NET 11 |
+      | .NET 10 |
 
   @jf
   Scenario Outline: <dotnet> publishes and restores with JFrog native build-info
@@ -146,4 +146,4 @@ Feature: NuGet snapshot retention and JFrog build records
     Examples:
       | dotnet  |
       | .NET    |
-      | .NET 11 |
+      | .NET 10 |

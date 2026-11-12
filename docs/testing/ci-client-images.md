@@ -22,7 +22,7 @@ original tested versions.
 | [`dart.Dockerfile`](../../test/acceptance/clients/dart.Dockerfile) | `dart:3.13.7@sha256:854f3c50b1cbd4a5a54c9fa67d4f5b6702ac49b4a26d21a80e7712a72528b215` | Dart/pub 3.13.7 | [Dart archive](https://dart.dev/get-dart/archive) |
 | [`debian.Dockerfile`](../../test/acceptance/clients/debian.Dockerfile) | `ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2` | APT bundled with Ubuntu 26.10 (immutable image) | [Ubuntu releases](https://ubuntu.com/project/docs/release-team/list-of-releases/) |
 | [`dotnet-10/Dockerfile`](../../test/acceptance/clients/dotnet-10/Dockerfile) | `mcr.microsoft.com/dotnet/sdk:10.0@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb` | NuGet bundled with the .NET SDK 10.0 image | [.NET downloads](https://dotnet.microsoft.com/en-us/download) |
-| [`dotnet-11.Dockerfile`](../../test/acceptance/clients/dotnet-11.Dockerfile) | `mcr.microsoft.com/dotnet/sdk:11.0@sha256:65f3c7c6a25a239ab3e6719f2896147e7b68242ff2d8818dd70498bde6ef8bea` | NuGet bundled with the .NET SDK 11.0 image | [.NET downloads](https://dotnet.microsoft.com/en-us/download) |
+| [`dotnet.Dockerfile`](../../test/acceptance/clients/dotnet.Dockerfile) | `mcr.microsoft.com/dotnet/sdk:11.0@sha256:65f3c7c6a25a239ab3e6719f2896147e7b68242ff2d8818dd70498bde6ef8bea` | NuGet bundled with the .NET SDK 11.0 image | [.NET downloads](https://dotnet.microsoft.com/en-us/download) |
 | [`fedora.Dockerfile`](../../test/acceptance/clients/fedora.Dockerfile) | `fedora:45@sha256:a7d72ba2745b100a3351087472e5ee7b2450af7cf331e7673007e3817612839c` | DNF and RPM bundled with Fedora 45 (immutable image) | [Fedora downloads](https://fedoraproject.org/workstation/download/) |
 | [`frogml/Dockerfile`](../../test/acceptance/clients/frogml/Dockerfile) | `python:3.13.18-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90` | FrogML 3.0.0; Python 3.13.18 | [FrogML release and wheel](https://pypi.org/project/frogml/3.0.0/#files), [Python releases](https://www.python.org/downloads/) |
 | [`git-lfs.Dockerfile`](../../test/acceptance/clients/git-lfs.Dockerfile) | `ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2` | Git LFS 3.8.1 | [Git LFS 3.8.1](https://github.com/git-lfs/git-lfs/releases/tag/v3.8.1) |
@@ -51,7 +51,7 @@ because the pinned Puppet cannot extract a module archive on Ruby 3.4
 npm 12 image stays on Node 24 LTS the same way: it keeps the prior Node line
 beside the newest Node ([decision 0034](../research/decisions/0034-npm.md)).
 The `dotnet-10` image stays on the .NET SDK's 10.0 LTS line the same way,
-beside the newest line in `dotnet-11.Dockerfile`
+beside the newest line in `dotnet.Dockerfile`
 ([#1229](https://github.com/weaveplatform/artifactweave/issues/1229)).
 
 The Hex image is the one that Dependabot does not move. `hexpm/elixir` holds a

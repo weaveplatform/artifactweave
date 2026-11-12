@@ -64,5 +64,5 @@ Feature: NuGet clients restore from a NuGet repository
       | dotnet  | source                              |
       | .NET    | api/nuget/v3/nuget-local/index.json   |
       | .NET    | nuget-discovery/index.json           |
-      | .NET 11 | api/nuget/v3/nuget-local/index.json   |
-      | .NET 11 | nuget-discovery/index.json           |
+      | .NET 10 | api/nuget/v3/nuget-local/index.json   |
+      | .NET 10 | nuget-discovery/index.json           |

@@ -43,4 +43,4 @@ Feature: Remote symbol reads preserve native PDB identities and bytes
     Examples:
       | dotnet  |
       | .NET    |
-      | .NET 11 |
+      | .NET 10 |

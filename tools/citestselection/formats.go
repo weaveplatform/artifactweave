@@ -105,7 +105,7 @@ var formats = map[string]formatImpact{
 	"nuget": {
 		"./internal/artifacts/ecosystem/nuget/...",
 		"@nuget&&~@gradle",
-		[]string{"dotnet", "dotnet11", "jf"},
+		[]string{"dotnet", "dotnet10", "jf"},
 	},
 	"pypi": {
 		"./internal/artifacts/ecosystem/pypi/...",
