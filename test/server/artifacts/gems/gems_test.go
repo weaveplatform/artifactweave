@@ -2,15 +2,19 @@ package gems_test
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/md5" //nolint:gosec // The compact index uses MD5 as an info cache validator.
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -591,9 +595,16 @@ func TestAccVirtualRejectsWrongPackageTypeMember(t *testing.T) {
 	if err := w.db.Repos().Update(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	got := w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/versions", "admin", nil)
-	if got.Code < 400 {
-		t.Fatalf("wrong-type virtual member accepted: %d %s", got.Code, got.Body)
+	for _, path := range []string{"versions", "gems/rake-12.3.1.gem"} {
+		got := w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/"+path, "admin", nil)
+		if got.Code < 400 {
+			t.Fatalf(
+				"wrong-type virtual member accepted through %s: %d %s",
+				path,
+				got.Code,
+				got.Body,
+			)
+		}
 	}
 }
 
@@ -994,4 +1005,300 @@ func TestAccRubyClientsInstallPinnedRake(t *testing.T) {
 	if infoRequests.Load() == 0 {
 		t.Fatal("Bundler did not consume the compact info route")
 	}
+}
+
+// setPolicy sets key's blackout and include and exclude patterns; an empty
+// include is the default, every path.
+func (w *world) setPolicy(key string, blackedOut bool, include, exclude string) {
+	w.t.Helper()
+	c, err := w.db.Repos().Get(w.t.Context(), key)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	if include == "" {
+		include = "**/*"
+	}
+	c.BlackedOut, c.IncludesPattern, c.ExcludesPattern = &blackedOut, &include, &exclude
+	if err := w.db.Repos().Update(w.t.Context(), c); err != nil {
+		w.t.Fatal(err)
+	}
+}
+
+// wantError fails unless rec answered code with message in Artifactory's
+// envelope.
+func wantError(t *testing.T, rec *httptest.ResponseRecorder, code int, message string) {
+	t.Helper()
+	var body struct {
+		Errors []struct {
+			Status  int    `json:"status"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if rec.Code != code || json.Unmarshal(rec.Body.Bytes(), &body) != nil ||
+		len(body.Errors) != 1 || body.Errors[0].Status != code ||
+		body.Errors[0].Message != message {
+		t.Fatalf("%d %s, want %d %q", rec.Code, rec.Body, code, message)
+	}
+}
+
+// blackedOut and rejected are the download policy's refusals of path in
+// key.
+func blackedOut(key, path string) string {
+	return "The repository '" + key + "' is blacked out and cannot serve artifact '" + key + ":" +
+		path + "'."
+}
+
+func rejected(key, path string) string {
+	return "The repository '" + key + "' rejected the artifact '" + key + ":" + path +
+		"' due to its include/exclude pattern settings."
+}
+
+// lists reports whether rec, a 200 index answer, lists rake 12.3.1, by its
+// name or, where the answer is rake's own, its version; a spec index file
+// is read through its gzip.
+func lists(t *testing.T, rec *httptest.ResponseRecorder) bool {
+	t.Helper()
+	status(t, rec, http.StatusOK)
+	body := rec.Body.Bytes()
+	if zr, err := gzip.NewReader(bytes.NewReader(body)); err == nil {
+		if body, err = io.ReadAll(zr); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return bytes.Contains(body, []byte("rake")) || bytes.Contains(body, []byte("12.3.1"))
+}
+
+var (
+	// specDocuments are the spec index files and quick gemspec 7.x stores
+	// and reads through its download path (RTFACT-27283).
+	specDocuments = []string{
+		"specs.4.8.gz", "latest_specs.4.8.gz", "prerelease_specs.4.8.gz",
+		"quick/Marshal.4.8/rake-12.3.1.gemspec.rz",
+	}
+	compactIndex = []string{"names", "versions", "info/rake"}
+	jsonAPI      = []string{
+		"api/v1/gems/rake.json", "api/v1/versions/rake", "api/v1/search.json?query=rake",
+	}
+)
+
+// A blacked-out local repository refuses its spec index files and quick
+// gemspecs, at their own paths, and its compact index [I], naming the
+// request's path, after read permission (DV-057). A pattern on a spec index
+// file's or gemspec's own path refuses it, and none refuses the compact
+// index [I]. The JSON API and search keep their answers, as 6.20's
+// searchers do not check the blackout (decision 0032) [I]. A pattern on the
+// gem leaves it listed and refuses only the gem (RTFACT-25571).
+func TestAccLocalIndexPolicy(t *testing.T) {
+	w := newWorld(t)
+	if err := w.db.Users().
+		Create(t.Context(), accesstest.User{Name: "nobody", PasswordHash: support.CheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	status(t, w.do(http.MethodPut, "/artifactory/gems-local/gems/rake-12.3.1.gem", "admin", w.gem),
+		http.StatusCreated)
+	const base = "/artifactory/api/gems/gems-local/"
+
+	w.setPolicy("gems-local", true, "", "")
+	for _, p := range append(slices.Clone(specDocuments), compactIndex...) {
+		for _, user := range []string{"reader", "admin"} {
+			wantError(t, w.do(http.MethodGet, base+p, user, nil), http.StatusNotFound,
+				blackedOut("gems-local", p))
+		}
+		wantError(t, w.do(http.MethodGet, base+p, "nobody", nil), http.StatusForbidden, "Forbidden")
+	}
+	rec := w.do(http.MethodHead, base+"versions", "reader", nil)
+	status(t, rec, http.StatusNotFound)
+	if rec.Header().Get("ETag") != "" || rec.Header().Get("Repr-Digest") != "" {
+		t.Errorf("a refusal sends the index's validators: %v", rec.Header())
+	}
+	for _, p := range jsonAPI {
+		if !lists(t, w.do(http.MethodGet, base+p, "reader", nil)) {
+			t.Errorf("%s does not list rake", p)
+		}
+	}
+
+	w.setPolicy("gems-local", false, "gems/**", "")
+	for _, p := range specDocuments {
+		wantError(t, w.do(http.MethodGet, base+p, "reader", nil), http.StatusNotFound,
+			rejected("gems-local", p))
+	}
+	for _, p := range append(slices.Clone(compactIndex), jsonAPI...) {
+		if !lists(t, w.do(http.MethodGet, base+p, "reader", nil)) {
+			t.Errorf("include gems/**: %s does not list rake", p)
+		}
+	}
+	w.setPolicy("gems-local", false, "", "**/specs.4.8.gz")
+	wantError(t, w.do(http.MethodGet, base+"specs.4.8.gz", "reader", nil), http.StatusNotFound,
+		rejected("gems-local", "specs.4.8.gz"))
+	if !lists(t, w.do(http.MethodGet, base+"latest_specs.4.8.gz", "reader", nil)) {
+		t.Error("latest_specs.4.8.gz does not list rake")
+	}
+
+	w.setPolicy("gems-local", false, "", "gems/rake-12.3.1.gem")
+	for _, p := range []string{"specs.4.8.gz", "info/rake", "api/v1/versions/rake"} {
+		if !lists(t, w.do(http.MethodGet, base+p, "reader", nil)) {
+			t.Errorf("exclude the gem: %s does not list rake", p)
+		}
+	}
+	status(t, w.do(http.MethodGet, base+"quick/Marshal.4.8/rake-12.3.1.gemspec.rz", "reader", nil),
+		http.StatusOK)
+	wantError(t, w.do(http.MethodGet, base+"gems/rake-12.3.1.gem", "reader", nil),
+		http.StatusNotFound, rejected("gems-local", "gems/rake-12.3.1.gem"))
+}
+
+// A virtual repository's indexes leave out a blacked-out member, which 7.x
+// ignores when it resolves, and, for a spec index file or gemspec, a member
+// whose patterns reject that path [I] (RTFACT-17256 shows it for PyPI). Its
+// own patterns refuse a spec index file or gemspec [I]. A pattern on one
+// gem's file, the member's or its own, leaves the gem listed
+// (RTFACT-25571).
+func TestAccVirtualIndexPolicy(t *testing.T) {
+	w := newWorld(t)
+	status(t, w.do(http.MethodPut, "/artifactory/gems-local/gems/rake-12.3.1.gem", "admin", w.gem),
+		http.StatusCreated)
+	const base = "/artifactory/api/gems/gems-virtual/"
+	listed := func(want bool, paths ...string) {
+		t.Helper()
+		for _, p := range paths {
+			if got := lists(t, w.do(http.MethodGet, base+p, "reader", nil)); got != want {
+				t.Errorf("%s lists rake: %v, want %v", p, got, want)
+			}
+		}
+	}
+	indexes := []string{
+		"specs.4.8.gz", "latest_specs.4.8.gz", "names", "versions", "info/rake",
+		"api/v1/search.json?query=rake",
+	}
+	listed(true, indexes...)
+
+	w.setPolicy("gems-local", true, "", "")
+	listed(false, indexes...)
+	for _, p := range []string{
+		"quick/Marshal.4.8/rake-12.3.1.gemspec.rz", "api/v1/gems/rake.json", "api/v1/versions/rake",
+	} {
+		wantError(t, w.do(http.MethodGet, base+p, "reader", nil), http.StatusNotFound,
+			"Could not find resource")
+	}
+
+	w.setPolicy("gems-local", false, "gems/**", "")
+	listed(false, "specs.4.8.gz", "latest_specs.4.8.gz")
+	listed(true, "versions", "info/rake", "api/v1/search.json?query=rake")
+	w.setPolicy("gems-local", false, "", "gems/rake-12.3.1.gem")
+	listed(true, indexes...)
+	w.setPolicy("gems-local", false, "", "")
+
+	w.setPolicy("gems-virtual", false, "", "**/specs.4.8.gz")
+	wantError(t, w.do(http.MethodGet, base+"specs.4.8.gz", "reader", nil), http.StatusNotFound,
+		"No repository found to serve the request for gems-virtual:specs.4.8.gz")
+	listed(true, "latest_specs.4.8.gz", "versions")
+	w.setPolicy("gems-virtual", false, "", "gems/**")
+	listed(true, indexes...)
+	wantError(t, w.do(http.MethodGet, base+"gems/rake-12.3.1.gem", "reader", nil),
+		http.StatusNotFound,
+		"No repository found to serve the request for gems-virtual:gems/rake-12.3.1.gem")
+}
+
+// A virtual gem download passes over a member that is blacked out or whose
+// patterns reject the gem, and serves it from the next member that holds
+// it; when none does, it answers its own 404, which names no member's
+// setting (decision 0032, from 6.20's VirtualRepoDownloadStrategy).
+func TestAccVirtualGemPassesOverRefusingMember(t *testing.T) {
+	w := newWorld(t)
+	for _, key := range []string{"gems-local", "gems-fed"} {
+		status(t, w.do(http.MethodPut, "/artifactory/"+key+"/gems/rake-12.3.1.gem", "admin", w.gem),
+			http.StatusCreated)
+	}
+	const path = "/artifactory/api/gems/gems-virtual/gems/rake-12.3.1.gem"
+	for _, c := range []struct {
+		blackedOut bool
+		exclude    string
+	}{{true, ""}, {false, "gems/rake-12.3.1.gem"}} {
+		w.setPolicy("gems-local", c.blackedOut, "", c.exclude)
+		rec := w.do(http.MethodGet, path, "reader", nil)
+		status(t, rec, http.StatusOK)
+		if !bytes.Equal(rec.Body.Bytes(), w.gem) {
+			t.Fatal("gem bytes changed")
+		}
+		w.setPolicy("gems-fed", c.blackedOut, "", c.exclude)
+		wantError(t, w.do(http.MethodGet, path, "reader", nil), http.StatusNotFound,
+			"Could not find resource")
+		w.setPolicy("gems-local", false, "", "")
+		w.setPolicy("gems-fed", false, "", "")
+	}
+	// A member that no longer exists is passed over too.
+	c, err := w.db.Repos().Get(t.Context(), "gems-virtual")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Repositories = []string{"removed-member", "gems-fed"}
+	if err := w.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	status(t, w.do(http.MethodGet, path, "reader", nil), http.StatusOK)
+}
+
+// A virtual repository leaves out a blacked-out remote member, as it does a
+// local one, rather than failing every answer, and passes over a remote
+// member that refuses the gem. The remote repository's own answers keep
+// theirs, the blackout naming its root (#216).
+func TestAccVirtualRemoteMemberPolicy(t *testing.T) {
+	up := fakeupstream.New(t, fakeupstream.Options{})
+	w := newRemoteWorld(t, up)
+	p, err := gemfmt.Read(
+		t.Context(),
+		bytes.NewReader(w.gem),
+		int64(len(w.gem)),
+		"gems/rake-12.3.1.gem",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	packages := []gemfmt.Package{p}
+	up.Set("/versions", fakeupstream.Resource{Body: gemfmt.CompactVersions(packages)})
+	up.Set("/info/rake", fakeupstream.Resource{Body: gemfmt.CompactInfo("rake", packages)})
+	up.Set("/gems/rake-12.3.1.gem", fakeupstream.Resource{Body: w.gem})
+	const (
+		virtual = "/artifactory/api/gems/gems-remote-virtual/"
+		remote  = "/artifactory/api/gems/gems-remote/"
+	)
+
+	w.setPolicy("gems-remote", true, "", "")
+	for _, p := range []string{"specs.4.8.gz", "versions", "api/v1/search.json?query=rake"} {
+		if lists(t, w.do(http.MethodGet, virtual+p, "admin", nil)) {
+			t.Errorf("%s lists the blacked-out member's rake", p)
+		}
+	}
+	wantError(t, w.do(http.MethodGet, virtual+"gems/rake-12.3.1.gem", "admin", nil),
+		http.StatusNotFound, "Could not find resource")
+	wantError(t, w.do(http.MethodGet, remote+"versions", "admin", nil), http.StatusNotFound,
+		blackedOut("gems-remote", ""))
+
+	w.setPolicy("gems-remote", false, "", "gems/rake-12.3.1.gem")
+	if !lists(t, w.do(http.MethodGet, virtual+"versions", "admin", nil)) {
+		t.Error("a member's pattern on the gem drops it from versions")
+	}
+	wantError(t, w.do(http.MethodGet, virtual+"gems/rake-12.3.1.gem", "admin", nil),
+		http.StatusNotFound, "Could not find resource")
+	wantError(t, w.do(http.MethodGet, remote+"gems/rake-12.3.1.gem", "admin", nil),
+		http.StatusNotFound, rejected("gems-remote", "gems/rake-12.3.1.gem"))
+
+	// [I] The remote's own spec index files are not checked at their paths
+	// until a capture shows where 7.x caches them (#216).
+	w.setPolicy("gems-remote", false, "", "**/specs.4.8.gz")
+	if lists(t, w.do(http.MethodGet, virtual+"specs.4.8.gz", "admin", nil)) {
+		t.Error("the virtual's specs.4.8.gz lists a member that rejects that path")
+	}
+	if !lists(t, w.do(http.MethodGet, remote+"specs.4.8.gz", "admin", nil)) {
+		t.Error("the remote's own specs.4.8.gz changed")
+	}
+
+	// A member that fails to serve the gem it lists fails the download, as
+	// before: only a member without the gem, or one that refuses it, is
+	// passed over.
+	w.setPolicy("gems-remote", false, "", "")
+	broken := bytes.Clone(w.gem)
+	broken[len(broken)/2] ^= 1
+	up.Set("/gems/rake-12.3.1.gem", fakeupstream.Resource{Body: broken})
+	status(t, w.do(http.MethodGet, virtual+"gems/rake-12.3.1.gem", "admin", nil),
+		http.StatusBadGateway)
 }

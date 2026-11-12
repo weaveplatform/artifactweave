@@ -248,7 +248,10 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
 		entries, err = h.remoteEntries(r)
 	} else {
-		entries, err = h.collect(r)
+		var members []*http.Request
+		if members, err = h.sources(r, path); err == nil {
+			entries, err = h.collect(r, members)
+		}
 	}
 	if err != nil {
 		h.fail(w, r, pkgroute.SourceError(err, false))
@@ -292,21 +295,62 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 }
 
 func metadataPath(path string) bool {
-	if path == "names" || path == "versions" || path == "specs.4.8.gz" ||
-		path == "latest_specs.4.8.gz" ||
-		path == "prerelease_specs.4.8.gz" {
-		return true
-	}
-	if strings.HasPrefix(path, "info/") && strings.Count(path, "/") == 1 {
-		return true
-	}
-	if strings.HasPrefix(path, "quick/Marshal.4.8/") && strings.Count(path, "/") == 2 &&
-		strings.HasSuffix(path, ".gemspec.rz") {
-		return true
-	}
-	return strings.HasPrefix(path, "api/v1/gems/") && strings.HasSuffix(path, ".json") ||
+	return specIndex(path) || compactIndex(path) ||
+		strings.HasPrefix(path, "api/v1/gems/") && strings.HasSuffix(path, ".json") ||
 		strings.HasPrefix(path, "api/v1/versions/") ||
 		path == "api/v1/search.json"
+}
+
+// specIndex reports the spec index files and quick gemspecs, which 7.x
+// stores in the repository and reindex re-creates (JFrog's RubyGems docs).
+func specIndex(path string) bool {
+	return path == "specs.4.8.gz" || path == "latest_specs.4.8.gz" ||
+		path == "prerelease_specs.4.8.gz" ||
+		strings.HasPrefix(path, "quick/Marshal.4.8/") && strings.Count(path, "/") == 2 &&
+			strings.HasSuffix(path, ".gemspec.rz")
+}
+
+// compactIndex reports Bundler's compact index.
+func compactIndex(path string) bool {
+	return path == "names" || path == "versions" ||
+		strings.HasPrefix(path, "info/") && strings.Count(path, "/") == 1
+}
+
+// sources applies the download policy to the index at path before any gem
+// is read, and returns the member requests a virtual repository builds it
+// from, in order; the request's own repository needs none.
+//   - A spec index file or quick gemspec is a file 7.x reads through its
+//     download path (RTFACT-27283), so the blackout and a pattern on path,
+//     a virtual repository's own included, refuse it, and a virtual
+//     repository leaves out a member that would.
+//   - The compact index is resolution metadata whose 7.x storage path is
+//     not documented, so the blackout alone refuses it, naming the
+//     request's path [I] (#216).
+//   - The JSON API and search keep a blacked-out repository's answers, as
+//     6.20's searchers do not check the blackout (decision 0032) [I].
+//
+// Every virtual merge leaves out a blacked-out member, local or remote,
+// which 7.x ignores when it resolves. A pattern on one gem's file leaves
+// the gem listed (RTFACT-25571).
+func (h handler) sources(r *http.Request, path string) ([]*http.Request, error) {
+	virtual := pkgroute.RequestFrom(r).Repo.Class == repo.Virtual
+	if virtual {
+		if err := cycle(pkgroute.RequestFrom(r).Repo); err != nil {
+			return nil, err
+		}
+	}
+	document := ""
+	switch {
+	case specIndex(path):
+		document = path
+	case compactIndex(path):
+		if err := h.k.CheckBlackedOut(r, path); err != nil {
+			return nil, err //nolint:wrapcheck // the kit's own answer
+		}
+	case !virtual:
+		return nil, nil
+	}
+	return h.k.MergeMembers(r, document) //nolint:wrapcheck // the kit's own answer
 }
 
 func serveMetadata(w http.ResponseWriter, r *http.Request, path, media string, b []byte) {
@@ -442,15 +486,25 @@ func (h handler) local(r *http.Request) ([]entry, error) {
 	return out, nil
 }
 
-func (h handler) members(r *http.Request) ([]*http.Request, error) {
-	c := pkgroute.RequestFrom(r).Repo
+// cycle refuses a virtual repository that lists itself or a member twice.
+func cycle(c repo.Config) error {
 	seen := map[string]bool{c.Key: true}
-	var out []*http.Request
 	for _, key := range c.Repositories {
 		if seen[key] {
-			return nil, bad("virtual RubyGems member cycle")
+			return bad("virtual RubyGems member cycle")
 		}
 		seen[key] = true
+	}
+	return nil
+}
+
+func (h handler) members(r *http.Request) ([]*http.Request, error) {
+	c := pkgroute.RequestFrom(r).Repo
+	if err := cycle(c); err != nil {
+		return nil, err
+	}
+	var out []*http.Request
+	for _, key := range c.Repositories {
 		member, err := h.k.DB().Repos().Get(r.Context(), key)
 		if errors.Is(err, kernel.ErrNotFound) {
 			continue
@@ -467,18 +521,17 @@ func (h handler) members(r *http.Request) ([]*http.Request, error) {
 	return out, nil
 }
 
-func (h handler) collect(r *http.Request) ([]entry, error) {
+// collect is the gems of the request's repository or, for a virtual
+// repository, of members in order, the first to list a path supplying it.
+func (h handler) collect(r *http.Request, members []*http.Request) ([]entry, error) {
 	if pkgroute.RequestFrom(r).Repo.Class != repo.Virtual {
 		return h.local(r)
-	}
-	members, err := h.members(r)
-	if err != nil {
-		return nil, err
 	}
 	selected := map[string]bool{}
 	var out []entry
 	for _, mr := range members {
 		var rows []entry
+		var err error
 		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
 			rows, err = h.remoteEntries(mr)
 		} else {
@@ -504,27 +557,66 @@ func (h handler) artifact(w http.ResponseWriter, r *http.Request, path string) {
 	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
-	q := pkgroute.RequestFrom(r)
-	if q.Repo.Class == repo.Virtual {
-		rows, err := h.collect(r)
-		if err != nil {
-			h.fail(w, r, pkgroute.SourceError(err, false))
-			return
+	switch pkgroute.RequestFrom(r).Repo.Class {
+	case repo.Virtual:
+		h.virtualArtifact(w, r, path)
+	case repo.Remote:
+		h.remoteArtifact(w, r, path)
+	default:
+		h.k.ServeItem(w, r, path)
+	}
+}
+
+// virtualArtifact serves path from the first member, in the virtual
+// repository's order, that holds the gem and serves it. A member that is
+// blacked out or whose patterns reject the gem is passed over for the
+// next, as 7.x resolves a virtual download (decision 0032, from 6.20's
+// VirtualRepoDownloadStrategy); the virtual repository's own patterns
+// refuse it before any member is tried.
+func (h handler) virtualArtifact(w http.ResponseWriter, r *http.Request, path string) {
+	if err := h.k.CheckDownload(r, path); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	members, err := h.members(r)
+	if err != nil {
+		h.fail(w, r, pkgroute.SourceError(err, false))
+		return
+	}
+	for _, mr := range members {
+		if !h.k.Can(mr, path, api.ActionRead) {
+			continue
 		}
-		for _, row := range rows {
-			if row.Path == path {
-				h.artifact(w, row.request, path)
+		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
+			result, err := h.remoteRead(mr, path)
+			if passedOver(err) {
+				continue
+			}
+			if err != nil {
+				h.fail(w, r, pkgroute.SourceError(err, false))
 				return
 			}
+			h.k.ServeResult(w, mr, result)
+			return
 		}
-		h.fail(w, r, missing())
+		f, err := h.k.DownloadItem(mr, path)
+		if passedOver(err) {
+			continue
+		}
+		if err != nil {
+			h.fail(w, r, err)
+			return
+		}
+		h.k.ServeFound(w, mr, f)
 		return
 	}
-	if q.Repo.Class == repo.Remote {
-		h.remoteArtifact(w, r, path)
-		return
-	}
-	h.k.ServeItem(w, r, path)
+	h.fail(w, r, missing())
+}
+
+// passedOver reports a member that does not hold the gem, or refuses it,
+// which a virtual repository passes over for its next member.
+func passedOver(err error) bool {
+	return errors.Is(err, kernel.ErrNotFound) && !pkgroute.IsRefusal(err)
 }
 
 func (h handler) remoteEntries(r *http.Request) ([]entry, error) {
@@ -681,12 +773,20 @@ func (h handler) remoteResult(r *http.Request, path string) (source.Result, erro
 }
 
 func (h handler) remoteArtifact(w http.ResponseWriter, r *http.Request, path string) {
+	result, err := h.remoteRead(r, path)
+	if err != nil {
+		h.fail(w, r, pkgroute.SourceError(err, false))
+		return
+	}
+	h.k.ServeResult(w, r, result)
+}
+
+func (h handler) remoteRead(r *http.Request, path string) (source.Result, error) {
 	// The compact index checksum binds the remote gem body to the metadata
 	// used for resolution. A missing version never authorizes a cold fetch.
 	p, err := h.remotePackage(r, path)
 	if err != nil {
-		h.fail(w, r, pkgroute.SourceError(err, false))
-		return
+		return source.Result{}, err
 	}
 	expected := p.SHA256
 	resource := pkgroute.Resource(r, path, "")
@@ -700,8 +800,7 @@ func (h handler) remoteArtifact(w http.ResponseWriter, r *http.Request, path str
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
-		h.fail(w, r, pkgroute.SourceError(err, false))
-		return
+		return source.Result{}, fmt.Errorf("gems: read remote gem: %w", err)
 	}
-	h.k.ServeResult(w, r, result)
+	return result, nil
 }

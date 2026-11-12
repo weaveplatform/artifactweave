@@ -63,9 +63,16 @@
 //     before it is cached or served.
 //   - A virtual repository lists, in order, the members the caller may
 //     traverse: P2 remotes, local Maven or Generic update sites, and
-//     acyclic nested P2 virtual repositories. A member's file is served
-//     under __p2/<n>/ by the kit's item GET, which checks the member's own
-//     permissions again.
+//     acyclic nested P2 virtual repositories, leaving out a blacked-out
+//     one. A member's file is served under __p2/<n>/ by the kit's item GET,
+//     which checks the member's own permissions again.
+//   - The download policy refuses after the read permission, with a 404
+//     and its message, as on the generic item route: a remote's blackout
+//     and patterns refuse its archive entries, a virtual repository's
+//     patterns refuse its own paths ("No repository found to serve the
+//     request"), and a member that refuses a file under __p2/<n>/ is
+//     passed over, so the virtual answers "Could not find resource".
+//     Patterns never refuse p2.index, as no path ending .index.
 //   - A folder, matrix parameters, a query, a path P2 does not class, or a
 //     P2 repository that is neither remote nor virtual answers 404.
 //   - The __p2_ext/ paths and the digest's input are the cache paths of
@@ -109,7 +116,8 @@
 //
 //   - p2_test.go: the kit's P2 source request on the published Eclipse
 //     GLSP files, the site.zip!/ suffix, and a virtual repository that
-//     fails closed when its member store fails.
+//     fails closed when its member store fails and leaves out a
+//     blacked-out member.
 //   - p2_external_helpers_test.go: child URLs and their origins, the child
 //     digest's inputs, resource paths within a site or an archive, the
 //     __p2_ext/ path parser, checksum pinning and archive suffix shapes.

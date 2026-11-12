@@ -51,9 +51,21 @@
 // # Invariants
 //
 //   - A version is listed, and latest resolved, only among the versions the
-//     caller may read and the repository's blackout and include and exclude
-//     patterns allow. A hosted version whose stored index entry or archive
+//     caller may read. A hosted version whose stored index entry or archive
 //     does not match fails with 502 rather than being advertised.
+//   - The download policy (#1251), after read permission: a blacked-out
+//     repository refuses the cookbook and version records before they are
+//     built, with the blackout's 404 naming the request's path, while its
+//     catalog and search keep their answers (empty, or a remote's blackout
+//     refusal); the patterns do not refuse them, and a version whose
+//     archive they reject stays listed, latest included. A download is
+//     refused at the archive's path, <name>/<name>-<version>.tar.gz, with
+//     the policy's 404 and message, a hosted or virtual repository's
+//     whether the named version exists or not. A remote's metadata reads
+//     check its blackout alone, and its archive read its patterns as well.
+//     A virtual repository leaves a blacked-out member out, and its own
+//     patterns refuse a download with "No repository found to serve the
+//     request".
 //   - A hosted or virtual catalog, and a cookbook's versions, hold at most
 //     4,096 entries (503 beyond); a remote accepts no more from its
 //     upstream.
@@ -66,7 +78,9 @@
 //     cache hit rechecks the source's authority and the caller's read
 //     permission.
 //   - A virtual repository resolves its members in order, the first member
-//     that holds a version supplying it.
+//     that holds a version supplying it; a download passes over a member
+//     whose own policy refuses the archive to the next one that holds the
+//     version.
 //   - Statuses and error texts stay byte-identical.
 //
 // # References
@@ -106,6 +120,9 @@
 //     publish and whole-cookbook delete, invalid requests, remote
 //     validation, authority, pagination and caching, virtual order and
 //     permission filtering, and broken stored indexes.
+//   - download_policy_test.go: the blackout and the patterns of local,
+//     virtual and remote repositories on every route, remotes read through
+//     the source boundary from a fake upstream Supermarket.
 //   - metadata_test.go: upstream version identity and URL boundaries,
 //     catalog bounds, version order and empty dependency objects.
 package chefhttp

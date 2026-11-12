@@ -42,6 +42,7 @@ type routeFixture struct {
 	up     *fakeupstream.Server
 	kit    *pkgroute.Kit
 	source *source.Service
+	blobs  *fs.Store
 }
 
 type brokenCDNBody struct{}
@@ -125,7 +126,7 @@ func newRouteFixture(t *testing.T) *routeFixture {
 			}
 		},
 	}, Protocol(Options{RemoteSources: service}))
-	return &routeFixture{t: t, router: r, db: db, up: up, kit: k, source: service}
+	return &routeFixture{t: t, router: r, db: db, up: up, kit: k, source: service, blobs: blobs}
 }
 
 func (f *routeFixture) get(key, path string) *httptest.ResponseRecorder {
@@ -823,7 +824,7 @@ func TestUnitCDNHandlersRejectPostFetchCorruption(t *testing.T) {
 	f := newRouteFixture(t)
 	h := handler{k: f.kit}
 	r := httptest.NewRequest(http.MethodGet, "/artifactory/api/pods/pods-remote/all_pods.txt", nil)
-	if _, err := h.remoteResult(r, "not-a-CDN-resource"); err == nil {
+	if _, err := h.remoteResult(r, "not-a-CDN-resource", false); err == nil {
 		t.Fatal("invalid CDN resource reached the upstream reader")
 	}
 	bad := source.Result{

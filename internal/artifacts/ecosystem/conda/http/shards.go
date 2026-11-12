@@ -84,7 +84,7 @@ func readShardMetadata(body io.Reader, size int64) ([]byte, error) {
 	return data, nil
 }
 
-func (h handler) remoteShardedIndex(r *http.Request, id condafmt.MetadataPath) (
+func (h handler) remoteShardedIndex(r *http.Request, id condafmt.MetadataPath, policy readPolicy) (
 	condafmt.Repodata, func(context.Context) error, error,
 ) {
 	indexPath := condafmt.IndexPath(id.Channel, id.Subdir, condafmt.ShardIndexFilename)
@@ -95,6 +95,8 @@ func (h handler) remoteShardedIndex(r *http.Request, id condafmt.MetadataPath) (
 		Method:           http.MethodGet,
 		PermissionFolder: true,
 		PermissionPath:   path.Dir(indexPath),
+		PolicyPath:       policy.path,
+		BlackoutOnly:     policy.download,
 		Variant:          "conda-shard-index-v1",
 		ExpectedContentTypes: []string{
 			"application/zstd",
@@ -138,7 +140,7 @@ func (h handler) remoteShardedIndex(r *http.Request, id condafmt.MetadataPath) (
 	remaining := maxShardSnapshotBytes - len(body)
 	for _, name := range slices.Sorted(maps.Keys(index.Shards)) {
 		digest := hex.EncodeToString(index.Shards[name])
-		shard, finish, size, err := h.remoteShard(r, id, name, digest, base)
+		shard, finish, size, err := h.remoteShard(r, id, policy, name, digest, base)
 		if err != nil {
 			return condafmt.Repodata{}, nil, err
 		}
@@ -162,7 +164,7 @@ func (h handler) remoteShardedIndex(r *http.Request, id condafmt.MetadataPath) (
 		maps.Copy(combined.PackagesConda, shard.PackagesConda)
 		fences = append(fences, finish)
 	}
-	filtered, err := h.filterIndex(r.Context(), r, combined, id, result.CheckRead)
+	filtered, err := h.filterIndex(r.Context(), r, combined, id, result.CheckPermission)
 	if err != nil {
 		return condafmt.Repodata{}, nil, err
 	}
@@ -181,6 +183,7 @@ func (h handler) remoteShardedIndex(r *http.Request, id condafmt.MetadataPath) (
 func (h handler) remoteShard(
 	r *http.Request,
 	id condafmt.MetadataPath,
+	policy readPolicy,
 	name, digest string,
 	base *url.URL,
 ) (
@@ -198,6 +201,8 @@ func (h handler) remoteShard(
 		Method:            http.MethodGet,
 		PermissionFolder:  true,
 		PermissionPath:    path.Dir(id.Path),
+		PolicyPath:        policy.path,
+		BlackoutOnly:      policy.download,
 		Variant:           "conda-shard-v1:" + name,
 		ExternalURL:       target.String(),
 		NoCrossOriginAuth: true,
@@ -238,7 +243,7 @@ func (h handler) remoteShard(
 	if err != nil {
 		return condafmt.Repodata{}, nil, 0, source.ErrInvalidResult
 	}
-	filtered, err := h.filterIndex(r.Context(), r, index, id, result.CheckRead)
+	filtered, err := h.filterIndex(r.Context(), r, index, id, result.CheckPermission)
 	return filtered, result.Revalidate, len(body), err
 }
 

@@ -74,6 +74,10 @@
 //     format_test.go and trace_test.go: download redirects and policies,
 //     folder downloads, checksum and sidecar files, overwrite refusals, what
 //     the format sees, and the trace endpoint.
+//   - protocol_download_policy_test.go: native protocol downloads and
+//     metadata under the download policy (issues 1237 and 1251).
+//   - folder_archive_policy_test.go: the folder archive download's policy
+//     (issue 1253).
 //   - multipart_test.go: the JFrog CLI's multipart upload.
 //
 // # References

@@ -87,7 +87,15 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 			return
 		}
-		f, err := h.k.ResolveItem(r, p.String())
+		// 7.x stores the manifest files at the repository root and reads
+		// them through the download path, so a blackout, or patterns that
+		// reject the manifest's own path, refuse it (R1); patterns
+		// that reject one rock leave the manifest listing it (R3).
+		if err := h.k.CheckDocument(r, p.String()); err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+		f, err := h.k.ResolveStoredItem(r, p.String())
 		if err != nil {
 			h.k.Error(w, r, err)
 			return
@@ -96,7 +104,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 			h.k.Error(w, r, apierror.New(http.StatusNotFound, "Could not find resource"))
 			return
 		}
-		h.k.ServeFound(w, r, f)
+		h.k.ServeFoundMetadata(w, r, f)
 		return
 	}
 	h.k.ServeItem(w, r, p.String())

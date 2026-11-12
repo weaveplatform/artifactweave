@@ -128,13 +128,19 @@ func TestAccRemoteDisclosureFencesEveryAuthority(t *testing.T) {
 			result := source.Result{
 				Revalidate: func(context.Context) error { return check("prior") },
 			}
+			// The chart's permission alone: the policy check of CheckRead
+			// would drop from the index a chart 7.x lists (RTFACT-29572).
 			metadata := source.Result{
 				Revalidate: func(context.Context) error { return check("metadata") },
-				CheckRead: func(_ context.Context, path string) error {
+				CheckPermission: func(_ context.Context, path string) error {
 					if path != "web.tgz" {
 						t.Fatal(path)
 					}
 					return check("chart")
+				},
+				CheckRead: func(context.Context, string) error {
+					t.Fatal("a disclosed chart was checked against the download policy")
+					return nil
 				},
 			}
 			fenceHelmDisclosures(&result, metadata, []string{"web.tgz"})

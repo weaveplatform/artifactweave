@@ -67,6 +67,17 @@
 //     A member the caller may not read, or one that lacks the resource
 //     (a remote whose upstream answers 404 included), is passed over; any
 //     other member failure fails the request.
+//   - The download policy (decision 0032), after read permission: the
+//     blackout and the patterns refuse names, versions and packages/NAME
+//     at those paths, where 7.x keeps them, a remote's included, with the
+//     policy's 404 naming the path; a pattern on a tarball leaves its
+//     release listed, a legacy one without the outer checksum its refused
+//     tarball would give. A remote tarball answers its own path's policy
+//     before the package metadata it is found through is read, and that
+//     read checks only the blackout. A virtual repository leaves out a
+//     member that is blacked out or whose patterns reject a document's
+//     path, passes a tarball over a member that refuses it, and answers
+//     its own patterns with "No repository found to serve the request".
 //   - Statuses and error texts stay byte-identical.
 //
 // # References

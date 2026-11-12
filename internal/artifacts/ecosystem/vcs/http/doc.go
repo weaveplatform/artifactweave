@@ -85,6 +85,12 @@
 //     remote source is read, and on an archive's or file's path before it
 //     is fetched; a reference the caller may not read is left out of a
 //     listing.
+//   - The download policy (decision 0032) comes after Read permission. The
+//     references, which a listing and a tag, branch or release download
+//     read first, are checked at 7.x's cached refs file,
+//     <owner>/<name>/gitrefs (RTFACT-30171, RTFACT-30743), and an archive
+//     at its cache path; a blacked-out remote or a path its patterns
+//     reject answers 404 with the policy's message.
 //   - An archive is read in full before it is admitted, a tar.gz to the end
 //     of its gzip stream and every ZIP member to its declared size, within
 //     256 MiB, 1 GiB expanded and 100,000 entries; every entry path is
@@ -162,7 +168,9 @@
 // them (testdata/README.md). The route suite test/server/artifacts/vcs and
 // the acceptance steps also read it. The REST evidence is
 // TestAccVCSRemoteRESTAndSubgroup in that route suite, which serves the
-// operations and the subgroup route through the router, and the @vcs
+// operations and the subgroup route through the router;
+// TestAccVCSRefsFollowThePolicyAtTheirCachedPath there checks the
+// references' download policy at their 7.x path; and the @vcs
 // acceptance scenarios (test/acceptance/features/vcs.feature,
 // vcs_legacy.feature and vcs_recipes.feature).
 package vcshttp

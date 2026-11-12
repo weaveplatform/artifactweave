@@ -42,7 +42,12 @@
 //   - A version is visible by what is stored, and the download policy
 //     (decision 0032) refuses only the file a read serves: a blacked-out
 //     repository's, or one the patterns reject, while a .mod they accept
-//     is served beside a .zip they reject.
+//     is served beside a .zip they reject. A .info made from the package
+//     index answers the policy at its own path, as a stored .info does
+//     (RTDEV-60689).
+//   - A blacked-out repository refuses @v/list and @latest too, once the
+//     caller may read a version, so read permission still comes first; the
+//     patterns never refuse them (#1237).
 //   - Statuses and error texts stay byte-identical: the go command and the
 //     JFrog CLI read them.
 //

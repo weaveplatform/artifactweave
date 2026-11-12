@@ -380,28 +380,55 @@ func notFound(w http.ResponseWriter, r *http.Request) {
 		"not a registry operation: %s %s", r.Method, r.URL.Path))
 }
 
-// blackedOut answers a pull from a blacked-out repository 404 NAME_UNKNOWN
-// with Artifactory's message, as a push to it is answered, before the item
-// is looked for: every Artifactory download is refused that way
-// (generic.CheckDownload).
-func (g *Registry) blackedOut(w http.ResponseWriter, r *http.Request, q Request) bool {
-	if err := generic.CheckBlackedOut(q.Repo, q.Name); err != nil {
-		g.writeErr(w, r, err)
-		return true
+// blackedOut refuses a pull from a blacked-out repository before the item
+// is looked for, whether or not it exists, as every Artifactory download is
+// refused (generic.CheckDownload). The message names the file the pull
+// reads, in the folder layout.RegistryResource gives it, so a local
+// repository names the path a remote one checks: <image>/<tag>/manifest.json
+// for a tag, as 7.x names the file it checks for a pull (RTFACT-27234),
+// <image>/sha256:<hex>/manifest.json for a digest and
+// <image>/_uploads/sha256__<hex> for a blob. Which copy 7.x names for a
+// digest or a blob needs a capture (#216); a reference that names no file
+// leaves the image's name.
+func blackedOut(w http.ResponseWriter, q Request, operation string) bool {
+	path := q.Name
+	if res, err := layout.RegistryResource(q.Name, operation, q.Reference); err == nil {
+		path = res.Path
 	}
-	return false
+	return refuse(w, generic.CheckBlackedOut(q.Repo, path))
 }
 
-// excluded answers a pulled item the repository's include and exclude
-// patterns reject as a missing one, 404 under code, with Artifactory's
-// message.
-func excluded(w http.ResponseWriter, q Request, it model.Item, code string) bool {
+// imageBlackedOut refuses a read of an image's tags list or referrers from a
+// blacked-out repository, naming the image as a blacked-out remote
+// repository's refusal of the same reads does. Clients resolve through both:
+// helm finds an unversioned or ranged chart's version in the tags list, and
+// cosign and notation find signatures through the referrers. The patterns
+// refuse neither: a tags list keeps the tags they reject (RTFACT-27234).
+func imageBlackedOut(w http.ResponseWriter, q Request) bool {
+	return refuse(w, generic.CheckBlackedOut(q.Repo, q.Name))
+}
+
+// excluded refuses a pulled item the repository's include and exclude
+// patterns reject.
+func excluded(w http.ResponseWriter, q Request, it model.Item) bool {
+	return refuse(w, generic.CheckDownload(q.Repo, it.FullPath(), false))
+}
+
+// refuse answers err when it is the download policy's refusal and reports
+// whether it did. The refusal keeps its 404 and message in Artifactory's
+// envelope, {"errors":[{"status":404,"message":...}]}, under no registry
+// code: docker pull printed "unknown: The repository '...' rejected the
+// artifact '...' due to its include/exclude pattern settings." for one
+// (RTFACT-27234), and the client prints unknown for a code it does not know
+// or for none, so 7.x sent no MANIFEST_UNKNOWN. A missing manifest or blob
+// keeps its registry code; only the policy's refusal is answered so.
+func refuse(w http.ResponseWriter, err error) bool {
 	var refused *format.RejectionError
-	if errors.As(generic.CheckDownload(q.Repo, it.FullPath(), false), &refused) {
-		Write(w, Errorf(http.StatusNotFound, code, "%s", refused.Message))
-		return true
+	if !errors.As(err, &refused) {
+		return false
 	}
-	return false
+	apierror.Write(w, apierror.ProfileArtifactory, apierror.New(refused.Status, refused.Message))
+	return true
 }
 
 // writeErr writes err, noting an unexpected one for the access log. A

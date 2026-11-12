@@ -118,7 +118,7 @@ func (h handler) remoteMetadata(
 	if err != nil {
 		return source.Result{}, fmt.Errorf("swift: remote metadata: %w", err)
 	}
-	if result.CheckRead == nil {
+	if result.CheckRead == nil || result.CheckPermission == nil {
 		if result.Stream != nil && result.Stream.Body != nil {
 			_ = result.Stream.Body.Close()
 		}
@@ -203,6 +203,11 @@ func (h handler) remoteArchive(r *http.Request, p swiftfmt.Package) (source.Resu
 		return source.Result{}, remoteInvalid()
 	}
 	if err := metadata.CheckRead(r.Context(), path); err != nil {
+		if pkgroute.IsRefusal(err) {
+			// The remote's patterns refuse the archive: the policy's own
+			// 404 and message (RTDEV-47144), not a fault.
+			err = pkgroute.SourceError(err, false)
+		}
 		return source.Result{}, fmt.Errorf("swift: archive permission: %w", err)
 	}
 	resource := pkgroute.Resource(r, path, "")
@@ -221,11 +226,22 @@ func (h handler) remoteArchive(r *http.Request, p swiftfmt.Package) (source.Resu
 	if err != nil {
 		return source.Result{}, fmt.Errorf("swift: remote archive: %w", err)
 	}
-	fence(&result, metadata, []string{path})
+	fence(&result, metadata, metadata.CheckRead, []string{path})
 	return result, nil
 }
 
-func fence(result *source.Result, metadata source.Result, paths []string) {
+// fence has result recheck, when it is delivered, the release metadata's
+// authority and check on each archive path it discloses: the download
+// policy with Read permission for an archive it serves, Read permission
+// alone for the archives a release list, release metadata or Package.swift
+// names, which stay answered when the patterns reject the archive
+// (R3).
+func fence(
+	result *source.Result,
+	metadata source.Result,
+	check func(context.Context, string) error,
+	paths []string,
+) {
 	prior := result.Revalidate
 	result.Revalidate = func(ctx context.Context) error {
 		if prior != nil {
@@ -238,11 +254,11 @@ func fence(result *source.Result, metadata source.Result, paths []string) {
 				return fmt.Errorf("swift: revalidate release metadata: %w", err)
 			}
 		}
-		if metadata.CheckRead == nil {
+		if check == nil {
 			return source.ErrDenied
 		}
 		for _, path := range paths {
-			if err := metadata.CheckRead(ctx, path); err != nil {
+			if err := check(ctx, path); err != nil {
 				return fmt.Errorf("swift: recheck archive permission: %w", err)
 			}
 		}
@@ -294,7 +310,9 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, q request) {
 				delete(out.Releases, version)
 				continue
 			}
-			if err := result.CheckRead(r.Context(), path); errors.Is(err, source.ErrDenied) {
+			// A release whose archive the remote's patterns reject stays
+			// listed (R3), so the rows take Read permission alone.
+			if err := result.CheckPermission(r.Context(), path); errors.Is(err, source.ErrDenied) {
 				delete(out.Releases, version)
 				continue
 			} else if err != nil {
@@ -308,7 +326,7 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, q request) {
 			h.k.Error(w, r, bad(http.StatusNotFound, "Swift package not found"))
 			return
 		}
-		fence(&result, result, paths)
+		fence(&result, result, result.CheckPermission, paths)
 		result, err = remoteJSONResult(result, out)
 		if err != nil {
 			h.k.Error(w, r, err)
@@ -322,7 +340,7 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, q request) {
 			h.k.Error(w, r, err)
 			return
 		}
-		fence(&result, result, []string{p.ArchivePath()})
+		fence(&result, result, result.CheckPermission, []string{p.ArchivePath()})
 		result, err = remoteJSONResult(result, info)
 		if err != nil {
 			h.k.Error(w, r, err)
@@ -392,12 +410,12 @@ func (h handler) remoteManifest(w http.ResponseWriter, r *http.Request, p swiftf
 		h.k.Error(w, r, remoteInvalid())
 		return
 	}
-	if result.CheckRead == nil {
+	if result.CheckPermission == nil {
 		_ = result.Stream.Body.Close()
 		h.k.Error(w, r, remoteInvalid())
 		return
 	}
-	fence(&result, result, []string{p.ArchivePath()})
+	fence(&result, result, result.CheckPermission, []string{p.ArchivePath()})
 	result.Stream.MediaType = "text/x-swift"
 	w.Header().Set("Content-Version", "1")
 	h.k.ServeResult(w, r, result)

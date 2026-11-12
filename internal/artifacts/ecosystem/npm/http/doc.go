@@ -73,6 +73,15 @@
 //
 //   - A packument, manifest, search result or tag list shows only the
 //     versions the caller may read.
+//   - The download policy, after read permission: the packument, a
+//     version's manifest and the dist-tags are checked at
+//     .npm/<name>/package.json, where 7.x keeps the packument, so the
+//     blackout or a pattern on that path refuses them with 404, locally
+//     and for a remote. A pattern on one version's tarball refuses only the
+//     tarball and leaves the version listed, and a remote tarball's read of
+//     its packument checks the blackout alone. A local search keeps its
+//     answers, as 6.20's searchers do not check the blackout (decision
+//     0032).
 //   - Remote metadata is cached as the upstream sent it; an answer
 //     rewrites only its tarball URLs and keeps its signature fields, and a
 //     tarball's integrity is checked before it is published or served from
@@ -124,6 +133,8 @@
 //     service, built by the access test kit (access/accesstest).
 //   - remote_test.go, remote_dist_test.go and remote_integrity_test.go:
 //     remote metadata, tarball integrity, URL policy and outages.
+//   - policy_test.go: the download policy on local and remote packuments,
+//     manifests, dist-tags, tarballs and search.
 //   - npmrc_test.go: the .npmrc lines and scopes.
 //   - login_test.go: the login and logout path predicates, the
 //     configuration operations' paths and the logged-path redactor.

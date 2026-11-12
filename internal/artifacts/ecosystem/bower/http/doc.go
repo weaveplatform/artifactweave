@@ -40,11 +40,19 @@
 //
 //   - A local or federated version's archive is built from its stored
 //     tree only when the caller may read every file in it, within 4096
-//     files and 128 MiB, and only when its bower.json is stored. The
-//     download policy then refuses it as the kit's Item would
-//     (Kit.CheckDownload): from a blacked-out repository, by its
-//     bower.json, and when the patterns reject any file in it. A virtual
-//     repository passes over a member that refuses the bower.json.
+//     files and 128 MiB, and only when its bower.json is stored.
+//   - The download policy (#1251), after read permission: a binary is
+//     refused before its version is looked up, a hosted repository's by
+//     the version's bower.json and then by any file the archive holds, a
+//     virtual repository's own patterns with "No repository found to serve
+//     the request", and a remote's at the path its cache keeps the archive
+//     at. The package lookup and refs of a blacked-out repository answer
+//     the blackout, naming the request's path, while the package list and
+//     search keep their answers. A version whose files the patterns reject
+//     stays listed, and a remote's metadata reads check its blackout alone.
+//     A virtual repository resolves without a blacked-out member, passes
+//     over a member that refuses any file of the archive, and refuses an
+//     external dependency's archive its own patterns reject.
 //   - A Git remote follows a registry pointer only within the configured
 //     Git origin and path, and an archive enters the remote cache only
 //     after its paths, size, file count, manifest and gzip integrity pass;
@@ -95,5 +103,6 @@
 // and dependencies_test.go files (the external dependency rewrite), and
 // archive_fault_test.go, failure_paths_test.go and source_fault_test.go
 // (corrupt archives and failing sources), and download_policy_test.go
-// (a blacked-out repository and excluded files).
+// (the blackout and the patterns of local, virtual, Artifactory and Git
+// remote repositories on every route, and of the dependency rewrite).
 package bowerhttp

@@ -258,3 +258,46 @@ func TestAccCondaShardFetchRechecksPermissionAndRepositoryRevision(t *testing.T)
 		})
 	}
 }
+
+// A remote channel caches its index files at their own paths (D-Conda), so
+// the remote's blackout, or a pattern on the requested document, refuses
+// that document naming it, after Read permission, in place of 403 "Conda
+// index is not readable". A package the remote's patterns reject stays
+// listed and only its download is refused (RTFACT-24940, this case), and a
+// package download is checked at the package's path, not its index's.
+func TestAccCondaDownloadPolicyRemote(t *testing.T) {
+	w, _, _ := newCondaRemoteWorld(t)
+	const name = "artifactweave-conda-fixture-1.0.0-0.tar.bz2"
+	base := "/artifactory/api/conda/remote/noarch/"
+	get := func(p string) *httptest.ResponseRecorder {
+		t.Helper()
+		return w.request("GET", base+p, "reader", "")
+	}
+	listed := func(metadata string) {
+		t.Helper()
+		if !condaListed(t, get(metadata), metadata, name)[name] {
+			t.Fatalf("%s left out %s", metadata, name)
+		}
+	}
+	listed("repodata.json")
+
+	w.c.BlackedOut = new(true)
+	w.update()
+	wantRefusal(t, get("repodata.json"), condaBlackedOut("remote", "noarch/repodata.json"))
+	wantRefusal(t, get(condafmt.ShardIndexFilename),
+		condaBlackedOut("remote", "noarch/"+condafmt.ShardIndexFilename))
+	wantRefusal(t, get(name), condaBlackedOut("remote", "noarch/"+name))
+	remoteStatus(t, w.request("GET", base+"repodata.json", "denied", ""), http.StatusForbidden)
+
+	w.c.BlackedOut, w.c.ExcludesPattern = new(false), new("**/"+name)
+	w.update()
+	listed("repodata.json")
+	listed("current_repodata.json")
+	wantRefusal(t, get(name), condaRejected("remote", "noarch/"+name))
+
+	w.c.ExcludesPattern = new("**/repodata.json")
+	w.update()
+	wantRefusal(t, get("repodata.json"), condaRejected("remote", "noarch/repodata.json"))
+	listed("current_repodata.json")
+	remoteStatus(t, get(name), http.StatusOK)
+}

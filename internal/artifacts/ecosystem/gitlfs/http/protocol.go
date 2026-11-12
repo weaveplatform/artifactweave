@@ -228,7 +228,7 @@ func (h handler) uploadEntry(r *http.Request, obj batchObject, out *batchResult)
 		out.Actions = map[string]batchAction{"upload": {Href: objectURL(r, obj.OID, obj.Size)}}
 		return nil
 	}
-	found, err := h.k.Item(target, path)
+	found, err := h.k.StoredItem(target, path)
 	if err == nil {
 		if !found.Item.Folder && found.Item.Size == obj.Size &&
 			found.Item.Actual.SHA256 == obj.OID {
@@ -251,34 +251,19 @@ func (h handler) downloadEntry(r *http.Request, obj batchObject, out *batchResul
 	return nil
 }
 
+// available reports whether a download batch may hand out obj. The download
+// policy comes after Read permission (DV-057), so a caller who may not read
+// gets 403 whatever the repository's settings: find checks a local or
+// federated repository's policy, the source boundary a remote's, and
+// virtualMember a virtual repository's own patterns.
 func (h handler) available(r *http.Request, obj batchObject) error {
 	path, _ := format.ObjectPath(obj.OID)
-	if err := generic.CheckDownload(pkgroute.RequestFrom(r).Repo, path, false); err != nil {
-		return fmt.Errorf("gitlfs: download policy: %w", err)
-	}
 	switch pkgroute.RequestFrom(r).Repo.Class {
 	case repo.Remote:
 		return h.remoteAvailable(r, obj)
 	case repo.Virtual:
-		members, err := h.members(r)
-		if err != nil {
-			return err
-		}
-		readable := false
-		for _, member := range members {
-			if !h.k.Can(member, path, api.ActionRead) {
-				continue
-			}
-			readable = true
-			if err = h.available(member, obj); missing(err) {
-				continue
-			}
-			return err
-		}
-		if !readable {
-			return apierror.New(http.StatusForbidden, "Git LFS read denied")
-		}
-		return kernel.ErrNotFound
+		_, err := h.virtualMember(r, obj)
+		return err
 	default:
 		found, err := h.find(r, path)
 		if err != nil {
@@ -380,7 +365,7 @@ func (h handler) find(r *http.Request, path string) (pkgroute.Found, error) {
 	if err := generic.CheckDownload(pkgroute.RequestFrom(r).Repo, path, false); err != nil {
 		return pkgroute.Found{}, fmt.Errorf("gitlfs: download policy: %w", err)
 	}
-	found, err := h.k.Item(r, path)
+	found, err := h.k.DownloadItem(r, path)
 	if err != nil {
 		return pkgroute.Found{}, fmt.Errorf("gitlfs: find object: %w", err)
 	}
@@ -457,39 +442,62 @@ func (h handler) serveObject(w http.ResponseWriter, r *http.Request, obj batchOb
 		h.k.ServeResult(w, r, result)
 		return nil
 	case repo.Virtual:
-		members, err := h.members(r)
+		member, err := h.virtualMember(r, obj)
 		if err != nil {
 			return err
 		}
-		readable := false
-		for _, member := range members {
-			if !h.k.Can(member, path, api.ActionRead) {
-				continue
-			}
-			readable = true
-			if err = h.available(member, obj); missing(err) {
-				continue
-			}
-			if err != nil {
-				return err
-			}
-			if pkgroute.RequestFrom(member).Repo.Class == repo.Remote {
-				return h.serveObject(w, member, obj)
-			}
-			found, err := h.find(member, path)
-			if err != nil {
-				return err
-			}
-			h.k.ServeFound(w, member, found)
-			return nil
+		if pkgroute.RequestFrom(member).Repo.Class == repo.Remote {
+			return h.serveObject(w, member, obj)
 		}
-		if !readable {
-			return apierror.New(http.StatusForbidden, "Git LFS read denied")
+		found, err := h.find(member, path)
+		if err != nil {
+			return err
 		}
-		return kernel.ErrNotFound
+		h.k.ServeFound(w, member, found)
+		return nil
 	default:
 		return source.ErrUnsupported
 	}
+}
+
+// virtualMember returns the first member of a virtual repository, in its
+// order, that the caller may read and that holds obj, passing over one that
+// misses obj or whose own policy refuses it. The virtual repository's own
+// patterns are checked once a member the caller may read is found, so a
+// caller who may read none gets 403 and learns nothing of them (DV-057).
+// They refuse a remote member's object too, which the source boundary
+// checks against the remote's own policy alone: an object they reject is
+// served by no member, 404 "No repository found to serve the request for
+// <virtual>:<path>" (decision 0032, 6.20 VirtualRepoDownloadStrategy).
+func (h handler) virtualMember(r *http.Request, obj batchObject) (*http.Request, error) {
+	path, _ := format.ObjectPath(obj.OID)
+	members, err := h.members(r)
+	if err != nil {
+		return nil, err
+	}
+	readable := false
+	for _, member := range members {
+		if !h.k.Can(member, path, api.ActionRead) {
+			continue
+		}
+		if !readable {
+			if err = h.k.CheckDownload(r, path); err != nil {
+				return nil, fmt.Errorf("gitlfs: download policy: %w", err)
+			}
+			readable = true
+		}
+		if err = h.available(member, obj); missing(err) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		return member, nil
+	}
+	if !readable {
+		return nil, apierror.New(http.StatusForbidden, "Git LFS read denied")
+	}
+	return nil, kernel.ErrNotFound
 }
 
 func (h handler) upload(w http.ResponseWriter, r *http.Request) {
@@ -528,7 +536,7 @@ func (h handler) upload(w http.ResponseWriter, r *http.Request) {
 			h.k.Error(w, r, err)
 			return
 		}
-		found, getErr := h.k.Item(target, path)
+		found, getErr := h.k.StoredItem(target, path)
 		if getErr == nil && !found.Item.Folder && found.Item.Size == size &&
 			found.Item.Actual.SHA256 == oid {
 			w.WriteHeader(http.StatusOK)

@@ -35,10 +35,15 @@ type referrersIndex struct {
 // index of the manifests in the image whose subject is the digest, from
 // their properties (DV-036). A digest nothing refers to, in an image that
 // may not exist, is an empty index: the API answers no 404 (end-12a). A
-// reference that is no digest is refused with DIGEST_INVALID.
+// reference that is no digest is refused with DIGEST_INVALID. A blacked-out
+// repository refuses the request first, as a blob pull checks blackout
+// before its digest (imageBlackedOut).
 func (g *Registry) getReferrers(w http.ResponseWriter, r *http.Request, q Request) {
 	if err := q.Require(r, q.Name+"/", api.ActionRead); err != nil {
 		Write(w, err)
+		return
+	}
+	if imageBlackedOut(w, q) {
 		return
 	}
 	if !layout.ValidDigest(q.Reference) {

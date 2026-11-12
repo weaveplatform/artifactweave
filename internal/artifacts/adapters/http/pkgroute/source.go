@@ -61,10 +61,34 @@ type ReadSource interface {
 	Read(*http.Request, repo.Config, source.Resource) (source.Result, error)
 }
 
-// Read is the stream-aware extension of Item. A future virtual source can
-// implement the same optional method while retaining each member's permission
-// and fetch intent. Existing local sources continue using their stored items.
+// Read is the stream-aware extension of DownloadItem. A future virtual
+// source can implement the same optional method while retaining each
+// member's permission and fetch intent. Existing local sources continue
+// using their stored items. An artifact read is a download: the download
+// policy applies to it as DownloadItem applies it, at the resource's
+// PolicyPath when it names one and only as blackout when it is
+// BlackoutOnly, as the source boundary applies them to a remote read. A
+// member request's refusal, a remote member's from the source boundary
+// included, is the member passed over (CheckDownload).
 func (k *Kit) Read(r *http.Request, resource source.Resource) (source.Result, error) {
+	return k.read(r, resource, true)
+}
+
+// ReadMetadata is Read for an artifact read whose result builds a listing
+// or a metadata answer rather than serving the artifact, such as the
+// manifest a Conan revision's file list is read from, or for a metadata
+// document ServeMetadata serves. The download policy Read applies to an
+// artifact read is not applied, as StoredItem does not apply it; the source
+// boundary still applies a remote repository's own policy.
+func (k *Kit) ReadMetadata(r *http.Request, resource source.Resource) (source.Result, error) {
+	return k.read(r, resource, false)
+}
+
+func (k *Kit) read(
+	r *http.Request,
+	resource source.Resource,
+	download bool,
+) (source.Result, error) {
 	q := RequestFrom(r)
 	allowed := can(r, q.Repo, resource.Path, accessapi.ActionRead)
 	if resource.PermissionFolder {
@@ -73,17 +97,27 @@ func (k *Kit) Read(r *http.Request, resource source.Resource) (source.Result, er
 	if !allowed {
 		return source.Result{}, refusal(r)
 	}
+	// The policy checks the path 7.x keeps the artifact at, when the
+	// protocol names one, so a pattern written for 7.x's layout matches.
+	policyPath := resource.Path
+	if resource.PolicyPath != "" {
+		policyPath = resource.PolicyPath
+	}
 	if src, ok := q.Source.(ReadSource); ok {
 		// The source boundary checks the remote member's own policy, never
-		// that of the virtual repository the request came through. Metadata
-		// reads are left as they were: what a protocol's metadata answers
-		// under the policy is still open (#1237).
-		if q.virtual != nil && resource.Kind == source.ResourceKindArtifact {
-			if err := q.download(resource.Path); err != nil {
+		// that of the virtual repository the request came through, so a
+		// member request checks the virtual repository's patterns here.
+		if download && q.virtual != nil && resource.Kind == source.ResourceKindArtifact &&
+			!resource.BlackoutOnly {
+			if err := q.download(policyPath); err != nil {
 				return source.Result{}, err
 			}
 		}
 		result, err := src.Read(r, q.Repo, resource)
+		if err != nil && q.virtual != nil && IsRefusal(err) {
+			// A remote member that refuses is passed over as a local one is.
+			return source.Result{}, passOver(q.Repo.Key, policyPath)
+		}
 		if err != nil {
 			return source.Result{}, fmt.Errorf("read source: %w", err)
 		}
@@ -92,7 +126,12 @@ func (k *Kit) Read(r *http.Request, resource source.Resource) (source.Result, er
 	if resource.Kind != source.ResourceKindArtifact {
 		return source.Result{}, source.ErrUnsupported
 	}
-	f, err := k.Item(r, resource.Path)
+	if download {
+		if err := q.refuse(policyPath, resource.BlackoutOnly, false); err != nil {
+			return source.Result{}, k.wrap(err)
+		}
+	}
+	f, err := k.StoredItem(r, resource.Path)
 	if err != nil {
 		return source.Result{}, err
 	}
@@ -121,6 +160,9 @@ func Resource(r *http.Request, path, escaped string) source.Resource {
 
 // SourceError maps only known source errors. Other errors retain the router's
 // existing internal-fault treatment; no upstream body or challenge is relayed.
+// The download policy's refusal answers its own status and message, and
+// IsRefusal still recognises it, so a virtual repository passes over a
+// remote member that refuses.
 func SourceError(err error, anonymous bool) error {
 	var failure *source.HTTPError
 	var rejected *format.RejectionError
@@ -129,7 +171,10 @@ func SourceError(err error, anonymous bool) error {
 	case err == nil:
 		return nil
 	case errors.As(err, &rejected):
-		return apierror.New(rejected.Status, rejected.Message)
+		return &sourceRefusal{
+			answer:    apierror.New(rejected.Status, rejected.Message),
+			rejection: rejected,
+		}
 	case errors.As(err, &failure):
 		status = failure.Status
 		e := apierror.New(status, http.StatusText(status))
@@ -162,6 +207,20 @@ func SourceError(err error, anonymous bool) error {
 	}
 	return apierror.New(status, http.StatusText(status))
 }
+
+// sourceRefusal is the source boundary's policy refusal as SourceError
+// answers it: Error finds the answer as an *apierror.Error and IsRefusal the
+// *format.RejectionError behind it. Unlike the kit's own refusal it is not
+// kernel.ErrNotFound, so a protocol's handling of a missing item leaves it
+// as it was.
+type sourceRefusal struct {
+	answer    *apierror.Error
+	rejection *format.RejectionError
+}
+
+func (e *sourceRefusal) Error() string { return e.rejection.Message }
+
+func (e *sourceRefusal) Unwrap() []error { return []error{e.answer, e.rejection} }
 
 // ServeStream owns and closes the body, including HEAD/304. It writes only
 // representation headers, never cookies or upstream authentication challenges.

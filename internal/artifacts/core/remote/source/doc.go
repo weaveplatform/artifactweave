@@ -22,8 +22,11 @@
 //     such as Maven's or Docker's), Resolve for the source identity,
 //     Revalidate for the caller's current authority, and access/api's
 //     Decider, which answers each Request's permission questions.
-//   - The generic deploy policy (generic.CheckDownload), which every
-//     authorised path also passes.
+//   - The generic download policy (generic.CheckDownload), which every
+//     authorised read also passes: at its permission path, or at the
+//     Resource's PolicyPath, the path Artifactory 7.x caches the document
+//     or file at, when the adapter names one, and only the repository's
+//     blackout when the Resource is BlackoutOnly (Resource.CheckPolicy).
 //
 // # Outputs
 //
@@ -35,6 +38,12 @@
 //   - The safe failures (ErrDenied, ErrInvalidRequest, ErrUnsupported,
 //     ErrUnavailable, ErrSuperseded, ErrInvalidResult) and HTTPError with
 //     its FailureKind, which routers map to their own error envelopes.
+//   - Resource.CheckPolicy, the policy rule Service.Read applies, which the
+//     application's Revalidate fences a result with too.
+//   - A Result's descendant checks: CheckRead and CheckFolder, which apply
+//     the download policy as Read does, and CheckPermission, which checks
+//     Read permission alone, for a listing that keeps a release whose file
+//     the repository's patterns reject, as Artifactory's listings do.
 //
 // # Invariants
 //
@@ -45,7 +54,11 @@
 //   - A backend failure leaves as a safe failure, kernel.ErrNotFound, the
 //     context's error or an HTTPError with a bounded status and
 //     Retry-After; upstream bodies, URLs, headers and credentials are never
-//     error messages.
+//     error messages. The download policy's refusal leaves as its own
+//     *format.RejectionError, from Read and from CheckRead and CheckFolder
+//     alike, since artifactweave writes its message: a listing that checks
+//     each disclosed release can keep one whose file is refused, and a read
+//     answers the policy's 404 (#1237).
 //   - The package opens no store transaction and propagates none.
 //
 // # References
@@ -71,11 +84,13 @@
 //
 // # Testing
 //
-//   - source_test.go, source_boundary_test.go, root_test.go and
-//     smart_test.go are an external test package (source_test) over fake
-//     backends: read intents and representations, refusals before lookup,
-//     result validation and safe errors, stream ownership and late fences,
-//     root metadata grants, and the Smart and Git LFS contracts.
+//   - source_test.go, source_boundary_test.go, root_test.go, smart_test.go
+//     and policy_test.go are an external test package (source_test) over
+//     fake backends: read intents and representations, refusals before
+//     lookup, result validation and safe errors, stream ownership and late
+//     fences, root metadata grants, the Smart and Git LFS contracts, and the
+//     policy path, blackout-only reads, policy refusals from CheckRead and
+//     CheckPermission's permission-only check.
 //   - authorize_test.go and cocoapods_test.go are in-package unit tests of
 //     the path authorisation and the CocoaPods Git descriptor.
 package source

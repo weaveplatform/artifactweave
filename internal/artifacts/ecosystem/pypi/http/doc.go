@@ -53,6 +53,15 @@
 // # Invariants
 //
 //   - A page lists only the files the caller may read.
+//   - The download policy, after read permission: a simple page is checked
+//     at the path 7.x keeps a remote's page at, .pypi/<name>.html or
+//     .pypi/simple.html, so the blackout or a pattern on that path refuses
+//     it with 404; a local repository's JSON API is refused by the
+//     blackout alone; and a wheel's core metadata takes its wheel's check.
+//     A remote's files are checked at their upstream paths, which for
+//     PyPI.org hold the file's hash, and a download's read of the page
+//     checks the blackout alone. A pattern on one file refuses only the
+//     file and leaves it listed.
 //   - The HTML pages are byte-exact: the goldens under testdata keep eol=lf
 //     (.gitattributes) so they compare the same on every platform.
 //   - Uploads to a remote repository are refused, and statuses and error
@@ -96,5 +105,7 @@
 //   - remote_test.go, remote_parse_test.go, remote_archive_test.go and
 //     remote_cached_hash_test.go: remote pages, metadata, archives and
 //     cached hashes.
+//   - policy_test.go: the download policy on local and remote pages, the
+//     JSON API, files and core metadata.
 //   - fault_test.go: store faults.
 package pypihttp

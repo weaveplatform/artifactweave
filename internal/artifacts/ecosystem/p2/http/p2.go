@@ -90,9 +90,15 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 	c repo.Config, cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 	archiveURL string,
 ) {
-	if !acc.File(c, req.Path, accessapi.ActionRead) ||
-		generic.CheckDownload(c, req.Path, false) != nil {
+	if !acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		return
+	}
+	// The remote's blackout and patterns refuse an archive entry as they
+	// refuse any of its files: 404 with the policy's message, after the
+	// permission check (DV-057), and before the archive is fetched.
+	if err := generic.CheckDownload(c, req.Path, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "P2 archive download check", err))
 		return
 	}
 	if s.RemoteSources == nil {
@@ -180,9 +186,16 @@ func (s p2Items) serveP2Virtual(
 	acc itemkit.Access,
 ) {
 	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
-		!acc.File(c, req.Path, accessapi.ActionRead) ||
-		generic.CheckDownload(c, req.Path, false) != nil {
+		!acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		return
+	}
+	// The virtual repository's own patterns refuse a path with "No
+	// repository found to serve the request", as on the generic route
+	// (VirtualRepoDownloadStrategy.getInfoFromSearchableRepositories in
+	// 6.20). p2.index ends in .index, which the patterns never refuse.
+	if err := generic.CheckDownload(c, req.Path, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "P2 virtual download check", err))
 		return
 	}
 	members, err := p2Members(r.Context(), st, c, acc, map[string]bool{})
@@ -202,9 +215,16 @@ func (s p2Items) serveP2Virtual(
 			return
 		}
 		member := members[i]
-		if !acc.File(member, parts[1], accessapi.ActionRead) ||
-			generic.CheckDownload(member, parts[1], false) != nil {
+		if !acc.File(member, parts[1], accessapi.ActionRead) {
 			httpkit.WriteErr(w, r, httpkit.Denied(p))
+			return
+		}
+		// A member whose patterns refuse the path is passed over, as a
+		// virtual repository's search passes over it (processStandard in
+		// 6.20), and no other member serves its __p2/<n>/ paths, so the
+		// answer is the virtual's not-found.
+		if generic.CheckDownload(member, parts[1], false) != nil {
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
 		// The cloned request retains the authenticated principal. The ordinary
@@ -244,6 +264,11 @@ func (s p2Items) serveP2Virtual(
 // p2Members keeps the virtual order and removes members a caller cannot
 // traverse. Only a P2 remote or a local Maven/Generic update site can supply
 // native metadata. A nested P2 virtual is permitted if its graph is acyclic.
+// A blacked-out member is left out: 7.x builds the composite from the
+// members a caller can use (RTFACT-29198) and ignores a blacked-out
+// repository "when trying to resolve artifacts" (local-repositories), so
+// listing it would only send the client to files that all refuse. A
+// member's patterns refuse its files, not its place in the composite.
 func p2Members(ctx context.Context, st itemkit.Store, c repo.Config, acc itemkit.Access,
 	visited map[string]bool,
 ) ([]repo.Config, error) {
@@ -261,7 +286,7 @@ func p2Members(ctx context.Context, st itemkit.Store, c repo.Config, acc itemkit
 		if err != nil {
 			return nil, fmt.Errorf("p2 member %s: %w", key, err)
 		}
-		if !acc.Folder(m, "", accessapi.ActionRead) {
+		if !acc.Folder(m, "", accessapi.ActionRead) || generic.CheckDownload(m, "", true) != nil {
 			continue
 		}
 		switch {

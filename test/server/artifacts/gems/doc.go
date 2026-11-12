@@ -21,6 +21,10 @@
 //   - TestAcc results for push and permissions, metadata, yanks, token
 //     authentication, remote caching and its checks, virtual members, and
 //     indexes that fail closed when a stored archive is missing or corrupt.
+//   - TestAcc results for the download policy of local, remote and virtual
+//     indexes and gems (issues 1237 and 1251), and, in
+//     gems_virtual_download_test.go, a virtual gem download that asks each
+//     member for the gem's own path.
 //   - TestAccRubyClientsInstallPinnedRake runs the gem and Bundler clients
 //     when they are installed, and skips otherwise.
 //

@@ -130,6 +130,9 @@ type pageLink struct {
 // the hive shows, in pages of pageSize in NuGet order. A package with none
 // answers 404, which the client reads as "no such package".
 func (h handler) registrationIndex(w http.ResponseWriter, r *http.Request, hv hive, id string) {
+	if h.blackedOut(w, r) {
+		return
+	}
 	p, _, err := h.load(r, id)
 	if err != nil {
 		h.k.Error(w, r, err)
@@ -229,6 +232,9 @@ func (h handler) registrationPage(
 	hv hive,
 	id, lower, upper string,
 ) {
+	if h.blackedOut(w, r) {
+		return
+	}
 	lo, okLo := nugetfmt.NormalizeVersion(lower)
 	hi, okHi := nugetfmt.NormalizeVersion(upper)
 	if !okLo || !okHi {
@@ -304,6 +310,9 @@ func (h handler) registrationLeaf(
 	hv hive,
 	id, ver string,
 ) {
+	if h.blackedOut(w, r) {
+		return
+	}
 	key, ok := versionKey(ver)
 	if !ok {
 		h.k.Error(w, r, notFound(r))

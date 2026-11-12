@@ -36,9 +36,11 @@ type DebianAPI struct{ *itemkit.Kit }
 // virtual repository's metadata under dists/ and its binary packages. It
 // ensures an index is never returned to a caller who cannot read every
 // package it advertises, which the ordinary item route cannot guarantee for
-// a cached or virtual metadata file. It reports whether it answered; every
-// other request, a folder among them, it leaves to the overlays after it
-// and the generic lookup.
+// a cached or virtual metadata file. That rule is about permission: the
+// download policy is checked at the index's own path, and an index keeps a
+// package whose file the patterns reject. It reports whether it answered;
+// every other request, a folder among them, it leaves to the overlays after
+// it and the generic lookup.
 func TryDebianItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
@@ -79,9 +81,19 @@ func (s DebianAPI) serveDebianIndex(
 		return
 	}
 	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
-		!acc.File(c, req.Path, accessapi.ActionRead) ||
-		generic.CheckDownload(c, req.Path, false) != nil {
+		!acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		return
+	}
+	// 7.x stores a local index and caches a remote one at this path and
+	// reads it through the download path, so a blacked-out repository, or
+	// patterns that reject the index's own path, answer the policy's 404
+	// and message once read permission is settled (DV-057). A remote's
+	// -cache alias answers as the remote does. The source boundary checks a
+	// remote index read's policy at its permission folder, the repository
+	// root, so only this check sees the patterns on the index's own path.
+	if err := generic.CheckDownload(c, req.Path, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian index download", err))
 		return
 	}
 	if cached && c.Class != repo.Remote {
@@ -90,7 +102,7 @@ func (s DebianAPI) serveDebianIndex(
 	}
 	var body []byte
 	var used func(context.Context) error
-	var checkRead func(context.Context, string) error
+	var checkPermission func(context.Context, string) error
 	var err error
 	switch c.Class {
 	case repo.Local, repo.Federated:
@@ -122,7 +134,7 @@ func (s DebianAPI) serveDebianIndex(
 			err = pkgroute.SourceError(err, p.Anonymous)
 			break
 		}
-		checkRead, used = result.CheckRead, result.Used
+		checkPermission, used = result.CheckPermission, result.Used
 		switch {
 		case result.Stream != nil:
 			defer func() { _ = result.Stream.Body.Close() }()
@@ -152,14 +164,17 @@ func (s DebianAPI) serveDebianIndex(
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "Debian index", err))
 		return
 	}
+	// Each listed package is checked for read permission alone. 7.x keeps a
+	// package whose file the patterns reject in its Debian metadata and
+	// refuses only that file's GET (RTFACT-30830), so the policy refusing a
+	// listed file neither refuses nor filters the index.
 	for _, path := range paths {
-		if !acc.File(c, path, accessapi.ActionRead) ||
-			generic.CheckDownload(c, path, false) != nil {
+		if !acc.File(c, path, accessapi.ActionRead) {
 			httpkit.WriteErr(w, r, httpkit.Denied(p))
 			return
 		}
-		if checkRead != nil {
-			if err := checkRead(ctx, path); err != nil {
+		if checkPermission != nil {
+			if err := checkPermission(ctx, path); err != nil {
 				if errors.Is(err, source.ErrDenied) {
 					httpkit.WriteErr(w, r, httpkit.Denied(p))
 				} else {

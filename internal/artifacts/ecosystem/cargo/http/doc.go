@@ -39,12 +39,21 @@
 //     a version's crate bytes; {"ok": true} for a yank or unyank; and a
 //     local crate's versions with their records. The protocol's own
 //     refusals use Cargo's {"errors": [{"detail": ...}]} body; the kit's,
-//     such as a permission refusal, keep the Artifactory envelope.
+//     such as a permission refusal, and the download policy's keep the
+//     Artifactory envelope.
 //
 // # Invariants
 //
 //   - An index file lists only the versions the caller may read, at most
 //     10,000; a crate with none answers 404.
+//   - The download policy (decision 0032), after read permission: the
+//     blackout and the patterns refuse config.json at config.json and an
+//     index file at index/<prefix>/<name>, where 7.x keeps them, a remote's
+//     included, with the policy's 404 naming that path; a pattern on one
+//     crate leaves its version listed. A blacked-out repository refuses a
+//     crate's versions. A remote crate answers its own path's policy before
+//     the config.json and index file it is found through are read, and
+//     those reads check only the blackout.
 //   - A publish needs write permission on the crate's path. Its body, a
 //     4-byte length, the metadata JSON (at most 1 MiB), a 4-byte length and
 //     the crate, must carry a crate whose Cargo.toml matches the metadata
@@ -99,6 +108,8 @@
 //     download URL templates.
 //   - remote_unit_test.go: the checks of an upstream config.json and index
 //     file.
+//   - download_policy_test.go: the download policy on hosted and remote
+//     repositories.
 //
 // The router's guard TestAccCargoNativeSpecRoutes (internal/app) and the
 // @cargo acceptance scenarios, with the native Cargo client, drive it through

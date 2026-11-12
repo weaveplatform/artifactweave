@@ -167,6 +167,19 @@ func (h handler) metadataJSON(w http.ResponseWriter, r *http.Request, name, vers
 	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
+	// The document is built from the index, at no path 7.x is known to
+	// keep it at, so only the blackout refuses it, before anything is
+	// built: JFrog's docs have a blacked-out repository ignored when
+	// resolving and serve no download from it. [I] 7.x's answer is not
+	// known (#216).
+	path := "pypi/" + name + "/json"
+	if version != "" {
+		path = "pypi/" + name + "/" + version + "/json"
+	}
+	if err := h.k.CheckBlackedOut(r, path); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	doc, err := JSONMetadata(r.Context(), h.k.DB(), pkgroute.RequestFrom(r).Repo.Key,
 		name, version, repoBase(r), h.reads(r))
 	if err != nil {

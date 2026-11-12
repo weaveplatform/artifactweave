@@ -72,7 +72,14 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
-	f, err := h.k.ResolveItem(r, helmfmt.IndexPath)
+	// 7.x stores index.yaml at the repository root and reads it through the
+	// download path, so a blackout or a pattern on index.yaml refuses it,
+	// while a pattern on one chart leaves the chart listed (RTFACT-29572).
+	if err := h.k.CheckDocument(r, helmfmt.IndexPath); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	f, err := h.k.ResolveStoredItem(r, helmfmt.IndexPath)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return

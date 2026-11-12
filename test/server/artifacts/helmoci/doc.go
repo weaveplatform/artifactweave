@@ -1,5 +1,6 @@
 // Package helmoci replays against the assembled server the requests that jf
-// helm push and jf rt bp send after helm pushes a chart to an OCI repository.
+// helm push and jf rt bp send after helm pushes a chart to an OCI repository,
+// and the listings helm and signing clients read from a blacked-out one.
 //
 // # Role
 //
@@ -20,6 +21,10 @@
 //     the folder and its files with the build, the manifest downloads and the
 //     build-info's helm module names the chart. The acceptance feature
 //     helm_oci.feature runs the pinned jf and helm themselves.
+//   - TestAccBlackedOutChartListings: a blacked-out repository refuses the
+//     chart's tags list, on both route forms, and its referrers with the
+//     download policy's 404 in Artifactory's envelope, naming the chart,
+//     after the read permission, which still answers 403 and 401.
 //
 // # References
 //

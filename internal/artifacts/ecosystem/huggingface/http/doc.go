@@ -63,6 +63,17 @@
 //   - A legacy migration keeps its source items, publishes one verified
 //     revision atomically, and refuses a move that would change any
 //     permission's access.
+//   - Artifactory's download policy, after the caller's read permission:
+//     a file of a blacked-out repository, or one the include and exclude
+//     patterns reject at its snapshot path, answers resolve 404 with the
+//     item routes' message before any header of the served file is set,
+//     and its Xet reconstruction and chunk ranges answer the same unless
+//     another file of the revision with the same content may be served. A
+//     blacked-out local or federated repository answers info, tree and the
+//     Xet read token with the blackout's 404, naming the model's folder,
+//     and a virtual repository passes over a blacked-out member, local or
+//     remote, when it chooses the member that serves a revision. The
+//     patterns leave a file listed and a read token issued.
 //   - Statuses and error texts stay byte-identical.
 //
 // # References
@@ -113,4 +124,9 @@
 //     test kit, access/accesstest), its faults and cancellation.
 //   - lifecycle_test.go: delete, restore and reindex through the item
 //     service.
+//
+// The route suite test/server/artifacts/huggingface checks the download
+// policy on resolve, info, tree and Xet, directly and through a virtual
+// repository (TestAccHuggingFaceDownloadPolicy and
+// TestAccHuggingFaceVirtualDownloadPolicy).
 package huggingfacehttp

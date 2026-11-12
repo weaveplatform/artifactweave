@@ -80,6 +80,17 @@ func (h handler) fail(w http.ResponseWriter, r *http.Request, status int, msg st
 	h.k.Error(w, r, apierror.New(status, msg))
 }
 
+// answer answers err from reading a repository's packages. A remote's
+// policy refusal, which a revalidation or a check of its metadata returns
+// unmapped, answers its own 404 and message rather than a fault (R4);
+// other errors keep their answers.
+func (h handler) answer(w http.ResponseWriter, r *http.Request, err error) {
+	if pkgroute.IsRefusal(err) {
+		err = pkgroute.SourceError(err, false)
+	}
+	h.k.Error(w, r, err)
+}
+
 func (h handler) signingKey(r *http.Request) (*rsa.PrivateKey, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	ref := c.PrimaryKeyPairRef
@@ -134,9 +145,20 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, "", accessapi.ActionRead) {
 		return
 	}
+	// 7.x keeps names, versions and packages/<name> at those paths (the
+	// Hex repositories' layout) and reads them through the download path,
+	// so the blackout and a pattern on the path, a remote's own included,
+	// refuse them before anything is read or computed, and a virtual
+	// repository's patterns answer "No repository found to serve the
+	// request" [I]. A pattern on a release's tarball leaves it listed:
+	// hiding a package takes a pattern on each layout folder (R1, R3, R5).
+	if err := h.k.CheckDocument(r, path); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	packages, err := h.packages(r, path)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.answer(w, r, err)
 		return
 	}
 	key, err := h.signingKey(r)
@@ -248,6 +270,12 @@ func (h handler) tarball(w http.ResponseWriter, r *http.Request, path string) {
 	}
 	c := pkgroute.RequestFrom(r).Repo
 	if c.Class == repo.Virtual {
+		// The virtual repository's own patterns leave it no member to
+		// search (6.20 VirtualRepoDownloadStrategy, R5).
+		if err := h.k.CheckDownload(r, path); err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
 		members, err := h.members(r)
 		if err != nil {
 			h.k.Error(w, r, err)
@@ -271,7 +299,7 @@ func (h handler) tarball(w http.ResponseWriter, r *http.Request, path string) {
 				h.k.ServeResult(w, mr, result)
 				return
 			}
-			found, err := h.k.Item(mr, path)
+			found, err := h.k.DownloadItem(mr, path)
 			if missing(err) {
 				continue
 			}
@@ -336,6 +364,12 @@ func (h handler) virtualPackages(
 		// may not read below it. Every release a member lists lives there,
 		// so passing over such a member hides nothing the caller may read.
 		if !h.k.CanFolder(mr, "tarballs", accessapi.ActionRead) {
+			continue
+		}
+		// A member that is blacked out, which 7.x ignores when it
+		// resolves, or whose patterns reject the document's path adds
+		// nothing to the merge (R5, [I] for the patterns).
+		if h.k.CheckDocument(mr, path) != nil {
 			continue
 		}
 		entries, err := h.packages(mr, path)

@@ -35,9 +35,16 @@ func (h handler) upstreamKey(r *http.Request) (*rsa.PublicKey, error) {
 	return key, nil
 }
 
+// remoteMetadata reads path, the upstream's signed versions or
+// packages/<name>, to answer document, the request's path. The remote's
+// download policy is checked at document, where 7.x keeps it, so a names
+// answer built from versions is checked at names; a lookup, the read a
+// tarball's download makes to find the tarball, checks only the blackout
+// (R1, R4).
 func (h handler) remoteMetadata(
 	r *http.Request,
-	path string,
+	path, document string,
+	lookup bool,
 	key *rsa.PublicKey,
 ) (source.Result, []byte, error) {
 	resource := source.Resource{
@@ -46,6 +53,8 @@ func (h handler) remoteMetadata(
 		Method:           http.MethodGet,
 		PermissionFolder: true,
 		PermissionPath:   "tarballs",
+		PolicyPath:       document,
+		BlackoutOnly:     lookup,
 		Variant:          "hex-registry-v2-signed",
 		ValidateMetadata: func(ctx context.Context, body io.ReadSeeker, size int64, _ source.MetadataResponse) error {
 			if err := ctx.Err(); err != nil {
@@ -98,13 +107,14 @@ func (h handler) remotePackages(
 	r *http.Request,
 	path string,
 ) (map[string]hexfmt.RegistryPackage, error) {
-	out, _, err := h.remotePackagesWithAuthority(r, path)
+	out, _, err := h.remotePackagesWithAuthority(r, path, false)
 	return out, err
 }
 
 func (h handler) remotePackagesWithAuthority(
 	r *http.Request,
 	path string,
+	lookup bool,
 ) (map[string]hexfmt.RegistryPackage, source.Result, error) {
 	key, err := h.upstreamKey(r)
 	if err != nil {
@@ -114,7 +124,7 @@ func (h handler) remotePackagesWithAuthority(
 	if path == "names" {
 		upstream = "versions"
 	}
-	metadata, data, err := h.remoteMetadata(r, upstream, key)
+	metadata, data, err := h.remoteMetadata(r, upstream, path, lookup, key)
 	if err != nil {
 		return nil, source.Result{}, err
 	}
@@ -144,9 +154,11 @@ func (h handler) remotePackagesWithAuthority(
 			if !h.k.Can(r, p, api.ActionRead) {
 				continue
 			}
+			// A release whose tarball the remote's patterns reject stays
+			// listed, and only its tarball refuses (R3).
 			if err := metadata.CheckRead(r.Context(), p); errors.Is(err, source.ErrDenied) {
 				continue
-			} else if err != nil {
+			} else if err != nil && !pkgroute.IsRefusal(err) {
 				return nil, source.Result{}, fmt.Errorf("hex: check remote release read: %w", err)
 			}
 			if release.OuterChecksum == [32]byte{} {
@@ -193,7 +205,7 @@ func (h handler) remotePackagesWithAuthority(
 			}
 			if err := metadata.CheckRead(r.Context(), p); errors.Is(err, source.ErrDenied) {
 				continue
-			} else if err != nil {
+			} else if err != nil && !pkgroute.IsRefusal(err) {
 				return nil, source.Result{}, fmt.Errorf("hex: check remote release read: %w", err)
 			}
 			entry := out[reg.Name]
@@ -227,7 +239,7 @@ func splitTarball(path string) (string, string, bool) {
 
 func (h handler) remoteTarball(w http.ResponseWriter, r *http.Request, path string) {
 	result, err := h.remoteResult(r, path)
-	if errors.Is(err, kernel.ErrNotFound) {
+	if errors.Is(err, kernel.ErrNotFound) && !pkgroute.IsRefusal(err) {
 		h.fail(w, r, http.StatusNotFound, "Hex tarball not found")
 		return
 	}
@@ -239,11 +251,17 @@ func (h handler) remoteTarball(w http.ResponseWriter, r *http.Request, path stri
 }
 
 func (h handler) remoteResult(r *http.Request, path string) (source.Result, error) {
+	// The tarball's own path, before the package metadata it is found
+	// through is read, so the refusal names the tarball (R10). A virtual
+	// member that refuses is passed over.
+	if err := h.k.CheckDocument(r, path); err != nil {
+		return source.Result{}, fmt.Errorf("hex: tarball download policy: %w", err)
+	}
 	name, version, ok := splitTarball(path)
 	if !ok {
 		return source.Result{}, kernel.ErrNotFound
 	}
-	entries, metadata, err := h.remotePackagesWithAuthority(r, "packages/"+name)
+	entries, metadata, err := h.remotePackagesWithAuthority(r, "packages/"+name, true)
 	if err != nil {
 		return source.Result{}, err
 	}
@@ -325,7 +343,15 @@ func (h handler) legacyOuterChecksum(
 ) ([32]byte, error) {
 	var zero [32]byte
 	resource := tarballResource(r, path, expected.Name, expected.Version, expected)
-	result, err := h.k.Read(r, resource)
+	result, err := h.k.ReadMetadata(r, resource)
+	if pkgroute.IsRefusal(err) || errors.Is(err, kernel.ErrNotFound) {
+		// The remote's patterns reject the tarball, so it is not read: the
+		// release stays listed as the upstream lists it, without the outer
+		// checksum, and only its download refuses (R3). A virtual member's
+		// refusal arrives as its pass-over, kernel.ErrNotFound; an upstream
+		// without the tarball answers an *apierror.Error.
+		return zero, nil
+	}
 	if err != nil {
 		return zero, fmt.Errorf("hex: read legacy tarball: %w", err)
 	}

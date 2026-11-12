@@ -199,9 +199,14 @@ func TestAccGalaxyCDNArchiveStripsCredentialsAndHonorsPatterns(t *testing.T) {
 	if err := f.db.Repos().Update(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	// The shared CheckRead boundary normalizes a pattern rejection to an
-	// unavailable result. It must not disclose metadata or contact the CDN.
-	requireStatus(t, f.do("GET", endpoint, nil, "", ""), http.StatusBadGateway)
+	// The shared CheckRead boundary passes the pattern rejection on as the
+	// repository's own 404 with the patterns' message, as the item routes
+	// answer it, not as an unavailable source (#1237). The CDN is not asked.
+	w = f.do("GET", endpoint, nil, "", "")
+	requireStatus(t, w, http.StatusNotFound)
+	if !strings.Contains(w.Body.String(), "due to its include/exclude pattern settings") {
+		t.Fatalf("refusal = %s, want the patterns' message", w.Body.String())
+	}
 	if requests.Load() != 1 {
 		t.Fatal("excluded artifact contacted CDN")
 	}

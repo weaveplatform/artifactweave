@@ -19,14 +19,16 @@
 //     tests retype, the users reader and denied and the remote-read
 //     permission.
 //   - The Puppet module fixtures in test/acceptance/fixtures/puppet, read
-//     root-relative through repopath, and an upstream test server.
+//     root-relative through repopath, module archives the tests build, and
+//     upstream Forge test servers.
 //
 // # Outputs
 //
 // Assertions only:
 //   - puppet_remote_test.go: the remote cache's refresh, offline answers
-//     and integrity checks, and the routes a local Puppet repository
-//     registers with their permissions and reindex.
+//     and integrity checks, the routes a local Puppet repository registers
+//     with their permissions and reindex, and the download policy of a
+//     remote, and of a virtual repository over it, at the paths 7.x checks.
 //
 // # References
 //

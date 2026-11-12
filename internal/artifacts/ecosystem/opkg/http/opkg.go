@@ -29,12 +29,14 @@ var (
 )
 
 type opkgIndexView struct {
-	repo       repo.Config
-	packages   []opkg.Package
-	raw        []byte
-	checkRead  func(context.Context, string) error
-	revalidate func(context.Context) error
-	used       func(context.Context) error
+	repo     repo.Config
+	packages []opkg.Package
+	raw      []byte
+	// checkPermission is a remote feed read's permission-only check of
+	// each package the feed lists (source.Result.CheckPermission).
+	checkPermission func(context.Context, string) error
+	revalidate      func(context.Context) error
+	used            func(context.Context) error
 }
 
 type opkgCandidate struct {
@@ -92,16 +94,26 @@ func (s opkgItems) serveOpkgIndex(
 		return
 	}
 	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
-		!acc.File(c, req.Path, accessapi.ActionRead) ||
-		generic.CheckDownload(c, req.Path, false) != nil {
+		!acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		return
+	}
+	// 7.x calculates and stores a local feed's Packages and caches a
+	// remote's at this path, so a blacked-out repository or patterns that
+	// reject the file's own path answer the policy's 404 and message once
+	// read permission is settled (DV-057); a virtual repository's patterns
+	// answer that no repository serves it. A remote's -cache alias answers
+	// as the remote does.
+	if err := generic.CheckDownload(c, req.Path, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "Opkg feed download", err))
 		return
 	}
 	var body []byte
 	var used func(context.Context) error
 	if c.Class == repo.Virtual {
 		indexPath := opkg.IndexPath(feed, opkg.PackagesName)
-		candidates, err := s.opkgCandidates(ctx, st, c, indexPath, p, acc, map[string]bool{})
+		candidates, err := s.opkgCandidates(ctx, st, c, indexPath, p, acc, false,
+			map[string]bool{})
 		if err != nil {
 			httpkit.WriteErr(w, r, s.ItemError(ctx, "Opkg virtual feed", err))
 			return
@@ -136,7 +148,7 @@ func (s opkgItems) serveOpkgIndex(
 			}
 		}
 		for _, pkg := range view.packages {
-			allowed, err := opkgPackageReadable(ctx, c, pkg.Path, acc, view.checkRead)
+			allowed, err := opkgPackageReadable(ctx, c, pkg.Path, acc, view.checkPermission)
 			if err != nil {
 				httpkit.WriteErr(w, r, s.ItemError(ctx, "Opkg package read authority", err))
 				return
@@ -157,11 +169,16 @@ func (s opkgItems) serveOpkgIndex(
 	}
 }
 
+// opkgPackageReadable reports whether the caller has Read permission on a
+// package a feed lists, in c and, through check, at a remote's source. It
+// is permission alone: a feed keeps a package whose file the patterns
+// reject and only that file's GET is refused, as 7.x keeps such a package
+// in a Debian or RPM index (RTFACT-30830, RTFACT-30656).
 func opkgPackageReadable(
 	ctx context.Context, c repo.Config, p string, acc itemkit.Access,
 	check func(context.Context, string) error,
 ) (bool, error) {
-	if !acc.File(c, p, accessapi.ActionRead) || generic.CheckDownload(c, p, false) != nil {
+	if !acc.File(c, p, accessapi.ActionRead) {
 		return false, nil
 	}
 	if check != nil {
@@ -200,8 +217,8 @@ func (s opkgItems) opkgMemberIndex(
 				pkgroute.SourceError(err, p.Anonymous),
 			)
 		}
-		view.checkRead, view.revalidate, view.used =
-			result.CheckRead, result.Revalidate, result.Used
+		view.checkPermission, view.revalidate, view.used =
+			result.CheckPermission, result.Revalidate, result.Used
 		switch {
 		case result.Stream != nil:
 			defer func() { _ = result.Stream.Body.Close() }()
@@ -254,9 +271,17 @@ func (s opkgItems) readOpkgBlob(ctx context.Context, sha string) ([]byte, error)
 	return body, nil
 }
 
+// opkgCandidates walks ordered virtual members. A duplicate path belongs to
+// the first readable member. A member whose download policy refuses its
+// feed takes no part in the feed, and only a blacked-out one in an IPK GET
+// (opkgMemberRefusesFeed). With download false, for the feed, a row stays
+// when the member's or the virtual repository's patterns reject its file,
+// which the feed keeps as 7.x's virtual indexes do (RTFACT-30656). With
+// download true, for an IPK GET, such a row is left out, so the GET passes
+// over that member to the next one that lists the path.
 func (s opkgItems) opkgCandidates(
 	ctx context.Context, st itemkit.Store, c repo.Config, indexPath string,
-	p kernel.Principal, acc itemkit.Access, seen map[string]bool,
+	p kernel.Principal, acc itemkit.Access, download bool, seen map[string]bool,
 ) ([]opkgCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
 		return nil, errOpkgVirtualCycle
@@ -278,12 +303,12 @@ func (s opkgItems) opkgCandidates(
 		}
 		if !acc.Folder(member, indexPath, accessapi.ActionRead) ||
 			!acc.File(member, indexPath, accessapi.ActionRead) ||
-			generic.CheckDownload(member, indexPath, false) != nil {
+			opkgMemberRefusesFeed(member, indexPath, download) {
 			continue
 		}
 		var entries []opkgCandidate
 		if member.Class == repo.Virtual {
-			entries, err = s.opkgCandidates(ctx, st, member, indexPath, p, acc, seen)
+			entries, err = s.opkgCandidates(ctx, st, member, indexPath, p, acc, download, seen)
 		} else {
 			var view opkgIndexView
 			view, err = s.opkgMemberIndex(ctx, st, member, false, indexPath, p, acc)
@@ -292,8 +317,11 @@ func (s opkgItems) opkgCandidates(
 			}
 			if err == nil {
 				for _, pkg := range view.packages {
+					if download && generic.CheckDownload(member, pkg.Path, false) != nil {
+						continue
+					}
 					allowed, checkErr := opkgPackageReadable(
-						ctx, member, pkg.Path, acc, view.checkRead)
+						ctx, member, pkg.Path, acc, view.checkPermission)
 					if checkErr != nil {
 						err = checkErr
 						break
@@ -312,8 +340,10 @@ func (s opkgItems) opkgCandidates(
 		}
 		for _, entry := range entries {
 			if selected[entry.pkg.Path] ||
-				!acc.File(c, entry.pkg.Path, accessapi.ActionRead) ||
-				generic.CheckDownload(c, entry.pkg.Path, false) != nil {
+				!acc.File(c, entry.pkg.Path, accessapi.ActionRead) {
+				continue
+			}
+			if download && generic.CheckDownload(c, entry.pkg.Path, false) != nil {
 				continue
 			}
 			selected[entry.pkg.Path] = true
@@ -321,6 +351,22 @@ func (s opkgItems) opkgCandidates(
 		}
 	}
 	return out, nil
+}
+
+// opkgMemberRefusesFeed reports whether a virtual repository's member takes
+// no part because its download policy refuses the feed at indexPath. The
+// virtual feed leaves out a member that refuses the document. An IPK GET
+// checks each member at the IPK's own path, as 6.20's
+// VirtualRepoDownloadStrategy does and as the patterns FAQ puts it
+// ("artifacts that match an exclude pattern are not resolved from that
+// repository"), so there the feed is only the lookup that finds the file: a
+// blacked-out member, which refuses every file, takes no part, and patterns
+// that reject only the feed leave the member's IPKs served.
+func opkgMemberRefusesFeed(member repo.Config, indexPath string, download bool) bool {
+	if !download {
+		return generic.CheckDownload(member, indexPath, false) != nil
+	}
+	return member.Class != repo.Virtual && generic.CheckBlackedOut(member, indexPath) != nil
 }
 
 func (s opkgItems) serveOpkgPackage(
@@ -331,16 +377,27 @@ func (s opkgItems) serveOpkgPackage(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.File(c, req.Path, accessapi.ActionRead) ||
-		generic.CheckDownload(c, req.Path, false) != nil {
+	if !acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		return
+	}
+	// The IPK's own path decides, as a download does: a blacked-out remote
+	// or patterns that reject the file answer the policy's 404 and message,
+	// and a virtual repository's patterns answer that no repository serves
+	// it. The feed read below, which pins the download's SHA-256, checks a
+	// remote's blackout alone (itemkit.OpkgSourceRequest reads it at the
+	// repository root), so patterns that reject only the feed's path leave
+	// the IPK served, as a download checks only its own path.
+	if err := generic.CheckDownload(c, req.Path, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Opkg package download", err))
 		return
 	}
 	indexPath := opkg.IndexPath(opkg.Feed(req.Path), opkg.PackagesName)
 	var candidates []opkgCandidate
 	var err error
 	if c.Class == repo.Virtual {
-		candidates, err = s.opkgCandidates(r.Context(), st, c, indexPath, p, acc, map[string]bool{})
+		candidates, err = s.opkgCandidates(r.Context(), st, c, indexPath, p, acc, true,
+			map[string]bool{})
 	} else {
 		var view opkgIndexView
 		view, err = s.opkgMemberIndex(r.Context(), st, c, cached, indexPath, p, acc)

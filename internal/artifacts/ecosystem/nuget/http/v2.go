@@ -65,6 +65,9 @@ func (h handler) v2(w http.ResponseWriter, r *http.Request) {
 // An exact lookup includes a SemVer 2 version even without semVerLevel:
 // NuGet's exact restore request carries no query parameters at all.
 func (h handler) v2Entry(w http.ResponseWriter, r *http.Request, id, ver string) {
+	if h.blackedOut(w, r) {
+		return
+	}
 	key, valid := versionKey(ver)
 	if !valid {
 		h.k.Error(w, r, notFound(r))
@@ -185,6 +188,11 @@ func odataLiteral(s string) (string, bool) {
 }
 
 func (h handler) v2Feed(w http.ResponseWriter, r *http.Request, endpoint string, count bool) {
+	// FindPackagesById() is what restore reads; Packages() and Search()
+	// list and search, which keep their answers.
+	if endpoint == "FindPackagesById()" && h.blackedOut(w, r) {
+		return
+	}
 	q, err := parseV2Query(r.URL.Query(), endpoint)
 	if err != nil {
 		h.k.Error(w, r, err)

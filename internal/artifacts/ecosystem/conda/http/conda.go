@@ -19,7 +19,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	condafmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/conda"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
@@ -103,8 +102,17 @@ func (h handler) readMetadata(w http.ResponseWriter, r *http.Request, id condafm
 		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Conda metadata not found"))
 		return
 	}
+	// 7.x calculates a local channel's index files and caches a remote's,
+	// each at its own path, and reads them through the download path, so a
+	// blackout or a pattern on the requested document refuses it, naming
+	// it, and a virtual repository's own patterns refuse it too (R1, R5). A
+	// pattern on one package's file leaves its record listed (RTFACT-24940).
+	if err := h.k.CheckDocument(r, id.Path); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	canonical := condafmt.IndexPath(id.Channel, id.Subdir, "repodata.json")
-	index, finish, err := h.memberIndex(r, canonical, map[string]bool{})
+	index, finish, err := h.memberIndex(r, canonical, readPolicy{path: id.Path}, map[string]bool{})
 	if err != nil {
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
@@ -154,10 +162,27 @@ func (h handler) serveBytes(w http.ResponseWriter, r *http.Request, body []byte,
 	http.ServeContent(w, r, path.Base(r.URL.Path), time.Time{}, bytes.NewReader(body))
 }
 
+// readPolicy is how the download policy applies to the reads an index is
+// built from. path is the one 7.x checks: the index document the request
+// answers, already checked with CheckDocument, or the package whose record a
+// download looks up, where download leaves the lookup to the blackout alone,
+// since the download checks the package at its own path.
+type readPolicy struct {
+	path     string
+	download bool
+}
+
 // memberIndex returns only package records the caller may read. A virtual
 // aggregates concrete members in configured order; it never inherits one
-// member's authority or source network permit from another.
-func (h handler) memberIndex(r *http.Request, indexPath string, seen map[string]bool) (
+// member's authority or source network permit from another. The records of
+// packages whose files the patterns reject are kept: only their downloads
+// are refused (R3).
+func (h handler) memberIndex(
+	r *http.Request,
+	indexPath string,
+	policy readPolicy,
+	seen map[string]bool,
+) (
 	condafmt.Repodata, func(context.Context) error, error,
 ) {
 	c := pkgroute.RequestFrom(r).Repo
@@ -174,11 +199,10 @@ func (h handler) memberIndex(r *http.Request, indexPath string, seen map[string]
 	seen[c.Key] = true
 	defer delete(seen, c.Key)
 	if c.Class == repo.Virtual {
-		return h.virtualIndex(r, id, seen)
+		return h.virtualIndex(r, id, policy, seen)
 	}
 	if !h.k.CanFolder(r, path.Dir(indexPath), api.ActionRead) ||
-		!h.k.Can(r, indexPath, api.ActionRead) ||
-		generic.CheckDownload(c, indexPath, false) != nil {
+		!h.k.Can(r, indexPath, api.ActionRead) {
 		return condafmt.Repodata{}, nil, apierror.New(
 			http.StatusForbidden,
 			"Conda index is not readable",
@@ -186,12 +210,12 @@ func (h handler) memberIndex(r *http.Request, indexPath string, seen map[string]
 	}
 	if c.Class == repo.Remote {
 		if h.settings.ShardsEnabled {
-			index, finish, err := h.remoteShardedIndex(r, id)
+			index, finish, err := h.remoteShardedIndex(r, id, policy)
 			if !errors.Is(err, errNoShardIndex) {
 				return index, finish, err
 			}
 		}
-		return h.remoteIndex(r, id)
+		return h.remoteIndex(r, id, policy)
 	}
 	return h.localIndex(r, id)
 }
@@ -199,7 +223,7 @@ func (h handler) memberIndex(r *http.Request, indexPath string, seen map[string]
 func (h handler) localIndex(r *http.Request, id condafmt.MetadataPath) (
 	condafmt.Repodata, func(context.Context) error, error,
 ) {
-	f, err := h.k.ResolveItem(r, id.Path)
+	f, err := h.k.ResolveStoredItem(r, id.Path)
 	if errors.Is(err, kernel.ErrNotFound) {
 		return condafmt.EmptyRepodata(id.Subdir), nil, nil
 	}
@@ -226,12 +250,13 @@ func (h handler) localIndex(r *http.Request, id condafmt.MetadataPath) (
 	return filtered, nil, err
 }
 
-func (h handler) remoteIndex(r *http.Request, id condafmt.MetadataPath) (
+func (h handler) remoteIndex(r *http.Request, id condafmt.MetadataPath, policy readPolicy) (
 	condafmt.Repodata, func(context.Context) error, error,
 ) {
 	resource := source.Resource{
 		Kind: source.ResourceKindMetadata, Path: id.Path, Method: http.MethodGet,
 		PermissionFolder: true, PermissionPath: path.Dir(id.Path),
+		PolicyPath: policy.path, BlackoutOnly: policy.download,
 		Variant: "conda-repodata-v1", ExpectedContentTypes: []string{
 			"application/json", "text/plain", "application/octet-stream",
 		},
@@ -263,7 +288,7 @@ func (h handler) remoteIndex(r *http.Request, id condafmt.MetadataPath) (
 	if err != nil {
 		return condafmt.Repodata{}, nil, fmt.Errorf("conda: upstream repodata content: %w", err)
 	}
-	filtered, err := h.filterIndex(r.Context(), r, index, id, result.CheckRead)
+	filtered, err := h.filterIndex(r.Context(), r, index, id, result.CheckPermission)
 	if err != nil {
 		return condafmt.Repodata{}, nil, err
 	}
@@ -294,15 +319,18 @@ func (h handler) resultBytes(ctx context.Context, result source.Result) ([]byte,
 	return body, nil
 }
 
+// filterIndex keeps the records of the packages the caller may read. check,
+// when set, is a remote result's permission-only check of each package. The
+// download policy drops no record: 7.x lists a package whose file the
+// patterns reject and refuses only its download (RTFACT-24940).
 func (h handler) filterIndex(ctx context.Context, r *http.Request,
 	index condafmt.Repodata, id condafmt.MetadataPath,
 	check func(context.Context, string) error,
 ) (condafmt.Repodata, error) {
 	filtered := condafmt.EmptyRepodata(id.Subdir)
-	c := pkgroute.RequestFrom(r).Repo
 	keep := func(filename string) (bool, error) {
 		p := condafmt.IndexPath(id.Channel, id.Subdir, filename)
-		if !h.k.Can(r, p, api.ActionRead) || generic.CheckDownload(c, p, false) != nil {
+		if !h.k.Can(r, p, api.ActionRead) {
 			return false, nil
 		}
 		if check != nil {

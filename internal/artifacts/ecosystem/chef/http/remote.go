@@ -18,7 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	cheffmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/chef"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
@@ -222,13 +221,19 @@ func (h handler) metadata(
 	}
 	target.RawQuery = query.Encode()
 	resource := source.Resource{
-		Kind:                source.ResourceKindMetadata,
-		Path:                strings.TrimPrefix(path, "/"),
-		ExternalURL:         target.String(),
-		Method:              http.MethodGet,
-		NoCrossOriginAuth:   true,
-		PermissionFolder:    true,
-		PermissionPath:      permission,
+		Kind:              source.ResourceKindMetadata,
+		Path:              strings.TrimPrefix(path, "/"),
+		ExternalURL:       target.String(),
+		Method:            http.MethodGet,
+		NoCrossOriginAuth: true,
+		PermissionFolder:  true,
+		PermissionPath:    permission,
+		// 7.x documents no path it keeps a remote's Chef metadata at, so
+		// only the remote's blackout refuses it (R2a, R4): a cookbook whose
+		// archives or folder the patterns reject stays listed, as
+		// RTFACT-20145 shows for search, and only an archive's own read is
+		// refused.
+		BlackoutOnly:        true,
 		Variant:             "chef-supermarket-metadata-v1",
 		ExpectedContentType: mediaType,
 		CheckURL:            func(_ context.Context, u *url.URL) error { return checkRegistry(c, u) },
@@ -248,7 +253,7 @@ func (h handler) metadata(
 	if err != nil {
 		return nil, result, fmt.Errorf("chef: metadata: %w", pkgroute.SourceError(err, false))
 	}
-	if result.CheckRead == nil || result.Revalidate == nil {
+	if result.CheckRead == nil || result.CheckPermission == nil || result.Revalidate == nil {
 		if result.Stream != nil {
 			_ = result.Stream.Body.Close()
 		}
@@ -315,10 +320,12 @@ func (h handler) remoteVersions(r *http.Request, name string) ([]release, error)
 	out := make([]release, 0, len(versions))
 	for _, version := range versions {
 		path := cheffmt.Path(name, version)
-		if !h.k.Can(r, path, api.ActionRead) || generic.CheckDownload(c, path, false) != nil {
+		// Read permission alone decides the listing: a version whose
+		// archive the patterns reject stays listed (R3).
+		if !h.k.Can(r, path, api.ActionRead) {
 			continue
 		}
-		if err = index.CheckRead(r.Context(), path); errors.Is(err, source.ErrDenied) {
+		if err = index.CheckPermission(r.Context(), path); errors.Is(err, source.ErrDenied) {
 			continue
 		} else if err != nil {
 			return nil, fmt.Errorf("chef: version authority: %w", pkgroute.SourceError(err, false))
@@ -346,10 +353,10 @@ func (h handler) remoteVersions(r *http.Request, name string) ([]release, error)
 			return result.Revalidate(ctx)
 		}
 		rel.checkRead = func(ctx context.Context, path string) error {
-			if e := index.CheckRead(ctx, path); e != nil {
+			if e := index.CheckPermission(ctx, path); e != nil {
 				return fmt.Errorf("chef: upstream authority: %w", e)
 			}
-			return result.CheckRead(ctx, path)
+			return result.CheckPermission(ctx, path)
 		}
 		out = append(out, rel)
 	}

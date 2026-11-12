@@ -36,6 +36,10 @@
 //
 //   - A download is refused before any lookup, whether or not the item
 //     exists and for an administrator too, as Artifactory does.
+//   - A system path, a Maven index file or any path ending .index, passes
+//     a download's include and exclude patterns but not the blackout, as
+//     Artifactory 6.20's RepoBase.accepts passes it (NamingUtils.isSystem);
+//     7.x documents nothing either way (#216).
 //   - The refusal statuses and messages are Artifactory's
 //     (BlackedOutException, IncludeExcludeException and the virtual
 //     repository's "No repository found"), so they stay byte-identical.
@@ -73,6 +77,6 @@
 //
 //   - generic_test.go: the deploy policy through Admit, the hooks doing
 //     nothing, and CheckDownload for blacked-out, pattern-refused, folder,
-//     root and virtual requests.
+//     root, virtual and system-path requests.
 //   - contract_test.go: the format contract suite (artifacts/core/formattest).
 package generic

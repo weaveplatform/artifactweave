@@ -80,6 +80,15 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, owner+"/"+name, api.ActionRead) {
 		return
 	}
+	// The version list is what the client resolves a range against before
+	// it downloads, and 7.x ignores a blacked-out repository when it
+	// resolves. Where 7.x keeps the list is not documented, so the blackout
+	// alone refuses it, naming the package's folder; patterns rejecting a
+	// version's archive leave that version listed.
+	if err := h.k.CheckBlackedOut(r, owner+"/"+name); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	p, err := h.k.DB().
 		Packages().
 		Find(r.Context(), pkgroute.RequestFrom(r).Repo.Key, owner+"/"+name)
@@ -131,9 +140,33 @@ func (h handler) download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := apmfmt.Path(owner, name, version)
+	// The contract marks a version's archive immutable for a day (APM
+	// registry HTTP API, sections 1.6 and 7.1, "versions are immutable"),
+	// and neither a refusal nor a missing version is a version: a client
+	// that cached one would not see the version for a day after the
+	// repository lets it through or it is published. So the archive is
+	// found, after the read grant and the download policy, before the
+	// headers are set, and ServeFound's own checks of both then pass.
+	if !h.k.Require(w, r, path, api.ActionRead) {
+		return
+	}
+	f, err := h.k.DownloadItem(r, path)
+	switch {
+	case pkgroute.IsRefusal(err):
+		h.k.Error(w, r, err)
+		return
+	case errors.Is(err, kernel.ErrNotFound) || err == nil && f.Item.Folder:
+		// The answer ServeItem gives a missing file, which this route gave
+		// before it found the archive itself.
+		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Could not find resource"))
+		return
+	case err != nil:
+		h.k.Error(w, r, err)
+		return
+	}
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Cache-Control", "private, max-age=86400, immutable")
-	h.k.ServeItem(w, r, path)
+	h.k.ServeFound(w, r, f)
 }
 
 func (h handler) publish(w http.ResponseWriter, r *http.Request) {

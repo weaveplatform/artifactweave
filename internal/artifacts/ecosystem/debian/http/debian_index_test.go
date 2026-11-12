@@ -6,12 +6,16 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // zeros reads as an endless run of zero bytes, an upstream body that
@@ -23,22 +27,138 @@ func (zeros) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// TestAccDebianIndexRefusesQueriesAndCallersWhoMayNotRead: a Packages index
-// with a query is not found, and one in a blacked-out repository, or asked
-// for by a caller who may not read it, is refused before it is read.
-func TestAccDebianIndexRefusesQueriesAndCallersWhoMayNotRead(t *testing.T) {
+// TestAccDebianIndexRefusals: a Packages or Sources index with a query is
+// not found; one asked for by a caller who may not read it is refused first,
+// whatever the repository's settings (DV-057); and one in a blacked-out
+// repository, or whose own path the patterns reject, answers the download
+// policy's 404 and message before it is read, an administrator included.
+func TestAccDebianIndexRefusals(t *testing.T) {
 	w := newOverlayWorld(t)
 	w.debRepos(
 		repo.Config{Key: "deb-local", Class: repo.Local},
 		repo.Config{Key: "deb-dark", Class: repo.Local, BlackedOut: new(true)},
+		repo.Config{Key: "deb-hidden", Class: repo.Local, ExcludesPattern: new("**/Packages*")},
 	)
-	for _, key := range []string{"deb-local", "deb-dark"} {
+	for _, key := range []string{"deb-local", "deb-dark", "deb-hidden"} {
 		w.publish(key, packagesIndex("alpha 1.0 "+debAlpha))
 	}
-	wantError(t, w.get("deb-local", debPackages+"?x=1", "admin"),
-		http.StatusNotFound, "Could not find resource")
-	wantError(t, w.get("deb-local", debPackages, "user"), http.StatusForbidden, "Forbidden")
-	wantError(t, w.get("deb-dark", debPackages, "admin"), http.StatusForbidden, "Forbidden")
+	for _, tc := range []struct {
+		name, key, path, as string
+		status              int
+		message             string
+	}{
+		{
+			"query", "deb-local", debPackages + "?x=1", "admin",
+			http.StatusNotFound, "Could not find resource",
+		},
+		{
+			"caller who may not read", "deb-local", debPackages, "user",
+			http.StatusForbidden, "Forbidden",
+		},
+		{
+			"caller who may not read a blacked-out index", "deb-dark", debPackages, "user",
+			http.StatusForbidden, "Forbidden",
+		},
+		{
+			"blacked-out Packages", "deb-dark", debPackages, "admin",
+			http.StatusNotFound, "The repository 'deb-dark' is blacked out and cannot serve " +
+				"artifact 'deb-dark:" + debPackages + "'.",
+		},
+		{
+			"blacked-out Sources", "deb-dark", debSources, "admin",
+			http.StatusNotFound, "The repository 'deb-dark' is blacked out and cannot serve " +
+				"artifact 'deb-dark:" + debSources + "'.",
+		},
+		{
+			"Packages the patterns reject", "deb-hidden", debPackages, "admin",
+			http.StatusNotFound, "The repository 'deb-hidden' rejected the artifact " +
+				"'deb-hidden:" + debPackages + "' due to its include/exclude pattern settings.",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wantError(t, w.get(tc.key, tc.path, tc.as), tc.status, tc.message)
+		})
+	}
+}
+
+// TestAccDebianIndexNeedsReadPermissionOnEveryListedPackage: a caller who
+// may read an index but not a package it lists is refused the index, the
+// permission rule the generic item route cannot apply.
+func TestAccDebianIndexNeedsReadPermissionOnEveryListedPackage(t *testing.T) {
+	w := newOverlayWorld(t)
+	w.debRepos(repo.Config{Key: "deb-local", Class: repo.Local})
+	w.publish("deb-local", packagesIndex("alpha 1.0 "+debAlpha))
+	indexOnly := &accessapitest.Decider{Admin: true, AllowsFunc: func(
+		_ accessapi.ResourceType, _ accessapi.Repo, path string, _ accessapi.Actions,
+	) bool {
+		return !strings.HasPrefix(path, "pool/")
+	}}
+	r := w.request("deb-local", debPackages, "reader")
+	r = r.WithContext(
+		accessapi.WithCaller(r.Context(), kernel.Principal{Name: "reader"}, indexOnly),
+	)
+	rec := httptest.NewRecorder()
+	w.kit.GetItem(rec, r)
+	wantError(t, rec, http.StatusForbidden, "Forbidden")
+}
+
+// TestAccDebianIndexKeepsAPackageThePatternsReject: a local or remote
+// Packages index is served unchanged, listing a package whose file the
+// repository's patterns reject, as 7.x keeps such a package in its Debian
+// metadata (RTFACT-30830); only that file's GET answers the policy's 404.
+func TestAccDebianIndexKeepsAPackageThePatternsReject(t *testing.T) {
+	index := packagesIndex("alpha 1.0 "+debAlpha, "beta 1.0 "+debBeta)
+	w := newOverlayWorld(t, withSources(upstream(map[string]func() (source.Result, error){
+		debPackages: streamed(index, nil),
+		debBeta:     streamed(debBody, nil),
+	})))
+	w.debRepos(
+		repo.Config{Key: "deb-local", Class: repo.Local, ExcludesPattern: new("pool/beta*")},
+		repo.Config{Key: "deb-remote", Class: repo.Remote, ExcludesPattern: new("pool/beta*")},
+	)
+	w.publish("deb-local", index)
+	w.put("deb-local", debAlpha, false, debBody)
+	w.put("deb-local", debBeta, false, debBody)
+	for _, key := range []string{"deb-local", "deb-remote"} {
+		t.Run(key, func(t *testing.T) {
+			rec := w.get(key, debPackages, "admin")
+			if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), index) {
+				t.Errorf("Packages answered %d %q, want the index as it is", rec.Code, rec.Body)
+			}
+			wantError(t, w.get(key, debBeta, "admin"), http.StatusNotFound,
+				"The repository '"+key+"' rejected the artifact '"+key+":"+debBeta+
+					"' due to its include/exclude pattern settings.")
+		})
+	}
+	if rec := w.get("deb-local", debAlpha, "admin"); rec.Code != http.StatusOK {
+		t.Errorf("accepted package answered %d %s, want 200", rec.Code, rec.Body)
+	}
+}
+
+// TestAccDebianRemoteIndexRefusedByThePolicy: a remote repository's index,
+// and the same index through its -cache alias, answers the policy's 404 and
+// message naming the remote and the index's path when the remote is blacked
+// out or its patterns reject that path, before its source is asked.
+func TestAccDebianRemoteIndexRefusedByThePolicy(t *testing.T) {
+	w := newOverlayWorld(t, refuseSources(t))
+	w.debRepos(
+		repo.Config{Key: "deb-dark", Class: repo.Remote, BlackedOut: new(true)},
+		repo.Config{Key: "deb-hidden", Class: repo.Remote, ExcludesPattern: new("**/Packages*")},
+	)
+	blackedOut := "The repository 'deb-dark' is blacked out and cannot serve artifact " +
+		"'deb-dark:" + debPackages + "'."
+	rejected := "The repository 'deb-hidden' rejected the artifact 'deb-hidden:" + debPackages +
+		"' due to its include/exclude pattern settings."
+	for _, tc := range []struct{ key, message string }{
+		{"deb-dark", blackedOut},
+		{"deb-dark-cache", blackedOut},
+		{"deb-hidden", rejected},
+		{"deb-hidden-cache", rejected},
+	} {
+		t.Run(tc.key, func(t *testing.T) {
+			wantError(t, w.get(tc.key, debPackages, "admin"), http.StatusNotFound, tc.message)
+		})
+	}
 }
 
 // TestUnitDebianIndexOfARepositoryWithoutOne: the index read answers not

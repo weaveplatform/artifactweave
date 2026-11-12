@@ -27,6 +27,15 @@ func recordOf(index condafmt.Repodata, id condafmt.PackagePath) (condafmt.Record
 	return rec, ok
 }
 
+// packageLookup is the policy of the index reads a download of id makes to
+// find its record: the package is checked at its own path, so a pattern on
+// the index does not refuse it (decision 0032: the path checked is
+// Artifactory's), and only the blackout refuses the lookup, naming the
+// package.
+func packageLookup(id condafmt.PackagePath) readPolicy {
+	return readPolicy{path: id.Path, download: true}
+}
+
 func (h handler) readPackage(w http.ResponseWriter, r *http.Request, id condafmt.PackagePath) {
 	if !h.k.Require(w, r, id.Path, api.ActionRead) {
 		return
@@ -60,8 +69,15 @@ func (h handler) servePackage(w http.ResponseWriter, r *http.Request, id condafm
 			if !h.k.Can(mr, id.Path, api.ActionRead) {
 				continue
 			}
+			// A member whose own policy refuses the package, a blacked-out
+			// one included, is passed over as one without it is (R5,
+			// decision 0032), since its index now lists a package whose file
+			// its patterns reject.
+			if generic.CheckDownload(pkgroute.RequestFrom(mr).Repo, id.Path, false) != nil {
+				continue
+			}
 			indexPath := condafmt.IndexPath(id.Channel, id.Subdir, "repodata.json")
-			index, fence, err := h.memberIndex(mr, indexPath, map[string]bool{})
+			index, fence, err := h.memberIndex(mr, indexPath, packageLookup(id), map[string]bool{})
 			if shardNotFound(err) {
 				continue
 			}
@@ -85,7 +101,7 @@ func (h handler) servePackage(w http.ResponseWriter, r *http.Request, id condafm
 		return source.ErrDenied
 	}
 	indexPath := condafmt.IndexPath(id.Channel, id.Subdir, "repodata.json")
-	index, finish, err := h.memberIndex(r, indexPath, map[string]bool{})
+	index, finish, err := h.memberIndex(r, indexPath, packageLookup(id), map[string]bool{})
 	if err != nil {
 		return err
 	}

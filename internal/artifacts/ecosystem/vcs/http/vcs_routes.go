@@ -183,6 +183,13 @@ func (s VCSAPI) vcsRefs(
 func (s VCSAPI) vcsReadRefs(
 	ctx context.Context, a vcsAccess, owner, name string, endpoint RefEndpoint,
 ) ([]Ref, error) {
+	// Read permission is checked at the project folder, and the download
+	// policy at 7.x's cached refs file, <owner>/<name>/gitrefs
+	// (RTFACT-30171), which a listing and every tag, branch or release
+	// download read first (RTFACT-30340). An exclude such as
+	// <owner>/<name>/* then refuses them, as RTFACT-30743 shows 7.x
+	// refusing jqlang/jq/*, where the folder admitted it, and the refusal
+	// states the pattern (RTDEV-47144).
 	resource := source.Resource{
 		Kind:              source.ResourceKindVersions,
 		Path:              owner + "/" + name + "/refs",
@@ -192,6 +199,7 @@ func (s VCSAPI) vcsReadRefs(
 		Method:            http.MethodGet,
 		PermissionFolder:  true,
 		PermissionPath:    owner + "/" + name,
+		PolicyPath:        owner + "/" + name + "/gitrefs",
 		Variant:           endpoint.Variant(),
 		ValidateMetadata: func(_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse) error {
 			if size <= 0 || size > MaxRefsBytes {

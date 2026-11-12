@@ -64,6 +64,18 @@
 //   - A virtual repository merges its members in order, the first member
 //     that has a version supplying it; a member that is missing or denies
 //     the read is skipped, and any other failure stops the read.
+//   - The download policy (#1251), after the read grant: a blacked-out
+//     repository refuses the collection, version list and version reads
+//     before they are built, with the blackout's 404 naming the request's
+//     path; the patterns do not refuse them, and a version whose archive
+//     they reject stays listed. A download is refused at the archive's path
+//     with the policy's 404 and message, whether the version exists or
+//     not. A remote's metadata reads check its blackout alone, naming the
+//     archive when a download makes them; its archive read checks its
+//     patterns as well. A virtual repository leaves a blacked-out member
+//     out of its listings, passes over a member whose policy refuses a
+//     download, and its own patterns refuse a download with "No repository
+//     found to serve the request".
 //   - A remote's upstream API is its URL as it is when that ends in
 //     /api/v3 or the published content root, galaxy.ansible.com's
 //     published content root for that host's root, and the URL with
@@ -122,6 +134,9 @@
 //     download, archives from a CDN without credentials and within the
 //     repository's patterns, unreadable remote versions filtered, and an
 //     archive whose identity differs refused even when its hash matches.
+//   - download_policy_test.go (external): the blackout and the patterns of
+//     local, virtual and remote repositories on the metadata routes and
+//     the archive download.
 //   - fault_test.go (external): store failures that never expose
 //     successful metadata, and remote archive integrity and write denial.
 //   - remote_test.go (external): malformed upstream metadata refused,

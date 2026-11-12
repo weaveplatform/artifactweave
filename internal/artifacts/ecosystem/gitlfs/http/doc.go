@@ -28,9 +28,10 @@
 //     base URL (platform/httpkit/baseurl), onto which action URLs point;
 //     the caller's principal and the kernel's errors, which lock owners and
 //     statuses come from; the generic download rule
-//     (artifacts/ecosystem/generic), which every object read meets first,
-//     so a blacked-out repository or an excluded path answers 404; and the
-//     format package, whose ObjectPath checks every OID.
+//     (artifacts/ecosystem/generic), which every object read meets once
+//     Read permission is checked, so a blacked-out repository or an
+//     excluded path answers 404; and the format package, whose ObjectPath
+//     checks every OID.
 //
 // # Outputs
 //
@@ -63,6 +64,18 @@
 //     members in order (400 for any other or a repeated member), skipping
 //     members the caller cannot read and those that miss, and answers 403
 //     when none is readable.
+//   - The download policy (decision 0032) comes after Read permission
+//     (DV-057), so a caller who may not read an object gets 403 whatever
+//     the repository's settings. A blacked-out repository, local,
+//     federated or remote, refuses every object, and patterns refuse the
+//     objects they reject: a transfer answers 404 with the policy's
+//     message, a download batch the object's 404. A virtual repository's
+//     own patterns refuse an object once a member the caller may read is
+//     found, a remote member's included: a transfer answers 404 "No
+//     repository found to serve the request". A member that refuses is
+//     passed over. An upload batch and a PUT's identity recheck look a
+//     stored object up without the policy, so it is never offered for
+//     upload again.
 //   - A remote serves a cached object only when it has the requested size
 //     and SHA-256, and otherwise asks the upstream's batch API for one
 //     object. The answer, of at most 64 KiB, must name that object and size
@@ -145,7 +158,11 @@
 //     checks, the lock cursor's binding, and the lock origin guard.
 //   - download_policy_test.go (external): a direct object download from a
 //     blacked-out repository, or of an excluded object, answers the
-//     policy's 404 and message.
+//     policy's 404 and message; local and remote batches check Read
+//     permission first; a virtual repository's patterns refuse a local or
+//     remote member's object after Read permission; a blacked-out remote
+//     member is passed over; and a stored object is never offered for
+//     upload again.
 //
 // The @gitlfs acceptance scenarios drive git-lfs through local, federated,
 // virtual and remote repositories, including two-user locking.

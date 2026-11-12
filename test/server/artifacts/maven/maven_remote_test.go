@@ -275,6 +275,72 @@ func TestAccMavenRemoteDenialsAndAdmission(t *testing.T) {
 	}
 }
 
+// Metadata a remote's patterns refuse counts as absent when it would resolve
+// a path: a non-unique snapshot and a version token are fetched as asked, as
+// 6.20's RemoteLatestMavenVersionResolver does ([I], #216), and the metadata
+// itself stays refused without an upstream request.
+func TestAccMavenRemoteRefusedMetadataCountsAsAbsent(t *testing.T) {
+	w := newMavenRemoteWorld(t)
+	w.c.ExcludesPattern = new("**/maven-metadata.xml")
+	w.update()
+	dir := "org/acme/app/1.1-SNAPSHOT/"
+	nonunique := sourceJAR(t, "nonunique")
+	mavenSource(w, dir+"app-1.1-SNAPSHOT.jar", nonunique, "application/java-archive")
+	mavenSource(
+		w,
+		dir+"app-1.1-20261021.120000-1.jar",
+		sourceJAR(t, "unique"),
+		"application/java-archive",
+	)
+	mavenSource(
+		w,
+		dir+"maven-metadata.xml",
+		[]byte(
+			`<metadata><versioning><snapshotVersions><snapshotVersion><extension>jar</extension><value>1.1-20261021.120000-1</value></snapshotVersion></snapshotVersions></versioning></metadata>`,
+		),
+		"application/xml",
+	)
+	res := w.request("GET", "/artifactory/remote/"+dir+"app-1.1-SNAPSHOT.jar", "reader", "")
+	remoteStatus(t, res, 200)
+	if !bytes.Equal(res.Body.Bytes(), nonunique) ||
+		w.up.Count("GET", "/"+dir+"app-1.1-20261021.120000-1.jar") != 0 {
+		t.Fatal("snapshot resolved through refused metadata", w.up.Requests())
+	}
+	for _, token := range []string{"[RELEASE]", "[LATEST]"} {
+		p := "org/acme/app/" + token + "/app-" + token + ".jar"
+		res := w.request("GET", "/artifactory/remote/"+p, "reader", "")
+		remoteStatus(t, res, 404)
+		// The upstream is asked for the path as it is, and its 404 answers.
+		if strings.Contains(res.Body.String(), "maven-metadata.xml") || w.up.Count("", "/"+p) == 0 {
+			t.Fatalf("%s: %s %v", token, res.Body, w.up.Requests())
+		}
+	}
+	res = w.request("GET", "/artifactory/remote/"+dir+"maven-metadata.xml", "reader", "")
+	remoteStatus(t, res, 404)
+	if !strings.Contains(res.Body.String(), "include/exclude pattern") {
+		t.Fatal("metadata not refused by the patterns", res.Body)
+	}
+	if n := w.up.Count(
+		"GET",
+		"/"+dir+"maven-metadata.xml",
+	) + w.up.Count(
+		"GET",
+		"/org/acme/app/maven-metadata.xml",
+	); n != 0 {
+		t.Fatal("refused metadata reached upstream", w.up.Requests())
+	}
+	// Metadata the upstream lacks still answers 404 without asking for the
+	// token's path.
+	w.c.ExcludesPattern = nil
+	w.update()
+	missing := "org/acme/none/[RELEASE]/none-[RELEASE].jar"
+	remoteStatus(t, w.request("GET", "/artifactory/remote/"+missing, "reader", ""), 404)
+	if w.up.Count("", "/org/acme/none/maven-metadata.xml") == 0 ||
+		w.up.Count("", "/"+missing) != 0 {
+		t.Fatal("token path fetched without metadata", w.up.Requests())
+	}
+}
+
 func TestAccMavenRemoteChecksumPolicies(t *testing.T) {
 	for _, policy := range []repo.RemoteChecksumPolicy{repo.GenerateIfAbsent, repo.Fail, repo.IgnoreAndGenerate, repo.PassThru} {
 		t.Run(string(policy), func(t *testing.T) {

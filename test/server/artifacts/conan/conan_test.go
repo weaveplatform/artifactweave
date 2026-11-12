@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -1300,4 +1301,164 @@ func TestAccConanVirtualPropagatesMemberFailure(t *testing.T) {
 			t.Errorf("virtual member failure %s: %d %s", path, rec.Code, rec.Body)
 		}
 	}
+}
+
+// repoConfigs is the part of a store the download policy tests change.
+type repoConfigs interface {
+	Get(ctx context.Context, key string) (repo.Config, error)
+	Update(ctx context.Context, c repo.Config) error
+}
+
+func patchConan(t *testing.T, repos repoConfigs, key string, change func(*repo.Config)) {
+	t.Helper()
+	c, err := repos.Get(t.Context(), key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	change(&c)
+	if err := repos.Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// conanRefused asserts the download policy's 404 in the Artifactory error
+// envelope, with message.
+func conanRefused(t *testing.T, rec *httptest.ResponseRecorder, message string) {
+	t.Helper()
+	var body struct {
+		Errors []struct {
+			Status  int    `json:"status"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if rec.Code != http.StatusNotFound || json.Unmarshal(rec.Body.Bytes(), &body) != nil ||
+		len(body.Errors) != 1 || body.Errors[0].Message != message {
+		t.Fatalf("%d %s, want 404 %q", rec.Code, rec.Body, message)
+	}
+}
+
+func conanBlackedOut(key, path string) string {
+	return fmt.Sprintf("The repository '%s' is blacked out and cannot serve artifact '%s:%s'.",
+		key, key, path)
+}
+
+func conanRejected(key, path string) string {
+	return fmt.Sprintf("The repository '%s' rejected the artifact '%s:%s' due to its "+
+		"include/exclude pattern settings.", key, key, path)
+}
+
+func conanServed(t *testing.T, rec *httptest.ResponseRecorder, contains string) {
+	t.Helper()
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), contains) {
+		t.Fatalf("%d %s, want 200 with %q", rec.Code, rec.Body, contains)
+	}
+}
+
+// A blacked-out local repository refuses the revision and file lists a
+// client resolves by, naming the request's path, and every file at its
+// own path, manifests included, whether the revision exists or not, after
+// read permission; its searches keep their answers (R2a, R1, R2b). The
+// patterns refuse only the file they reject, which stays listed (R3). A
+// virtual repository leaves a blacked-out member out, passes over a member
+// that refuses a file, and its own patterns refuse the file (R5).
+func TestAccConanDownloadPolicyLocalAndVirtual(t *testing.T) {
+	w := newItemWorld(t, false)
+	for _, c := range []repo.Config{
+		{Key: "conan-one", Class: repo.Local, PackageType: repo.Conan},
+		{Key: "conan-two", Class: repo.Local, PackageType: repo.Conan},
+		{Key: "conan-virt", Class: repo.Virtual, PackageType: repo.Conan, Repositories: []string{"conan-one", "conan-two"}},
+	} {
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	put := func(path, body string) {
+		t.Helper()
+		if rec := w.do("PUT", path, "admin", body); rec.Code != http.StatusCreated {
+			t.Fatalf("PUT %s: %d %s", path, rec.Code, rec.Body)
+		}
+	}
+	const recipe = "/v2/conans/hello/1.0/_/_"
+	for key, content := range map[string]string{"conan-one": "recipe one", "conan-two": "recipe two"} {
+		files := "/artifactory/api/conan/" + key + recipe + "/revisions/abc/files/"
+		put(files+"conanfile.py", content)
+		put(files+"conanmanifest.txt", fmt.Sprintf("1\nconanfile.py: %s\n", md5Hex(content)))
+	}
+	pkg := "/artifactory/api/conan/conan-one" + recipe + "/revisions/abc/packages/id1/revisions/p1/files/"
+	put(pkg+"conan_package.tgz", conanTestArchive(t, "conaninfo.txt", "settings"))
+	put(pkg+"conaninfo.txt", "settings")
+	put(pkg+"conanmanifest.txt", fmt.Sprintf("1\nconaninfo.txt: %s\n", md5Hex("settings")))
+	one := func(route, as string) *httptest.ResponseRecorder {
+		t.Helper()
+		return w.do("GET", "/artifactory/api/conan/conan-one"+route, as, "")
+	}
+	virt := func(route string) *httptest.ResponseRecorder {
+		t.Helper()
+		return w.do("GET", "/artifactory/api/conan/conan-virt"+route, "admin", "")
+	}
+	stored := func(file string) string { return "_/hello/1.0/_/abc/export/" + file }
+
+	patchConan(t, w.db.Repos(), "conan-one", func(c *repo.Config) { c.BlackedOut = new(true) })
+	for _, route := range []string{
+		"/latest", "/revisions", "/revisions/abc/files", "/revisions/abc/packages/id1/latest",
+		"/revisions/abc/packages/id1/revisions", "/revisions/abc/packages/id1/revisions/p1/files",
+	} {
+		conanRefused(t, one(recipe+route, "admin"),
+			conanBlackedOut("conan-one", strings.TrimPrefix(recipe+route, "/")))
+	}
+	for _, file := range []string{"conanfile.py", "conanmanifest.txt"} {
+		conanRefused(t, one(recipe+"/revisions/abc/files/"+file, "admin"),
+			conanBlackedOut("conan-one", stored(file)))
+	}
+	conanRefused(
+		t,
+		one(recipe+"/revisions/abc/packages/id1/revisions/p1/files/conaninfo.txt", "admin"),
+		conanBlackedOut("conan-one", "_/hello/1.0/_/abc/package/id1/p1/conaninfo.txt"),
+	)
+	conanRefused(t, one(recipe+"/revisions/zzz/files/conanfile.py", "admin"),
+		conanBlackedOut("conan-one", "_/hello/1.0/_/zzz/export/conanfile.py"))
+	for as, status := range map[string]int{"user": http.StatusForbidden, "": http.StatusUnauthorized} {
+		for _, route := range []string{"/latest", "/revisions/abc/files", "/revisions/abc/files/conanfile.py"} {
+			if rec := one(recipe+route, as); rec.Code != status {
+				t.Fatalf("%s as %q: %d %s", route, as, rec.Code, rec.Body)
+			}
+		}
+	}
+	conanServed(t, one("/v2/conans/search?q=hello*", "admin"), "hello/1.0@_/_")
+	conanServed(t, one(recipe+"/revisions/abc/search", "admin"), "settings")
+	conanServed(t, virt(recipe+"/latest"), `"revision":"abc"`)
+	conanServed(t, virt(recipe+"/revisions/abc/files/conanfile.py"), "recipe two")
+	if rec := virt(recipe + "/revisions/abc/packages/id1/latest"); rec.Code != http.StatusNotFound {
+		t.Fatalf("a blacked-out member's package revisions merged: %d %s", rec.Code, rec.Body)
+	}
+	conanServed(t, virt("/v2/conans/search?q=hello*"), "hello/1.0@_/_")
+
+	patchConan(t, w.db.Repos(), "conan-one", func(c *repo.Config) {
+		c.BlackedOut, c.ExcludesPattern = new(false), new("**/conanfile.py")
+	})
+	conanServed(t, one(recipe+"/revisions", "admin"), "abc")
+	conanServed(t, one(recipe+"/revisions/abc/files", "admin"), "conanfile.py")
+	conanRefused(t, one(recipe+"/revisions/abc/files/conanfile.py", "admin"),
+		conanRejected("conan-one", stored("conanfile.py")))
+	conanServed(t, one(recipe+"/revisions/abc/files/conanmanifest.txt", "admin"), "conanfile.py: ")
+	conanServed(t, virt(recipe+"/revisions/abc/files/conanfile.py"), "recipe two")
+
+	patchConan(t, w.db.Repos(), "conan-one", func(c *repo.Config) {
+		c.ExcludesPattern = new("**/conanmanifest.txt")
+	})
+	conanServed(t, one(recipe+"/revisions/abc/files", "admin"), "conanmanifest.txt")
+	conanRefused(t, one(recipe+"/revisions/abc/files/conanmanifest.txt", "admin"),
+		conanRejected("conan-one", stored("conanmanifest.txt")))
+	conanServed(t, one(recipe+"/revisions/abc/files/conanfile.py", "admin"), "recipe one")
+	conanServed(t, virt(recipe+"/revisions/abc/files/conanmanifest.txt"), md5Hex("recipe two"))
+	conanServed(t, virt(recipe+"/revisions/abc/files/conanfile.py"), "recipe one")
+
+	patchConan(t, w.db.Repos(), "conan-one", func(c *repo.Config) { c.ExcludesPattern = new("") })
+	patchConan(t, w.db.Repos(), "conan-virt", func(c *repo.Config) {
+		c.ExcludesPattern = new("**/conanfile.py")
+	})
+	conanRefused(t, virt(recipe+"/revisions/abc/files/conanfile.py"),
+		"No repository found to serve the request for conan-virt:"+stored("conanfile.py"))
+	conanServed(t, virt(recipe+"/revisions/abc/files"), "conanfile.py")
+	conanServed(t, virt(recipe+"/revisions/abc/files/conanmanifest.txt"), md5Hex("recipe one"))
 }

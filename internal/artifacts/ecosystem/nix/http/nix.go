@@ -116,17 +116,20 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if path == "nix-cache-info" {
+		// Read permission comes before the download policy (DV-057), so a
+		// caller who may not read gets 403 or 401, not the policy's 404.
+		if !h.k.Require(w, r, path, accessapi.ActionRead) {
+			return
+		}
 		if err := generic.CheckDownload(pkgroute.RequestFrom(r).Repo, path, false); err != nil {
 			h.fail(w, r, err)
 			return
 		}
-		if h.k.Require(w, r, path, accessapi.ActionRead) {
-			write(w, r, []byte(nixfmt.CacheInfo), "text/x-nix-cache-info")
-		}
+		write(w, r, []byte(nixfmt.CacheInfo), "text/x-nix-cache-info")
 		return
 	}
 	if nixfmt.IsInfoPath(path) {
-		found, err := h.lookup(r, path)
+		found, err := h.lookup(r, path, "")
 		if err != nil {
 			h.fail(w, r, err)
 			return
@@ -152,7 +155,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, kernel.ErrNotFound)
 		return
 	}
-	found, err := h.lookup(r, parts[1]+".narinfo")
+	found, err := h.lookup(r, parts[1]+".narinfo", "nar/"+parts[2])
 	if err != nil {
 		h.fail(w, r, err)
 		return
@@ -179,17 +182,40 @@ func write(w http.ResponseWriter, r *http.Request, data []byte, mediaType string
 	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
 }
 
+// missing reports a member that a virtual repository passes over: one
+// without the path, and one whose download policy refuses it, a remote
+// member's included, since 7.x ignores a blacked-out member when it
+// resolves and resolves nothing from a member whose patterns reject the
+// path (R5). An upstream fault is neither, so the virtual
+// repository fails closed on it.
 func missing(err error) bool {
 	var e *apierror.Error
-	return errors.Is(err, kernel.ErrNotFound) || errors.As(err, &e) && e.Status == 404
+	return errors.Is(err, kernel.ErrNotFound) || errors.As(err, &e) && e.Status == 404 ||
+		pkgroute.IsRefusal(err)
 }
 
-func (h handler) lookup(r *http.Request, path string) (located, error) {
+// lookup finds the narinfo at path, and the NAR it names, for a caller who
+// may read both. archive is empty for a narinfo request, and the NAR's
+// stored path, nar/<file>, for a NAR request. The download policy is
+// checked at the path the client asked for alone, before the narinfo is
+// read: a narinfo request at the narinfo's path, so that patterns
+// rejecting only its NAR leave the stored narinfo served, as 7.x serves a
+// stored document whose release's file is refused (R1, R3); a NAR
+// request at the NAR's path, so that the narinfo read on the way is a
+// lookup the patterns do not refuse and a refusal names the NAR
+// (R4, R5, R10). A virtual repository checks its own patterns once, at that
+// path, and never drops a member's narinfo for them.
+func (h handler) lookup(r *http.Request, path, archive string) (located, error) {
 	c := pkgroute.RequestFrom(r).Repo
-	if !h.k.Can(r, path, accessapi.ActionRead) {
+	checked := path
+	if archive != "" {
+		checked = archive
+	}
+	if !h.k.Can(r, path, accessapi.ActionRead) ||
+		archive != "" && !h.k.Can(r, archive, accessapi.ActionRead) {
 		return located{}, source.ErrDenied
 	}
-	if err := generic.CheckDownload(c, path, false); err != nil {
+	if err := generic.CheckDownload(c, checked, false); err != nil {
 		return located{}, fmt.Errorf("nix: lookup: %w", err)
 	}
 	if c.Class == repo.Virtual {
@@ -208,15 +234,14 @@ func (h handler) lookup(r *http.Request, path string) (located, error) {
 			if !h.k.Can(mr, path, accessapi.ActionRead) {
 				continue
 			}
-			found, err := h.lookup(mr, path)
+			found, err := h.lookup(mr, path, archive)
 			if missing(err) {
 				continue
 			}
 			if err != nil {
 				return located{}, fmt.Errorf("nix: lookup: %w", err)
 			}
-			if !h.k.Can(r, found.info.URL, accessapi.ActionRead) ||
-				generic.CheckDownload(c, found.info.URL, false) != nil {
+			if !h.k.Can(r, found.info.URL, accessapi.ActionRead) {
 				continue
 			}
 			memberCheck := found.check
@@ -231,7 +256,7 @@ func (h handler) lookup(r *http.Request, path string) (located, error) {
 		return located{}, kernel.ErrNotFound
 	}
 	if c.Class == repo.Remote {
-		return h.remoteInfo(r, path)
+		return h.remoteInfo(r, path, archive != "")
 	}
 	it, err := h.k.DB().Items().Get(r.Context(), c.Key, false, path)
 	if err != nil {
@@ -244,16 +269,13 @@ func (h handler) lookup(r *http.Request, path string) (located, error) {
 	if !h.k.Can(r, info.URL, accessapi.ActionRead) {
 		return located{}, source.ErrDenied
 	}
-	if err := generic.CheckDownload(c, info.URL, false); err != nil {
-		return located{}, fmt.Errorf("nix: lookup: %w", err)
-	}
-	archive, err := nixfmt.ReferencedArchive(r.Context(), h.env(), c, info, false)
+	stored, err := nixfmt.ReferencedArchive(r.Context(), h.env(), c, info, false)
 	if err != nil {
 		return located{}, fmt.Errorf("nix: lookup: %w", err)
 	}
 	return located{
 		info:    info,
-		archive: &archive,
+		archive: &stored,
 		r:       r,
 		check:   func(context.Context) error { return h.current(r, path, info.URL) },
 	}, nil

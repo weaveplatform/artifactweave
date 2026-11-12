@@ -38,6 +38,7 @@ const route = "/artifactory/api/aieditorextensions/editor-remote/"
 
 type fixture struct {
 	t             *testing.T
+	db            *inmem.Store
 	app           http.Handler
 	upstream      *httptest.Server
 	queries       atomic.Int32
@@ -81,6 +82,7 @@ func newFixture(t *testing.T) *fixture {
 	f.upstream = httptest.NewServer(http.HandlerFunc(f.serveUpstream))
 	t.Cleanup(f.upstream.Close)
 	db := inmem.New()
+	f.db = db
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -428,5 +430,60 @@ func TestAccGalleryRejectsMalformedClientPathsAndSeparatesQueryCache(t *testing.
 				t.Fatalf("%d %s, want %d", r.Code, r.Body, tc.expected)
 			}
 		})
+	}
+}
+
+// The gallery answer checks each extension's folder against the remote
+// repository's patterns as a folder, admitted when the patterns could
+// admit a file below it: an include naming one version's folder keeps the
+// extension listed, where checking the folder's own path as a file
+// dropped it. Patterns rejecting only the VSIX keep the extension listed
+// and refuse the VSIX alone.
+func TestAccGalleryQueryChecksTheExtensionFolderAsAFolder(t *testing.T) {
+	f := newFixture(t)
+	q := []byte(
+		`{"filters":[{"criteria":[{"filterType":7,"value":"ms-vscode.hexeditor"},{"filterType":8,"value":"Microsoft.VisualStudio.Code"},{"filterType":12,"value":"4096"}],"pageNumber":1,"pageSize":1,"sortBy":0,"sortOrder":0}],"assetTypes":[],"flags":950}`,
+	)
+	patch := func(change func(*repo.Config)) {
+		t.Helper()
+		c, err := f.db.Repos().Get(t.Context(), "editor-remote")
+		if err != nil {
+			t.Fatal(err)
+		}
+		change(&c)
+		if err := f.db.Repos().Update(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const (
+		listedAt = "/artifactory/api/aieditorextensions/editor-remote/assets/ms-vscode/hexeditor/1.11.1/"
+		vsix     = "assets/ms-vscode/hexeditor/1.11.1/Microsoft.VisualStudio.Services.VSIXPackage"
+	)
+	listed := func() {
+		t.Helper()
+		r := f.request(http.MethodPost, "_apis/public/gallery/extensionquery", "reader", q)
+		if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), listedAt) ||
+			!strings.Contains(r.Body.String(), `"count":1`) {
+			t.Fatalf("gallery: %d %s, want hexeditor listed", r.Code, r.Body)
+		}
+	}
+
+	include := "extensions/ms-vscode/hexeditor/1.11.1/**"
+	patch(func(c *repo.Config) { c.IncludesPattern = &include })
+	listed()
+	if r := f.request(http.MethodGet, vsix, "reader", nil); r.Code != http.StatusOK ||
+		!bytes.Equal(r.Body.Bytes(), f.vsix) {
+		t.Fatalf("VSIX under the include: %d %s", r.Code, r.Body)
+	}
+
+	// The VSIX is cached as package.zip in its version's folder.
+	all, exclude := "**", "**/package.zip"
+	patch(func(c *repo.Config) { c.IncludesPattern, c.ExcludesPattern = &all, &exclude })
+	listed()
+	r := f.request(http.MethodGet, vsix, "reader", nil)
+	if r.Code != http.StatusNotFound || !strings.Contains(r.Body.String(),
+		"The repository 'editor-remote' rejected the artifact "+
+			"'editor-remote:extensions/ms-vscode/hexeditor/1.11.1/package.zip'") {
+		t.Fatalf("excluded VSIX: %d %s, want the patterns' refusal", r.Code, r.Body)
 	}
 }

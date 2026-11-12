@@ -39,13 +39,28 @@
 // # Invariants
 //
 //   - A caller receives a local, federated or remote repository's index
-//     only when they may read every package it lists. A virtual index lists
-//     only the packages the caller may read, both in the virtual repository
-//     and in the member that holds them, and a package path belongs to the
-//     first member that lists it, the member a package GET serves it from.
-//   - A missing member, or one whose index is unpublished or unreadable to
-//     the caller, is skipped; a member of another package type, a member
-//     cycle or a chain of more than eight nested repositories is refused.
+//     only when they have Read permission on every package it lists. A
+//     virtual index lists only the packages the caller has Read permission
+//     on, both in the virtual repository and in the member that holds them,
+//     and a package path belongs to the first member that lists it. The
+//     download policy does not filter or refuse an index for the packages
+//     it lists: a package whose file the include and exclude patterns
+//     reject stays listed and only its GET is refused, as in 7.x's Debian
+//     and RPM indexes (RTFACT-30830, RTFACT-30656).
+//   - An index and a virtual package are read under the download policy at
+//     their own path, after the Read permission check (DV-057): a
+//     blacked-out repository, or patterns that reject the path, answer the
+//     item route's 404 and message, and a virtual repository's own patterns
+//     answer that no repository serves the request. A virtual package's GET
+//     passes over a member whose download policy refuses the file to the
+//     next member that lists it.
+//   - A missing member, or one whose index is unpublished, unreadable to the
+//     caller or refused by the member's download policy, is skipped; a
+//     member of another package type, a member cycle or a chain of more
+//     than eight nested repositories is refused. A virtual package's GET
+//     checks a member's policy at the package's own path, never at the
+//     index it reads to find the package, so there only a blacked-out
+//     member is skipped for its index.
 //   - A virtual repository serves a package only when an index the caller
 //     can see lists it.
 //   - An index is read up to 36 MiB, a remote's is validated before it is
@@ -87,14 +102,18 @@
 //
 // alpine_test.go calls the overlay and its helpers without the router, over
 // a kittest world (fixture_test.go, modelled on rpmhttp's): paths outside
-// the layout and callers who may not download refused; local index content
-// that is a folder, lost, empty, unreadable or malformed; a remote index
-// whose authority is rechecked, streamed or cached; virtual indexes that
-// skip unreadable members and fail closed on cycles, wrong member types,
-// store faults and unusable signing keys; virtual packages served from a
-// listed local file or relayed from a remote member; and remote index and
-// package reads on a server built without remote sources. Its item GETs run
-// through the kit with TryAlpineItem as the only overlay. The @alpine
-// acceptance partition (test/acceptance/features/alpine.feature) drives its
-// indexes and packages through the router with apk.
+// the layout and callers who may not download refused, and indexes and
+// virtual packages the download policy refuses answering its 404; a
+// package the patterns reject kept in a local, remote or virtual index
+// while its GET is refused or passed over to the next member; a virtual
+// package served from a member whose patterns reject only its index; local
+// index content that is a folder, lost, empty, unreadable or malformed; a
+// remote index whose authority is rechecked, streamed or cached; virtual
+// indexes that skip unreadable members and fail closed on cycles, wrong
+// member types, store faults and unusable signing keys; virtual packages
+// served from a listed local file or relayed from a remote member; and
+// remote index and package reads on a server built without remote sources.
+// Its item GETs run through the kit with TryAlpineItem as the only overlay.
+// The @alpine acceptance partition (test/acceptance/features/alpine.feature)
+// drives its indexes and packages through the router with apk.
 package alpinehttp

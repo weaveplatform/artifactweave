@@ -35,7 +35,7 @@ func (h handler) recipeRevisions(w http.ResponseWriter, r *http.Request, ref con
 		h.method(w, r)
 		return
 	}
-	list, err := h.revisions(r, ref, "")
+	list, err := h.resolve(r, ref, "")
 	if err != nil {
 		h.error(w, r, err)
 		return
@@ -48,7 +48,7 @@ func (h handler) recipeLatest(w http.ResponseWriter, r *http.Request, ref conanf
 		h.method(w, r)
 		return
 	}
-	list, err := h.revisions(r, ref, "")
+	list, err := h.resolve(r, ref, "")
 	if err != nil {
 		h.error(w, r, err)
 		return
@@ -66,7 +66,7 @@ func (h handler) packageRevisions(
 		h.method(w, r)
 		return
 	}
-	list, err := h.revisions(r, ref, id)
+	list, err := h.resolve(r, ref, id)
 	if err != nil {
 		h.error(w, r, err)
 		return
@@ -84,12 +84,47 @@ func (h handler) packageLatest(
 		h.method(w, r)
 		return
 	}
-	list, err := h.revisions(r, ref, id)
+	list, err := h.resolve(r, ref, id)
 	if err != nil {
 		h.error(w, r, err)
 		return
 	}
 	writeJSON(w, list[0])
+}
+
+// resolve lists the revisions a client resolves a recipe or a package by.
+// 7.x ignores a blacked-out repository when it resolves, and documents no
+// path it keeps these lists at, so a local repository's blackout refuses
+// them after the read grant and before they are built, naming the request's
+// path, and its patterns do not (R2a, #216). A remote's blackout refuses
+// its read (remoteJSON), and a virtual repository leaves a blacked-out
+// member out (virtualRevisions). A package search reads the revisions
+// without this check, as a native search keeps its answer (R2b).
+func (h handler) resolve(r *http.Request, ref conanfmt.Reference, id string) ([]revision, error) {
+	if c := pkgroute.RequestFrom(r).Repo; c.Class != repo.Remote && c.Class != repo.Virtual {
+		if !h.k.CanFolder(r, revisionFolder(ref, id), api.ActionRead) {
+			return nil, denied(r)
+		}
+		if err := h.k.CheckBlackedOut(r, requestPath(r)); err != nil {
+			return nil, fmt.Errorf("resolve conan revisions: %w", err)
+		}
+	}
+	return h.revisions(r, ref, id)
+}
+
+// requestPath is the request's path after the repository key, which a
+// refusal of metadata 7.x keeps at no documented path names (R2a). serve
+// has already parsed it.
+func requestPath(r *http.Request) string {
+	p, _ := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
+	return p.String()
+}
+
+func revisionFolder(ref conanfmt.Reference, id string) string {
+	if id != "" {
+		return ref.Root() + "/package/" + id
+	}
+	return strings.Join([]string{ref.User, ref.Name, ref.Version, ref.Channel}, "/")
 }
 
 func (h handler) revisions(r *http.Request, ref conanfmt.Reference, id string) ([]revision, error) {
@@ -100,10 +135,7 @@ func (h handler) revisions(r *http.Request, ref conanfmt.Reference, id string) (
 	if c.Class == repo.Virtual {
 		return h.virtualRevisions(r, ref, id)
 	}
-	folder := strings.Join([]string{ref.User, ref.Name, ref.Version, ref.Channel}, "/")
-	if id != "" {
-		folder = ref.Root() + "/package/" + id
-	}
+	folder := revisionFolder(ref, id)
 	if !h.k.CanFolder(r, folder, api.ActionRead) {
 		return nil, denied(r)
 	}
@@ -158,6 +190,11 @@ func (h handler) fileList(w http.ResponseWriter, r *http.Request, root string) {
 		h.virtualFileList(w, r, root)
 		return
 	}
+	// The list a client resolves a revision's files by, as resolve's.
+	if err := h.k.CheckBlackedOut(r, requestPath(r)); err != nil {
+		h.error(w, r, err)
+		return
+	}
 	if err := h.requireComplete(r, root); err != nil {
 		h.error(w, r, err)
 		return
@@ -208,8 +245,20 @@ func (h handler) file(w http.ResponseWriter, r *http.Request, f conanfmt.FilePat
 			h.virtualFile(w, r, f)
 			return
 		}
+		// Every file, the manifest and conaninfo.txt included, is stored at
+		// its own path in 7.x and read through the download path (R1). It is
+		// checked before the revision is looked up, so a refusal says why
+		// whether the revision exists or not (RTDEV-47144).
+		if err := h.k.CheckDownload(r, f.Path()); err != nil {
+			h.error(w, r, err)
+			return
+		}
 		if err := h.requireComplete(r, f.Root()); err != nil {
 			h.error(w, r, err)
+			return
+		}
+		if document(f.File) {
+			h.k.ServeMetadata(w, r, f.Path())
 			return
 		}
 		h.k.ServeItem(w, r, f.Path())
@@ -239,11 +288,18 @@ func (h handler) requireComplete(r *http.Request, root string) error {
 	return h.manifest(r, root+"/"+conanfmt.Manifest)
 }
 
+// document reports a revision's metadata documents, its manifest and a
+// package's conaninfo.txt, which describe the revision's files. A GET of
+// one is checked at its own path like any file's (file), but the lookups
+// that only ask whether a revision is complete or what it lists are not,
+// so a revision whose manifest the patterns reject stays listed (R3).
+func document(file string) bool { return file == conanfmt.Manifest || file == "conaninfo.txt" }
+
 func (h handler) manifest(r *http.Request, path string) error {
 	if !h.k.Can(r, path, api.ActionRead) {
 		return denied(r)
 	}
-	found, err := h.k.Item(r, path)
+	found, err := h.k.StoredItem(r, path)
 	switch {
 	case errors.Is(err, kernel.ErrNotFound) || err == nil && found.Item.Folder:
 		return apierror.New(http.StatusNotFound, "Conan revision not found")

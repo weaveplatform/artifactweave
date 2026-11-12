@@ -8,6 +8,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
@@ -188,4 +190,100 @@ func TestAccConanRemoteArchiveIntegrity(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A blacked-out remote refuses its revision and file lists naming the
+// request's path, and each file naming the file, without asking its
+// upstream; its search keeps main's answer (R2b). A file or manifest its
+// patterns reject stays listed, where the file list answered 502 and the
+// revision list dropped the revision, and only its own GET is refused
+// (R3, R4). A virtual repository's search passes over a blacked-out remote
+// member, where the whole search failed (R5).
+func TestAccConanDownloadPolicyRemote(t *testing.T) {
+	w := newRemoteWorld(t)
+	for _, c := range []repo.Config{
+		{Key: "conan-up", Class: repo.Remote, PackageType: repo.Conan, URL: w.up.URL},
+		{Key: "conan-local", Class: repo.Local, PackageType: repo.Conan},
+		{Key: "conan-virt", Class: repo.Virtual, PackageType: repo.Conan, Repositories: []string{"conan-up", "conan-local"}},
+	} {
+		if err := w.rt.Store.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const recipe = "/v2/conans/hello/1.0/_/_"
+	jsonHeader := http.Header{"Content-Type": []string{"application/json"}}
+	w.up.Set(recipe+"/revisions", fakeupstream.Resource{
+		Body:   []byte(`{"revisions":[{"revision":"abc","time":"2026-10-24T00:00:00Z"}]}`),
+		Header: jsonHeader,
+	})
+	w.up.Set(recipe+"/revisions/abc/files", fakeupstream.Resource{
+		Body:   []byte(`{"files":{"conanfile.py":{},"conanmanifest.txt":{}}}`),
+		Header: jsonHeader,
+	})
+	manifest := fmt.Sprintf("1\nconanfile.py: %s\n", md5Hex("remote recipe"))
+	w.up.Set(recipe+"/revisions/abc/files/conanmanifest.txt",
+		fakeupstream.Resource{Body: []byte(manifest)})
+	w.up.Set(recipe+"/revisions/abc/files/conanfile.py",
+		fakeupstream.Resource{Body: []byte("remote recipe")})
+	local := "/artifactory/api/conan/conan-local" + recipe + "/revisions/abc/files/"
+	// The recipe goes up before the manifest that lists it: the server
+	// refuses a manifest naming content it does not hold with 422.
+	for _, f := range []struct{ file, body string }{
+		{"conanfile.py", "local recipe"},
+		{"conanmanifest.txt", fmt.Sprintf("1\nconanfile.py: %s\n", md5Hex("local recipe"))},
+	} {
+		if rec := w.request(
+			http.MethodPut,
+			local+f.file,
+			"admin",
+			f.body,
+		); rec.Code != http.StatusCreated {
+			t.Fatalf("PUT %s: %d %s", f.file, rec.Code, rec.Body)
+		}
+	}
+	get := func(key, route string) *httptest.ResponseRecorder {
+		t.Helper()
+		return w.request(http.MethodGet, "/artifactory/api/conan/"+key+route, "admin", "")
+	}
+	stored := func(file string) string { return "_/hello/1.0/_/abc/export/" + file }
+
+	patchConan(t, w.rt.Store.Repos(), "conan-up", func(c *repo.Config) { c.BlackedOut = new(true) })
+	for _, route := range []string{"/latest", "/revisions", "/revisions/abc/files"} {
+		conanRefused(t, get("conan-up", recipe+route),
+			conanBlackedOut("conan-up", strings.TrimPrefix(recipe+route, "/")))
+	}
+	for _, file := range []string{"conanfile.py", "conanmanifest.txt"} {
+		conanRefused(t, get("conan-up", recipe+"/revisions/abc/files/"+file),
+			conanBlackedOut("conan-up", stored(file)))
+	}
+	conanRefused(t, get("conan-up", "/v2/conans/search?q=hello*"),
+		conanBlackedOut("conan-up", ""))
+	if n := len(w.up.Requests()); n != 0 {
+		t.Fatalf("a blacked-out remote asked its upstream %d times", n)
+	}
+	conanServed(t, get("conan-virt", "/v2/conans/search?q=hello*"), "hello/1.0@_/_")
+	conanServed(t, get("conan-virt", recipe+"/latest"), `"revision":"abc"`)
+	conanServed(t, get("conan-virt", recipe+"/revisions/abc/files/conanfile.py"), "local recipe")
+	if n := len(w.up.Requests()); n != 0 {
+		t.Fatalf("a virtual repository asked a blacked-out member's upstream %d times", n)
+	}
+
+	patchConan(t, w.rt.Store.Repos(), "conan-up", func(c *repo.Config) {
+		c.BlackedOut, c.ExcludesPattern = new(false), new("**/conanfile.py")
+	})
+	conanServed(t, get("conan-up", recipe+"/latest"), `"revision":"abc"`)
+	conanServed(t, get("conan-up", recipe+"/revisions/abc/files"), "conanfile.py")
+	conanRefused(t, get("conan-up", recipe+"/revisions/abc/files/conanfile.py"),
+		conanRejected("conan-up", stored("conanfile.py")))
+	conanServed(t, get("conan-virt", recipe+"/revisions/abc/files/conanfile.py"), "local recipe")
+
+	patchConan(t, w.rt.Store.Repos(), "conan-up", func(c *repo.Config) {
+		c.ExcludesPattern = new("**/conanmanifest.txt")
+	})
+	conanServed(t, get("conan-up", recipe+"/revisions"), `"revision":"abc"`)
+	conanServed(t, get("conan-up", recipe+"/revisions/abc/files"), "conanmanifest.txt")
+	conanRefused(t, get("conan-up", recipe+"/revisions/abc/files/conanmanifest.txt"),
+		conanRejected("conan-up", stored("conanmanifest.txt")))
+	conanServed(t, get("conan-up", recipe+"/revisions/abc/files/conanfile.py"), "remote recipe")
+	conanServed(t, get("conan-virt", recipe+"/revisions/abc/files/conanfile.py"), "remote recipe")
 }

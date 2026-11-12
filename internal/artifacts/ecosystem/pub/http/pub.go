@@ -109,6 +109,15 @@ type versionRecord struct {
 	Pubspec       map[string]any `json:"pubspec"`
 }
 
+// documentPath is where 7.x keeps name's versions document, which its
+// indexer writes and the versions routes read through the download path
+// (Pub Repositories docs: "The index of the packages will be populated
+// under the .pub, each package has its own json file"; RTDEV-85999), so a
+// blacked-out repository or a pattern on that path refuses the document.
+// The patterns of one release's archive do not: the release stays listed
+// and only its archive is refused (R3).
+func documentPath(name string) string { return ".pub/" + name + ".json" }
+
 func packageName(r *http.Request) (string, error) {
 	name, err := url.PathUnescape(chi.URLParam(r, "package"))
 	if err != nil || !pubfmt.ValidName(name) {
@@ -130,7 +139,11 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid pub versions query"))
 		return
 	}
-	releases, err := h.lookup(r, name)
+	if err := h.k.CheckDocument(r, documentPath(name)); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	releases, err := h.lookup(r, name, false)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -171,7 +184,11 @@ func (h handler) version(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
-	releases, err := h.lookup(r, name)
+	if err := h.k.CheckDocument(r, documentPath(name)); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	releases, err := h.lookup(r, name, false)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -206,34 +223,94 @@ func (h handler) archive(w http.ResponseWriter, r *http.Request) {
 	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
-	releases, err := h.lookup(r, name)
+	class := pkgroute.RequestFrom(r).Repo.Class
+	if class == repo.Remote || class == repo.Virtual {
+		// The archive's own path, before the lookup, so the refusal names
+		// it (R10): a remote's own policy, or a virtual repository's
+		// patterns, which leave it no member to search ("No repository
+		// found to serve the request", 6.20 VirtualRepoDownloadStrategy).
+		// A local archive takes it from ServeItem.
+		if err := h.k.CheckDocument(r, path); err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+	}
+	if class == repo.Virtual {
+		h.virtualArchive(w, r, name, version, path)
+		return
+	}
+	releases, err := h.lookup(r, name, true)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
 	for _, release := range releases {
-		if release.meta.Version != version {
-			continue
-		}
-		if release.revalidate != nil {
-			if err := release.revalidate(r.Context()); err != nil {
-				h.k.Error(w, r, pkgroute.SourceError(err, false))
-				return
-			}
-		}
-		w.Header().Set("Content-Type", "application/octet-stream")
-		if release.remoteURL != "" {
-			h.remoteArchive(w, r, release)
+		if release.meta.Version == version {
+			h.serveArchive(w, r, release, path)
 			return
 		}
-		member := r
-		if release.member != nil {
-			member = release.member
-		}
-		h.k.ServeItem(w, member, path)
-		return
 	}
 	h.k.Error(w, r, apierror.New(http.StatusNotFound, "version not found"))
+}
+
+// virtualArchive serves the archive of version from the first member, in
+// the virtual repository's order, that holds the version and does not
+// refuse the archive: 7.x ignores a blacked-out member when it resolves
+// and passes over a member that cannot serve the file, so a member whose
+// policy refuses it leaves the archive to the next member that holds it
+// (R5). Every member's versions are still read first, as the merge reads
+// them, so a member that fails fails the download as it fails the list.
+func (h handler) virtualArchive(
+	w http.ResponseWriter,
+	r *http.Request,
+	name, version, path string,
+) {
+	members, err := h.memberReleases(r, name, true)
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	for _, found := range members {
+		for _, release := range found {
+			if release.meta.Version != version {
+				continue
+			}
+			// archive checked the virtual repository's own patterns, so
+			// a refusal here is the member's, which passes it over.
+			if h.k.CheckDocument(release.member, path) != nil {
+				break
+			}
+			h.serveArchive(w, r, release, path)
+			return
+		}
+	}
+	h.k.Error(w, r, apierror.New(http.StatusNotFound, "version not found"))
+}
+
+// serveArchive serves release's archive at path from the repository the
+// release was listed in.
+func (h handler) serveArchive(
+	w http.ResponseWriter,
+	r *http.Request,
+	release release,
+	path string,
+) {
+	if release.revalidate != nil {
+		if err := release.revalidate(r.Context()); err != nil {
+			h.k.Error(w, r, pkgroute.SourceError(err, false))
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	if release.remoteURL != "" {
+		h.remoteArchive(w, r, release)
+		return
+	}
+	member := r
+	if release.member != nil {
+		member = release.member
+	}
+	h.k.ServeItem(w, member, path)
 }
 
 func record(r *http.Request, meta pubfmt.Metadata) versionRecord {
@@ -247,15 +324,19 @@ func record(r *http.Request, meta pubfmt.Metadata) versionRecord {
 	}
 }
 
-func (h handler) lookup(r *http.Request, name string) ([]release, error) {
+// lookup returns name's releases in r's repository. file is set for the
+// lookup an archive download makes, which the blackout alone refuses: the
+// archive's own path takes the patterns, so a pattern on the versions
+// document does not refuse the archive.
+func (h handler) lookup(r *http.Request, name string, file bool) ([]release, error) {
 	q := pkgroute.RequestFrom(r)
 	switch q.Repo.Class {
 	case repo.Local, repo.Federated:
 		return h.hosted(r, name)
 	case repo.Remote:
-		return h.remoteVersions(r, name)
+		return h.remoteVersions(r, name, file)
 	case repo.Virtual:
-		return h.virtual(r, name)
+		return h.virtual(r, name, file)
 	default:
 		return nil, source.ErrUnsupported
 	}
@@ -295,36 +376,17 @@ func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	return out, nil
 }
 
-func (h handler) virtual(r *http.Request, name string) ([]release, error) {
-	q := pkgroute.RequestFrom(r)
+// virtual merges the members' releases of name, an earlier member's copy
+// of a version shadowing a later member's.
+func (h handler) virtual(r *http.Request, name string, file bool) ([]release, error) {
+	members, err := h.memberReleases(r, name, file)
+	if err != nil {
+		return nil, err
+	}
 	byVersion := map[string]release{}
-	for _, key := range q.Repo.Repositories {
-		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("pub: virtual member: %w", err)
-		}
-		mr, err := h.k.MemberRequest(r, member)
-		if err != nil {
-			return nil, err //nolint:wrapcheck // protocol class refusal
-		}
-		if !h.k.CanFolder(mr, name, api.ActionRead) {
-			continue
-		}
-		found, err := h.lookup(mr, name)
-		if err != nil {
-			var response *apierror.Error
-			if errors.Is(err, kernel.ErrNotFound) ||
-				errors.As(err, &response) && response.Status == http.StatusNotFound {
-				continue
-			}
-			return nil, err
-		}
+	for _, found := range members {
 		for _, v := range found {
 			if _, exists := byVersion[v.meta.Version]; !exists {
-				v.member = mr
 				byVersion[v.meta.Version] = v
 			}
 		}
@@ -334,6 +396,43 @@ func (h handler) virtual(r *http.Request, name string) ([]release, error) {
 		out = append(out, v)
 	}
 	sortReleases(out)
+	return out, nil
+}
+
+// memberReleases returns, in the virtual repository's order, the releases
+// of name each member the caller may read holds, each with its member's
+// request. The versions document leaves out a blacked-out member, which
+// 7.x ignores when it resolves, and one whose patterns reject the
+// document's path ([I], R5); an archive download's lookup leaves out only
+// a blacked-out member, and passes over one that refuses the archive.
+func (h handler) memberReleases(r *http.Request, name string, file bool) ([][]release, error) {
+	doc := documentPath(name)
+	if file {
+		doc = ""
+	}
+	members, err := h.k.MergeMembers(r, doc)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // a refusal or a protocol class refusal, answered as it is
+	}
+	var out [][]release
+	for _, mr := range members {
+		if !h.k.CanFolder(mr, name, api.ActionRead) {
+			continue
+		}
+		found, err := h.lookup(mr, name, file)
+		if err != nil {
+			var response *apierror.Error
+			if errors.Is(err, kernel.ErrNotFound) ||
+				errors.As(err, &response) && response.Status == http.StatusNotFound {
+				continue
+			}
+			return nil, err
+		}
+		for i := range found {
+			found[i].member = mr
+		}
+		out = append(out, found)
+	}
 	return out, nil
 }
 

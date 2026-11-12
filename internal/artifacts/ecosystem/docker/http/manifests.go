@@ -50,7 +50,7 @@ func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request
 		Write(w, err)
 		return
 	}
-	if g.blackedOut(w, r, q) {
+	if blackedOut(w, q, "manifests") {
 		return
 	}
 	it, err := g.findManifest(r, q)
@@ -62,7 +62,7 @@ func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request
 		g.writeErr(w, r, err)
 		return
 	}
-	if excluded(w, q, it, CodeManifestUnknown) {
+	if excluded(w, q, it) {
 		return
 	}
 	content, _, err := g.blobs.Open(r.Context(), it.Actual.SHA256)

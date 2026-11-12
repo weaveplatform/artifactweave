@@ -213,9 +213,30 @@ func (h handler) dependencyVersionRead(
 	}, nil
 }
 
+// dependencyReader is how readDependency reads a dependency's archive from
+// the cache member. A client downloading the archive downloads a file the
+// virtual repository serves, which its own patterns refuse with "No
+// repository found to serve the request" (R5). A parent's rewrite caching
+// the archive serves the parent, which binary has checked, so the virtual
+// repository's patterns refuse the dependency only when the client asks
+// for it.
+func (h handler) dependencyReader(
+	download bool,
+) func(*http.Request, source.Resource) (source.Result, error) {
+	if download {
+		return h.k.Read
+	}
+	return h.k.ReadMetadata
+}
+
+// readDependency reads an external dependency's archive through the
+// virtual repository's cache member. download is whether the client is
+// downloading the archive itself, rather than a parent's rewrite caching it
+// on the way.
 func (h handler) readDependency(
 	r *http.Request,
 	name, raw, version string,
+	download bool,
 ) (dependencyRead, error) {
 	if !bowerfmt.ValidName(name) || !h.k.CanFolder(r, name, accessapi.ActionRead) {
 		return dependencyRead{}, source.ErrDenied
@@ -286,7 +307,7 @@ func (h handler) readDependency(
 	if err := h.currentDependencyRead(r.Context(), r, resource.Path, false); err != nil {
 		return dependencyRead{}, err
 	}
-	result, err := h.k.Read(member, resource)
+	result, err := h.dependencyReader(download)(member, resource)
 	if err != nil {
 		return dependencyRead{}, fmt.Errorf("bower dependency read: %w", err)
 	}
@@ -357,7 +378,7 @@ func (h handler) externalBinary(w http.ResponseWriter, r *http.Request) bool {
 	var read dependencyRead
 	var data []byte
 	if err == nil {
-		read, err = h.readDependency(r, name, raw, "")
+		read, err = h.readDependency(r, name, raw, "", true)
 		data = read.data
 	}
 	if err == nil {
@@ -447,7 +468,7 @@ func (h handler) rewriteArchive(r *http.Request, data []byte, name string) ([]by
 				deps[dep] = target
 				continue
 			}
-			if _, err := h.readDependency(r, dep, target, ""); err != nil {
+			if _, err := h.readDependency(r, dep, target, "", false); err != nil {
 				return nil, err
 			}
 			deps[dep] = "art://external/" + dep + "#" + dependencyTarget(target)
@@ -670,8 +691,11 @@ func (h handler) shorthandRefs(w http.ResponseWriter, r *http.Request) {
 	for _, ref := range refs {
 		path := bowerfmt.ManifestPath(pointer.name, ref.Version)
 		if h.k.Can(r, path, accessapi.ActionRead) && h.k.Can(member, path, accessapi.ActionRead) {
-			if result.CheckRead != nil {
-				err = result.CheckRead(r.Context(), path)
+			// Read permission alone decides the refs a client resolves from:
+			// a tag whose archive the cache's patterns reject stays listed,
+			// and only the archive's read is refused (R3).
+			if result.CheckPermission != nil {
+				err = result.CheckPermission(r.Context(), path)
 			}
 			if err == nil {
 				err = h.currentDependencyRead(r.Context(), r, path, false)
@@ -708,7 +732,7 @@ func (h handler) shorthandBinary(w http.ResponseWriter, r *http.Request) {
 		if !bowerfmt.ValidVersion(version) {
 			version = ""
 		}
-		read, err = h.readDependency(r, pointer.name, target.String(), version)
+		read, err = h.readDependency(r, pointer.name, target.String(), version, true)
 		data = read.data
 	}
 	if err == nil {

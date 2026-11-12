@@ -89,6 +89,12 @@ The JFrog REST
 operations under `/artifactory/api/docker/<repo>/v2/` that are not registry operations
 (`promote`, `parentManifests`, `delete`) keep the Artifactory envelope.
 
+So does a pull the download policy refuses (amended 2026-11-11, #1251). It answers 404 with
+the blackout's or the patterns' message as `{"errors":[{"status":404,"message":...}]}`,
+under no registry code, because the Docker client printed `unknown: <message>` for 7.x's
+pattern refusal ([RTFACT-27234](https://jfrog.atlassian.net/browse/RTFACT-27234)). Decision
+[0032](0032-package-format-handlers.md) lists which pulls and listings it refuses.
+
 ### Authentication on the registry
 
 - A request with no credentials to any registry path answers 401 `UNAUTHORIZED` with the

@@ -64,7 +64,13 @@
 //     version conflicts (409).
 //   - The manifest GET needs the read grant on the manifest and on every
 //     declared file (403), and answers only a complete version (404 for a
-//     missing file, 409 for one that differs).
+//     missing file, 409 for one that differs). After the manifest's read
+//     grant and before the manifest is read, Artifactory's download policy
+//     checks the manifest's own path, models/<name>/<version>/
+//     model-manifest.json: a blacked-out repository, or include and
+//     exclude patterns rejecting that path, answer 404 with the item
+//     routes' message. Patterns rejecting a declared file leave the
+//     manifest answered, with the file listed.
 //   - Statuses and error texts stay byte-identical.
 //
 // # References

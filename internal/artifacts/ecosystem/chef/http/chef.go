@@ -85,7 +85,15 @@ type release struct {
 	member     *http.Request
 	remoteURL  string
 	revalidate func(context.Context) error
-	checkRead  func(context.Context, string) error
+	// checkRead rechecks the caller's Read permission on a path the
+	// upstream disclosed, without the download policy, so a record lists a
+	// version whose archive the patterns reject; the archive's own read
+	// applies the policy.
+	checkRead func(context.Context, string) error
+	// alternates are the later members of a virtual repository that hold
+	// the same version, in order, for a download to pass on to when a
+	// member's own policy refuses the archive.
+	alternates []release
 }
 
 func base(r *http.Request) string {
@@ -149,9 +157,53 @@ func (h handler) identity(w http.ResponseWriter, r *http.Request) (string, bool)
 	return name, h.k.RequireFolder(w, r, name, api.ActionRead)
 }
 
+// resolution refuses the cookbook and version records a client resolves a
+// cookbook from, before they are built, when the repository is blacked
+// out: 7.x ignores a blacked-out repository when it resolves (R2a). It
+// names the request's own path, since 7.x documents none it keeps this
+// metadata at, and so the patterns do not refuse it (#216). The catalog
+// and search keep their answers under the blackout, as a native search
+// does (R2b), and a virtual repository has no blackout.
+func (h handler) resolution(w http.ResponseWriter, r *http.Request) bool {
+	if err := h.k.CheckBlackedOut(r, requestPath(r)); err != nil {
+		h.k.Error(w, r, err)
+		return false
+	}
+	return true
+}
+
+// requestPath is the request's path after the repository key. The kit has
+// parsed it before any route runs.
+func requestPath(r *http.Request) string {
+	p, _ := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
+	return p.String()
+}
+
+// archivePolicy applies the download policy to the archive at path, so a
+// refused download answers the policy's 404 and message rather than "Chef
+// cookbook or version not found" (decision 0032, RTDEV-47144): a hosted
+// repository's blackout and patterns, and a virtual repository's own
+// patterns with "No repository found to serve the request". A remote's
+// blackout is checked here, before its upstream is asked where the
+// archive is; its patterns are checked when the source boundary reads the
+// archive.
+func (h handler) archivePolicy(w http.ResponseWriter, r *http.Request, path string) bool {
+	var err error
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		err = h.k.CheckBlackedOut(r, path)
+	} else {
+		err = h.k.CheckDownload(r, path)
+	}
+	if err != nil {
+		h.k.Error(w, r, err)
+		return false
+	}
+	return true
+}
+
 func (h handler) cookbook(w http.ResponseWriter, r *http.Request) {
 	name, ok := h.identity(w, r)
-	if !ok {
+	if !ok || !h.resolution(w, r) {
 		return
 	}
 	found, err := h.lookup(r, name)
@@ -168,7 +220,12 @@ func (h handler) cookbook(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, r, 200, cookbookRecord(r, found))
 }
 
-func (h handler) resolve(w http.ResponseWriter, r *http.Request) (release, bool) {
+// resolve finds the version a version record or a download names. A
+// download of a named version is refused at its archive's path before the
+// version is looked up, so the policy answers whether the version exists
+// or not; latest is resolved first, as a record is, and its archive
+// checked once it is known.
+func (h handler) resolve(w http.ResponseWriter, r *http.Request, download bool) (release, bool) {
 	name, ok := h.identity(w, r)
 	if !ok {
 		return release{}, false
@@ -179,6 +236,13 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) (release, bool)
 		return release{}, false
 	}
 	if version != "latest" && !h.k.Require(w, r, cheffmt.Path(name, version), api.ActionRead) {
+		return release{}, false
+	}
+	if download && version != "latest" {
+		if !h.archivePolicy(w, r, cheffmt.Path(name, version)) {
+			return release{}, false
+		}
+	} else if !h.resolution(w, r) {
 		return release{}, false
 	}
 	found, err := h.lookup(r, name)
@@ -192,6 +256,9 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) (release, bool)
 				h.k.Error(w, r, err)
 				return release{}, false
 			}
+			if download && version == "latest" && !h.archivePolicy(w, r, rel.meta.Path) {
+				return release{}, false
+			}
 			return rel, true
 		}
 	}
@@ -200,17 +267,33 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) (release, bool)
 }
 
 func (h handler) version(w http.ResponseWriter, r *http.Request) {
-	rel, ok := h.resolve(w, r)
+	rel, ok := h.resolve(w, r, false)
 	if ok {
 		writeJSON(w, r, 200, versionRecord(r, rel.meta))
 	}
 }
 
+// archive serves a version's archive. A virtual repository's comes from
+// the first member, in order, that holds the version and whose own policy
+// accepts the archive: a member that refuses it is passed over, as one
+// without it is (R5, decision 0032), and when none serves it the answer
+// is Chef's not-found.
 func (h handler) archive(w http.ResponseWriter, r *http.Request) {
-	rel, ok := h.resolve(w, r)
+	rel, ok := h.resolve(w, r, true)
 	if !ok {
 		return
 	}
+	for _, candidate := range append([]release{rel}, rel.alternates...) {
+		if candidate.member != nil && h.memberRefuses(candidate.member, candidate.meta.Path) {
+			continue
+		}
+		h.serveArchive(w, r, candidate)
+		return
+	}
+	h.k.Error(w, r, missing())
+}
+
+func (h handler) serveArchive(w http.ResponseWriter, r *http.Request, rel release) {
 	if rel.remoteURL != "" {
 		h.remoteArchive(w, r, rel)
 		return
@@ -220,6 +303,19 @@ func (h handler) archive(w http.ResponseWriter, r *http.Request) {
 		member = rel.member
 	}
 	h.k.ServeItem(w, member, rel.meta.Path)
+}
+
+// memberRefuses reports whether a virtual repository's member refuses the
+// archive at path by its own download policy; resolve has checked the
+// virtual repository's own patterns, which the member request carries. A
+// remote member's is checked here, before its upstream is asked, at the
+// path the source boundary checks when it reads the archive.
+func (h handler) memberRefuses(mr *http.Request, path string) bool {
+	member := pkgroute.RequestFrom(mr).Repo
+	if member.Class == repo.Remote {
+		return generic.CheckDownload(member, path, false) != nil
+	}
+	return h.k.CheckDownload(mr, path) != nil
 }
 
 func (h handler) publish(w http.ResponseWriter, r *http.Request) {
@@ -400,6 +496,12 @@ func (h handler) names(r *http.Request) ([]string, error) {
 			if err != nil {
 				return nil, fmt.Errorf("chef: member: %w", err)
 			}
+			// 7.x ignores a blacked-out member when it resolves (R5), so
+			// a blacked-out remote member's refused catalog does not
+			// refuse the virtual repository's.
+			if generic.CheckBlackedOut(member, "") != nil {
+				continue
+			}
 			mr, err := h.k.MemberRequest(r, member)
 			if err != nil {
 				return nil, fmt.Errorf("chef: member request: %w", err)
@@ -495,8 +597,13 @@ func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	out := make([]release, 0, len(versions))
 	for _, v := range versions {
 		path := cheffmt.Path(name, v.Version)
-		if !h.k.Can(r, path, api.ActionRead) ||
-			generic.CheckDownload(q.Repo, path, false) != nil {
+		// Read permission decides what is listed: a version whose archive
+		// the patterns reject stays listed, and only its download is
+		// refused (R3; RTFACT-20145 shows an excluded cookbook still
+		// found by search). A blacked-out repository lists nothing, which
+		// is what its catalog and search answer (R2b); its records and
+		// downloads refuse before they look (resolution, archivePolicy).
+		if !h.k.Can(r, path, api.ActionRead) || generic.CheckBlackedOut(q.Repo, path) != nil {
 			continue
 		}
 		var meta cheffmt.Metadata
@@ -525,6 +632,10 @@ func (h handler) virtual(r *http.Request, name string) ([]release, error) {
 		if err != nil {
 			return nil, fmt.Errorf("chef: virtual member: %w", err)
 		}
+		// 7.x ignores a blacked-out member when it resolves (R5).
+		if generic.CheckBlackedOut(member, "") != nil {
+			continue
+		}
 		mr, err := h.k.MemberRequest(r, member)
 		if err != nil {
 			return nil, err //nolint:wrapcheck // protocol class refusal
@@ -541,13 +652,18 @@ func (h handler) virtual(r *http.Request, name string) ([]release, error) {
 			}
 			return nil, err
 		}
+		// A version whose archive a member's patterns or the virtual
+		// repository's own reject stays listed (R3, R5); its download
+		// passes over that member or is refused (archive).
 		for _, v := range found {
-			if !h.k.Can(r, v.meta.Path, api.ActionRead) ||
-				generic.CheckDownload(q.Repo, v.meta.Path, false) != nil {
+			if !h.k.Can(r, v.meta.Path, api.ActionRead) {
 				continue
 			}
-			if _, exists := byVersion[v.meta.Version]; !exists {
-				v.member = mr
+			v.member = mr
+			if first, exists := byVersion[v.meta.Version]; exists {
+				first.alternates = append(first.alternates, v)
+				byVersion[v.meta.Version] = first
+			} else {
 				byVersion[v.meta.Version] = v
 			}
 		}

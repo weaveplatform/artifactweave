@@ -76,6 +76,15 @@ type version struct {
 
 func notFound() error { return apierror.New(http.StatusNotFound, "CocoaPods resource not found") }
 
+// cdnDocument is where 7.x keeps the CDN document a request path names:
+// a local repository's CDN index is the folder .pod/cdn/, and a CDN remote
+// fills the same folder as it resolves (CocoaPods Repositories docs,
+// "Identify Whether a CocoaPods Repository Uses CDN"). 7.x reads a stored
+// document through the download path, so a blacked-out repository, or a
+// pattern on that path, refuses it with the policy's 404; a pattern on one
+// pod's archive does not, and the pod stays listed (R1, R3).
+func cdnDocument(path string) string { return ".pod/cdn/" + path }
+
 func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
 	if err != nil || p.Folder || len(p.Props) != 0 || r.URL.RawQuery != "" {
@@ -100,6 +109,10 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.HasPrefix(path, "packages/") {
 		h.localArchive(w, r, strings.TrimPrefix(path, "packages/"))
+		return
+	}
+	if err := h.k.CheckDocument(r, cdnDocument(path)); err != nil {
+		h.k.Error(w, r, err)
 		return
 	}
 	if path == "CocoaPods-version.yml" {

@@ -52,6 +52,16 @@
 //     carries its SHA-1 as the shasum.
 //   - A virtual repository's members are distinct and read in order; the
 //     first readable member that holds a package supplies all its versions.
+//   - The download policy (decision 0032): a blacked-out repository, a
+//     remote's included, refuses packages.json and p2 metadata with the
+//     blackout's 404 naming the request path, after read permission; 7.x
+//     does not document where it keeps them, so the patterns do not refuse
+//     them. An archive answers its own path's policy, and a pattern on it
+//     leaves the release listed. A virtual repository resolves a package
+//     past a blacked-out member, passes an archive the resolved member
+//     refuses on to the next member that holds the version, and answers
+//     its own patterns on an archive with "No repository found to serve
+//     the request".
 //   - A remote accepts an upstream metadata-url only on the upstream's own
 //     scheme and host, and dist URLs only as http or https without
 //     credentials, query or fragment. Its entries are served without their
@@ -99,6 +109,8 @@
 //     untrusted upstream metadata, access revoked at delivery, a remote
 //     without a registry URL, source failures, and a virtual repository
 //     that selects a remote's archive.
+//   - download_policy_test.go: the download policy on hosted, virtual and
+//     remote repositories.
 //
 // The router's guard TestAccNativeComposerRoutesAvoidHandwrittenStubs
 // (internal/app) and the @composer acceptance scenarios, with the native

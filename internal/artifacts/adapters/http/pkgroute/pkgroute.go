@@ -708,17 +708,32 @@ func refusal(r *http.Request) error {
 // lists and npm's packuments are built from the index.
 func (k *Kit) DB() Store { return k.o.Store }
 
-// Item returns the item at path in the request's repository, through its
-// Source, unless the download policy refuses path (Request.download): that
-// refusal is kernel.ErrNotFound to the caller, which passes over it as it
-// passes over a missing item, and Error answers its 404. The caller checks
-// read permission first.
-func (k *Kit) Item(r *http.Request, path string) (Found, error) {
+// DownloadItem returns the item at path in the request's repository,
+// through its Source, for a lookup whose answer serves it: a file a
+// download serves, or a stored metadata document answered from its own
+// path. The download policy (Request.download) refuses path first, whether
+// the item exists or not. That refusal is kernel.ErrNotFound to the caller,
+// which passes over it as it passes over a missing item, and Error answers
+// its 404 with the item routes' message. The caller checks read permission
+// first.
+func (k *Kit) DownloadItem(r *http.Request, path string) (Found, error) {
 	q := RequestFrom(r)
 	if err := q.download(path); err != nil {
 		return Found{}, fmt.Errorf("%s: %w", k.p.Name, err)
 	}
 	return k.find(r, q, path)
+}
+
+// StoredItem returns the item stored at path in the request's repository,
+// through its Source, whatever the download policy says of path, for a
+// lookup whose answer does not serve it. Listings use it: Artifactory
+// lists a release whose file the include and exclude patterns reject and
+// refuses only the file's download (RTFACT-24511, RTFACT-29572,
+// RTFACT-8218), so a listing that looked its files up with DownloadItem
+// would drop the release. So does a lookup behind a write, such as whether
+// a deploy replaces a file, which the deploy's own checks refuse.
+func (k *Kit) StoredItem(r *http.Request, path string) (Found, error) {
+	return k.find(r, RequestFrom(r), path)
 }
 
 func (k *Kit) find(r *http.Request, q Request, path string) (Found, error) {
@@ -729,16 +744,27 @@ func (k *Kit) find(r *http.Request, q Request, path string) (Found, error) {
 	return f, nil
 }
 
-// ResolveItem applies the format's download resolution and refreshes its
-// derived work before looking up the item. The caller checks permission
-// first, including formats whose metadata has repository-wide visibility.
-// The download policy checks path as requested, before it is resolved, as
-// the item routes' download does.
-func (k *Kit) ResolveItem(r *http.Request, path string) (Found, error) {
+// ResolveDownloadItem is DownloadItem after the format's download
+// resolution, which refreshes the format's derived work, such as a stored
+// index, before the item is looked up. The download policy checks path as
+// requested, before it is resolved, as the item routes' download does. The
+// caller checks permission first, including formats whose metadata has
+// repository-wide visibility.
+func (k *Kit) ResolveDownloadItem(r *http.Request, path string) (Found, error) {
 	q := RequestFrom(r)
 	if err := q.download(path); err != nil {
 		return Found{}, fmt.Errorf("%s: %w", k.p.Name, err)
 	}
+	return k.resolveFound(r, q, path)
+}
+
+// ResolveStoredItem is StoredItem after the format's download resolution,
+// for a lookup whose answer does not serve the item.
+func (k *Kit) ResolveStoredItem(r *http.Request, path string) (Found, error) {
+	return k.resolveFound(r, RequestFrom(r), path)
+}
+
+func (k *Kit) resolveFound(r *http.Request, q Request, path string) (Found, error) {
 	resolved, err := k.o.Items().Resolve(r.Context(), q.Repo, format.Download{Path: path})
 	if err != nil {
 		return Found{}, fmt.Errorf("%s: resolve %s: %w", k.p.Name, path, err)
@@ -754,11 +780,28 @@ func (k *Kit) ResolveItem(r *http.Request, path string) (Found, error) {
 // download policy refuses path, whether it exists or not; a missing file,
 // or a folder, answers 404.
 func (k *Kit) ServeItem(w http.ResponseWriter, r *http.Request, path string) {
+	k.serveItem(w, r, path, true)
+}
+
+// ServeMetadata answers GET or HEAD of the stored metadata document at
+// path, such as a Go version's .info, as ServeItem answers a file but
+// without the download policy that DownloadItem applies to files. Whether
+// the policy refuses a metadata document at its own path is the protocol's
+// to decide, with CheckDocument.
+func (k *Kit) ServeMetadata(w http.ResponseWriter, r *http.Request, path string) {
+	k.serveItem(w, r, path, false)
+}
+
+func (k *Kit) serveItem(w http.ResponseWriter, r *http.Request, path string, download bool) {
 	if !k.Require(w, r, path, accessapi.ActionRead) {
 		return
 	}
+	read, lookup := k.ReadMetadata, k.StoredItem
+	if download {
+		read, lookup = k.Read, k.DownloadItem
+	}
 	if _, ok := RequestFrom(r).Source.(ReadSource); ok {
-		result, err := k.Read(r, Resource(r, path, escapeResource(path)))
+		result, err := read(r, Resource(r, path, escapeResource(path)))
 		if err != nil {
 			k.Error(w, r, err)
 			return
@@ -766,7 +809,7 @@ func (k *Kit) ServeItem(w http.ResponseWriter, r *http.Request, path string) {
 		k.ServeResult(w, r, result)
 		return
 	}
-	f, err := k.Item(r, path)
+	f, err := lookup(r, path)
 	switch {
 	case errors.As(err, new(*refusedError)):
 		k.Error(w, r, err)
@@ -781,8 +824,8 @@ func (k *Kit) ServeItem(w http.ResponseWriter, r *http.Request, path string) {
 
 // ServeFound serves an already resolved file after checking Read and the
 // download policy, against f's repository, for a file the protocol found
-// without Item. A file a virtual repository's request found in a member is
-// checked as the member request's would be. Signed downloads use the
+// without DownloadItem. A file a virtual repository's request found in a
+// member is checked as the member request's would be. Signed downloads use the
 // verified item so a concurrent overwrite cannot replace the bytes between
 // checking the signed digest and opening the blob.
 func (k *Kit) ServeFound(w http.ResponseWriter, r *http.Request, f Found) {
@@ -801,6 +844,17 @@ func (k *Kit) ServeFound(w http.ResponseWriter, r *http.Request, f Found) {
 			err = notFound()
 		}
 		k.Error(w, r, err)
+		return
+	}
+	k.o.ServeItem(w, r, f.Repo, f.Item)
+}
+
+// ServeFoundMetadata serves a stored metadata document the protocol found,
+// such as a LuaRocks manifest, after checking Read against f's repository,
+// without the download policy: ServeMetadata for a document already found.
+func (k *Kit) ServeFoundMetadata(w http.ResponseWriter, r *http.Request, f Found) {
+	if !can(r, f.Repo, f.Item.FullPath(), accessapi.ActionRead) {
+		k.Error(w, r, refusal(r))
 		return
 	}
 	k.o.ServeItem(w, r, f.Repo, f.Item)

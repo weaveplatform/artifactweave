@@ -62,7 +62,16 @@ func validateJSON(_ context.Context, body io.ReadSeeker, size int64) error {
 	return nil
 }
 
-func (h handler) remoteJSON(r *http.Request, rest, folder string) ([]byte, source.Result, error) {
+// remoteJSON reads one Conan metadata document of a remote repository. For
+// resolution metadata, the revision and file lists, only the blackout
+// refuses it, naming the request's path, as a local repository's (resolve);
+// a search keeps main's check of the whole policy at the permission folder
+// (R2b).
+func (h handler) remoteJSON(
+	r *http.Request,
+	rest, folder string,
+	resolution bool,
+) ([]byte, source.Result, error) {
 	resource := source.Resource{
 		Kind: source.ResourceKindMetadata, Path: ".conan/" + rest,
 		EscapedPath:  ".conan/" + escapePath(rest),
@@ -70,6 +79,9 @@ func (h handler) remoteJSON(r *http.Request, rest, folder string) ([]byte, sourc
 		PermissionFolder: true, PermissionPath: folder,
 		ExpectedContentType: "application/json", Variant: "conan-json-v1",
 		Validate: validateJSON,
+	}
+	if resolution {
+		resource.PolicyPath, resource.BlackoutOnly = requestPath(r), true
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
@@ -124,7 +136,7 @@ func (h handler) remoteRevisions(
 		rest = recipeRevisionURL(ref) + "/packages/" + id + "/revisions"
 		folder = ref.Root() + "/package/" + id
 	}
-	data, result, err := h.remoteJSON(r, rest, folder)
+	data, result, err := h.remoteJSON(r, rest, folder, true)
 	if err != nil {
 		return nil, err
 	}
@@ -140,14 +152,17 @@ func (h handler) remoteRevisions(
 			return nil, source.ErrInvalidResult
 		}
 		if h.k.CanFolder(r, folder, api.ActionRead) {
-			if result.CheckRead != nil {
+			// The manifest's Read permission alone: a revision whose
+			// manifest the patterns reject stays listed (R3), as a local
+			// repository's does, and only the manifest's GET is refused.
+			if result.CheckPermission != nil {
 				candidate := ref
 				candidate.Revision = rev.Revision
 				path := candidate.RecipeRoot() + "/" + conanfmt.Manifest
 				if id != "" {
 					path = ref.PackageRoot(id, rev.Revision) + "/" + conanfmt.Manifest
 				}
-				if err := result.CheckRead(r.Context(), path); err != nil {
+				if err := result.CheckPermission(r.Context(), path); err != nil {
 					continue
 				}
 			}
@@ -175,7 +190,7 @@ func (h handler) remoteFileList(w http.ResponseWriter, r *http.Request, root str
 		h.bad(w, r, "invalid Conan revision root")
 		return
 	}
-	if _, err := h.remoteManifest(r, f); err != nil {
+	if _, err := h.remoteManifest(r, f, requestPath(r)); err != nil {
 		h.error(w, r, err)
 		return
 	}
@@ -183,7 +198,7 @@ func (h handler) remoteFileList(w http.ResponseWriter, r *http.Request, root str
 	if f.Package {
 		rest += "/packages/" + f.ID + "/revisions/" + f.PRev
 	}
-	data, result, err := h.remoteJSON(r, rest+"/files", root)
+	data, result, err := h.remoteJSON(r, rest+"/files", root, true)
 	if err != nil {
 		h.error(w, r, err)
 		return
@@ -220,8 +235,11 @@ func (h handler) validRemoteFiles(
 		if !h.k.Can(r, path, api.ActionRead) {
 			return nil, denied(r)
 		}
-		if result.CheckRead != nil {
-			if err := result.CheckRead(r.Context(), path); err != nil {
+		// Read permission alone: a file the patterns reject stays listed
+		// (R3), where the whole list answered 502, and only its GET is
+		// refused.
+		if result.CheckPermission != nil {
+			if err := result.CheckPermission(r.Context(), path); err != nil {
 				return nil, fmt.Errorf(
 					"check conan file permission: %w",
 					pkgroute.SourceError(err, false),
@@ -242,7 +260,7 @@ func (h handler) remoteFile(w http.ResponseWriter, r *http.Request, f conanfmt.F
 	if f.File != conanfmt.Manifest {
 		manifest := f
 		manifest.File = conanfmt.Manifest
-		body, err := h.remoteManifest(r, manifest)
+		body, err := h.remoteManifest(r, manifest, f.Path())
 		if err != nil {
 			h.error(w, r, err)
 			return
@@ -292,7 +310,11 @@ func (h handler) remoteFile(w http.ResponseWriter, r *http.Request, f conanfmt.F
 			return nil
 		}
 	}
-	result, err := h.k.Read(r, resource)
+	read := h.k.Read
+	if document(f.File) {
+		read = h.k.ReadMetadata
+	}
+	result, err := read(r, resource)
 	if err != nil {
 		h.error(w, r, pkgroute.SourceError(err, false))
 		return
@@ -315,13 +337,25 @@ func validateRemoteManifest(_ context.Context, reader io.ReadSeeker, size int64)
 	return nil
 }
 
-func (h handler) remoteManifest(r *http.Request, f conanfmt.FilePath) (map[string]string, error) {
+// remoteManifest reads the manifest that lists a remote revision's files and
+// their digests, for a file download, a file list or a virtual repository's
+// choice of member. Only the blackout refuses it, naming policy, the file the
+// download serves or the list's request path: these are the internal lookups
+// a request makes (R4), and a revision whose manifest the patterns reject
+// stays listed (R3). A GET of the manifest itself is checked in full
+// (remoteFile).
+func (h handler) remoteManifest(
+	r *http.Request,
+	f conanfmt.FilePath,
+	policy string,
+) (map[string]string, error) {
 	resource := source.Resource{
 		Kind: source.ResourceKindArtifact, Path: f.Path(), EscapedPath: escapePath(f.Path()),
 		UpstreamPath: fileURL(f), Method: http.MethodGet,
 		Variant: "conan-manifest-v1", Validate: validateRemoteManifest,
+		PolicyPath: policy, BlackoutOnly: true,
 	}
-	result, err := h.k.Read(r, resource)
+	result, err := h.k.ReadMetadata(r, resource)
 	if err != nil {
 		return nil, fmt.Errorf("read conan manifest: %w", pkgroute.SourceError(err, false))
 	}
@@ -365,7 +399,7 @@ func (h handler) remoteManifest(r *http.Request, f conanfmt.FilePath) (map[strin
 }
 
 func (h handler) remoteSearch(w http.ResponseWriter, r *http.Request) {
-	data, result, err := h.remoteJSON(r, "v2/conans/search", "")
+	data, result, err := h.remoteJSON(r, "v2/conans/search", "", false)
 	if err != nil {
 		h.error(w, r, err)
 		return
@@ -429,7 +463,7 @@ func (h handler) remotePackageSearch(
 	if ref.Revision != "" {
 		folder = ref.Root()
 	}
-	data, result, err := h.remoteJSON(r, rest+"/search", folder)
+	data, result, err := h.remoteJSON(r, rest+"/search", folder, false)
 	if err != nil {
 		h.error(w, r, err)
 		return

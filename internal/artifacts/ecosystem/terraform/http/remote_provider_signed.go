@@ -135,7 +135,7 @@ func (h handler) remoteSignedProvider(w http.ResponseWriter, r *http.Request, c 
 			}
 		}
 	}()
-	result.Revalidate = combineModuleFences(bundle.results, bundle.paths)
+	result.Revalidate = combineModuleFences(bundle.results, readCheck, bundle.paths)
 	result.Used = combineModuleUsage(bundle.results)
 	h.k.ServeResult(w, r, result)
 }

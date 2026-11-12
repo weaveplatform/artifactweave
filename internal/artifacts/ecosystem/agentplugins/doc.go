@@ -63,9 +63,11 @@
 //     Agent Plugins Standard bundle and no VS Code marketplace, which later
 //     JFrog releases added; vscode-marketplace.json stays reserved.
 //   - A marketplace file is rendered for each reader and lists, for each
-//     plugin, the newest version that reader may read and the repository's
-//     patterns allow, so a narrower read grant never discloses a hidden
-//     bundle. The unified file advertises ZIP sources, and Claude's file URL
+//     plugin, the newest version that reader may read, so a narrower read
+//     grant never discloses a hidden bundle. A version whose ZIP the
+//     repository's patterns reject stays listed, as 7.x's stored file lists
+//     each plugin's latest version, and only the ZIP's download refuses.
+//     The unified file advertises ZIP sources, and Claude's file URL
 //     sources.
 //   - The property names are stored, so they stay byte-identical.
 //

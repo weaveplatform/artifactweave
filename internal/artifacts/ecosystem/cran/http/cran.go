@@ -27,11 +27,13 @@ var (
 )
 
 type cranIndexView struct {
-	repo       repo.Config
-	packages   []cran.Package
-	checkRead  func(context.Context, string) error
-	revalidate func(context.Context) error
-	used       func(context.Context) error
+	repo     repo.Config
+	packages []cran.Package
+	// checkPermission is a remote index read's permission-only check of
+	// each package the index lists (source.Result.CheckPermission).
+	checkPermission func(context.Context, string) error
+	revalidate      func(context.Context) error
+	used            func(context.Context) error
 }
 
 type cranCandidate struct {
@@ -52,8 +54,10 @@ type CranAPI struct {
 
 // TryCranItem is the overlay (itemkit.Overlay) that serves a CRAN
 // repository's PACKAGES and PACKAGES.gz, listing only the packages the
-// caller may read, and a virtual or remote repository's packages, only as
-// an index the caller can see lists them. It answers 404 for PACKAGES.rds,
+// caller has Read permission on, a package whose file the include and
+// exclude patterns reject among them, and a virtual or remote repository's
+// packages, only as an index the caller can see lists them, each under the
+// download policy at its own path. It answers 404 for PACKAGES.rds,
 // which sends R to PACKAGES.gz. It reports whether it answered; every other
 // request, a folder or a local repository's package among them, it leaves
 // to the overlays after it and the generic lookup.
@@ -94,25 +98,36 @@ func (s CranAPI) serveCranIndex(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.Folder(c, feed, accessapi.ActionRead) || !acc.File(c, req.Path, accessapi.ActionRead) ||
-		generic.CheckDownload(c, req.Path, false) != nil {
+	if !acc.Folder(c, feed, accessapi.ActionRead) || !acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		return
+	}
+	// 7.x calculates and stores a local repository's PACKAGES and caches a
+	// remote's at this path, so a blacked-out repository or patterns that
+	// reject the file's own path answer the policy's 404 and message once
+	// Read permission is settled (DV-057); a virtual repository's patterns
+	// answer that no repository serves it. A remote's -cache alias answers
+	// as the remote does.
+	if err := generic.CheckDownload(c, req.Path, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "CRAN index download", err))
 		return
 	}
 	var candidates []cranCandidate
 	var err error
 	var used func(context.Context) error
 	if c.Class == repo.Virtual {
-		candidates, err = s.cranCandidates(ctx, st, c, req.Path, p, acc, map[string]bool{})
+		candidates, err = s.cranCandidates(ctx, st, c, req.Path, p, acc, false,
+			map[string]bool{})
 	} else {
 		var view cranIndexView
-		view, err = s.cranMemberIndex(ctx, st, c, cached, req.Path, p, acc)
+		view, err = s.cranMemberIndex(ctx, st, c, cached, false, req.Path, p, acc)
 		if err == nil && view.revalidate != nil {
 			err = view.revalidate(ctx)
 		}
 		if err == nil {
 			for _, pkg := range view.packages {
-				allowed, checkErr := cranPackageReadable(ctx, c, pkg.Path, acc, view.checkRead)
+				allowed, checkErr := cranPackageReadable(ctx, c, pkg.Path, acc,
+					view.checkPermission)
 				if checkErr != nil {
 					err = checkErr
 					break
@@ -154,11 +169,16 @@ func (s CranAPI) serveCranIndex(
 	}
 }
 
+// cranPackageReadable reports whether the caller has Read permission on a
+// package an index lists, in c and, through check, at a remote's source.
+// It is permission alone: an index keeps a package whose file the patterns
+// reject and only that file's GET is refused, as 7.x keeps such a package
+// in a Debian or RPM index (RTFACT-30830, RTFACT-30656).
 func cranPackageReadable(
 	ctx context.Context, c repo.Config, p string, acc itemkit.Access,
 	check func(context.Context, string) error,
 ) (bool, error) {
-	if !acc.File(c, p, accessapi.ActionRead) || generic.CheckDownload(c, p, false) != nil {
+	if !acc.File(c, p, accessapi.ActionRead) {
 		return false, nil
 	}
 	if check != nil {
@@ -172,8 +192,12 @@ func cranPackageReadable(
 	return true, nil
 }
 
+// cranMemberIndex reads the index at indexPath of a local, federated or
+// remote repository. lookup says the read is the one a package GET makes to
+// find the package and pin its MD5, rather than a read of the document
+// itself.
 func (s CranAPI) cranMemberIndex(
-	ctx context.Context, st itemkit.Store, c repo.Config, cached bool, indexPath string,
+	ctx context.Context, st itemkit.Store, c repo.Config, cached, lookup bool, indexPath string,
 	p kernel.Principal, acc itemkit.Access,
 ) (cranIndexView, error) {
 	view := cranIndexView{repo: c}
@@ -193,6 +217,15 @@ func (s CranAPI) cranMemberIndex(
 		if err != nil {
 			return view, err
 		}
+		// The kit checks Read permission at the feed folder, and without a
+		// policy path the source would check the remote's patterns there too,
+		// so a pattern that matches only the folder, such as src/*, would
+		// refuse the index and every package. The policy is checked at the
+		// path 7.x caches the index at instead, and a package GET's lookup
+		// checks only the blackout, since the package's own path was checked
+		// before the lookup (decision 0032, "Where the policy applies").
+		query.Resource.PolicyPath = indexPath
+		query.Resource.BlackoutOnly = lookup
 		result, err := s.RemoteSources.Read(ctx, query)
 		if err != nil {
 			return view, fmt.Errorf(
@@ -200,8 +233,8 @@ func (s CranAPI) cranMemberIndex(
 				pkgroute.SourceError(err, p.Anonymous),
 			)
 		}
-		view.checkRead, view.revalidate, view.used =
-			result.CheckRead, result.Revalidate, result.Used
+		view.checkPermission, view.revalidate, view.used =
+			result.CheckPermission, result.Revalidate, result.Used
 		switch {
 		case result.Stream != nil:
 			defer func() { _ = result.Stream.Body.Close() }()
@@ -267,9 +300,19 @@ func (s CranAPI) readCranBlob(ctx context.Context, sha string) ([]byte, error) {
 	return body, nil
 }
 
+// cranCandidates walks ordered virtual members. A package name belongs to
+// the first member that lists a readable row for it. A member whose
+// download policy refuses its index takes no part in the index, and only a
+// blacked-out one in a package GET (cranMemberRefusesIndex). With download
+// false, for the index, a row stays when the member's or the virtual
+// repository's patterns reject its file, which the index keeps as 7.x's
+// virtual indexes do (RTFACT-30656), so the name belongs to that row. With
+// download true, for a package GET, such a row is left out before names are
+// claimed, so the GET passes over that member to the next one that lists
+// the name, as it did before the index kept the row.
 func (s CranAPI) cranCandidates(
 	ctx context.Context, st itemkit.Store, c repo.Config, indexPath string,
-	p kernel.Principal, acc itemkit.Access, seen map[string]bool,
+	p kernel.Principal, acc itemkit.Access, download bool, seen map[string]bool,
 ) ([]cranCandidate, error) {
 	if seen[c.Key] || len(seen) >= 8 {
 		return nil, errCranVirtualCycle
@@ -292,26 +335,29 @@ func (s CranAPI) cranCandidates(
 		feed, _, _ := cran.IndexPath(indexPath)
 		if !acc.Folder(member, feed, accessapi.ActionRead) ||
 			!acc.File(member, indexPath, accessapi.ActionRead) ||
-			generic.CheckDownload(member, indexPath, false) != nil {
+			cranMemberRefusesIndex(member, indexPath, download) {
 			continue
 		}
 		var entries []cranCandidate
 		if member.Class == repo.Virtual {
-			entries, err = s.cranCandidates(ctx, st, member, indexPath, p, acc, seen)
+			entries, err = s.cranCandidates(ctx, st, member, indexPath, p, acc, download, seen)
 		} else {
 			var view cranIndexView
-			view, err = s.cranMemberIndex(ctx, st, member, false, indexPath, p, acc)
+			view, err = s.cranMemberIndex(ctx, st, member, false, download, indexPath, p, acc)
 			if err == nil && view.revalidate != nil {
 				err = view.revalidate(ctx)
 			}
 			if err == nil {
 				for _, pkg := range view.packages {
+					if download && generic.CheckDownload(member, pkg.Path, false) != nil {
+						continue
+					}
 					allowed, checkErr := cranPackageReadable(
 						ctx,
 						member,
 						pkg.Path,
 						acc,
-						view.checkRead,
+						view.checkPermission,
 					)
 					if checkErr != nil {
 						err = checkErr
@@ -331,8 +377,10 @@ func (s CranAPI) cranCandidates(
 		}
 		for _, entry := range entries {
 			if selected[entry.pkg.Name] ||
-				!acc.File(c, entry.pkg.Path, accessapi.ActionRead) ||
-				generic.CheckDownload(c, entry.pkg.Path, false) != nil {
+				!acc.File(c, entry.pkg.Path, accessapi.ActionRead) {
+				continue
+			}
+			if download && generic.CheckDownload(c, entry.pkg.Path, false) != nil {
 				continue
 			}
 			selected[entry.pkg.Name] = true
@@ -340,6 +388,22 @@ func (s CranAPI) cranCandidates(
 		}
 	}
 	return out, nil
+}
+
+// cranMemberRefusesIndex reports whether a virtual repository's member
+// takes no part because its download policy refuses the index at
+// indexPath. The virtual index leaves out a member that refuses the
+// document. A package GET checks each member at the package's own path, as
+// 6.20's VirtualRepoDownloadStrategy does and as the patterns FAQ puts it
+// ("artifacts that match an exclude pattern are not resolved from that
+// repository"), so there the index is only the lookup that finds the file:
+// a blacked-out member, which refuses every file, takes no part, and
+// patterns that reject only the index leave the member's packages served.
+func cranMemberRefusesIndex(member repo.Config, indexPath string, download bool) bool {
+	if !download {
+		return generic.CheckDownload(member, indexPath, false) != nil
+	}
+	return member.Class != repo.Virtual && generic.CheckBlackedOut(member, indexPath) != nil
 }
 
 func (s CranAPI) serveCranPackage(
@@ -350,9 +414,19 @@ func (s CranAPI) serveCranPackage(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.File(c, req.Path, accessapi.ActionRead) ||
-		generic.CheckDownload(c, req.Path, false) != nil {
+	if !acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		return
+	}
+	// The package's own path decides, as a download does: a blacked-out
+	// remote or patterns that reject the file answer the policy's 404 and
+	// message, and a virtual repository's patterns answer that no repository
+	// serves it. The index read below, which pins a remote download's MD5,
+	// is a lookup that checks only the remote's blackout (cranMemberIndex),
+	// so patterns that reject the PACKAGES file or its folder leave the
+	// package served, as a download checks only its own path.
+	if err := generic.CheckDownload(c, req.Path, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "CRAN package download", err))
 		return
 	}
 	feed, _, _, _ := cran.PackagePath(req.Path)
@@ -360,10 +434,11 @@ func (s CranAPI) serveCranPackage(
 	var candidates []cranCandidate
 	var err error
 	if c.Class == repo.Virtual {
-		candidates, err = s.cranCandidates(r.Context(), st, c, indexPath, p, acc, map[string]bool{})
+		candidates, err = s.cranCandidates(r.Context(), st, c, indexPath, p, acc, true,
+			map[string]bool{})
 	} else {
 		var view cranIndexView
-		view, err = s.cranMemberIndex(r.Context(), st, c, cached, indexPath, p, acc)
+		view, err = s.cranMemberIndex(r.Context(), st, c, cached, true, indexPath, p, acc)
 		if err == nil && view.revalidate != nil {
 			err = view.revalidate(r.Context())
 		}

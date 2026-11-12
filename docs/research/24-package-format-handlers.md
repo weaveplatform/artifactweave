@@ -157,8 +157,8 @@ reasoning behind those requirements.
 | 5.2 | Whether Artifactory refuses a deploy outside `includesPattern`, inside `excludesPattern` or to a blacked-out repository for every package type, and with which status and message | [I] |
 | 5.3 | Whether Artifactory returns `X-Checksum-*` headers on every deploy's 201, or only on some paths | [I] |
 | 5.4 | Whether 7.x still refuses a download from a blacked-out repository, or of an excluded path, with 6.20's 404 and messages, ahead of the read permission check (decision 0032, #328) | [I] |
-| 5.5 | What a Docker pull answers for a blacked-out repository and for a manifest or blob the patterns reject; the Docker addon is not open source, and artifactweave answers 404 `NAME_UNKNOWN`, `MANIFEST_UNKNOWN` and `BLOB_UNKNOWN` with the generic messages | [I] |
-| 5.6 | Whether Docker tag lists, referrers and the catalog of a blacked-out repository answer 404 or list nothing; artifactweave still lists them | [I] |
+| 5.5 | What a Docker pull answers for a blacked-out repository and for a manifest or blob the patterns reject, and which path the blackout message names. The Docker addon is not open source. artifactweave answers 404 with the generic messages in Artifactory's envelope, `{"errors":[{"status":404,"message":...}]}`, under no registry code: the Docker client printed `unknown: <message>` for 7.x's pattern refusal (RTFACT-27234). The blackout names `<image>/<tag>/manifest.json` for a tag (decision 0032, #1251) | [I] |
+| 5.6 | Whether Docker tag lists, referrers and the catalog of a blacked-out repository answer 404 or list nothing, and whether the patterns filter them. artifactweave refuses a blacked-out repository's tags lists and referrers with the blackout's 404 naming `<repo>:<image>` and still lists its catalog. The catalog leaves out images the patterns reject (RTFACT-26524), and tags lists and referrers keep what the patterns reject (RTFACT-27234 is an open request to filter tags) | [I] |
 | 5.7 | Whether the storage API's file list (`?list`) leaves out items the patterns reject, and how it treats a virtual repository's blacked-out member; it is built by the closed REST addon, and artifactweave refuses only a blacked-out repository named directly | [I] |
 | 5.8 | Whether 7.x's storage API item info still describes items of a blacked-out repository and excluded paths, as 6.20's `ArtifactResource.prepareStorageInfoResponse` does | [I] |
 
@@ -178,8 +178,12 @@ Artifactory wires it.
   from [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed), "so AQL results align with repository access rules and other search
   methods". That points to the search APIs filtering them as well, as artifactweave does
   (DV-058), but no note says so outright.
-- **5.4.** No 7.x page or note describes a download from a blacked-out repository, so it stays
-  open.
+- **5.4.** The Local Repositories page says that a blacked-out repository is "not available for
+  download or deployment of artifacts", and since
+  [RTDEV-47144](https://jfrog.atlassian.net/browse/RTDEV-47144) (SaaS 7.98.2) a download the
+  patterns refuse answers 404 with a message that says why. No source gives a blackout
+  refusal's status or body, or says whether read permission is checked first, so 5.4 stays open
+  for those (decision 0032's download policy rules, #1251).
 - **npm.** [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed) refuses copy and move into `.npm/` (research 25 section 5).
   The JFrog operations `api/npm/auth` and `api/npm/<repo>/auth/<scope>` answer errors in the
   Artifactory envelope, `{"errors":[{"status":400,"message":"Not supported user type."}]}` on

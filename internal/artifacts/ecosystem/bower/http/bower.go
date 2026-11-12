@@ -84,7 +84,7 @@ func (h handler) packageByName(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Bower package"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
+	if !h.k.RequireFolder(w, r, name, api.ActionRead) || !h.resolution(w, r) {
 		return
 	}
 	versions, err := h.versions(r, name)
@@ -97,6 +97,29 @@ func (h handler) packageByName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonAnswer(w, r, h.entry(r, name))
+}
+
+// resolution refuses the package lookup and refs a client resolves a
+// package from, before they are built, when the repository is blacked out:
+// 7.x ignores a blacked-out repository when it resolves (R2a). It names the
+// request's own path, since 7.x documents none it keeps this metadata at,
+// and so the patterns do not refuse it (#216). The package list and search
+// keep their answers under the blackout, as a native search does (R2b), and
+// a virtual repository has no blackout.
+func (h handler) resolution(w http.ResponseWriter, r *http.Request) bool {
+	if err := h.k.CheckBlackedOut(r, requestPath(r)); err != nil {
+		h.k.Error(w, r, err)
+		return false
+	}
+	return true
+}
+
+// requestPath is the request's path after the repository key, which a
+// blackout of metadata 7.x keeps at no documented path names. The kit has
+// parsed it before any route runs.
+func requestPath(r *http.Request) string {
+	p, _ := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
+	return p.String()
 }
 
 func (h handler) search(w http.ResponseWriter, r *http.Request) {
@@ -137,7 +160,7 @@ func (h handler) list(w http.ResponseWriter, r *http.Request, query string) {
 			answer = append(answer, h.entry(r, name))
 			continue
 		}
-		vs, err := h.versions(r, name)
+		vs, err := h.readableVersions(r, name, false)
 		if err != nil {
 			h.k.Error(w, r, pkgroute.SourceError(err, false))
 			return
@@ -168,7 +191,7 @@ func (h handler) refs(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Bower refs path"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
+	if !h.k.RequireFolder(w, r, name, api.ActionRead) || !h.resolution(w, r) {
 		return
 	}
 	versions, err := h.versions(r, name)
@@ -220,6 +243,9 @@ func (h handler) binary(w http.ResponseWriter, r *http.Request) {
 	if !h.k.Require(w, r, bowerfmt.ManifestPath(name, version), api.ActionRead) {
 		return
 	}
+	if !h.archivePolicy(w, r, name, version) {
+		return
+	}
 	versions, err := h.versions(r, name)
 	if err != nil {
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
@@ -230,6 +256,29 @@ func (h handler) binary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.serveBinary(w, r, name, version, tag)
+}
+
+// archivePolicy applies the download policy to the archive a binary request
+// serves before its version is looked up, so a refused archive answers the
+// policy's 404 and message whether the version exists or not, rather than
+// "Bower version not found" (decision 0032, RTDEV-47144). A hosted
+// repository's archive is checked at the version's manifest, as localBinary
+// checks it first, and a virtual repository's own patterns at the same
+// path. A remote repository's blackout is checked at the path its cache
+// keeps the archive at, before its upstream is asked for the refs; its
+// patterns are checked there when the source boundary reads the archive.
+func (h handler) archivePolicy(w http.ResponseWriter, r *http.Request, name, version string) bool {
+	var err error
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		err = h.k.CheckBlackedOut(r, remoteArchivePath(name, version))
+	} else {
+		err = h.k.CheckDownload(r, bowerfmt.ManifestPath(name, version))
+	}
+	if err != nil {
+		h.k.Error(w, r, err)
+		return false
+	}
+	return true
 }
 
 func identity(r *http.Request, binary bool) (name, tag string, ok bool) {
@@ -277,13 +326,26 @@ func (h handler) packageNames(r *http.Request, query string) ([]string, error) {
 	}
 }
 
+// versions lists the versions of name a client resolves from, which leave a
+// virtual repository's blacked-out member out (readableVersions).
 func (h handler) versions(r *http.Request, name string) ([]string, error) {
+	return h.readableVersions(r, name, true)
+}
+
+// readableVersions lists the versions of name whose manifest the caller may
+// read. A version whose files the patterns reject stays listed, as
+// Artifactory's listings keep it and refuse only the file (R3). resolving
+// leaves a virtual repository's blacked-out member out, which 7.x ignores
+// when it resolves (R5); the package list and search keep a blacked-out
+// local member's packages, as a native search keeps a blacked-out
+// repository's answer (R2b).
+func (h handler) readableVersions(r *http.Request, name string, resolving bool) ([]string, error) {
 	if !h.k.CanFolder(r, name, api.ActionRead) {
 		return nil, nil
 	}
 	switch pkgroute.RequestFrom(r).Repo.Class {
 	case repo.Virtual:
-		return h.virtualVersions(r, name)
+		return h.virtualVersions(r, name, resolving)
 	case repo.Remote:
 		return h.remoteVersions(r, name)
 	default:

@@ -48,16 +48,8 @@ func FindBlob(
 	items port.ItemStore,
 	repoKey, name, hex string,
 ) (model.Item, error) {
-	q := aql.Query{Criteria: aql.And{
-		aql.RepoSet{Refs: []aql.RepoRef{{Key: repoKey}}},
-		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
-		&aql.FieldCriterion{Field: aql.FieldSHA256, Op: aql.OpEq, Text: hex},
-		&aql.FieldCriterion{Field: aql.FieldName, Op: aql.OpEq, Text: BlobFile(hex)},
-		&aql.FieldCriterion{Field: aql.FieldPath, Op: aql.OpMatch, Text: name + "/*"},
-		&aql.FieldCriterion{
-			Field: aql.FieldDepth, Op: aql.OpEq, Number: int64(strings.Count(name, "/") + 3),
-		},
-	}, Limit: 1, HasLimit: true}
+	q := blobCopies(repoKey, name, hex)
+	q.Limit, q.HasLimit = 1, true
 	hits, err := items.Search(ctx, &q, aql.Options{})
 	if err != nil {
 		return model.Item{}, fmt.Errorf("docker: find blob %s in %s: %w", hex, name, err)
@@ -66,4 +58,39 @@ func FindBlob(
 		return model.Item{}, fmt.Errorf("docker: blob %s in %s: %w", hex, name, kernel.ErrNotFound)
 	}
 	return hits[0].Item, nil
+}
+
+// FindBlobs returns every file FindBlob could return for the blob hex: a
+// layer that several tags of the image share has a copy in each tag folder,
+// and a pull may serve any copy the repository's patterns accept.
+func FindBlobs(
+	ctx context.Context,
+	items port.ItemStore,
+	repoKey, name, hex string,
+) ([]model.Item, error) {
+	q := blobCopies(repoKey, name, hex)
+	hits, err := items.Search(ctx, &q, aql.Options{})
+	if err != nil {
+		return nil, fmt.Errorf("docker: find copies of blob %s in %s: %w", hex, name, err)
+	}
+	out := make([]model.Item, 0, len(hits))
+	for _, h := range hits {
+		out = append(out, h.Item)
+	}
+	return out, nil
+}
+
+// blobCopies is the search for the files holding the blob hex in the image
+// name's own folders.
+func blobCopies(repoKey, name, hex string) aql.Query {
+	return aql.Query{Criteria: aql.And{
+		aql.RepoSet{Refs: []aql.RepoRef{{Key: repoKey}}},
+		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
+		&aql.FieldCriterion{Field: aql.FieldSHA256, Op: aql.OpEq, Text: hex},
+		&aql.FieldCriterion{Field: aql.FieldName, Op: aql.OpEq, Text: BlobFile(hex)},
+		&aql.FieldCriterion{Field: aql.FieldPath, Op: aql.OpMatch, Text: name + "/*"},
+		&aql.FieldCriterion{
+			Field: aql.FieldDepth, Op: aql.OpEq, Number: int64(strings.Count(name, "/") + 3),
+		},
+	}}
 }

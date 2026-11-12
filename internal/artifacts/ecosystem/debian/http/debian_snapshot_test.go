@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
 
@@ -285,4 +287,48 @@ func TestUnitDebianSnapshotWorkWithoutAuthenticator(t *testing.T) {
 		err.Error() != "work: permanent refusal: debian snapshot authentication unavailable" {
 		t.Fatalf("a snapshot without an authenticator: %v", err)
 	}
+}
+
+// TestUnitDebianSnapshotWorkAnswersTheSourcesPolicy: a snapshot run through
+// the work queue, as the server runs one, hands the source's policy refusal
+// back through EnsureFresh unchanged, so the request answers the policy's
+// 404 and message naming the source's Release.
+func TestUnitDebianSnapshotWorkAnswersTheSourcesPolicy(t *testing.T) {
+	ctx := t.Context()
+	st := inmem.New()
+	cheapSeed(t, st)
+	for _, c := range []repo.Config{
+		{Key: "deb-source", Class: repo.Local, PackageType: repo.Debian, BlackedOut: new(true)},
+		{Key: "deb-target", Class: repo.Local, PackageType: repo.Debian},
+	} {
+		if err := st.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	accessAPI := accesstest.Over(t, st).API()
+	q, err := work.New(st, work.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	k := itemkit.New(itemkit.Deps{Store: st, Access: accessAPI, Work: q})
+	if err := RegisterDebianSnapshotWork(q, k); err != nil {
+		t.Fatal(err)
+	}
+	p, err := accessAPI.Authenticator.Basic(ctx, "admin", "pw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, d, err := accessAPI.Authorizer.Authorize(ctx, p, p.Anonymous)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = DebianAPI{k}.CreateDebianSnapshot(api.WithCaller(ctx, p, d),
+		artgen.CreateDebianSnapshotRequestObject{
+			RepoKey: "deb-source",
+			Body: &artgen.CreateDebianSnapshotJSONRequestBody{
+				Tag: "first", TargetRepo: "deb-target", Distribution: "stable",
+			},
+		})
+	wantAPIError(t, err, http.StatusNotFound, "The repository 'deb-source' is blacked out "+
+		"and cannot serve artifact 'deb-source:dists/stable/Release'.")
 }

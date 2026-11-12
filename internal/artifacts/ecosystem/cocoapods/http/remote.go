@@ -150,7 +150,12 @@ func validateCDN(
 	}
 }
 
-func (h handler) remoteResult(r *http.Request, path string) (source.Result, error) {
+// remoteResult reads the CDN document at path through the remote's source.
+// The remote's own policy is checked at the document's 7.x path
+// (cdnDocument), where a pattern written for 7.x's layout names it, and
+// only as its blackout for lookup, the spec a source archive download
+// reads on its way to the archive, whose own path takes the patterns.
+func (h handler) remoteResult(r *http.Request, path string, lookup bool) (source.Result, error) {
 	if !validCDNPath(path) {
 		return source.Result{}, source.ErrInvalidRequest
 	}
@@ -167,6 +172,7 @@ func (h handler) remoteResult(r *http.Request, path string) (source.Result, erro
 		Kind: source.ResourceKindMetadata, Path: "cdn/" + path,
 		ExternalURL: target.String(), CheckURL: cdnGuard(target),
 		Method: http.MethodGet, PermissionFolder: true, PermissionPath: permission,
+		PolicyPath: cdnDocument(path), BlackoutOnly: lookup,
 		Variant: "cocoapods-cdn-v1", ValidateMetadata: validateCDN(path),
 	}
 	if path == "CocoaPods-version.yml" {
@@ -193,7 +199,7 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, path string)
 		h.k.Error(w, r, notFound())
 		return
 	}
-	result, err := h.remoteResult(r, path)
+	result, err := h.remoteResult(r, path, false)
 	if errors.Is(err, source.ErrInvalidRequest) {
 		h.k.Error(w, r, notFound())
 		return
@@ -459,7 +465,16 @@ func (h handler) serveRewritten(
 }
 
 func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, name, version, ext string) {
-	specResult, err := h.remoteResult(r, podfmt.SpecPath(name, version))
+	// The archive's own path takes the remote's policy before the spec it
+	// is found through is read, so a refusal names the archive (R10), once
+	// the caller may read it: read permission comes first (DV-057).
+	if p := sourcePath(name, version, ext); h.k.Can(r, p, api.ActionRead) {
+		if err := h.k.CheckDocument(r, p); err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+	}
+	specResult, err := h.remoteResult(r, podfmt.SpecPath(name, version), true)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return

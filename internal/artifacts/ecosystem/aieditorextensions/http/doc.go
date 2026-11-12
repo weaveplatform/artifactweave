@@ -47,7 +47,10 @@
 //     (400). It is cached under the SHA-256 of its canonical form, so
 //     distinct queries never share an answer. An exact extension query is
 //     checked against that extension's folder, a search against the
-//     repository's, and every result against its own read permission.
+//     repository's, and every result against its own read permission and,
+//     as a folder, the remote repository's download policy: a result whose
+//     folder the include and exclude patterns could admit a file below
+//     stays listed, and each asset is checked at its own cached path.
 //   - An upstream gallery answer is taken only when it validates, within
 //     8 MiB of JSON: each extension's publisher, name, version, asset types
 //     and asset origins. An asset is fetched only when the gallery lists

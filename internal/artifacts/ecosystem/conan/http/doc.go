@@ -60,6 +60,19 @@
 //   - A virtual repository reads its members in order, and uploads only to
 //     its default deployment repository, which must be one of its members,
 //     local or federated, and writable by the caller.
+//   - The download policy (#1251), after read permission: a blacked-out
+//     repository refuses the revision lists, latest revisions and file
+//     lists before they are built, with the blackout's 404 naming the
+//     request's path; the patterns do not refuse them, and they list a
+//     revision or file the patterns reject. Every file, the manifest and
+//     conaninfo.txt included, is checked at its own path, whether its
+//     revision exists or not; a remote's lookups of a manifest for a
+//     download or a list check its blackout alone. Searches keep their
+//     answers, but a virtual repository's search passes over a blacked-out
+//     remote member. A virtual repository leaves a blacked-out member out
+//     of its revisions, passes over a member that refuses a file, and its
+//     own patterns refuse a file with "No repository found to serve the
+//     request".
 //   - A password login gets a revocable token that lasts at most an hour;
 //     a token login gets its own token back.
 //   - Statuses and error texts stay byte-identical.

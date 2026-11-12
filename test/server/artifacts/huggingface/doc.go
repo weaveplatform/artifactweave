@@ -30,8 +30,9 @@
 // Assertions only:
 //   - huggingface_xet_test.go and huggingface_xet_provenance_test.go:
 //     published reconstruction and capabilities, corrupt content and generic
-//     bypasses, shard declarations, oversized capabilities, and the caller
-//     and content provenance of commits.
+//     bypasses, shard declarations, oversized capabilities, the caller and
+//     content provenance of commits, and the download policy on resolve,
+//     info, tree and Xet, directly and through a virtual repository.
 //   - huggingface_xet_native_test.go: the native Hub client's upload and
 //     download through Xet.
 //

@@ -43,14 +43,29 @@
 // # Invariants
 //
 //   - A virtual repository's repodata lists only the packages the caller
-//     may read, both in the virtual repository and in the member that holds
-//     them, and a package path belongs to the first member that lists it.
-//   - A missing member, or one whose repodata is unpublished or unreadable
-//     to the caller, is skipped; a member of another package type, a member
-//     cycle or a chain of more than eight nested repositories is refused.
-//   - A package is served only when repodata the caller can see lists it,
-//     and only with the SHA-256 that repodata gives: a local member's stored
-//     file must match it, and a remote member's download is pinned to it.
+//     has Read permission on, both in the virtual repository and in the
+//     member that holds them, and a package path belongs to the first
+//     member that lists it. The download policy does not filter it: a
+//     package whose file a member's or the virtual repository's patterns
+//     reject stays listed, as in 7.x's virtual primary.xml.gz
+//     (RTFACT-30656), and only its GET is refused.
+//   - A missing member, or one whose repodata is unpublished, unreadable to
+//     the caller or refused by the member's download policy (blacked out,
+//     or patterns that reject its repomd.xml or primary file), is skipped;
+//     a member of another package type, a member cycle or a chain of more
+//     than eight nested repositories is refused. A package GET checks a
+//     member's policy at the package's own path, never at the repodata it
+//     reads to find the package, so there only a blacked-out member is
+//     skipped for its repodata.
+//   - The repodata and package reads check Read permission first and then
+//     the virtual repository's own patterns at the requested path, which
+//     answer 404 "No repository found to serve the request for
+//     <key>:<path>" (DV-057). A package GET passes over a member whose
+//     download policy refuses the file to the next member that lists it.
+//   - A package is served only when a member's repodata the caller can see
+//     lists it, and only with the SHA-256 that member's repodata gives: a
+//     local member's stored file must match it, and a remote member's
+//     download is pinned to it.
 //   - Member repodata is read up to 36 MiB, and a remote's is validated
 //     before it is used. A request with matrix parameters or a query string
 //     answers 404.
@@ -100,12 +115,16 @@
 // package pinned to its indexed SHA-256; and local member content that is
 // incomplete or drifted. rpm_paths_test.go adds the paths the overlay
 // leaves alone, packages served only when listed below their yum root,
-// members skipped when blacked out, excluded or a folder, remote packages
-// whose bytes are not an RPM or whose cached copy is revoked, and the YUM
-// calculation's path and virtual view checks. Their item GETs run through
-// the kit with TryRPMItem as the only overlay. The route suite
-// test/server/artifacts/rpm checks through the router that virtual
-// repodata is signed with the configured GPG key, and the @rpm acceptance
-// partition (test/acceptance/features/rpm.feature) is the native dnf
-// evidence.
+// members skipped when blacked out, excluded or a folder, the virtual
+// repository's own patterns answering that no repository serves the path,
+// packages a local or remote member's patterns, or a virtual repository's
+// own, reject kept listed while their GET passes over the refusing member,
+// a package served from a member whose patterns reject only its repodata,
+// remote packages whose bytes are not an RPM or whose cached copy is
+// revoked, and the YUM calculation's path and virtual view checks. Their
+// item GETs run through the kit with TryRPMItem as the only overlay. The
+// route suite test/server/artifacts/rpm checks through the router that
+// virtual repodata is signed with the configured GPG key, and the @rpm
+// acceptance partition (test/acceptance/features/rpm.feature) is the
+// native dnf evidence.
 package rpmhttp

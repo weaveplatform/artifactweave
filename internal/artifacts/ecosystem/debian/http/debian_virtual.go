@@ -44,9 +44,16 @@ func (s DebianAPI) serveVirtualDebianMetadata(
 ) {
 	if len(req.Props) != 0 || r.URL.RawQuery != "" ||
 		!acc.Folder(c, req.Path, accessapi.ActionRead) ||
-		!acc.File(c, req.Path, accessapi.ActionRead) ||
-		generic.CheckDownload(c, req.Path, false) != nil {
+		!acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		return
+	}
+	// The virtual repository's own patterns rejecting the document leave
+	// it no member to serve it from, the 404 a file gets (6.20
+	// VirtualRepoDownloadStrategy); 7.x caches virtual Debian metadata as
+	// a file (RTDEV-50452).
+	if err := generic.CheckDownload(c, req.Path, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian virtual index download", err))
 		return
 	}
 	parts := strings.Split(req.Path, "/")
@@ -188,7 +195,7 @@ func (s DebianAPI) addDebianMemberIndexes(
 		return fmt.Errorf("debian member %s Release: %w", member.Key, err)
 	}
 	for _, ref := range refs {
-		body, checkRead, err := s.debianMemberBytes(ctx, st, member, ref.Path, p, acc)
+		body, checkPermission, err := s.debianMemberBytes(ctx, st, member, ref.Path, p, acc)
 		if errors.Is(err, kernel.ErrNotFound) || errors.Is(err, source.ErrDenied) {
 			continue
 		}
@@ -207,16 +214,20 @@ func (s DebianAPI) addDebianMemberIndexes(
 		if selected[base] == nil {
 			selected[base] = map[string]bool{}
 		}
+		// A row stays when the member's or the virtual repository's patterns
+		// reject its file: 7.x merges the members' indexes as they are and
+		// refuses only the file's GET (RTFACT-30830; RTFACT-30656 for a
+		// virtual RPM repository), which serveVirtualDebianPackage passes on
+		// to the next member. So the first member's row for a Filename is
+		// listed, with its own Size and SHA256, whatever the policy says.
 		for _, row := range rows {
 			if selected[base][row.Filename] ||
 				!acc.File(member, row.Filename, accessapi.ActionRead) ||
-				!acc.File(virtual, row.Filename, accessapi.ActionRead) ||
-				generic.CheckDownload(member, row.Filename, false) != nil ||
-				generic.CheckDownload(virtual, row.Filename, false) != nil {
+				!acc.File(virtual, row.Filename, accessapi.ActionRead) {
 				continue
 			}
-			if checkRead != nil {
-				if err := checkRead(ctx, row.Filename); errors.Is(err, source.ErrDenied) {
+			if checkPermission != nil {
+				if err := checkPermission(ctx, row.Filename); errors.Is(err, source.ErrDenied) {
 					continue
 				} else if err != nil {
 					return fmt.Errorf("debian member %s package authority: %w", member.Key, err)
@@ -235,9 +246,12 @@ func (s DebianAPI) serveVirtualDebianPackage(
 ) {
 	ctx := r.Context()
 	if len(req.Props) != 0 || r.URL.RawQuery != "" ||
-		!acc.File(c, req.Path, accessapi.ActionRead) ||
-		generic.CheckDownload(c, req.Path, false) != nil {
+		!acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		return
+	}
+	if err := generic.CheckDownload(c, req.Path, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian virtual package download", err))
 		return
 	}
 	for _, key := range c.Repositories {
@@ -338,14 +352,24 @@ func (s DebianAPI) serveRemoteVirtualDebianPackage(
 
 // debianMemberBytes reads only an authorized, validated member representation.
 // Remote metadata uses source.Policy so the selected cache variant retains
-// upstream freshness and redirect constraints.
+// upstream freshness and redirect constraints. For a remote member it also
+// returns the read's permission-only check of the packages the document
+// lists (source.Result.CheckPermission), and nil for any other.
+//
+// A path the caller may not read, or that the member's download policy
+// refuses, is source.ErrDenied, which a virtual merge leaves the member out
+// for. A policy refusal also carries the policy's 404 and message naming
+// <member>:<path> (pkgroute.IsRefusal), which a snapshot of the member
+// answers with, as a GET of that file would.
 func (s DebianAPI) debianMemberBytes(
 	ctx context.Context, st itemkit.Store, member repo.Config, path string,
 	p kernel.Principal, acc itemkit.Access,
 ) ([]byte, func(context.Context, string) error, error) {
-	if !acc.File(member, path, accessapi.ActionRead) ||
-		generic.CheckDownload(member, path, false) != nil {
+	if !acc.File(member, path, accessapi.ActionRead) {
 		return nil, nil, source.ErrDenied
+	}
+	if err := generic.CheckDownload(member, path, false); err != nil {
+		return nil, nil, fmt.Errorf("%w: %w", source.ErrDenied, err)
 	}
 	if member.Class == repo.Remote {
 		if s.RemoteSources == nil {
@@ -376,13 +400,13 @@ func (s DebianAPI) debianMemberBytes(
 			if err != nil {
 				return nil, nil, fmt.Errorf("debian member stream: %w", err)
 			}
-			return body, result.CheckRead, nil
+			return body, result.CheckPermission, nil
 		}
 		if result.Item == nil {
 			return nil, nil, source.ErrInvalidResult
 		}
 		body, err := s.readDebianBlob(ctx, result.Item.Actual.SHA256)
-		return body, result.CheckRead, err
+		return body, result.CheckPermission, err
 	}
 	it, err := st.Items().Get(ctx, member.Key, false, path)
 	if err != nil {

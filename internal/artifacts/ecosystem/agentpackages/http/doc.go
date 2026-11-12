@@ -37,6 +37,16 @@
 //
 //   - A version list and a search show only archives the caller may read; a
 //     package with no readable version answers 404.
+//   - Artifactory's download policy (generic.CheckDownload), after the
+//     caller's read permission: a version's download from a blacked-out
+//     repository, whether the version exists or not, or of an archive the
+//     include and exclude patterns reject, answers 404 with the item
+//     routes' message. A blacked-out repository's version list answers the
+//     blackout's 404, naming the package's folder. The patterns do not
+//     shorten the list, and the search keeps its answer.
+//   - Only a served archive carries the archive's Content-Type and the
+//     immutable Cache-Control; a refusal and a missing version's 404 do
+//     not.
 //   - A publish needs write permission on the archive's path, the
 //     application/zip media type (415) and at most 64 MiB (413), and never
 //     replaces a published version (409).
@@ -73,6 +83,7 @@
 //
 // The package has no tests of its own: test/server/artifacts/agentpackages
 // drives it through the whole router
-// (TestAccAgentPackagesAPMProtocolAndLifecycle), and the @apm acceptance
-// scenarios drive it with the native APM client.
+// (TestAccAgentPackagesAPMProtocolAndLifecycle, and
+// TestAccAgentPackagesDownloadPolicy for the download policy), and the
+// @apm acceptance scenarios drive it with the native APM client.
 package agentpackageshttp

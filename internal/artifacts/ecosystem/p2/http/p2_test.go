@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
@@ -132,6 +133,43 @@ func TestUnitP2VirtualFailsClosedWhenMemberStoreFails(t *testing.T) {
 		fault,
 	) {
 		t.Errorf("member store failure was hidden: %v", err)
+	}
+}
+
+// A blacked-out member is left out of the virtual's members, so the
+// composite and the __p2/<n>/ paths number the rest alike; a member whose
+// patterns exclude everything keeps its place.
+func TestUnitP2VirtualLeavesOutBlackedOutMembers(t *testing.T) {
+	w := newItemWorld(t)
+	on, everything := true, "**"
+	for _, c := range []repo.Config{
+		{Key: "p2-dark", Class: repo.Remote, PackageType: repo.P2, URL: "https://dark.example/", BlackedOut: &on},
+		{Key: "p2-excluding", Class: repo.Remote, PackageType: repo.P2, URL: "https://site.example/", ExcludesPattern: &everything},
+		{Key: "p2-local", Class: repo.Local, PackageType: repo.Generic},
+	} {
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d, err := accesstest.Over(t, w.db).
+		Decide(t.Context(), accessapi.Subject{Name: "admin", Admin: true}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := repo.Config{
+		Key: "p2-virtual", Class: repo.Virtual, PackageType: repo.P2,
+		Repositories: []string{"p2-dark", "p2-excluding", "p2-local"},
+	}
+	members, err := p2Members(t.Context(), w.db, c, itemkit.Access{Decider: d}, map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var keys []string
+	for _, m := range members {
+		keys = append(keys, m.Key)
+	}
+	if !slices.Equal(keys, []string{"p2-excluding", "p2-local"}) {
+		t.Errorf("members %v", keys)
 	}
 }
 

@@ -34,6 +34,22 @@ const (
 // unknown (#216).
 const apiVersion = "1.1"
 
+// pagePath is where 7.x caches a remote repository's page of project name,
+// or its project list for "", and the path the download policy checks a
+// page at (RTFACT-30116). JFrog's answer on RTFACT-17256 has an exclude of
+// .pypi/<name>.* on a remote block that project's page, and its KB on PyPI
+// patterns (quoted on RTFACT-20646) says **/simple.html must be included
+// "or no packages will be able to be pulled". A pattern on one file
+// leaves the page listing it (RTFACT-24511). [I] Whether 7.x keeps a local
+// repository's pages there too is not known (#216); a local page is
+// checked at the same path.
+func pagePath(name string) string {
+	if name == "" {
+		return ".pypi/simple.html"
+	}
+	return ".pypi/" + name + ".html"
+}
+
 // list answers the project list: one entry per project with a file the
 // caller may read. A caller who may read nothing in the repository is
 // refused, so pip asks for credentials (RTFACT-17764).
@@ -43,6 +59,10 @@ func (h handler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
+		return
+	}
+	if err := h.k.CheckDocument(r, pagePath("")); err != nil {
+		h.k.Error(w, r, err)
 		return
 	}
 	names, err := projects(r.Context(), h.k.DB(), pkgroute.RequestFrom(r).Repo.Key, h.reads(r))
@@ -67,6 +87,10 @@ func (h handler) project(w http.ResponseWriter, r *http.Request, name string) {
 		return
 	}
 	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
+		return
+	}
+	if err := h.k.CheckDocument(r, pagePath(name)); err != nil {
+		h.k.Error(w, r, err)
 		return
 	}
 	p, ok, err := load(r.Context(), h.k.DB(), pkgroute.RequestFrom(r).Repo.Key, name, h.reads(r))

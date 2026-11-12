@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
@@ -53,7 +54,7 @@ func (h handler) remotePackage(
 	if spec == "" && !tagsOnly && abbreviated(r) {
 		accept = abbreviatedType
 	}
-	doc, result, err := h.upstreamPackage(r, name, accept)
+	doc, result, err := h.upstreamPackage(r, name, accept, "")
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -89,9 +90,18 @@ func (h handler) remotePackage(
 	h.serveRemoteJSON(w, r, result, accept, output)
 }
 
+// upstreamPackage reads name's packument from the remote repository. Read
+// permission is checked at the package's folder, and the remote's download
+// policy at the path 7.x caches the packument at (documentPath,
+// RTFACT-18463), so a pattern on the package's folder, written for its
+// tarballs, leaves the package listed. tarball, when set, is the tarball a
+// download reads the packument for, to find its upstream URL: that read is
+// refused only by the remote's blackout, naming the tarball, and the
+// tarball's own read applies the patterns to the tarball's path. [I]
+// Whether 7.x reads the packument for a tarball is not known (#216).
 func (h handler) upstreamPackage(
 	r *http.Request,
-	name, accept string,
+	name, accept, tarball string,
 ) (remoteDocument, source.Result, error) {
 	resource := source.Resource{
 		Kind:                source.ResourceKindMetadata,
@@ -101,9 +111,18 @@ func (h handler) upstreamPackage(
 		Accept:              accept,
 		PermissionFolder:    true,
 		PermissionPath:      name,
+		PolicyPath:          documentPath(name),
 		ExpectedContentType: jsonType,
 		Variant:             "npm-packument-v2",
 		Validate:            validatePackageMetadata(pkgroute.RequestFrom(r).Repo, name),
+	}
+	if tarball != "" {
+		resource.BlackoutOnly = true
+		// A request path that is no item path names no tarball, and finds
+		// none below; the blackout then names the packument.
+		if _, _, _, err := kernel.SplitItemPath(tarball); err == nil {
+			resource.PolicyPath = tarball
+		}
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
@@ -207,7 +226,7 @@ func (h handler) remoteTarball(w http.ResponseWriter, r *http.Request, name, pat
 	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
-	doc, _, err := h.upstreamPackage(r, name, jsonType)
+	doc, _, err := h.upstreamPackage(r, name, jsonType, path)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -317,8 +336,13 @@ func (h handler) remoteReadOnly(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+// fenceDisclosures checks again, before delivery, that the caller may read
+// each version the answer discloses. It checks Read permission alone
+// (CheckPermission): a version whose tarball the remote's patterns reject
+// stays listed, as 7.x lists it (RTFACT-19925, RTFACT-30307), and only the
+// tarball's own read is refused.
 func fenceDisclosures(result *source.Result, paths []string) {
-	current, check := result.Revalidate, result.CheckRead
+	current, check := result.Revalidate, result.CheckPermission
 	result.Revalidate = func(ctx context.Context) error {
 		if current != nil {
 			if err := current(ctx); err != nil {

@@ -123,13 +123,13 @@ func TestUnitCRANVirtualRejectsCyclesAndWrongMembers(t *testing.T) {
 			t.Fatal(err)
 		}
 		got, err := svc.cranCandidates(t.Context(), w.db, c, "src/contrib/PACKAGES", p, acc,
-			map[string]bool{})
+			false, map[string]bool{})
 		if !errors.Is(err, tc.expected) || tc.expected == nil && len(got) != 0 {
 			t.Errorf("%s: candidates=%v error=%v", tc.key, got, err)
 		}
 	}
 	if _, err := svc.cranMemberIndex(t.Context(), w.db,
-		repo.Config{Key: "cran-local", Class: repo.Local}, true,
+		repo.Config{Key: "cran-local", Class: repo.Local}, true, false,
 		"src/contrib/PACKAGES", p, acc); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("local cache alias accepted: %v", err)
 	}

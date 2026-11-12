@@ -48,6 +48,13 @@
 //     may read, and keeps signed chart and provenance bytes unchanged.
 //   - A provenance file is served only while it matches the current index,
 //     offline reads included.
+//   - The download policy (#1251) refuses index.yaml, local or remote, at
+//     its own path, where 7.x stores or caches it: a blacked-out repository
+//     or a pattern on index.yaml answers 404 naming it, after Read
+//     permission. A chart the patterns reject stays listed, and only its
+//     download and a provenance file the patterns reject are refused, each
+//     at its own path. A remote chart download's index lookup is refused
+//     by the blackout alone, naming the requested file.
 //   - Statuses, error texts and the remote cache variants (helm-chart-v2,
 //     helm-provenance-v1) stay byte-identical.
 //
@@ -87,4 +94,6 @@
 //     and remote_review_regression_test.go: remote indexes, charts and
 //     provenance, URL policy, admission limits, offline reads and
 //     disclosure.
+//   - download_policy_test.go: the download policy at the local and remote
+//     index.yaml, charts and provenance files.
 package helmhttp

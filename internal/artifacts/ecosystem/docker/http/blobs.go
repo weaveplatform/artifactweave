@@ -1,6 +1,7 @@
 package dockerhttp
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -11,10 +12,12 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/registry"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
@@ -51,7 +54,7 @@ func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
 		Write(w, err)
 		return
 	}
-	if g.blackedOut(w, r, q) {
+	if blackedOut(w, q, "blobs") {
 		return
 	}
 	hex, err := blobDigest(q.Reference)
@@ -59,16 +62,16 @@ func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
 		Write(w, err)
 		return
 	}
-	it, err := layout.FindBlob(r.Context(), g.store.Items(), q.Repo.Key, q.Name, hex)
+	it, err := g.findBlob(r.Context(), q, hex)
 	if errors.Is(err, kernel.ErrNotFound) {
 		Write(w, blobUnknown(q.Reference))
 		return
 	}
-	if err != nil {
-		g.writeErr(w, r, err)
+	if refuse(w, err) {
 		return
 	}
-	if excluded(w, q, it, CodeBlobUnknown) {
+	if err != nil {
+		g.writeErr(w, r, err)
 		return
 	}
 	h := w.Header()
@@ -81,6 +84,34 @@ func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
 		return
 	}
 	g.serveBlob(w, r, q.Repo, it)
+}
+
+// findBlob finds the copy of the blob hex that a pull of q's image serves:
+// the copy layout.FindBlob finds, or when the repository's include and
+// exclude patterns reject it, another copy in the image they accept. A layer
+// that two tags share is a copy in each tag folder, and 7.x serves it to a
+// pull the patterns accept although a copy sits in a folder they exclude
+// (RTFACT-30134, fixed). When the patterns accept no copy, the error is
+// their refusal of the first.
+func (g *Registry) findBlob(ctx context.Context, q Request, hex string) (model.Item, error) {
+	it, err := layout.FindBlob(ctx, g.store.Items(), q.Repo.Key, q.Name, hex)
+	if err != nil {
+		return model.Item{}, err //nolint:wrapcheck // the layout names itself
+	}
+	refused := generic.CheckDownload(q.Repo, it.FullPath(), false)
+	if refused == nil {
+		return it, nil
+	}
+	copies, err := layout.FindBlobs(ctx, g.store.Items(), q.Repo.Key, q.Name, hex)
+	if err != nil {
+		return model.Item{}, err //nolint:wrapcheck // the layout names itself
+	}
+	for _, c := range copies {
+		if generic.CheckDownload(q.Repo, c.FullPath(), false) == nil {
+			return c, nil
+		}
+	}
+	return model.Item{}, refused //nolint:wrapcheck // the RejectionError is the answer
 }
 
 // streamBlob serves a blob's content from the blob store, ranges and
@@ -158,8 +189,8 @@ func (g *Registry) startUpload(w http.ResponseWriter, r *http.Request, q Request
 
 // mount answers a cross-repository mount when it can and reports whether
 // it wrote a response. false opens a session instead: the source is not
-// readable, holds no such blob, or does not parse, and a client learns
-// nothing from the difference.
+// readable, holds no such blob, does not parse, or would not serve the blob
+// to a pull (lends), and a client learns nothing from the difference.
 func (g *Registry) mount(w http.ResponseWriter, r *http.Request, q Request, o registry.Owner) bool {
 	query := r.URL.Query()
 	hex, err := uploadDigest(query.Get("mount"))
@@ -168,6 +199,14 @@ func (g *Registry) mount(w http.ResponseWriter, r *http.Request, q Request, o re
 	}
 	for _, src := range g.mountSources(r, q, query.Get("from")) {
 		if src.Require(r, src.Name+"/", api.ActionRead) != nil {
+			continue
+		}
+		lent, err := g.lends(r.Context(), q, src, hex)
+		if err != nil {
+			g.uploadErr(w, r, q, err)
+			return true
+		}
+		if !lent {
 			continue
 		}
 		_, ok, err := g.uploads.Mount(r.Context(), o, src.Repo, src.Name, hex)
@@ -181,6 +220,28 @@ func (g *Registry) mount(w http.ResponseWriter, r *http.Request, q Request, o re
 		}
 	}
 	return false
+}
+
+// lends reports whether src, a mount's source image, lends q the blob hex.
+// A mount reads the source's blob, so a source in another repository lends
+// it only when a pull from there would serve it: not while that repository
+// is blacked out, and not when its include and exclude patterns accept no
+// copy (findBlob). The client then uploads the blob, as from a source it
+// cannot read. This is inferred from the download policy (#216). A source
+// in q's own repository is left to the write's own check, which refuses a
+// blacked-out repository as it refused it before.
+func (g *Registry) lends(ctx context.Context, q Request, src Request, hex string) (bool, error) {
+	if src.Repo.Key == q.Repo.Key {
+		return true, nil
+	}
+	if generic.CheckBlackedOut(src.Repo, src.Name) != nil {
+		return false, nil
+	}
+	_, err := g.findBlob(ctx, src, hex)
+	if errors.Is(err, kernel.ErrNotFound) || errors.As(err, new(*format.RejectionError)) {
+		return false, nil
+	}
+	return err == nil, err
 }
 
 // mountSources are the images from may name, as the client addresses

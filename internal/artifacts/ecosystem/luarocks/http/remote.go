@@ -46,9 +46,17 @@ func validateRemoteManifest(
 	return nil
 }
 
+// upstreamManifest reads the remote's manifest at path. A client's request
+// for it (lookup false) is checked by the download policy at path as a
+// file, where 7.x caches it, so a blackout names the manifest and patterns
+// that reject it refuse it: RTFACT-30802 shows 7.x checking a remote's
+// patterns at a metadata file's cache path. remoteRock's lookup of a rock
+// in the manifest (lookup true) is part of the rock's download, which the
+// rock's own path decides, so only the blackout refuses it (R4).
 func (h handler) upstreamManifest(
 	r *http.Request,
 	path string,
+	lookup bool,
 ) (source.Result, remoteManifest, error) {
 	resource := source.Resource{
 		Kind:             source.ResourceKindMetadata,
@@ -57,6 +65,11 @@ func (h handler) upstreamManifest(
 		PermissionFolder: true,
 		Variant:          "luarocks-manifest-v1",
 		ValidateMetadata: validateRemoteManifest,
+	}
+	if lookup {
+		resource.BlackoutOnly = true
+	} else {
+		resource.PolicyPath = path
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
@@ -78,7 +91,17 @@ func (h handler) upstreamManifest(
 	return result, manifest, nil
 }
 
-func fenceDisclosures(result *source.Result, metadata source.Result, paths []string) {
+// fenceDisclosures has result recheck, when it is delivered, the authority
+// of the manifest that disclosed paths and check on each of them: the
+// download policy with Read permission for a rock the result serves, Read
+// permission alone for the rocks a manifest lists, which stay listed when
+// the patterns reject their files (R3).
+func fenceDisclosures(
+	result *source.Result,
+	manifest func(context.Context) error,
+	check func(context.Context, string) error,
+	paths []string,
+) {
 	prior := result.Revalidate
 	result.Revalidate = func(ctx context.Context) error {
 		if prior != nil {
@@ -86,14 +109,14 @@ func fenceDisclosures(result *source.Result, metadata source.Result, paths []str
 				return err
 			}
 		}
-		if metadata.Revalidate != nil {
-			if err := metadata.Revalidate(ctx); err != nil {
+		if manifest != nil {
+			if err := manifest(ctx); err != nil {
 				return fmt.Errorf("luarocks manifest authority: %w", err)
 			}
 		}
-		if metadata.CheckRead != nil {
+		if check != nil {
 			for _, path := range paths {
-				if err := metadata.CheckRead(ctx, path); err != nil {
+				if err := check(ctx, path); err != nil {
 					return fmt.Errorf("luarocks package authority: %w", err)
 				}
 			}
@@ -131,7 +154,13 @@ func (h handler) remoteRock(r *http.Request, path string) (source.Result, error)
 	if !ok {
 		return source.Result{}, kernel.ErrNotFound
 	}
-	metadata, manifest, err := h.upstreamManifest(r, luafmt.ManifestPath)
+	// The rock's own path is checked before the manifest lookup, so a
+	// blackout names the rock, the file the download asks for, and a member
+	// that refuses it is passed over before its upstream is asked anything.
+	if err := h.k.CheckDocument(r, path); err != nil {
+		return source.Result{}, fmt.Errorf("luarocks rock policy: %w", err)
+	}
+	metadata, manifest, err := h.upstreamManifest(r, luafmt.ManifestPath, true)
 	if err != nil {
 		return source.Result{}, err
 	}
@@ -157,25 +186,28 @@ func (h handler) remoteRock(r *http.Request, path string) (source.Result, error)
 	if err != nil {
 		return source.Result{}, fmt.Errorf("luarocks rock read: %w", err)
 	}
-	fenceDisclosures(&result, metadata, []string{path})
+	fenceDisclosures(&result, metadata.Revalidate, metadata.CheckRead, []string{path})
 	return result, nil
 }
 
 func (h handler) remoteManifest(
 	ctx context.Context, w http.ResponseWriter, r *http.Request, path string,
 ) {
-	metadata, manifest, err := h.upstreamManifest(r, path)
+	metadata, manifest, err := h.upstreamManifest(r, path, false)
 	if err != nil {
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
 	}
 	var checkErr error
+	// A rock whose file the remote's patterns reject stays listed and only
+	// its download is refused (R3), so the rows take Read permission
+	// alone.
 	data, paths, err := manifest.filtered(func(path string) bool {
 		if !h.k.Can(r, path, api.ActionRead) {
 			return false
 		}
-		if metadata.CheckRead != nil {
-			if e := metadata.CheckRead(ctx, path); e != nil {
+		if metadata.CheckPermission != nil {
+			if e := metadata.CheckPermission(ctx, path); e != nil {
 				if !errors.Is(e, source.ErrDenied) {
 					checkErr = e
 				}
@@ -201,6 +233,6 @@ func (h handler) remoteManifest(
 			},
 		},
 	}
-	fenceDisclosures(&metadata, source.Result{CheckRead: metadata.CheckRead}, paths)
+	fenceDisclosures(&metadata, nil, metadata.CheckPermission, paths)
 	h.k.ServeResult(w, r, metadata)
 }

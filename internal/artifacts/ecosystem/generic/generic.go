@@ -3,6 +3,7 @@ package generic
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
@@ -78,7 +79,8 @@ const rejectedByPatterns = "The repository '%s' rejected the artifact '%s:%s' du
 // path is the one Artifactory checks: the archive of an archive entry and
 // the file a checksum sidecar describes (RepoBase.accepts). folder is
 // whether the request named a folder, which in Artifactory is a trailing
-// slash (RepoPathImpl). The root is always accepted.
+// slash (RepoPathImpl). The root is always accepted, and so is a system
+// path (systemPath) by the patterns, though not by the blackout.
 //
 // A virtual repository has no blackedOut (only RealRepoDescriptor carries
 // it), and its own patterns refusing the path leave it no member to search
@@ -90,7 +92,7 @@ func CheckDownload(c repo.Config, path string, folder bool) error {
 			return err
 		}
 	}
-	if path == "" || repo.PatternsOf(c).Accepts(path, folder) {
+	if path == "" || systemPath(path) || repo.PatternsOf(c).Accepts(path, folder) {
 		return nil
 	}
 	if c.Class == repo.Virtual {
@@ -98,6 +100,17 @@ func CheckDownload(c repo.Config, path string, folder bool) error {
 			"No repository found to serve the request for %s:%s", c.Key, path)
 	}
 	return format.Rejectf(http.StatusNotFound, rejectedByPatterns, c.Key, c.Key, path)
+}
+
+// systemPath reports a path Artifactory's include and exclude patterns do
+// not apply to: a Maven index file, whose name starts
+// nexus-maven-repository-index, and any path ending .index, such as P2's
+// p2.index (NamingUtils.isSystem, which RepoBase.accepts passes before the
+// patterns, in Artifactory OSS 6.20). 7.x documents nothing either way, so
+// this follows 6.20 until a capture shows otherwise (#216).
+func systemPath(p string) bool {
+	name := p[strings.LastIndexByte(p, '/')+1:]
+	return strings.HasPrefix(name, "nexus-maven-repository-index") || strings.HasSuffix(p, ".index")
 }
 
 // Classify reports every generic file as unique content.

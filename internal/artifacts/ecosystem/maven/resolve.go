@@ -149,7 +149,13 @@ func (r resolution) snapshot(ctx context.Context) (string, error) {
 // among the module's release files, or its integration files of the path's
 // base revision, those with the path's coordinates, latest first, name the
 // first whose path holds the request with its token replaced by the file's
-// revision, or else the first.
+// revision, or else the first. A file the repository's patterns reject takes
+// no part, as in snapshot resolution: JFrog documents an excluded artifact
+// as "not resolved from that repository" (local-repositories). 6.20's
+// ReleaseVersionsRetriever filtered by the layout alone and served the
+// excluded release; 7.x's answer is to be captured (#216). Read permission
+// is left to the check of the resolved path, as 6.20 leaves it, so a newest
+// release the caller may not read is refused rather than passed over.
 func (r resolution) tokens(ctx context.Context, release bool) (string, error) {
 	tl, err := r.r.l.VersionTokens()
 	if err != nil {
@@ -167,6 +173,10 @@ func (r resolution) tokens(ctx context.Context, release bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	patterns := repo.PatternsOf(r.c)
+	files = slices.DeleteFunc(files, func(f candidate) bool {
+		return !patterns.Accepts(f.FullPath(), false)
+	})
 	latest, token := r.releases(want.Coordinates, files), tokenRelease
 	if !release {
 		latest, token = r.integrations(want.Coordinates, files), tokenIntegration

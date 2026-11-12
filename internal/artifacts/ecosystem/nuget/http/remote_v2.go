@@ -135,7 +135,9 @@ func (s *remoteSession) xmlDocument(
 		Method:           http.MethodGet,
 		PermissionFolder: true,
 		PermissionPath:   id,
-		Accept:           "application/atom+xml, application/xml, text/xml",
+		// The blackout alone refuses a feed, for the reasons document gives.
+		BlackoutOnly: true,
+		Accept:       "application/atom+xml, application/xml, text/xml",
 		ExpectedContentTypes: []string{
 			"application/atom+xml",
 			"application/xml",

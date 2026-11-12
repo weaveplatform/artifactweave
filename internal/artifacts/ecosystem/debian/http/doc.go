@@ -1,6 +1,7 @@
 // Package debianhttp serves the Debian protocol over the item kit: the
-// Packages and Sources indexes, handed only to a caller who may read every
-// package they list; a virtual repository's apt metadata, composed from its
+// Packages and Sources indexes, under the download policy at their own path
+// and handed only to a caller with Read permission on every package they
+// list; a virtual repository's apt metadata, composed from its
 // members and signed with its key pair when it names one, and the packages
 // that metadata lists; the artifactory spec's metadata calculation (POST
 // /api/deb/reindex/{repoKey}); and snapshots, which copy a distribution's
@@ -80,20 +81,39 @@
 //     Debian target: the source distribution's Release, each index it
 //     declares, bound to the size and SHA-256 the Release gives (at most 64
 //     MiB each and 512 MiB in all), and InRelease and Release.gpg where they
-//     exist. A read of a package path redirects to the recorded source. A
-//     request first claims the tag's folder, so a request from another
-//     source or distribution answers 409, and a retry of the same request
-//     completes it.
+//     exist. A read of the snapshot's metadata is a read of the target's
+//     stored file, under the target's download policy; a read of a package
+//     path redirects to the recorded source, whose policy answers the
+//     redirected request. A request first claims the tag's folder, so a
+//     request from another source or distribution answers 409, and a retry
+//     of the same request completes it. The source's Release, each index it
+//     declares, InRelease and Release.gpg are read under the source's
+//     download policy at their own path, after the Read permission check
+//     (DV-057): a blacked-out source, or patterns that reject one of them,
+//     answer the policy's 404 and message naming <source>:<path>, as a GET
+//     of that file would, and the target gets no snapshot.
 //   - A Packages or Sources index, stored, cached or in a snapshot, reaches
-//     only a caller who may read every package it lists, which the generic
-//     item route cannot check.
+//     only a caller with Read permission on every package it lists, which
+//     the generic item route cannot check. The download policy does not
+//     filter or refuse an index for the packages it lists: a package whose
+//     file the include and exclude patterns reject stays listed and only its
+//     download is refused, as in Artifactory's indexes (RTFACT-30830,
+//     RTFACT-30656).
+//   - An index, a virtual repository's metadata and a virtual package are
+//     read under the download policy at their own path, after the Read
+//     permission check (DV-057): a blacked-out repository, or patterns that
+//     reject the path, answer the item route's 404 and message, and a
+//     virtual repository's own patterns answer that no repository serves
+//     the request. A virtual package's GET passes over a member that refuses
+//     it to the next member.
 //   - A virtual repository's metadata is composed for each request from its
 //     members in order, at most 128. A member of another type, a virtual
-//     member or one with the trivial layout is refused, and a package path
-//     belongs to the first member that lists it. A member's index must match
-//     the size and SHA-256 its Release gives, and only the packages the
-//     caller may read are listed. A key pair, GPG only, signs the Release as
-//     InRelease and Release.gpg.
+//     member or one with the trivial layout is refused, a member that
+//     refuses its Release or index (blacked out, for one) is left out, and a
+//     package path belongs to the first member that lists it. A member's
+//     index must match the size and SHA-256 its Release gives, and only the
+//     packages the caller has Read permission on are listed. A key pair, GPG
+//     only, signs the Release as InRelease and Release.gpg.
 //   - A server built without a remote source service answers a remote
 //     index read, and a virtual repository's metadata or package read that
 //     reaches a remote member, 500, a fault of its own, not the upstream's.
@@ -142,7 +162,8 @@
 //   - debian_snapshot_test.go: a snapshot claim bound to its source and
 //     distribution, the repositories and permissions a snapshot needs,
 //     completed and claimed tags kept, and the queued work under the
-//     caller's current permissions and without an authenticator.
+//     caller's current permissions, without an authenticator, and answering
+//     the source's download policy.
 //   - debian_snapshot_security_test.go: snapshot metadata that is missing,
 //     oversized, misdigested or malformed is refused, and a claimed tag
 //     cannot pass to another source; its snapshot request runs through the
@@ -150,17 +171,22 @@
 //   - debian_source_test.go: the kit's Debian source request checks a
 //     remote's packages and metadata.
 //   - debian_index_test.go: Packages and Sources indexes refused with a
-//     query, in a blacked-out repository or to a caller who may not read
-//     them; repositories that have no index; local index content that is a
-//     folder, unreadable or malformed; and remote indexes streamed, cached,
-//     over the size bound, or listing a package the source refuses or
-//     cannot check.
-//   - debian_virtual_test.go: virtual metadata refused, merged from the
-//     readable members, and failing closed on store faults, wrong member
-//     types and unusable signing keys; a remote member's Release and
-//     Packages through its source; virtual packages served from the first
-//     member that holds them; and remote index and virtual package reads on
-//     a server built without remote sources.
+//     query, to a caller who may not read them or a package they list, and
+//     with the download policy's 404 in a blacked-out repository, local or
+//     remote, or one whose patterns reject the index; a package the patterns
+//     reject kept listed while its GET is refused; repositories that have no
+//     index; local index content that is a folder, unreadable or malformed;
+//     and remote indexes streamed, cached, over the size bound, or listing a
+//     package the source refuses or cannot check.
+//   - debian_virtual_test.go: virtual metadata refused, including by the
+//     virtual repository's own patterns, merged from the readable members,
+//     and failing closed on store faults, wrong member types and unusable
+//     signing keys; packages a local or remote member's patterns, or the
+//     virtual repository's own, reject kept listed while their GET passes
+//     over the refusing member; a remote member's Release and Packages
+//     through its source; virtual packages served from the first member
+//     that holds them; and remote index and virtual package reads on a
+//     server built without remote sources.
 //   - debian_operations_test.go: the rebuild that writes no properties, for
 //     an absent repository, an unreadable package and a queue that refuses
 //     it.
@@ -168,10 +194,17 @@
 //     store or a caller, and requests whose caller's permissions cannot be
 //     read; queued snapshots over the work key bound or refused by the
 //     queue or their run; the work handler registered once and refusing
-//     jobs it cannot run; and claims and snapshots failing closed on store,
+//     jobs it cannot run; claims and snapshots failing closed on store,
 //     blob and permission faults, Release declarations that do not parse,
-//     excluded packages, an unreadable InRelease and a package a remote
-//     source refuses.
+//     a listed package the caller may not read, an unreadable InRelease and
+//     a package a remote source refuses; snapshots of a local or remote
+//     source whose patterns reject a listed package keeping it listed, the
+//     snapshot's index still served once the source is blacked out; a
+//     snapshot's metadata refused by a blacked-out target or its patterns;
+//     and a snapshot whose source is blacked out, or whose patterns reject
+//     its Release, an index or its InRelease, answering the policy's 404 and
+//     message, while a caller who may not read an index still fails it as
+//     before.
 //
 // debian_index_test.go and debian_virtual_test.go serve their item GETs
 // through the kit with TryDebianItem as the only overlay

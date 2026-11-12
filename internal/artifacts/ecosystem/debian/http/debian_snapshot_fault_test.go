@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -399,9 +400,9 @@ func TestUnitDebianSnapshotCopiesTheSourceMetadata(t *testing.T) {
 
 // TestUnitDebianSnapshotCreationFailsClosed: a snapshot is recorded only
 // when every step succeeds. A marker or metadata the store cannot read or
-// write, a target the caller may not write below the tag, a source Release
-// whose declarations do not parse, a listed package the source excludes,
-// and an InRelease that cannot be read each fail the snapshot.
+// write, a target the caller may not write below the tag, a listed package
+// the caller may not read, a source Release whose declarations do not
+// parse, and an InRelease that cannot be read each fail the snapshot.
 func TestUnitDebianSnapshotCreationFailsClosed(t *testing.T) {
 	// The caller may do anything but act below the tag in the target, which
 	// the snapshot checks file by file after it has checked the tag itself.
@@ -411,6 +412,16 @@ func TestUnitDebianSnapshotCreationFailsClosed(t *testing.T) {
 			_ accessapi.ResourceType, r accessapi.Repo, path string, _ accessapi.Actions,
 		) bool {
 			return r.Key != snapshotJob.Target || !strings.HasPrefix(path, snapshotMarker+"/")
+		},
+	}}
+	// The caller may do anything but read the source's packages, which the
+	// snapshot checks for each path the source's indexes list.
+	noReadsOfPackages := itemkit.Access{Decider: &accessapitest.Decider{
+		Admin: true,
+		AllowsFunc: func(
+			_ accessapi.ResourceType, r accessapi.Repo, path string, _ accessapi.Actions,
+		) bool {
+			return r.Key != snapshotJob.Source || !strings.HasPrefix(path, "pool/")
 		},
 	}}
 	for _, tc := range []struct {
@@ -444,22 +455,15 @@ func TestUnitDebianSnapshotCreationFailsClosed(t *testing.T) {
 			want: kernel.ErrForbidden,
 		},
 		{
+			name: "caller may not read a listed package", acc: &noReadsOfPackages,
+			want: kernel.ErrForbidden,
+		},
+		{
 			name: "source Release declarations do not parse",
 			seed: func(w *itemWorld) {
 				w.put("deb-source", debRelease, false, []byte("Suite: stable\n"))
 			},
 			step: "snapshot Release declarations",
-		},
-		{
-			name: "listed package excluded by the source",
-			seed: func(w *itemWorld) {
-				c := w.debRepo("deb-source")
-				c.ExcludesPattern = new("pool/**")
-				if err := w.db.Repos().Update(w.t.Context(), c); err != nil {
-					w.t.Fatal(err)
-				}
-			},
-			want: kernel.ErrForbidden,
 		},
 		{
 			name: "InRelease unreadable",
@@ -572,4 +576,215 @@ func TestAccDebianSnapshotReadsNeedAStoreAndACaller(t *testing.T) {
 			wantError(t, rec, tc.status, tc.message)
 		})
 	}
+}
+
+// snapshotRead serves a GET of rel in snapshotJob's tag through svc's
+// snapshot read route as the named caller: admin is kittest's
+// administrator, whom every question allows, and any other name a user
+// whom none allows.
+func snapshotRead(t *testing.T, svc DebianAPI, rel, as string) *httptest.ResponseRecorder {
+	t.Helper()
+	p, d := kittest.Admin, kittest.AdminAccess().Decider
+	if as != kittest.Admin.Name {
+		p, d = kernel.Principal{Name: as}, &accessapitest.Decider{}
+	}
+	r := chi.NewRouter()
+	svc.RegisterDebianSnapshotRoutes(r)
+	req := httptest.NewRequestWithContext(accessapi.WithCaller(t.Context(), p, d),
+		http.MethodGet, "/artifactory/api/deb/"+snapshotJob.Target+"/"+snapshotMarker+"/"+rel, nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	return rec
+}
+
+// setRepo stores the repository key's configuration as change leaves it.
+func setRepo(t *testing.T, w *itemWorld, key string, change func(*repo.Config)) {
+	t.Helper()
+	c := w.debRepo(key)
+	change(&c)
+	if err := w.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestUnitDebianSnapshotKeepsAPackageTheSourceRefuses: a snapshot copies
+// the source's indexes as they are, so a package whose file the source's
+// patterns reject stays listed, as it does in the source's own index
+// (RTFACT-30830). The snapshot's index is then served while the source
+// refuses that package, or is blacked out: only the package path, which
+// redirects to the source, meets the source's policy there.
+func TestUnitDebianSnapshotKeepsAPackageTheSourceRefuses(t *testing.T) {
+	w := snapshotWorld(t)
+	setRepo(t, w, snapshotJob.Source, func(c *repo.Config) { c.ExcludesPattern = new("pool/**") })
+	svc := DebianAPI{newKit(withAccess(t, Config{Store: w.db, Blobs: w.blobs}))}
+	if err := svc.createDebianSnapshot(t.Context(), w.db, snapshotJob,
+		kittest.Admin, kittest.AdminAccess()); err != nil {
+		t.Fatalf("snapshot of a source that rejects a listed package: %v", err)
+	}
+	wantListed := func(when string) {
+		t.Helper()
+		rec := snapshotRead(t, svc, debPackages, kittest.Admin.Name)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: snapshot Packages answered %d %s, want 200", when, rec.Code, rec.Body)
+		}
+		if got := filenames(t, rec.Body.Bytes()); !slices.Equal(got, []string{debAlpha}) {
+			t.Errorf("%s: snapshot Packages lists %v, want alpha", when, got)
+		}
+	}
+	wantListed("source rejects alpha")
+	setRepo(t, w, snapshotJob.Source, func(c *repo.Config) { c.BlackedOut = new(true) })
+	wantListed("source blacked out")
+	rec := snapshotRead(t, svc, debAlpha, kittest.Admin.Name)
+	if want := "/artifactory/" + snapshotJob.Source + "/" + debAlpha; rec.Code != http.StatusFound ||
+		rec.Header().Get("Location") != want {
+		t.Errorf("snapshot package answered %d to %q, want 302 to %q",
+			rec.Code, rec.Header().Get("Location"), want)
+	}
+	rec = snapshotRead(t, svc, debPackages, "reader")
+	wantError(t, rec, http.StatusForbidden, "Forbidden")
+}
+
+// TestUnitDebianSnapshotReadsUnderTheTargetsPolicy: a snapshot's metadata
+// is a stored file of the target, so patterns that now reject its path, or
+// a blacked-out target, answer the item route's 404 and message naming
+// the stored path, once the caller's read permission is settled. A package
+// path still redirects to the source, whose policy answers that request.
+func TestUnitDebianSnapshotReadsUnderTheTargetsPolicy(t *testing.T) {
+	w := snapshotWorld(t)
+	svc := DebianAPI{newKit(withAccess(t, Config{Store: w.db, Blobs: w.blobs}))}
+	if err := svc.createDebianSnapshot(t.Context(), w.db, snapshotJob,
+		kittest.Admin, kittest.AdminAccess()); err != nil {
+		t.Fatal(err)
+	}
+	stored := snapshotJob.Target + ":" + snapshotMarker + "/" + debPackages
+	setRepo(
+		t,
+		w,
+		snapshotJob.Target,
+		func(c *repo.Config) { c.ExcludesPattern = new("**/Packages") },
+	)
+	wantError(t, snapshotRead(t, svc, debPackages, kittest.Admin.Name), http.StatusNotFound,
+		"The repository '"+snapshotJob.Target+"' rejected the artifact '"+stored+
+			"' due to its include/exclude pattern settings.")
+	if rec := snapshotRead(t, svc, debRelease, kittest.Admin.Name); rec.Code != http.StatusOK {
+		t.Errorf("Release the patterns accept answered %d %s, want 200", rec.Code, rec.Body)
+	}
+	setRepo(t, w, snapshotJob.Target, func(c *repo.Config) {
+		c.ExcludesPattern, c.BlackedOut = new(""), new(true)
+	})
+	wantError(t, snapshotRead(t, svc, debPackages, kittest.Admin.Name), http.StatusNotFound,
+		"The repository '"+snapshotJob.Target+"' is blacked out and cannot serve artifact '"+
+			stored+"'.")
+	wantError(t, snapshotRead(t, svc, debPackages, "reader"), http.StatusForbidden, "Forbidden")
+	if rec := snapshotRead(t, svc, debAlpha, kittest.Admin.Name); rec.Code != http.StatusFound {
+		t.Errorf("package path answered %d %s, want the redirect to the source", rec.Code, rec.Body)
+	}
+}
+
+// TestUnitDebianSnapshotOfARemoteKeepsAPackageItsPatternsReject: a
+// snapshot of a remote source checks each package its index lists for
+// Read permission alone (source.Result.CheckPermission), so a package
+// whose file the remote's patterns reject is copied in the index rather
+// than failing the snapshot.
+func TestUnitDebianSnapshotOfARemoteKeepsAPackageItsPatternsReject(t *testing.T) {
+	index := packagesIndex("alpha 1.0 " + debAlpha)
+	w := newOverlayWorld(t, withSources(upstream(map[string]func() (source.Result, error){
+		debRelease:  streamed(releaseFor(index), nil),
+		debPackages: streamed(index, nil),
+	})))
+	w.debRepos(
+		repo.Config{Key: snapshotJob.Source, Class: repo.Remote, ExcludesPattern: new("pool/**")},
+		repo.Config{Key: snapshotJob.Target, Class: repo.Local},
+	)
+	svc := DebianAPI{w.kit}
+	if err := svc.createDebianSnapshot(t.Context(), w.db, snapshotJob,
+		kittest.Admin, kittest.AdminAccess()); err != nil {
+		t.Fatalf("snapshot of a remote that rejects a listed package: %v", err)
+	}
+	stored := w.item(snapshotJob.Target, false, snapshotMarker+"/"+debPackages)
+	body, err := svc.readDebianBlob(t.Context(), stored.Actual.SHA256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := filenames(t, body); !slices.Equal(got, []string{debAlpha}) {
+		t.Errorf("snapshot Packages lists %v, want alpha", got)
+	}
+}
+
+// TestAccDebianSnapshotAnswersTheSourcesPolicy: a snapshot reads the
+// source's Release, the indexes it declares and its signatures as
+// downloads of the source, so a blacked-out source, or patterns that
+// reject one of them, answer the policy's 404 and message naming
+// <source>:<path>, as a GET of that file would, and the target is left
+// without the snapshot. A caller who may not read an index still fails the
+// snapshot as before, with no policy answer.
+func TestAccDebianSnapshotAnswersTheSourcesPolicy(t *testing.T) {
+	const (
+		url  = "/artifactory/api/deb/deb-source/snapshot"
+		body = `{"tag":"first","targetRepo":"deb-target","distribution":"stable"}`
+	)
+	rejected := func(path string) string {
+		return "The repository '" + snapshotJob.Source + "' rejected the artifact '" +
+			snapshotJob.Source + ":" + path + "' due to its include/exclude pattern settings."
+	}
+	for _, tc := range []struct {
+		name    string
+		change  func(*repo.Config)
+		message string
+	}{
+		{
+			"source blacked out", func(c *repo.Config) { c.BlackedOut = new(true) },
+			"The repository '" + snapshotJob.Source + "' is blacked out and cannot serve " +
+				"artifact '" + snapshotJob.Source + ":" + debRelease + "'.",
+		},
+		{
+			"patterns reject the Release",
+			func(c *repo.Config) { c.ExcludesPattern = new("**/Release") }, rejected(debRelease),
+		},
+		{
+			"patterns reject an index",
+			func(c *repo.Config) { c.ExcludesPattern = new("**/Packages") }, rejected(debPackages),
+		},
+		// The signatures are read the same way, so a rejected InRelease
+		// refuses the snapshot even where the source has none: the patterns
+		// answer before the file is looked up, as on a GET.
+		{
+			"patterns reject the InRelease",
+			func(c *repo.Config) { c.ExcludesPattern = new("**/InRelease") },
+			rejected("dists/stable/InRelease"),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := snapshotWorld(t)
+			setRepo(t, w, snapshotJob.Source, tc.change)
+			wantError(
+				t,
+				w.do(http.MethodPost, url, "admin", body, "Content-Type", "application/json"),
+				http.StatusNotFound,
+				tc.message,
+			)
+			if _, err := w.db.Items().Get(t.Context(), snapshotJob.Target, false,
+				snapshotMarker+"/"+debRelease); !errors.Is(err, kernel.ErrNotFound) {
+				t.Errorf("refused snapshot copied the Release: %v", err)
+			}
+		})
+	}
+	t.Run("caller may not read an index", func(t *testing.T) {
+		w := snapshotWorld(t)
+		noIndexReads := itemkit.Access{Decider: &accessapitest.Decider{
+			Admin: true,
+			AllowsFunc: func(
+				_ accessapi.ResourceType, r accessapi.Repo, path string, _ accessapi.Actions,
+			) bool {
+				return r.Key != snapshotJob.Source || path != debPackages
+			},
+		}}
+		svc := DebianAPI{newKit(withAccess(t, Config{Store: w.db, Blobs: w.blobs}))}
+		err := svc.createDebianSnapshot(t.Context(), w.db, snapshotJob, kittest.Admin, noIndexReads)
+		if !errors.Is(err, source.ErrDenied) {
+			t.Fatalf("snapshot returned %v, want the denial", err)
+		}
+		wantAPIError(t, svc.ItemError(t.Context(), "Debian snapshot", err),
+			http.StatusInternalServerError, "internal error")
+	})
 }

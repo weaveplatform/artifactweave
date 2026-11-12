@@ -25,10 +25,14 @@ func (g *Registry) registerListings() {
 }
 
 // listTags serves GET .../<name>/tags/list: the image's tags in the
-// specification's order, a page of them with n and last.
+// specification's order, a page of them with n and last. A blacked-out
+// repository refuses it before the image is looked for (imageBlackedOut).
 func (g *Registry) listTags(w http.ResponseWriter, r *http.Request, q Request) {
 	if err := q.Require(r, q.Name+"/", api.ActionRead); err != nil {
 		Write(w, err)
+		return
+	}
+	if imageBlackedOut(w, q) {
 		return
 	}
 	tags, found, err := layout.Tags(r.Context(), g.store.Items(), q.Repo.Key, q.Name)
@@ -70,9 +74,11 @@ func (g *Registry) catalog(w http.ResponseWriter, r *http.Request, q Request) {
 		}
 	}
 	keys := make([]string, 0, len(repos))
+	patterns := make(map[string]repo.RepoPatterns, len(repos))
 	for _, c := range repos {
 		if g.readsAnything(r, c) {
 			keys = append(keys, c.Key)
+			patterns[c.Key] = repo.PatternsOf(c)
 		}
 	}
 	images, err := layout.Images(r.Context(), g.store.Items(), keys)
@@ -82,7 +88,12 @@ func (g *Registry) catalog(w http.ResponseWriter, r *http.Request, q Request) {
 	}
 	names := []string{}
 	for _, im := range images {
-		if !ValidName(im.Name) {
+		// An image whose folder its repository's include and exclude
+		// patterns reject is left out, before the page is cut, as 7.x
+		// filters its catalog (RTFACT-26524, fixed). An image the patterns
+		// reject only some tags of stays, as its tags list keeps those tags
+		// (RTFACT-27234).
+		if !ValidName(im.Name) || !patterns[im.Repo].Accepts(im.Name, true) {
 			continue
 		}
 		if q.RepoKey == "" {

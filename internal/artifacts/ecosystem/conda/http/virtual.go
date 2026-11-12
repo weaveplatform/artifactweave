@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	condafmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/conda"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
@@ -48,7 +49,12 @@ func (h handler) members(r *http.Request) ([]*http.Request, error) {
 	return members, nil
 }
 
-func (h handler) virtualIndex(r *http.Request, id condafmt.MetadataPath, seen map[string]bool) (
+func (h handler) virtualIndex(
+	r *http.Request,
+	id condafmt.MetadataPath,
+	policy readPolicy,
+	seen map[string]bool,
+) (
 	condafmt.Repodata, func(context.Context) error, error,
 ) {
 	members, err := h.members(r)
@@ -62,7 +68,14 @@ func (h handler) virtualIndex(r *http.Request, id condafmt.MetadataPath, seen ma
 			!h.k.Can(mr, id.Path, api.ActionRead) {
 			continue
 		}
-		index, finish, err := h.memberIndex(mr, id.Path, seen)
+		// 7.x ignores a blacked-out member when it resolves, and a member
+		// whose patterns refuse the path adds nothing to the index, rather
+		// than failing it (R5, as Kit.MergeMembers leaves members out). A
+		// member that rejects only a package's file still lists it.
+		if generic.CheckDownload(pkgroute.RequestFrom(mr).Repo, policy.path, false) != nil {
+			continue
+		}
+		index, finish, err := h.memberIndex(mr, id.Path, policy, seen)
 		if shardNotFound(err) {
 			continue
 		}

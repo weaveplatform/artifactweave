@@ -19,6 +19,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -91,6 +92,22 @@ type Resource struct {
 	// represent the query as a canonical folder. It requires actual root Read,
 	// not a grant on any descendant, and disclosed files still need CheckRead.
 	PermissionRoot bool
+	// PolicyPath, when set, is the path the repository's download policy is
+	// checked at instead of the permission path, as a file: the path
+	// Artifactory 7.x caches the document or file at, such as npm's
+	// .npm/<name>/package.json, so a pattern written for 7.x's layout
+	// refuses what it names there, while Read permission is still checked
+	// at the permission path (CheckPolicy).
+	PolicyPath string
+	// BlackoutOnly checks only the repository's blackout, not its include
+	// and exclude patterns: for a lookup a download makes on its way to the
+	// file it serves, such as the metadata a remote tarball's URL is read
+	// from, which the patterns of the lookup's own path do not refuse.
+	BlackoutOnly bool
+	// permissionOnly drops the download policy from CheckPolicy. Only
+	// Result.CheckPermission sets it, on the descendant it checks, so no
+	// adapter's read can pass the policy by it.
+	permissionOnly bool
 	// GoneIsMissing is a trusted protocol opt-in: GOPROXY permits member fallback
 	// for both 404 and 410. Other protocols retain their existing error semantics.
 	GoneIsMissing bool
@@ -218,6 +235,12 @@ type Result struct {
 	// CheckFolder checks whether a disclosed descendant folder can contain
 	// readable items. It preserves narrow grants without granting file access.
 	CheckFolder func(context.Context, string) error
+	// CheckPermission is CheckRead without the download policy: it checks
+	// only a disclosed descendant's Read permission, for a listing that
+	// keeps a release whose file the repository's include and exclude
+	// patterns reject, as Artifactory's listings and indexes do, while the
+	// file's own read is refused (#1237).
+	CheckPermission func(context.Context, string) error
 	// Revalidate fences backend-specific credentials immediately before delivery.
 	Revalidate func(context.Context) error
 	Item       *model.Item
@@ -351,7 +374,7 @@ func (s *Service) fenceDelivery(
 		}
 		return nil
 	}
-	check := func(current context.Context, path string, folder bool) error {
+	check := func(current context.Context, path string, folder, policy bool) error {
 		scope := q.Resource.Path
 		if q.Resource.PermissionRoot {
 			scope = ""
@@ -363,7 +386,12 @@ func (s *Service) fenceDelivery(
 			return ErrDenied
 		}
 		exact := q
-		exact.Resource = Resource{Kind: ResourceKindArtifact, Path: path, Method: http.MethodGet}
+		exact.Resource = Resource{
+			Kind:           ResourceKindArtifact,
+			Path:           path,
+			Method:         http.MethodGet,
+			permissionOnly: !policy,
+		}
 		if folder {
 			if !q.Resource.PermissionFolder && !q.Resource.PermissionRoot {
 				return ErrDenied
@@ -380,8 +408,15 @@ func (s *Service) fenceDelivery(
 		}
 		return s.revalidate(current, exact, p)
 	}
-	result.CheckRead = func(ctx context.Context, path string) error { return check(ctx, path, false) }
-	result.CheckFolder = func(ctx context.Context, path string) error { return check(ctx, path, true) }
+	result.CheckRead = func(ctx context.Context, path string) error {
+		return check(ctx, path, false, true)
+	}
+	result.CheckFolder = func(ctx context.Context, path string) error {
+		return check(ctx, path, true, true)
+	}
+	result.CheckPermission = func(ctx context.Context, path string) error {
+		return check(ctx, path, false, false)
+	}
 }
 
 func authorize(q Request) error {
@@ -553,6 +588,48 @@ func galleryPOSTHasUnsupportedOptions(r Resource) bool {
 		r.NuGetEmptyFeed || r.ChecksumOnly || r.Mutable || r.GoneIsMissing
 }
 
+// CheckPolicy applies c's download policy to a read of r whose Read
+// permission is checked at path, a folder when r.PermissionFolder or
+// r.PermissionRoot says so: at r.PolicyPath instead, as a file, when the
+// adapter set one, and only c's blackout when r.BlackoutOnly is set
+// (generic.CheckDownload, generic.CheckBlackedOut). Service.Read and the
+// application's Revalidate both check it, so a read is refused, and a
+// result fenced, by the same rule. A descendant Result.CheckPermission
+// checks has no policy to apply.
+func (r Resource) CheckPolicy(c repo.Config, path string) error {
+	if r.permissionOnly {
+		return nil
+	}
+	folder := r.PermissionFolder || r.PermissionRoot
+	if r.PolicyPath != "" {
+		path, folder = r.PolicyPath, false
+	}
+	var err error
+	if r.BlackoutOnly {
+		err = generic.CheckBlackedOut(c, path)
+	} else {
+		err = generic.CheckDownload(c, path, folder)
+	}
+	if err != nil {
+		return fmt.Errorf("download policy: %w", err)
+	}
+	return nil
+}
+
+// validPolicyPath reports whether r's PolicyPath, when set, is a decoded
+// repository-relative item path, as Path must be.
+func validPolicyPath(r Resource) bool {
+	if r.PolicyPath == "" {
+		return true
+	}
+	if r.PolicyPath != strings.Trim(r.PolicyPath, "/") ||
+		strings.ContainsAny(r.PolicyPath, "\r\n") {
+		return false
+	}
+	_, _, _, err := kernel.SplitItemPath(r.PolicyPath)
+	return err == nil
+}
+
 func authorizePath(q Request, checkedPath string) error {
 	r := q.Resource
 	if q.Access == nil {
@@ -567,17 +644,16 @@ func authorizePath(q Request, checkedPath string) error {
 		checkedPath, accessapi.ActionRead) {
 		return ErrDenied
 	}
-	if err := generic.CheckDownload(
-		q.Repo,
-		checkedPath,
-		r.PermissionFolder || r.PermissionRoot,
-	); err != nil {
+	if err := r.CheckPolicy(q.Repo, checkedPath); err != nil {
 		return fmt.Errorf("source download: %w", err)
 	}
 	return nil
 }
 
 func permissionPath(r Resource) (string, error) {
+	if !validPolicyPath(r) {
+		return "", ErrInvalidRequest
+	}
 	checkedPath := r.Path
 	if r.PermissionRoot {
 		if r.Kind == ResourceKindArtifact || r.Method != http.MethodGet || r.PermissionFolder ||
@@ -735,6 +811,13 @@ func safeError(err error) error {
 			return &copy
 		}
 		return ErrUnavailable
+	}
+	// The download policy's refusal is the repository's own answer, in
+	// messages artifactweave writes: a listing that checks each disclosed
+	// release with CheckRead keeps a release whose file is refused, and a
+	// read answers the policy's 404 rather than a gateway failure.
+	if errors.As(err, new(*format.RejectionError)) {
+		return err
 	}
 	for _, allowed := range []error{
 		ErrDenied, ErrInvalidRequest, ErrUnsupported,

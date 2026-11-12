@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	conanfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/conan"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
@@ -126,11 +127,11 @@ func (h handler) virtualRevisions(
 	var out []revision
 	seen := map[string]bool{}
 	for _, mr := range members {
-		folder := strings.Join([]string{ref.User, ref.Name, ref.Version, ref.Channel}, "/")
-		if id != "" {
-			folder = ref.Root() + "/package/" + id
+		if !h.k.CanFolder(mr, revisionFolder(ref, id), api.ActionRead) {
+			continue
 		}
-		if !h.k.CanFolder(mr, folder, api.ActionRead) {
+		// 7.x ignores a blacked-out member when it resolves (R5).
+		if generic.CheckBlackedOut(pkgroute.RequestFrom(mr).Repo, "") != nil {
 			continue
 		}
 		list, err := h.revisions(mr, ref, id)
@@ -159,22 +160,37 @@ func (h handler) virtualRevisions(
 	return out, nil
 }
 
+// virtualRevisionMember returns the request for the first member that has
+// f's revision. A blacked-out member is passed over, and for a download,
+// a member whose own policy refuses f, remote members included, so the
+// next member serves it (R5). A file list is answered by a member whose
+// patterns reject one of the files, as that member's own list is (R3).
 func (h handler) virtualRevisionMember(
 	r *http.Request,
 	f conanfmt.FilePath,
+	download bool,
 ) (*http.Request, error) {
 	members, err := h.virtualMembers(r)
 	if err != nil {
 		return nil, err
 	}
+	// With no path checked only the blackout refuses; policy is the path a
+	// remote member's blackout would name.
+	checked, policy := "", requestPath(r)
+	if download {
+		checked, policy = f.Path(), f.Path()
+	}
 	for _, mr := range members {
 		if !h.k.Can(mr, f.Path(), api.ActionRead) {
+			continue
+		}
+		if generic.CheckDownload(pkgroute.RequestFrom(mr).Repo, checked, false) != nil {
 			continue
 		}
 		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
 			manifest := f
 			manifest.File = conanfmt.Manifest
-			entries, e := h.remoteManifest(mr, manifest)
+			entries, e := h.remoteManifest(mr, manifest, policy)
 			if missing(e) {
 				continue
 			}
@@ -194,7 +210,11 @@ func (h handler) virtualRevisionMember(
 			return nil, e
 		}
 		if f.File != conanfmt.Manifest {
-			_, e := h.k.Item(mr, f.Path())
+			lookup := h.k.DownloadItem
+			if document(f.File) {
+				lookup = h.k.StoredItem
+			}
+			_, e := lookup(mr, f.Path())
 			if missing(e) {
 				continue
 			}
@@ -213,7 +233,7 @@ func (h handler) virtualFileList(w http.ResponseWriter, r *http.Request, root st
 		h.bad(w, r, "invalid Conan revision root")
 		return
 	}
-	mr, err := h.virtualRevisionMember(r, f)
+	mr, err := h.virtualRevisionMember(r, f, false)
 	if err != nil {
 		h.error(w, r, err)
 		return
@@ -222,7 +242,13 @@ func (h handler) virtualFileList(w http.ResponseWriter, r *http.Request, root st
 }
 
 func (h handler) virtualFile(w http.ResponseWriter, r *http.Request, f conanfmt.FilePath) {
-	mr, err := h.virtualRevisionMember(r, f)
+	// The virtual repository's own patterns leave it no member to search,
+	// which says so rather than "Conan revision not found" (R5).
+	if err := h.k.CheckDownload(r, f.Path()); err != nil {
+		h.error(w, r, err)
+		return
+	}
+	mr, err := h.virtualRevisionMember(r, f, true)
 	if err != nil {
 		h.error(w, r, err)
 		return
@@ -239,6 +265,14 @@ func (h handler) virtualSearch(w http.ResponseWriter, r *http.Request) {
 	set := map[string]bool{}
 	for _, mr := range members {
 		if !h.k.CanFolder(mr, "", api.ActionRead) {
+			continue
+		}
+		// A blacked-out remote member, whose own search the blackout
+		// refuses, is passed over rather than failing the whole search, as
+		// 7.x ignores it (R5, #216). A local member's search keeps its
+		// answer, as a native search does under the blackout (R2b).
+		if c := pkgroute.RequestFrom(mr).Repo; c.Class == repo.Remote &&
+			generic.CheckBlackedOut(c, "") != nil {
 			continue
 		}
 		rec := httptest.NewRecorder()

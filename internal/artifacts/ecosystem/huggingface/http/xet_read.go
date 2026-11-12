@@ -88,6 +88,7 @@ func (h handler) xetPublishedFile(
 	if pkgroute.RequestFrom(chosen.request).Repo.Key != c.Member || chosen.info.SHA != c.Revision {
 		return chosen, record, missing()
 	}
+	var refusal error
 	for _, s := range chosen.info.Siblings {
 		if s.LFS == nil || c.File != "" && s.Filename != c.File {
 			continue
@@ -109,6 +110,16 @@ func (h handler) xetPublishedFile(
 		if candidate.Size != s.Size {
 			return chosen, record, xetInvalid()
 		}
+		// Xet carries the bytes of the file resolve serves, so the file's
+		// download policy refuses them as it refuses resolve. Another file
+		// of the revision with the same content may still be served, so
+		// the refusal is answered only when none is.
+		if e = h.k.CheckDownload(chosen.request, path); e != nil {
+			if refusal == nil {
+				refusal = e
+			}
+			continue
+		}
 		if chosen.fence != nil {
 			if e = chosen.fence(r.Context()); e != nil {
 				return chosen, record, e
@@ -120,6 +131,9 @@ func (h handler) xetPublishedFile(
 			}
 		}
 		return chosen, candidate, nil
+	}
+	if refusal != nil {
+		return chosen, record, refusal
 	}
 	return chosen, record, missing()
 }

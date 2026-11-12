@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -651,4 +652,425 @@ func TestUnitCRANVirtualStaleMemberAndCorruptHostedIndex(t *testing.T) {
 	wantStatus(t, w.do(http.MethodGet,
 		"/artifactory/cran-stale/src/contrib/PACKAGES", "admin", ""),
 		http.StatusInternalServerError)
+}
+
+// The source feed's index, and the archive of the assertthat package the
+// published fixtures hold.
+const (
+	cranIndex      = "src/contrib/PACKAGES"
+	cranAssertthat = "src/contrib/assertthat_0.2.1.tar.gz"
+)
+
+// wantCRANError fails the test unless rec answered status with the
+// Artifactory error envelope that carries message.
+func wantCRANError(t *testing.T, rec *httptest.ResponseRecorder, status int, message string) {
+	t.Helper()
+	var body struct {
+		Errors []struct {
+			Status  int    `json:"status"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if rec.Code != status || json.Unmarshal(rec.Body.Bytes(), &body) != nil ||
+		len(body.Errors) != 1 || body.Errors[0].Status != status ||
+		body.Errors[0].Message != message {
+		t.Errorf("answered %d %s, want %d %q", rec.Code, rec.Body, status, message)
+	}
+}
+
+// cranPublish uploads each body to the source feed of the local repository
+// key and then applies tune to its configuration, as an administrator who
+// sets a download policy once the packages are deployed, which the patterns
+// would otherwise refuse.
+func cranPublish(
+	t *testing.T,
+	w *itemWorld,
+	key string,
+	tune func(*repo.Config),
+	bodies ...string,
+) {
+	t.Helper()
+	cranRepo(t, w, repo.Config{Key: key, Class: repo.Local, PackageType: repo.Cran})
+	for _, body := range bodies {
+		wantStatus(t, w.do(http.MethodPost, "/artifactory/api/cran/"+key+"/sources", "admin", body),
+			http.StatusCreated)
+	}
+	c, err := w.db.Repos().Get(t.Context(), key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tune(&c)
+	if err := w.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// cranExcluding returns a tune that sets the exclude pattern to pattern.
+func cranExcluding(pattern string) func(*repo.Config) {
+	return func(c *repo.Config) { c.ExcludesPattern = &pattern }
+}
+
+// cranUpstream serves the published assertthat index and archive, and
+// fails the test when the source is asked for the archive by a remote whose
+// patterns reject it.
+func cranUpstream(t *testing.T) *source.Service {
+	index := cranFixtureBytes(t, "assertthat-PACKAGES")
+	archive := cranFixtureBytes(t, "assertthat_0.2.1.tar.gz")
+	return &source.Service{Resolve: sourceIdentity, HTTP: sourceBackend(
+		func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+			body := index
+			switch q.Resource.Path {
+			case cranIndex:
+			case cranAssertthat:
+				if q.Repo.ExcludesPattern != nil &&
+					strings.Contains(*q.Repo.ExcludesPattern, "assertthat") {
+					t.Errorf("the source of %s was asked for an archive its patterns reject",
+						q.Repo.Key)
+				}
+				body = archive
+			default:
+				return source.Result{}, kernel.ErrNotFound
+			}
+			return source.Result{Stream: &source.Stream{
+				Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
+				Representation: source.Representation{Size: int64(len(body))},
+			}}, nil
+		},
+	)}
+}
+
+// TestAccCRANRefusalsAnswerTheDownloadPolicy: an index, and a remote or
+// virtual package, is refused to a caller who may not read it before
+// anything else (DV-057). Past that, a blacked-out local or remote
+// repository, its -cache alias, or patterns that reject the requested path
+// answer the download policy's 404 and message before the source is asked,
+// and a virtual repository whose own patterns reject the path answers that
+// no repository serves it.
+func TestAccCRANRefusalsAnswerTheDownloadPolicy(t *testing.T) {
+	w := newItemWorld(t, false)
+	body := string(cranFixtureBytes(t, "assertthat_0.2.1.tar.gz"))
+	cranPublish(t, w, "cran-local", func(*repo.Config) {}, body)
+	cranPublish(t, w, "cran-dark", func(c *repo.Config) { c.BlackedOut = new(true) }, body)
+	cranPublish(t, w, "cran-hidden", cranExcluding("**/PACKAGES*"), body)
+	for _, c := range []repo.Config{
+		{
+			Key: "cran-dark-remote", Class: repo.Remote, PackageType: repo.Cran,
+			URL: "https://up.example", BlackedOut: new(true),
+		},
+		{
+			Key: "cran-picky-remote", Class: repo.Remote, PackageType: repo.Cran,
+			URL: "https://up.example", ExcludesPattern: new("**/*.tar.gz"),
+		},
+		{
+			Key: "cran-closed", Class: repo.Virtual, PackageType: repo.Cran,
+			Repositories: []string{"cran-local"}, ExcludesPattern: new("src/**"),
+		},
+	} {
+		cranRepo(t, w, c)
+	}
+	blackedOut := func(key, path string) string {
+		return "The repository '" + key + "' is blacked out and cannot serve artifact '" +
+			key + ":" + path + "'."
+	}
+	rejected := func(key, path string) string {
+		return "The repository '" + key + "' rejected the artifact '" + key + ":" + path +
+			"' due to its include/exclude pattern settings."
+	}
+	for _, tc := range []struct {
+		name, key, path, as string
+		status              int
+		message             string
+	}{
+		{"user reads an index", "cran-local", cranIndex, "user", http.StatusForbidden, "Forbidden"},
+		{
+			"user reads a blacked-out index", "cran-dark", cranIndex, "user",
+			http.StatusForbidden, "Forbidden",
+		},
+		{
+			"user reads a package a remote's patterns reject", "cran-picky-remote",
+			cranAssertthat, "user", http.StatusForbidden, "Forbidden",
+		},
+		{
+			"blacked-out index", "cran-dark", cranIndex, "admin",
+			http.StatusNotFound, blackedOut("cran-dark", cranIndex),
+		},
+		{
+			"blacked-out compressed index", "cran-dark", cranIndex + ".gz", "admin",
+			http.StatusNotFound, blackedOut("cran-dark", cranIndex+".gz"),
+		},
+		{
+			"index the patterns reject", "cran-hidden", cranIndex, "admin",
+			http.StatusNotFound, rejected("cran-hidden", cranIndex),
+		},
+		{
+			"blacked-out remote index", "cran-dark-remote", cranIndex, "admin",
+			http.StatusNotFound, blackedOut("cran-dark-remote", cranIndex),
+		},
+		{
+			"blacked-out remote's cache", "cran-dark-remote-cache", cranIndex, "admin",
+			http.StatusNotFound, blackedOut("cran-dark-remote", cranIndex),
+		},
+		{
+			"blacked-out remote's package", "cran-dark-remote", cranAssertthat, "admin",
+			http.StatusNotFound, blackedOut("cran-dark-remote", cranAssertthat),
+		},
+		{
+			"remote package the patterns reject", "cran-picky-remote", cranAssertthat, "admin",
+			http.StatusNotFound, rejected("cran-picky-remote", cranAssertthat),
+		},
+		{
+			"virtual index its patterns reject", "cran-closed", cranIndex, "admin",
+			http.StatusNotFound, "No repository found to serve the request for cran-closed:" + cranIndex,
+		},
+		{
+			"virtual package its patterns reject", "cran-closed", cranAssertthat, "admin",
+			http.StatusNotFound,
+			"No repository found to serve the request for cran-closed:" + cranAssertthat,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := w.do(http.MethodGet, "/artifactory/"+tc.key+"/"+tc.path, tc.as, "")
+			wantCRANError(t, rec, tc.status, tc.message)
+		})
+	}
+}
+
+// TestAccCRANIndexKeepsAPackageThePatternsReject: a local or remote index
+// lists a package whose archive the repository's patterns reject, as 7.x
+// keeps such a package in its indexes (RTFACT-30830, RTFACT-30656); only
+// that archive's GET answers the policy's 404. A remote whose patterns
+// reject only the PACKAGES file still serves the archive, which a download
+// checks at its own path: the index read that pins its MD5 is a lookup that
+// checks only the remote's blackout.
+func TestAccCRANIndexKeepsAPackageThePatternsReject(t *testing.T) {
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = cranUpstream(t) })
+	archive := cranFixtureBytes(t, "assertthat_0.2.1.tar.gz")
+	zeta := conanTestArchive(t, "zeta/DESCRIPTION", "Package: zeta\nVersion: 1.0\n")
+	cranPublish(t, w, "cran-local", cranExcluding("**/assertthat_*"), string(archive), zeta)
+	for _, c := range []repo.Config{
+		{
+			Key: "cran-remote", Class: repo.Remote, PackageType: repo.Cran,
+			URL: "https://up.example", ExcludesPattern: new("**/assertthat_*"),
+		},
+		{
+			Key: "cran-indexless", Class: repo.Remote, PackageType: repo.Cran,
+			URL: "https://up.example", ExcludesPattern: new("**/PACKAGES*"),
+		},
+	} {
+		cranRepo(t, w, c)
+	}
+	for _, tc := range []struct {
+		key  string
+		want []string
+	}{
+		{"cran-local", []string{"File: assertthat_0.2.1.tar.gz", "File: zeta_1.0.tar.gz"}},
+		{"cran-remote", []string{"File: assertthat_0.2.1.tar.gz"}},
+	} {
+		t.Run(tc.key, func(t *testing.T) {
+			index := w.do(http.MethodGet, "/artifactory/"+tc.key+"/"+cranIndex, "admin", "")
+			wantStatus(t, index, http.StatusOK)
+			for _, want := range tc.want {
+				if !strings.Contains(index.Body.String(), want) {
+					t.Errorf("index lacks %q: %s", want, index.Body)
+				}
+			}
+			wantCRANError(t,
+				w.do(http.MethodGet, "/artifactory/"+tc.key+"/"+cranAssertthat, "admin", ""),
+				http.StatusNotFound, "The repository '"+tc.key+"' rejected the artifact '"+
+					tc.key+":"+cranAssertthat+"' due to its include/exclude pattern settings.")
+		})
+	}
+	got := w.do(http.MethodGet, "/artifactory/cran-indexless/"+cranAssertthat, "admin", "")
+	wantStatus(t, got, http.StatusOK)
+	if !bytes.Equal(got.Body.Bytes(), archive) {
+		t.Error("archive behind a rejected index changed during delivery")
+	}
+}
+
+// TestAccCRANVirtualKeepsPackagesThePatternsReject: a virtual index keeps a
+// package whose archive a local or remote member's patterns, or a virtual
+// repository's own, reject, nested ones included, and that row claims the
+// package's name. The archive's GET passes over the refusing member to the
+// next that lists the package, without asking a refusing remote's source,
+// answers not found when none serves that path, and answers that no
+// repository serves it when the virtual repository's own patterns reject
+// it.
+func TestAccCRANVirtualKeepsPackagesThePatternsReject(t *testing.T) {
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = cranUpstream(t) })
+	archive := cranFixtureBytes(t, "assertthat_0.2.1.tar.gz")
+	cranPublish(t, w, "cran-hiding", cranExcluding("**/assertthat_*"), string(archive))
+	cranPublish(t, w, "cran-plain", func(*repo.Config) {}, string(archive))
+	cranPublish(t, w, "cran-newer", cranExcluding("**/zeta_2.0*"),
+		conanTestArchive(t, "zeta/DESCRIPTION", "Package: zeta\nVersion: 2.0\n"))
+	cranPublish(t, w, "cran-older", func(*repo.Config) {},
+		conanTestArchive(t, "zeta/DESCRIPTION", "Package: zeta\nVersion: 1.0\n"))
+	for _, c := range []repo.Config{
+		{
+			Key: "cran-remote", Class: repo.Remote, PackageType: repo.Cran,
+			URL: "https://up.example", ExcludesPattern: new("**/assertthat_*"),
+		},
+		{Key: "cran-virtual", Repositories: []string{"cran-hiding", "cran-plain"}},
+		{Key: "cran-only-hiding", Repositories: []string{"cran-hiding"}},
+		{
+			Key: "cran-picky", Repositories: []string{"cran-plain"},
+			ExcludesPattern: new("**/assertthat_*"),
+		},
+		{Key: "cran-nested", Repositories: []string{"cran-picky"}},
+		{Key: "cran-over-remote", Repositories: []string{"cran-remote"}},
+		{Key: "cran-versions", Repositories: []string{"cran-newer", "cran-older"}},
+	} {
+		if c.Class == "" {
+			c.Class, c.PackageType = repo.Virtual, repo.Cran
+		}
+		cranRepo(t, w, c)
+	}
+	for _, key := range []string{
+		"cran-virtual", "cran-only-hiding", "cran-picky", "cran-nested", "cran-over-remote",
+	} {
+		index := w.do(http.MethodGet, "/artifactory/"+key+"/"+cranIndex, "admin", "")
+		wantStatus(t, index, http.StatusOK)
+		if strings.Count(index.Body.String(), "File: assertthat_0.2.1.tar.gz") != 1 {
+			t.Errorf("%s index does not list assertthat once: %s", key, index.Body)
+		}
+	}
+	index := w.do(http.MethodGet, "/artifactory/cran-versions/"+cranIndex, "admin", "")
+	wantStatus(t, index, http.StatusOK)
+	if !strings.Contains(index.Body.String(), "File: zeta_2.0.tar.gz") ||
+		strings.Contains(index.Body.String(), "zeta_1.0") {
+		t.Errorf("cran-versions index does not list cran-newer's zeta alone: %s", index.Body)
+	}
+	got := w.do(http.MethodGet, "/artifactory/cran-virtual/"+cranAssertthat, "admin", "")
+	wantStatus(t, got, http.StatusOK)
+	if !bytes.Equal(got.Body.Bytes(), archive) {
+		t.Error("archive changed during virtual delivery")
+	}
+	for _, url := range []string{
+		"/artifactory/cran-only-hiding/" + cranAssertthat,
+		"/artifactory/cran-nested/" + cranAssertthat,
+		"/artifactory/cran-over-remote/" + cranAssertthat,
+		"/artifactory/cran-versions/src/contrib/zeta_2.0.tar.gz",
+	} {
+		wantCRANError(t, w.do(http.MethodGet, url, "admin", ""),
+			http.StatusNotFound, "Could not find resource")
+	}
+	wantStatus(t, w.do(http.MethodGet,
+		"/artifactory/cran-versions/src/contrib/zeta_1.0.tar.gz", "admin", ""), http.StatusOK)
+	wantCRANError(t, w.do(http.MethodGet, "/artifactory/cran-picky/"+cranAssertthat, "admin", ""),
+		http.StatusNotFound,
+		"No repository found to serve the request for cran-picky:"+cranAssertthat)
+}
+
+// TestAccCRANVirtualPackageChecksAMemberAtThePackagesPath: a virtual
+// package GET checks each member at the package's own path, never at the
+// index it reads to find the package. A local or remote member, or a
+// nested virtual one, whose patterns reject only its PACKAGES serves the
+// package, while the virtual index still leaves that member out; a
+// blacked-out member, which refuses every file, takes no part.
+func TestAccCRANVirtualPackageChecksAMemberAtThePackagesPath(t *testing.T) {
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = cranUpstream(t) })
+	archive := cranFixtureBytes(t, "assertthat_0.2.1.tar.gz")
+	cranPublish(t, w, "cran-indexless", cranExcluding("**/PACKAGES*"), string(archive))
+	cranPublish(t, w, "cran-dark", func(c *repo.Config) { c.BlackedOut = new(true) },
+		string(archive))
+	cranPublish(t, w, "cran-plain", func(*repo.Config) {}, string(archive))
+	for _, c := range []repo.Config{
+		{
+			Key: "cran-remote", Class: repo.Remote, PackageType: repo.Cran,
+			URL: "https://up.example", ExcludesPattern: new("**/PACKAGES*"),
+		},
+		{
+			Key: "cran-closed", Repositories: []string{"cran-plain"},
+			ExcludesPattern: new("**/PACKAGES*"),
+		},
+		{Key: "cran-over-indexless", Repositories: []string{"cran-indexless"}},
+		{Key: "cran-over-remote", Repositories: []string{"cran-remote"}},
+		{Key: "cran-over-dark", Repositories: []string{"cran-dark"}},
+		{Key: "cran-over-closed", Repositories: []string{"cran-closed"}},
+	} {
+		if c.Class == "" {
+			c.Class, c.PackageType = repo.Virtual, repo.Cran
+		}
+		cranRepo(t, w, c)
+	}
+	for _, key := range []string{
+		"cran-over-indexless", "cran-over-remote", "cran-over-dark", "cran-over-closed",
+	} {
+		index := w.do(http.MethodGet, "/artifactory/"+key+"/"+cranIndex, "admin", "")
+		wantStatus(t, index, http.StatusOK)
+		if strings.Contains(index.Body.String(), "assertthat") {
+			t.Errorf("%s index lists the refusing member's package: %s", key, index.Body)
+		}
+	}
+	for _, key := range []string{"cran-over-indexless", "cran-over-remote", "cran-over-closed"} {
+		got := w.do(http.MethodGet, "/artifactory/"+key+"/"+cranAssertthat, "admin", "")
+		wantStatus(t, got, http.StatusOK)
+		if !bytes.Equal(got.Body.Bytes(), archive) {
+			t.Errorf("%s changed the member's archive during delivery", key)
+		}
+	}
+	wantCRANError(t,
+		w.do(http.MethodGet, "/artifactory/cran-over-dark/"+cranAssertthat, "admin", ""),
+		http.StatusNotFound, "Could not find resource")
+}
+
+// TestAccCRANRemoteChecksItsIndexAtTheDocumentsPath: a remote's PACKAGES is
+// read under the remote's download policy at the path 7.x caches it at, and
+// the PACKAGES lookup a package GET makes to pin the archive's MD5 checks
+// only the remote's blackout (decision 0032, "Where the policy applies").
+// Patterns that reject the feed folder but neither the PACKAGES file nor
+// the archive leave both served, directly and through a virtual
+// repository; patterns that reject only the PACKAGES file refuse it, naming
+// its path, and leave the archive served; a blacked-out remote refuses
+// both.
+func TestAccCRANRemoteChecksItsIndexAtTheDocumentsPath(t *testing.T) {
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = cranUpstream(t) })
+	archive := cranFixtureBytes(t, "assertthat_0.2.1.tar.gz")
+	remote := func(key string, tune func(*repo.Config)) repo.Config {
+		c := repo.Config{
+			Key: key, Class: repo.Remote, PackageType: repo.Cran, URL: "https://up.example",
+		}
+		tune(&c)
+		return c
+	}
+	for _, c := range []repo.Config{
+		remote("cran-plain-remote", func(*repo.Config) {}),
+		remote("cran-folder-remote", cranExcluding("src/*")),
+		remote("cran-indexless-remote", cranExcluding("**/PACKAGES*")),
+		remote("cran-dark-remote", func(c *repo.Config) { c.BlackedOut = new(true) }),
+		{
+			Key: "cran-over-folder", Class: repo.Virtual, PackageType: repo.Cran,
+			Repositories: []string{"cran-folder-remote"},
+		},
+	} {
+		cranRepo(t, w, c)
+	}
+	plain := w.do(http.MethodGet, "/artifactory/cran-plain-remote/"+cranIndex, "admin", "")
+	wantStatus(t, plain, http.StatusOK)
+	if !strings.Contains(plain.Body.String(), "File: assertthat_0.2.1.tar.gz") {
+		t.Fatalf("the plain remote's index lacks assertthat: %s", plain.Body)
+	}
+	for _, key := range []string{"cran-folder-remote", "cran-over-folder"} {
+		index := w.do(http.MethodGet, "/artifactory/"+key+"/"+cranIndex, "admin", "")
+		if index.Code != http.StatusOK || !bytes.Equal(index.Body.Bytes(), plain.Body.Bytes()) {
+			t.Errorf("%s index answered %d %s, want the plain remote's %s",
+				key, index.Code, index.Body, plain.Body)
+		}
+	}
+	for _, key := range []string{"cran-folder-remote", "cran-over-folder", "cran-indexless-remote"} {
+		got := w.do(http.MethodGet, "/artifactory/"+key+"/"+cranAssertthat, "admin", "")
+		if got.Code != http.StatusOK || !bytes.Equal(got.Body.Bytes(), archive) {
+			t.Errorf("%s archive answered %d %.200s, want the upstream archive",
+				key, got.Code, got.Body)
+		}
+	}
+	wantCRANError(t,
+		w.do(http.MethodGet, "/artifactory/cran-indexless-remote/"+cranIndex, "admin", ""),
+		http.StatusNotFound, "The repository 'cran-indexless-remote' rejected the artifact "+
+			"'cran-indexless-remote:"+cranIndex+"' due to its include/exclude pattern settings.")
+	for _, path := range []string{cranIndex, cranAssertthat} {
+		wantCRANError(t,
+			w.do(http.MethodGet, "/artifactory/cran-dark-remote/"+path, "admin", ""),
+			http.StatusNotFound, "The repository 'cran-dark-remote' is blacked out and cannot "+
+				"serve artifact 'cran-dark-remote:"+path+"'.")
+	}
 }

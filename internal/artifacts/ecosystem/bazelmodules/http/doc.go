@@ -56,6 +56,18 @@
 //     metadata.json, and serves every other document of a version from the
 //     first member that can serve all of it: a hosted member holding the
 //     complete version, or a remote with a valid source.json.
+//   - The download policy (#1251), after read permission: every route is
+//     checked at the path 7.x keeps its file or document at in the Bazel
+//     Central Registry layout, a hosted archive at
+//     modules/<name>/<version>/<file> and a remote's where its cache keeps
+//     it, and a refusal answers the blackout's or the patterns' 404 and
+//     message, a remote's own included. A version whose files the
+//     patterns reject stays listed, and its source.json is served; a
+//     remote's metadata reads check its blackout alone. A virtual
+//     repository leaves a blacked-out member and one whose patterns reject
+//     metadata.json out of its metadata, passes over a member whose policy
+//     refuses the request, and its own patterns refuse the request with "No
+//     repository found to serve the request".
 //   - Statuses and error texts stay byte-identical.
 //
 // # References
@@ -91,6 +103,8 @@
 //     archives, wrong manifests and corrupt archives, and, with
 //     ARTIFACTWEAVE_BAZEL_CLIENT=1 and Docker, the pinned Bazel client
 //     (TestAccBazelClient, which the client recipe cites).
+//   - download_policy_test.go: the blackout and the patterns of local,
+//     virtual and remote repositories on every route.
 //   - remote_test.go, failures_test.go and fences_test.go: remote cache,
 //     offline, integrity and redirects, closed failures, virtual member
 //     selection and source revocation before delivery.

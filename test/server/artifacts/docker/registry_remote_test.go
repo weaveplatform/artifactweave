@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -390,4 +391,74 @@ func TestAccRegistryRemoteIntegrityAndDeniedPaths(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A remote repository's own blackout and patterns refuse a read before the
+// upstream is asked, with a 404 and the policy's message in Artifactory's
+// envelope under no registry code, as a local repository's refusal answers
+// (RTFACT-27234): manifests, blobs, tags and referrers alike. The message
+// names the path the read checks.
+func TestAccRegistryRemotePolicyRefusals(t *testing.T) {
+	w := registryWorld(t)
+	manifest, layer := registryImage(t, w, "policy")
+	registryPut(w, "manifests", "latest", layout.MediaTypeOCIManifest, manifest)
+	registryPut(w, "manifests", "old", layout.MediaTypeOCIManifest, manifest)
+	w.up.Set("/v2/team/image/tags/list", fakeupstream.Resource{
+		Body:   []byte(`{"name":"team/image","tags":["latest","old"]}`),
+		Header: http.Header{"Content-Type": {"application/json"}},
+	})
+	digest, blob := registryDigest(manifest), registryDigest(layer)
+	reads := map[string]string{
+		"/v2/remote/team/image/manifests/latest":    "team/image/latest/manifest.json",
+		"/v2/remote/team/image/manifests/" + digest: "team/image/sha256:" + digest[7:] + "/manifest.json",
+		"/v2/remote/team/image/blobs/" + blob:       "team/image/_uploads/sha256__" + blob[7:],
+		"/v2/remote/team/image/tags/list":           "team/image",
+		"/v2/remote/team/image/referrers/" + digest: "team/image",
+	}
+	refused := func(target, msg string) {
+		t.Helper()
+		rec := w.request("GET", target, "reader", "")
+		var body map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatalf("%s: %v: %s", target, err, rec.Body)
+		}
+		want := map[string]any{"errors": []any{
+			map[string]any{"status": float64(http.StatusNotFound), "message": msg},
+		}}
+		if rec.Code != http.StatusNotFound || !reflect.DeepEqual(body, want) {
+			t.Fatalf("%s: %d %s, want the policy's 404 %q", target, rec.Code, rec.Body, msg)
+		}
+		if !strings.Contains(target, "/tags/") && !strings.Contains(target, "/referrers/") {
+			remoteStatus(t, w.request("HEAD", target, "reader", ""), http.StatusNotFound)
+		}
+	}
+	on, off, all, one := true, false, "team/image/**", "team/image/old/**"
+	w.c.BlackedOut = &on
+	w.update()
+	for target, path := range reads {
+		refused(target, "The repository 'remote' is blacked out and cannot serve artifact 'remote:"+
+			path+"'.")
+	}
+	w.c.BlackedOut, w.c.ExcludesPattern = &off, &all
+	w.update()
+	for target, path := range reads {
+		refused(target, "The repository 'remote' rejected the artifact 'remote:"+path+
+			"' due to its include/exclude pattern settings.")
+	}
+	if n := len(w.up.Requests()); n != 0 {
+		t.Fatalf("refused reads reached the upstream %d times", n)
+	}
+	// Patterns that reject one tag refuse its pull. The tags list leaves
+	// that tag out, as before; what 7.x lists is a capture for #216.
+	w.c.ExcludesPattern = &one
+	w.update()
+	refused("/v2/remote/team/image/manifests/old", "The repository 'remote' rejected the artifact "+
+		"'remote:team/image/old/manifest.json' due to its include/exclude pattern settings.")
+	tags := w.request("GET", "/v2/remote/team/image/tags/list", "reader", "")
+	remoteStatus(t, tags, http.StatusOK)
+	if !strings.Contains(tags.Body.String(), `"tags":["latest"]`) {
+		t.Fatalf("tags: %s", tags.Body)
+	}
+	remoteStatus(t, w.request("GET", "/v2/remote/team/image/manifests/latest", "reader", ""),
+		http.StatusOK)
 }

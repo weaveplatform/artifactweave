@@ -39,10 +39,23 @@ type version struct {
 
 const latestTag = npmfmt.TagLatest
 
+// documentPath is where 7.x keeps name's packument, in a local repository
+// and in a remote repository's cache (DV-042, RTFACT-18463), and reads it
+// through the download path: RTFACT-13337 shows a local packument read
+// refused for "npm-test:.npm/@itamarb/test/package.json" by the include
+// and exclude patterns, and npm's docs have an include pattern name
+// .npm/ paths for that reason. artifactweave builds the packument from the
+// index and stores nothing there, so the download policy is checked at
+// this path instead: a blacked-out repository and a pattern on the path
+// refuse the packument, and the version manifest and dist-tags 7.x answers
+// from it, while a pattern on one version's tarball leaves the version
+// listed (RTFACT-19925).
+func documentPath(name string) string { return ".npm/" + name + "/package.json" }
+
 // packument answers the full packument, or the abbreviated one when the
 // request asks for it.
 func (h handler) packument(w http.ResponseWriter, r *http.Request, name string) {
-	p, ok := h.load(w, r, name)
+	p, ok := h.loadDocument(w, r, name)
 	if !ok {
 		return
 	}
@@ -106,7 +119,7 @@ func noneMatch(h, tag string) bool {
 // manifest answers one version's document, the version named by its
 // number or by a dist-tag.
 func (h handler) manifest(w http.ResponseWriter, r *http.Request, name, spec string) {
-	p, ok := h.load(w, r, name)
+	p, ok := h.loadDocument(w, r, name)
 	if !ok {
 		return
 	}
@@ -133,6 +146,30 @@ func (h handler) load(w http.ResponseWriter, r *http.Request, name string) (pkg,
 	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return pkg{}, false
 	}
+	return h.found(w, r, name)
+}
+
+// loadDocument is load for a read 7.x answers from the package's stored
+// document: the packument, a version's manifest or the dist-tags. After
+// the permission check (DV-057), and before it looks for the package, it
+// applies the download policy at documentPath, so the refusal is the same
+// whether or not the package exists. load goes without it for the
+// unpublish that keeps some versions, whose read of them is a write's
+// lookup, not a download.
+func (h handler) loadDocument(w http.ResponseWriter, r *http.Request, name string) (pkg, bool) {
+	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
+		return pkg{}, false
+	}
+	if err := h.k.CheckDocument(r, documentPath(name)); err != nil {
+		h.k.Error(w, r, err)
+		return pkg{}, false
+	}
+	return h.found(w, r, name)
+}
+
+// found is load once the caller may read the package's folder: the
+// package with the versions the caller may read, or 404 when it has none.
+func (h handler) found(w http.ResponseWriter, r *http.Request, name string) (pkg, bool) {
 	p, ok, err := h.readable(r, name)
 	switch {
 	case err != nil:

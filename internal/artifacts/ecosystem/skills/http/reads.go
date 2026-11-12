@@ -104,10 +104,41 @@ func (h handler) visible(r *http.Request, slug string) (skill, error) {
 	return s, nil
 }
 
+// notBlackedOut answers the blackout's 404, naming path, before a read
+// computes anything from the skill index, and reports whether the read may
+// go on. 7.x ignores a blacked-out repository when it resolves, and where
+// it keeps a skill's index is not documented, so the reads a client
+// resolves a skill's version from (detail, versions, version and resolve;
+// the JFrog CLI's install resolves its version from the list of versions)
+// refuse at the skill's folder. A download, and a read of one file of a
+// bundle, refuse before the index is read too, whether the version exists
+// or not, as the item routes refuse a missing path (6.20 checks the
+// download policy before it looks a path up). The list and search keep
+// their answers, as 6.20's searchers check permissions and patterns but
+// not the blackout, and patterns rejecting a version's bundle leave it
+// listed: only the bundle's download and its files refuse.
+func (h handler) notBlackedOut(w http.ResponseWriter, r *http.Request, path string) bool {
+	if err := h.k.CheckBlackedOut(r, path); err != nil {
+		h.k.Error(w, r, err)
+		return false
+	}
+	return true
+}
+
+// selected finds the version a read names, after the caller's read
+// permission on the skill's folder. A blacked-out repository is refused
+// first, naming blackout: the skill's folder for the version route's
+// resolution metadata, and refusedAt's path for a bundle or a file in it.
+// malformed, when not nil, is the 400 the rest of the request's shape
+// earns. A blacked-out repository answers it in place of the refusal, as
+// request-shape checks come before any policy check; without the blackout
+// the caller answers it once the version is found, so that a version that
+// does not exist keeps its 404 first.
 func (h handler) selected(
 	w http.ResponseWriter,
 	r *http.Request,
-	slug, version string,
+	slug, version, blackout string,
+	malformed error,
 ) (skillVersion, bool) {
 	if !h.authenticated(w, r) {
 		return skillVersion{}, false
@@ -117,6 +148,13 @@ func (h handler) selected(
 		return skillVersion{}, false
 	}
 	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
+		return skillVersion{}, false
+	}
+	if malformed != nil && h.k.CheckBlackedOut(r, blackout) != nil {
+		h.k.Error(w, r, malformed)
+		return skillVersion{}, false
+	}
+	if !h.notBlackedOut(w, r, blackout) {
 		return skillVersion{}, false
 	}
 	s, err := h.visible(r, slug)
@@ -303,7 +341,7 @@ func (h handler) detail(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badQuery("invalid skill slug"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
+	if !h.k.RequireFolder(w, r, slug, api.ActionRead) || !h.notBlackedOut(w, r, slug) {
 		return
 	}
 	s, err := h.visible(r, slug)
@@ -332,7 +370,7 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badQuery("invalid skill slug"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
+	if !h.k.RequireFolder(w, r, slug, api.ActionRead) || !h.notBlackedOut(w, r, slug) {
 		return
 	}
 	s, err := h.visible(r, slug)
@@ -373,7 +411,7 @@ func (h handler) versions(w http.ResponseWriter, r *http.Request) {
 
 func (h handler) version(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
-	v, ok := h.selected(w, r, slug, chi.URLParam(r, "version"))
+	v, ok := h.selected(w, r, slug, chi.URLParam(r, "version"), slug, nil)
 	if !ok {
 		return
 	}
@@ -476,7 +514,7 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badQuery("invalid skill slug"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, slug, api.ActionRead) {
+	if !h.k.RequireFolder(w, r, slug, api.ActionRead) || !h.notBlackedOut(w, r, slug) {
 		return
 	}
 	s, err := h.visible(r, slug)
@@ -495,32 +533,59 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 	h.k.Error(w, r, notFound())
 }
 
+// refusedAt is the path a blacked-out repository's refusal of a version's
+// bundle names, and of a file in it, which takes its bundle's check. A
+// named version's refusal names its bundle, as the refusal of a stored one
+// does, whether it is stored or not; latest is resolved from the index,
+// which a blacked-out repository does not read, so its refusal names the
+// skill's folder, as resolve's does.
+func refusedAt(slug, version string) string {
+	if version == "" || version == "latest" {
+		return slug
+	}
+	return skillsfmt.Path(slug, version)
+}
+
 func (h handler) download(w http.ResponseWriter, r *http.Request) {
-	slug := r.URL.Query().Get("slug")
-	v, ok := h.selected(w, r, slug, r.URL.Query().Get("version"))
+	slug, version := r.URL.Query().Get("slug"), r.URL.Query().Get("version")
+	v, ok := h.selected(w, r, slug, version, refusedAt(slug, version), nil)
 	if !ok {
 		return
 	}
 	h.k.ServeItem(w, r, skillsfmt.Path(slug, v.record.Version))
 }
 
+// badFileName is the 400 a single-file read's path earns unless it names a
+// safe relative file, and nil otherwise.
+func badFileName(name string) error {
+	if !safeFileName(name) || strings.HasSuffix(name, "/") {
+		return badQuery("invalid skill file path")
+	}
+	return nil
+}
+
 func (h handler) singleFile(w http.ResponseWriter, r *http.Request) {
-	slug := chi.URLParam(r, "slug")
-	v, ok := h.selected(w, r, slug, r.URL.Query().Get("version"))
+	slug, version := chi.URLParam(r, "slug"), r.URL.Query().Get("version")
+	name := r.URL.Query().Get("path")
+	malformed := badFileName(name)
+	v, ok := h.selected(w, r, slug, version, refusedAt(slug, version), malformed)
 	if !ok {
 		return
 	}
-	name := r.URL.Query().Get("path")
-	if !safeFileName(name) || strings.HasSuffix(name, "/") {
-		h.k.Error(w, r, badQuery("invalid skill file path"))
+	if malformed != nil {
+		h.k.Error(w, r, malformed)
 		return
 	}
 	path := skillsfmt.Path(slug, v.record.Version)
 	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
-	f, err := h.k.Item(r, path)
-	if errors.Is(err, kernel.ErrNotFound) {
+	f, err := h.k.DownloadItem(r, path)
+	// A file of the bundle takes the bundle's download policy, and its
+	// refusal, which is kernel.ErrNotFound too, keeps the policy's 404 and
+	// message, as the bundle's download answers; only a missing bundle is
+	// this route's own "not found".
+	if errors.Is(err, kernel.ErrNotFound) && !pkgroute.IsRefusal(err) {
 		h.k.Error(w, r, notFound())
 		return
 	}
@@ -587,7 +652,7 @@ func (h handler) xrayStatus(w http.ResponseWriter, r *http.Request) {
 	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
-	f, err := h.k.Item(r, path)
+	f, err := h.k.StoredItem(r, path)
 	if errors.Is(err, kernel.ErrNotFound) || err == nil && f.Item.Folder {
 		h.k.Error(w, r, notFound())
 		return

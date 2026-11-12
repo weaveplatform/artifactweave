@@ -145,6 +145,11 @@ func decodeRemote(r io.Reader) (remoteDoc, error) {
 
 // Each cached document is validated independently of the first reader's grants.
 // Rewritten documents exist only for this request, never in the shared cache.
+// Only the remote's blackout refuses a document: the patterns are the
+// .nupkg's to apply, so a pattern on a package's folder leaves its versions
+// listed and refuses their downloads, as 7.x does (RTFACT-6205,
+// RTFACT-8218), and a search goes upstream whatever they say
+// (RTFACT-30307).
 func (s *remoteSession) document(
 	target, path, folder, kind, id string,
 ) (remoteDoc, source.Result, error) {
@@ -164,6 +169,7 @@ func (s *remoteSession) document(
 		ExternalURL:         target,
 		PermissionFolder:    true,
 		PermissionPath:      folder,
+		BlackoutOnly:        true,
 		Accept:              jsonType,
 		ExpectedContentType: jsonType,
 		Variant:             "nuget-v3-" + kind + "-v1",
@@ -271,9 +277,11 @@ func (s *remoteSession) fence(ctx context.Context) error {
 			}
 		}
 	}
+	// Read permission alone: a disclosed version whose .nupkg the patterns
+	// reject stays listed, and only its download is refused.
 	for path, r := range s.disclosed {
-		if r.CheckRead != nil {
-			if err := r.CheckRead(ctx, path); err != nil {
+		if r.CheckPermission != nil {
+			if err := r.CheckPermission(ctx, path); err != nil {
 				return fmt.Errorf("nuget delivery fence: %w", err)
 			}
 		}

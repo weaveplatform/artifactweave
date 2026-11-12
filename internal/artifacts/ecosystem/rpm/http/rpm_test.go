@@ -177,7 +177,16 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 		if err != nil {
 			t.Fatal(err)
 		}
-		packages, err := svc.rpmCandidates(t.Context(), w.db, c, "", p, acc, map[string]bool{})
+		packages, err := svc.rpmCandidates(
+			t.Context(),
+			w.db,
+			c,
+			"",
+			p,
+			acc,
+			false,
+			map[string]bool{},
+		)
 		if !errors.Is(err, tc.expected) || (tc.expected == nil && len(packages) != 0) {
 			t.Errorf("%s: packages=%v error=%v, want %v", tc.key, packages, err, tc.expected)
 		}
@@ -218,6 +227,7 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 		"",
 		p,
 		acc,
+		false,
 		map[string]bool{"rpm-cycle": true},
 	); !errors.Is(
 		err,
@@ -321,7 +331,7 @@ func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 		),
 	}
 	svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs, RemoteSources: sources})}
-	packages, err := svc.rpmMemberPackages(t.Context(), w.db, remote, "", p, acc)
+	packages, err := svc.rpmMemberPackages(t.Context(), w.db, remote, "", p, acc, false)
 	if err != nil || len(packages) != 1 ||
 		packages[0].Path != "pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm" {
 		t.Fatalf("genuine createrepo metadata rejected: packages=%v, error=%v", packages, err)
@@ -333,14 +343,14 @@ func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 	corrupt := append([]byte(nil), primary...)
 	corrupt[0] ^= 0xff
 	responses[primaryPath] = corrupt
-	if _, err := svc.rpmMemberPackages(t.Context(), w.db, remote, "", p, acc); err == nil {
+	if _, err := svc.rpmMemberPackages(t.Context(), w.db, remote, "", p, acc, false); err == nil {
 		t.Fatal("virtual member admitted primary with a mismatched checksum")
 	}
 	responses[primaryPath] = primary
 	corrupt = append([]byte(nil), manifest...)
 	corrupt[0] ^= 0xff
 	responses["repodata/repomd.xml"] = corrupt
-	if _, err := svc.rpmMemberPackages(t.Context(), w.db, remote, "", p, acc); err == nil {
+	if _, err := svc.rpmMemberPackages(t.Context(), w.db, remote, "", p, acc, false); err == nil {
 		t.Fatal("virtual member admitted malformed repomd")
 	}
 	responses["repodata/repomd.xml"] = manifest
@@ -589,6 +599,7 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 		"",
 		p,
 		acc,
+		false,
 	); !errors.Is(
 		err,
 		kernel.ErrNotFound,
@@ -596,7 +607,7 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 		t.Errorf("manifest with missing primary returned %v", err)
 	}
 	seed(primaryPath, primary)
-	packages, err := svc.rpmMemberPackages(t.Context(), w.db, member, "", p, acc)
+	packages, err := svc.rpmMemberPackages(t.Context(), w.db, member, "", p, acc, false)
 	if err != nil || len(packages) != 1 {
 		t.Fatalf("independent local metadata rejected: packages=%v error=%v", packages, err)
 	}
@@ -623,7 +634,7 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 	corrupt = bytes.Clone(primary)
 	corrupt[len(corrupt)-1] ^= 0xff
 	seed(primaryPath, corrupt)
-	if _, err := svc.rpmMemberPackages(t.Context(), w.db, member, "", p, acc); err == nil {
+	if _, err := svc.rpmMemberPackages(t.Context(), w.db, member, "", p, acc, false); err == nil {
 		t.Error("local member admitted primary with wrong checksum")
 	}
 	if res := w.do(
@@ -636,7 +647,7 @@ func TestAccRPMVirtualLocalMemberRejectsIncompleteAndDriftedContent(t *testing.T
 	}
 	seed(primaryPath, primary)
 	seed("repodata/repomd.xml", []byte("malformed repomd"))
-	if _, err := svc.rpmMemberPackages(t.Context(), w.db, member, "", p, acc); err == nil {
+	if _, err := svc.rpmMemberPackages(t.Context(), w.db, member, "", p, acc, false); err == nil {
 		t.Error("local member admitted malformed repomd")
 	}
 }

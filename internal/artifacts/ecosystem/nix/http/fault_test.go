@@ -99,6 +99,9 @@ func (s *testSource) Read(
 			return source.Result{}, err
 		}
 	}
+	// This source applies no download policy, so its permission-only check
+	// is its read check.
+	result.CheckPermission = result.CheckRead
 	return result, nil
 }
 
@@ -276,6 +279,11 @@ func TestAccNixPathAndVirtualPolicyFailures(t *testing.T) {
 		code := 404
 		if kind == "wrong-member" {
 			code = 400
+		}
+		// The virtual repository's patterns rejecting only the NAR leave
+		// the narinfo served; policy_test.go checks the NAR's refusal.
+		if kind == "excluded" {
+			code = 200
 		}
 		status(t, f.do("GET", "/artifactory/api/nix/"+kind+"/"+infoPath, nil, ""), code)
 		status(t, f.do("POST", "/artifactory/api/nix/"+kind+"/reindex", nil, ""), 400)

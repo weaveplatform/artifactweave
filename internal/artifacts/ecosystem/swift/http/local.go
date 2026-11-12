@@ -52,8 +52,13 @@ func (h handler) localRead(w http.ResponseWriter, r *http.Request, q request) {
 	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
-	f, err := h.k.Item(r, path)
+	f, err := h.localArchive(r, q.kind, path)
 	switch {
+	case pkgroute.IsRefusal(err):
+		// The policy's own 404 says why the archive is refused
+		// (RTDEV-47144, R6), and no archive header is set first (R7).
+		h.k.Error(w, r, err)
+		return
 	case errors.Is(err, kernel.ErrNotFound), err == nil && f.Item.Folder:
 		h.k.Error(w, r, bad(http.StatusNotFound, "Swift release not found"))
 		return
@@ -74,9 +79,38 @@ func (h handler) localRead(w http.ResponseWriter, r *http.Request, q request) {
 	}
 }
 
+// localArchive finds the release's archive at path for a request of kind.
+// The archive's download is refused by the download policy. Release
+// metadata and Package.swift, which 7.x answers from documents of its own
+// (RTFACT-29202), are refused by the blackout alone, at the requested path,
+// before anything is computed (R2a): no source shows the archive's
+// patterns refusing them, so they answer as main did when the patterns
+// reject only the archive (R3).
+func (h handler) localArchive(r *http.Request, kind, path string) (pkgroute.Found, error) {
+	var f pkgroute.Found
+	var err error
+	if kind == "archive" {
+		f, err = h.k.DownloadItem(r, path)
+	} else if err = h.k.CheckBlackedOut(r, pkgroute.RequestFrom(r).Rest); err == nil {
+		f, err = h.k.StoredItem(r, path)
+	}
+	if err != nil {
+		return pkgroute.Found{}, fmt.Errorf("swift: release archive: %w", err)
+	}
+	return f, nil
+}
+
 func (h handler) localReleases(w http.ResponseWriter, r *http.Request, p swiftfmt.Package) {
 	folder := p.Scope + "/" + p.Name
 	if !h.k.RequireFolder(w, r, folder, api.ActionRead) {
+		return
+	}
+	// 7.x answers the list from a stored Releases.json (RTFACT-29202),
+	// which a blacked-out repository does not serve, so the blackout
+	// refuses it before the index is read (R2a); patterns that
+	// reject one release's archive leave the release listed (R3).
+	if err := h.k.CheckBlackedOut(r, folder); err != nil {
+		h.k.Error(w, r, err)
 		return
 	}
 	c := pkgroute.RequestFrom(r).Repo

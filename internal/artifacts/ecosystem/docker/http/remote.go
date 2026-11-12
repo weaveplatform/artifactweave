@@ -212,6 +212,12 @@ func (g *Registry) remoteListing(
 }
 
 func (g *Registry) remoteError(w http.ResponseWriter, r *http.Request, q Request, err error) {
+	// The remote repository's own blackout or patterns, which the source
+	// boundary checks before any upstream request, answer as a local
+	// repository's refusal does (refuse), for its tags and referrers too.
+	if refuse(w, err) {
+		return
+	}
 	if errors.Is(err, kernel.ErrNotFound) {
 		switch q.Kind {
 		case KindBlob:

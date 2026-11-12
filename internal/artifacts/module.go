@@ -25,7 +25,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraformbackend"
@@ -350,11 +349,7 @@ func (m *Module) OpenRemoteSources(ctx context.Context) error {
 		) {
 			return source.ErrDenied
 		}
-		return generic.CheckDownload(
-			q.Repo,
-			path,
-			q.Resource.PermissionFolder || q.Resource.PermissionRoot,
-		)
+		return q.Resource.CheckPolicy(q.Repo, path)
 	}
 	revalidate := func(ctx context.Context, q source.Request, permit source.Permit) error {
 		return revalidatePrincipal(ctx, q, permit, false)

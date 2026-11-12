@@ -113,6 +113,30 @@ type release struct {
 }
 type catalog map[string][]release
 
+// checkBlackedOut refuses a blacked-out repository's metadata at the
+// request path p, before anything is computed or read: 7.x ignores a
+// blacked-out repository when it resolves and serves no download from it,
+// and where it keeps Composer metadata is not documented, so the patterns
+// do not refuse it ([I], R2a, #216). A virtual repository has no blackout.
+func (h handler) checkBlackedOut(w http.ResponseWriter, r *http.Request, p string) bool {
+	if err := h.k.CheckBlackedOut(r, p); err != nil {
+		h.k.Error(w, r, err)
+		return false
+	}
+	return true
+}
+
+// fail answers err from reading a package's metadata. A remote's policy
+// refusal, which the revalidation of its metadata returns unmapped,
+// answers with its own 404 and message (R4); other errors keep their
+// answers.
+func (h handler) fail(w http.ResponseWriter, r *http.Request, err error) {
+	if pkgroute.IsRefusal(err) {
+		err = pkgroute.SourceError(err, false)
+	}
+	h.k.Error(w, r, err)
+}
+
 func (h handler) root(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
@@ -121,10 +145,13 @@ func (h handler) root(w http.ResponseWriter, r *http.Request) {
 		h.bad(w, r)
 		return
 	}
+	if !h.checkBlackedOut(w, r, "packages.json") {
+		return
+	}
 	q := pkgroute.RequestFrom(r)
 	if q.Repo.Class == repo.Remote {
 		if _, _, err := h.remoteRoot(r); err != nil {
-			h.k.Error(w, r, err)
+			h.fail(w, r, err)
 			return
 		}
 		respondJSON(
@@ -200,13 +227,20 @@ func (h handler) p2(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
+	document := "p2/" + name + ".json"
+	if dev {
+		document = "p2/" + name + "~dev.json"
+	}
+	if !h.checkBlackedOut(w, r, document) {
+		return
+	}
 	releases, err := h.lookup(r, name)
 	if err != nil {
 		if errors.Is(err, kernel.ErrNotFound) {
 			h.notFound(w, r)
 			return
 		}
-		h.k.Error(w, r, err)
+		h.fail(w, r, err)
 		return
 	}
 	entries := []map[string]any{}
@@ -259,32 +293,39 @@ func (h handler) lookup(r *http.Request, name string) ([]release, error) {
 			return nil, err
 		}
 		for _, member := range members {
-			if !h.k.CanFolder(member, name, api.ActionRead) {
-				continue
-			}
-			found, err := h.lookup(member, name)
-			if errors.Is(err, kernel.ErrNotFound) {
-				continue
-			}
+			found, err := h.memberLookup(r, member, name)
 			if err != nil {
 				return nil, err
 			}
 			if len(found) > 0 {
-				for i := range found {
-					found[i].Member = member
-					found[i].Document["dist"] = distDocument(
-						r,
-						name,
-						found[i].Version,
-						found[i].SHA1,
-					)
-				}
 				return found, nil
 			}
 		}
 		return nil, kernel.ErrNotFound
 	}
 	return nil, source.ErrUnsupported
+}
+
+// memberLookup returns the releases of name in member, a member request of
+// virtual request r, under r's distribution URLs, or none when the caller
+// may not read the package there, the member lacks it, or the member is
+// blacked out: 7.x ignores a blacked-out repository when it resolves (R5).
+func (h handler) memberLookup(r, member *http.Request, name string) ([]release, error) {
+	if !h.k.CanFolder(member, name, api.ActionRead) || h.k.CheckBlackedOut(member, "") != nil {
+		return nil, nil
+	}
+	found, err := h.lookup(member, name)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	for i := range found {
+		found[i].Member = member
+		found[i].Document["dist"] = distDocument(r, name, found[i].Version, found[i].SHA1)
+	}
+	return found, nil
 }
 
 func (h handler) members(r *http.Request) ([]*http.Request, error) {
@@ -420,44 +461,106 @@ func (h handler) dist(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
+	switch pkgroute.RequestFrom(r).Repo.Class {
+	case repo.Virtual:
+		h.virtualDist(w, r, name, version)
+		return
+	case repo.Remote:
+		// The archive's own path, before the metadata it is found through
+		// is read, so the refusal names the archive (R10).
+		if err := h.k.CheckDocument(r, name+"/"+version+".zip"); err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+	}
 	releases, err := h.lookup(r, name)
 	if err != nil {
 		if errors.Is(err, kernel.ErrNotFound) {
 			h.notFound(w, r)
 			return
 		}
-		h.k.Error(w, r, err)
+		h.fail(w, r, err)
 		return
 	}
 	for _, rel := range releases {
-		if rel.Version != version {
+		if rel.Version == version {
+			h.serveDist(w, r, rel)
+			return
+		}
+	}
+	h.notFound(w, r)
+}
+
+// virtualDist serves version's archive from the member a virtual
+// repository resolves name to, the first that holds a release of it: when
+// that member lacks the version the answer is not found. When the member
+// refuses the archive, it is passed over for the next member that holds
+// the version, as 7.x ignores a blacked-out member and passes over one
+// that cannot serve the file (R5); the virtual repository's own patterns
+// refuse it with "No repository found to serve the request". A later
+// member is read only once an earlier one is passed over.
+func (h handler) virtualDist(w http.ResponseWriter, r *http.Request, name, version string) {
+	members, err := h.members(r)
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	passing := false
+	for _, member := range members {
+		found, err := h.memberLookup(r, member, name)
+		if err != nil {
+			h.fail(w, r, err)
+			return
+		}
+		if len(found) == 0 {
 			continue
 		}
-		if rel.revalidate != nil {
-			if err := rel.revalidate(r.Context()); err != nil {
-				h.k.Error(w, r, pkgroute.SourceError(err, false))
-				return
-			}
-		}
-		q := pkgroute.RequestFrom(r)
-		if q.Repo.Class == repo.Virtual {
-			if rel.Member == nil {
+		var rel *release
+		for i := range found {
+			if found[i].Version == version {
+				rel = &found[i]
 				break
 			}
-			r = rel.Member
 		}
-		if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
-			h.remoteDist(w, r, rel)
+		switch {
+		case rel == nil && passing:
+			continue
+		case rel == nil:
+			h.notFound(w, r)
 			return
 		}
-		if !h.k.Can(r, rel.Path, api.ActionRead) {
-			h.k.Error(w, r, apierror.New(http.StatusForbidden, "Composer archive read denied"))
-			return
+		if err := h.k.CheckDocument(member, rel.Path); err != nil {
+			if pkgroute.IsRefusal(err) {
+				h.k.Error(w, r, err)
+				return
+			}
+			passing = true
+			continue
 		}
-		h.k.ServeFound(w, r, pkgroute.Found{Repo: pkgroute.RequestFrom(r).Repo, Item: rel.Item})
+		h.serveDist(w, member, *rel)
 		return
 	}
 	h.notFound(w, r)
+}
+
+// serveDist serves rel's archive from the repository of r, the request
+// rel was listed through.
+func (h handler) serveDist(w http.ResponseWriter, r *http.Request, rel release) {
+	if rel.revalidate != nil {
+		if err := rel.revalidate(r.Context()); err != nil {
+			h.k.Error(w, r, pkgroute.SourceError(err, false))
+			return
+		}
+	}
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.remoteDist(w, r, rel)
+		return
+	}
+	if !h.k.Can(r, rel.Path, api.ActionRead) {
+		h.k.Error(w, r, apierror.New(http.StatusForbidden, "Composer archive read denied"))
+		return
+	}
+	h.k.ServeFound(w, r, pkgroute.Found{Repo: pkgroute.RequestFrom(r).Repo, Item: rel.Item})
 }
 
 func parseDist(rest string) (string, string, bool) {

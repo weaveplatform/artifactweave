@@ -104,7 +104,8 @@ func TestUnitHooksDoNothing(t *testing.T) {
 
 // A download is refused 404, existing or not, from a blacked-out repository
 // and of a path the patterns reject; a virtual repository is never blacked
-// out and has its own wording.
+// out and has its own wording, and a system path passes the patterns but
+// not the blackout.
 func TestUnitCheckDownload(t *testing.T) {
 	const excludedMsg = "The repository 'libs' rejected the artifact 'libs:secret/a.jar' due to " +
 		"its include/exclude pattern settings."
@@ -161,6 +162,40 @@ func TestUnitCheckDownload(t *testing.T) {
 			name:  "a virtual repository's patterns",
 			patch: virtual(picky), path: "secret/a.jar",
 			msg: "No repository found to serve the request for libs:secret/a.jar",
+		},
+		{
+			name:  "a Maven index file the patterns would reject",
+			patch: func(c *repo.Config) { c.IncludesPattern = ptr("org/**") },
+			path:  ".index/nexus-maven-repository-index.gz",
+		},
+		{
+			name:  "a path ending .index the patterns would reject",
+			patch: func(c *repo.Config) { c.ExcludesPattern = ptr("**/*.index") },
+			path:  "releases/p2.index",
+		},
+		{
+			name:  "the Maven index folder",
+			patch: func(c *repo.Config) { c.ExcludesPattern = ptr(".index/**") },
+			path:  ".index", folder: true,
+		},
+		{
+			name:  "a virtual repository's system path",
+			patch: virtual(func(c *repo.Config) { c.ExcludesPattern = ptr("**") }),
+			path:  "p2.index",
+		},
+		{
+			name:  "a system path of a blacked-out repository",
+			patch: dark, path: "releases/p2.index",
+			msg: "The repository 'libs' is blacked out and cannot serve artifact " +
+				"'libs:releases/p2.index'.",
+		},
+		{
+			name:  "a name holding the index prefix later",
+			patch: func(c *repo.Config) { c.ExcludesPattern = ptr("**") },
+			path:  "a/my-nexus-maven-repository-index.gz",
+			msg: "The repository 'libs' rejected the artifact " +
+				"'libs:a/my-nexus-maven-repository-index.gz' due to its include/exclude " +
+				"pattern settings.",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

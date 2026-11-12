@@ -226,8 +226,9 @@ func (s metadataSource) Read(
 		Metadata: source.MetadataResponse{
 			BaseURL: "https://example.com/puppet/v3/releases",
 		},
-		Revalidate: revalidate,
-		CheckRead:  s.check,
+		Revalidate:      revalidate,
+		CheckRead:       s.check,
+		CheckPermission: s.check,
 	}
 	if s.metadataBase != "" {
 		result.Metadata.BaseURL = s.metadataBase
@@ -722,6 +723,8 @@ func TestAccLateReadRevocationAndArchiveManifestMismatch(t *testing.T) {
 			t.Fatalf("archive metadata mismatch %d", r.Code)
 		}
 	}
+	// Patterns that reject the module's archives leave its releases listed
+	// and refuse only the archives (R3).
 	f := newFixture(t, repo.Local)
 	f.deploy(f.c, data)
 	f.c.ExcludesPattern = new("acme-widget/**")
@@ -732,10 +735,14 @@ func TestAccLateReadRevocationAndArchiveManifestMismatch(t *testing.T) {
 		"GET",
 		base+"/v3/releases?module=acme-widget",
 		"admin",
-	); r.Code != 404 &&
-		!strings.Contains(r.Body.String(), `"results":[]`) {
-		t.Fatalf("excluded item leaked: %d %s", r.Code, r.Body.String())
+	); r.Code != 200 ||
+		!strings.Contains(r.Body.String(), `"version":"1.0.0"`) {
+		t.Fatalf("excluded archive's release unlisted: %d %s", r.Code, r.Body.String())
 	}
+	wantPolicy(t, f.do("GET", base+"/v3/files/acme-widget-1.0.0.tar.gz", "admin"),
+		"The repository 'puppet-local' rejected the artifact "+
+			"'puppet-local:acme-widget/acme-widget-1.0.0.tar.gz' due to its include/exclude "+
+			"pattern settings.")
 }
 
 func TestAccCachedMetadataAuthorityAndURLFence(t *testing.T) {
@@ -807,6 +814,9 @@ func TestAccCachedMetadataAuthorityAndURLFence(t *testing.T) {
 }
 
 func TestAccVirtualMemberFailuresAndFiltering(t *testing.T) {
+	// The virtual repository's own patterns rejecting a release's archive
+	// leave the release listed (R3); its archive answers the
+	// virtual repository's 404 (TestUnitVirtualPatternsRefuseOnlyTheArchive).
 	for _, tc := range []struct {
 		name                string
 		failure             error
@@ -816,7 +826,7 @@ func TestAccVirtualMemberFailuresAndFiltering(t *testing.T) {
 		{name: "missing member", failure: kernel.ErrNotFound, want: 200},
 		{name: "unavailable member", failure: source.ErrUnavailable, want: 502},
 		{name: "member store failure", repoFault: true, want: 500},
-		{name: "virtual excludes member item", excluded: true, want: 200},
+		{name: "virtual excludes member archive", excluded: true, want: 200},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			src := metadataSource{
@@ -842,8 +852,8 @@ func TestAccVirtualMemberFailuresAndFiltering(t *testing.T) {
 				t.Fatal(err)
 			}
 			r := f.do("GET", base+"/v3/releases?module=acme-widget", "admin")
-			if r.Code != tc.want ||
-				tc.want == 200 && !strings.Contains(r.Body.String(), `"results":[]`) {
+			listed := strings.Contains(r.Body.String(), `"version":"1.0.0"`)
+			if r.Code != tc.want || tc.want == 200 && listed != tc.excluded {
 				t.Fatalf("%d %s", r.Code, r.Body.String())
 			}
 		})

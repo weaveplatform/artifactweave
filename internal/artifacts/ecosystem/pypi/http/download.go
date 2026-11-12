@@ -35,8 +35,25 @@ func (h handler) download(w http.ResponseWriter, r *http.Request, p pkgroute.Pat
 		return
 	}
 	path := p.String()
-	if wheel, ok := strings.CutSuffix(path, metadataSuffix); ok && h.format.CoreMetadata &&
-		strings.HasSuffix(wheel, ".whl") {
+	wheel, ok := strings.CutSuffix(path, metadataSuffix)
+	if ok && strings.HasSuffix(wheel, ".whl") {
+		h.wheelMetadata(w, r, path, wheel)
+		return
+	}
+	h.k.ServeItem(w, r, path)
+}
+
+// wheelMetadata answers path, the core metadata of the wheel at wheel
+// (PEP 658): the index's, with pypi.core_metadata on, or else a file
+// stored at path. Either way the wheel's download policy applies, not
+// path's: decision 0032 checks a file's sidecar and an archive's entry at
+// the file, so a blacked-out repository or a pattern rejecting the wheel
+// refuses its metadata too, naming the wheel, and a pattern on .metadata
+// paths alone refuses nothing. [I] 7.x's PEP 658 support is an
+// undocumented system property, so the path it names is not known
+// (RTFACT-26891, #216).
+func (h handler) wheelMetadata(w http.ResponseWriter, r *http.Request, path, wheel string) {
+	if h.format.CoreMetadata {
 		text, found, err := h.coreMetadata(r, wheel)
 		switch {
 		case err != nil:
@@ -44,13 +61,25 @@ func (h handler) download(w http.ResponseWriter, r *http.Request, p pkgroute.Pat
 			return
 		case found:
 			// Under the wheel's Read permission, whose metadata it is.
-			if h.k.Require(w, r, wheel, api.ActionRead) {
+			if h.k.Require(w, r, wheel, api.ActionRead) && h.allowed(w, r, wheel) {
 				writePage(w, r, "application/octet-stream", false, []byte(text))
 			}
 			return
 		}
 	}
-	h.k.ServeItem(w, r, path)
+	if h.k.Require(w, r, path, api.ActionRead) && h.allowed(w, r, wheel) {
+		h.k.ServeMetadata(w, r, path)
+	}
+}
+
+// allowed applies the download policy to path, having answered its
+// refusal.
+func (h handler) allowed(w http.ResponseWriter, r *http.Request, path string) bool {
+	if err := h.k.CheckDownload(r, path); err != nil {
+		h.k.Error(w, r, err)
+		return false
+	}
+	return true
 }
 
 // coreMetadata is the core metadata the index keeps for the wheel at path,
@@ -59,7 +88,7 @@ func (h handler) download(w http.ResponseWriter, r *http.Request, p pkgroute.Pat
 // wheel has metadata, and the bytes always match the hash the pages
 // advertise (decision 0037).
 func (h handler) coreMetadata(r *http.Request, path string) (string, bool, error) {
-	f, err := h.k.Item(r, path)
+	f, err := h.k.StoredItem(r, path)
 	switch {
 	case errors.Is(err, kernel.ErrNotFound) || err == nil && f.Item.Folder:
 		return "", false, nil

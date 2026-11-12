@@ -224,8 +224,9 @@ func (s metadataSource) Read(
 		Metadata: source.MetadataResponse{
 			BaseURL: resource.ExternalURL,
 		},
-		Revalidate: revalidate,
-		CheckRead:  s.check,
+		Revalidate:      revalidate,
+		CheckRead:       s.check,
+		CheckPermission: s.check,
 	}
 	if s.metadataBase != "" {
 		result.Metadata.BaseURL = s.metadataBase
@@ -707,12 +708,19 @@ func TestAccHostedCatalogAndLatestAreFilteredBeforeSelection(t *testing.T) {
 			t.Fatal(got.Code, got.Body.String())
 		}
 	}
+	// The patterns, unlike permissions, leave the version latest names: a
+	// version whose archive they reject stays listed and only its
+	// download is refused (R3).
 	f.c.ExcludesPattern = new("**/*-2.0.0.tar.gz")
 	if err := f.db.Repos().Update(t.Context(), f.c); err != nil {
 		t.Fatal(err)
 	}
 	got = f.do("GET", base+"/api/v1/cookbooks/widget/versions/latest", "reader")
-	if got.Code != 200 || !strings.Contains(got.Body.String(), `"version":"1.0.0"`) {
+	if got.Code != 200 || !strings.Contains(got.Body.String(), `"version":"2.0.0"`) {
+		t.Fatal(got.Code, got.Body.String())
+	}
+	got = f.do("GET", base+"/api/v1/cookbooks/widget/versions/latest/download", "reader")
+	if got.Code != 404 || !strings.Contains(got.Body.String(), "include/exclude pattern") {
 		t.Fatal(got.Code, got.Body.String())
 	}
 	for _, path := range []string{"/api/v1/cookbooks/widget/versions/latest?bad=1", "/api/v1/cookbooks/widget/bad", "/api/v1/cookbooks/widget?bad=1"} {
@@ -759,19 +767,31 @@ func TestAccVirtualMembersRetainPriorityAndCurrentPermissions(t *testing.T) {
 			t.Fatal(got.Code, got.Body.String())
 		}
 	}
+	// The virtual repository's own patterns refuse the archive's download
+	// but leave the version listed (R5).
 	f.c.ExcludesPattern = new("**/*-1.0.0.tar.gz")
 	if err := f.db.Repos().Update(t.Context(), f.c); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.do("GET", base+"/api/v1/cookbooks/widget", "reader"); got.Code != 404 {
-		t.Fatal(got.Code)
+	if got := f.do("GET", base+"/api/v1/cookbooks/widget", "reader"); got.Code != 200 ||
+		!strings.Contains(got.Body.String(), "1_0_0") ||
+		strings.Contains(got.Body.String(), "2_0_0") {
+		t.Fatal(got.Code, got.Body.String())
 	}
 	if got := f.do(
 		"GET",
 		base+"/api/v1/cookbooks",
 		"reader",
 	); got.Code != 200 ||
-		!strings.Contains(got.Body.String(), `"total":0`) {
+		!strings.Contains(got.Body.String(), `"total":1`) {
+		t.Fatal(got.Code, got.Body.String())
+	}
+	if got := f.do(
+		"GET",
+		base+"/api/v1/cookbooks/widget/versions/1_0_0/download",
+		"reader",
+	); got.Code != 404 ||
+		!strings.Contains(got.Body.String(), "No repository found to serve the request") {
 		t.Fatal(got.Code, got.Body.String())
 	}
 	faults.repos = true
@@ -833,22 +853,21 @@ func TestAccRemotePoliciesFilterBeforeVersionMetadata(t *testing.T) {
 			t.Fatal(got.Code, got.Body.String())
 		}
 	}
-	s = upstream(t, data)
-	reads := s.bodyAt
-	s.bodyAt = func(r source.Resource) string {
-		if r.Path == "api/v1/cookbooks/widget" {
-			return reads(r)
-		}
-		t.Fatal("excluded archive triggered a version request")
-		return ""
-	}
-	f = newFixtureWith(t, repo.Remote, func(p *pkgroute.Protocol) { p.Sources[repo.Remote] = s })
+	// A version whose archive the remote's patterns reject stays listed
+	// (R3); the source boundary refuses only the archive's read
+	// (download_policy_test.go).
+	f = newFixtureWith(
+		t,
+		repo.Remote,
+		func(p *pkgroute.Protocol) { p.Sources[repo.Remote] = upstream(t, data) },
+	)
 	f.c.ExcludesPattern = new("**/*.tar.gz")
 	if err := f.db.Repos().Update(t.Context(), f.c); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.do("GET", base+"/api/v1/cookbooks/widget", "admin"); got.Code != 404 {
-		t.Fatal(got.Code)
+	if got := f.do("GET", base+"/api/v1/cookbooks/widget", "admin"); got.Code != 200 ||
+		!strings.Contains(got.Body.String(), "1_0_0") {
+		t.Fatal(got.Code, got.Body.String())
 	}
 }
 
