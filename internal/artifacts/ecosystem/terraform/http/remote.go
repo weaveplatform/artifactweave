@@ -224,11 +224,11 @@ func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operatio
 		h.k.Error(w, r, err)
 		return
 	}
-	path := location.cachePath(q.module)
+	path := location.Path
 	if !h.k.Require(w, r, path, accessapi.ActionRead) {
 		return
 	}
-	resource := moduleArtifactResource(r, q.module, location)
+	resource := moduleArtifactResource(r, location)
 	resource.Method = http.MethodGet // issuing a signed digest requires validated complete bytes, including HEAD
 	artifact, err := h.k.Read(r, resource)
 	if err != nil {
@@ -248,6 +248,7 @@ func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operatio
 	}
 	public, err := h.remoteDownloadURL(
 		r,
+		q.module,
 		path,
 		digest,
 		artifact.Identity,
@@ -261,7 +262,7 @@ func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operatio
 	revalidate := combineModuleFences(
 		[]source.Result{result, metadata, artifact},
 		readCheck,
-		[]string{path},
+		within(artifact, path),
 	)
 	control := source.Result{
 		Stream: &source.Stream{
@@ -310,7 +311,7 @@ func (h handler) remoteModuleVersions(
 			h.k.Error(w, r, err)
 			return
 		}
-		path := location.cachePath(m)
+		path := location.listingPath(m)
 		if !h.k.Can(r, path, accessapi.ActionRead) {
 			continue
 		}
@@ -333,7 +334,7 @@ func (h handler) remoteModuleVersions(
 			ETag:      `"` + hex.EncodeToString(sum[:]) + `"`,
 		},
 	}
-	result.Revalidate = combineModuleFences(results, permissionCheck, paths)
+	result.Revalidate = combineModuleFences(results, permissionCheck, within(results[0], paths...))
 	h.k.ServeResult(w, r, result)
 }
 
@@ -351,10 +352,29 @@ func permissionCheck(r source.Result) func(context.Context, string) error {
 	return r.CheckPermission
 }
 
+// disclosed is a path an answer discloses, with the read whose descendant
+// check covers it: a source result checks only its own path or, for a
+// folder's metadata, the paths below the folder. A file is covered by its
+// own read, as its cache path need not lie below the package's folder, and
+// a listing's path by the metadata read of the folder it is in.
+type disclosed struct {
+	path  string
+	scope source.Result
+}
+
+// within is paths, each covered by scope.
+func within(scope source.Result, paths ...string) []disclosed {
+	out := make([]disclosed, 0, len(paths))
+	for _, path := range paths {
+		out = append(out, disclosed{path: path, scope: scope})
+	}
+	return out
+}
+
 func combineModuleFences(
 	results []source.Result,
 	check func(source.Result) func(context.Context, string) error,
-	paths []string,
+	paths []disclosed,
 ) func(context.Context) error {
 	return func(ctx context.Context) error {
 		for _, result := range results {
@@ -364,12 +384,14 @@ func combineModuleFences(
 				}
 			}
 		}
-		if len(results) == 0 || check == nil || check(results[0]) == nil {
+		if check == nil {
 			return nil
 		}
-		for _, path := range paths {
-			if err := check(results[0])(ctx, path); err != nil {
-				return fmt.Errorf("terraform module delivery: %w", err)
+		for _, d := range paths {
+			if fence := check(d.scope); fence != nil {
+				if err := fence(ctx, d.path); err != nil {
+					return fmt.Errorf("terraform module delivery: %w", err)
+				}
 			}
 		}
 		return nil
@@ -412,8 +434,8 @@ func moduleDigest(result source.Result) string {
 	return ""
 }
 
-func moduleArtifactResource(r *http.Request, m tf.Module, s moduleSource) source.Resource {
-	resource := pkgroute.Resource(r, s.cachePath(m), "")
+func moduleArtifactResource(r *http.Request, s moduleSource) source.Resource {
+	resource := pkgroute.Resource(r, s.Path, "")
 	resource.Query = ""
 	resource.Accept = "application/octet-stream"
 	resource.ExternalURL = s.Target
@@ -444,17 +466,10 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 	if !h.k.Require(w, r, c.Path, accessapi.ActionRead) {
 		return
 	}
-	slash := strings.LastIndexByte(c.Path, '/')
-	if slash < 0 {
-		h.k.Error(w, r, forbidden)
-		return
-	}
-	ext := moduleArchiveType(c.Path)
-	if ext == "" {
-		h.k.Error(w, r, forbidden)
-		return
-	}
-	m, ok := tf.ParseModule(c.Path[:len(c.Path)-len(ext)] + "zip")
+	// The archive's cache path follows its location, so the URL names the
+	// module it was issued for, and the location read now must name the
+	// same path.
+	m, ok := tf.ParseModule(c.Module + ".zip")
 	if !ok || c.Source == nil {
 		h.k.Error(w, r, forbidden)
 		return
@@ -469,11 +484,11 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 		h.k.Error(w, r, err)
 		return
 	}
-	if location.cachePath(m) != c.Path || metadata.Identity != *c.Source {
+	if location.Path != c.Path || metadata.Identity != *c.Source {
 		h.k.Error(w, r, forbidden)
 		return
 	}
-	resource := moduleArtifactResource(r, m, location)
+	resource := moduleArtifactResource(r, location)
 	resource.Method = http.MethodGet
 	if resource.Checksums.SHA256 != "" && !strings.EqualFold(resource.Checksums.SHA256, c.SHA256) {
 		h.k.Error(w, r, forbidden)
@@ -493,7 +508,7 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 	result.Revalidate = combineModuleFences(
 		[]source.Result{metadata, result},
 		readCheck,
-		[]string{c.Path},
+		within(result, c.Path),
 	)
 	h.k.ServeResult(w, r, result)
 }

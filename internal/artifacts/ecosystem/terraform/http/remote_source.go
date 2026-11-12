@@ -30,6 +30,9 @@ type moduleSource struct {
 	Subdir    string           `json:"subdir"`
 	Archive   string           `json:"archive"`
 	Checksums kernel.Checksums `json:"checksums"`
+	// Path is the archive's cache path, where its read checks Read
+	// permission and the remote's download policy and the cache keeps it.
+	Path string `json:"path"`
 }
 
 func remoteModuleError() error {
@@ -199,6 +202,13 @@ func parseModuleSource(raw, base string, c repo.Config) (moduleSource, error) {
 	if err = allowModuleURL(c, out.Target); err != nil {
 		return out, err
 	}
+	// [I] No 7.x source shows where a remote caches an HTTP archive; it is
+	// taken to follow the rule a provider's files do, below the remote's
+	// URL (remoteFilePath).
+	var ok bool
+	if out.Path, ok = remoteFilePath(c.URL, out.Target); !ok {
+		return out, remoteModuleError()
+	}
 	return out, nil
 }
 
@@ -258,6 +268,17 @@ func githubModuleSource(
 	}
 	if err := allowModuleURL(c, out.Target); err != nil {
 		return out, err
+	}
+	// 7.x serves a Git source through its VCS support, which fetches the
+	// ref as a tag (RTFACT-30340's trace: moduleGitDownload calls
+	// VcsRemoteHandler.downloadTag), and the vcs-default layout keeps a tag
+	// at [orgPath]/[module]/tags/[baseRev]/[module]-[baseRev].[ext] (VCS
+	// repositories doc). [I] That a Terraform remote keeps that layout, and
+	// the extension: 7.x asks GitHub for a zip, this adapter for a tar.gz.
+	out.Path = parts[0] + "/" + repoName + "/tags/" + ref + "/" +
+		repoName + "-" + ref + "." + out.Archive
+	if _, _, _, err := kernel.SplitItemPath(out.Path); err != nil {
+		return out, remoteModuleError()
 	}
 	return out, nil
 }
@@ -371,7 +392,41 @@ func allowModuleURL(c repo.Config, target string) error {
 	)
 }
 
-func (s moduleSource) cachePath(m tf.Module) string {
+// remoteFilePath is the path a remote repository caches the file at target
+// under, as 7.x does: below base, the remote's own URL for that kind of
+// file, the rest of target's path, and anywhere else
+// external/<host>/<path>. JFrog's include pattern examples for a remote
+// Terraform repository name a HashiCorp provider's files
+// **/terraform-provider-<type>/**, its path below the default Providers
+// URL https://releases.hashicorp.com, and another publisher's
+// **/external/github.com/<owner>/terraform-provider-<type>/** (Terraform
+// repositories doc, "Configure a Remote Terraform Repository"); RTFACT-30802
+// roots both at the cache's top. The rest of each path, the host without
+// the scheme 7.6x's download URLs carried (RTFACT-29809) and the query
+// left out, are [I]. ok is false for a target that names no file.
+func remoteFilePath(base, target string) (string, bool) {
+	u, err := url.Parse(target)
+	if err != nil || u.Path == "" || strings.HasSuffix(u.Path, "/") {
+		return "", false
+	}
+	path := "external/" + strings.ToLower(u.Host) + u.Path
+	if b, e := url.Parse(base); e == nil && b.Host != "" && b.Scheme == u.Scheme &&
+		strings.EqualFold(b.Host, u.Host) {
+		if rest, below := strings.CutPrefix(u.Path, strings.TrimRight(b.Path, "/")+"/"); below {
+			path = rest
+		}
+	}
+	if _, _, _, err = kernel.SplitItemPath(path); err != nil || strings.HasPrefix(path, "/") {
+		return "", false
+	}
+	return path, true
+}
+
+// listingPath is where the version list checks Read on the archive of m's
+// version: its name in the module's own folder, as in a local repository.
+// Where 7.x checks a listing is [I], so the list filters as it did before
+// the archive moved to its 7.x cache path (Path).
+func (s moduleSource) listingPath(m tf.Module) string {
 	return m.Package() + "/" + m.Version + "." + s.Archive
 }
 
