@@ -197,6 +197,9 @@
 //     which keep their status; and a remote listing's final fence.
 //   - remote_error_test.go: the envelope and code of each failure a remote
 //     read answers, and kernel's shared errors left unchanged.
+//   - refusal_test.go: 7.x's refusal message for each kind and method, the
+//     permissions asked before a registry token's grant, and a request
+//     without a decider on an authenticated server.
 //   - The guard suites test/server/artifacts/docker and
 //     test/server/artifacts/helmoci, and the OCI conformance job, drive the
 //     registry through the whole server; the docker suite drives DockerAPI's
