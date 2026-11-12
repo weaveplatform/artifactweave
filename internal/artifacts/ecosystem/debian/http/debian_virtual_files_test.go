@@ -164,9 +164,7 @@ func TestAccDebianVirtualDistsFileFromTheFirstMemberThatServesIt(t *testing.T) {
 // repository does not compose is refused to a caller who may not read it,
 // before the virtual repository's patterns are asked (DV-057); patterns
 // that reject it answer that no repository serves it; a remote member's
-// upstream fault answers 502; and a file no member holds is not found. A
-// query or matrix parameters keep the not-found answer such a path had
-// before the virtual repository served it.
+// upstream fault answers 502; and a file no member holds is not found.
 func TestAccDebianVirtualDistsFileRefusals(t *testing.T) {
 	w := newOverlayWorld(t, withSources(upstream(map[string]func() (source.Result, error){
 		debInstaller: failing(source.ErrUnavailable),
@@ -220,14 +218,6 @@ func TestAccDebianVirtualDistsFileRefusals(t *testing.T) {
 		},
 		{
 			"no member holds it", "deb-virtual", debContents, "admin",
-			http.StatusNotFound, "Could not find resource",
-		},
-		{
-			"query", "deb-virtual", debTranslation + "?x=1", "admin",
-			http.StatusNotFound, "Could not find resource",
-		},
-		{
-			"matrix parameters", "deb-virtual", debTranslation + ";x=1", "admin",
 			http.StatusNotFound, "Could not find resource",
 		},
 	} {

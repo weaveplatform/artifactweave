@@ -42,8 +42,7 @@ func (s DebianAPI) serveVirtualDebianMetadata(
 	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
-	if len(req.Props) != 0 || r.URL.RawQuery != "" ||
-		!acc.Folder(c, req.Path, accessapi.ActionRead) ||
+	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
 		!acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
@@ -54,6 +53,14 @@ func (s DebianAPI) serveVirtualDebianMetadata(
 	// a file (RTDEV-50452).
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian virtual index download", err))
+		return
+	}
+	// 7.x serves this document through its virtual download path, as any
+	// other file (the ?trace of RTFACT-26349, 7.25.7), so a query changes
+	// nothing and a matrix parameter is matched against its properties. The
+	// composed document carries none [I], so only a mandatory key refuses it.
+	if !debianMatrix(req).Matches(nil) {
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	parts := strings.Split(req.Path, "/")
@@ -261,8 +268,7 @@ func (s DebianAPI) serveVirtualDebianFile(
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access, what string,
 ) {
 	ctx := r.Context()
-	if len(req.Props) != 0 || r.URL.RawQuery != "" ||
-		!acc.File(c, req.Path, accessapi.ActionRead) {
+	if !acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -312,10 +318,21 @@ func (s DebianAPI) serveVirtualDebianFile(
 			httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian virtual "+what, err))
 			return
 		}
-		if !it.Folder {
-			s.ServeFile(w, r, st, itemkit.Found{Repo: member, Item: it}, p)
+		if it.Folder {
+			continue
+		}
+		// A member's file that the matrix parameters do not match does not
+		// serve the request, and the walk asks the next member, as 6.20's
+		// VirtualRepoDownloadStrategy.processStandard passes over a member
+		// whose resource is not found [I].
+		if err := matchDebianMatrix(ctx, st, it, req); errors.Is(err, kernel.ErrNotFound) {
+			continue
+		} else if err != nil {
+			httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian virtual "+what, err))
 			return
 		}
+		s.ServeFile(w, r, st, itemkit.Found{Repo: member, Item: it}, p)
+		return
 	}
 	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 }
@@ -337,6 +354,24 @@ func (s DebianAPI) serveVirtualDebianSources(
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	ctx := r.Context()
+	// A remote member's own GET of its index refuses a query or a matrix
+	// parameter (serveDebianIndex), so that member lacks the file here.
+	if member.Class == repo.Remote && (len(req.Props) != 0 || r.URL.RawQuery != "") {
+		return false
+	}
+	if member.Class != repo.Remote && len(req.Props) != 0 {
+		it, err := st.Items().Get(ctx, member.Key, false, req.Path)
+		if err == nil && !it.Folder {
+			err = matchDebianMatrix(ctx, st, it, req)
+		}
+		if errors.Is(err, kernel.ErrNotFound) {
+			return false
+		}
+		if err != nil {
+			httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian virtual index", err))
+			return true
+		}
+	}
 	body, checkPermission, err := s.debianMemberBytes(ctx, st, member, req.Path, p, acc)
 	if errors.Is(err, kernel.ErrNotFound) || errors.Is(err, source.ErrDenied) {
 		return false
@@ -377,9 +412,13 @@ func (s DebianAPI) serveRemoteVirtualDebianFile(
 			s.InternalError(r.Context(), "Debian virtual source", source.ErrUnavailable))
 		return true
 	}
+	// The member gets the request as its own GET would: the query, less
+	// the server's own controls such as skipUpdateStats, and the matrix
+	// parameters, which its stream or cached file must match.
 	q := source.Request{
 		Repo: member, Subject: accessapi.SubjectOf(p), Access: acc.Decider,
 		Project: member.ProjectKey, Resource: itemkit.RemoteResource(r, req.Path),
+		Matrix: debianMatrix(req),
 	}
 	q, err := itemkit.DebianSourceRequest(q)
 	if errors.Is(err, kernel.ErrNotFound) && strings.HasPrefix(req.Path, "dists/") {
@@ -407,6 +446,12 @@ func (s DebianAPI) serveRemoteVirtualDebianFile(
 		return true
 	}
 	if result.Stream != nil {
+		// A stream carries no properties, so only a mandatory key refuses
+		// it, as the item route's trace of a remote read answers [I].
+		if !q.Matrix.Matches(nil) {
+			_ = result.Stream.Body.Close()
+			return false
+		}
 		s.ServeRemoteStream(w, r, result, member, req, q.Resource, "", p.Anonymous)
 		return true
 	}
@@ -419,6 +464,14 @@ func (s DebianAPI) serveRemoteVirtualDebianFile(
 			r,
 			s.InternalError(r.Context(), "Debian virtual source", source.ErrInvalidResult),
 		)
+		return true
+	}
+	if err := matchDebianMatrix(r.Context(), s.Store, *result.Item, req); errors.Is(
+		err, kernel.ErrNotFound,
+	) {
+		return false
+	} else if err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian virtual "+what, err))
 		return true
 	}
 	s.ServeFile(w, r, s.Store,

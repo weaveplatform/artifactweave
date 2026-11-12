@@ -703,6 +703,17 @@ paths:
         name: entity_type
         required: true
         schema:
+          enum:
+          - users
+          - groups
+          - permissions
+          - tokens
+          - projects
+          - environments
+          - roles
+          - projectGroups
+          - projectUsers
+          - projectResources
           type: string
       - description: Optional query parameter. Return only entities with at least one target in this state; omitted
           means any state.
@@ -856,6 +867,17 @@ paths:
         name: entity_type
         required: true
         schema:
+          enum:
+          - users
+          - groups
+          - permissions
+          - tokens
+          - projects
+          - environments
+          - roles
+          - projectGroups
+          - projectUsers
+          - projectResources
           type: string
       - description: Required path parameter. The entity's business id, such as a username or group name.
         in: path

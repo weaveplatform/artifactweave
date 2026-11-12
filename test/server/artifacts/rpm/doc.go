@@ -1,5 +1,5 @@
 // Package rpm runs the RPM routes of the assembled server: the signing of
-// virtual repository metadata.
+// virtual repository metadata, and the async values of the YUM reindex.
 //
 // # Role
 //
@@ -20,6 +20,8 @@
 //
 // Assertions only:
 //   - rpm_test.go: virtual metadata is signed with the configured GPG key.
+//   - yum_reindex_async_test.go: Calculate YUM Repository Metadata with each
+//     async value, queued or run before it answers, or refused.
 //
 // # References
 //
