@@ -60,8 +60,8 @@ is not runtime support. Client contracts are recorded in
 | NuGet (`/api/nuget/...`) | the Artifactory envelope, as 7.x answers its NuGet routes; `NuGet.Protocol` reads only the status ([research 29 sections 7 and 9](29-nuget.md#7-push-delete-and-relist)) |
 | Helm (`/api/helm/...`) | the Artifactory envelope; `helm` reads only the status ([decision 0039](decisions/0039-helm.md)) |
 | Dart pub (`/api/pub/...`) | `{"error":{"code":"<CODE>","message":"<string>"}}` as `application/vnd.pub.v2+json`, with `Bearer realm="pub"` on a 401: the pub repository specification's challenge, the only one whose message `dart pub` prints |
-| Swift registry (`/api/swift/...`) | RFC 7807 problem JSON, `{"title":"<status text>","status":<int>,"detail":"<string>"}`, as `application/problem+json`, which the Swift registry specification requires for every error |
-| Agent Packages (`/api/agentpackages/...`) | RFC 7807 problem JSON as for Swift, which the APM registry contract requires for every 4xx and 5xx |
+| Swift registry (`/api/swift/...`) | RFC 7807 problem JSON, `{"title":"<status text>","status":<int>,"detail":"<string>"}`, as `application/problem+json` with `Content-Version: 1`, which the Swift registry specification requires for every error (sections 3.3 and 3.5); SwiftPM shows an error's `detail` only when that header is present ([#1278](https://github.com/weaveplatform/artifactweave/issues/1278)) |
+| Agent Packages (`/api/agentpackages/...`) | RFC 7807 problem JSON as for Swift, without `Content-Version`, which the APM registry contract requires for every 4xx and 5xx |
 
 The JFrog operations beside a registry with an envelope of its own answer in the Artifactory
 envelope: npm's login and reindex (RTFACT-30181, [decision 0034](decisions/0034-npm.md)), and

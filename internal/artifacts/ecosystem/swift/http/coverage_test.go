@@ -73,7 +73,7 @@ func TestUnitSwiftPublicationRejectsInvalidFormsAndDeniedWriter(t *testing.T) {
 			{name: "metadata", body: []byte(`{}`)},
 			{name: "metadata", body: []byte(`{}`)},
 		}, 400},
-		{"empty archive", []publishPart{{name: "source-archive"}}, 413},
+		{"empty archive", []publishPart{{name: "source-archive"}}, 422},
 		{"invalid base64 archive", []publishPart{{name: "source-archive", encoding: "base64", body: []byte("%%%")}}, 400},
 		{"invalid base64 character", []publishPart{{name: "source-archive", encoding: "base64", body: []byte("!!!!")}}, 400},
 		{"invalid metadata", []publishPart{
