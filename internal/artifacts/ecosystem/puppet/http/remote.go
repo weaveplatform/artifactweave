@@ -27,6 +27,13 @@ import (
 const (
 	maxMetadataBytes = 16 << 20
 	maxVersions      = 4096
+	// upstreamPage is the page of releases a remote asks its upstream for.
+	// The Forge serves at most 100 whatever limit is asked (it answered
+	// limit=1000 with "limit": 100 on 2026-11-12), and so do 7.x's own lists
+	// (RTFACT-30529), so a remote over either reads 100 a page. Asking for
+	// more only makes every page short. What 7.x's remote asks is unknown;
+	// RTFACT-13687 shows a 5.1 virtual asking a member for limit=100.
+	upstreamPage = 100
 )
 
 type upstreamVersion struct {
@@ -95,9 +102,17 @@ func parseVersions(data []byte, name, responseBase string, offset int) ([]releas
 		)
 	}
 	more := offset+len(out) < doc.Pagination.Total
+	// A page with more after it that holds fewer releases than the remote
+	// asked for is valid only when the upstream's own limit says it serves
+	// pages that small. Short for any other reason, it leaves the remote
+	// unable to tell where the next page starts, since the upstream's
+	// offsets may count releases the page left out. A page that holds more
+	// than was asked is not short: the next page starts after what it held.
+	short := len(out) < upstreamPage &&
+		(doc.Pagination.Limit < 1 || len(out) != doc.Pagination.Limit)
 	// Never follow an upstream-supplied pagination URL. Its presence must agree
 	// with the bounded total; subsequent pages use our canonical query.
-	if more && (len(out) != 1000 || doc.Pagination.Next == nil) ||
+	if more && (short || doc.Pagination.Next == nil) ||
 		!more && doc.Pagination.Next != nil {
 		return nil, false, invalidUpstream()
 	}
@@ -120,11 +135,15 @@ func validArchiveURL(u *url.URL) bool {
 func (h handler) remoteVersions(r *http.Request, name string, u use) ([]release, error) {
 	all := []release{}
 	seen := map[string]bool{}
-	for offset := 0; offset < maxVersions; offset += 1000 {
-		found, more, err := h.remotePage(r, name, offset, u)
+	// The next page starts after the releases this one held, not after the
+	// limit asked: an upstream may serve fewer (parseVersions), and found
+	// leaves out those the caller may not read.
+	for offset := 0; offset < maxVersions; {
+		found, held, more, err := h.remotePage(r, name, offset, u)
 		if err != nil {
 			return nil, err
 		}
+		offset += held
 		for _, rel := range found {
 			if seen[rel.meta.Version] {
 				return nil, invalidUpstream()
@@ -140,24 +159,26 @@ func (h handler) remoteVersions(r *http.Request, name string, u use) ([]release,
 	return nil, invalidUpstream()
 }
 
+// remotePage returns the releases of the upstream page at offset that the
+// caller may read, how many releases the page held, and whether more follow.
 func (h handler) remotePage(
 	r *http.Request,
 	name string,
 	offset int,
 	u use,
-) ([]release, bool, error) {
+) ([]release, int, bool, error) {
 	// Forge query parameters identify a protocol resource; they are not caller
 	// query propagation. An explicit same-source URL keeps them in cache identity
 	// even when propagateQueryParams is false.
 	base, err := url.Parse(pkgroute.RequestFrom(r).Repo.URL)
 	if err != nil || !validArchiveURL(base) {
-		return nil, false, invalidUpstream()
+		return nil, 0, false, invalidUpstream()
 	}
 	base.Path = strings.TrimRight(base.Path, "/") + "/v3/releases"
 	base.RawPath = ""
 	query := base.Query()
 	query.Set("module", name)
-	query.Set("limit", "1000")
+	query.Set("limit", strconv.Itoa(upstreamPage))
 	query.Set("offset", strconv.Itoa(offset))
 	query.Set("sort_by", "version")
 	base.RawQuery = query.Encode()
@@ -203,27 +224,27 @@ func (h handler) remotePage(
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
-		return nil, false, fmt.Errorf("puppet: metadata: %w", pkgroute.SourceError(err, false))
+		return nil, 0, false, fmt.Errorf("puppet: metadata: %w", pkgroute.SourceError(err, false))
 	}
 	data, err := h.metadataBytes(r, result)
 	if err != nil {
-		return nil, false, err
+		return nil, 0, false, err
 	}
 	if result.CheckRead == nil || result.CheckPermission == nil || result.Revalidate == nil {
-		return nil, false, fmt.Errorf(
+		return nil, 0, false, fmt.Errorf(
 			"puppet: missing authority: %w",
 			pkgroute.SourceError(source.ErrInvalidResult, false),
 		)
 	}
 	if _, _, ok := withinRegistry(pkgroute.RequestFrom(r).Repo, result.Metadata.BaseURL); !ok {
-		return nil, false, invalidUpstream()
+		return nil, 0, false, invalidUpstream()
 	}
 	releases, more, err := parseVersions(data, name, result.Metadata.BaseURL, offset)
 	if err != nil {
-		return nil, false, err
+		return nil, 0, false, err
 	}
 	if err = result.Revalidate(r.Context()); err != nil {
-		return nil, false, fmt.Errorf("puppet: authority: %w", pkgroute.SourceError(err, false))
+		return nil, 0, false, fmt.Errorf("puppet: authority: %w", pkgroute.SourceError(err, false))
 	}
 	out := releases[:0]
 	for _, rel := range releases {
@@ -237,14 +258,17 @@ func (h handler) remotePage(
 			if errors.Is(err, source.ErrDenied) {
 				continue
 			}
-			return nil, false, fmt.Errorf("puppet: authority: %w", pkgroute.SourceError(err, false))
+			return nil, 0, false, fmt.Errorf(
+				"puppet: authority: %w",
+				pkgroute.SourceError(err, false),
+			)
 		}
 		rel.revalidate = result.Revalidate
 		rel.checkPermission = result.CheckPermission
 		rel.checkRead = result.CheckRead
 		out = append(out, rel)
 	}
-	return out, more, nil
+	return out, len(releases), more, nil
 }
 
 func (h handler) metadataBytes(r *http.Request, result source.Result) ([]byte, error) {
