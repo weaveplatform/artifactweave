@@ -20,16 +20,17 @@ import (
 // Families that are stubbed or ignored are still fetched so the baseline
 // records them as missing explicitly rather than by omission.
 //
-// Since 2026-11-12 two of these answer 404, repositories-api and
-// jfrog-artifactory-builds-api: JFrog renamed both families, to
-// jfrog-artifactory-repositories-api and jfrog-artifactory-build-api. Fetch
-// takes their pages from the parent index (#1308). Moving to the new URLs
-// would also rename the families' slugs, which api/oracle-inventory.json and
-// research 14 use, so it belongs with a refresh of the inventory.
+// JFrog renames a family now and then; the old llms.txt then answers 404.
+// repositories-api and jfrog-artifactory-builds-api became
+// jfrog-artifactory-repositories-api and jfrog-artifactory-build-api on
+// 2026-11-12. The family's slug is the URL's directory, so a rename here also
+// renames it in api/oracle-inventory.json and research 14: run make
+// oracle-inventory after editing this list. Until a rename is noticed, fetch
+// takes the family's pages from the parent index (#1308).
 var Indexes = []string{
 	"https://docs.jfrog.com/artifactory/reference/artifacts-storage-api/llms.txt",
 	"https://docs.jfrog.com/artifactory/reference/package-type-specific-apis/llms.txt",
-	"https://docs.jfrog.com/artifactory/reference/repositories-api/llms.txt",
+	"https://docs.jfrog.com/artifactory/reference/jfrog-artifactory-repositories-api/llms.txt",
 	"https://docs.jfrog.com/artifactory/reference/federated-repositories-api/llms.txt",
 	"https://docs.jfrog.com/artifactory/reference/repository-replication-api/llms.txt",
 	"https://docs.jfrog.com/artifactory/reference/searches-api/llms.txt",
@@ -49,10 +50,7 @@ var Indexes = []string{
 	"https://docs.jfrog.com/integrations/reference/jfrog-platform-webhooks-api/llms.txt",
 	"https://docs.jfrog.com/integrations/reference/jfrog-artifactory-live-logs-api/llms.txt",
 	// The Builds API (build-info publish, promotion, retention, deletion).
-	// docs.jfrog.com also lists the same pages under jfrog-artifactory-build-api,
-	// with "-1" slugs until 2026-11-12; fetching both would only duplicate
-	// every operation.
-	"https://docs.jfrog.com/integrations/reference/jfrog-artifactory-builds-api/llms.txt",
+	"https://docs.jfrog.com/integrations/reference/jfrog-artifactory-build-api/llms.txt",
 }
 
 // BaselineFile is the committed list of accepted gaps, relative to -api.

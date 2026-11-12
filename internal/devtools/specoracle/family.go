@@ -163,8 +163,8 @@ func parseSections(body string) []indexSection {
 
 // parentURL is the llms.txt one directory above a family index:
 // .../artifactory/reference/llms.txt for
-// .../artifactory/reference/repositories-api/llms.txt. It lists every family
-// of that docs project, each under its own "## " heading.
+// .../artifactory/reference/jfrog-artifactory-repositories-api/llms.txt. It
+// lists every family of that docs project, each under its own "## " heading.
 func parentURL(index string) (string, error) {
 	u, err := url.Parse(index)
 	if err != nil {

@@ -348,8 +348,8 @@ func (f *fetcher) get(ctx context.Context, url string) ([]byte, int, error) {
 
 // FamilySlug turns an index URL into a directory name, dropping the host,
 // the "reference" segment and the llms.txt file name:
-// https://docs.jfrog.com/artifactory/reference/repositories-api/llms.txt
-// becomes artifactory-repositories-api.
+// https://docs.jfrog.com/artifactory/reference/jfrog-artifactory-repositories-api/llms.txt
+// becomes artifactory-jfrog-artifactory-repositories-api.
 func FamilySlug(index string) string {
 	path := strings.TrimPrefix(index, "https://")
 	path = strings.TrimPrefix(path, "http://")
