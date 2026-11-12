@@ -14,7 +14,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
@@ -117,11 +119,11 @@ func armored(typ string, write func(io.Writer) error) (string, error) {
 // running binary's SQLite store directly. The packument is built from that
 // row on each read (DV-042), so the next read serves the tampered signature.
 func (w *world) tamperNPMSignature(name, version, repo, other string) error {
-	u := url.URL{
-		Scheme:   "file",
-		Path:     filepath.Join(w.dataDir, "artifactweave.db"),
-		RawQuery: "_pragma=busy_timeout(10000)",
+	path, err := w.sqliteStore()
+	if err != nil {
+		return err
 	}
+	u := url.URL{Scheme: "file", Path: path, RawQuery: "_pragma=busy_timeout(10000)"}
 	db, err := sql.Open("sqlite", u.String())
 	if err != nil {
 		return err
@@ -169,4 +171,33 @@ func (w *world) tamperNPMSignature(name, version, repo, other string) error {
 		return fmt.Errorf("tamper %s@%s: %d rows, %v", name, version, n, err)
 	}
 	return nil
+}
+
+// sqliteStore is the path of the running binary's SQLite store. Acceptance
+// starts the binary with its default store, SQLite in the data directory,
+// but the environment it inherits could name another driver, and opening
+// the path would then create an empty file whose missing tables say nothing
+// of the cause. So a step that writes the store refuses any other driver by
+// name, and a store that is not there.
+func (w *world) sqliteStore() (string, error) {
+	driver := "sqlite"
+	if w.server != nil {
+		for _, kv := range w.server.Env {
+			if v, ok := strings.CutPrefix(kv, "ARTIFACTWEAVE_DATABASE_DRIVER="); ok && v != "" {
+				driver = v
+			}
+		}
+	}
+	if driver != "sqlite" {
+		return "", fmt.Errorf(
+			"this step writes the binary's SQLite store, but the registry runs on database driver %q",
+			driver,
+		)
+	}
+	path := filepath.Join(w.dataDir, "artifactweave.db")
+	if _, err := os.Stat(path); err != nil {
+		return "", fmt.Errorf("this step writes the binary's SQLite store, which is not at %s: %w",
+			path, err)
+	}
+	return path, nil
 }
