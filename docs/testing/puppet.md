@@ -52,6 +52,21 @@ return module and release metadata. Search currently supports an exact module
 name (`GET .../v3/modules?query=acme-widget`). Arbitrary search queries and nested
 virtual members are refused explicitly.
 
+`GET .../v3/releases` and `GET .../v3/modules` with no query list every release
+and module a local or federated repository hosts that the caller may read, as
+7.x's [Get Puppet Releases](https://docs.jfrog.com/artifactory/reference/getpuppetreleases)
+and [Get Puppet Modules](https://docs.jfrog.com/artifactory/reference/getpuppetmodules)
+do. They page 20 entries unless `limit` asks for up to 100 (a larger `limit` is
+served as 100, as 7.x serves it, RTFACT-30529), from `offset`. Each answer
+carries the Forge's `pagination` object, `limit`, `offset`, `first`,
+`previous`, `current`, `next` and `total`, as JFrog's sample answer does;
+`puppet_forge`, which r10k and librarian-puppet use, reads it there. Modules
+are listed by name and releases by module name, newest first. A virtual
+repository answers both lists 404, as 7.x does
+([RTFACT-15072](https://jfrog.atlassian.net/browse/RTFACT-15072)). A remote
+repository still answers them 400: JFrog support says a remote serves them, but
+no source shows what it lists.
+
 Delete and trash restore use the normal item APIs and update the native view.
 `POST /artifactory/api/puppet/{repo}/reindex` is the Artifactweave maintenance
 endpoint for rebuilding hosted module indexes from archives. It requires Manage
