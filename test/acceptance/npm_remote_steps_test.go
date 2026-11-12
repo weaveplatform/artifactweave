@@ -13,6 +13,7 @@ import (
 
 func (w *world) registerRemoteNPM(sc *godog.ScenarioContext) {
 	sc.Step(`^an npm upstream serves "([^"]*)" at "([^"]*)"$`, w.npmUpstream)
+	w.registerNPMSignatures(sc)
 }
 
 func (w *world) npmUpstream(name, version string) error {

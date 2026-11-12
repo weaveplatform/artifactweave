@@ -133,6 +133,7 @@ func Protocols(d Deps) []pkgroute.Protocol {
 			Accounts:       npmAccounts(d),
 			MaxPublishSize: d.NPMMaxPublishSize,
 			Format:         d.FormatSettings.NPM,
+			KeyPairs:       d.Access.Keys,
 		}),
 		nugethttp.V3(d.RemoteSources),
 		nugethttp.V2(d.RemoteSources),
