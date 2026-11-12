@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
 	"time"
@@ -41,10 +42,17 @@ type Options struct {
 	// remote repository verifies upstream signatures against its pairs. A
 	// repository that names a key pair requires it.
 	KeyPairs accessapi.Keys
+	// Channels is the NixOS Channel Registry a remote repository resolves
+	// an official channel name against, and Releases the base the registry
+	// redirects a channel to, whose tarball the remote caches. Nil means
+	// https://channels.nixos.org and https://releases.nixos.org; tests
+	// point both at a fixture.
+	Channels, Releases *url.URL
 }
 
-// Protocol mounts the Nix binary-cache routes for local, federated and
-// virtual repositories, and for remote ones when o.RemoteSources is set.
+// Protocol mounts the Nix binary-cache and channel routes for local,
+// federated and virtual repositories, and for remote ones when
+// o.RemoteSources is set.
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},
@@ -53,6 +61,12 @@ func Protocol(o Options) pkgroute.Protocol {
 	}
 	if o.RemoteSources != nil {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
+	}
+	if o.Channels == nil {
+		o.Channels = &url.URL{Scheme: "https", Host: "channels.nixos.org"}
+	}
+	if o.Releases == nil {
+		o.Releases = &url.URL{Scheme: "https", Host: "releases.nixos.org"}
 	}
 	return pkgroute.Protocol{
 		Name:         "nix",
@@ -113,6 +127,10 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	path, err := requestPath(r)
 	if err != nil {
 		h.fail(w, r, err)
+		return
+	}
+	if path == "channels" || strings.HasPrefix(path, "channels/") {
+		h.channels(w, r, path)
 		return
 	}
 	if path == "nix-cache-info" {
@@ -336,6 +354,15 @@ func (h handler) put(w http.ResponseWriter, r *http.Request) {
 	if c.Class != repo.Local && c.Class != repo.Federated {
 		h.fail(w, r, apierror.New(405, "Nix publication requires a hosted repository"))
 		return
+	}
+	// The JFrog documentation uploads a channel snapshot to its folder,
+	// channels/<name>/<flavor>/<snapshot>, and says its tarball's name,
+	// nixexprs.tar.xz, is enforced: the tarball is stored under that name
+	// in the folder [I], where nix-channel asks for it. A PUT that names the
+	// file itself, as curl -T sends to a URL ending in a slash, lands at the
+	// same path.
+	if s, ok := nixfmt.ParseSnapshotDir(path); ok {
+		path = s.Path()
 	}
 	limit := nixfmt.MaxArchiveBytes
 	if nixfmt.IsInfoPath(path) || path == "nix-cache-info" {
