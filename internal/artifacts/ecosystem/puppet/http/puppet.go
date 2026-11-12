@@ -307,18 +307,91 @@ func (h handler) release(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
-		rel, found, err := h.remoteRelease(r, name, version)
-		if err != nil {
-			h.k.Error(w, r, err)
-			return
-		}
-		if found {
-			writeJSON(w, r, 200, record(rel))
-			return
-		}
+	rel, found, err := h.upstreamRecord(r, name, version, listing)
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	if found {
+		writeJSON(w, r, 200, record(rel))
+		return
 	}
 	h.k.Error(w, r, apierror.New(404, "Puppet release not found"))
+}
+
+// upstreamRecord returns release version of module name from an upstream's
+// own record of it, v3/releases/<slug>, for a release the release pages
+// leave out, and false when no upstream holds it: a remote's upstream
+// (remoteRelease), or a virtual repository's remote members' upstreams, in
+// member order (virtualRecord). A hosted repository has no upstream.
+func (h handler) upstreamRecord(
+	r *http.Request,
+	name, version string,
+	u use,
+) (release, bool, error) {
+	switch pkgroute.RequestFrom(r).Repo.Class {
+	case repo.Remote:
+		return h.remoteRelease(r, name, version, u)
+	case repo.Virtual:
+		return h.virtualRecord(r, name, version, u)
+	default:
+		return release{}, false, nil
+	}
+}
+
+// virtualRecord asks a virtual repository's remote members, in member
+// order, for the upstream's record of a release every member's release
+// pages leave out, and returns the first that holds it, served through that
+// member (#1369). JFrog's Puppet repositories page says a virtual repository
+// aggregates its members for the Puppet client and r10k, and r10k reads
+// v3/releases/<slug> and then fetches the file_uri it names, so the virtual
+// repository answers both from the member that holds the record. That 7.x's
+// virtual repository asks its remote members so is [I]. A member is passed
+// over as the merge of the release pages passes it over (virtual): one the
+// caller may not read the module folder of, and one whose read answers 404,
+// as a blacked-out member's or one whose patterns reject the read does. To
+// serve the archive, a member whose own patterns reject the archive is
+// passed over too, as it is for a listed release (R5).
+func (h handler) virtualRecord(
+	r *http.Request,
+	name, version string,
+	u use,
+) (release, bool, error) {
+	path := puppetfmt.Path(name, version)
+	for _, key := range pkgroute.RequestFrom(r).Repo.Repositories {
+		member, err := h.k.DB().Repos().Get(r.Context(), key)
+		if errors.Is(err, kernel.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return release{}, false, fmt.Errorf("puppet: virtual member: %w", err)
+		}
+		if member.Class != repo.Remote ||
+			u == download && generic.CheckDownload(member, path, false) != nil {
+			continue
+		}
+		mr, err := h.k.MemberRequest(r, member)
+		if err != nil {
+			return release{}, false, err //nolint:wrapcheck // protocol class refusal
+		}
+		if !h.k.CanFolder(mr, name, api.ActionRead) {
+			continue
+		}
+		rel, found, err := h.remoteRelease(mr, name, version, u)
+		if err != nil {
+			var response *apierror.Error
+			if errors.Is(err, kernel.ErrNotFound) ||
+				errors.As(err, &response) && response.Status == http.StatusNotFound {
+				continue
+			}
+			return release{}, false, err
+		}
+		if found {
+			rel.member = mr
+			return rel, true, nil
+		}
+	}
+	return release{}, false, nil
 }
 
 func (h handler) module(w http.ResponseWriter, r *http.Request) {
@@ -485,27 +558,58 @@ func (h handler) archive(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
+	listed := false
 	for _, rel := range releases {
+		if rel.meta.Version != version {
+			continue
+		}
+		listed = true
 		// A version every member of a virtual repository refuses has no
 		// member left to serve it, and answers as one none holds (R5).
-		if rel.meta.Version == version && !rel.refused {
-			if err = h.authority(r, []release{rel}); err != nil {
-				h.k.Error(w, r, err)
-				return
-			}
-			if rel.remoteURL != "" {
-				h.remoteArchive(w, r, rel)
-				return
-			}
-			member := r
-			if rel.member != nil {
-				member = rel.member
-			}
-			h.k.ServeItem(w, member, path)
+		if !rel.refused {
+			h.serveArchive(w, r, rel, path)
+			return
+		}
+	}
+	// A release the pages leave out is served from the archive its
+	// upstream's record names, as v3/releases/<slug> answers that record
+	// (#1344): r10k reads the record and then fetches its file_uri, so a
+	// record whose archive answers 404 is one no client can install
+	// (#1369). The archive is checked against the record as a listed
+	// release's is against its page (remoteArchive). What 7.x answers here
+	// is [I]: RTFACT-19130 shows a remote answering the record of a release
+	// the Forge's lists leave out, not the archive request that follows.
+	if !listed {
+		rel, found, err := h.upstreamRecord(r, name, version, download)
+		if err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+		if found {
+			h.serveArchive(w, r, rel, path)
 			return
 		}
 	}
 	h.k.Error(w, r, apierror.New(404, "Puppet release not found"))
+}
+
+// serveArchive answers the archive at path of rel, once its authority
+// holds: from the upstream when rel is a remote's, and otherwise from the
+// stored item of the repository, or virtual member, that holds it.
+func (h handler) serveArchive(w http.ResponseWriter, r *http.Request, rel release, path string) {
+	if err := h.authority(r, []release{rel}); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	if rel.remoteURL != "" {
+		h.remoteArchive(w, r, rel)
+		return
+	}
+	member := r
+	if rel.member != nil {
+		member = rel.member
+	}
+	h.k.ServeItem(w, member, path)
 }
 
 func (h handler) authority(r *http.Request, releases []release) error {

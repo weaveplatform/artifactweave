@@ -134,12 +134,16 @@ type metadataSource struct {
 	// moduleRevalidateError change a module record read's answer as
 	// metadataBase, readError, missingRevalidate, missingStream and
 	// revalidateError change a release page's.
-	moduleBase             string
-	moduleReadError        error
-	moduleNoRevalidate     bool
-	moduleNoStream         bool
-	moduleRevalidateError  error
-	metadataBase           string
+	moduleBase            string
+	moduleReadError       error
+	moduleNoRevalidate    bool
+	moduleNoStream        bool
+	moduleRevalidateError error
+	metadataBase          string
+	// pagesAtURL answers a release page from the address the remote asked
+	// for, as moduleRecord answers a module record, rather than from
+	// metadataBase, for remotes over more than one upstream.
+	pagesAtURL             bool
 	cachedItem             *artmodel.Item
 	skipMetadataValidation bool
 	redirect               *url.URL
@@ -255,6 +259,14 @@ func (s metadataSource) Read(
 	}
 	if s.metadataBase != "" {
 		result.Metadata.BaseURL = s.metadataBase
+	}
+	if s.pagesAtURL {
+		at, err := url.Parse(resource.ExternalURL)
+		if err != nil {
+			return source.Result{}, err
+		}
+		at.RawQuery = ""
+		result.Metadata.BaseURL = at.String()
 	}
 	if resource.ValidateMetadata != nil && !s.skipMetadataValidation {
 		if err := resource.ValidateMetadata(

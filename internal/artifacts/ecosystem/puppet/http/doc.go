@@ -134,8 +134,14 @@
 //     without the fields no record answers, and validated as a page's
 //     release is; the upstream's 404 for it, or a caller the source
 //     denies, answers "Puppet release not found" as before. A listed
-//     release never reads it, and the lists, the module record and the
-//     archive route still answer from the pages alone.
+//     release never reads it, and the lists and the search still answer
+//     from the pages alone. The archive route serves such a release's
+//     archive from the address the record names, read with the blackout
+//     alone as the pages are for an archive and checked against the
+//     record, and a virtual repository answers both the record and the
+//     archive from its first remote member, in member order, whose
+//     upstream's record holds the release, once every member's pages leave
+//     it out (#1369) [I].
 //   - A virtual repository resolves its members in order, leaving out a
 //     blacked-out member and, outside the search, a remote whose patterns
 //     reject its release pages. A version comes from the first member that holds it and whose
@@ -175,8 +181,9 @@
 //     https://github.com/weaveplatform/artifactweave/issues/1325,
 //     https://github.com/weaveplatform/artifactweave/issues/1326,
 //     https://github.com/weaveplatform/artifactweave/issues/1327,
-//     https://github.com/weaveplatform/artifactweave/issues/1343 and
-//     https://github.com/weaveplatform/artifactweave/issues/1344
+//     https://github.com/weaveplatform/artifactweave/issues/1343,
+//     https://github.com/weaveplatform/artifactweave/issues/1344 and
+//     https://github.com/weaveplatform/artifactweave/issues/1369
 //
 // # Status
 //
@@ -208,6 +215,10 @@
 //     leave out answered from the upstream's record, the query and
 //     authority of that read, the upstream's 404 and a denied caller, and
 //     the record's failures.
+//   - upstream_archive_test.go: the archive of a release only the
+//     upstream's record holds, through a remote and a virtual repository,
+//     the record read's authority, the archive checked against the record,
+//     member order and the members passed over, and the failures.
 //   - groups_test.go: module_groups on one module's release list and the
 //     module search answering as without it on every repository class, a
 //     remote's upstream queries without it, and the refusals it leaves

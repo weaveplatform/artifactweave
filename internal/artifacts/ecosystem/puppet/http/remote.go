@@ -555,8 +555,17 @@ func (h handler) remoteModule(r *http.Request, name string, u use) (moduleDetail
 // .puppet/<m>/releases.json, without the fields no record answers
 // (releaseExclusions), which the Forge's description lets this operation
 // leave out too, and validated as a release page's record is. Where 7.x
-// caches it is [I].
-func (h handler) remoteRelease(r *http.Request, name, version string) (release, bool, error) {
+// caches it is [I]. To serve the record's archive (u download) it is read
+// as the pages are to find a listed release's archive, with the blackout
+// alone (R4): the archive route has checked the archive's own path first.
+// The release returned carries the read's authority, which the archive
+// route checks again before it serves the archive, as for a listed
+// release.
+func (h handler) remoteRelease(
+	r *http.Request,
+	name, version string,
+	u use,
+) (release, bool, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	slug := name + "-" + version
 	// The remote has read its release pages first, from the same address,
@@ -576,6 +585,7 @@ func (h handler) remoteRelease(r *http.Request, name, version string) (release, 
 		PermissionFolder:    true,
 		PermissionPath:      name,
 		PolicyPath:          ".puppet/" + name + "/releases.json",
+		BlackoutOnly:        u != listing,
 		Variant:             "puppet-forge-v3-release-v1",
 		ExpectedContentType: mediaType,
 		ValidateMetadata: func(_ context.Context, body io.ReadSeeker, _ int64, meta source.MetadataResponse) error {
@@ -635,6 +645,9 @@ func (h handler) remoteRelease(r *http.Request, name, version string) (release, 
 			pkgroute.SourceError(err, false),
 		)
 	}
+	rel.revalidate = result.Revalidate
+	rel.checkPermission = result.CheckPermission
+	rel.checkRead = result.CheckRead
 	return rel, true, nil
 }
 
