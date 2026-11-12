@@ -144,11 +144,22 @@ its status alone.
 
 - **Existence.** A blob is in `<repo>/<name>` when one of the image's own folders (a tag
   folder, a digest folder or `_uploads/`, each a direct child of `<name>/`) holds
-  `sha256__<hex>` with its digest. `HEAD` answers from the
-  item's metadata; `GET` streams from the blob store, honours `Range`, and goes through
+  `sha256__<hex>` with its digest. `GET` and `HEAD` go through the server's file download:
+  `GET` streams from the blob store, honours `Range`, and goes through
   the download redirect policy of decision [0029](0029-cdn-delivery-and-download-redirect.md),
   which Artifactory applies to Docker too (research 19). `HEAD` never redirects. Both send
-  `Docker-Content-Digest`, `Content-Length` and `Accept-Ranges: bytes`.
+  `Docker-Content-Digest` and the headers of a file download: `Content-Length`,
+  `Accept-Ranges: bytes`, `Last-Modified`, `X-Artifactory-Filename`, `Content-Disposition`,
+  `X-Checksum-Md5`, `X-Checksum-Sha1`, `X-Checksum-Sha256`, and the bare SHA-1 as `ETag`,
+  equal to `X-Checksum-Sha1`, as 7.x answers a blob `GET` on a local and a remote repository
+  ([RTFACT-29977](https://jfrog.atlassian.net/browse/RTFACT-29977) on 7.55.8,
+  [RTFACT-30157](https://jfrog.atlassian.net/browse/RTFACT-30157) on 7.71.4) and a `HEAD`
+  since RTFACT-29977's fix (amended 2026-11-12, #1317). `If-None-Match` takes that SHA-1 bare,
+  quoted, weak or in a list, as on the item route, and `If-Range` takes it bare or quoted. A
+  local blob's `HEAD` answers `If-None-Match` and `If-Modified-Since` with 304, as 6.20's
+  download does, and ignores `Range`, `If-Range`, `If-Match` and `If-Unmodified-Since`, which
+  that download does not evaluate on a `HEAD` **[I]**. A remote repository's blob, on its
+  first fetch and from the cache, carries the same `ETag` and checksums.
 - **Uploads.** `POST .../blobs/uploads/` opens a session in `internal/platform/blob/session`
   recorded in the `uploads` store, and answers 202 with an absolute `Location` from the
   base-URL resolver, `Range: 0-0` and `Docker-Upload-UUID`. `OCI-Chunk-Min-Length` is sent
@@ -288,7 +299,12 @@ its status alone.
   each tag, and answers 201 with an `OCI-Tag` header for each tag accepted.
 - **Reads.** `GET` and `HEAD` by tag read the tag folder's manifest; by digest they read the
   manifest with that SHA-256 in any of the image's own folders. `Content-Type` is
-  `docker.manifest.type`, and `Docker-Content-Digest` and `ETag` carry the digest.
+  `docker.manifest.type`, and `Docker-Content-Digest` carries the digest. `ETag` is the
+  `manifest.json` file's bare SHA-1, as 7.5.7 answered a local manifest `GET`
+  ([RTFACT-23106](https://jfrog.atlassian.net/browse/RTFACT-23106)) and 7.33.12 a `HEAD`
+  ([RTFACT-27199](https://jfrog.atlassian.net/browse/RTFACT-27199)), and conditional requests
+  take it as a blob's do (amended 2026-11-12, #1317). A remote repository's manifest keeps
+  its digest as `ETag`, since no capture shows a remote one's **[I]**.
   `X-Artifactory-Docker-Registry` names the repository that holds the manifest, by its
   stored key, which `jf docker push` and `pull` read (R23 6). A
   manifest is never converted: a request whose `Accept` lists manifest types but not the
