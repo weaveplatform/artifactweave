@@ -43,8 +43,10 @@ form with its by-hash copy, and the setting takes effect at the next index
 rebuild. A Sources index keeps its plain and gzip forms. The repository's
 Release signer binds the index checksum; apt checks both the Release
 signature and package checksum. `POST /artifactory/api/deb/reindex/<repo>`
-rebuilds a local index. Deleting or restoring a package also reconciles
-metadata. A remote repository validates Release and index structure, package
+rebuilds a local index: `async=1` queues the rebuild and answers at once, and
+`async=0` or none waits for it; `true` and `false` work too, as JFrog's
+earlier REST API reference wrote them. Deleting or restoring a package also
+reconciles metadata. A remote repository validates Release and index structure, package
 bytes and cache freshness; plain, gzip, xz, bzip2, lzma and zstd index
 encodings are accepted. It also asks its upstream for an installer's
 Packages index, checked as an index of `.udeb` files, and for any
@@ -56,6 +58,16 @@ as a component Release, a Contents index, a translation, an installer file
 or a Sources index, comes from the first member, in member order, that may
 serve it and holds it; a remote member asks its upstream. The virtual
 repository's Release does not list those files.
+
+A GET of an index, a virtual repository's metadata or a virtual package takes
+the query parameters Artifactory documents for any file, such as
+`skipUpdateStats`, and matrix parameters, matched against the file's
+properties as on any other GET, once the caller's read permission is settled.
+A virtual repository's composed metadata carries no properties, so only a
+mandatory key (`;key+=value`) refuses it, and a member whose file does not
+match is passed over for the next. A remote repository's index refuses a
+query or matrix parameters with 404 until it is settled whether a remote
+passes them on to its upstream.
 
 For source packages, deploy the `.dsc` with `dsc.distribution` and
 `dsc.component`, plus every archive named by that descriptor at the same

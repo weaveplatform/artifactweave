@@ -52,16 +52,9 @@ func TryDebianItem(
 	}
 	if c.Class == repo.Virtual && strings.HasPrefix(req.Path, "dists/") {
 		_, byHash := debian.ByHashMetadataPath(req.Path)
-		switch {
-		case debian.ReleaseMetadataPath(req.Path) || debian.PackagesIndexPath(req.Path) || byHash:
+		if debian.ReleaseMetadataPath(req.Path) || debian.PackagesIndexPath(req.Path) || byHash {
 			s.serveVirtualDebianMetadata(w, r, st, c, req, p, acc)
-		case len(req.Props) != 0 || r.URL.RawQuery != "":
-			// Such a path answered not found to every request before #1254,
-			// which asks for the plain read only. With a matrix parameter or
-			// a query it keeps that answer [I], where the composed files and
-			// the packages refuse one as forbidden.
-			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
-		default:
+		} else {
 			s.serveVirtualDebianFile(w, r, st, c, req, p, acc, "file")
 		}
 		return true
@@ -83,13 +76,19 @@ func (s DebianAPI) serveDebianIndex(
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	ctx := r.Context()
-	if len(req.Props) != 0 || r.URL.RawQuery != "" {
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
-		return
-	}
 	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
 		!acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		return
+	}
+	// Whether a remote repository passes a query or a matrix parameter on
+	// to its upstream is not settled, so a remote index keeps refusing one,
+	// now once read permission is settled (DV-057). A stored index takes
+	// both as every other file does: 7.x documents skipUpdateStats for a GET
+	// of any file (RTFACT-25636, 7.21.3), so a query changes nothing, and
+	// the matrix parameters are matched below.
+	if c.Class == repo.Remote && (len(req.Props) != 0 || r.URL.RawQuery != "") {
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	// 7.x stores a local index and caches a remote one at this path and
@@ -117,6 +116,9 @@ func (s DebianAPI) serveDebianIndex(
 		it, err = st.Items().Get(ctx, c.Key, false, req.Path)
 		if err == nil && it.Folder {
 			err = kernel.ErrNotFound
+		}
+		if err == nil {
+			err = matchDebianMatrix(ctx, st, it, req)
 		}
 		if err == nil {
 			body, err = s.readDebianBlob(ctx, it.Actual.SHA256)
@@ -246,6 +248,36 @@ func debianIndexPaths(path string, body []byte) ([]string, error) {
 		return nil, fmt.Errorf("debian Sources index: %w", err)
 	}
 	return paths, nil
+}
+
+// matchDebianMatrix returns kernel.ErrNotFound unless the stored file it
+// matches the request's matrix parameters, which "make resolution
+// conditional on properties" on a GET of any file (research 02): a key the
+// file carries must have a value asked for, and a mandatory key ("key+=")
+// must be carried (JFrog's guide, Using Properties in Deployment and
+// Resolution). 7.x stores a local Debian index as a file and serves it
+// through its download path, which matches a file's properties so (6.20
+// DbStoringRepoMixin.getInfo), and no source makes Debian metadata an
+// exception.
+func matchDebianMatrix(
+	ctx context.Context, st itemkit.Store, it model.Item, req itemkit.ItemRequest,
+) error {
+	if len(req.Props) == 0 {
+		return nil
+	}
+	props, err := st.Items().Properties(ctx, it.ID)
+	if err != nil {
+		return fmt.Errorf("debian: properties of %s: %w", it.FullPath(), err)
+	}
+	if !debianMatrix(req).Matches(props) {
+		return kernel.ErrNotFound
+	}
+	return nil
+}
+
+// debianMatrix is the request's matrix parameters as a download matches them.
+func debianMatrix(req itemkit.ItemRequest) model.Matrix {
+	return model.Matrix{Props: req.Props, Mandatory: req.Mandatory}
 }
 
 func (s DebianAPI) readDebianBlob(ctx context.Context, sha string) ([]byte, error) {
