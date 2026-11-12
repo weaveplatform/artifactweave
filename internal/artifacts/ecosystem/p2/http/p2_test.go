@@ -137,7 +137,7 @@ func TestUnitP2VirtualFailsClosedWhenMemberStoreFails(t *testing.T) {
 }
 
 // A blacked-out member is left out of the virtual's members, so the
-// composite and the __p2/<n>/ paths number the rest alike; a member whose
+// composite does not list it and its key's paths answer 404; a member whose
 // patterns exclude everything keeps its place.
 func TestUnitP2VirtualLeavesOutBlackedOutMembers(t *testing.T) {
 	w := newItemWorld(t)

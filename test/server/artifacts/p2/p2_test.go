@@ -202,8 +202,8 @@ func TestAccP2RemoteAndVirtualWirePaths(t *testing.T) {
 		body []byte
 	}{
 		{"/artifactory/p2-remote/content.jar", content},
-		{"/artifactory/p2-virtual/__p2/0/content.jar", content},
-		{"/artifactory/p2-virtual/__p2/1/p2.index", index},
+		{"/artifactory/p2-virtual/p2-local/content.jar", content},
+		{"/artifactory/p2-virtual/p2-remote/p2.index", index},
 	} {
 		res := w.do(http.MethodGet, tc.path, "admin", "")
 		if res.Code != http.StatusOK || !bytes.Equal(res.Body.Bytes(), tc.body) {
@@ -215,8 +215,8 @@ func TestAccP2RemoteAndVirtualWirePaths(t *testing.T) {
 		if res.Code != http.StatusOK {
 			t.Errorf("virtual %s: %d %s", name, res.Code, res.Body)
 		}
-		if name != "p2.index" &&
-			(!strings.Contains(res.Body.String(), "__p2/0") || !strings.Contains(res.Body.String(), "__p2/1")) {
+		if name != "p2.index" && !strings.Contains(res.Body.String(),
+			"<child location=\"p2-local\"/>\n<child location=\"p2-remote\"/>\n") {
 			t.Errorf("virtual %s omitted members: %s", name, res.Body)
 		}
 	}
@@ -227,8 +227,9 @@ func TestAccP2RemoteAndVirtualWirePaths(t *testing.T) {
 		{http.MethodGet, "/artifactory/p2-remote/arbitrary.txt", "admin", 404},
 		{http.MethodGet, "/artifactory/p2-remote/content.jar?url=https://attacker.example", "admin", 404},
 		{http.MethodGet, "/artifactory/p2-remote/content.jar", "user", 403},
-		{http.MethodGet, "/artifactory/p2-virtual/__p2/2/content.jar", "admin", 404},
-		{http.MethodGet, "/artifactory/p2-virtual/__p2/0/../content.jar", "admin", 400},
+		{http.MethodGet, "/artifactory/p2-virtual/p2-other/content.jar", "admin", 404},
+		{http.MethodGet, "/artifactory/p2-virtual/__p2/0/content.jar", "admin", 404},
+		{http.MethodGet, "/artifactory/p2-virtual/p2-local/../content.jar", "admin", 400},
 		{http.MethodPut, "/artifactory/p2-virtual/content.jar", "admin", 405},
 	} {
 		res := w.do(tc.method, tc.path, tc.user, "bad")
@@ -425,18 +426,19 @@ func TestAccP2VirtualFiltersMembersAndDeniesUnpermittedChild(t *testing.T) {
 	}
 	res := w.do(http.MethodGet, "/artifactory/p2-parent/compositeContent.xml", "admin", "")
 	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `children size="2"`) ||
-		strings.Contains(res.Body.String(), "__p2/2") {
+		!strings.Contains(res.Body.String(),
+			"<child location=\"p2-child\"/>\n<child location=\"p2-nested\"/>\n") {
 		t.Fatalf("virtual member filtering: %d %s", res.Code, res.Body)
 	}
 	for _, tc := range []struct {
 		path, user string
 		expected   int
 	}{
-		{"/artifactory/p2-parent/__p2/0/p2.index", "user", http.StatusForbidden},
-		{"/artifactory/p2-parent/__p2/zero/p2.index", "admin", http.StatusNotFound},
-		{"/artifactory/p2-parent/__p2/00/p2.index", "admin", http.StatusNotFound},
-		{"/artifactory/p2-parent/__p2/0/unknown.txt", "admin", http.StatusNotFound},
-		{"/artifactory/p2-parent/__p2/0", "admin", http.StatusNotFound},
+		{"/artifactory/p2-parent/p2-child/p2.index", "user", http.StatusForbidden},
+		{"/artifactory/p2-parent/p2-wrong/p2.index", "admin", http.StatusNotFound},
+		{"/artifactory/p2-parent/missing/p2.index", "admin", http.StatusNotFound},
+		{"/artifactory/p2-parent/p2-child/unknown.txt", "admin", http.StatusNotFound},
+		{"/artifactory/p2-parent/p2-child", "admin", http.StatusNotFound},
 		{"/artifactory/p2-parent/unknown.txt", "admin", http.StatusNotFound},
 		{"/artifactory/p2-parent/p2.index", "deployer", http.StatusForbidden},
 	} {
@@ -562,10 +564,11 @@ func TestAccP2DownloadPolicy(t *testing.T) {
 	)
 
 	res := w.do(http.MethodGet, "/artifactory/p2-virtual/compositeContent.xml", "admin", "")
-	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `children size="2"`) {
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `children size="2"`) ||
+		strings.Contains(res.Body.String(), "p2-dark") {
 		t.Errorf("blacked-out member listed: %d %s", res.Code, res.Body)
 	}
-	served("/artifactory/p2-virtual/__p2/1/content.jar", content)
+	served("/artifactory/p2-virtual/p2-remote/content.jar", content)
 
 	patch(
 		"p2-virtual",
@@ -576,16 +579,16 @@ func TestAccP2DownloadPolicy(t *testing.T) {
 		fmt.Sprintf(virtual, "compositeContent.xml"),
 	)
 	refused(
-		"/artifactory/p2-virtual/__p2/0/content.jar",
-		fmt.Sprintf(virtual, "__p2/0/content.jar"),
+		"/artifactory/p2-virtual/p2-local/content.jar",
+		fmt.Sprintf(virtual, "p2-local/content.jar"),
 	)
 	served("/artifactory/p2-virtual/p2.index", nil)
-	served("/artifactory/p2-virtual/__p2/0/p2.index", index)
+	served("/artifactory/p2-virtual/p2-local/p2.index", index)
 
 	patch("p2-virtual", func(c *repo.Config) { c.ExcludesPattern = nil })
 	patch("p2-local", func(c *repo.Config) { c.ExcludesPattern = new("content.jar") })
-	refused("/artifactory/p2-virtual/__p2/0/content.jar", "Could not find resource")
-	served("/artifactory/p2-virtual/__p2/0/p2.index", index)
+	refused("/artifactory/p2-virtual/p2-local/content.jar", "Could not find resource")
+	served("/artifactory/p2-virtual/p2-local/p2.index", index)
 
 	patch("p2-zipped", func(c *repo.Config) { c.ExcludesPattern = new("**") })
 	refused("/artifactory/p2-zipped/content.jar", fmt.Sprintf(excluded, "p2-zipped", "content.jar"))
@@ -601,4 +604,146 @@ func TestAccP2DownloadPolicy(t *testing.T) {
 	if !slices.Equal(reads, want) {
 		t.Errorf("reads %v, want %v", reads, want)
 	}
+}
+
+// TestAccP2VirtualServesMembersUnderTheirKeys: a P2 virtual repository
+// serves a member's files under the member's key, as 7.x answers
+// p2-virtual/download.eclipse.org/releases/luna/p2.index from the
+// repository keyed download.eclipse.org (RTFACT-7631, RTFACT-29198). The
+// composite lists the keys, so a member's path is the same for every
+// caller and stays put when another member is blacked out; the virtual's
+// patterns see the path a 7.x client asks for; and the numbered __p2/<n>/
+// paths of earlier builds name no member.
+func TestAccP2VirtualServesMembersUnderTheirKeys(t *testing.T) {
+	index, content := p2Fixture(t, "p2.index"), p2Fixture(t, "content.jar")
+	var reads []string
+	backend := sourceBackend(
+		func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+			reads = append(reads, q.Resource.Path)
+			body := map[string][]byte{
+				"releases/luna/p2.index":    index,
+				"releases/luna/content.jar": content,
+				"releases/juno/content.jar": content,
+			}[q.Resource.Path]
+			if body == nil {
+				return source.Result{}, kernel.ErrNotFound
+			}
+			return source.Result{Stream: &source.Stream{
+				Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
+				Representation: source.Representation{Size: int64(len(body))},
+			}}, nil
+		},
+	)
+	w := newItemWorld(t, false, func(c *Config) {
+		c.RemoteSources = &source.Service{Resolve: sourceIdentity, HTTP: backend}
+	})
+	configs := map[string]repo.Config{}
+	for _, c := range []repo.Config{
+		{Key: "p2-first", Class: repo.Local, PackageType: repo.Generic},
+		{
+			Key: "download.eclipse.org", Class: repo.Remote, PackageType: repo.P2,
+			URL: "https://download.eclipse.org/",
+		},
+		{
+			Key: "p2-virtual", Class: repo.Virtual, PackageType: repo.P2,
+			Repositories: []string{"p2-first", "download.eclipse.org"},
+		},
+	} {
+		c = *repo.Defaults(&c)
+		if err := w.db.Repos().Create(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+		configs[c.Key] = c
+	}
+	if res := w.do(
+		http.MethodPut, "/artifactory/p2-first/p2.index", "admin", string(index),
+	); res.Code != http.StatusCreated {
+		t.Fatalf("publish p2.index: %d %s", res.Code, res.Body)
+	}
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "p2-virtual-without-first",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
+				"p2-virtual":           {Include: []string{"**"}},
+				"download.eclipse.org": {Include: []string{"**"}},
+			},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	patch := func(key string, f func(*repo.Config)) {
+		t.Helper()
+		c := configs[key]
+		f(&c)
+		if err := w.db.Repos().Update(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+		configs[key] = c
+	}
+	served := func(path, as string, want []byte) {
+		t.Helper()
+		res := w.do(http.MethodGet, path, as, "")
+		if res.Code != http.StatusOK || !bytes.Equal(res.Body.Bytes(), want) {
+			t.Errorf("%s as %s: %d %.200s", path, as, res.Code, res.Body)
+		}
+	}
+	children := func(as, want string) {
+		t.Helper()
+		res := w.do(http.MethodGet, "/artifactory/p2-virtual/compositeContent.xml", as, "")
+		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), want) {
+			t.Errorf("composite as %s: %d %s, want %q", as, res.Code, res.Body, want)
+		}
+	}
+	refused := func(path, msg string) {
+		t.Helper()
+		res := w.do(http.MethodGet, path, "admin", "")
+		want := fmt.Sprintf(`{"errors":[{"message":%q,"status":404}]}`, msg)
+		if res.Code != http.StatusNotFound || strings.TrimSpace(res.Body.String()) != want {
+			t.Errorf("%s: %d %s, want 404 %s", path, res.Code, res.Body, want)
+		}
+	}
+	const (
+		luna = "/artifactory/p2-virtual/download.eclipse.org/releases/luna/p2.index"
+		both = "<children size=\"2\">\n<child location=\"p2-first\"/>\n" +
+			"<child location=\"download.eclipse.org\"/>\n</children>"
+		eclipseOnly = "<children size=\"1\">\n<child location=\"download.eclipse.org\"/>\n</children>"
+	)
+
+	// A caller who may not read p2-first is given one child, not two, and
+	// reads download.eclipse.org at the path the admin does.
+	children("admin", both)
+	children("user", eclipseOnly)
+	served(luna, "admin", index)
+	served(luna, "user", index)
+	served("/artifactory/p2-virtual/p2-first/p2.index", "admin", index)
+
+	// The virtual's patterns see the member's key and the update site's
+	// sub-path, and a refused path is never fetched.
+	patch("p2-virtual", func(c *repo.Config) {
+		c.ExcludesPattern = new("download.eclipse.org/releases/juno/**")
+	})
+	refused(
+		"/artifactory/p2-virtual/download.eclipse.org/releases/juno/content.jar",
+		"No repository found to serve the request for "+
+			"p2-virtual:download.eclipse.org/releases/juno/content.jar",
+	)
+	served(
+		"/artifactory/p2-virtual/download.eclipse.org/releases/luna/content.jar",
+		"admin",
+		content,
+	)
+	if slices.Contains(reads, "releases/juno/content.jar") {
+		t.Errorf("refused path was fetched: %v", reads)
+	}
+
+	// A blacked-out member leaves the composite, its key's paths answer
+	// 404, and the other member's path does not move.
+	on := true
+	patch("p2-first", func(c *repo.Config) { c.BlackedOut = &on })
+	children("admin", eclipseOnly)
+	served(luna, "admin", index)
+	refused("/artifactory/p2-virtual/p2-first/p2.index", "Could not find resource")
+
+	refused("/artifactory/p2-virtual/__p2/0/releases/luna/p2.index", "Could not find resource")
 }

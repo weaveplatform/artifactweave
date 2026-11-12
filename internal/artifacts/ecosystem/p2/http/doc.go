@@ -64,15 +64,25 @@
 //   - A virtual repository lists, in order, the members the caller may
 //     traverse: P2 remotes, local Maven or Generic update sites, and
 //     acyclic nested P2 virtual repositories, leaving out a blacked-out
-//     one. A member's file is served under __p2/<n>/ by the kit's item GET,
-//     which checks the member's own permissions again.
+//     one. A member's file is served under <member key>/, as 7.x serves
+//     p2-virtual/download.eclipse.org/releases/luna/p2.index from the
+//     repository keyed download.eclipse.org, so the path is the same for
+//     every caller and does not move when another member is left out. The
+//     kit's item GET serves it and checks the member's own permissions
+//     again; a key that names no listed member answers 404.
 //   - The download policy refuses after the read permission, with a 404
 //     and its message, as on the generic item route: a remote's blackout
 //     and patterns refuse its archive entries, a virtual repository's
-//     patterns refuse its own paths ("No repository found to serve the
-//     request"), and a member that refuses a file under __p2/<n>/ is
-//     passed over, so the virtual answers "Could not find resource".
-//     Patterns never refuse p2.index, as no path ending .index.
+//     patterns refuse its own paths, a member's <member key>/ paths
+//     included ("No repository found to serve the request"), and a member
+//     that refuses a file under its key is passed over, so the virtual
+//     answers "Could not find resource". Patterns never refuse p2.index,
+//     as no path ending .index.
+//   - A server built without a remote source service answers a remote
+//     composite, child or archive entry read, made directly or through a
+//     virtual repository, 500, a fault of its own, not the upstream's. A
+//     composite child path that is not well formed is refused before any
+//     read, as it is with a service.
 //   - A folder, matrix parameters, a query, a path P2 does not class, or a
 //     P2 repository that is neither remote nor virtual answers 404.
 //   - The __p2_ext/ paths and the digest's input are the cache paths of
@@ -98,9 +108,15 @@
 //   - Plan: docs/implementation/plan.md#p31-native-build-and-plugin-repositories
 //     and #p9d-modular-monolith-migration, epic WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
+//   - RTFACT-7631 and RTFACT-29198, whose P2 virtual requests name the
+//     member's key and the update site's sub-path:
+//     https://jfrog.atlassian.net/browse/RTFACT-7631 and
+//     https://jfrog.atlassian.net/browse/RTFACT-29198.
 //   - https://github.com/weaveplatform/artifactweave/issues/773,
-//     https://github.com/weaveplatform/artifactweave/issues/1084 and
-//     https://github.com/weaveplatform/artifactweave/issues/1090
+//     https://github.com/weaveplatform/artifactweave/issues/1084,
+//     https://github.com/weaveplatform/artifactweave/issues/1090,
+//     https://github.com/weaveplatform/artifactweave/issues/1247 and
+//     https://github.com/weaveplatform/artifactweave/issues/1257
 //
 // # Status
 //
@@ -124,6 +140,8 @@
 //   - p2_external_error_test.go: reads that fail closed at the source and
 //     delivery fences, cached metadata served from its stored bytes, bounded
 //     streams, and archive entries checked before publication.
+//   - p2_nosource_test.go: remote reads, direct and through a virtual
+//     repository, on a server built without a remote source service.
 //
 // The route suite test/server/artifacts/p2 checks the protocol through the
 // router, and the @p2 acceptance partition

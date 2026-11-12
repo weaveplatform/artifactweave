@@ -25,8 +25,9 @@
 //
 // Assertions only:
 //   - p2_test.go: archive suffix bounds and permissions, the remote and
-//     virtual wire paths, invalid or changed cached representations and
-//     virtual member filtering.
+//     virtual wire paths, invalid or changed cached representations,
+//     virtual member filtering and a virtual's member files under their
+//     keys.
 //   - p2_external_test.go, p2_external_error_test.go and
 //     p2_external_cache_integrity_test.go: external composite children,
 //     their depth, origins and authority, metadata fallback, archive

@@ -3,13 +3,14 @@ package p2http
 import (
 	"bytes"
 	"context"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
-	"strconv"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,8 +35,8 @@ type p2Items struct{ *itemkit.Kit }
 // TryP2Item is the overlay (itemkit.Overlay) that reserves a P2
 // repository's update-site wire paths before generic item routing: a
 // virtual repository's p2.index and composite metadata over the members the
-// caller may traverse, and each member's files under __p2/<n>/; a remote's
-// composite metadata and external children; and a remote site.zip!/
+// caller may traverse, and each member's files under <member key>/; a
+// remote's composite metadata and external children; and a remote site.zip!/
 // archive's entries. A folder, matrix parameters, a query, a path P2 does
 // not class or a repository that is neither remote nor virtual answers
 // 404. Remote reads still cross the common source policy and cache
@@ -101,8 +102,15 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "P2 archive download check", err))
 		return
 	}
+	// The missing service is this server's fault, not the upstream's, so it
+	// answers 500 rather than SourceError's 502, as Alpine's and opkg's
+	// remote reads do.
 	if s.RemoteSources == nil {
-		httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrUnavailable, p.Anonymous))
+		httpkit.WriteErr(
+			w,
+			r,
+			s.InternalError(r.Context(), "P2 archive source", source.ErrUnavailable),
+		)
 		return
 	}
 	q := source.Request{
@@ -203,27 +211,30 @@ func (s p2Items) serveP2Virtual(
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "P2 virtual members", err))
 		return
 	}
-	if strings.HasPrefix(req.Path, "__p2/") {
-		parts := strings.SplitN(strings.TrimPrefix(req.Path, "__p2/"), "/", 2)
-		if len(parts) != 2 || p2.Classify(parts[1]) == p2.KindInvalid {
-			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
-			return
-		}
-		i, parseErr := strconv.Atoi(parts[0])
-		if parseErr != nil || i < 0 || i >= len(members) || strconv.Itoa(i) != parts[0] {
+	// The virtual's own files are single names; any other path is a
+	// member's, <member key>/<path>. 7.x serves an aggregated repository's
+	// files under its key and the update site's sub-path, as in
+	// p2-virtual/download.eclipse.org/releases/luna/p2.index (RTFACT-7631,
+	// RTFACT-29198), so a member's path names the member, never its place
+	// among the members the caller may read, and the patterns above saw
+	// the path a 7.x client asks for. A member the caller may not traverse,
+	// or a blacked-out one, is not among members, so its key answers 404.
+	if key, name, ok := strings.Cut(req.Path, "/"); ok {
+		i := slices.IndexFunc(members, func(m repo.Config) bool { return m.Key == key })
+		if i < 0 || p2.Classify(name) == p2.KindInvalid {
 			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
 		member := members[i]
-		if !acc.File(member, parts[1], accessapi.ActionRead) {
+		if !acc.File(member, name, accessapi.ActionRead) {
 			httpkit.WriteErr(w, r, httpkit.Denied(p))
 			return
 		}
 		// A member whose patterns refuse the path is passed over, as a
 		// virtual repository's search passes over it (processStandard in
-		// 6.20), and no other member serves its __p2/<n>/ paths, so the
-		// answer is the virtual's not-found.
-		if generic.CheckDownload(member, parts[1], false) != nil {
+		// 6.20), and no other member serves its paths, so the answer is the
+		// virtual's not-found.
+		if generic.CheckDownload(member, name, false) != nil {
 			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
@@ -232,7 +243,7 @@ func (s p2Items) serveP2Virtual(
 		// checks again; it never grants a virtual-only caller member bytes.
 		clone := r.Clone(r.Context())
 		uri := *r.URL
-		uri.Path = "/artifactory/" + member.Key + "/" + parts[1]
+		uri.Path = "/artifactory/" + member.Key + "/" + name
 		uri.RawPath = ""
 		clone.URL = &uri
 		s.GetItem(w, clone)
@@ -322,8 +333,14 @@ func p2Composite(kind string, members []repo.Config) []byte {
 		typ,
 	)
 	fmt.Fprintf(&b, "<children size=\"%d\">\n", len(members))
-	for i := range members {
-		fmt.Fprintf(&b, "<child location=\"__p2/%d\"/>\n", i)
+	for _, m := range members {
+		// The location is relative, so a client resolves it to the
+		// virtual's <member key>/ path. The key rules leave nothing to
+		// escape in a key such as download.eclipse.org; escaping keeps any
+		// key one path segment of a well-formed attribute all the same.
+		b.WriteString("<child location=\"")
+		_ = xml.EscapeText(&b, []byte(url.PathEscape(m.Key)))
+		b.WriteString("\"/>\n")
 	}
 	b.WriteString("</children>\n</repository>\n")
 	return []byte(b.String())

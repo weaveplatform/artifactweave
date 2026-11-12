@@ -692,7 +692,7 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 | `useNamespaces` | `false` | Helm. |
 | `dockerApiVersion` | `V2` | |
 | `debianTrivialLayout`, `debianDefaultArchitectures`, `optionalIndexCompressionFormats` | | Accepted; effective Debian metadata behavior is planned in P29. |
-| `p2Urls` | | P2 virtual repositories: the update sites aggregated; `p2.urls` in the YAML form. Accepted and persisted. |
+| `p2Urls` | | P2 virtual repositories: the update sites aggregated; `p2.urls` in the YAML form. Accepted and persisted. 7.x names a local member in it as `local://<key>/<suffix>`, creates a remote repository per host for the other URLs and serves each URL under `<repository key>/<sub-path>` (RTFACT-7631, RTFACT-29198, RTFACT-29915); artifactweave builds the composite from `repositories` and serves each member under its key (#1257). |
 
 ## Federated fields
 

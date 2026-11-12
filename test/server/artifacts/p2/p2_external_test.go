@@ -509,16 +509,31 @@ func TestAccP2VirtualDoesNotLendExternalChildAuthority(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	res := w.do(http.MethodGet, "/artifactory/p2-members/__p2/0/compositeContent.xml", "admin", "")
+	res := w.do(
+		http.MethodGet,
+		"/artifactory/p2-members/p2-allowed/compositeContent.xml",
+		"admin",
+		"",
+	)
 	if res.Code != http.StatusOK {
 		t.Fatalf("allowed member composite: %d %s", res.Code, res.Body)
 	}
 	child := regexp.MustCompile(`__p2_ext/[a-f0-9]{64}`).FindString(res.Body.String())
-	res = w.do(http.MethodGet, "/artifactory/p2-members/__p2/0/"+child+"/content.jar", "admin", "")
+	res = w.do(
+		http.MethodGet,
+		"/artifactory/p2-members/p2-allowed/"+child+"/content.jar",
+		"admin",
+		"",
+	)
 	if res.Code != http.StatusOK || externalReads != 1 {
 		t.Fatalf("allowed member child: %d, reads %d", res.Code, externalReads)
 	}
-	res = w.do(http.MethodGet, "/artifactory/p2-members/__p2/1/"+child+"/content.jar", "admin", "")
+	res = w.do(
+		http.MethodGet,
+		"/artifactory/p2-members/p2-restricted/"+child+"/content.jar",
+		"admin",
+		"",
+	)
 	if res.Code == http.StatusOK || externalReads != 1 ||
 		strings.Contains(res.Body.String(), "child.example") {
 		t.Fatalf(
