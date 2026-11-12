@@ -50,7 +50,9 @@ func TestUnitP2SourceAdmission(t *testing.T) {
 		expected                 error
 	}{
 		{"../content.jar", "", "", kernel.ErrNotFound},
-		{"content.jar", "download=1", "", source.ErrInvalidRequest},
+		// A query is kept for the source boundary, which passes it on only
+		// under Propagate Query Params (#1350).
+		{"content.jar", "download=1", "", nil},
 		{"plugins/org.example_1.0.jar", "", "bytes=0-10", source.ErrInvalidRequest},
 	} {
 		_, err := itemkit.P2SourceRequest(

@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
@@ -497,6 +498,12 @@ func (p *Policy) used(token model.RemoteCacheToken) func(context.Context) error 
 // 304; the caller's own validators never reach the upstream. Format rules
 // build their extra exchanges, such as Maven's checksum sidecars, from it
 // so that they go out as the policy's own requests do.
+//
+// The request's matrix parameters follow the path, after its last segment,
+// as 7.x's HttpRepo.downloadResource (GET) and assembleRetrieveInfoUrl
+// (HEAD) append buildRequestMatrixParams to the remote request URL. They
+// are not part of the cache key, so the copy they fetch is cached at its
+// bare path. An external URL names its own resource and takes none.
 func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 	path := q.Resource.EscapedPath
 	if path == "" {
@@ -508,6 +515,8 @@ func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 	query := q.Resource.Query
 	if q.Resource.ExternalURL != "" {
 		path, query = "", ""
+	} else if upstreamMatrix(q.MatrixParams) {
+		path += q.MatrixParams
 	}
 	headers := make(http.Header)
 	if q.Resource.Accept != "" {
@@ -538,6 +547,15 @@ func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 		Header:              headers,
 		Metadata:            q.Resource.Kind != source.ResourceKindArtifact,
 	}
+}
+
+// upstreamMatrix reports whether params may follow the upstream path: one
+// or more ";"-led parameters that cannot end the path or start a query or
+// a fragment. Anything else is left off, so a malformed value never moves
+// the request to another path; the item route builds only this form
+// (pkgroute.UpstreamMatrix).
+func upstreamMatrix(params string) bool {
+	return strings.HasPrefix(params, ";") && !strings.ContainsAny(params, "/?#\\\r\n")
 }
 
 // PolicyError classifies a failure of the policy's own work for the source

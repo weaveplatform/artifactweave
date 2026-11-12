@@ -102,6 +102,73 @@ func (p *Path) addMatrix(params string) error {
 	return nil
 }
 
+// UpstreamMatrix is the matrix parameters of escaped, a path as
+// r.URL.EscapedPath() gives it, in the form 7.x appends them to a remote
+// repository's request URL (RemoteRepoBase.buildRequestMatrixParams, then
+// HttpRepo.encodeIfNeeded, in 7.161.26): every parameter of every segment,
+// in request order, to follow the URL's last segment; ";key=value",
+// ";key+=value" for a mandatory key and ";key" for a blank value, with "+"
+// escaped to %2B as HttpUtils.escapePlusSymbol escapes it. A key and value
+// are decoded as ParsePath decodes them and escaped again. A value keeps a
+// comma, so ";k=a,b" reaches the upstream as it was sent. 7.x's
+// encodeQuery would leave "/", "?", "#" and ";" in a value as they are,
+// which would move the rest of the value into another segment, the query or
+// another parameter; they are escaped here so the value arrives whole.
+func UpstreamMatrix(escaped string) string {
+	var b strings.Builder
+	for _, seg := range strings.Split(escaped, "/") {
+		_, params, ok := strings.Cut(seg, ";")
+		if !ok {
+			continue
+		}
+		for _, param := range strings.Split(params, ";") {
+			rawKey, rawValue, _ := strings.Cut(param, "=")
+			key, keyErr := url.PathUnescape(rawKey)
+			value, valueErr := url.QueryUnescape(rawValue)
+			mandatory := false
+			if base, ok := strings.CutSuffix(key, "+"); ok {
+				key, mandatory = base, true
+			}
+			// ParsePath has refused a malformed parameter with 400 before
+			// a remote read; an empty one names no key, as 7.x ignores it.
+			if key == "" || keyErr != nil || valueErr != nil {
+				continue
+			}
+			b.WriteByte(';')
+			b.WriteString(matrixEscape(key, "=;"))
+			if mandatory {
+				b.WriteString("%2B")
+			}
+			if strings.TrimSpace(value) != "" {
+				b.WriteByte('=')
+				b.WriteString(matrixEscape(value, ";"))
+			}
+		}
+	}
+	return b.String()
+}
+
+// matrixEscape percent-encodes every byte of s but the characters a URL's
+// query keeps as they are (RFC 3986 unreserved, and ":@&=$,!*'()"), and
+// those in also; "+", "/", "?", "#" and "%" are always encoded.
+func matrixEscape(s, also string) string {
+	const hex = "0123456789ABCDEF"
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		keep := 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9' ||
+			strings.IndexByte("-_.~:@&=$,!*'()", c) >= 0
+		if keep && strings.IndexByte(also, c) < 0 {
+			b.WriteByte(c)
+			continue
+		}
+		b.WriteByte('%')
+		b.WriteByte(hex[c>>4])
+		b.WriteByte(hex[c&0xf])
+	}
+	return b.String()
+}
+
 // SplitValues splits a property value list at its commas; a backslash
 // escapes the character after it, so "a\,b" is one value.
 func SplitValues(v string) []string {

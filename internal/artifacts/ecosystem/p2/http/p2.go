@@ -37,11 +37,12 @@ type p2Items struct{ *itemkit.Kit }
 // virtual repository's p2.index and composite metadata over the members the
 // caller may traverse, and each member's files under <member key>/; a
 // remote's composite metadata and external children; and a remote site.zip!/
-// archive's entries. A folder, matrix parameters, a query, a path P2 does
-// not class or a repository that is neither remote nor virtual answers
-// 404. Remote reads still cross the common source policy and cache
-// boundary. It reports whether it answered; a repository of another type,
-// and a remote's own update-site files, it leaves to the generic lookup.
+// archive's entries. A folder, a path P2 does not class or a repository
+// that is neither remote nor virtual answers 404; a query and matrix
+// parameters are taken as any file's GET takes them (#1350). Remote reads
+// still cross the common source policy and cache boundary. It reports
+// whether it answered; a repository of another type, and a remote's own
+// update-site files, it leaves to the generic lookup.
 func TryP2Item(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
@@ -50,7 +51,7 @@ func TryP2Item(
 	if c.PackageType != repo.P2 {
 		return false
 	}
-	if req.IsFolder || len(req.Props) != 0 || r.URL.RawQuery != "" {
+	if req.IsFolder {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return true
 	}
@@ -100,6 +101,9 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 	// permission check (DV-057), and before the archive is fetched.
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "P2 archive download check", err))
+		return
+	}
+	if !s.p2CopyMatches(w, r, c, req) {
 		return
 	}
 	// The missing service is this server's fault, not the upstream's, so it
@@ -241,12 +245,27 @@ func (s p2Items) serveP2Virtual(
 		// The cloned request retains the authenticated principal. The ordinary
 		// item route performs the member's source/cache and final permission
 		// checks again; it never grants a virtual-only caller member bytes.
+		// It keeps the query and the matrix parameters, after the path's
+		// last segment, so the member matches and forwards them as its own
+		// GET would (#1350), as 7.x's virtual download passes the request's
+		// properties to each member it asks (processStandard, 7.161.26).
 		clone := r.Clone(r.Context())
 		uri := *r.URL
-		uri.Path = "/artifactory/" + member.Key + "/" + name
-		uri.RawPath = ""
+		uri.RawPath = "/artifactory/" + url.PathEscape(member.Key) + "/" +
+			p2EscapePath(name) + pkgroute.UpstreamMatrix(r.URL.EscapedPath())
+		uri.Path, _ = url.PathUnescape(uri.RawPath)
 		clone.URL = &uri
 		s.GetItem(w, clone)
+		return
+	}
+	// The virtual repository's own files take a query and matrix
+	// parameters as any other file's GET does (#1350): a query, such as
+	// skipUpdateStats (RTFACT-25636, 7.21.3), changes nothing, and matrix
+	// parameters "make resolution conditional on properties" (JFrog's
+	// guide, Using Properties in Deployment and Resolution). These composed
+	// files carry none [I], so only a mandatory key refuses them.
+	if !req.Matrix().Matches(nil) {
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	var body []byte
@@ -277,6 +296,39 @@ func (s p2Items) serveP2Virtual(
 		w.Header().Set("Content-Type", "application/xml")
 	}
 	http.ServeContent(w, r, req.Path, time.Time{}, bytes.NewReader(body))
+}
+
+// p2EscapePath escapes each segment of an item path for a URL path, so a
+// segment's ";" or "%" stays in its name.
+func p2EscapePath(p string) string {
+	segments := strings.Split(p, "/")
+	for i, seg := range segments {
+		segments[i] = url.PathEscape(seg)
+	}
+	return strings.Join(segments, "/")
+}
+
+// p2CopyMatches reports whether the copy of req's path that the remote c's
+// cache holds matches the request's matrix parameters, or that it holds
+// none (itemkit.RemoteCopyMatches); otherwise it answers 404, or 500 when
+// the properties cannot be read, and reports false. An external composite
+// child and an archive entry are fetched from a URL other than the
+// remote's own, so their parameters are matched here and never passed on
+// [I]; a composite at the remote's own URL passes them on as any remote
+// file does (#1371).
+func (s p2Items) p2CopyMatches(
+	w http.ResponseWriter, r *http.Request, c repo.Config, req itemkit.ItemRequest,
+) bool {
+	matches, err := itemkit.RemoteCopyMatches(r.Context(), s.Store, c, req.Path, req)
+	if err != nil {
+		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "P2 properties", err))
+		return false
+	}
+	if !matches {
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+		return false
+	}
+	return true
 }
 
 // p2Members keeps the virtual order and removes members a caller cannot
