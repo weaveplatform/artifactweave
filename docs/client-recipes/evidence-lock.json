@@ -4,7 +4,7 @@
   ".github/actions/jfrog-cli/action.yml": "92ce6c997058db51ea98d2bac453d5dea5e4d103e7af268dda87428b674ab78f",
   ".github/actions/registry-clients/action.yml": "ef020d59ee4b103272682c15cd5a1db1fbf3d0ac782d7fa37200a83c161d0f5e",
   ".github/workflows/quality-gate.yml": "b99372992c017ea1fef71f1d2fb723f517f70b673eafc50cb8b02dc810735a8c",
-  "deploy/check.sh": "264837052199f1e4d93e080aebf8e747ff6f8a12823fb75100e5312cb1b03285",
+  "deploy/check.sh": "e657b14afb5a2f3a0b0a20007274a3c5dabc899ff643f4f57ce22e2d27f43a57",
   "docs/research/39-vcs-legacy.md": "3e79e20a799adce720a38edeb3be24bfa277cc951a6261665ca4d5b57d90943e",
   "go.mod": "d817a061a4f1f98a223477015f4d9b73ad2620c427e82a5b3b20b7b2b3470c45",
   "internal/access/adapters/http/authn_middleware.go": "26a242f13938c0ec86cabd65da43739f125fe010ba2b3360c2ef05812194f383",
