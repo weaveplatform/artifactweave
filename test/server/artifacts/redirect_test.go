@@ -85,7 +85,7 @@ func TestAccRedirectAnswersConditionalRequestsLocally(t *testing.T) {
 			t.Fatalf("%s: redirected to %s", c.name, rec.Header().Get("Location"))
 		}
 		if c.expected == http.StatusNotModified &&
-			(rec.Header().Get("ETag") != etag || rec.Header().Get("Content-Type") != "") {
+			(rec.Header().Get("ETag") != sha1Hex("redirected") || rec.Header().Get("Content-Type") != "") {
 			t.Fatalf("%s: 304 headers %v", c.name, rec.Header())
 		}
 	}
