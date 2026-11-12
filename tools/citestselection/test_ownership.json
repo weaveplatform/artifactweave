@@ -152,7 +152,8 @@
       "access_test.go",
       "items_test.go",
       "kit_test.go",
-      "redirect_test.go"
+      "redirect_test.go",
+      "remote_matrix_test.go"
     ],
     "internal/configuration/adapters/http": [
       "descriptor_test.go",
