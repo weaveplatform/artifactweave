@@ -236,7 +236,9 @@ components:
         primaryKeyPairRef:
           description: Optional within this object. Name of the key pair used to sign metadata for formats that
             need it (Debian, RPM, Alpine, Terraform provider packages). Must name an existing key pair, a
-            GPG pair on a Terraform repository whose terraformType is PROVIDER.
+            GPG pair on a Terraform repository whose terraformType is PROVIDER. An ECDSA pair on an npm repository
+            signs each version's dist.signatures, and changing it queues a reindex that signs every version again
+            (decision 0034).
           type: string
         priorityResolution:
           description: Optional within this object. When true a virtual repository resolves this member before members
@@ -534,7 +536,9 @@ components:
         primaryKeyPairRef:
           description: Optional within this object. Name of the key pair used to sign metadata for formats that
             need it (Debian, RPM, Alpine, Terraform provider packages). Must name an existing key pair, a
-            GPG pair on a Terraform repository whose terraformType is PROVIDER.
+            GPG pair on a Terraform repository whose terraformType is PROVIDER. An ECDSA pair on an npm repository
+            signs each version's dist.signatures, and changing it queues a reindex that signs every version again
+            (decision 0034).
           type: string
         priorityResolution:
           description: Optional within this object. When true a virtual repository resolves this member before members
