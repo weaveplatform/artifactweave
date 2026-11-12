@@ -1064,7 +1064,17 @@ var mimeTypes = map[string]string{
 	".gz":   "application/x-gzip",
 	".tgz":  "application/x-gzip",
 	".tar":  "application/x-tar",
+	// Artifactory's default MIME table gives a box this type (mimetypes.xml,
+	// the same in 7.38.8 and 7.125.7 system exports), and 7.37.15 answered
+	// the Vagrant box file route with it (RTFACT-27264). A box written before
+	// this row keeps the type it was recorded with.
+	".box": vagrantBoxType,
 }
+
+// vagrantBoxType is the media type of a .box file. It is Artifactory's own
+// name for the type, which is why remoteCheckedType leaves it out of a
+// remote's check.
+const vagrantBoxType = "application/x-vagrant-box"
 
 // MimeType is the media type recorded for a file name.
 func MimeType(name string) string {

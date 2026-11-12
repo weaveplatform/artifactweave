@@ -18,18 +18,30 @@ import (
 )
 
 // index makes the tarball it, at its canonical path, the one file of its
-// version, with the version's Metadata, sets the properties that follow
-// from its package.json, and gives the version latest when rule 2 or 3
-// says so (claimLatest), by the dist-tags the tarball carries. Those are
-// the write's own, or a copy's or a restore's carried over.
+// version, with the version's Metadata, signed with c's primary key pair
+// when that signs (SignerFor), sets the properties that follow from its
+// package.json, and gives the version latest when rule 2 or 3 says so
+// (claimLatest), by the dist-tags the tarball carries. Those are the
+// write's own, or a copy's or a restore's carried over. 7.x signs each
+// package of a signing repository as it is published (decision 0034,
+// "Signatures"), and every route that lands a tarball indexes it here.
 func (h Handler) index(
 	ctx context.Context,
-	st format.Store,
+	env format.Env,
 	c repo.Config,
 	it model.Item,
 	t *Tarball,
 ) error {
+	st := env.Store
+	signer, err := SignerFor(ctx, env.Keys, c)
+	if err != nil {
+		return err
+	}
 	props, err := setProperties(ctx, st, it, t)
+	if err != nil {
+		return err
+	}
+	meta, err := metadataOf(t, it, props, signer)
 	if err != nil {
 		return err
 	}
@@ -46,7 +58,7 @@ func (h Handler) index(
 		return fmt.Errorf("npm: version %s of %s: %w", t.Version, t.Name, err)
 	}
 	pv, err := pkgindex.Sync(ctx, st, p, pkgindex.IndexedVersion{
-		Version: t.Version, Created: at, Metadata: metadataOf(t, it, props).encode(),
+		Version: t.Version, Created: at, Metadata: meta.encode(),
 		Files: []int64{it.ID},
 	})
 	if err != nil {
@@ -277,6 +289,13 @@ func (h Handler) reindex(ctx context.Context, env format.Env, c repo.Config) err
 		}
 	}
 	err = st.Tx(ctx, func(ctx context.Context) error {
+		// A reindex signs every version with the primary pair as it now
+		// is: 7.x signs a repository's existing packages by reindexing it
+		// when its key pair is set (decision 0034, "Signatures").
+		signer, err := SignerFor(ctx, env.Keys, c)
+		if err != nil {
+			return err
+		}
 		hits, err := st.Items().Search(ctx, tarballQuery(c, true), aql.Options{})
 		if err != nil {
 			return fmt.Errorf("npm: tarballs of %s: %w", c.Key, err)
@@ -297,9 +316,13 @@ func (h Handler) reindex(ctx context.Context, env format.Env, c repo.Config) err
 				byName[t.Name] = p
 			}
 			p.Created = earliest(p.Created, at)
+			meta, err := metadataOf(t, h.Item, h.Properties, signer)
+			if err != nil {
+				return err
+			}
 			p.Versions = append(p.Versions, pkgindex.IndexedVersion{
 				Version: t.Version, Created: at,
-				Metadata: metadataOf(t, h.Item, h.Properties).encode(), Files: []int64{h.Item.ID},
+				Metadata: meta.encode(), Files: []int64{h.Item.ID},
 			})
 		}
 		want := make([]pkgindex.Indexed, 0, len(byName))

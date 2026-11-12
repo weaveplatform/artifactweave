@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "pub",
   "name": "Dart pub hosted registry",
-  "client": "Dart/pub 3.15.0",
+  "client": "Dart/pub 3.14.0",
   "version_sources": [
     "test/acceptance/clients/dart.Dockerfile"
   ],

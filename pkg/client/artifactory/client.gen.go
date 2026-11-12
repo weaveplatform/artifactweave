@@ -372,6 +372,7 @@ func (e CopyOrMoveMessageLevel) Valid() bool {
 
 // Defines values for KeyPairInputPairType.
 const (
+	ECDSA   KeyPairInputPairType = "ECDSA"
 	Ed25519 KeyPairInputPairType = "Ed25519"
 	GPG     KeyPairInputPairType = "GPG"
 	RSA     KeyPairInputPairType = "RSA"
@@ -380,6 +381,8 @@ const (
 // Valid indicates whether the value is a known member of the KeyPairInputPairType enum.
 func (e KeyPairInputPairType) Valid() bool {
 	switch e {
+	case ECDSA:
+		return true
 	case Ed25519:
 		return true
 	case GPG:
@@ -4768,7 +4771,7 @@ type KeyPairInput struct {
 	// PairName Required within this object. Unique name of the pair; it is the identifier in every other key-pair operation and in a repository's primaryKeyPairRef and secondaryKeyPairRef fields.
 	PairName string `json:"pairName"`
 
-	// PairType Required within this object. RSA for Alpine signing; GPG for Debian, RPM and Opkg metadata, Helm provenance and Terraform provider registries; Ed25519 for Nix binary caches.
+	// PairType Required within this object. RSA for Alpine signing; GPG for Debian, RPM and Opkg metadata, Helm provenance and Terraform provider registries; Ed25519 for Nix binary caches; ECDSA (P-256, P-384 or P-521, as PEM or gpg's ASCII-armored export) for npm package signatures (decision 0034). The REST spelling ECDSA is inferred from the Keys Management type.
 	PairType KeyPairInputPairType `json:"pairType"`
 
 	// Passphrase Optional within this object. Passphrase protecting privateKey, if any. Stored sealed and never returned.
@@ -4793,7 +4796,7 @@ type KeyPairInput struct {
 	} `json:"vaultPublicKey,omitempty"`
 }
 
-// KeyPairInputPairType Required within this object. RSA for Alpine signing; GPG for Debian, RPM and Opkg metadata, Helm provenance and Terraform provider registries; Ed25519 for Nix binary caches.
+// KeyPairInputPairType Required within this object. RSA for Alpine signing; GPG for Debian, RPM and Opkg metadata, Helm provenance and Terraform provider registries; Ed25519 for Nix binary caches; ECDSA (P-256, P-384 or P-521, as PEM or gpg's ASCII-armored export) for npm package signatures (decision 0034). The REST spelling ECDSA is inferred from the Keys Management type.
 type KeyPairInputPairType string
 
 // KeyPairSummary The readable projection of a key pair. Reads never include private material or the passphrase.
@@ -4804,7 +4807,7 @@ type KeyPairSummary struct {
 	// PairName Optional within this object. Pair name, the identifier.
 	PairName *string `json:"pairName,omitempty"`
 
-	// PairType Optional within this object. RSA, GPG or Ed25519.
+	// PairType Optional within this object. RSA, GPG, Ed25519 or ECDSA.
 	PairType *string `json:"pairType,omitempty"`
 
 	// PublicKey Optional within this object. The public key material.

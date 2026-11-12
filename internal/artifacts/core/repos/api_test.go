@@ -386,6 +386,12 @@ func TestUnitRepositoriesOwesReindex(t *testing.T) {
 	untyped := repo.Config{Key: "tf", Class: repo.Local, PackageType: repo.Terraform}
 	typed := untyped
 	typed.TerraformType = repo.TerraformModule
+	npm := func(class repo.Class, primary, secondary string) repo.Config {
+		return repo.Config{
+			Key: "n", Class: class, PackageType: repo.NPM,
+			PrimaryKeyPairRef: primary, SecondaryKeyPairRef: secondary,
+		}
+	}
 	for name, tc := range map[string]struct {
 		stored, updated repo.Config
 		want            bool
@@ -393,6 +399,13 @@ func TestUnitRepositoriesOwesReindex(t *testing.T) {
 		"type given": {untyped, typed, true},
 		"type kept":  {typed, typed, false},
 		"still none": {untyped, untyped, false},
+		// An npm repository signs every version again when its primary
+		// pair changes (decision 0034, "Signatures").
+		"npm primary set":     {npm(repo.Local, "", ""), npm(repo.Local, "k1", ""), true},
+		"npm primary changed": {npm(repo.Local, "k1", ""), npm(repo.Local, "k2", "k1"), true},
+		"npm primary cleared": {npm(repo.Federated, "k1", ""), npm(repo.Federated, "", ""), true},
+		"npm primary kept":    {npm(repo.Local, "k1", ""), npm(repo.Local, "k1", "k2"), false},
+		"npm remote":          {npm(repo.Remote, "", ""), npm(repo.Remote, "k1", ""), false},
 		"not terraform": {
 			repo.Config{Key: "g", PackageType: repo.Generic},
 			repo.Config{Key: "g", PackageType: repo.Generic, TerraformType: repo.TerraformModule},

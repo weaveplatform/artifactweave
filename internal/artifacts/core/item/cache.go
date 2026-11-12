@@ -346,8 +346,22 @@ func remoteMIME(u CacheUpload, body *bufio.Reader) error {
 	return remoteExpectedMIME(u, body)
 }
 
+// remoteCheckedType is the type remoteExpectedMIME holds an upstream's
+// label of the file at p to. A .box is checked as the untyped file it was
+// before it had a type: an upstream other than Artifactory may label a box
+// as a tar, a gzip or binary/octet-stream file, which a check against the
+// box type would refuse, where Artifactory refuses only the labels on its
+// block list (HttpRepo.blockMismatchingMimeTypes in 6.20).
+func remoteCheckedType(p string) string {
+	expected, _, _ := mime.ParseMediaType(MimeType(p))
+	if expected == vagrantBoxType {
+		return "application/octet-stream"
+	}
+	return expected
+}
+
 func remoteExpectedMIME(u CacheUpload, body *bufio.Reader) error {
-	expected, _, _ := mime.ParseMediaType(MimeType(u.Token.Key.Path))
+	expected := remoteCheckedType(u.Token.Key.Path)
 	if u.ExpectedContentType != "" {
 		var err error
 		expected, _, err = mime.ParseMediaType(u.ExpectedContentType)

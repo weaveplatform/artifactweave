@@ -94,7 +94,7 @@ func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it
 		return err
 	}
 	if t := in.tarball; t != nil && it.FullPath() == CanonicalPath(t.Name, t.Version) {
-		return h.index(ctx, env.Store, c, it, t)
+		return h.index(ctx, env, c, it, t)
 	}
 	return h.unindex(ctx, env.Store, it)
 }
