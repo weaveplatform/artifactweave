@@ -215,8 +215,8 @@ func TestAccP2VirtualRejectsForgedMemberSelectionAndCycle(t *testing.T) {
 		}
 	}
 	for _, bad := range []string{
-		"__p2/0", "__p2/x/content.jar", "__p2/-1/content.jar",
-		"__p2/01/content.jar", "__p2/1/content.jar", "__p2/0/unknown.txt",
+		"p2-safe-member", "p2-other/content.jar", "p2-cycle-virtual/content.jar",
+		"__p2/0/content.jar", "p2-safe-member/unknown.txt",
 	} {
 		res := w.do(http.MethodGet, "/artifactory/p2-safe-virtual/"+bad, "admin", "")
 		if res.Code == http.StatusOK || childReads != 0 {
@@ -228,7 +228,12 @@ func TestAccP2VirtualRejectsForgedMemberSelectionAndCycle(t *testing.T) {
 			)
 		}
 	}
-	res := w.do(http.MethodGet, "/artifactory/p2-safe-virtual/__p2/0/content.jar", "admin", "")
+	res := w.do(
+		http.MethodGet,
+		"/artifactory/p2-safe-virtual/p2-safe-member/content.jar",
+		"admin",
+		"",
+	)
 	if res.Code != http.StatusOK || childReads != 1 ||
 		!bytes.Equal(res.Body.Bytes(), p2Fixture(t, "content.jar")) {
 		t.Fatalf("valid member route changed: %d, reads %d", res.Code, childReads)
@@ -348,10 +353,9 @@ func TestAccP2VirtualInventoryKeepsOnlyReadableNativeMembersInOrder(t *testing.T
 	}
 	res := w.do(http.MethodGet, "/artifactory/p2-inventory-root/compositeContent.xml", "admin", "")
 	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `children size="3"`) ||
-		!strings.Contains(res.Body.String(), "__p2/0") ||
-		!strings.Contains(res.Body.String(), "__p2/1") ||
-		!strings.Contains(res.Body.String(), "__p2/2") ||
-		strings.Contains(res.Body.String(), "__p2/3") {
+		!strings.Contains(res.Body.String(), "<child location=\"p2-inventory-remote\"/>\n"+
+			"<child location=\"p2-inventory-nested\"/>\n"+
+			"<child location=\"p2-inventory-local\"/>\n") {
 		t.Fatalf("virtual native member order/filter changed: %d %s", res.Code, res.Body)
 	}
 	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
@@ -365,7 +369,7 @@ func TestAccP2VirtualInventoryKeepsOnlyReadableNativeMembersInOrder(t *testing.T
 	}
 	res = w.do(http.MethodGet, "/artifactory/p2-inventory-root/compositeContent.xml", "user", "")
 	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `children size="0"`) ||
-		strings.Contains(res.Body.String(), "__p2/") {
+		strings.Contains(res.Body.String(), "<child ") {
 		t.Fatalf("virtual-only grant disclosed member inventory: %d %s", res.Code, res.Body)
 	}
 	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
@@ -383,7 +387,12 @@ func TestAccP2VirtualInventoryKeepsOnlyReadableNativeMembersInOrder(t *testing.T
 	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `children size="1"`) {
 		t.Fatalf("narrow member not traversable in virtual inventory: %d %s", res.Code, res.Body)
 	}
-	res = w.do(http.MethodGet, "/artifactory/p2-inventory-root/__p2/0/content.jar", "user", "")
+	res = w.do(
+		http.MethodGet,
+		"/artifactory/p2-inventory-root/p2-inventory-remote/content.jar",
+		"user",
+		"",
+	)
 	if res.Code != http.StatusForbidden {
 		t.Fatalf("virtual path bypassed member file denial: %d %s", res.Code, res.Body)
 	}

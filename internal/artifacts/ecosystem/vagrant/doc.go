@@ -13,15 +13,16 @@
 // service through the format hooks (decision 0032), so every write and
 // property change in a Vagrant repository reaches it whichever API carried
 // it; the slice's http package (artifacts/ecosystem/vagrant/http) serves
-// the box catalog over what it keeps.
+// the box catalog over what it keeps, and the boxes.
 //
 // # Inputs
 //
 //   - Driving: the format registry (artifacts/ecosystem), which hands the
 //     item service's hooks for vagrant repositories to Handler, and the
 //     work queue, which runs every format's reindex through it; and the
-//     protocol, which checks a box name (ValidName) and reads each box's
-//     identity and provider from its properties (Verified).
+//     protocol, which tells a box file's path from a box name (IsBoxPath),
+//     checks a box name (ValidName) and reads each box's identity and
+//     provider from its properties (Verified).
 //   - Driven: the format hooks' environment (format.Env): its blobs hold
 //     the boxes, and its store holds the items, their properties and the
 //     package index (artifacts/core/pkgindex). The generic deploy policy
@@ -45,7 +46,7 @@
 //     verify.
 //   - The derived vagrant.provider, vagrant.architecture and vagrant.sha256
 //     item properties on each stored box.
-//   - The rules the protocol shares: Identity, Box, ValidName,
+//   - The rules the protocol shares: Identity, Box, IsBoxPath, ValidName,
 //     ValidComponent, Properties, Verified, ReadBox, the identity property
 //     names (PropName, PropProvider and PropVersion) and MaxArchiveBytes.
 //
@@ -61,11 +62,12 @@
 //     zero padding may follow its end; every ZIP member's checksum is
 //     checked.
 //   - Only local and federated repositories take a box, and every write but
-//     a checksum deploy must be one (400). A box_name is <name> or
-//     <namespace>/<name>, each part at most 128 letters, digits, dots,
-//     underscores and hyphens, starting with a letter or digit; a
-//     box_version is a dotted version of at most 128 bytes, with an
-//     optional hyphenated pre-release.
+//     a checksum deploy must be one (400). A box is stored only at a path
+//     IsBoxPath accepts (400), which the protocol serves as a box file. A
+//     box_name is <name> or <namespace>/<name>, each part at most 128
+//     letters, digits, dots, underscores and hyphens, starting with a
+//     letter or digit; a box_version is a dotted version of at most 128
+//     bytes, with an optional hyphenated pre-release.
 //   - The index is rebuilt from the recorded properties alone, so a
 //     property change never decompresses a VM disk; a box whose recorded
 //     SHA-256 or provider no longer agrees with it is not indexed. Only the

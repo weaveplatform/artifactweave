@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
@@ -42,7 +41,7 @@ func (Handler) Inspect(
 	_ repo.Config,
 	w format.Write,
 ) (any, error) {
-	if w.Op == format.OpChecksum || !strings.HasSuffix(w.Path, ".box") {
+	if w.Op == format.OpChecksum || !IsBoxPath(w.Path) {
 		return inspection{}, nil
 	}
 	b, err := readStored(ctx, env, w.Checksums.SHA256)
@@ -75,7 +74,7 @@ func (Handler) Admit(
 			"Vagrant supports local and federated repositories",
 		)
 	}
-	if !strings.HasSuffix(w.Path, ".box") {
+	if !IsBoxPath(w.Path) {
 		return w, format.Rejectf(http.StatusBadRequest, "Vagrant artifacts must be .box archives")
 	}
 	id, ok := Properties(w.Properties)
@@ -101,7 +100,7 @@ func (Handler) Admit(
 // other paths change nothing; a box that no longer reads as valid fails
 // with 400.
 func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
-	if it.Folder || it.Cached || !strings.HasSuffix(it.FullPath(), ".box") {
+	if it.Folder || it.Cached || !IsBoxPath(it.FullPath()) {
 		return nil
 	}
 	b, err := boxFor(ctx, env, it.Actual.SHA256)
@@ -225,7 +224,7 @@ func eachItem(
 			return fmt.Errorf("vagrant: list boxes: %w", err)
 		}
 		for _, it := range items {
-			if it.Folder || !strings.HasSuffix(it.FullPath(), ".box") {
+			if it.Folder || !IsBoxPath(it.FullPath()) {
 				continue
 			}
 			if err := visit(it); err != nil {

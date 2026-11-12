@@ -27,6 +27,7 @@ import (
 	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	tf "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraform"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
@@ -57,7 +58,7 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		t.Fatal(err)
 	}
 	if err := f.db.Permissions().
-		Create(t.Context(), accesstest.Permission{Name: "remote-read", Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead}}, Targets: map[string]accesstest.Target{"remote": {Include: []string{"ns/name/aws/1.0.0.zip"}}}}}}); err != nil {
+		Create(t.Context(), accesstest.Permission{Name: "remote-read", Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead}}, Targets: map[string]accesstest.Target{"remote": {Include: []string{"ns/name/aws/1.0.0.zip", "archives/1.0.0.zip"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	resolver, err := upstream.NewResolver(
@@ -291,9 +292,12 @@ func TestAccRemoteSignedModuleRejectsChangedClaimsBeforeFetch(t *testing.T) {
 	}{
 		{"missing credential", func(c *claims) { c.Credential = nil }},
 		{"missing source", func(c *claims) { c.Source = nil }},
-		{"path without repository components", func(c *claims) { c.Path = "module.zip" }},
-		{"unsupported archive extension", func(c *claims) { c.Path = "ns/name/aws/1.0.0.exe" }},
-		{"unparseable module version", func(c *claims) { c.Path = "ns/name/aws/not-semver.zip" }},
+		// The cache path is the archive URL's, so a URL that names the
+		// module's old identity path, or any other, is refused.
+		{"identity path", func(c *claims) { c.Path = "ns/name/aws/1.0.0.zip" }},
+		{"unsupported archive extension", func(c *claims) { c.Path = "archives/1.0.0.exe" }},
+		{"module without repository components", func(c *claims) { c.Module = "module" }},
+		{"unparseable module version", func(c *claims) { c.Module = "ns/name/aws/not-semver" }},
 		{"changed source identity", func(c *claims) { changed := *c.Source; changed.ID = "different-source"; c.Source = &changed }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -455,7 +459,7 @@ func TestUnitRemoteModuleDeliveryRejectsUnreadableAndRevokedSources(t *testing.T
 	}
 	denied := source.ErrDenied
 	var checked []string
-	fence := combineModuleFences([]source.Result{{
+	scope := source.Result{
 		CheckRead: func(_ context.Context, path string) error {
 			checked = append(checked, path)
 			if path == "private.zip" {
@@ -463,17 +467,23 @@ func TestUnitRemoteModuleDeliveryRejectsUnreadableAndRevokedSources(t *testing.T
 			}
 			return nil
 		},
-	}}, readCheck, []string{"public.zip", "private.zip"})
+	}
+	fence := combineModuleFences(
+		[]source.Result{scope},
+		readCheck,
+		within(scope, "public.zip", "private.zip"),
+	)
 	if err := fence(t.Context()); !errors.Is(err, denied) || len(checked) != 2 {
 		t.Fatalf("changed item permissions were not fenced: paths=%v err=%v", checked, err)
 	}
 	called := false
-	fence = combineModuleFences([]source.Result{{Revalidate: func(context.Context) error {
+	scope = source.Result{Revalidate: func(context.Context) error {
 		return denied
 	}, CheckRead: func(context.Context, string) error {
 		called = true
 		return nil
-	}}}, readCheck, []string{"private.zip"})
+	}}
+	fence = combineModuleFences([]source.Result{scope}, readCheck, within(scope, "private.zip"))
 	if err := fence(t.Context()); !errors.Is(err, denied) || called {
 		t.Fatalf("revoked source reached descendant check: called=%t err=%v", called, err)
 	}
@@ -481,7 +491,7 @@ func TestUnitRemoteModuleDeliveryRejectsUnreadableAndRevokedSources(t *testing.T
 	// CheckRead applies, so a release whose file the patterns reject stays
 	// listed (R3); a result without the check fences nothing more.
 	checked = nil
-	fence = combineModuleFences([]source.Result{{
+	scope = source.Result{
 		CheckRead: func(context.Context, string) error {
 			t.Fatal("a listing's fence applied the download policy")
 			return nil
@@ -490,11 +500,20 @@ func TestUnitRemoteModuleDeliveryRejectsUnreadableAndRevokedSources(t *testing.T
 			checked = append(checked, path)
 			return nil
 		},
-	}}, permissionCheck, []string{"public.zip"})
+	}
+	fence = combineModuleFences(
+		[]source.Result{scope},
+		permissionCheck,
+		within(scope, "public.zip"),
+	)
 	if err := fence(t.Context()); err != nil || len(checked) != 1 {
 		t.Fatalf("listing fence: paths=%v err=%v", checked, err)
 	}
-	if err := combineModuleFences([]source.Result{{}}, permissionCheck, []string{"public.zip"})(
+	if err := combineModuleFences(
+		[]source.Result{{}},
+		permissionCheck,
+		within(source.Result{}, "public.zip"),
+	)(
 		t.Context(),
 	); err != nil {
 		t.Fatalf("a result without CheckPermission failed its fence: %v", err)
@@ -510,6 +529,7 @@ func TestUnitRemoteModuleDeliveryRejectsUnreadableAndRevokedSources(t *testing.T
 	h = handler{o: Options{Now: time.Now}}
 	if target, err := h.remoteDownloadURL(
 		r,
+		tf.Module{Namespace: "ns", Name: "name", System: "aws", Version: "1.0.0"},
 		"ns/name/aws/1.0.0.zip",
 		strings.Repeat("0", 64),
 		artmodel.SourceIdentity{},
@@ -920,6 +940,8 @@ func TestAccRemoteModuleExternalOriginCredentialPolicy(t *testing.T) {
 	if e := f.db.Repos().Update(t.Context(), c); e != nil {
 		t.Fatal(e)
 	}
+	// An archive outside the remote's URL is cached under external/.
+	f.grant("external/**")
 	expect(t, f.do("GET", remoteModuleBase+"1.0.0/download", "reader"), 502)
 	if len(other.Requests()) != 0 {
 		t.Fatal("allow pattern bypassed private address policy")

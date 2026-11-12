@@ -177,4 +177,4 @@ Feature: NuGet clients publish and delete packages
     Examples:
       | dotnet  |
       | .NET    |
-      | .NET 11 |
+      | .NET 10 |

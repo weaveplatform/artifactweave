@@ -81,6 +81,12 @@ func ValidName(s string) bool {
 	return true
 }
 
+// IsBoxPath reports whether a box may be stored at path: it ends .box. The
+// hooks admit and index a box only at such a path, and the native route
+// serves such a path as a box file, so every box the catalog lists is one
+// that route serves.
+func IsBoxPath(path string) bool { return strings.HasSuffix(path, ".box") }
+
 // Properties returns the identity p gives a box and reports whether it is
 // complete and valid: exactly one value each for box_name, box_provider and
 // box_version, a valid name (ValidName) and provider (ValidComponent), and

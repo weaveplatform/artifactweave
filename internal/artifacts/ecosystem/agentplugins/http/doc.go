@@ -25,8 +25,8 @@
 //     read from, and which resolves the repository and the caller's access
 //     and writes errors; the generic download policy
 //     (artifacts/ecosystem/generic); and the format package
-//     (artifacts/ecosystem/agentplugins), whose IsMarketplace,
-//     IsReservedMarketplace and Marketplace name and render the files.
+//     (artifacts/ecosystem/agentplugins), whose IsMarketplace and
+//     Marketplace name and render the files.
 //
 // # Outputs
 //
@@ -34,9 +34,8 @@
 //     RegisterAgentMarketplaceRoutes mounts GET and HEAD of
 //     /artifactory/api/agentplugins/{repoKey}/{marketplace}.
 //   - TryAgentMarketplaceItem: the overlay that serves a marketplace file at
-//     a local Agent Plugins repository's root, answers 404 for a reserved
-//     name that is no marketplace, and leaves every other request to the
-//     overlays after it and the generic lookup.
+//     a local Agent Plugins repository's root, and leaves every other
+//     request to the overlays after it and the generic lookup.
 //
 // # Invariants
 //
@@ -59,7 +58,7 @@
 //   - Decision 0032: docs/research/decisions/0032-package-format-handlers.md
 //     (format routes come before the generic item lookup, in a fixed order).
 //   - docs/research/33-package-formats.md, "Agent Plugins" (the contract,
-//     the marketplace files and the 7.161.32 version boundary).
+//     the marketplace files and the 7.173.8 version boundary).
 //   - JFrog Agent Plugins repositories:
 //     https://docs.jfrog.com/artifactory/docs/agent-plugins-repositories.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
@@ -71,13 +70,15 @@
 //     and #p9d-modular-monolith-migration, epic WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
 //   - https://github.com/weaveplatform/artifactweave/issues/690,
-//     https://github.com/weaveplatform/artifactweave/issues/1086 and
-//     https://github.com/weaveplatform/artifactweave/issues/1090
+//     https://github.com/weaveplatform/artifactweave/issues/1086,
+//     https://github.com/weaveplatform/artifactweave/issues/1090 and
+//     https://github.com/weaveplatform/artifactweave/issues/1255
 //
 // # Status
 //
 // Implemented P9b (newly identified Artifactory formats), as the server
-// root's agentplugins.go. P9d moved it here (WEB-17).
+// root's agentplugins.go. P9d moved it here (WEB-17). Issue 1255 added
+// vscode-marketplace.json, which self-managed 7.173.8 renders.
 //
 // # Testing
 //

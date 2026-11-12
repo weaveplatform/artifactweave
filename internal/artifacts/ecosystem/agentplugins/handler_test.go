@@ -119,8 +119,7 @@ func TestUnitHandlerMissingBlobAndReindexFault(t *testing.T) {
 		rootOnly,
 		c,
 		it,
-	); err == nil ||
-		!strings.Contains(err.Error(), "root-only") {
-		t.Fatalf("root-only target bundle: %v", err)
+	); !errors.Is(err, ErrArchive) {
+		t.Fatalf("root-only bundle that does not conform: %v", err)
 	}
 }

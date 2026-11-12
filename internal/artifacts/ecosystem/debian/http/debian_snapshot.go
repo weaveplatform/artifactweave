@@ -18,9 +18,11 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -313,7 +315,7 @@ func (s DebianAPI) debianSnapshotFiles(
 	base := "dists/" + distribution + "/"
 	release, _, err := s.debianMemberBytes(ctx, st, c, base+"Release", p, acc)
 	if err != nil {
-		return nil, fmt.Errorf("snapshot Release: %w", err)
+		return nil, fmt.Errorf("snapshot Release: %w", snapshotReadError(err, p))
 	}
 	refs, err := debian.ReleaseIndexRefs(distribution, release)
 	if err != nil {
@@ -327,7 +329,7 @@ func (s DebianAPI) debianSnapshotFiles(
 		}
 		body, checkPermission, err := s.debianMemberBytes(ctx, st, c, ref.Path, p, acc)
 		if err != nil {
-			return nil, fmt.Errorf("snapshot index %s: %w", ref.Path, err)
+			return nil, fmt.Errorf("snapshot index %s: %w", ref.Path, snapshotReadError(err, p))
 		}
 		if int64(len(body)) != ref.Size ||
 			fmt.Sprintf("%x", sha256.Sum256(body)) != ref.SHA256 {
@@ -348,7 +350,8 @@ func (s DebianAPI) debianSnapshotFiles(
 				}
 				if checkPermission != nil {
 					if err := checkPermission(ctx, artifact); err != nil {
-						return nil, fmt.Errorf("snapshot artifact authority: %w", err)
+						return nil, fmt.Errorf("snapshot artifact authority: %w",
+							snapshotReadError(err, p))
 					}
 				}
 			}
@@ -366,11 +369,27 @@ func (s DebianAPI) debianSnapshotFiles(
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("snapshot %s: %w", suffix, err)
+			return nil, fmt.Errorf("snapshot %s: %w", suffix, snapshotReadError(err, p))
 		}
 		files[base+suffix] = body
 	}
 	return files, nil
+}
+
+// snapshotReadError answers a read of the source that the caller may not
+// make as snapshotRepos answers a Release the caller may not read: 403, or
+// 401 to an anonymous caller (#1258). A Release that the caller may read can
+// still declare an index that a permission target excludes, and the bare
+// source.ErrDenied that debianMemberBytes or a remote source's package check
+// returns then would answer 500. A download policy refusal carries
+// source.ErrDenied as well, so that a virtual merge passes over the member,
+// but it keeps the policy's 404 and message (pkgroute.IsRefusal): read
+// permission was settled before the policy was asked (DV-057).
+func snapshotReadError(err error, p kernel.Principal) error {
+	if errors.Is(err, source.ErrDenied) && !pkgroute.IsRefusal(err) {
+		return httpkit.Denied(p)
+	}
+	return err
 }
 
 // RegisterDebianSnapshotRoutes mounts the snapshot reads, GET and HEAD of

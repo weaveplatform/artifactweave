@@ -49,6 +49,9 @@
 //   - An archive's content has the type its name gives, and holds only
 //     regular files and folders with clean paths, within 10,000 entries
 //     and 512 MiB.
+//   - Only an upload that breaks those rules is refused (409). A stored
+//     upload that cannot be read is no invalid publication: the read's
+//     error fails the write (500).
 //   - Nothing is derived into storage: the registry view is computed from
 //     the current stored files, so no second copy of the metadata can go
 //     stale.
@@ -82,6 +85,9 @@
 //   - bazelmodules_test.go: paths and module identity, the integrity
 //     encoding, the strip prefix of real archive layouts, and admission of
 //     invalid paths.
+//   - readfault_test.go: an upload whose content fails a read at any point,
+//     on a store with ReadAt or one that can only seek, is an error, not an
+//     invalid publication, and invalid uploads are still refused 409.
 //
 // The hooks are also tested end to end through the protocol, whose
 // package runs the pinned Bazel client (TestAccBazelClient).
