@@ -17,6 +17,11 @@
 //   - TestAccAgentPackagesAPMProtocolAndLifecycle: APM publish, version
 //     listing, download and search in local and federated repositories, with
 //     the permission and size limits, and deletion with the trash can on.
+//   - TestAccAgentPackagesDownloadPolicy: the blackout and the include and
+//     exclude patterns on the version list and the download (issue 1251).
+//   - TestAccAgentPackagesStoreFaults, in agentpackages_fault_test.go: the
+//     500 a store fault answers on the version list and the download, without
+//     the caching headers of a served answer.
 //
 // # References
 //
