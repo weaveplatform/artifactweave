@@ -17,6 +17,7 @@ var indexes = map[string]string{
 	"claude-marketplace.json": "claude",
 	"cursor-marketplace.json": "cursor",
 	"codex-marketplace.json":  "codex",
+	"vscode-marketplace.json": "vscode",
 }
 
 // ErrMarketplace is what Marketplace returns, wrapped with the name, for a
@@ -25,18 +26,13 @@ var ErrMarketplace = errors.New("agentplugins: unknown agent plugin marketplace"
 
 // IsMarketplace reports whether name is one of the marketplace files a local
 // Agent Plugins repository renders at its root: marketplace.json, which
-// lists every plugin, and claude-marketplace.json, cursor-marketplace.json
-// and codex-marketplace.json, which list the plugins carrying that
-// harness's manifest.
+// lists every plugin; claude-marketplace.json and codex-marketplace.json,
+// which list the plugins carrying that harness's manifest;
+// cursor-marketplace.json, which lists those with a Cursor manifest or a
+// conforming root plugin.json; and vscode-marketplace.json, which lists
+// those with a conforming root plugin.json only (the Agent Plugins
+// Repositories docs' "Marketplace Files and Indexing" table, 7.173.8).
 func IsMarketplace(name string) bool { _, ok := indexes[name]; return ok }
-
-// IsReservedMarketplace reports whether name is a marketplace file or
-// vscode-marketplace.json. The 7.161.32 target does not render the VS Code
-// file, which arrived in a later JFrog release, so the item routes answer
-// 404 for it, but no upload may take the name either.
-func IsReservedMarketplace(name string) bool {
-	return IsMarketplace(name) || name == "vscode-marketplace.json"
-}
 
 // Marketplace selects each package's latest readable version. Rendering for
 // each caller avoids exposing ZIPs hidden by path-scoped Read permissions.
@@ -73,7 +69,7 @@ func Marketplace(
 						err,
 					)
 				}
-				if !can(meta.Path) || harness != "" && !slices.Contains(meta.Harnesses, harness) {
+				if !can(meta.Path) || !meta.listedIn(harness) {
 					continue
 				}
 				entry, err := marketplaceEntry(meta, harness)
@@ -102,21 +98,62 @@ func Marketplace(
 	return out, nil
 }
 
-func marketplaceEntry(meta Metadata, harness string) (map[string]any, error) {
-	manifestHarness := harness
-	if manifestHarness == "" {
+// listedIn reports whether the marketplace file of harness lists this
+// version: the unified file lists every version, the VS Code file only the
+// standard layout, the Cursor file a Cursor manifest or the standard
+// layout, and the others their own harness's manifest.
+func (m Metadata) listedIn(harness string) bool {
+	switch harness {
+	case "":
+		return true
+	case "vscode":
+		return len(m.Standard) > 0
+	case "cursor":
+		return len(m.Standard) > 0 || slices.Contains(m.Harnesses, harness)
+	default:
+		return slices.Contains(m.Harnesses, harness)
+	}
+}
+
+// manifestFor picks the manifest whose fields fill the entry, and reports
+// whether it is the root plugin.json. A harness's own manifest comes
+// first: the docs have the Cursor file use .cursor-plugin/plugin.json when
+// a bundle carries it beside a conforming root plugin.json, and the
+// unified file keeps, for a bundle with both layouts, the first of the
+// Claude, Cursor and Codex manifests that it used before the standard was
+// indexed [I]. The root plugin.json fills the rest.
+func (m Metadata) manifestFor(harness string) (json.RawMessage, bool) {
+	switch harness {
+	case "vscode":
+		return m.Standard, true
+	case "":
 		for _, h := range []string{"claude", "cursor", "codex"} {
-			if slices.Contains(meta.Harnesses, h) {
-				manifestHarness = h
-				break
+			if slices.Contains(m.Harnesses, h) {
+				return m.Manifests[h], false
 			}
 		}
+		return m.Standard, true
+	case "cursor":
+		if !slices.Contains(m.Harnesses, harness) {
+			return m.Standard, true
+		}
 	}
+	return m.Manifests[harness], false
+}
+
+func marketplaceEntry(meta Metadata, harness string) (map[string]any, error) {
 	entry := map[string]any{}
-	if raw := meta.Manifests[manifestHarness]; len(raw) > 0 {
+	raw, standard := meta.manifestFor(harness)
+	if len(raw) > 0 {
 		if err := json.Unmarshal(raw, &entry); err != nil {
 			return nil, fmt.Errorf("agentplugins: manifest of %s: %w", meta.Name, err)
 		}
+	}
+	// The root plugin.json's $schema names a closed schema with no source
+	// field, so an entry that kept it would claim a schema it fails [I].
+	// Harness manifests keep any $schema of their own, as they always have.
+	if standard {
+		delete(entry, "$schema")
 	}
 	entry["name"] = meta.Name
 	entry["version"] = meta.Version

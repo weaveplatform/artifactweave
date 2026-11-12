@@ -11,7 +11,8 @@
   "fresh_home": "Use a temporary JFrog CLI home and a separate AW_PLUGIN_HOME; run plugin operations with env HOME=\"$AW_PLUGIN_HOME\" so no real Cursor or Claude installation is modified.",
   "prerequisites": [
     "Local agentplugins repository.",
-    "A plugin/ directory containing .cursor-plugin/plugin.json with name hello-plugin and version 1.0.0."
+    "A plugin/ directory containing .cursor-plugin/plugin.json with name hello-plugin and version 1.0.0.",
+    "For the Agent Plugins Standard, a standard/ directory whose root plugin.json sets $schema to https://agent-plugins.org/schemas/1.0.0/plugin.schema.json and name to hello-standard, and validates against that schema."
   ],
   "configure": [
     {
@@ -33,22 +34,34 @@
         "language": "sh",
         "code": "env HOME=\"$AW_PLUGIN_HOME\" jf agent plugins publish plugin --repo \"$AW_REPO\" --version 1.0.0",
         "note": ""
+      },
+      {
+        "language": "sh",
+        "code": "env HOME=\"$AW_PLUGIN_HOME\" jf agent plugins publish standard --repo \"$AW_REPO\" --version 1.0.0",
+        "note": "A root plugin.json that does not validate against the Agent Plugins 1.0.0 schema is not the standard layout: on its own the upload answers 409."
       }
     ]
   },
   "install": {
     "classes": "L",
-    "note": "The native CLI installs the Cursor plugin into the isolated home.",
+    "note": "The native CLI installs the Cursor plugin, and the standard plugin for VS Code and Cursor, into the isolated home. VS Code discovers it under .copilot/installed-plugins/<repository key>/.",
     "steps": [
       {
         "language": "sh",
         "code": "env HOME=\"$AW_PLUGIN_HOME\" jf agent plugins install hello-plugin --harness cursor --repo \"$AW_REPO\" --version 1.0.0\nenv HOME=\"$AW_PLUGIN_HOME\" jf agent plugins list --harness cursor --format json",
+        "note": ""
+      },
+      {
+        "language": "sh",
+        "code": "env HOME=\"$AW_PLUGIN_HOME\" jf agent plugins install hello-standard --harness vscode --repo \"$AW_REPO\" --version 1.0.0\nenv HOME=\"$AW_PLUGIN_HOME\" jf agent plugins install hello-standard --harness cursor --repo \"$AW_REPO\" --version 1.0.0",
         "note": ""
       }
     ]
   },
   "limitations": [
     "Claude marketplace JSON and ZIP authorization are tested, but this recipe claims the actual Cursor adapter install performed by JFrog CLI, not a Claude desktop install.",
+    "vscode-marketplace.json is served and tested as JSON, but no pinned client reads it: JFrog CLI installs --harness vscode from marketplace.json, and VS Code has no native connection to an HTTP marketplace of ZIP sources.",
+    "Pass --version to jf agent plugins install. Without it the CLI looks the marketplace file up with an AQL search, which does not find the marketplace files the registry renders for each reader.",
     "Remote, virtual and federated classes are unsupported."
   ],
   "evidence": [
@@ -58,7 +71,11 @@
         "agent plugins publish plugin --repo plugins-clients --version 1.0.0",
         "agent plugins install hello-plugin --harness cursor",
         "Then the response status is 403",
-        "Then the response status is 401"
+        "Then the response status is 401",
+        "agent plugins publish standard --repo plugins-standard --version 1.0.0",
+        "/artifactory/api/agentplugins/plugins-standard/vscode-marketplace.json",
+        "agent plugins install hello-standard --harness vscode",
+        "agent plugins install hello-standard --harness cursor"
       ]
     },
     {

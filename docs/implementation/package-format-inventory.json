@@ -761,7 +761,7 @@
       "type": "agentplugins",
       "catalog": true,
       "classes": "L",
-      "client": "Claude Code",
+      "client": "Claude Code; JFrog CLI for Cursor and VS Code",
       "operations": "native publish/resolve and lifecycle per linked acceptance",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",

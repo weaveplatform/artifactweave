@@ -238,10 +238,47 @@ artifactweave design choice **[I]**: shared stored JSON could disclose a
 plugin ZIP hidden by a narrower Read grant. It needs target-instance
 comparison under [#216].
 
-The 7.161.32 target branch accepts harness manifests only. A root-only
-`plugin.json` bundle is rejected; the newer `vscode-marketplace.json` is
-absent. Agent Plugins Standard and VS Code remain in the implementation
-scope at the target-version boundary, pending [#216] capture.
+**Agent Plugins Standard in [#1255].** A bundle is also indexed by a root
+`plugin.json` that conforms to the [Agent Plugins Standard] 1.0.0: it
+validates against `schemas/1.0.0/plugin.schema.json`, so `$schema` is
+`https://agent-plugins.org/schemas/1.0.0/plugin.schema.json`, `name` meets
+the spec's section 5.5, the metadata fields have their types and no other
+field is present. The guide's "Marketplace Files and Indexing" table sets
+the files: `vscode-marketplace.json` lists the standard layout only,
+`cursor-marketplace.json` lists a Cursor manifest or the standard layout,
+`marketplace.json` lists every plugin, and the Claude and Codex files keep
+their own harness. Every file uses a `zip` source except Claude's. A
+standard bundle's multi-valued `agentplugins.type` is `generic`, `vscode`
+and `cursor`. When a bundle carries both layouts, the Cursor file takes
+its fields from `.cursor-plugin/plugin.json`, as the guide says. The
+following answers are **[I]**, pending [#216] capture:
+- "Conforming" means schema-valid. The spec lets a loading client ignore an
+  unknown field or a non-object `extensions`, but it says such a manifest
+  "does not conform to the schema", and the registry validates rather than
+  loads. A root `plugin.json` that does not conform indexes nothing: a
+  root-only bundle is still refused with 409, and a harness bundle keeps
+  its harness-only listing and types. A root `plugin.json` that is not a
+  JSON object with a name still fails the whole bundle, as before.
+- A bundle with both layouts takes the union of the types, sorted. The
+  unified file keeps the first of the Claude, Cursor and Codex manifests.
+- An entry built from the root `plugin.json` drops its `$schema`: that
+  schema is closed and has no `source`, so the entry would claim a schema
+  it fails.
+
+No client reads `vscode-marketplace.json` yet. JFrog CLI 2.131.0, and its
+newer `main`, installs `--harness vscode` from the unified
+`marketplace.json` ([JFrog CLI marketplace source]), and the guide says
+Cursor, Codex and VS Code have no native marketplace connection. VS Code's
+own marketplaces take Git, GitHub, npm, pip and relative-path sources,
+not ZIP URLs ([VS Code plugin marketplaces]). VS Code reads the installed
+plugin's root `plugin.json` and selects its Agent Plugins adapter by the
+`agent-plugins.org` `$schema` ([VS Code agent plugin parser]). The native
+scenario publishes a standard plugin with the pinned CLI, installs it for
+VS Code and Cursor, and checks the JSON that each file serves and the root
+`plugin.json` in the folder VS Code discovers plugins from. The installs
+pass `--version`: without it the CLI looks the marketplace file up with an
+AQL search, which does not find the files the registry renders for each
+reader.
 
 **Native client proof in #691.** JFrog CLI 2.126.0 publishes a Cursor plugin,
 installs v1 to an isolated client home and updates it to v2 from the marketplace.
@@ -254,14 +291,15 @@ scenario because the CLI otherwise queries OneModel for signed Evidence, which
 P23 has not implemented. This opt-out must be removed when P23 supplies
 backing evidence verification.
 
-**Version boundary.** The rolling guide also describes root `plugin.json`
-under Agent Plugins Standard 1.0.0, `vscode-marketplace.json`, and VS Code
-client installation. JFrog's [SaaS release notes] first announce those in
-**7.168.0 SaaS**, newer than the listed **7.161.32 self-managed** target.
-Do not describe that extension as observed 7.161.32 behavior. [#690]/[#691]
-may implement it as forward compatibility with explicit tests and an **[I]**
-target-version marker; [#216] must capture availability and exact JSON on
-7.161.32. `marketplace.json` structure is explicitly beta and may change.
+**Version boundary.** JFrog's [SaaS release notes] first announced the
+Agent Plugins Standard in **7.168.0 SaaS**. The [self-managed release
+notes] ship it in **7.173.8** (released 2026-10-26): "This release
+introduces support for the Agent Plugins standard (schema 1.0.0) and
+official support for VSCode harness." artifactweave targets the latest
+self-managed 7.x, 7.173.18 at the time of [#1255], so the standard and
+`vscode-marketplace.json` are in scope. [#216] still has to capture the
+exact JSON. `marketplace.json` structure is explicitly beta and may
+change.
 
 ## Agent Packages — #692
 
@@ -331,7 +369,7 @@ general virtual work must preserve LuaRocks virtual behavior from [#686].
 | P9B-2 | Native LuaRocks `upload` with rockspec then source rock, `manifest`/`manifest-5.x` reads, missing/denied/overwrite cases, virtual local+remote selection, warm/expired/offline cache and reindex. Capture all upload method/path/body/result shapes. |
 | P9B-3 | NIM 1.3+ Docker run against paired NIM/Docker remotes: capture NGC methods, model mappings, authentication challenge, file bytes, metadata properties, failure/negative-cache responses and permission revocation. |
 | P9B-4 | Skills multipart publish, discovery, list/detail/versions/search, fingerprint resolve, download/file, delete/reindex and scan-status with no Xray entitlement; compare anonymous and revoked-token responses. |
-| P9B-5 | Agent Plugins harness ZIP publish/index/Claude and CLI install/update, multiple versions/layout changes, malformed manifest, narrow Read and revoke. Probe Standard/VS Code separately to establish whether 7.161.32 has post-7.168 SaaS behavior. |
+| P9B-5 | Agent Plugins harness ZIP publish/index/Claude and CLI install/update, multiple versions/layout changes, malformed manifest, narrow Read and revoke. Probe the Agent Plugins Standard on 7.173.x: which root `plugin.json` conforms, `agentplugins.type` for each layout and both, the entry fields of `vscode-marketplace.json` and `cursor-marketplace.json`, and the manifest each file uses for a bundle with both layouts. |
 | P9B-6 | APM ZIP publish/versions/download/search/install through local and federated, exact/range versions, bad path/ZIP, overwrite, anonymous/denied access, restore/reindex and replication prohibition. |
 
 [LuaRocks guide]: https://docs.jfrog.com/artifactory/docs/luarocks-repositories
@@ -343,6 +381,11 @@ general virtual work must preserve LuaRocks virtual behavior from [#686].
 [Repository API]: https://docs.jfrog.com/artifactory/reference/createRepository
 [Smart Remote prefixes]: https://docs.jfrog.com/artifactory/docs/smart-remote-repositories
 [SaaS release notes]: https://docs.jfrog.com/releases/docs/artifactory-saas-releases
+[self-managed release notes]: https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases
+[Agent Plugins Standard]: https://github.com/agentplugins/agent-plugins-spec/blob/main/spec/1.0.0.md
+[JFrog CLI marketplace source]: https://github.com/jfrog/jfrog-cli-artifactory/blob/30c80a7deec4/agent/plugins/common/marketplace.go
+[VS Code plugin marketplaces]: https://github.com/microsoft/vscode/blob/fcdfa8f173bf/src/vs/workbench/contrib/chat/common/plugins/pluginMarketplaceService.ts
+[VS Code agent plugin parser]: https://github.com/microsoft/vscode/blob/fcdfa8f173bf/src/vs/platform/agentPlugins/common/agentPluginParser.ts
 [release index]: https://docs.jfrog.com/releases/docs/artifactory-release-notes
 [release dates]: https://docs.jfrog.com/releases/docs/artifactory-end-of-life
 [JFrog CLI plugins]: https://docs.jfrog.com/artifactory/docs/jf-agent-plugins
@@ -357,6 +400,7 @@ general virtual work must preserve LuaRocks virtual behavior from [#686].
 [#690]: https://github.com/weaveplatform/artifactweave/issues/690
 [#691]: https://github.com/weaveplatform/artifactweave/issues/691
 [#693]: https://github.com/weaveplatform/artifactweave/issues/693
+[#1255]: https://github.com/weaveplatform/artifactweave/issues/1255
 [P13]: ../implementation/plan.md#p13-peer-trust-and-federated-repositories
 [P23]: ../implementation/plan.md#p23-evidence-and-provenance
 [P26]: ../implementation/plan.md#p26-security-scanning-and-intelligence

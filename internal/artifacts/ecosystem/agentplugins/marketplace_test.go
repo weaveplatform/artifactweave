@@ -3,6 +3,7 @@ package agentplugins
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -102,10 +103,10 @@ func TestUnitMarketplaceLatestAndPermissionFiltering(t *testing.T) {
 		ctx,
 		st,
 		"plugins",
-		"vscode-marketplace.json",
+		"plugins.json",
 		func(string) bool { return true },
-	); err == nil {
-		t.Fatal("accepted unsupported target-version index")
+	); !errors.Is(err, ErrMarketplace) {
+		t.Fatalf("rendered a file that is no marketplace: %v", err)
 	}
 	if _, err := marketplaceEntry(Metadata{Name: "bad", Manifests: map[string]json.RawMessage{
 		"claude": []byte("{"),

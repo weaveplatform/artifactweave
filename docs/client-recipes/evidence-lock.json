@@ -65,7 +65,7 @@
   "test/acceptance/debian_steps_test.go": "c15ab45b6550e656a30c410b31e3fc6a6ec2b596475f6c34c42f67b293d4fd6a",
   "test/acceptance/docker_steps_test.go": "0efcfcbd0fb61f17a19c08db17117cc0f5ba524748c591bb3ef9e539508eea73",
   "test/acceptance/features/agent_packages.feature": "18badcdbd8becac5c867b5293994bdd9eabb8db613adce3b35862fa0e671d374",
-  "test/acceptance/features/agent_plugins_clients.feature": "96eb62a8d347e49336e1500c23321e11c15031a7ca10a40cc62ba858e429bf02",
+  "test/acceptance/features/agent_plugins_clients.feature": "f4b7a5746d13f1017a71e0bcf2161c8e9c646149a7be04a5277d194326882224",
   "test/acceptance/features/ai_editor_extensions.feature": "c2031c4c80a643f0f2dbb984d5c3d67d40b47abc2144c9e24e226f476c8ec848",
   "test/acceptance/features/alpine.feature": "e7ce610871bc47d5f2bc10eaca9922d19039088ab73dde7a40ee6ab7a078c28e",
   "test/acceptance/features/ansible.feature": "1cd22d0010271504f3d74728860bf5f0d3fac3e16f605067229c8772f809c307",
