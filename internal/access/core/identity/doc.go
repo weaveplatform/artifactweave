@@ -64,6 +64,8 @@
 // request 108), the Access user lock policy (pull request 242), the legacy
 // password endpoints (pull request 466) and login suspension, filters and
 // limits (pull request 470). Moved here in P9d, where Service takes Store.
+// Access v2's create or replace of a group (ReplaceGroup) came with issue
+// 1200.
 //
 // # Testing
 //
@@ -78,6 +80,9 @@
 //     TestUnitAccessStoreFailures.
 //   - fault_test.go: TestUnitStoreFailures and
 //     TestUnitAccessLockPolicyStoreFailures.
+//   - replace_group_test.go: TestUnitReplaceGroupCreates,
+//     TestUnitReplaceGroupResetsEachField, TestUnitReplaceGroupSetsEachField,
+//     TestUnitReplaceGroupRefusals and TestUnitReplaceGroupOneTransaction.
 //
 // The tests run on the metadata store's in-memory store, seeded with the
 // built-in principals through a stand-in for the artifacts module's

@@ -44,14 +44,22 @@ var scenarioReady = map[string]func(t *testing.T, h *harness){}
 // (frontdoor_test.go).
 var scenarioBeforeStart = map[string]func(t *testing.T, h *harness){}
 
+// scenarioEdgeHeader holds request headers a scenario adds to every request
+// for one of its storage hosts, keyed like scenarioChecks: azure/cdn asks
+// Front Door for its debug headers, so an answer a check did not expect
+// says whether the origin or the edge gave it (frontdoor_test.go).
+var scenarioEdgeHeader = map[string]http.Header{}
+
 var errNotTCP = errors.New("listener address is not TCP")
 
+// TestMain runs the TestUnit tests of the suite's own helpers anywhere;
+// TestAccScenario skips itself unless a scenario is named.
 func TestMain(m *testing.M) {
 	if os.Getenv("ARTIFACTWEAVE_SCENARIO") == "" {
 		fmt.Println(
-			"skipping test/platform: ARTIFACTWEAVE_SCENARIO is not set (platform-scenarios.yml sets it)",
+			"test/platform: ARTIFACTWEAVE_SCENARIO is not set (platform-scenarios.yml sets it); " +
+				"only the helpers' unit tests run",
 		)
-		os.Exit(0)
 	}
 	os.Exit(m.Run())
 }
@@ -60,6 +68,9 @@ func TestMain(m *testing.M) {
 // generic checks followed by the scenario's own.
 func TestAccScenario(t *testing.T) {
 	scenario := os.Getenv("ARTIFACTWEAVE_SCENARIO")
+	if scenario == "" {
+		t.Skip("ARTIFACTWEAVE_SCENARIO is not set (platform-scenarios.yml sets it)")
+	}
 	h := start(t)
 	if ready := scenarioReady[scenario]; ready != nil {
 		ready(t, h)
@@ -83,6 +94,9 @@ type harness struct {
 	storageHosts map[string]bool
 	// outputs are the scenario's Terraform outputs, by name.
 	outputs map[string]json.RawMessage
+	// edgeHeader is what fetch adds to a request for one of storageHosts
+	// (scenarioEdgeHeader).
+	edgeHeader http.Header
 	// noFollow sees the registry's own answer, so a 302 stays a 302.
 	noFollow *http.Client
 	// plain follows redirects and carries no credentials, as a package
@@ -105,6 +119,7 @@ func start(t *testing.T) *harness {
 	h := &harness{
 		storageHosts: map[string]bool{mustEnv(t, "ARTIFACTWEAVE_SCENARIO_STORAGE_HOST"): true},
 		outputs:      map[string]json.RawMessage{},
+		edgeHeader:   scenarioEdgeHeader[os.Getenv("ARTIFACTWEAVE_SCENARIO")],
 		password:     randomString(t, 18),
 		noFollow: &http.Client{
 			Timeout:       10 * time.Minute,

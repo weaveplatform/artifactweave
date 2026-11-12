@@ -1348,6 +1348,7 @@ func accessIdentityMatrix() []matrixRow {
 		at("POST "+groups, `{"name":"ng-{p}"}`, administrators, 201),
 		row("GET "+groups+"/{name}", groups+"/team", "", administrators, 200),
 		row("PATCH "+groups+"/{name}", groups+"/g-{p}", `{"description":"d"}`, administrators, 200),
+		row("PUT "+groups+"/{name}", groups+"/g-{p}", `{"description":"d"}`, administrators, 200),
 		row("DELETE "+groups+"/{name}", groups+"/g-{p}", "", administrators, 204),
 		row(
 			"PATCH "+groups+"/{name}/members", groups+"/g-{p}/members", `{"add":["v-{p}"]}`,

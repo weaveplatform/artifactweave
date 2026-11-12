@@ -35,6 +35,41 @@ func (s *Service) CreateGroup(ctx context.Context, g model.Group, members []stri
 	return err //nolint:wrapcheck // ErrNotFound names the unknown member
 }
 
+// ReplaceGroup creates g with members, as CreateGroup does, when no group
+// has g's name, and otherwise replaces that group with g; it reports whether
+// it created the group. It is Access v2's create or replace, not the legacy
+// PutGroup: JFrog's Create or Replace a Group resets every field a request
+// leaves out to its create default, so g is stored as given (the caller
+// fills the defaults) and members replaces the membership even when empty.
+// What the request cannot carry survives: the realm and realm attributes,
+// which the page says a replacement keeps, and the platform auditor flag,
+// which no group request sets. An unknown member is kernel.ErrNotFound,
+// which Access v2 documents as 404.
+func (s *Service) ReplaceGroup(ctx context.Context, g model.Group, members []string) (bool, error) {
+	if err := validName("group", g.Name); err != nil {
+		return false, err
+	}
+	var created bool
+	err := s.tx(ctx, func(ctx context.Context) error {
+		groups := s.Store.Groups()
+		old, err := groups.Get(ctx, g.Name)
+		next := g
+		next.Members = sortedUnique(members)
+		switch {
+		case errors.Is(err, kernel.ErrNotFound):
+			created = true
+			next.Realm, next.RealmAttributes = model.RealmInternal, ""
+			return groups.Create(ctx, next) //nolint:wrapcheck // names an unknown member
+		case err != nil:
+			return err //nolint:wrapcheck // a store error
+		}
+		next.Realm, next.RealmAttributes = old.Realm, old.RealmAttributes
+		next.Roles.PlatformAuditor = old.Roles.PlatformAuditor
+		return groups.Update(ctx, next) //nolint:wrapcheck // names an unknown member
+	})
+	return created, err
+}
+
 // UpdateUserGroups applies add, then remove, to the user's memberships and
 // returns the resulting groups. A name in both lists ends up removed; an
 // unknown group in add is ErrInvalid.
