@@ -63,9 +63,10 @@ type Options struct {
 	// manifest pushes and mounts write through the item service; nil means
 	// the generic handler, which indexes no image or tag.
 	Formats format.Registry
-	// ServeBlob answers a GET of a blob's item in a repository with the
-	// server's download, which applies the download redirect policy
-	// (decision 0029) and counts the download. Nil streams it from Blobs.
+	// ServeBlob answers a GET or HEAD of a blob's item in a repository with
+	// the server's download, which sends a file's headers, applies the
+	// download redirect policy to a GET (decision 0029) and counts the
+	// download. Nil streams it from Blobs.
 	ServeBlob func(w http.ResponseWriter, r *http.Request, c repo.Config, it model.Item)
 	// RedirectManifest answers a GET of a manifest's item, whose media type
 	// is mediaType, with the server's download redirect when the policy says

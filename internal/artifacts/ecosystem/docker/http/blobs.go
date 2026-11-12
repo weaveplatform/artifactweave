@@ -46,9 +46,11 @@ func (g *Registry) registerBlobs() {
 	g.handle(KindUpload, http.MethodDelete, g.cancelUpload)
 }
 
-// getBlob serves HEAD and GET of a blob in the image. HEAD answers from the
-// item; GET streams it, or redirects to a signed URL when the repository's
-// download redirect says so (decision 0029).
+// getBlob serves HEAD and GET of a blob in the image through the server's
+// download (Options.ServeBlob), which streams it, or redirects a GET to a
+// signed URL when the repository's download redirect says so (decision
+// 0029). A HEAD gets the headers the GET sends, ETag and X-Checksum-* among
+// them, as 7.x sends them since RTFACT-29977, and is never redirected.
 func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
 	if err := q.Require(r, q.Name+"/", api.ActionRead); err != nil {
 		Write(w, err)
@@ -74,16 +76,30 @@ func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
 		g.writeErr(w, r, err)
 		return
 	}
-	h := w.Header()
-	h.Set(contentDigestHeader, "sha256:"+hex)
+	w.Header().Set(contentDigestHeader, "sha256:"+hex)
 	if r.Method == http.MethodHead {
-		h.Set("Content-Type", "application/octet-stream")
-		h.Set("Content-Length", strconv.FormatInt(it.Size, 10))
-		h.Set("Accept-Ranges", "bytes")
-		w.WriteHeader(http.StatusOK)
-		return
+		r = headRequest(r)
 	}
 	g.serveBlob(w, r, q.Repo, it)
+}
+
+// headRequest is r without the headers Artifactory's download leaves
+// unevaluated on a HEAD, so that a blob HEAD answers only If-None-Match and
+// If-Modified-Since with 304, as 6.20's download does
+// (DownloadServiceImpl.isNotModified), and otherwise 200 with the whole
+// length. A HEAD sends no range (RequestResponseHelper.sendHeadResponse, and
+// RFC 9110 defines range handling for GET only), and the download evaluates
+// neither If-Match nor If-Unmodified-Since (RTFACT-17259; #1314 for the
+// GET). Without this, a HEAD with Range would answer 206 and one with a
+// stale If-Match 412, where the HEAD answered 200 before it went through the
+// download.
+func headRequest(r *http.Request) *http.Request {
+	out := r.WithContext(r.Context())
+	out.Header = r.Header.Clone()
+	for _, k := range []string{"Range", "If-Range", "If-Match", "If-Unmodified-Since"} {
+		out.Header.Del(k)
+	}
+	return out
 }
 
 // findBlob finds the copy of the blob hex that a pull of q's image serves:

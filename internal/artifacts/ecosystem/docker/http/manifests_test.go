@@ -2,6 +2,8 @@ package dockerhttp
 
 import (
 	"context"
+	"crypto/sha1" //nolint:gosec // the ETag is the file's SHA-1, as 7.x sends it
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -74,21 +76,39 @@ func TestAccPushAndPullByTagAndDigest(t *testing.T) {
 		expect(t, get, http.StatusOK, "")
 		h := get.Header()
 		if get.Body.String() != body || h.Get("Content-Type") != layout.MediaTypeOCIManifest ||
-			h.Get(contentDigestHeader) != d || h.Get("ETag") != `"`+d+`"` ||
+			h.Get(contentDigestHeader) != d || h.Get("ETag") != sha1Of(body) ||
 			h.Get(RegistryHeader) != "docker-local" {
 			t.Fatalf("%s: %v %q", target, h, get.Body)
 		}
 		head := w.do(http.MethodHead, target, "", nil)
 		expect(t, head, http.StatusOK, "")
-		if head.Body.Len() != 0 || head.Header().Get("Content-Length") != strconv.Itoa(len(body)) ||
-			head.Header().Get(contentDigestHeader) != d ||
-			head.Header().Get(RegistryHeader) != "docker-local" {
-			t.Fatalf("HEAD %s: %v", target, head.Header())
+		hh := head.Header()
+		if head.Body.Len() != 0 || hh.Get("Content-Length") != strconv.Itoa(len(body)) ||
+			hh.Get(contentDigestHeader) != d || hh.Get("ETag") != sha1Of(body) ||
+			hh.Get(RegistryHeader) != "docker-local" {
+			t.Fatalf("HEAD %s: %v", target, hh)
 		}
 	}
-	// A conditional GET with the digest as ETag is answered from the cache.
-	expect(t, w.do(http.MethodGet, "/v2/docker-local/team/app/manifests/v1", "",
-		map[string]string{"If-None-Match": `"` + d + `"`}), http.StatusNotModified, "")
+	// A conditional GET that sends the ETag back, bare or quoted, is
+	// answered from the cache; the digest is no longer the ETag.
+	for value, want := range map[string]int{
+		sha1Of(body):             http.StatusNotModified,
+		`"` + sha1Of(body) + `"`: http.StatusNotModified,
+		`"` + d + `"`:            http.StatusOK,
+	} {
+		rec := w.do(http.MethodGet, "/v2/docker-local/team/app/manifests/v1", "",
+			map[string]string{"If-None-Match": value})
+		expect(t, rec, want, "")
+		if rec.Header().Get("ETag") != sha1Of(body) {
+			t.Fatalf("If-None-Match %s: ETag %q", value, rec.Header().Get("ETag"))
+		}
+	}
+}
+
+// sha1Of is the bare hex SHA-1 of s, the ETag 7.x sends for a stored file.
+func sha1Of(s string) string {
+	sum := sha1.Sum([]byte(s)) //nolint:gosec // the ETag is the file's SHA-1
+	return hex.EncodeToString(sum[:])
 }
 
 // A push by digest stores the digest folder and each ?tag= (end-7b), and
