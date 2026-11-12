@@ -3,14 +3,17 @@
 // not (ArchivePath, ReadArchive, Archive). It signs and verifies a narinfo
 // with Ed25519 over Nix's fingerprint of its store path, and its Handler
 // keeps each store path's narinfo and archive consistent in a repository.
+// It also names and checks a channel's snapshots: the path of each
+// snapshot's nixexprs.tar.xz (Snapshot, ParseSnapshotDir,
+// ParseSnapshotPath) and the tarball itself (ReadChannel).
 //
 // # Role
 //
 // artifacts module, ecosystem layer: the Nix narinfo metadata and archive
 // rules of the Nix slice. Its Handler plugs into the item service through
 // the format hooks (decision 0032); the slice's http package
-// (artifacts/ecosystem/nix/http) serves the binary-cache protocol over what
-// it keeps.
+// (artifacts/ecosystem/nix/http) serves the binary-cache protocol and
+// channels over what it keeps.
 //
 // # Inputs
 //
@@ -40,13 +43,16 @@
 //     archive are both stored and agree (Deployed, Deleted, Reindex);
 //     refuse a generic download from a remote and check a narinfo's
 //     archive before a generic download serves the narinfo (Resolve); and
-//     class each path (Classify).
+//     class each path (Classify). A channel snapshot's tarball is admitted
+//     only when ReadChannel passes it, and is not indexed.
 //   - The package index: a package per store path name, with a version
 //     per store hash whose metadata is its narinfo's Info as JSON and whose
 //     files are the narinfo and its archive.
 //   - The rules the protocol shares: Info, Parse, IsInfoPath, ArchivePath,
 //     Nix32, Archive, ReadArchive, ReadInfo, ReferencedArchive, CacheInfo,
-//     ErrInvalid and the size limits.
+//     ErrInvalid and the size limits; and for channels Snapshot,
+//     ValidChannel, ValidFlavor, ParseSnapshotDir, ParseSnapshotPath,
+//     IsChannelPath, ReadChannel, ChannelFile and MaxChannelBytes.
 //
 // # Invariants
 //
@@ -60,6 +66,10 @@
 //     hash and size, and references), and an archive never changes.
 //   - The index lists a store path only while its narinfo and archive are
 //     both stored and agree.
+//   - A channel snapshot is stored only as
+//     channels/<channel>/<nixpkgs|nixos>/<snapshot>/nixexprs.tar.xz, and
+//     only as an xz stream of one tar archive with an entry, nothing after
+//     it but zero padding.
 //
 // # References
 //
@@ -79,13 +89,14 @@
 //   - Plan: docs/implementation/plan.md#p33-automation-and-source-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/788 and
-//     https://github.com/weaveplatform/artifactweave/issues/1037
+//   - https://github.com/weaveplatform/artifactweave/issues/788,
+//     https://github.com/weaveplatform/artifactweave/issues/1037 and
+//     https://github.com/weaveplatform/artifactweave/issues/1263
 //
 // # Status
 //
 // Implemented P9c, which delivered the plan's P33 group (issues #782 to
-// #788). Moved here in P9d.
+// #788). Moved here in P9d. Channels added by #1263.
 //
 // # Testing
 //
@@ -99,4 +110,6 @@
 //     failures and the publication lock's failures.
 //   - contract_test.go: the format's lifecycle through the item service,
 //     and concurrent first publications of one store path.
+//   - channel_test.go: snapshot paths, channel tarballs and their faults,
+//     and a tarball's admission without indexing.
 package nix

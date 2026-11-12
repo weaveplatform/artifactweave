@@ -40,7 +40,8 @@ type inspection struct {
 
 // Inspect reads a write's content before the write's transaction, so Admit
 // and Deployed decide without parsing under the write lock: nix-cache-info
-// must be exactly CacheInfo, a narinfo must parse against its path, and
+// must be exactly CacheInfo, a narinfo must parse against its path, a
+// channel snapshot's tarball (IsChannelPath) must pass ReadChannel, and
 // any other path must be an archive path whose content passes ReadArchive.
 // It answers nil for a checksum write. Content that fails is refused with
 // 400, an archive whose SHA-256 is not the one its path names with 409,
@@ -76,6 +77,13 @@ func (Handler) Inspect(
 			return nil, format.Rejectf(400, "invalid Nix narinfo")
 		}
 		out.info = &info
+	case IsChannelPath(w.Path):
+		// The status and message are inferred: the JFrog documentation
+		// enforces the xz tarball without saying how it answers one that
+		// is not (#216).
+		if err := ReadChannel(rc, bi.Size); err != nil {
+			return nil, format.Rejectf(400, "invalid Nix channel archive")
+		}
 	default:
 		compression, ok := ArchivePath(w.Path)
 		if !ok {
@@ -267,8 +275,8 @@ func ReadInfo(ctx context.Context, env format.Env, it model.Item) (Info, error) 
 // names is stored and matches, or, for an archive, every narinfo that
 // names it. A version is the store hash, under a package named for the
 // rest of the store path's name, with the narinfo's Info as JSON metadata
-// and both items as its files. Folders are skipped, and nix-cache-info is
-// checked but not indexed.
+// and both items as its files. Folders are skipped, and nix-cache-info and
+// a channel snapshot's tarball are checked but not indexed.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder {
 		return nil
@@ -287,7 +295,9 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it m
 	); err != nil {
 		return err
 	}
-	if it.FullPath() == "nix-cache-info" {
+	// A channel snapshot is no store path, so it adds no version; the JFrog
+	// documentation groups packages from narinfo metadata alone.
+	if it.FullPath() == "nix-cache-info" || IsChannelPath(it.FullPath()) {
 		return nil
 	}
 	// A copy or restore can bring metadata before its archive. Only publish a

@@ -69,3 +69,15 @@ Feature: Nix publishes and substitutes signed binary cache content
     When I substitute the controlled Nix path from "nix-remote" with the "trusted" key
     Then the command succeeds
     And the output contains "native nix fixture"
+
+  Scenario: nix-channel follows a channel to the snapshot uploaded last
+    Given the registry is running
+    And the Nix client can reach the registry
+    When I PUT "/artifactory/api/repositories/nix-channels" as admin with body:
+      """
+      {"rclass":"local","packageType":"nix"}
+      """
+    Then the response status is 200
+    When I publish two Nix channel snapshots to "nix-channels" and follow the channel with nix-channel
+    Then the command succeeds
+    And the output contains "followed channel snapshot second"
