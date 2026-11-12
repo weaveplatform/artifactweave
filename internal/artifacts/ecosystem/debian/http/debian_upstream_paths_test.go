@@ -16,6 +16,7 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
@@ -216,4 +217,50 @@ func TestAccDebianLocalServesAnLzmaIndexAsAnIndex(t *testing.T) {
 		return !strings.HasPrefix(path, "pool/")
 	}}
 	wantError(t, w.getAs("deb-local", debLzmaIndex, indexOnly), http.StatusForbidden, "Forbidden")
+}
+
+// TestUnitDebianSnapshotOfARemoteCopiesItsInstallerAndLzmaIndexes: a
+// snapshot copies every metadata file of its source's distribution, as the
+// JFrog guide says, so a remote source whose Release declares an
+// installer's Packages index and a .lzma index, as Debian's archives
+// declare the first, has both copied where the snapshot failed as not
+// found before #1273. The .lzma index is checked and given a by-hash copy
+// as every binary-<arch> index is; the installer's is copied as it is.
+func TestUnitDebianSnapshotOfARemoteCopiesItsInstallerAndLzmaIndexes(t *testing.T) {
+	index := packagesIndex("alpha 1.0 " + debAlpha)
+	lzmaBody := indexForm(t, index, ".lzma")
+	udeb := []byte(strings.Replace(string(index), debAlpha, "pool/alpha_1.0_amd64.udeb", 1))
+	installer := indexForm(t, udeb, ".gz")
+	release := fmt.Appendf(nil,
+		"Suite: stable\nArchitectures: amd64\nComponents: main\nSHA256:\n"+
+			" %x %d main/binary-amd64/Packages\n %x %d main/binary-amd64/Packages.lzma\n"+
+			" %x %d main/debian-installer/binary-amd64/Packages.gz\n",
+		sha256.Sum256(index), len(index), sha256.Sum256(lzmaBody), len(lzmaBody),
+		sha256.Sum256(installer), len(installer))
+	w := newOverlayWorld(t, withSources(upstream(map[string]func() (source.Result, error){
+		debRelease:        streamed(release, nil),
+		debPackages:       streamed(index, nil),
+		debLzmaIndex:      streamed(lzmaBody, nil),
+		debInstallerIndex: streamed(installer, nil),
+	})))
+	w.debRepos(
+		repo.Config{Key: snapshotJob.Source, Class: repo.Remote},
+		repo.Config{Key: snapshotJob.Target, Class: repo.Local},
+	)
+	svc := DebianAPI{w.kit}
+	if err := svc.createDebianSnapshot(t.Context(), w.db, snapshotJob,
+		kittest.Admin, kittest.AdminAccess()); err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
+	for path, body := range map[string][]byte{
+		debLzmaIndex:      lzmaBody,
+		debInstallerIndex: installer,
+		fmt.Sprintf("dists/stable/main/binary-amd64/by-hash/SHA256/%x", sha256.Sum256(lzmaBody)): lzmaBody,
+	} {
+		stored := w.item(snapshotJob.Target, false, snapshotMarker+"/"+path)
+		got, err := svc.readDebianBlob(t.Context(), stored.Actual.SHA256)
+		if err != nil || !bytes.Equal(got, body) {
+			t.Errorf("%s copied as %q, %v", path, got, err)
+		}
+	}
 }

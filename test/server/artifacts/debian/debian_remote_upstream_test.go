@@ -98,9 +98,13 @@ func TestAccDebianRemoteRelaysWhatAptReadsThroughItsCache(t *testing.T) {
 	files := map[string][]byte{
 		"dists/stable/main/debian-installer/binary-amd64/Packages.gz": debianForm(t,
 			[]byte(stanza("pool/main/a/alpha/alpha_1.0_amd64.udeb", deb)), ".gz"),
-		byHash("i18n/", translation):                   translation,
-		byHash("", contents):                           contents,
-		"dists/stable/main/binary-amd64/Packages.lzma": debianForm(t, []byte(stanza(pkg, deb)), ".lzma"),
+		byHash("i18n/", translation): translation,
+		byHash("", contents):         contents,
+		"dists/stable/main/binary-amd64/Packages.lzma": debianForm(
+			t,
+			[]byte(stanza(pkg, deb)),
+			".lzma",
+		),
 		"pool/main/by-hash/SHA256/alpha_1.0_amd64.deb": deb,
 		"dists/stable/main/i18n/Translation-en.bz2":    []byte("translation file"),
 	}

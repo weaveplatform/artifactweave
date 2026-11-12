@@ -107,7 +107,11 @@ func rebuildWithFormats(
 		return model.Item{}, nil
 	}
 	env.Underive = func(context.Context, repo.Config, bool, string) error { return nil }
-	if err := (Handler{}).Work(t.Context(), env, work.WorkItem{Kind: KindIndex, Key: c.Key}); err != nil {
+	if err := (Handler{}).Work(
+		t.Context(),
+		env,
+		work.WorkItem{Kind: KindIndex, Key: c.Key},
+	); err != nil {
 		t.Fatal(err)
 	}
 	return generated

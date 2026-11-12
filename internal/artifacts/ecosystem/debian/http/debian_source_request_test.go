@@ -1,4 +1,4 @@
-package itemkit_test
+package debianhttp
 
 import (
 	"bytes"
@@ -12,7 +12,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
@@ -21,22 +20,6 @@ import (
 func debianStanza(file string) []byte {
 	return []byte("Package: alpha\nVersion: 1.0\nArchitecture: amd64\nFilename: " + file +
 		"\nSize: 4\nSHA256: " + strings.Repeat("a", 64) + "\n\n")
-}
-
-// debianForm is body in the form suffix names, as a repository writes it.
-func debianForm(t *testing.T, body []byte, suffix string) []byte {
-	t.Helper()
-	forms, err := debian.IndexForms(body, []string{"bz2", "lzma", "xz"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, form := range forms {
-		if form.Suffix == suffix {
-			return form.Body
-		}
-	}
-	t.Fatalf("no %q form", suffix)
-	return nil
 }
 
 func debianRequest(p, query string) (source.Request, error) {
@@ -54,10 +37,10 @@ func wantIntegrityFailure(t *testing.T, name string, err error) {
 	}
 }
 
-// zeros reads n zero bytes.
-type zeros struct{ n int64 }
+// zeroBytes reads n zero bytes.
+type zeroBytes struct{ n int64 }
 
-func (z *zeros) Read(p []byte) (int, error) {
+func (z *zeroBytes) Read(p []byte) (int, error) {
 	if z.n <= 0 {
 		return 0, io.EOF
 	}
@@ -67,7 +50,7 @@ func (z *zeros) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-func (z *zeros) Seek(int64, int) (int64, error) { return 0, nil }
+func (z *zeroBytes) Seek(int64, int) (int64, error) { return 0, nil }
 
 // TestUnitDebianSourceRequestNamesWhatAptReadsFromAnUpstream: a remote
 // Debian repository's source request admits the paths apt reads that it
@@ -83,8 +66,8 @@ func TestUnitDebianSourceRequestNamesWhatAptReadsFromAnUpstream(t *testing.T) {
 	sum := sha256.Sum256(translation)
 	translationByHash := "dists/stable/main/i18n/by-hash/SHA256/" + hex.EncodeToString(sum[:])
 	contentsByHash := "dists/stable/main/by-hash/SHA256/" + hex.EncodeToString(sum[:])
-	udebIndex := debianForm(t, debianStanza("pool/main/a/alpha/alpha_1.0_amd64.udeb"), ".gz")
-	lzmaIndex := debianForm(t, debianStanza("pool/main/a/alpha/alpha_1.0_amd64.deb"), ".lzma")
+	udebIndex := indexForm(t, debianStanza("pool/main/a/alpha/alpha_1.0_amd64.udeb"), ".gz")
+	lzmaIndex := indexForm(t, debianStanza("pool/main/a/alpha/alpha_1.0_amd64.deb"), ".lzma")
 	for _, tc := range []struct {
 		name, path, variant string
 		// kind is the zero kind for a package, which the source service
@@ -150,8 +133,11 @@ func TestUnitDebianSourceRequestNamesWhatAptReadsFromAnUpstream(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantIntegrityFailure(t, "installer index naming a .deb", q.Resource.ValidateMetadata(
-		t.Context(), bytes.NewReader(debianStanza("pool/a.deb")), int64(len(debianStanza("pool/a.deb"))),
-		source.MetadataResponse{}))
+		t.Context(),
+		bytes.NewReader(debianStanza("pool/a.deb")),
+		int64(len(debianStanza("pool/a.deb"))),
+		source.MetadataResponse{},
+	))
 }
 
 // TestUnitDebianSourceRequestBoundsOnlyAnIndexCopy: a binary-<arch> or
@@ -161,7 +147,7 @@ func TestUnitDebianSourceRequestNamesWhatAptReadsFromAnUpstream(t *testing.T) {
 func TestUnitDebianSourceRequestBoundsOnlyAnIndexCopy(t *testing.T) {
 	const size = 64<<20 + 1
 	sum := sha256.New()
-	if _, err := io.Copy(sum, &zeros{n: size}); err != nil {
+	if _, err := io.Copy(sum, &zeroBytes{n: size}); err != nil {
 		t.Fatal(err)
 	}
 	name := hex.EncodeToString(sum.Sum(nil))
@@ -177,7 +163,12 @@ func TestUnitDebianSourceRequestBoundsOnlyAnIndexCopy(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = q.Resource.ValidateMetadata(t.Context(), &zeros{n: size}, size, source.MetadataResponse{})
+		err = q.Resource.ValidateMetadata(
+			t.Context(),
+			&zeroBytes{n: size},
+			size,
+			source.MetadataResponse{},
+		)
 		if tc.valid && err != nil {
 			t.Errorf("%s: %v", tc.path, err)
 		}
