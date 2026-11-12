@@ -49,7 +49,10 @@ func TestAccP8ErrorProfiles(t *testing.T) {
 
 // The pub, Swift and Agent Packages paths answer every error in their
 // protocol's envelope, the middleware's included, and the JFrog reindex
-// operation beside pub and Swift keeps Artifactory's (#1249).
+// operation beside pub and Swift keeps Artifactory's, on either route that
+// takes it: the generated one, even with an empty key, and pkgroute's
+// reserved one, which trims slashes. The bare prefix, which no protocol
+// route takes, keeps Artifactory's too (#1249).
 func TestAccProtocolErrorProfiles(t *testing.T) {
 	for path, want := range map[string]apierror.Profile{
 		"/artifactory/api/pub/r/api/packages/x":               apierror.ProfilePub,
@@ -57,7 +60,14 @@ func TestAccProtocolErrorProfiles(t *testing.T) {
 		"/artifactory/api/pub/r/reindex":                      apierror.ProfileArtifactory,
 		"/artifactory/api/pub/r/reindex/":                     apierror.ProfileArtifactory,
 		"/artifactory/api/pub/r/reindex/x":                    apierror.ProfilePub,
-		"/artifactory/api/pub//reindex":                       apierror.ProfilePub,
+		"/artifactory/api/pub//reindex":                       apierror.ProfileArtifactory,
+		"/artifactory/api/pub//reindex/":                      apierror.ProfilePub,
+		"/artifactory/api/pub/":                               apierror.ProfileArtifactory,
+		"/artifactory/api/pub//":                              apierror.ProfilePub,
+		"/artifactory/api/swift/":                             apierror.ProfileArtifactory,
+		"/artifactory/api/swift//reindex":                     apierror.ProfileArtifactory,
+		"/artifactory/api/agentpackages/":                     apierror.ProfileArtifactory,
+		"/artifactory/api/agentpackages//x":                   apierror.ProfileAPM,
 		"/artifactory/api/swift/r/acme/widget":                apierror.ProfileSwiftRegistry,
 		"/artifactory/api/swift/r/reindex":                    apierror.ProfileArtifactory,
 		"/artifactory/api/swift/r/acme/reindex":               apierror.ProfileSwiftRegistry,
@@ -73,8 +83,10 @@ func TestAccProtocolErrorProfiles(t *testing.T) {
 // The authentication middleware's 401 and 403 on the pub, Swift and Agent
 // Packages paths answer in the protocol's envelope with its content type, and
 // pub's 401 with the Bearer realm="pub" challenge dart pub reads (#1249).
-// Their reindex operations keep Artifactory's envelope and Basic challenge.
-// Under /v2 a 403 carries the distribution specification's DENIED (#1248).
+// Their reindex operations keep Artifactory's envelope and Basic challenge,
+// and so do the binder's 400 for a reindex with an empty key and the
+// router's 404 for a bare prefix, which no middleware writes. Under /v2 a
+// 403 carries the distribution specification's DENIED (#1248).
 func TestAccProtocolMiddlewareEnvelopes(t *testing.T) {
 	w := newItemWorld(t, false)
 	if err := w.db.Users().Create(t.Context(), accesstest.User{
@@ -142,6 +154,16 @@ func TestAccProtocolMiddlewareEnvelopes(t *testing.T) {
 			http.MethodPost, "/artifactory/api/swift/libs-local/reindex", nil, 401,
 			"application/json", apierror.BasicChallenge,
 			`{"errors":[{"message":"Authentication is required","status":401}]}`,
+		},
+		{
+			http.MethodPost, "/artifactory/api/pub//reindex", basic("admin", "pw"), 400,
+			"application/json", "",
+			`{"errors":[{"message":"Invalid format for parameter repoKey: parameter 'repoKey' is empty, can't bind its value","status":400}]}`,
+		},
+		{
+			http.MethodGet, "/artifactory/api/swift/", basic("admin", "pw"), 404,
+			"application/json", "",
+			`{"errors":[{"message":"not found: GET /artifactory/api/swift/","status":404}]}`,
 		},
 		{
 			http.MethodGet, "/v2/", basic("locked", "pw"), 403, "application/json", "",
