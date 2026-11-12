@@ -178,8 +178,12 @@ Artifactory wires it.
   from [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed), "so AQL results align with repository access rules and other search
   methods". That points to the search APIs filtering them as well, as artifactweave does
   (DV-058), but no note says so outright.
-- **5.4.** No 7.x page or note describes a download from a blacked-out repository, so it stays
-  open.
+- **5.4.** The Local Repositories page says that a blacked-out repository is "not available for
+  download or deployment of artifacts", and since
+  [RTDEV-47144](https://jfrog.atlassian.net/browse/RTDEV-47144) (SaaS 7.98.2) a download the
+  patterns refuse answers 404 with a message that says why. No source gives a blackout
+  refusal's status or body, or says whether read permission is checked first, so 5.4 stays open
+  for those (decision 0032's download policy rules, #1251).
 - **npm.** [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed) refuses copy and move into `.npm/` (research 25 section 5).
   The JFrog operations `api/npm/auth` and `api/npm/<repo>/auth/<scope>` answer errors in the
   Artifactory envelope, `{"errors":[{"status":400,"message":"Not supported user type."}]}` on
