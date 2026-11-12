@@ -682,6 +682,10 @@ types blacked out in P19 [I], and a deviation is registered only if 7.x serves t
 
 - **Read permission first, then the policy** (DV-057). Bazel modules, Git LFS's download batch,
   Nix's `nix-cache-info` and Terraform's signed URLs check it first too.
+- **A request that fails the route's own validation answers its 400 before the policy is
+  checked** [I]. Skills' single-file read is the case: under a blackout, a malformed `path`
+  answers 400 "invalid skill file path" ahead of the refusal; without a blackout, a missing
+  version keeps its 404 first (`skills/http/reads.go`; #216 G-SK-1).
 - **A policy refusal is 404 with the policy's message,** never 401 or 403 (RTDEV-47144).
   Debian, RPM, Alpine, Opkg, CRAN and p2 answered it with 401 or 403 before #1251, and Conda
   with 403 "Conda index is not readable".
