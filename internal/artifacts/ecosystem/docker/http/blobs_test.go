@@ -153,10 +153,13 @@ func TestAccMonolithicUploadAndPull(t *testing.T) {
 			t.Fatalf("GET %s: %v %q", target, get.Header(), get.Body)
 		}
 	}
+	// The Docker API answers a range with the whole blob, as 7.71.4 does
+	// (RTFACT-30157).
 	part := w.do(http.MethodGet, "/v2/docker-local/team/app/blobs/"+d, "",
 		map[string]string{"Range": "bytes=6-10"})
-	if part.Code != http.StatusPartialContent || part.Body.String() != "bytes" {
-		t.Fatalf("range: %d %q", part.Code, part.Body)
+	if part.Code != http.StatusOK || part.Body.String() != "layer bytes" ||
+		part.Header().Get("Content-Range") != "" || part.Header().Get("Accept-Ranges") != "bytes" {
+		t.Fatalf("range: %d %q %v", part.Code, part.Body, part.Header())
 	}
 	// Under a subdomain the image is named without the repository.
 	sub := w.do(http.MethodGet, "/v2/team/app/blobs/"+d, "",
