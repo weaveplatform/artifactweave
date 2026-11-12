@@ -161,6 +161,20 @@ func TestAccNixPublishNeedsWriteOnTheFolder(t *testing.T) {
 	})
 }
 
+// Read is checked where the files are stored, so a permission target
+// written for the client's URLs no longer covers them, and one written
+// for the binary-cache folder, as for 7.x, does.
+func TestAccNixReadIsCheckedAtTheStoredPaths(t *testing.T) {
+	f := newFixture(t)
+	f.publish()
+	f.grant("client", api.ActionRead, "nar/**", "*.narinfo")
+	status(t, f.do("GET", prefix+infoPath, nil, "publisher"), 403)
+	status(t, f.do("GET", f.native("local"), nil, "publisher"), 403)
+	f.grant("folder", api.ActionRead, "binary-cache/**")
+	status(t, f.do("GET", prefix+infoPath, nil, "publisher"), 200)
+	status(t, f.do("GET", f.native("local"), nil, "publisher"), 200)
+}
+
 // DELETE names the files by the client's URLs and removes them where the
 // repository stores them; a remote's cache is not deleted through them.
 func TestAccNixDeleteRemovesTheStoredFiles(t *testing.T) {
