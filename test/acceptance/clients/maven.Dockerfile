@@ -8,10 +8,17 @@ FROM maven:3-eclipse-temurin-27@sha256:a6cd0d45e565ec76bf1969702bcbdb800d3461c83
 
 # UX-01 verifies Ivy and direct Gradle recipes with released clients too.
 # Checksums are the upstream Maven Central SHA-512 and Gradle release SHA-256.
-RUN curl -fsSL --retry 3 https://repo.maven.apache.org/maven2/org/apache/ivy/ivy/2.6.0/ivy-2.6.0.jar -o /opt/ivy.jar \
-    && echo '0e66c0908287112b8a63e468a572ea265767225422bfb17ff3ec9deaa647d2aafbf79b0fa18d021fc3a3e0f8cabc7c07e7c4e613f1d49a538987c49df836dd29  /opt/ivy.jar' | sha512sum -c - \
-    && curl -fsSL --retry 3 https://services.gradle.org/distributions/gradle-9.8.2-bin.zip -o /tmp/gradle.zip \
-    && echo '21bd5da2de49b642904077f38c0efdc7778e92b3ed0889392dca61b97e389607  /tmp/gradle.zip' | sha256sum -c - \
+# Each has a second source for the same bytes (#1322). Ivy falls back to
+# Google's mirror of Maven Central, which maven.apache.org/repository names.
+# services.gradle.org only redirects to the gradle/gradle-distributions GitHub
+# release, so Gradle falls back to that release directly.
+COPY fetch-pinned.sh /usr/local/bin/fetch-pinned
+RUN fetch-pinned 0e66c0908287112b8a63e468a572ea265767225422bfb17ff3ec9deaa647d2aafbf79b0fa18d021fc3a3e0f8cabc7c07e7c4e613f1d49a538987c49df836dd29 /opt/ivy.jar \
+      https://repo.maven.apache.org/maven2/org/apache/ivy/ivy/2.6.0/ivy-2.6.0.jar \
+      https://maven-central.storage-download.googleapis.com/maven2/org/apache/ivy/ivy/2.6.0/ivy-2.6.0.jar \
+    && fetch-pinned 21bd5da2de49b642904077f38c0efdc7778e92b3ed0889392dca61b97e389607 /tmp/gradle.zip \
+      https://services.gradle.org/distributions/gradle-9.8.2-bin.zip \
+      https://github.com/gradle/gradle-distributions/releases/download/v9.8.2/gradle-9.8.2-bin.zip \
     && mkdir -p /opt/gradle \
     && cd /opt/gradle && jar xf /tmp/gradle.zip \
     && rm /tmp/gradle.zip \
