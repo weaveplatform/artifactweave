@@ -2,6 +2,8 @@ package puppet_test
 
 import (
 	"bytes"
+	"crypto/md5" //nolint:gosec // the Forge's file_md5, which 7.x relays
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	puppetfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/puppet"
@@ -20,12 +23,15 @@ import (
 // newest first, sorted by version, and serves at most limitCap of them a
 // page whatever limit is asked, as forgeapi.puppet.com serves at most 100
 // (it answered limit=1000 with "limit": 100 on 2026-11-12). Its pages carry
-// the Forge's whole pagination object. It records the limit and offset of
-// each release page asked for.
+// the Forge's whole pagination object, and its release records the fields
+// a remote relays. It records the limit and offset of each release page
+// asked for.
 type cappedForge struct {
 	*httptest.Server
 	versions []string
 	archives map[string][]byte
+	// dates are the created_at and updated_at the Forge gives each version.
+	dates    map[string]string
 	limitCap int
 	// short serves one release fewer than a page that has more after it
 	// should hold, while its pagination still states limitCap.
@@ -39,13 +45,16 @@ type cappedForge struct {
 func newCappedForge(t *testing.T, releases, limitCap int, short bool) *cappedForge {
 	t.Helper()
 	f := &cappedForge{
-		archives: map[string][]byte{}, limitCap: limitCap, short: short,
-		asked: map[string]bool{},
+		archives: map[string][]byte{}, dates: map[string]string{}, limitCap: limitCap,
+		short: short, asked: map[string]bool{},
 	}
+	zone := time.FixedZone("", -7*60*60)
 	for i := releases - 1; i >= 0; i-- {
 		v := fmt.Sprintf("1.%d.0", i)
 		f.versions = append(f.versions, v)
 		f.archives[v], _ = puppetArchive(t, v, "forge")
+		f.dates[v] = time.Date(2020, 1, 1, 0, 0, 0, 0, zone).Add(time.Duration(i) * time.Hour).
+			Format("2006-01-02 15:04:05 -0700")
 	}
 	f.Server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.Close)
@@ -98,12 +107,23 @@ func (f *cappedForge) serve(out http.ResponseWriter, r *http.Request) {
 	}
 	results := []any{}
 	for _, v := range served {
-		data, manifest := f.archives[v], f.manifest(v)
+		data := f.archives[v]
 		results = append(results, map[string]any{
-			"uri": "/v3/releases/acme-widget-" + v, "slug": "acme-widget-" + v, "version": v,
-			"file_uri":    "/v3/files/acme-widget-" + v + ".tar.gz",
-			"file_sha256": checksum(data), "file_size": len(data),
-			"metadata": manifest,
+			"uri": "/v3/releases/acme-widget-" + v, "slug": "acme-widget-" + v,
+			"module": map[string]any{
+				"uri": "/v3/modules/acme-widget", "slug": "acme-widget", "name": "widget",
+				"deprecated_at": nil, "owner": f.owner(),
+			},
+			"version": v,
+			"metadata": struct {
+				puppetfmt.Manifest
+				ProjectPage string `json:"project_page"`
+			}{f.manifest(v), forgeHomepage},
+			"supported": true, "file_uri": "/v3/files/acme-widget-" + v + ".tar.gz",
+			"file_size": len(data), "file_md5": md5Hex(data), "file_sha256": checksum(data),
+			"downloads": f.downloads(v), "readme": "# acme-widget " + v, "changelog": nil,
+			"license": "Apache License", "created_at": f.dates[v], "updated_at": f.dates[v],
+			"deleted_at": nil,
 		})
 	}
 	out.Header().Set("Content-Type", "application/json")
@@ -137,90 +157,209 @@ func (f *cappedForge) pagesAsked() []string {
 	return out
 }
 
-// releaseRecord is a release as every Puppet route answers it, in the
-// order of its fields.
+// forgeHomepage is the project_page of every release's metadata, which a
+// module record answers as its homepage_url, "&" as it is.
+const forgeHomepage = "https://example.invalid/widget?tab=readme&lang=en"
+
+// md5Hex returns the MD5 of data in hex, as the Forge's file_md5 gives it.
+func md5Hex(data []byte) string {
+	digest := md5.Sum(data) //nolint:gosec // the Forge's file_md5, which 7.x relays
+	return hex.EncodeToString(digest[:])
+}
+
+// ownerRecord is a module's owner, as the Forge and a remote answer it.
+type ownerRecord struct {
+	URI        string `json:"uri"`
+	Slug       string `json:"slug"`
+	Username   string `json:"username"`
+	GravatarID string `json:"gravatar_id"`
+}
+
+// owner is the module's owner as the Forge answers it.
+func (f *cappedForge) owner() ownerRecord {
+	return ownerRecord{"/v3/users/acme", "acme", "acme", "fdd009b7c1ec96e088b389f773e87aec"}
+}
+
+// downloads is the count the Forge gives version v: its minor version
+// plus one.
+func (f *cappedForge) downloads(v string) int {
+	minor, _ := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(v, "1."), ".0"))
+	return minor + 1
+}
+
+// The records a remote answers relay the Forge's fields (RTFACT-19130),
+// in the order of the module's own records: its record.go.
+type moduleRef struct {
+	URI          string      `json:"uri"`
+	Slug         string      `json:"slug"`
+	Name         string      `json:"name"`
+	Owner        ownerRecord `json:"owner"`
+	DeprecatedAt *string     `json:"deprecated_at"`
+}
+
 type releaseRecord struct {
 	URI        string             `json:"uri"`
 	Slug       string             `json:"slug"`
+	Module     moduleRef          `json:"module"`
 	Version    string             `json:"version"`
-	FileURI    string             `json:"file_uri"`
-	FileSHA256 string             `json:"file_sha256"`
-	FileSize   int                `json:"file_size"`
 	Metadata   puppetfmt.Manifest `json:"metadata"`
 	Tags       []string           `json:"tags"`
+	Supported  bool               `json:"supported"`
+	FileURI    string             `json:"file_uri"`
+	FileSize   int                `json:"file_size"`
+	FileMD5    string             `json:"file_md5"`
+	FileSHA256 string             `json:"file_sha256"`
+	Downloads  int                `json:"downloads"`
+	Readme     string             `json:"readme"`
+	Changelog  *string            `json:"changelog"`
+	License    string             `json:"license"`
+	CreatedAt  string             `json:"created_at"`
+	UpdatedAt  string             `json:"updated_at"`
+	DeletedAt  *string            `json:"deleted_at"`
 }
 
+type releaseLink struct {
+	URI     string `json:"uri"`
+	Version string `json:"version"`
+}
+
+type moduleRecord struct {
+	URI            string        `json:"uri"`
+	Slug           string        `json:"slug"`
+	Name           string        `json:"name"`
+	Downloads      int           `json:"downloads"`
+	CreatedAt      string        `json:"created_at"`
+	UpdatedAt      string        `json:"updated_at"`
+	Supported      bool          `json:"supported"`
+	Endorsement    *string       `json:"endorsement"`
+	ModuleGroup    string        `json:"module_group"`
+	Owner          ownerRecord   `json:"owner"`
+	CurrentRelease releaseRecord `json:"current_release"`
+	Releases       []releaseLink `json:"releases"`
+	HomepageURL    string        `json:"homepage_url"`
+	IssuesURL      *string       `json:"issues_url"`
+}
+
+// pageObject is the Forge's whole pagination object, which every list
+// answers before its results (RTFACT-14557).
 type pageObject struct {
-	Limit  int     `json:"limit"`
-	Offset int     `json:"offset"`
-	Total  int     `json:"total"`
-	Next   *string `json:"next"`
+	Limit    int     `json:"limit"`
+	Offset   int     `json:"offset"`
+	First    string  `json:"first"`
+	Previous *string `json:"previous"`
+	Current  string  `json:"current"`
+	Next     *string `json:"next"`
+	Total    int     `json:"total"`
+}
+
+// newPageObject returns the pagination of route's page at offset of limit
+// entries in a list of total, whose links keep filter first.
+func newPageObject(route, filter string, limit, offset, total int) pageObject {
+	link := func(at int) *string {
+		s := fmt.Sprintf("%s?%s&limit=%d&offset=%d", route, filter, limit, at)
+		return &s
+	}
+	p := pageObject{
+		Limit: limit, Offset: offset, First: *link(0), Current: *link(offset), Total: total,
+	}
+	if offset > 0 {
+		p.Previous = link(max(offset-limit, 0))
+	}
+	if offset+limit < total {
+		p.Next = link(offset + limit)
+	}
+	return p
 }
 
 func (f *cappedForge) record(v string) releaseRecord {
 	data := f.archives[v]
 	return releaseRecord{
-		URI: "/v3/releases/acme-widget-" + v, Slug: "acme-widget-" + v, Version: v,
-		FileURI: "/v3/files/acme-widget-" + v + ".tar.gz", FileSHA256: checksum(data),
-		FileSize: len(data), Metadata: f.manifest(v), Tags: []string{},
+		URI: "/v3/releases/acme-widget-" + v, Slug: "acme-widget-" + v,
+		Module: moduleRef{
+			URI: "/v3/modules/acme-widget", Slug: "acme-widget", Name: "widget",
+			Owner: f.owner(),
+		},
+		Version: v, Metadata: f.manifest(v), Tags: []string{}, Supported: true,
+		FileURI: "/v3/files/acme-widget-" + v + ".tar.gz", FileSize: len(data),
+		FileMD5: md5Hex(data), FileSHA256: checksum(data), Downloads: f.downloads(v),
+		Readme: "# acme-widget " + v, License: "Apache License",
+		CreatedAt: f.dates[v], UpdatedAt: f.dates[v],
 	}
 }
 
-func (f *cappedForge) moduleRecord() map[string]any {
-	releases := []map[string]string{}
+// moduleRecord is the module as a remote answers it, from its releases:
+// their downloads summed, the oldest release's created_at and the newest's
+// updated_at, and the newest's owner and links.
+func (f *cappedForge) moduleRecord() moduleRecord {
+	out := moduleRecord{
+		URI: "/v3/modules/acme-widget", Slug: "acme-widget", Name: "widget",
+		CreatedAt: f.dates[f.versions[len(f.versions)-1]], UpdatedAt: f.dates[f.versions[0]],
+		Supported: true, ModuleGroup: "base", Owner: f.owner(),
+		CurrentRelease: f.record(f.versions[0]), Releases: []releaseLink{},
+		HomepageURL: forgeHomepage,
+	}
 	for _, v := range f.versions {
-		releases = append(releases, map[string]string{
-			"version": v, "uri": "/v3/releases/acme-widget-" + v,
-		})
+		out.Downloads += f.downloads(v)
+		out.Releases = append(out.Releases, releaseLink{"/v3/releases/acme-widget-" + v, v})
 	}
-	return map[string]any{
-		"name": "widget", "slug": "acme-widget", "uri": "/v3/modules/acme-widget",
-		"owner":           map[string]string{"username": "acme"},
-		"current_release": f.record(f.versions[0]), "releases": releases,
-	}
+	return out
 }
 
 // answers returns the exact body each route of a remote, or of a virtual
 // repository over it, answers for acme-widget once it has read every
-// release the Forge holds: the release list a page of 100 at a time, the
-// newest release, the oldest one, which the Forge serves last, the module
-// and the module search.
+// release the Forge holds: the release list a page of 100 at a time, and
+// the first, second and last page of 20 it serves when no limit is asked,
+// the newest release, the oldest one, which the Forge serves last, the
+// module and the module search. "&" is written as it is (#1287).
 func (f *cappedForge) answers(t *testing.T) map[string]string {
 	t.Helper()
 	encode := func(doc any) string {
 		var b bytes.Buffer
-		if err := json.NewEncoder(&b).Encode(doc); err != nil {
+		e := json.NewEncoder(&b)
+		e.SetEscapeHTML(false)
+		if err := e.Encode(doc); err != nil {
 			t.Fatal(err)
 		}
 		return b.String()
+	}
+	type page[T any] struct {
+		Pagination pageObject `json:"pagination"`
+		Results    []T        `json:"results"`
 	}
 	newest, oldest := f.versions[0], f.versions[len(f.versions)-1]
 	out := map[string]string{
 		"/v3/releases/acme-widget-" + newest: encode(f.record(newest)),
 		"/v3/releases/acme-widget-" + oldest: encode(f.record(oldest)),
 		"/v3/modules/acme-widget":            encode(f.moduleRecord()),
-		"/v3/modules?query=acme-widget": encode(map[string]any{
-			"results":    []any{f.moduleRecord()},
-			"pagination": pageObject{Limit: 1000, Total: 1},
+		"/v3/modules?query=acme-widget": encode(page[moduleRecord]{
+			newPageObject("/v3/modules", "query=acme-widget", 20, 0, 1),
+			[]moduleRecord{f.moduleRecord()},
 		}),
 	}
 	total := len(f.versions)
-	for offset := 0; offset < total; offset += 100 {
-		end := min(offset+100, total)
-		page := pageObject{Limit: 100, Offset: offset, Total: total}
-		if end < total {
-			next := fmt.Sprintf("/v3/releases?module=acme-widget&limit=100&offset=%d", end)
-			page.Next = &next
-		}
+	releases := func(limit, offset int) string {
 		records := []releaseRecord{}
-		for _, v := range f.versions[offset:end] {
+		for _, v := range f.versions[offset:min(offset+limit, total)] {
 			records = append(records, f.record(v))
 		}
-		route := fmt.Sprintf("/v3/releases?module=acme-widget&limit=100&offset=%d", offset)
-		out[route] = encode(struct {
-			Results    []releaseRecord `json:"results"`
-			Pagination pageObject      `json:"pagination"`
-		}{records, page})
+		return encode(page[releaseRecord]{
+			newPageObject("/v3/releases", "module=acme-widget", limit, offset, total), records,
+		})
+	}
+	for offset := 0; offset < total; offset += 100 {
+		out[fmt.Sprintf("/v3/releases?module=acme-widget&limit=100&offset=%d", offset)] = releases(
+			100,
+			offset,
+		)
+	}
+	out["/v3/releases?module=acme-widget"] = releases(20, 0)
+	for _, offset := range []int{20, (total - 1) / 20 * 20} {
+		if offset > 0 && offset < total {
+			out[fmt.Sprintf("/v3/releases?module=acme-widget&offset=%d", offset)] = releases(
+				20,
+				offset,
+			)
+		}
 	}
 	return out
 }

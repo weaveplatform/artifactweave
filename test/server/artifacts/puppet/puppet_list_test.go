@@ -42,9 +42,25 @@ func TestAccPuppetWholeRepositoryLists(t *testing.T) {
 	}
 	r = w.request("GET", api+"puppet/v3/modules", "admin", "")
 	body := r.Body.String()
-	if r.Code != 200 || !strings.Contains(body, `"total":1},"results":[{"current_release"`) ||
-		!strings.Contains(body, `"slug":"acme-widget","uri":"/v3/modules/acme-widget"}]}`) {
+	if r.Code != 200 || !strings.Contains(body,
+		`"total":1},"results":[{"uri":"/v3/modules/acme-widget","slug":"acme-widget",`) ||
+		!strings.Contains(body, `"version_requirement":">= 1.0.0 < 2.0.0"}]},"tags":[],`) ||
+		!strings.Contains(body, `"homepage_url":null,"issues_url":null}]}`) {
 		t.Fatalf("modules: %d %s", r.Code, body)
+	}
+	// The spec declares limit and offset as integers; the protocol, which the
+	// generated operations hand every request to, still answers a malformed
+	// page, the search's included, with its own 400.
+	for route, message := range map[string]string{
+		"v3/releases?module=acme-widget&limit=x": "invalid Puppet limit",
+		"v3/releases?offset=-1":                  "invalid Puppet offset",
+		"v3/modules?query=acme-widget&offset=x":  "invalid Puppet offset",
+	} {
+		r := w.request("GET", api+"puppet/"+route, "admin", "")
+		if r.Code != 400 || r.Body.String() !=
+			`{"errors":[{"message":"`+message+`","status":400}]}`+"\n" {
+			t.Fatalf("%s: %d %s", route, r.Code, r.Body.String())
+		}
 	}
 	for _, route := range []string{"v3/releases", "v3/modules"} {
 		remoteStatus(t, w.request("HEAD", api+"puppet/"+route, "admin", ""), 200)

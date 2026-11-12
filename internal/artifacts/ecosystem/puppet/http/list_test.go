@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/api"
@@ -21,10 +22,12 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
-// listRelease is one release the list tests deploy, with its archive.
+// listRelease is one release the list tests deploy, with its archive and
+// the stored item that holds it.
 type listRelease struct {
 	name, version string
 	data          []byte
+	item          artmodel.Item
 }
 
 // moduleArchive returns an archive of module name at version that holds
@@ -67,53 +70,111 @@ func (f *fixture) deployList(c repo.Config) []listRelease {
 	for _, rel := range [][2]string{
 		{"acme-beta", "2.0.0"}, {"acme-alpha", "1.0.0"}, {"acme-alpha", "1.1.0"},
 	} {
-		data := moduleArchive(f.t, rel[0], rel[1])
-		if _, err := f.items.Deploy(f.t.Context(), item.Deploy{
-			Target: item.Target{Repo: c, Path: rel[0] + "/" + rel[0] + "-" + rel[1] + ".tar.gz"},
-			Body:   bytes.NewReader(data),
-			By:     "admin",
-		}); err != nil {
-			f.t.Fatal(err)
-		}
-		out = append(out, listRelease{rel[0], rel[1], data})
+		out = append(out, f.deployRelease(c, rel[0], rel[1], moduleArchive(f.t, rel[0], rel[1])))
 	}
 	return []listRelease{out[2], out[1], out[0]}
 }
 
-// releaseJSON is the record every release list answers for rel.
-func releaseJSON(rel listRelease) string {
+// deployRelease deploys data as the archive of module name at version to c,
+// and returns the release with its stored item.
+func (f *fixture) deployRelease(c repo.Config, name, version string, data []byte) listRelease {
+	f.t.Helper()
+	path := name + "/" + name + "-" + version + ".tar.gz"
+	if _, err := f.items.Deploy(f.t.Context(), item.Deploy{
+		Target: item.Target{Repo: c, Path: path}, Body: bytes.NewReader(data), By: "admin",
+	}); err != nil {
+		f.t.Fatal(err)
+	}
+	it, err := f.db.Items().Get(f.t.Context(), c.Key, false, path)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	return listRelease{name, version, data, it}
+}
+
+// forgeDate writes t as a hosted record's dates are written.
+func forgeDate(t time.Time) string {
+	return t.UTC().Format("2006-01-02 15:04:05 -0700")
+}
+
+// hostedOwner is the owner object of a hosted module of acme.
+const hostedOwner = `{"uri":"/v3/users/acme","slug":"acme","username":"acme","gravatar_id":null}`
+
+// releaseJSON is the record every route answers for hosted release rel, an
+// archive moduleArchive built, downloaded downloads times.
+func releaseJSON(rel listRelease, downloads ...int) string {
+	return recordJSON(rel, fmt.Sprintf(
+		`{"name":"%[1]s","version":"%[2]s","summary":"%[1]s %[2]s","dependencies":[]}`,
+		rel.name, rel.version), sumCounts(downloads))
+}
+
+// recordJSON is the record every route answers for hosted release rel,
+// whose metadata answers as metadata: the fields of JFrog's reference and
+// 7.x's answers, its MD5 and dates from its stored item, and null for the
+// texts a hosted release has none of.
+func recordJSON(rel listRelease, metadata string, downloads int) string {
 	slug := rel.name + "-" + rel.version
+	_, module, _ := strings.Cut(rel.name, "-")
 	return fmt.Sprintf(
-		`{"uri":"/v3/releases/%[1]s","slug":"%[1]s","version":"%[2]s",`+
-			`"file_uri":"/v3/files/%[1]s.tar.gz","file_sha256":"%[3]s","file_size":%[4]d,`+
-			`"metadata":{"name":"%[5]s","version":"%[2]s","summary":"%[5]s %[2]s","dependencies":[]},`+
-			`"tags":[]}`,
-		slug, rel.version, sum(rel.data), len(rel.data), rel.name,
+		`{"uri":"/v3/releases/%[1]s","slug":"%[1]s",`+
+			`"module":{"uri":"/v3/modules/%[5]s","slug":"%[5]s","name":"%[6]s",`+
+			`"owner":`+hostedOwner+`,"deprecated_at":null},"version":"%[2]s",`+
+			`"metadata":%[11]s,`+
+			`"tags":[],"supported":false,"file_uri":"/v3/files/%[1]s.tar.gz","file_size":%[4]d,`+
+			`"file_md5":"%[7]s","file_sha256":"%[3]s","downloads":%[8]d,`+
+			`"readme":null,"changelog":null,"license":null,`+
+			`"created_at":"%[9]s","updated_at":"%[10]s","deleted_at":null}`,
+		slug, rel.version, sum(rel.data), len(rel.data), rel.name, module,
+		rel.item.Actual.MD5, downloads, forgeDate(rel.item.Created),
+		forgeDate(rel.item.Updated), metadata,
 	)
 }
 
-// moduleJSON is the record the module search and the module list answer
-// for a module whose releases are rels, newest first.
+// sumCounts sums counts.
+func sumCounts(counts []int) int {
+	n := 0
+	for _, c := range counts {
+		n += c
+	}
+	return n
+}
+
+// moduleJSON is the record v3/modules/<m>, the module search and the module
+// list answer for a hosted module whose releases are rels, newest first,
+// none of them downloaded: created_at is the earliest release's and
+// updated_at the latest's, and endorsement and module_group are JFrog's
+// sample answer's.
 func moduleJSON(rels ...listRelease) string {
 	name := rels[0].name
-	owner, module, _ := strings.Cut(name, "-")
+	_, module, _ := strings.Cut(name, "-")
 	var versions []string
+	created, updated := forgeDate(rels[0].item.Created), forgeDate(rels[0].item.Updated)
 	for _, rel := range rels {
 		versions = append(versions, fmt.Sprintf(
 			`{"uri":"/v3/releases/%s-%s","version":"%s"}`, name, rel.version, rel.version))
+		created = min(created, forgeDate(rel.item.Created))
+		updated = max(updated, forgeDate(rel.item.Updated))
 	}
 	return fmt.Sprintf(
-		`{"current_release":%s,"name":"%s","owner":{"username":"%s"},"releases":[%s],`+
-			`"slug":"%s","uri":"/v3/modules/%s"}`,
-		releaseJSON(rels[0]), module, owner, strings.Join(versions, ","), name, name,
+		`{"uri":"/v3/modules/%[1]s","slug":"%[1]s","name":"%[2]s","downloads":0,`+
+			`"created_at":"%[3]s","updated_at":"%[4]s","supported":false,"endorsement":null,`+
+			`"module_group":"base","owner":`+hostedOwner+`,"current_release":%[5]s,`+
+			`"releases":[%[6]s],"homepage_url":null,"issues_url":null}`,
+		name, module, created, updated, releaseJSON(rels[0]), strings.Join(versions, ","),
 	)
 }
 
 // listJSON is a whole-repository list's answer: its pagination, as 7.x's
-// sample answer for Get Puppet Modules gives it, and results.
+// sample answer for Get Puppet Modules gives it, and results. A route with
+// a query, such as "/v3/releases?module=acme-alpha", keeps it first in each
+// link, as 7.x's release list does (RTFACT-14557).
 func listJSON(route string, limit, offset, total int, results ...string) string {
+	sep := "?"
+	if strings.Contains(route, "?") {
+		sep = "&"
+	}
 	link := func(offset int) string {
-		return fmt.Sprintf(`"%s?limit=%d&offset=%d"`, route, limit, offset)
+		return fmt.Sprintf(`"%s%slimit=%d&offset=%d"`, route, sep, limit, offset)
 	}
 	previous, next := "null", "null"
 	if offset > 0 {
@@ -324,37 +385,20 @@ func TestUnitListsOfVirtualAndRemoteRepositories(t *testing.T) {
 	}
 }
 
-// The one-module list and the module search answer as they did, and a
-// query that names more than a page keeps the 400 it had.
-func TestUnitListsLeaveTheOneModuleRoutes(t *testing.T) {
+// A query that names more than a page keeps the 400 it had before the
+// lists were served; the one-module list's and the search's own paging is
+// paging_test.go's.
+func TestUnitListsLeaveTheOneModuleRefusals(t *testing.T) {
 	f := newFixture(t, repo.Local)
-	rels := f.deployList(f.c)
-	r := f.do("GET", base+"/v3/releases?module=acme-alpha", "admin")
-	want := `{"results":[` + releaseJSON(rels[0]) + `,` + releaseJSON(rels[1]) +
-		`],"pagination":{"limit":1000,"offset":0,"total":2,"next":null}}` + "\n"
-	if r.Code != 200 || r.Body.String() != want {
-		t.Fatalf("module list: %d %s\nwant %s", r.Code, r.Body.String(), want)
-	}
-	r = f.do("GET", base+"/v3/releases?module=acme-alpha&limit=1", "admin")
-	if r.Code != 200 || !strings.Contains(r.Body.String(),
-		`"next":"/v3/releases?module=acme-alpha`+"\\u0026"+`limit=1`+"\\u0026"+`offset=1"`) {
-		t.Fatalf("module list page: %d %s", r.Code, r.Body.String())
-	}
-	r = f.do("GET", base+"/v3/modules?query=acme-beta", "admin")
-	want = `{"pagination":{"limit":1000,"offset":0,"total":1,"next":null},"results":[` +
-		moduleJSON(rels[2]) + `]}` + "\n"
-	if r.Code != 200 || r.Body.String() != want {
-		t.Fatalf("search: %d %s\nwant %s", r.Code, r.Body.String(), want)
-	}
+	f.deployList(f.c)
 	for route, message := range map[string]string{
-		"/v3/releases?sort_by=version":       "invalid Puppet module",
-		"/v3/releases?exclude_fields=x":      "invalid Puppet module",
-		"/v3/releases?limit=1&limit=2":       "unsupported Puppet query",
-		"/v3/releases?owner=acme":            "unsupported Puppet query",
-		"/v3/modules?owner=acme":             "search requires an exact Puppet module name",
-		"/v3/modules?limit=1&limit=2":        "search requires an exact Puppet module name",
-		"/v3/modules?query=acme-alpha&limit": "search requires an exact Puppet module name",
-		"/v3/modules?limit=%zz":              "search requires an exact Puppet module name",
+		"/v3/releases?sort_by=version":  "invalid Puppet module",
+		"/v3/releases?exclude_fields=x": "invalid Puppet module",
+		"/v3/releases?limit=1&limit=2":  "unsupported Puppet query",
+		"/v3/releases?owner=acme":       "unsupported Puppet query",
+		"/v3/modules?owner=acme":        "search requires an exact Puppet module name",
+		"/v3/modules?limit=1&limit=2":   "search requires an exact Puppet module name",
+		"/v3/modules?limit=%zz":         "search requires an exact Puppet module name",
 	} {
 		wantError(t, f.do("GET", base+route, "admin"), 400, message)
 	}
