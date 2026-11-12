@@ -416,6 +416,27 @@ func (p failingPackages) List(
 	return p.PackageStore.List(ctx, key, page) //nolint:wrapcheck // a test's pass-through
 }
 
+// SearchNuGet reads the packages and their versions together, so it fails
+// as List and Versions fail, and corrupts what it returns as Versions does.
+func (p failingPackages) SearchNuGet(
+	ctx context.Context,
+	q port.NuGetSearch,
+	page kernel.Page,
+) ([]port.SearchCandidate, string, error) {
+	if p.failing == "list" || p.failing == "versions" {
+		return nil, "", errBroken
+	}
+	found, next, err := p.PackageStore.SearchNuGet(ctx, q, page)
+	if p.failing == "metadata" {
+		for _, c := range found {
+			for i := range c.Versions {
+				c.Versions[i].Metadata = []byte("{")
+			}
+		}
+	}
+	return found, next, err //nolint:wrapcheck // a test's pass-through
+}
+
 func (p failingPackages) Versions(
 	ctx context.Context,
 	id int64,

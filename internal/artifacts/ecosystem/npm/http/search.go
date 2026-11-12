@@ -10,6 +10,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
@@ -20,7 +21,7 @@ const (
 	maxSearchTerms = 3
 	// defaultSearchSize is npm's own searchlimit, which it always sends.
 	defaultSearchSize = 20
-	// searchPage is how many packages one read of the index lists.
+	// searchPage is the most packages one read of the index returns.
 	searchPage = 500
 )
 
@@ -84,8 +85,15 @@ type searchPackage struct {
 // package is matched as its caller sees it: by its latest among the
 // versions the caller may read, every term of the text appearing, ignoring
 // case, in its name, description or a keyword. A package the caller may
-// read no version of is left out. Results are in name order, the index's,
-// so the scan stops once it has from+size.
+// read no version of is left out. Results are in name order, the index's.
+//
+// The store returns, a page at a time and in that order, only the
+// packages whose name or a version's metadata may hold every term
+// (port.NpmSearch); the match and the caller's permissions are decided
+// here, so from is counted here too. Permissions are path patterns the
+// access module evaluates in Go, and latest and the text are what the
+// caller may read of each package, so no query can count from exactly.
+// The scan stops once it has from+size, and holds one page of candidates.
 func (h handler) search(w http.ResponseWriter, r *http.Request) {
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
 		h.remoteSearch(w, r)
@@ -95,15 +103,16 @@ func (h handler) search(w http.ResponseWriter, r *http.Request) {
 	key := pkgroute.RequestFrom(r).Repo.Key
 	answer := searchAnswer{Objects: []searchObject{}}
 	skip := q.from
-	page := kernel.Page{Limit: searchPage}
+	find := port.NpmSearch{RepoKey: key, Terms: q.terms}
+	page := kernel.Page{Limit: batch(skip, q.size, 0)}
 	for {
-		found, next, err := h.k.DB().Packages().List(r.Context(), key, page)
+		found, next, err := h.k.DB().Packages().SearchNpm(r.Context(), find, page)
 		if err != nil {
 			h.k.Error(w, r, fmt.Errorf("npm: search %s: %w", key, err))
 			return
 		}
-		for _, f := range found {
-			hit, ok, err := h.searched(r, f.Name, q.terms)
+		for _, c := range found {
+			hit, ok, err := h.searched(r, c, q.terms)
 			switch {
 			case err != nil:
 				h.k.Error(w, r, err)
@@ -123,19 +132,33 @@ func (h handler) search(w http.ResponseWriter, r *http.Request) {
 		if next == "" {
 			break
 		}
-		page.After = next
+		page = kernel.Page{After: next, Limit: batch(skip, q.size-len(answer.Objects), page.Limit)}
 	}
 	writeJSON(w, http.StatusOK, jsonType, answer)
 }
 
-// searched is the package called name as the caller's search lists it, if
-// the caller may read a version of it and its latest matches every term.
+// batch is how many candidates the next read of the index asks for: as
+// many as the page still lacks (skip more to pass over, then wanted), so
+// a caller who may read every candidate reads no more than its page needs.
+// After a read that left the page short (last), it asks at least twice
+// as many, so a caller who may read few of the candidates does not read
+// them a handful at a time. It never asks more than searchPage.
+func batch(skip, wanted, last int) int {
+	lacking := searchPage
+	if skip < searchPage && wanted < searchPage {
+		lacking = skip + wanted
+	}
+	return min(searchPage, max(lacking, 2*last))
+}
+
+// searched is the package c as the caller's search lists it, if the
+// caller may read a version of it and its latest matches every term.
 func (h handler) searched(
 	r *http.Request,
-	name string,
+	c port.SearchCandidate,
 	terms []string,
 ) (searchPackage, bool, error) {
-	p, ok, err := h.readable(r, name)
+	p, ok, err := h.visible(r, c.Package, c.Versions)
 	if err != nil || !ok {
 		return searchPackage{}, false, err
 	}
@@ -148,7 +171,7 @@ func (h handler) searched(
 		return searchPackage{}, false, err
 	}
 	hit := searchPackage{
-		Name: name, Description: description(fields["description"]),
+		Name: p.name, Description: description(fields["description"]),
 		Maintainers: []json.RawMessage{}, Version: v.number, Date: stamp(v.meta.Published),
 		Keywords: npmfmt.Keywords(fields["keywords"]), Author: fields["author"],
 	}
