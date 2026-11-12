@@ -1,6 +1,7 @@
 package dockerhttp
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -230,17 +231,42 @@ func (g *Registry) remoteError(w http.ResponseWriter, r *http.Request, q Request
 		return
 	}
 	p, _ := kernel.FromContext(r.Context())
-	err = pkgroute.SourceError(err, p.Anonymous || p.Name == "")
-	var e *apierror.Error
-	if errors.As(err, &e) {
-		if e.Code == "" {
-			e.Code = CodeDenied
-			if e.Status == 429 {
-				e.Code = CodeTooManyRequests
-			}
-		}
+	answer := pkgroute.SourceError(err, p.Anonymous || p.Name == "")
+	if retrievalFailed(err) {
+		// The remote's failure to fetch, unlike the caller's refusal, answers
+		// in Artifactory's envelope under no registry code, keeping its
+		// status, message and Retry-After. docker pull printed "unknown:
+		// Invalid username/password configured for Remote Docker repository:
+		// ..." when 7.x's upstream refused its credentials (a KB article of
+		// 2022, and RTFACT-30467, filed in 2024), and the client prints
+		// unknown only for a code it does not know or for none, as with the
+		// download policy's refusal (refuse). The 403, 429 and 5xx follow
+		// the 401 [I].
+		apierror.Write(w, apierror.ProfileArtifactory, answer)
+		return
 	}
-	g.writeErr(w, r, err)
+	g.writeErr(w, r, answer)
+}
+
+// retrievalFailed reports whether err, which SourceError maps, is the remote
+// failing to fetch what was asked: its upstream's answer, which the source
+// boundary relays only for a 401, 403, 429 or 5xx, no usable answer, none in
+// time, a configuration change during the fetch, or a fetch cut short. The
+// caller's own refusal (source.ErrDenied), an invalid source request and an
+// unsupported operation keep their registry codes. The checks run in
+// SourceError's order, so an error that matches two of them is classed by
+// the answer it gets.
+func retrievalFailed(err error) bool {
+	if errors.As(err, new(*source.HTTPError)) {
+		return true
+	}
+	if errors.Is(err, source.ErrDenied) || errors.Is(err, source.ErrInvalidRequest) ||
+		errors.Is(err, source.ErrUnsupported) {
+		return false
+	}
+	return errors.Is(err, context.DeadlineExceeded) || errors.Is(err, source.ErrSuperseded) ||
+		errors.Is(err, source.ErrUnavailable) || errors.Is(err, source.ErrInvalidResult) ||
+		errors.Is(err, context.Canceled)
 }
 
 type remoteWriter struct {

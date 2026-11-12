@@ -106,6 +106,12 @@
 //     leaves out an image its repository's patterns reject (RTFACT-26524),
 //     and a mount from another repository that would refuse the blob opens
 //     a session.
+//   - A remote repository's failure to fetch, its upstream's 401, 403, 429
+//     or 5xx or an upstream that is unreachable, unusable or slow, answers
+//     its status and message in Artifactory's envelope, under no registry
+//     code, as the Docker client showed 7.x's answer to an upstream that
+//     refused its credentials (RTFACT-30467, #1248). The caller's own
+//     refusal keeps DENIED, or UNAUTHORIZED when anonymous.
 //
 // # References
 //
@@ -180,6 +186,8 @@
 //     a blob served from a copy the patterns accept, mounts from a refusing
 //     source and catalogs the patterns filter; a format's refusals of writes,
 //     which keep their status; and a remote listing's final fence.
+//   - remote_error_test.go: the envelope and code of each failure a remote
+//     read answers, and kernel's shared errors left unchanged.
 //   - The guard suites test/server/artifacts/docker and
 //     test/server/artifacts/helmoci, and the OCI conformance job, drive the
 //     registry through the whole server; the docker suite drives DockerAPI's
