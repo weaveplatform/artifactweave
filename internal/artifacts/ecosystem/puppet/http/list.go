@@ -1,7 +1,6 @@
 package puppethttp
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -63,12 +62,19 @@ type listPage struct {
 	Total    int     `json:"total"`
 }
 
-// newListPage returns the pagination of a page of route's list. The links
-// are Forge-relative, as 7.x's are ("/v3/modules?limit=20&offset=0"); the
-// client resolves them against the repository's Forge URL.
-func newListPage(route string, limit, offset, total int) listPage {
+// newListPage returns the pagination of a page of route's list, which
+// filter, when set, narrows to one module ("module=<m>" or "query=<m>").
+// The links are Forge-relative, as 7.x's are
+// ("/v3/releases?module=sql&limit=20&offset=0" in RTFACT-14557); the client
+// resolves them against the repository's Forge URL. Each keeps the filter
+// first, as 7.x's and the Forge's do.
+func newListPage(route, filter string, limit, offset, total int) listPage {
 	link := func(offset int) string {
-		return route + "?limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset)
+		page := "limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset)
+		if filter != "" {
+			page = filter + "&" + page
+		}
+		return route + "?" + page
 	}
 	p := listPage{
 		Limit: limit, Offset: offset, Total: total,
@@ -206,7 +212,7 @@ func (h handler) listReleases(w http.ResponseWriter, r *http.Request, q url.Valu
 		}
 	}
 	start, end := window(offset, limit, len(all))
-	out := []versionRecord{}
+	out := []releaseRecord{}
 	for _, e := range all[start:end] {
 		v, err := h.k.DB().Packages().Version(r.Context(), e.id, e.version)
 		if errors.Is(err, kernel.ErrNotFound) {
@@ -223,12 +229,12 @@ func (h handler) listReleases(w http.ResponseWriter, r *http.Request, q url.Valu
 			h.k.Error(w, r, err)
 			return
 		}
-		out = append(out, record(rel.meta))
+		out = append(out, record(rel))
 	}
-	writeList(w, r, struct {
+	writeJSON(w, r, http.StatusOK, struct {
 		Pagination listPage        `json:"pagination"`
-		Results    []versionRecord `json:"results"`
-	}{newListPage("/v3/releases", limit, offset, len(all)), out})
+		Results    []releaseRecord `json:"results"`
+	}{newListPage("/v3/releases", "", limit, offset, len(all)), out})
 }
 
 // listModules answers v3/modules without query: every module of the
@@ -246,7 +252,7 @@ func (h handler) listModules(w http.ResponseWriter, r *http.Request, q url.Value
 		return
 	}
 	start, end := window(offset, limit, len(modules))
-	out := []map[string]any{}
+	out := []moduleRecord{}
 	for _, m := range modules[start:end] {
 		releases, err := h.hosted(r, m.name)
 		if err != nil {
@@ -257,12 +263,12 @@ func (h handler) listModules(w http.ResponseWriter, r *http.Request, q url.Value
 		if len(releases) == 0 {
 			continue
 		}
-		out = append(out, moduleRecord(releases))
+		out = append(out, newModuleRecord(releases))
 	}
-	writeList(w, r, struct {
-		Pagination listPage         `json:"pagination"`
-		Results    []map[string]any `json:"results"`
-	}{newListPage("/v3/modules", limit, offset, len(modules)), out})
+	writeJSON(w, r, http.StatusOK, struct {
+		Pagination listPage       `json:"pagination"`
+		Results    []moduleRecord `json:"results"`
+	}{newListPage("/v3/modules", "", limit, offset, len(modules)), out})
 }
 
 // listed is a module of a whole-repository list with the versions of it
@@ -323,18 +329,5 @@ func (h handler) catalog(r *http.Request) ([]listed, int, error) {
 			return out, total, nil
 		}
 		page.After = next
-	}
-}
-
-// writeList answers a list as writeJSON answers JSON, writing its links'
-// "&" as it is, as 7.x does, rather than as the \u0026 escape.
-func writeList(w http.ResponseWriter, r *http.Request, doc any) {
-	w.Header().Set("Content-Type", mediaType)
-	w.Header().Set("Cache-Control", "private, no-store")
-	w.WriteHeader(http.StatusOK)
-	if r.Method != http.MethodHead {
-		enc := json.NewEncoder(w)
-		enc.SetEscapeHTML(false)
-		_ = enc.Encode(doc)
 	}
 }

@@ -137,6 +137,15 @@ func Write(w http.ResponseWriter, s Profile, err error) {
 	if s == ProfileAPM || s == ProfileSwiftRegistry {
 		w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
 	}
+	if s == ProfileSwiftRegistry {
+		// The registry specification (3.5) requires Content-Version on every
+		// answer, and its error examples carry it. SwiftPM reads an error's
+		// detail only after its validateAPIVersion accepts this header;
+		// without it SwiftPM prints its own text for the status instead
+		// (#1278). 1 is the version the Swift handlers give their successful
+		// answers, the only one SwiftPM speaks.
+		w.Header().Set("Content-Version", "1")
+	}
 	if s == ProfilePub {
 		w.Header().Set("Content-Type", "application/vnd.pub.v2+json")
 	}

@@ -1,5 +1,6 @@
-// Package debian runs the Debian snapshot routes of the assembled server:
-// their read guards and their refusals of unavailable or corrupt indexes.
+// Package debian runs the Debian snapshot routes of the assembled server,
+// with their read guards and their refusals of unavailable or corrupt
+// indexes, and a remote Debian repository's relay of upstream files.
 //
 // # Role
 //
@@ -15,12 +16,18 @@
 //     newItemWorld): the users reader, deployer and user, the deploy-libs
 //     permission and eight local, remote and virtual repositories, with the
 //     request and seed helpers of test/server/support.
+//   - The harness's remote world (harness.NewRemoteWorld): a remote
+//     repository over a chi upstream archive the test serves, through the
+//     remote cache and its validation.
 //
 // # Outputs
 //
 // Assertions only:
 //   - debian_snapshot_security_test.go: snapshot read guards, and
 //     unavailable or corrupt indexes refused.
+//   - debian_remote_upstream_test.go: the files apt reads that a remote
+//     asks its upstream for and serves (#1273), and a by-hash file whose
+//     bytes do not match its name refused and not cached.
 //
 // # References
 //
@@ -33,8 +40,9 @@
 //     suites).
 //   - docs/testing/server-test-ownership.md: how CI selection gives the
 //     package an owner.
-//   - https://github.com/weaveplatform/artifactweave/issues/1068 and
-//     https://github.com/weaveplatform/artifactweave/issues/1083
+//   - https://github.com/weaveplatform/artifactweave/issues/1068,
+//     https://github.com/weaveplatform/artifactweave/issues/1083 and
+//     https://github.com/weaveplatform/artifactweave/issues/1273
 //
 // # Status
 //

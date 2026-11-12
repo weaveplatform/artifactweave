@@ -6818,12 +6818,16 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getPuppetModules",
     "state": "partial: handwritten override of generated operation",
-    "contract": "Not implemented for the Puppet ecosystem; answers 501.",
+    "contract": "Lists the Puppet modules the caller may read, in pages. With `query` naming one module, the page holds that module when the caller may read a release of it, and is empty otherwise; local, federated, remote and virtual repositories answer it. Without `query`, the pages list every module a local or federated repository hosts, ordered by name; a virtual repository answers 404 and a remote repository 400. A page holds 20 modules unless `limit` asks for up to 100, and a larger `limit` is served as 100. Each module lists only the releases the caller may read.",
     "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "native-puppet",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "declared_page_controls": [
+      "query limit: Optional query parameter. Most modules a page holds, at least 1. Defaults to 20; a value above 100 is served as 100.",
+      "query offset: Optional query parameter. Number of modules before the page, at least 0. Defaults to 0; an offset past the last module answers an empty page."
+    ],
     "response_collections": [
       "200 application/json.results[]"
     ],
@@ -6862,12 +6866,17 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getPuppetModuleInfo",
     "state": "partial: handwritten override of generated operation",
-    "contract": "Not implemented for the Puppet ecosystem; answers 501.",
+    "contract": "Returns one Puppet module, its newest release and the list of its releases the caller may read, from a local, federated, remote or virtual repository. A module with no release the caller may read answers 404. Any query parameter is rejected with 400.",
     "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "native-puppet",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "response_collections": [
+      "200 application/json.current_release.metadata.dependencies[]",
+      "200 application/json.current_release.tags[]",
+      "200 application/json.releases[]"
+    ],
     "pagination_execution": "native wire contract retained: complete indexes, catalog/offset/cursor variants and streaming files differ by route; see family review for exact execution and limits",
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
@@ -6884,12 +6893,16 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getPuppetReleases",
     "state": "partial: handwritten override of generated operation",
-    "contract": "Not implemented for the Puppet ecosystem; answers 501.",
+    "contract": "Lists the Puppet module releases the caller may read, in pages, newest version first. With `module`, the pages list that one module's releases; local, federated, remote and virtual repositories answer them. Without `module`, the pages list every release a local or federated repository hosts, by module name; a virtual repository answers 404 and a remote repository 400. A page holds 20 releases unless `limit` asks for up to 100, and a larger `limit` is served as 100.",
     "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "native-puppet",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "declared_page_controls": [
+      "query limit: Optional query parameter. Most releases a page holds, at least 1. Defaults to 20; a value above 100 is served as 100.",
+      "query offset: Optional query parameter. Number of releases before the page, at least 0, and with `module` at most 4,096. Defaults to 0; an offset past the last release answers an empty page."
+    ],
     "response_collections": [
       "200 application/json.results[]"
     ],
@@ -6928,12 +6941,16 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getPuppetReleaseInfo",
     "state": "partial: handwritten override of generated operation",
-    "contract": "Not implemented for the Puppet ecosystem; answers 501.",
+    "contract": "Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. Any query parameter is rejected with 400.",
     "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "native-puppet",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "response_collections": [
+      "200 application/json.metadata.dependencies[]",
+      "200 application/json.tags[]"
+    ],
     "pagination_execution": "native wire contract retained: complete indexes, catalog/offset/cursor variants and streaming files differ by route; see family review for exact execution and limits",
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
@@ -15672,7 +15689,7 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "calculateConanRepositoryMetadata",
     "state": "stub: 501",
-    "contract": "Not implemented for the Conan ecosystem; answers 501.",
+    "contract": "Queues a rebuild of the package index of a local or federated Conan repository from its completed recipe and package revisions, and returns once the work is queued. Requires Manage on the repository; other package types and classes are rejected with 400.",
     "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
     "review_family": "native-conan",
     "effects": "no operation effect; middleware still authenticates/admit-limits",
@@ -15689,7 +15706,7 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "calculateCondaRepositoryMetadata",
     "state": "stub: 501",
-    "contract": "Not implemented for the Conda ecosystem; answers 501.",
+    "contract": "Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types and classes are rejected with 400.",
     "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
     "review_family": "native-conda",
     "effects": "no operation effect; middleware still authenticates/admit-limits",
@@ -15750,7 +15767,7 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "calculateCranRepositoryMetadata",
     "state": "stub: 501",
-    "contract": "Not implemented for the CRAN ecosystem; answers 501.",
+    "contract": "Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400.",
     "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
     "review_family": "native-cran",
     "effects": "no operation effect; middleware still authenticates/admit-limits",

@@ -65,6 +65,22 @@
     "PUT /mc/api/v1/system/backup/import"
   ],
   "divergent": {
+    "GET /artifactory/api/puppet/{}/v3/modules": [
+      "missing response 200 property current",
+      "missing response 200 property limit",
+      "missing response 200 property next",
+      "missing response 200 property offset",
+      "missing response 200 property previous",
+      "missing response 200 property total"
+    ],
+    "GET /artifactory/api/puppet/{}/v3/releases": [
+      "missing response 200 property current",
+      "missing response 200 property limit",
+      "missing response 200 property next",
+      "missing response 200 property offset",
+      "missing response 200 property previous",
+      "missing response 200 property total"
+    ],
     "GET /artifactory/api/repositories": [
       "missing response 200 property [].upstreamRepoKey"
     ],
