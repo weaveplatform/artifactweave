@@ -57,4 +57,4 @@ Feature: NuGet clients discover packages through the v3 feed
     Examples:
       | dotnet  |
       | .NET    |
-      | .NET 11 |
+      | .NET 10 |

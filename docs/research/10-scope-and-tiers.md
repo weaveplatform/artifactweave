@@ -52,20 +52,31 @@ is not runtime support. Client contracts are recorded in
 | Grid (`/grid/...`) | `{"code":"<CODE>","message":"<string>"}`, with `details` when set |
 | Workers (`/worker/...`) | as Access *(JFrog documents none; unverified)* |
 | Xray (`/xray/...`) | `{"error":"<string>"}` |
-| OCI distribution (`/v2/...`) | `{"errors":[{"code":"<CODE>","message":"<string>","detail":<any>}]}` |
+| OCI distribution (`/v2/...`) | `{"errors":[{"code":"<CODE>","message":"<string>","detail":<any>}]}`; a remote's failure to fetch and the download policy's refusal answer in the Artifactory envelope ([decision 0031](decisions/0031-docker-oci-registry.md)) |
 | npm (`/api/npm/...`) | `{"error":"<string>"}`, with `reason` on publish conflicts |
 | Terraform registry (`/api/terraform/...`: the module and provider registries and the network mirror) | `{"errors":["<string>"]}` ([decision 0040](decisions/0040-terraform.md)) |
 | Go proxy (`/api/go/...`) | plain text, the only form whose body the go command shows ([decision 0035](decisions/0035-go-modules.md)) |
 | PyPI (`/api/pypi/...`) | the Artifactory envelope, as every 7.x capture there is ([research 28](28-pypi.md), [decision 0037](decisions/0037-pypi.md)) |
 | NuGet (`/api/nuget/...`) | the Artifactory envelope, as 7.x answers its NuGet routes; `NuGet.Protocol` reads only the status ([research 29 sections 7 and 9](29-nuget.md#7-push-delete-and-relist)) |
 | Helm (`/api/helm/...`) | the Artifactory envelope; `helm` reads only the status ([decision 0039](decisions/0039-helm.md)) |
+| Dart pub (`/api/pub/...`) | `{"error":{"code":"<CODE>","message":"<string>"}}` as `application/vnd.pub.v2+json`, with `Bearer realm="pub"` on a 401: the pub repository specification's challenge, the only one whose message `dart pub` prints |
+| Swift registry (`/api/swift/...`) | RFC 7807 problem JSON, `{"title":"<status text>","status":<int>,"detail":"<string>"}`, as `application/problem+json`, which the Swift registry specification requires for every error |
+| Agent Packages (`/api/agentpackages/...`) | RFC 7807 problem JSON as for Swift, which the APM registry contract requires for every 4xx and 5xx |
 
 The JFrog operations beside a registry with an envelope of its own answer in the Artifactory
-envelope: npm's login and reindex (RTFACT-30181, [decision 0034](decisions/0034-npm.md)) and
-Terraform's reindex **[I]**. PyPI and Helm were plain text here until
+envelope: npm's login and reindex (RTFACT-30181, [decision 0034](decisions/0034-npm.md)), and
+Terraform's, pub's and Swift's reindex **[I]**. PyPI and Helm were plain text here until
 [#532](https://github.com/weaveplatform/artifactweave/issues/532).
 
-The table is implemented once in `internal/server/apierror` and tested per surface.
+Every error on a surface's paths uses its envelope, the middleware's included: the
+authentication 401 and 403 and the request limiter's 429 and 503
+([#1249](https://github.com/weaveplatform/artifactweave/issues/1249)), so that a client
+meets one format. On the pub, Swift and Agent Packages paths 7.x's envelope for these is
+unconfirmed **[I]**: RTFACT-31048 logs 7.x's pub handler sending a 503 through
+`ArtifactoryResponseBase`, which in 6.20's source writes the Artifactory envelope.
+
+The table is implemented once in `internal/platform/httpkit/apierror`, selected by path in
+`errorProfileRules` (`internal/app/router.go`), and tested per surface.
 
 ## Product families
 

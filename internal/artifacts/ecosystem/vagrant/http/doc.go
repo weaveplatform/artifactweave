@@ -1,11 +1,12 @@
-// Package vagranthttp serves the native Vagrant box catalog at Artifactory's
+// Package vagranthttp serves the native Vagrant routes at Artifactory's
 // prefix, /artifactory/api/vagrant/{repo}, on Vagrant local and federated
-// repositories: GET or HEAD of a box name answers the catalog that vagrant
+// repositories. GET or HEAD of a box name answers the catalog that vagrant
 // box add, outdated and update read, listing its versions and, for each,
 // the providers and architectures whose boxes the caller may read, with
-// each box's download URL and SHA-256. The box rules and the index are the
-// format package's (artifacts/ecosystem/vagrant); this package answers
-// HTTP with them.
+// each box's download URL and SHA-256. GET or HEAD of a box file's path,
+// which each download URL names, serves the stored box. The box rules and
+// the index are the format package's (artifacts/ecosystem/vagrant); this
+// package answers HTTP with them.
 //
 // # Role
 //
@@ -21,14 +22,15 @@
 //     deployed, deleted and annotated through the ordinary item API, where
 //     the format's hooks keep the index; this package only reads.
 //   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions and the blackout, and reads the
-//     package index, the items and their properties in one transaction;
-//     the generic download
-//     policy (generic.CheckDownload), which drops a box the repository's
-//     include and exclude patterns refuse; the request's base URL
-//     (platform/httpkit/baseurl), from which download URLs are built; and
-//     the format package, whose rules check the name and verify each box's
-//     properties.
+//     and the caller, checks permissions and the blackout, reads the
+//     package index, the items and their properties in one transaction,
+//     and serves a box file through the item download (Kit.ServeItem); the
+//     generic download policy (generic.CheckDownload), which drops from a
+//     catalog a box the repository's include and exclude patterns refuse;
+//     the request's base URL (platform/httpkit/baseurl), from which
+//     download URLs are built; and the format package, whose rules tell a
+//     box file's path from a box name, check the name and verify each
+//     box's properties.
 //
 // # Outputs
 //
@@ -40,12 +42,19 @@
 //     kept by no cache (Cache-Control: private, no-store); 404 when the
 //     box is unknown or no version has a box to list; and the blackout 404
 //     when a blacked-out repository's catalog would list a box.
+//   - Box files as the item download answers them: the bytes with their
+//     checksum headers, 206 to a Range, 401 or 403 to a caller who may not
+//     read the path, the download policy's 404 under a blackout or patterns
+//     that reject the path, and 404 "Could not find resource" when no file
+//     is stored there.
 //
 // # Invariants
 //
-//   - A box name is <name> or <namespace>/<name> (400), and a request takes
-//     no query (400); matrix parameters on the name filter the boxes by
-//     their properties.
+//   - A path names a box file when it is a valid item path ending .box
+//     (vagrant.IsBoxPath) with no matrix parameters, and a box otherwise
+//     [I]. A box name is <name> or <namespace>/<name> (400), and a catalog
+//     request takes no query (400); matrix parameters on the name filter
+//     the boxes by their properties.
 //   - A box is listed only when the caller may read it, it is in the
 //     repository itself (never a remote's cache), the include and exclude
 //     patterns allow it and its recorded properties verify. Of several
@@ -56,8 +65,12 @@
 //     names (R2a, R9, R10). Read permission comes first (DV-057): a caller
 //     who may read none of the box's entries answers 404 "Vagrant box not
 //     found", as for an unknown box.
-//   - Download URLs name the item under /artifactory/{repo}/ and never
-//     carry a token.
+//   - Download URLs name the box file under /artifactory/api/vagrant/{repo}/,
+//     where 7.x's catalogs point, and never carry a token; neither route
+//     takes one from a query (DV-148).
+//   - A box file is served as the item download serves it: read permission
+//     on its path first (DV-057), then the blackout and the patterns at
+//     that path (R9, R10), so a refusal says nothing of what is stored.
 //   - A catalog lists at most 10,000 versions and 10,000 boxes (503
 //     beyond).
 //   - A remote or virtual repository has no source and answers 501.
@@ -74,7 +87,11 @@
 //     docs/client-recipes/vagrant.md (the client recipe, whose evidence is
 //     test/acceptance/vagrant_steps_test.go and the @vagrant scenarios).
 //   - JFrog Vagrant repositories:
-//     https://docs.jfrog.com/artifactory/docs/vagrant-repositories.
+//     https://docs.jfrog.com/artifactory/docs/vagrant-repositories; the box
+//     file route: https://jfrog.atlassian.net/browse/RTFACT-17993,
+//     https://jfrog.atlassian.net/browse/RTFACT-27264 and
+//     https://jfrog.atlassian.net/browse/RTFACT-13807.
+//   - DV-057 and DV-148: docs/implementation/deviations.md.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Dependency rules".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
@@ -88,7 +105,8 @@
 // # Status
 //
 // Implemented P9c, which delivered the plan's P33 group (issues #782 to
-// #788). Moved here in P9d.
+// #788). Moved here in P9d. The box file route:
+// https://github.com/weaveplatform/artifactweave/issues/1259.
 //
 // # Testing
 //
@@ -101,6 +119,10 @@
 //     would see a box, as reader or administrator, with matrix parameters
 //     and by HEAD, and "Vagrant box not found" to one who would not, with
 //     and without the blackout.
+//   - boxfile_test.go (external too): the box file route, its URL in the
+//     catalog, its bytes, checksum headers and ranges, paths with no box,
+//     read permission ahead of the lookup, the download policy, and the
+//     paths that stay catalog requests.
 //
 // The @vagrant acceptance scenarios drive the Vagrant client against local
 // and one-node federated repositories.

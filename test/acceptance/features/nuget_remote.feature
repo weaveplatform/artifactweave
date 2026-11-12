@@ -50,4 +50,4 @@ Feature: Native NuGet restores signed packages through a private v3 remote
     Examples:
       | dotnet  |
       | .NET    |
-      | .NET 11 |
+      | .NET 10 |

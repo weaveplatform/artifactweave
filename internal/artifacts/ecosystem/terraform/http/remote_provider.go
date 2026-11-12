@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	tf "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraform"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/archive"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
@@ -201,6 +202,15 @@ type providerBundle struct {
 	h1       string
 }
 
+// disclosed is each file of the bundle, covered by its own read.
+func (b providerBundle) disclosed() []disclosed {
+	out := make([]disclosed, 0, len(b.paths))
+	for index, path := range b.paths {
+		out = append(out, disclosed{path: path, scope: b.results[b.resultIndex(index)]})
+	}
+	return out
+}
+
 func (b *providerBundle) close() {
 	for _, result := range b.results {
 		closeModuleResult(result)
@@ -238,29 +248,37 @@ func (h handler) providerBytes(r *http.Request, result source.Result, limit int6
 	return data, nil
 }
 
-func providerCompanionPath(q providerOp, signature bool) string {
-	_, typ, _ := strings.Cut(q.name, "/")
-	value := q.name + "/" + q.version + "/terraform-provider-" + typ + "_" + q.version + "_SHA256SUMS"
-	if signature {
-		value += ".sig"
-	}
-	return value
-}
-
-func (h handler) providerBundle(r *http.Request, q providerOp) (providerBundle, error) {
+// providerBundle reads q's package metadata, then its SHA256SUMS,
+// signature and archive at the cache paths their URLs set, where each
+// read checks Read permission and the remote's download policy and the
+// cache keeps the file, so a pattern written for 7.x's paths admits or
+// refuses the file the same way at both. admit, when set, sees those paths
+// before any file is read.
+func (h handler) providerBundle(
+	r *http.Request,
+	q providerOp,
+	admit func(paths []string) error,
+) (providerBundle, error) {
 	metadata, result, digest, err := h.upstreamProviderPackage(r, q)
 	b := providerBundle{q: q, metadata: metadata, digest: digest, results: []source.Result{result}}
 	if err != nil {
 		return b, err
 	}
-	b.paths = []string{
-		providerArchivePath(q),
-		providerCompanionPath(q, false),
-		providerCompanionPath(q, true),
+	b.paths = metadata.paths
+	if admit != nil {
+		if err = admit(b.paths); err != nil {
+			return b, err
+		}
 	}
 	for _, path := range b.paths {
 		if !h.k.Can(r, path, api.ActionRead) {
-			return b, source.ErrDenied
+			// The item routes' refusal, 401 or 403, as a file read
+			// answers it (pkgroute.SourceError's mapping of a denial):
+			// a bare source.ErrDenied is no API error, and answered 500.
+			if p, _ := kernel.FromContext(r.Context()); p.Anonymous || p.Name == "" {
+				return b, kernel.ErrUnauthenticated
+			}
+			return b, kernel.ErrForbidden
 		}
 	}
 	fetch := func(index int, target, variant string, validate func(context.Context, io.ReadSeeker, int64) error) (source.Result, error) {
@@ -437,7 +455,7 @@ func (h handler) remoteProvider(w http.ResponseWriter, r *http.Request, q provid
 			h.remoteProviderMirror(w, r, q, version, result)
 			return
 		}
-		bundle, e := h.providerBundle(r, q)
+		bundle, e := h.providerBundle(r, q, nil)
 		defer bundle.close()
 		if e != nil {
 			h.k.Error(w, r, e)
@@ -453,7 +471,7 @@ func (h handler) remoteProvider(w http.ResponseWriter, r *http.Request, q provid
 			doc[key], _ = json.Marshal(target)
 		}
 		results := append([]source.Result{result}, bundle.results...)
-		h.serveProviderJSON(w, r, doc, results, bundle.paths)
+		h.serveProviderJSON(w, r, doc, results, bundle.disclosed())
 		return
 	}
 	h.k.Error(w, r, missing())
@@ -520,7 +538,7 @@ func (h handler) remoteProviderVersions(
 		}
 		doc = map[string]any{"versions": v}
 	}
-	h.serveProviderJSON(w, r, doc, results, paths)
+	h.serveProviderJSON(w, r, doc, results, within(result, paths...))
 }
 
 // Supplied platforms establish canonical archive identities without fetching
@@ -534,7 +552,7 @@ func (h handler) providerVersionVisibility(
 	if len(platforms) > 0 {
 		for _, platform := range platforms {
 			q.os, q.arch = platform.OS, platform.Arch
-			path := providerArchivePath(q)
+			path := providerListingPath(q)
 			if h.k.Can(r, path, api.ActionRead) {
 				readable = append(readable, platform)
 				paths = append(paths, path)
@@ -544,7 +562,7 @@ func (h handler) providerVersionVisibility(
 	}
 	for _, platform := range providerPlatforms {
 		q.os, q.arch = platform.OS, platform.Arch
-		path := providerArchivePath(q)
+		path := providerListingPath(q)
 		if !h.k.Can(r, path, api.ActionRead) {
 			continue
 		}
@@ -579,14 +597,14 @@ func (h handler) remoteProviderMirror(
 		platforms = providerPlatforms
 	}
 	archives := map[string]any{}
-	paths := []string{}
+	paths := []disclosed{}
 	results := []source.Result{result}
 	for _, platform := range platforms {
 		q.os, q.arch = platform.OS, platform.Arch
-		if !h.k.Can(r, providerArchivePath(q), api.ActionRead) {
+		if !h.k.Can(r, providerListingPath(q), api.ActionRead) {
 			continue
 		}
-		bundle, err := h.providerBundle(r, q)
+		bundle, err := h.providerBundle(r, q, nil)
 		defer bundle.close()
 		if err != nil {
 			var api *apierror.Error
@@ -605,7 +623,7 @@ func (h handler) remoteProviderMirror(
 			"url":    target,
 			"hashes": []string{bundle.h1, "zh:" + strings.ToLower(bundle.metadata.Shasum)},
 		}
-		paths = append(paths, bundle.paths...)
+		paths = append(paths, bundle.disclosed()...)
 		results = append(results, bundle.results...)
 	}
 	if len(archives) == 0 {
@@ -620,7 +638,7 @@ func (h handler) serveProviderJSON(
 	r *http.Request,
 	doc any,
 	results []source.Result,
-	paths []string,
+	paths []disclosed,
 ) {
 	body, err := json.Marshal(doc)
 	if err != nil {

@@ -516,8 +516,9 @@ func TestUnitDebianSnapshotCreationFailsClosed(t *testing.T) {
 
 // TestUnitDebianSnapshotRechecksARemoteSourcesPackages: a snapshot of a
 // remote repository copies its metadata only once the source has rechecked
-// each package the index lists, so a package the upstream now refuses
-// fails the snapshot rather than leaving a tag that names it.
+// each package the index lists, so a package the source now refuses the
+// caller fails the snapshot with the permission answer, 403, rather than
+// leaving a tag that names it.
 func TestUnitDebianSnapshotRechecksARemoteSourcesPackages(t *testing.T) {
 	index := packagesIndex("alpha 1.0 " + debAlpha)
 	// The source service makes the first check itself when it answers, so
@@ -533,8 +534,8 @@ func TestUnitDebianSnapshotRechecksARemoteSourcesPackages(t *testing.T) {
 	)
 	err := DebianAPI{w.kit}.createDebianSnapshot(t.Context(), w.db, snapshotJob,
 		kittest.Admin, kittest.AdminAccess())
-	if !errors.Is(err, source.ErrDenied) {
-		t.Errorf("snapshot returned %v, want the source's refusal", err)
+	if !errors.Is(err, kernel.ErrForbidden) {
+		t.Errorf("snapshot returned %v, want the source's refusal as 403", err)
 	}
 	if _, err := w.db.Items().Get(t.Context(), snapshotJob.Target, false,
 		snapshotMarker+"/"+debRelease); !errors.Is(err, kernel.ErrNotFound) {
@@ -716,8 +717,9 @@ func TestUnitDebianSnapshotOfARemoteKeepsAPackageItsPatternsReject(t *testing.T)
 // downloads of the source, so a blacked-out source, or patterns that
 // reject one of them, answer the policy's 404 and message naming
 // <source>:<path>, as a GET of that file would, and the target is left
-// without the snapshot. A caller who may not read an index still fails the
-// snapshot as before, with no policy answer.
+// without the snapshot. A caller who may not read an index gets the
+// permission answer, 403, not a policy answer
+// (TestAccDebianSnapshotAnswersAPermissionDenial covers the refusal).
 func TestAccDebianSnapshotAnswersTheSourcesPolicy(t *testing.T) {
 	const (
 		url  = "/artifactory/api/deb/deb-source/snapshot"
@@ -781,10 +783,7 @@ func TestAccDebianSnapshotAnswersTheSourcesPolicy(t *testing.T) {
 		}}
 		svc := DebianAPI{newKit(withAccess(t, Config{Store: w.db, Blobs: w.blobs}))}
 		err := svc.createDebianSnapshot(t.Context(), w.db, snapshotJob, kittest.Admin, noIndexReads)
-		if !errors.Is(err, source.ErrDenied) {
-			t.Fatalf("snapshot returned %v, want the denial", err)
-		}
 		wantAPIError(t, svc.ItemError(t.Context(), "Debian snapshot", err),
-			http.StatusInternalServerError, "internal error")
+			http.StatusForbidden, "Forbidden")
 	})
 }

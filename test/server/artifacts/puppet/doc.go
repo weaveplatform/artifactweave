@@ -1,6 +1,6 @@
 // Package puppet runs the Puppet routes of the assembled application: a
 // remote module cache through refresh, offline and integrity failures, and
-// a local repository's registered routes and reindex.
+// a local repository's registered routes, lists and reindex.
 //
 // # Role
 //
@@ -29,6 +29,10 @@
 //     and integrity checks, the routes a local Puppet repository registers
 //     with their permissions and reindex, and the download policy of a
 //     remote, and of a virtual repository over it, at the paths 7.x checks.
+//   - puppet_list_test.go: a local repository's lists of every release and
+//     module through the generated Get Puppet Releases and Get Puppet
+//     Modules routes, with their permissions, and a virtual repository's
+//     404.
 //
 // # References
 //

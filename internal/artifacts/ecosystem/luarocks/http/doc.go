@@ -66,6 +66,15 @@
 //     (405 when none is set, 400 when it is missing or not local) that the
 //     caller may also write to (403).
 //   - Remote and virtual reads take no query (400).
+//   - A local or federated repository resolves, and so may queue the
+//     manifest work for, only the names the work writes: manifest and
+//     manifest-5.1 to manifest-5.5. Any other manifest-5. name, such as the
+//     manifest-5.4.zip, and manifest-5.4.json under LuaJIT, that the client
+//     asks for first, is served if stored and otherwise answers 404 "Could
+//     not find resource" [I], after the same permission and download policy
+//     checks.
+//   - An upload whose stored content fails a read while it is checked
+//     answers 500, never the 400 of a bad rock.
 //   - The download policy (decision 0032) is checked after Read permission
 //     at the path a client asks for. A local or federated manifest is a
 //     stored document 7.x reads through the download path, so a blackout,
@@ -139,6 +148,13 @@
 //     and virtual manifests and rocks: blackout, patterns on the manifest
 //     and on one rock, members passed over or left out, and the virtual
 //     repository's own patterns.
+//   - manifest_names_test.go (external): the manifest names the work does
+//     not write answer 404 with no work queued and no fault, and keep their
+//     refusals; a deployed manifest-5.4.zip is served; and the names the
+//     work writes answer as before on every class.
+//   - rock_read_test.go (external): a rock upload or item deploy whose
+//     stored content fails a read answers 500 and stores nothing, while bad
+//     rocks are still refused 400.
 //
 // The @luarocks acceptance scenarios drive the luarocks client against
 // local, federated, remote and virtual repositories.

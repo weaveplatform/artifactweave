@@ -11,7 +11,7 @@ Endpoint: `${AW_URL}/artifactory/api/nuget/v3/${AW_REPO}/index.json`
 ## Before connecting
 
 - An SDK project to pack and a separate consumer project with its PackageReference.
-- Use the .NET 10 image for the primary supported lane; .NET 11 is a candidate compatibility check.
+- Use the .NET 10 LTS image for the primary supported lane; every dotnet scenario also runs on the newest .NET SDK image.
 - Python 3 is required by the configuration snippet to encode runtime credentials safely.
 
 Authentication: Use AW_USER and a short-lived AW_TOKEN whose subject is AW_USER. The server accepts an access/reference token as the Basic password and rechecks the subject and repository permissions. Reading requires read permission; publication requires write permission and replacement may require delete permission. NuGet push uses AW_USER:AW_TOKEN as its API-key value, matching the tested native publication contract.
@@ -77,7 +77,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 These are the pinned client definitions and executable evidence from which this recipe was reviewed. Their [fingerprints](evidence-lock.json) detect subsequent source changes; a fingerprint alone is not a native-client test result. See [verification](README.md#verification) for the required run evidence.
 
 - Client pin: [test/acceptance/clients/dotnet-10/Dockerfile](../../test/acceptance/clients/dotnet-10/Dockerfile).
-- Client pin: [test/acceptance/clients/dotnet-11.Dockerfile](../../test/acceptance/clients/dotnet-11.Dockerfile).
+- Client pin: [test/acceptance/clients/dotnet.Dockerfile](../../test/acceptance/clients/dotnet.Dockerfile).
 - Evidence: [test/acceptance/features/nuget_publish.feature](../../test/acceptance/features/nuget_publish.feature).
 - Evidence: [test/acceptance/features/nuget_v3.feature](../../test/acceptance/features/nuget_v3.feature).
 - Evidence: [internal/access/core/authn/token.go](../../internal/access/core/authn/token.go).

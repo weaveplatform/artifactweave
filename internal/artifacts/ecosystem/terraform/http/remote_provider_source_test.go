@@ -59,7 +59,7 @@ func TestUnitRemoteProviderMetadataSchemas(t *testing.T) {
 func TestUnitRemoteProviderPackageSchema(t *testing.T) {
 	f := newProviderFixture(t)
 	c, _ := f.db.Repos().Get(t.Context(), "remote")
-	for _, field := range []string{"platform", "protocols", "filename", "hash", "keys", "private-key", "url", "host"} {
+	for _, field := range []string{"platform", "protocols", "filename", "hash", "keys", "private-key", "url", "host", "folder"} {
 		t.Run(field, func(t *testing.T) {
 			raw, _ := json.Marshal(f.metadata)
 			var doc map[string]any
@@ -90,6 +90,9 @@ func TestUnitRemoteProviderPackageSchema(t *testing.T) {
 				doc["download_url"] = "http://user:secret@upstream.example/provider.zip"
 			case "host":
 				doc["download_url"] = "https://unapproved.example/provider.zip"
+			case "folder":
+				// A URL that names no file has no cache path.
+				doc["shasums_url"] = "/storage/"
 			}
 			data, _ := json.Marshal(doc)
 			if _, err := parseRemoteProviderPackage(
@@ -128,7 +131,7 @@ func TestUnitRemoteMirrorSchemasAndStrongestHash(t *testing.T) {
 			t.Fatal("accepted", raw)
 		}
 	}
-	for _, raw := range []string{`null`, `{}`, `{"archives":null}`, `{"archives":{"../amd64":{"url":"https://storage.example/a.zip"}}}`, `{"archives":{"linux_amd64":{"url":"ftp://storage.example/a.zip"}}}`, `{"archives":{"linux_amd64":{"url":"https://hostile.example/a.zip"}}}`} {
+	for _, raw := range []string{`null`, `{}`, `{"archives":null}`, `{"archives":{"../amd64":{"url":"https://storage.example/a.zip"}}}`, `{"archives":{"linux_amd64":{"url":"ftp://storage.example/a.zip"}}}`, `{"archives":{"linux_amd64":{"url":"https://hostile.example/a.zip"}}}`, `{"archives":{"linux_amd64":{"url":"https://storage.example/dir/"}}}`} {
 		if _, err := parseMirrorArchives(
 			strings.NewReader(raw),
 			"https://registry.example/api/",
