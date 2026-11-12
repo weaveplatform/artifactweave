@@ -107,6 +107,10 @@ type world struct {
 	// the registry", empty until then.
 	chefImage, nixImage, puppetImage, npmImage, mavenImage, pythonImage, luarocksImage, bowerImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, gitLFSImage, opkgImage, p2Image, dartImage, cocoapodsImage, condaImage, vscodeImage, rImage, vagrantImage, ansibleImage, frogMLImage string
 
+	// luaRocksLog is how far the server's log ran when the last luarocks
+	// command started, so a step can read the requests that command made.
+	luaRocksLog int
+
 	dartRepo, dartToken, dartFrontURL string
 	dartHashes                        map[string][32]byte
 	dartVersions                      map[string]map[string]pubFixtureVersion
