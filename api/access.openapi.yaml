@@ -5593,6 +5593,59 @@ paths:
       summary: Update a group
       tags:
         - groups
+    put:
+      description: 'Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.'
+      operationId: replaceGroup
+      parameters:
+        - $ref: '#/components/parameters/groupName'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupCreateRequest'
+        description: The group's complete state.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupDetails'
+          description: The group was replaced.
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupDetails'
+          description: The group was created.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Validation failed: a name that differs from the path or is not valid, both members and import_from_ldap_group_setting given, or import_from_ldap_group_setting given.'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A user in members does not exist.
+      summary: Create or replace a group
+      tags:
+        - groups
+      x-oracle-source: https://docs.jfrog.com/administration/reference/replacegroup.md
   /api/v2/groups/{name}/members:
     patch:
       description: Applies the add list then the remove list to the group's members and returns the resulting full member list. Unknown usernames in add answer 404; names already present or already absent are ignored. Admin only.
@@ -7090,7 +7143,7 @@ components:
             type: string
           type: array
         name:
-          description: Required within this object. The group name; unique, case-insensitive.
+          description: Required within this object. The group name; unique, case-insensitive. A create or replace by name (PUT) may send it empty or leave it out and takes the name in the path; any other value must equal the name in the path.
           type: string
         policy_manager:
           default: false

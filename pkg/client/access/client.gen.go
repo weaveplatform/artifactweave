@@ -762,7 +762,7 @@ type GroupCreateRequest struct {
 	// Members Optional within this object. Initial member usernames; each must exist. Mutually exclusive with import_from_ldap_group_setting.
 	Members *[]string `json:"members,omitempty"`
 
-	// Name Required within this object. The group name; unique, case-insensitive.
+	// Name Required within this object. The group name; unique, case-insensitive. A create or replace by name (PUT) may send it empty or leave it out and takes the name in the path; any other value must equal the name in the path.
 	Name string `json:"name"`
 
 	// PolicyManager Optional within this object. Stored and echoed; no effect.
@@ -2683,6 +2683,9 @@ type CreateGroupJSONRequestBody = GroupCreateRequest
 // UpdateGroupJSONRequestBody defines body for UpdateGroup for application/json ContentType.
 type UpdateGroupJSONRequestBody = GroupUpdateRequest
 
+// ReplaceGroupJSONRequestBody defines body for ReplaceGroup for application/json ContentType.
+type ReplaceGroupJSONRequestBody = GroupCreateRequest
+
 // UpdateGroupMembersJSONRequestBody defines body for UpdateGroupMembers for application/json ContentType.
 type UpdateGroupMembersJSONRequestBody UpdateGroupMembersJSONBody
 
@@ -4468,6 +4471,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with PATCH /api/v2/groups/{name} (the `UpdateGroup` operationId).
 	UpdateGroup(ctx context.Context, name GroupName, body UpdateGroupJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReplaceGroupWithBody Create or replace a group
+	//
+	// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v2/groups/{name} (the `ReplaceGroup` operationId).
+	ReplaceGroupWithBody(ctx context.Context, name GroupName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReplaceGroup Create or replace a group
+	//
+	// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v2/groups/{name} (the `ReplaceGroup` operationId).
+	ReplaceGroup(ctx context.Context, name GroupName, body ReplaceGroupJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateGroupMembersWithBody Add or remove members
 	//
@@ -8014,6 +8035,44 @@ func (c *Client) UpdateGroupWithBody(ctx context.Context, name GroupName, conten
 // Corresponds with PATCH /api/v2/groups/{name} (the `UpdateGroup` operationId).
 func (c *Client) UpdateGroup(ctx context.Context, name GroupName, body UpdateGroupJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateGroupRequest(c.Server, name, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReplaceGroupWithBody Create or replace a group
+//
+// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v2/groups/{name} (the `ReplaceGroup` operationId).
+func (c *Client) ReplaceGroupWithBody(ctx context.Context, name GroupName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaceGroupRequestWithBody(c.Server, name, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReplaceGroup Create or replace a group
+//
+// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v2/groups/{name} (the `ReplaceGroup` operationId).
+func (c *Client) ReplaceGroup(ctx context.Context, name GroupName, body ReplaceGroupJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaceGroupRequest(c.Server, name, body)
 	if err != nil {
 		return nil, err
 	}
@@ -13879,6 +13938,53 @@ func NewUpdateGroupRequestWithBody(server string, name GroupName, contentType st
 	return req, nil
 }
 
+// NewReplaceGroupRequest calls the generic ReplaceGroup builder with application/json body
+func NewReplaceGroupRequest(server string, name GroupName, body ReplaceGroupJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewReplaceGroupRequestWithBody(server, name, "application/json", bodyReader)
+}
+
+// NewReplaceGroupRequestWithBody constructs an http.Request for the ReplaceGroup method, with any body, and a specified content type
+func NewReplaceGroupRequestWithBody(server string, name GroupName, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/groups/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewUpdateGroupMembersRequest calls the generic UpdateGroupMembers builder with application/json body
 func NewUpdateGroupMembersRequest(server string, name GroupName, body UpdateGroupMembersJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -16647,6 +16753,24 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PATCH /api/v2/groups/{name} (the `UpdateGroup` operationId).
 	UpdateGroupWithResponse(ctx context.Context, name GroupName, body UpdateGroupJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateGroupResponse, error)
+
+	// ReplaceGroupWithBodyWithResponse Create or replace a group
+	//
+	// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v2/groups/{name} (the `ReplaceGroup` operationId).
+	ReplaceGroupWithBodyWithResponse(ctx context.Context, name GroupName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceGroupResponse, error)
+
+	// ReplaceGroupWithResponse Create or replace a group
+	//
+	// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v2/groups/{name} (the `ReplaceGroup` operationId).
+	ReplaceGroupWithResponse(ctx context.Context, name GroupName, body ReplaceGroupJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceGroupResponse, error)
 
 	// UpdateGroupMembersWithBodyWithResponse Add or remove members
 	//
@@ -24909,6 +25033,82 @@ func (r UpdateGroupResponse) ContentType() string {
 	return ""
 }
 
+type ReplaceGroupResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *GroupDetails
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *GroupDetails
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ReplaceGroupResponse) GetJSON200() *GroupDetails {
+	return r.JSON200
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r ReplaceGroupResponse) GetJSON201() *GroupDetails {
+	return r.JSON201
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ReplaceGroupResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ReplaceGroupResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ReplaceGroupResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ReplaceGroupResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ReplaceGroupResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReplaceGroupResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReplaceGroupResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReplaceGroupResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type UpdateGroupMembersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -29011,6 +29211,36 @@ func (c *ClientWithResponses) UpdateGroupWithResponse(ctx context.Context, name 
 		return nil, err
 	}
 	return ParseUpdateGroupResponse(rsp)
+}
+
+// ReplaceGroupWithBodyWithResponse Create or replace a group
+//
+// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v2/groups/{name} (the `ReplaceGroup` operationId).
+func (c *ClientWithResponses) ReplaceGroupWithBodyWithResponse(ctx context.Context, name GroupName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceGroupResponse, error) {
+	rsp, err := c.ReplaceGroupWithBody(ctx, name, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReplaceGroupResponse(rsp)
+}
+
+// ReplaceGroupWithResponse Create or replace a group
+//
+// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v2/groups/{name} (the `ReplaceGroup` operationId).
+func (c *ClientWithResponses) ReplaceGroupWithResponse(ctx context.Context, name GroupName, body ReplaceGroupJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceGroupResponse, error) {
+	rsp, err := c.ReplaceGroup(ctx, name, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReplaceGroupResponse(rsp)
 }
 
 // UpdateGroupMembersWithBodyWithResponse Add or remove members
@@ -35556,6 +35786,67 @@ func ParseUpdateGroupResponse(rsp *http.Response) (*UpdateGroupResponse, error) 
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseReplaceGroupResponse parses an HTTP response from a ReplaceGroupWithResponse call
+func ParseReplaceGroupResponse(rsp *http.Response) (*ReplaceGroupResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReplaceGroupResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GroupDetails
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest GroupDetails
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest ErrorResponse
