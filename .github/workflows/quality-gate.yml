@@ -728,6 +728,22 @@ jobs:
             sleep 2
           done
 
+      # Each Maven image pins a floating tag such as maven:3.9-eclipse-temurin
+      # by digest, so only the image itself says which Maven and JDK releases
+      # the scenarios ran. The Maven recipe's client label sends readers here
+      # for them (#1241): the image build log is printed only on failure.
+      - name: Maven client versions
+        if: ${{ !cancelled() && (needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',maven,')) }}
+        run: |
+          for image in artifactweave-accept-maven artifactweave-accept-maven39; do
+            if docker image inspect "$image" >/dev/null 2>&1; then
+              echo "$image:"
+              docker run --rm "$image" mvn --version
+            else
+              echo "$image: not built"
+            fi
+          done
+
       - name: SwiftPM native client acceptance
         if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',swift,')
         env:
@@ -858,10 +874,11 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
-  # NuGet's native .NET 10/11 matrix runs beside the other acceptance
-  # scenarios. The required filters are disjoint and exhaustive for non-Gradle
-  # deterministic pickles, including untagged features; the opt-in live Bower
-  # upstream probe is excluded. TestAccFeatures fails on zero picks.
+  # NuGet's native matrix, on the .NET SDK's LTS line and its newest line,
+  # runs beside the other acceptance scenarios. The required filters are
+  # disjoint and exhaustive for non-Gradle deterministic pickles, including
+  # untagged features; the opt-in live Bower upstream probe is excluded.
+  # TestAccFeatures fails on zero picks.
   acceptance-nuget:
     name: 'Go acceptance (Linux, NuGet native clients)'
     needs: [impact]
@@ -882,9 +899,9 @@ jobs:
       - name: NuGet client images (background)
         run: |
           {
-            docker build -t artifactweave-accept-dotnet test/acceptance/clients/dotnet-10
-            docker build -t artifactweave-accept-dotnet11 \
-              -f test/acceptance/clients/dotnet-11.Dockerfile test/acceptance/clients
+            docker build -t artifactweave-accept-dotnet10 test/acceptance/clients/dotnet-10
+            docker build -t artifactweave-accept-dotnet \
+              -f test/acceptance/clients/dotnet.Dockerfile test/acceptance/clients
           } > "$RUNNER_TEMP/client-images.log" 2>&1 &
 
       - name: Set up Go
@@ -903,11 +920,26 @@ jobs:
           ARTIFACTWEAVE_REQUIRE_DOCKER: '1'
           ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
           ARTIFACTWEAVE_DOTNET_IMAGE: artifactweave-accept-dotnet
-          ARTIFACTWEAVE_DOTNET11_IMAGE: artifactweave-accept-dotnet11
+          ARTIFACTWEAVE_DOTNET10_IMAGE: artifactweave-accept-dotnet10
           ARTIFACTWEAVE_ACCEPT_TAGS: '@nuget&&~@gradle'
         run: |
           mkdir -p cover/accept-nuget
           ARTIFACTWEAVE_GOCOVERDIR="$PWD/cover/accept-nuget" GOWORK=off go test -timeout=15m -count=1 -run '^TestAccFeatures\z' ./test/acceptance/...
+
+      # Each image pins a floating line tag such as sdk:10.0 by digest, so
+      # only the image itself says which SDK release the scenarios ran. The
+      # NuGet recipe's client label sends readers here for it (#1241): the
+      # build log is printed only on failure, and go test runs without -v.
+      - name: NuGet client versions
+        if: ${{ !cancelled() }}
+        run: |
+          for image in artifactweave-accept-dotnet artifactweave-accept-dotnet10; do
+            if docker image inspect "$image" >/dev/null 2>&1; then
+              echo "$image: .NET SDK $(docker run --rm "$image" dotnet --version)"
+            else
+              echo "$image: not built"
+            fi
+          done
 
       - name: NuGet client image build log
         if: failure()
