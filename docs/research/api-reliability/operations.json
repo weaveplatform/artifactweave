@@ -6941,7 +6941,7 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getPuppetReleaseInfo",
     "state": "partial: handwritten override of generated operation",
-    "contract": "Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. Any query parameter is rejected with 400.",
+    "contract": "Returns one Puppet module release the caller may read, from a local, federated, remote or virtual repository. A remote repository answers a release its upstream's release list leaves out from the upstream's record of that release. Any query parameter is rejected with 400.",
     "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "native-puppet",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",

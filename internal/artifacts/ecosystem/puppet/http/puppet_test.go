@@ -155,6 +155,10 @@ type metadataSource struct {
 	archive                []byte
 	archiveSet             bool
 	missingArchiveRV       bool
+
+	// release answers a read of one release's record, v3/releases/<slug>
+	// (recordStub).
+	release recordStub
 }
 
 func (metadataSource) Item(
@@ -216,6 +220,9 @@ func (s metadataSource) Read(
 	}
 	if resource.Variant == "puppet-forge-v3-module-v1" {
 		return s.moduleRecord(r, resource)
+	}
+	if resource.Variant == "puppet-forge-v3-release-v1" {
+		return s.release.read(r, resource)
 	}
 	body := s.body
 	if s.bodyAt != nil {

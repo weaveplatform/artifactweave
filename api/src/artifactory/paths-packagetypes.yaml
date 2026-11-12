@@ -1470,7 +1470,7 @@ paths:
       - description: Optional query parameter. Exact name of the one module to answer, as `<owner>-<name>`,
           for example `puppetlabs-stdlib`. A remote repository answers the module only when its upstream
           serves the module's record. Any other search, a repeated parameter or a parameter other than
-          `query`, `limit` and `offset` is rejected with 400.
+          `query`, `limit`, `offset` and `module_groups` is rejected with 400.
         in: query
         name: query
         schema:
@@ -1492,6 +1492,14 @@ paths:
           description: Number of modules before the page, at least 0.
           minimum: 0
           type: integer
+      - description: Optional query parameter. Accepted with `query`, as the Puppet client sends it on Puppet
+          Enterprise (`base pe_only`). Any value leaves the page as it is, the page's links leave it out, and
+          a remote repository does not pass it to its upstream.
+        in: query
+        name: module_groups
+        schema:
+          description: Forge module groups, separated by spaces.
+          type: string
       responses:
         '200':
           content:
@@ -1652,7 +1660,7 @@ paths:
           type: string
       - description: Optional query parameter. Module whose releases to list, as `<owner>-<name>`, for
           example `puppetlabs-stdlib`. A repeated parameter, or a parameter other than `module`, `limit`,
-          `offset`, `sort_by` and `exclude_fields`, is rejected with 400.
+          `offset`, `sort_by`, `exclude_fields` and `module_groups`, is rejected with 400.
         in: query
         name: module
         schema:
@@ -1690,6 +1698,14 @@ paths:
         name: exclude_fields
         schema:
           description: Names of top-level record fields, separated by commas or spaces.
+          type: string
+      - description: Optional query parameter. Accepted with `module`, as the Puppet client sends it on
+          Puppet Enterprise (`base pe_only`), and rejected with 400 without it. Any value leaves the page as
+          it is, the page's links leave it out, and a remote repository does not pass it to its upstream.
+        in: query
+        name: module_groups
+        schema:
+          description: Forge module groups, separated by spaces.
           type: string
       responses:
         '200':
@@ -1752,7 +1768,8 @@ paths:
   /api/puppet/{repoKey}/v3/releases/{userModuleVersion}:
     get:
       description: Returns one Puppet module release the caller may read, from a local, federated, remote
-        or virtual repository. Any query parameter is rejected with 400.
+        or virtual repository. A remote repository answers a release its upstream's release list leaves out
+        from the upstream's record of that release. Any query parameter is rejected with 400.
       operationId: getPuppetReleaseInfo
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
