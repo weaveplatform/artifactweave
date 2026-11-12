@@ -68,6 +68,16 @@ the OTP major, so the declared pins could no longer name the exact OTP release.
 Dependabot also misorders those tags: from `1.20.5-otp-29-alpine` it would
 propose `1.20-otp-28-alpine`.
 
+Every base is a stable release. `tools/depsync/sync.py` refuses an acceptance
+Dockerfile whose `FROM` tag carries a prerelease marker after its version, such
+as `-118.1.beta`, `a1`, `rc1`, `-dev` or `-preview`, and names the file, the tag
+and the marker. Variant suffixes such as `-slim`, `-alpine` or `-bookworm` pass.
+Dependabot proposes such tags for `python` and `dart`, whose `latest` tag shares
+its digest with no full version tag, so `.github/dependabot.yml` ignores their
+prereleases by version range
+([#1223](https://github.com/weaveplatform/artifactweave/issues/1223),
+[#1304](https://github.com/weaveplatform/artifactweave/issues/1304)).
+
 Purposeful compatibility lanes retain their declared runtimes. Updating a pin
 regenerates this inventory, recipe labels and secondary version assertions; it
 does not bypass native tests or the review required for acceptance client changes.

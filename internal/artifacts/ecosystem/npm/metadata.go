@@ -35,13 +35,17 @@ type Metadata struct {
 
 // Dist is a version's dist object, less the tarball URL, which a packument
 // builds from the base URL of each request. 7.x's dist has nothing else
-// (RTFACT-30472): npm's own registry adds fileCount and unpackedSize, which
-// no JFrog client reads.
+// (RTFACT-30472) but the signatures of a signing repository: npm's own
+// registry adds fileCount and unpackedSize, which no JFrog client reads.
 type Dist struct {
 	// Shasum is the stored SHA-1, in hex.
 	Shasum string `json:"shasum"`
 	// Integrity is the stored SHA-512 in Subresource Integrity form.
 	Integrity string `json:"integrity"`
+	// Signatures are the repository's signatures of the version, made when
+	// it was indexed (SignerFor). A repository that signs nothing stores
+	// none, so its Metadata keeps the bytes it had before signing existed.
+	Signatures []Signature `json:"signatures,omitempty"`
 }
 
 // DecodeMetadata reads a version's Metadata.
@@ -53,16 +57,21 @@ func DecodeMetadata(b []byte) (Metadata, error) {
 	return m, nil
 }
 
-// metadataOf is the Metadata of t stored as it with props.
-func metadataOf(t *Tarball, it model.Item, props model.Properties) Metadata {
+// metadataOf is the Metadata of t stored as it with props, signed by s.
+func metadataOf(t *Tarball, it model.Item, props model.Properties, s *Signer) (Metadata, error) {
 	m := Metadata{
 		Manifest:         t.Manifest,
 		Dist:             Dist{Shasum: it.Actual.SHA1, Integrity: integrity(it.Actual.SHA512)},
 		HasInstallScript: t.HasInstallScript,
 		Published:        published(it),
 	}
+	sigs, err := s.Sign(t.Name, t.Version, m.Dist.Integrity)
+	if err != nil {
+		return Metadata{}, err
+	}
+	m.Dist.Signatures = sigs
 	m.annotate(props)
-	return m
+	return m, nil
 }
 
 // annotate takes the version state npm changes after a publish from the

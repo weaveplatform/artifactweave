@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
@@ -30,6 +31,10 @@ type Options struct {
 	// Format are the npm format's settings, which a read applies when it
 	// resolves latest itself, as the format would settle it.
 	Format npmfmt.Settings
+	// KeyPairs reads the key pairs whose public keys the keys endpoint
+	// lists (decision 0034, "Signatures"). Without it no repository lists
+	// any, and the endpoint answers 404 as before signing existed.
+	KeyPairs accessapi.Keys
 }
 
 // DefaultMaxPublishSize is decision 0034's default npm.max_publish_size.
@@ -63,6 +68,7 @@ func Protocol(o Options) pkgroute.Protocol {
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			routes(r, handler{
 				accounts: o.Accounts, k: k, maxPublish: o.MaxPublishSize, format: o.Format,
+				keyPairs: o.KeyPairs,
 			})
 		},
 	}
@@ -92,6 +98,7 @@ type handler struct {
 	k          *pkgroute.Kit
 	maxPublish int64
 	format     npmfmt.Settings
+	keyPairs   accessapi.Keys
 }
 
 // ping answers every caller the server lets through: an authenticated
@@ -124,6 +131,9 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
 	if err != nil {
 		h.k.Error(w, r, err)
+		return
+	}
+	if slices.Equal(p.Segments, keysPath) && h.keys(w, r) {
 		return
 	}
 	name, rest, ok := splitName(p.Segments)
