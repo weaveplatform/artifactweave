@@ -522,7 +522,7 @@
       "classes": "LF",
       "client": "Vagrant 2.4.9",
       "operations": "L: publish, resolve, reindex, delete, restore; F: publish, resolve, reindex (one node)",
-      "route": "GET/HEAD /artifactory/api/vagrant/{repo-key}/{box-name}; PUT/GET/DELETE /artifactory/{repo-key}/{path}.box",
+      "route": "GET/HEAD /artifactory/api/vagrant/{repo-key}/{box-name}; GET/HEAD /artifactory/api/vagrant/{repo-key}/{path}.box; PUT/GET/DELETE /artifactory/{repo-key}/{path}.box",
       "metadata": "property-indexed box versions, providers, architectures and SHA-256 verified downloads",
       "lifecycle": "property updates, delete, restore, copy, move and maintenance reindex",
       "status": "native",

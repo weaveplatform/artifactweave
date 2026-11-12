@@ -27,15 +27,33 @@ vagrant box list
 Use HTTPS and a token whose principal can read the intended archive paths.
 Vagrant 2.4.9 sends the token as a Bearer header to the configured server host,
 including archive downloads. The token is never embedded in generated metadata
-URLs. Do not enable Vagrant's legacy URL-token mode.
+URLs, and a token in a URL's `access_token` query authenticates nothing
+([DV-148](../implementation/deviations.md#security)). So Vagrant's legacy URL-token mode,
+`VAGRANT_SERVER_ACCESS_TOKEN_BY_URL`, does not work: leave it unset.
 
 `GET` and `HEAD /artifactory/api/vagrant/<repo>/<box-name>` expose readable
-versions and providers, optional architecture, a SHA-256 checksum and the
-original item download URL. A name can be a single component or
+versions and providers, optional architecture, a SHA-256 checksum and each
+box's download URL. A name can be a single component or
 `namespace/name`. Each file must carry exactly one valid `box_name`,
 `box_provider` and `box_version`; the provider must agree with the archive's
 root `metadata.json`. Additional item properties can filter the metadata request
 through the existing matrix-property syntax.
+
+The download URL is Artifactory's native box file route,
+`/artifactory/api/vagrant/<repo>/<path>.box`, where `<path>.box` is the box's
+item path. Artifactory 7.x's catalogs point there
+([RTFACT-17993](https://jfrog.atlassian.net/browse/RTFACT-17993)), and Vagrant
+downloads from it
+([RTFACT-27264](https://jfrog.atlassian.net/browse/RTFACT-27264)). `GET` and
+`HEAD` of it serve the stored box as the item download does, with its checksum
+headers. A `Range` request answers 206, so an interrupted download resumes;
+Artifactory ignores the `Range` on this route, a bug that RTFACT-27264 and
+[RTFACT-13807](https://jfrog.atlassian.net/browse/RTFACT-13807) report. The
+route checks read permission on the path first, then the repository's blackout
+and its include and exclude patterns, and answers 404 "Could not find resource"
+when no file is stored at the path. A path that ends `.box` and carries no
+matrix parameters is a box file, so a box whose name ends `.box` is reached only
+with a matrix parameter, such as `;box_provider=virtualbox`.
 
 The server validates tar, gzip-compressed tar and ZIP boxes before indexing,
 including archive paths, member types, compression integrity and root metadata.
@@ -103,3 +121,9 @@ Protocol sources, checked 2026-10-27:
 [box archive format](https://developer.hashicorp.com/vagrant/docs/boxes/format),
 [catalog metadata](https://developer.hashicorp.com/vagrant/docs/boxes/box_repository),
 and [Vagrant 2.4.9 authentication middleware](https://github.com/hashicorp/vagrant/blob/v2.4.9/plugins/commands/cloud/auth/middleware/add_downloader_authentication.rb).
+Sources for the box file route and URL tokens, checked 2026-11-12:
+[RTFACT-17993](https://jfrog.atlassian.net/browse/RTFACT-17993),
+[RTFACT-27264](https://jfrog.atlassian.net/browse/RTFACT-27264),
+[RTFACT-13807](https://jfrog.atlassian.net/browse/RTFACT-13807),
+[RTFACT-17005](https://jfrog.atlassian.net/browse/RTFACT-17005) and
+[RTFACT-26348](https://jfrog.atlassian.net/browse/RTFACT-26348).
