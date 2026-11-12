@@ -345,7 +345,7 @@ func (s DebianAPI) serveVirtualDebianFile(
 			httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian virtual "+what, err))
 			return
 		}
-		s.ServeFile(w, r, st, itemkit.Found{Repo: member, Item: it}, p)
+		s.ServeItemFile(w, r, st, itemkit.Found{Repo: member, Item: it}, p)
 		return
 	}
 	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
@@ -499,7 +499,7 @@ func (s DebianAPI) serveRemoteVirtualDebianFile(
 		)
 		return true
 	}
-	s.ServeFile(w, r, s.Store,
+	s.ServeItemFile(w, r, s.Store,
 		itemkit.Found{Repo: member, Item: *result.Item, Used: result.Used}, p)
 	return true
 }

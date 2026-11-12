@@ -477,7 +477,7 @@ func (s alpineItems) serveVirtualAlpinePackage(
 			}
 			matches, err = itemkit.MatchesMatrix(r.Context(), st, it, req)
 			if err == nil && matches {
-				s.ServeFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
+				s.ServeItemFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
 				return
 			}
 		}
@@ -549,6 +549,6 @@ func (s alpineItems) serveRemoteAlpinePackage(
 		)
 		return
 	}
-	s.ServeFile(w, r, s.Store,
+	s.ServeItemFile(w, r, s.Store,
 		itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }

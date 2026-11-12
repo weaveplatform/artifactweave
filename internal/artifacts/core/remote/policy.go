@@ -97,6 +97,9 @@ type fillResult struct {
 	entry       model.RemoteCacheEntry
 	isTransient bool
 	failure     error
+	// refused is the MIME refusal an expired entry was served despite
+	// (Policy.refuse).
+	refused *source.MIMERefusal
 }
 
 func (p *Policy) now() time.Time {
@@ -211,7 +214,9 @@ func (p *Policy) Read(
 			return source.Result{}, err
 		}
 	}
-	return p.resultFor(responseCtx, q, filled.entry)
+	result, err := p.resultFor(responseCtx, q, filled.entry)
+	result.Refused = filled.refused
+	return result, err
 }
 
 func transientResource(q source.Request) bool {

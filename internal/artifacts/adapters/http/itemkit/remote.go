@@ -53,6 +53,11 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 		return false
 	}
 	resource := RemoteResource(r, req.Path)
+	// The item route checks an upstream's label against the client's
+	// Accept, and answers a refusal 409, as 7.x's download does.
+	resource.ClientMIME = &source.ClientMIME{
+		Accept: append([]string(nil), r.Header.Values("Accept")...),
+	}
 	sidecar := ""
 	if artifact, alg, ok := item.Sidecar(req.Path); ok && errors.Is(err, kernel.ErrNotFound) {
 		// A checksum cannot disclose a file the caller cannot read. Cold SHA-256
@@ -74,6 +79,10 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 		case errors.Is(getErr, kernel.ErrNotFound) && string(alg) == "sha256" &&
 			c.RetrieveSha256FromServer != nil && *c.RetrieveSha256FromServer:
 			resource.ChecksumOnly = true
+			// 7.x never fetches a checksum from the upstream ("Checksums are
+			// not downloadable", RemoteRepoBase.getInfo), so this retrieval
+			// has no 7.x refusal to answer: its refused label stays a 502.
+			resource.ClientMIME = nil
 		default:
 			httpkit.WriteErr(w, r, ItemNotFound())
 			return true
@@ -134,6 +143,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 		s.serveRemoteChecksum(
 			sw,
 			r,
+			req.Path,
 			item.ServedChecksum(c, *result.Item, item.Algorithm(sidecar)),
 			result.Item.Modified,
 		)
@@ -141,7 +151,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 			_ = result.Used(ctx)
 		}
 	} else {
-		s.ServeFile(w, r, s.Store, Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
+		s.ServeItemFile(w, r, s.Store, Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 	}
 	return true
 }
@@ -299,14 +309,14 @@ func (s *Kit) ServeRemoteStream(
 			checksum = strings.Repeat("0", size)
 		}
 		sw := &StatusWriter{ResponseWriter: w}
-		s.serveRemoteChecksum(sw, r, checksum, result.Stream.Modified)
+		s.serveRemoteChecksum(sw, r, req.Path, checksum, result.Stream.Modified)
 		if sw.Complete(r) && result.Used != nil {
 			_ = result.Used(ctx)
 		}
 		return
 	}
 	if resource.ChecksumOnly && r.Method != http.MethodHead {
-		s.serveColdChecksum(w, r, result.Stream)
+		s.serveColdChecksum(w, r, req.Path, result.Stream)
 		return
 	}
 	if resource.ChecksumOnly {
@@ -314,7 +324,7 @@ func (s *Kit) ServeRemoteStream(
 		// characters. HEAD cannot inspect that body, but must describe the same
 		// representation rather than the upstream checksum file's byte length.
 		result.Stream.Size = 64
-		result.Stream.MediaType = "text/plain"
+		result.Stream.MediaType = checksumType(r, req.Path)
 		result.Stream.ETag = ""
 		result.Stream.Checksums = kernel.Checksums{}
 		result.Stream.ContentRange = ""
@@ -630,6 +640,7 @@ func RPMSourceIntegrity() error {
 func (s *Kit) serveRemoteChecksum(
 	w http.ResponseWriter,
 	r *http.Request,
+	name string,
 	value string,
 	modified time.Time,
 ) {
@@ -637,7 +648,7 @@ func (s *Kit) serveRemoteChecksum(
 		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Type", checksumType(r, name))
 	http.ServeContent(w, r, "", modified, strings.NewReader(value))
 }
 
@@ -676,6 +687,7 @@ func (s *Kit) recordCacheUse(ctx context.Context, f Found) {
 func (s *Kit) serveColdChecksum(
 	w http.ResponseWriter,
 	r *http.Request,
+	name string,
 	stream *source.Stream,
 ) {
 	defer func() { _ = stream.Body.Close() }()
@@ -693,7 +705,7 @@ func (s *Kit) serveColdChecksum(
 		)
 		return
 	}
-	s.serveRemoteChecksum(w, r, sums.SHA256, stream.Modified)
+	s.serveRemoteChecksum(w, r, name, sums.SHA256, stream.Modified)
 }
 
 func (s *Kit) mavenSourceRequest(
