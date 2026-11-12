@@ -242,6 +242,23 @@ func (g *Registry) remoteError(w http.ResponseWriter, r *http.Request, q Request
 		// unknown only for a code it does not know or for none, as with the
 		// download policy's refusal (refuse). The 403, 429 and 5xx follow
 		// the 401 [I].
+		//
+		// A relayed 401 carries 7.x's message for an upstream that refuses
+		// the remote's credentials, which names the remote. 7.x appends ":
+		// Error in getting information for '<path>'" and its Java exception
+		// (RTFACT-30467), which are left out [I]. JFrog's AI Catalog
+		// troubleshooting gives the same message when the remote's key is
+		// missing, so it does not depend on credentials being configured. The
+		// error is copied: SourceError's errors may be shared.
+		var upstream *source.HTTPError
+		var e *apierror.Error
+		if errors.As(err, &upstream) && upstream.Status == http.StatusUnauthorized &&
+			errors.As(answer, &e) {
+			refused := *e
+			refused.Message = "Invalid username/password configured for Remote Docker repository: " +
+				q.Repo.Key
+			answer = &refused
+		}
 		apierror.Write(w, apierror.ProfileArtifactory, answer)
 		return
 	}

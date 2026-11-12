@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -15,7 +16,8 @@ import (
 // TestUnitRemoteErrorEnvelopes: a remote's failure to fetch, whether its
 // upstream's 401, 403, 429 or 5xx relayed or an upstream that is unreachable,
 // unusable or slow, answers in Artifactory's envelope under no registry code
-// (#1248). The caller's own refusal answers the specification's code, and a
+// (#1248), the 401 with 7.x's message naming the remote (RTFACT-30467). The
+// caller's own refusal answers the specification's code, and a
 // request the source cannot serve or an operation it does not support keeps
 // its code. No refusal writes a code into kernel's shared errors.
 func TestUnitRemoteErrorEnvelopes(t *testing.T) {
@@ -31,7 +33,7 @@ func TestUnitRemoteErrorEnvelopes(t *testing.T) {
 	}{
 		{
 			name: "upstream 401", err: &source.HTTPError{Status: 401}, status: 401,
-			body: `{"errors":[{"message":"Unauthorized","status":401}]}`,
+			body: `{"errors":[{"message":"Invalid username/password configured for Remote Docker repository: remote","status":401}]}`,
 		},
 		{
 			name: "upstream 403", err: &source.HTTPError{Status: 403}, status: 403,
@@ -96,7 +98,10 @@ func TestUnitRemoteErrorEnvelopes(t *testing.T) {
 			r := httptest.NewRequest(http.MethodGet, "/v2/remote/image/manifests/latest", nil)
 			r = r.WithContext(kernel.WithPrincipal(r.Context(), p))
 			w := httptest.NewRecorder()
-			q := Request{Kind: KindManifest, RepoKey: "remote", Name: "image", Reference: "latest"}
+			q := Request{
+				Kind: KindManifest, RepoKey: "remote", Repo: repo.Config{Key: "remote", Class: repo.Remote},
+				Name: "image", Reference: "latest",
+			}
 			(&Registry{}).remoteError(w, r, q, c.err)
 			if w.Code != c.status || w.Body.String() != c.body+"\n" ||
 				w.Header().Get("Content-Type") != "application/json" ||

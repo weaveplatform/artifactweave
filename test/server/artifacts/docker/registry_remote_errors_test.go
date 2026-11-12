@@ -12,7 +12,8 @@ import (
 // TestAccRegistryRemoteUpstreamErrors: a remote Docker repository answers its
 // upstream's 401, 403, 429 and 502 for a manifest with the same status in
 // Artifactory's envelope, under no registry code (decision 0031, #1248), and
-// never with the upstream's body. The upstream's 401 challenges for Basic
+// never with the upstream's body. The 401 carries 7.x's message, which
+// names the remote (RTFACT-30467). The upstream's 401 challenges for Basic
 // after the remote sent its credentials, so it refuses them, as nvcr.io
 // refused 7.x's in RTFACT-30467. The 429 keeps the upstream's Retry-After,
 // and the 401 carries the registry's own Bearer challenge, as it did before.
@@ -25,7 +26,7 @@ func TestAccRegistryRemoteUpstreamErrors(t *testing.T) {
 	}{
 		{
 			status: 401, header: http.Header{"Www-Authenticate": {`Basic realm="upstream"`}},
-			body: `{"errors":[{"message":"Unauthorized","status":401}]}`,
+			body: `{"errors":[{"message":"Invalid username/password configured for Remote Docker repository: remote","status":401}]}`,
 		},
 		{status: 403, body: `{"errors":[{"message":"Forbidden","status":403}]}`},
 		{

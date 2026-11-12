@@ -100,14 +100,22 @@ So does a remote repository's failure to fetch (amended 2026-11-12, #1248): its 
 [retrieval contract](../../implementation/remote-retrieval-contract.md)), and the 502, 503 or
 504 it answers when the upstream is unreachable or answers something unusable, when the
 remote's configuration changes during the fetch, or when the upstream does not answer in
-time. The status, the message (the status's text) and any `Retry-After` are kept. When
-7.x's upstream refused its credentials, docker pull printed `unknown: Invalid
-username/password configured for Remote Docker repository: <key>: ...`
-([a KB article of 2022](https://jfrog.com/help/r/artifactory-docker-pull-fails-via-artifactory-when-2fa-is-enabled-on-docker-hub-account),
+time. The status and any `Retry-After` are kept, and the message is the status's text,
+except for the 401. When 7.x's upstream refused its credentials, docker pull printed
+`unknown: Invalid username/password configured for Remote Docker repository: <key>: Error
+in getting information for '<path>' (java.lang.IllegalStateException: Can't fetch token
+...)` ([a KB article of 2022](https://jfrog.com/help/r/artifactory-docker-pull-fails-via-artifactory-when-2fa-is-enabled-on-docker-hub-account),
 [RTFACT-30467](https://jfrog.atlassian.net/browse/RTFACT-30467)), as it printed `unknown:`
-for the pattern refusal. **[I]** The 403, 429 and 5xx follow the 401, and 7.x's message,
-which names the repository, is not mirrored. A caller whose own permission the remote
-refuses still answers `DENIED`, or `UNAUTHORIZED` with the challenge when anonymous.
+for the pattern refusal. So the 401's message is `Invalid username/password configured
+for Remote Docker repository: <key>`, naming the remote. The rest of 7.x's text is its Java
+exception's detail and is left out **[I]**. JFrog's
+[AI Catalog troubleshooting](https://docs.jfrog.com/ai-ml/docs/troubleshoot-models-in-ai-catalog)
+gives the same message when the remote's NVIDIA NGC key "is missing or incorrect", so it
+does not depend on credentials being configured. Every capture is a refusal at the
+upstream's token endpoint; the 401 takes the message for every upstream refusal the
+remote relays as a 401 **[I]**. The 403, 429 and 5xx follow the 401's envelope **[I]**. A
+caller whose own permission the remote refuses still answers `DENIED`, or `UNAUTHORIZED`
+with the challenge when anonymous.
 
 A 401, 403 or 429 written with no registry code, by the request limiter or the
 authentication middleware for example, carries the code the table gives its status:

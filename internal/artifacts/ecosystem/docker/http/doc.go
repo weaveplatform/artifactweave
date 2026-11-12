@@ -110,8 +110,10 @@
 //     or 5xx or an upstream that is unreachable, unusable or slow, answers
 //     its status and message in Artifactory's envelope, under no registry
 //     code, as the Docker client showed 7.x's answer to an upstream that
-//     refused its credentials (RTFACT-30467, #1248). The caller's own
-//     refusal keeps DENIED, or UNAUTHORIZED when anonymous.
+//     refused its credentials (RTFACT-30467, #1248). That 401's message is
+//     7.x's "Invalid username/password configured for Remote Docker
+//     repository: <key>". The caller's own refusal keeps DENIED, or
+//     UNAUTHORIZED when anonymous.
 //
 // # References
 //
