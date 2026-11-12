@@ -204,9 +204,14 @@ func (s CranAPI) cranMemberIndex(
 	var body []byte
 	var err error
 	if c.Class == repo.Remote {
+		// A missing service is this server's fault, not the upstream's, so
+		// the read answers 500 as Alpine's and opkg's index reads do. The
+		// answer is made here because every caller passes the error through
+		// SourceError, which would turn a bare source.ErrUnavailable into
+		// the upstream's 502.
 		if s.RemoteSources == nil {
 			return view, fmt.Errorf("cran: remote index source: %w",
-				pkgroute.SourceError(source.ErrUnavailable, p.Anonymous))
+				s.InternalError(ctx, "CRAN index source", source.ErrUnavailable))
 		}
 		query := source.Request{
 			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
@@ -480,6 +485,13 @@ func (s CranAPI) serveRemoteCranPackage(
 	w http.ResponseWriter, r *http.Request, c repo.Config, cached bool,
 	req itemkit.ItemRequest, expected cran.Package, p kernel.Principal, acc itemkit.Access,
 ) {
+	// The route reads the remote's index first, which already answers 500
+	// for a missing service, so only a direct call gets here without one;
+	// it answers as the index read does rather than calling through nil.
+	if s.RemoteSources == nil {
+		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "CRAN source", source.ErrUnavailable))
+		return
+	}
 	query := source.Request{
 		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
 		CacheOnly: cached,

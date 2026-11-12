@@ -57,9 +57,9 @@ each code with the reference registry's status (R23 1.3):
 | `MANIFEST_INVALID` | 400 | `UNSUPPORTED` | 405, or 404 for an unknown operation |
 | `MANIFEST_UNKNOWN` | 404 | `TOOMANYREQUESTS` | 429 |
 
-Only these fourteen codes are sent, with one exception, `TAG_INVALID` for the reserved
-tag below; the other legacy schema-1 codes and the reference registry's `RANGE_INVALID` are
-not. `message` is a short English sentence, and `detail`, when present,
+Registry handlers send only these fourteen codes, with one exception, `TAG_INVALID` for the
+reserved tag below; the other legacy schema-1 codes and the reference registry's
+`RANGE_INVALID` are not. `message` is a short English sentence, and `detail`, when present,
 names what failed (the digest, the tag, the expected and actual sizes). Four codes carry
 7.x's own text:
 - `MANIFEST_UNKNOWN` answers `"message":"The named manifest is not known to the registry."`
@@ -94,6 +94,40 @@ the blackout's or the patterns' message as `{"errors":[{"status":404,"message":.
 under no registry code, because the Docker client printed `unknown: <message>` for 7.x's
 pattern refusal ([RTFACT-27234](https://jfrog.atlassian.net/browse/RTFACT-27234)). Decision
 [0032](0032-package-format-handlers.md) lists which pulls and listings it refuses.
+
+So does a remote repository's failure to fetch (amended 2026-11-12, #1248): its upstream's
+401, 403, 429 or 5xx, which the remote relays (the
+[retrieval contract](../../implementation/remote-retrieval-contract.md)), and the 502, 503 or
+504 it answers when the upstream is unreachable or answers something unusable, when the
+remote's configuration changes during the fetch, or when the upstream does not answer in
+time. The status and any `Retry-After` are kept, and the message is the status's text,
+except for the 401. When 7.x's upstream refused its credentials, docker pull printed
+`unknown: Invalid username/password configured for Remote Docker repository: <key>: Error
+in getting information for '<path>' (java.lang.IllegalStateException: Can't fetch token
+...)` ([a KB article of 2022](https://jfrog.com/help/r/artifactory-docker-pull-fails-via-artifactory-when-2fa-is-enabled-on-docker-hub-account),
+[RTFACT-30467](https://jfrog.atlassian.net/browse/RTFACT-30467)), as it printed `unknown:`
+for the pattern refusal. So the 401's message is `Invalid username/password configured
+for Remote Docker repository: <key>`, naming the remote. The rest of 7.x's text is its Java
+exception's detail and is left out **[I]**. JFrog's
+[AI Catalog troubleshooting](https://docs.jfrog.com/ai-ml/docs/troubleshoot-models-in-ai-catalog)
+gives the same message when the remote's NVIDIA NGC key "is missing or incorrect", so it
+does not depend on credentials being configured. Every capture is a refusal at the
+upstream's token endpoint; the 401 takes the message for every upstream refusal the
+remote relays as a 401 **[I]**. The 403, 429 and 5xx follow the 401's envelope **[I]**. A
+caller whose own permission the remote refuses still answers `DENIED`, or `UNAUTHORIZED`
+with the challenge when anonymous.
+
+A 401, 403 or 429 written with no registry code, by the request limiter or the
+authentication middleware for example, carries the code the table gives its status:
+`UNAUTHORIZED`, `DENIED` or `TOOMANYREQUESTS`, never the JAX-RS name, such as `FORBIDDEN`
+or `TOO_MANY_REQUESTS`, that the other surfaces' codes take (amended 2026-11-12, #1248).
+Docker's client reads a code the specification does not name as unknown, and the Docker
+daemon retries a layer that failed with unknown but gives up at once on these three. A
+status the table gives no single code keeps its JAX-RS name: a 400 that is no registry
+operation's, such as an `Idempotency-Key` refusal, is `BAD_REQUEST`, and a server error is
+`INTERNAL_ERROR`, `BAD_GATEWAY`, `SERVICE_UNAVAILABLE` or `GATEWAY_TIMEOUT`. The
+specification constrains only a 4xx's body, and Docker's registry client reports a 5xx by
+its status alone.
 
 ### Authentication on the registry
 

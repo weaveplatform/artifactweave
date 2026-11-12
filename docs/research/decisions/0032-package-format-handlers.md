@@ -223,9 +223,16 @@ item path. `Inspect` validates the archive before the write transaction; protect
 properties bind the provider and optional architecture to its actual SHA-256. The
 package index follows deploy, property edits, copy, move, delete and restore. Reindex
 revalidates archive bytes and rebuilds these records. Metadata is computed on read,
-filters each archive by the current principal and repository patterns, and links to
-the existing item download route. The [client guide](../../testing/vagrant.md) records
-the local and one-node federated scope and native evidence.
+filters each archive by the current principal and repository patterns, and links each
+box at Artifactory's native box file route, `/api/vagrant/<repo>/<path>.box`, where 7.x's
+catalogs point ([RTFACT-17993](https://jfrog.atlassian.net/browse/RTFACT-17993)) and
+Vagrant downloads ([RTFACT-27264](https://jfrog.atlassian.net/browse/RTFACT-27264))
+(2026-11-12, #1259). That route serves the stored box as the item download does: read
+permission on its path first (DV-057), then the blackout and the patterns. A path that
+ends `.box` and carries no matrix parameters is a box file, and any other path a box
+name [I]. A token in its `access_token` query authenticates nothing (DV-148). The
+[client guide](../../testing/vagrant.md) records the local and one-node federated scope
+and native evidence.
 
 **Which derived work goes through the work queue** (decision 0033; amended 2026-10-20, #533):
 - **Through the queue, one kind per format and kind of work:**
@@ -314,6 +321,13 @@ Artifactory 6.20's source elsewhere, with two departures:
   engine (decision [0012](0012-search-and-aql.md)), so they hide what AQL hides; Artifactory's
   search APIs filter their results apart from AQL and exempt a caller who may annotate
   (DV-058).
+
+**No token in a Vagrant URL.** Artifactory takes a token from a Vagrant URL's
+`access_token` query, where Vagrant 2.2.10 and earlier sent it. The box file route takes
+its credential only from the headers decision
+[0005](0005-authentication-and-tokens.md#decision) accepts, so the query authenticates
+nothing (DV-148): a token in a URL ends up in logs, and Vagrant 2.4.9 sends a Bearer header
+to its server's host unless told to use the query.
 
 **Alternatives considered:**
 - *Per-format write services that the protocol handlers call:* every format would also need
@@ -783,10 +797,10 @@ keeps a release whose file the patterns reject (R3).
 | Nix | `nix-cache-info`, `<hash>.narinfo` | none | A NAR is checked at its own `nar/<file>`, so patterns on the NARs leave the narinfo served. |
 | VCS | a remote repository's refs at `<owner>/<name>/gitrefs` | none | Read permission stays on the project folder. `downloadCommit` reads no refs. |
 | Puppet | a remote repository's `.puppet/<m>/releases.json` [I] | `v3/releases`, with or without `module`; `v3/releases/<slug>`; `v3/modules/<m>`; `v3/modules` without `query` | Module search (`v3/modules?query=`) kept (R2b). The lists of every release and module keep a release whose archive the patterns reject (R3); 7.x writes Puppet's listings as stored documents, an `all.json` among them (RTFACT-26143). Archive at `<m>/<m>-<v>.tar.gz`. |
-| Vagrant | none | the box catalog `<box>`, to a caller who could see one of its boxes | Other callers get "Vagrant box not found" as before. The catalog leaves out an entry whose box the patterns reject until P19 [I]. |
+| Vagrant | none | the box catalog `<box>`, to a caller who could see one of its boxes | Other callers get "Vagrant box not found" as before. The catalog leaves out an entry whose box the patterns reject until P19 [I]. A box file is checked at its own `<path>.box` (#1259). |
 | Maven | `maven-metadata.xml` and files, through the item routes | none | Version tokens skip rejected releases; a remote's refused `maven-metadata.xml` counts as absent [I]. `.index/` files take the blackout alone. |
 | Docker, OCI, Helm OCI | `<image>/<tag>/manifest.json`, `<image>/sha256:<hex>/manifest.json`, `<image>/_uploads/sha256__<hex>` [I] | `tags/list`, referrers (`<image>`) | `_catalog` leaves out rejected images; a local repository's tags lists keep rejected tags. |
-| p2 | composites and files, through the item routes; a remote repository over a `site.zip!/` URL at the entry's path | none | `p2.index` takes the blackout alone. A virtual leaves a blacked-out member out. |
+| p2 | composites and files, through the item routes, a virtual's member files at `<member key>/<path>` and its composite's children from `p2Urls` (#1257); a remote repository over a `site.zip!/` URL at the entry's path | none | `p2.index` takes the blackout alone. A virtual leaves a blacked-out member out. |
 | Debian | `Packages*`, `Sources*`, by-hash, `Release`, `InRelease`, `Release.gpg`; a snapshot's `snapshots/<tag>/<path>` | none | |
 | RPM | `repodata/repomd.xml` and the other repodata | none | |
 | Alpine | `<branch>/<repo>/<arch>/APKINDEX.tar.gz` | none | |

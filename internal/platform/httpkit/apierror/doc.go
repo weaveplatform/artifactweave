@@ -57,7 +57,14 @@
 //     which is Go's status text in upper case with underscores for spaces
 //     (BAD_REQUEST, METHOD_NOT_ALLOWED, REQUEST_ENTITY_TOO_LARGE,
 //     TOO_MANY_REQUESTS, SERVICE_UNAVAILABLE). 500 is INTERNAL_ERROR, as is
-//     a status Go has no text for, and 501 is UNSUPPORTED.
+//     a status Go has no text for, and 501 is UNSUPPORTED. A status JAX-RS
+//     has no constant for keeps only the letters of Go's text (418 is
+//     IM_A_TEAPOT), so every code is upper-case letters and underscores.
+//   - Under ProfileOCI, an error whose code is empty or its status's name
+//     carries the distribution specification's code for a 401, 403 or 429
+//     instead: UNAUTHORIZED, DENIED or TOOMANYREQUESTS. Write computes it
+//     and never changes the error, since the kernel's errors are shared by
+//     every surface.
 //   - It imports nothing beyond the standard library. Decision 0044 holds the
 //     kernel to the standard library and this package, so any other import
 //     would reach the kernel too, and an import of the kernel would be a
@@ -100,6 +107,10 @@
 //   - https://github.com/weaveplatform/artifactweave/issues/1000 and
 //     https://github.com/weaveplatform/artifactweave/issues/1236 (a code
 //     for every status).
+//   - The OCI codes: the distribution specification's error codes
+//     (https://github.com/opencontainers/distribution-spec/blob/v1.1.0/spec.md#error-codes),
+//     decision 0031 (docs/research/decisions/0031-docker-oci-registry.md),
+//     and https://github.com/weaveplatform/artifactweave/issues/1248.
 //
 // # Status
 //
@@ -113,7 +124,9 @@
 // Terraform backend (P8, #558), NoChallenge and RetryAfterSeconds for remote
 // sources (P9, #616), APM (P9b, #692), and the Swift registry and Dart pub
 // (P9c, #766 and #765). Moved here in P9d. New takes the code from the
-// status's name (#1236).
+// status's name (#1236). The OCI envelope gives a 401, 403 or 429 the
+// specification's code, and a code keeps only letters and underscores
+// (#1248).
 //
 // # Testing
 //
@@ -130,6 +143,9 @@
 //     the Access, Grid and Pub envelopes, the code New derives, with the
 //     status, content type and message, in each of the three; and the text
 //     of Error.
+//   - TestUnitOCICodes: the OCI envelope's code for an error built with New,
+//     one with no code and one a handler gave a code, and that rendering
+//     leaves the error unchanged.
 //
 // These tests leave the APM and Swift registry problem JSON, the Dart pub
 // Bearer challenge, and Retry-After to the tests of the routes that write
