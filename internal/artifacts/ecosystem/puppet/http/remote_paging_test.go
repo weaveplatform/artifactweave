@@ -45,11 +45,11 @@ func upstreamReleasePage(t *testing.T, offset, held, total, limit int, next bool
 	return data
 }
 
-// A remote asks for 100 releases a page and reads a page as complete when
-// it holds what was asked, or as many as the upstream's own limit says it
-// serves. A page with more after it that is short for no reason the
-// upstream states still answers 502, as does every other page main
-// refused (#1285).
+// A remote asks for 20 releases a page (#1300) and reads a page as
+// complete when it holds what was asked or more, or as many as the
+// upstream's own limit says it serves. A page with more after it that is
+// short for no reason the upstream states still answers 502, as does every
+// other page main refused (#1285).
 func TestUnitRemotePageSizes(t *testing.T) {
 	const feed = "https://forge.example/v3/releases"
 	for _, tc := range []struct {
@@ -59,21 +59,22 @@ func TestUnitRemotePageSizes(t *testing.T) {
 		more                       bool
 		valid                      bool
 	}{
-		// The Forge serves 100 whatever limit is asked.
-		{"the Forge's page of 100", 0, 100, 150, 100, true, true, true},
-		{"the Forge's last page", 100, 50, 150, 100, false, false, true},
-		{"a smaller limit the upstream states", 0, 20, 150, 20, true, true, true},
+		{"the page of 20 asked", 0, 20, 150, 20, true, true, true},
+		{"the page of 20 asked, no limit stated", 0, 20, 150, 0, true, true, true},
+		{"the last page", 140, 10, 150, 20, false, false, true},
+		{"a smaller limit the upstream states", 0, 10, 150, 10, true, true, true},
+		{"a page of 100 for 20 asked", 0, 100, 150, 100, true, true, true},
 		{"a page that holds more than asked", 0, 500, 1001, 0, true, true, true},
 		{"a page of 1,000 with no limit", 0, 1000, 1001, 0, true, true, true},
-		{"a module of at most 100 releases", 0, 100, 100, 100, false, false, true},
+		{"a module of at most 20 releases", 0, 20, 20, 20, false, false, true},
 		{"a short last page with no limit", 0, 2, 2, 0, false, false, true},
-		{"short under the limit asked", 0, 99, 150, 100, true, false, false},
-		{"short with no limit", 0, 99, 150, 0, true, false, false},
-		{"short under the limit stated", 0, 19, 150, 20, true, false, false},
+		{"short under the limit asked", 0, 19, 150, 20, true, false, false},
+		{"short with no limit", 0, 19, 150, 0, true, false, false},
+		{"short under the limit stated", 0, 9, 150, 10, true, false, false},
 		{"empty with more after it", 0, 0, 150, 0, true, false, false},
-		{"empty under a stated limit", 0, 0, 150, 20, true, false, false},
-		{"a full page with no next", 0, 100, 150, 100, false, false, false},
-		{"a last page that names a next", 100, 50, 150, 100, true, false, false},
+		{"empty under a stated limit", 0, 0, 150, 10, true, false, false},
+		{"a full page with no next", 0, 20, 150, 20, false, false, false},
+		{"a last page that names a next", 140, 10, 150, 20, true, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			data := upstreamReleasePage(t, tc.offset, tc.held, tc.total, tc.limit, tc.next)

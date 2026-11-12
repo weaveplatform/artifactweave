@@ -38,3 +38,21 @@ func TestUnitManifestLinks(t *testing.T) {
 		t.Fatalf("archive links: %+v", meta)
 	}
 }
+
+// ReadArchive keeps the whole metadata.json, compacted and otherwise as the
+// file writes it, for a release record's metadata (#1325).
+func TestUnitArchiveKeepsTheDocument(t *testing.T) {
+	m := []byte("{\n  \"name\": \"acme-widget\",\n  \"version\": \"1.2.3\",\n" +
+		"  \"summary\": \"a & <b>\",\n  \"tags\": [\"x\"],\n  \"weight\": 1.50\n}\n")
+	archive := archiveFixture(t,
+		[]tar.Header{{Name: "acme-widget-1.2.3/metadata.json", Mode: 0o644, Size: int64(len(m))}},
+		[][]byte{m})
+	meta, err := ReadArchive(bytes.NewReader(archive), int64(len(archive)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const want = `{"name":"acme-widget","version":"1.2.3","summary":"a & <b>","tags":["x"],"weight":1.50}`
+	if string(meta.Document) != want {
+		t.Fatalf("document: %s", meta.Document)
+	}
+}

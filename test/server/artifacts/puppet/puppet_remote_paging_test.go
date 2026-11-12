@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -24,8 +26,10 @@ import (
 // page whatever limit is asked, as forgeapi.puppet.com serves at most 100
 // (it answered limit=1000 with "limit": 100 on 2026-11-12). Its pages carry
 // the Forge's whole pagination object, and its release records the fields
-// a remote relays. It records the limit and offset of each release page
-// asked for.
+// a remote relays, with a REFERENCE.md of reference bytes, and leave out
+// the fields exclude_fields names, as the Forge does. It serves the
+// module's record too. It records the limit and offset of each release
+// page asked for, and each exclude_fields asked.
 type cappedForge struct {
 	*httptest.Server
 	versions []string
@@ -35,9 +39,11 @@ type cappedForge struct {
 	limitCap int
 	// short serves one release fewer than a page that has more after it
 	// should hold, while its pagination still states limitCap.
-	short bool
-	mu    sync.Mutex
-	asked map[string]bool
+	short     bool
+	reference int
+	mu        sync.Mutex
+	asked     map[string]bool
+	excluded  map[string]bool
 	// files counts the archive requests.
 	files int
 }
@@ -46,7 +52,7 @@ func newCappedForge(t *testing.T, releases, limitCap int, short bool) *cappedFor
 	t.Helper()
 	f := &cappedForge{
 		archives: map[string][]byte{}, dates: map[string]string{}, limitCap: limitCap,
-		short: short, asked: map[string]bool{},
+		short: short, asked: map[string]bool{}, excluded: map[string]bool{},
 	}
 	zone := time.FixedZone("", -7*60*60)
 	for i := releases - 1; i >= 0; i-- {
@@ -62,6 +68,14 @@ func newCappedForge(t *testing.T, releases, limitCap int, short bool) *cappedFor
 }
 
 func (f *cappedForge) serve(out http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/v3/modules/acme-widget" {
+		f.mu.Lock()
+		f.excluded["module: "+r.URL.Query().Get("exclude_fields")] = true
+		f.mu.Unlock()
+		out.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(out).Encode(f.upstreamModule())
+		return
+	}
 	if r.URL.Path != "/v3/releases" {
 		f.mu.Lock()
 		f.files++
@@ -85,7 +99,12 @@ func (f *cappedForge) serve(out http.ResponseWriter, r *http.Request) {
 	}
 	f.mu.Lock()
 	f.asked[fmt.Sprintf("limit=%s&offset=%d", q.Get("limit"), offset)] = true
+	f.excluded["releases: "+q.Get("exclude_fields")] = true
 	f.mu.Unlock()
+	omit := map[string]bool{}
+	for _, field := range strings.Fields(q.Get("exclude_fields")) {
+		omit[field] = true
+	}
 	limit = min(limit, f.limitCap)
 	total := len(f.versions)
 	offset = min(offset, total)
@@ -108,7 +127,7 @@ func (f *cappedForge) serve(out http.ResponseWriter, r *http.Request) {
 	results := []any{}
 	for _, v := range served {
 		data := f.archives[v]
-		results = append(results, map[string]any{
+		rel := map[string]any{
 			"uri": "/v3/releases/acme-widget-" + v, "slug": "acme-widget-" + v,
 			"module": map[string]any{
 				"uri": "/v3/modules/acme-widget", "slug": "acme-widget", "name": "widget",
@@ -123,8 +142,12 @@ func (f *cappedForge) serve(out http.ResponseWriter, r *http.Request) {
 			"file_size": len(data), "file_md5": md5Hex(data), "file_sha256": checksum(data),
 			"downloads": f.downloads(v), "readme": "# acme-widget " + v, "changelog": nil,
 			"license": "Apache License", "created_at": f.dates[v], "updated_at": f.dates[v],
-			"deleted_at": nil,
-		})
+			"deleted_at": nil, "reference": strings.Repeat("r", f.reference),
+		}
+		for field := range omit {
+			delete(rel, field)
+		}
+		results = append(results, rel)
 	}
 	out.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(out).Encode(map[string]any{
@@ -141,6 +164,22 @@ func (f *cappedForge) manifest(v string) puppetfmt.Manifest {
 	return puppetfmt.Manifest{
 		Name: "acme-widget", Version: v, Summary: "forge",
 		Dependencies: []puppetfmt.Dependency{},
+	}
+}
+
+// upstreamModule is the module's record as the Forge gives it, with the
+// values a module record built from the releases would have: their
+// downloads summed, the oldest release's created_at and the newest's
+// updated_at, and the releases' links, so that a virtual repository over a
+// remote, which builds its record from the releases, answers what the
+// remote relays.
+func (f *cappedForge) upstreamModule() map[string]any {
+	m := f.moduleRecord()
+	return map[string]any{
+		"uri": m.URI, "slug": m.Slug, "name": m.Name, "downloads": m.Downloads,
+		"created_at": m.CreatedAt, "updated_at": m.UpdatedAt, "supported": true,
+		"endorsement": nil, "module_group": "base", "owner": f.owner(),
+		"homepage_url": forgeHomepage, "issues_url": nil, "deprecated_at": nil,
 	}
 }
 
@@ -198,24 +237,24 @@ type moduleRef struct {
 }
 
 type releaseRecord struct {
-	URI        string             `json:"uri"`
-	Slug       string             `json:"slug"`
-	Module     moduleRef          `json:"module"`
-	Version    string             `json:"version"`
-	Metadata   puppetfmt.Manifest `json:"metadata"`
-	Tags       []string           `json:"tags"`
-	Supported  bool               `json:"supported"`
-	FileURI    string             `json:"file_uri"`
-	FileSize   int                `json:"file_size"`
-	FileMD5    string             `json:"file_md5"`
-	FileSHA256 string             `json:"file_sha256"`
-	Downloads  int                `json:"downloads"`
-	Readme     string             `json:"readme"`
-	Changelog  *string            `json:"changelog"`
-	License    string             `json:"license"`
-	CreatedAt  string             `json:"created_at"`
-	UpdatedAt  string             `json:"updated_at"`
-	DeletedAt  *string            `json:"deleted_at"`
+	URI        string          `json:"uri"`
+	Slug       string          `json:"slug"`
+	Module     moduleRef       `json:"module"`
+	Version    string          `json:"version"`
+	Metadata   json.RawMessage `json:"metadata"`
+	Tags       []string        `json:"tags"`
+	Supported  bool            `json:"supported"`
+	FileURI    string          `json:"file_uri"`
+	FileSize   int             `json:"file_size"`
+	FileMD5    string          `json:"file_md5"`
+	FileSHA256 string          `json:"file_sha256"`
+	Downloads  int             `json:"downloads"`
+	Readme     string          `json:"readme"`
+	Changelog  *string         `json:"changelog"`
+	License    string          `json:"license"`
+	CreatedAt  string          `json:"created_at"`
+	UpdatedAt  string          `json:"updated_at"`
+	DeletedAt  *string         `json:"deleted_at"`
 }
 
 type releaseLink struct {
@@ -279,7 +318,7 @@ func (f *cappedForge) record(v string) releaseRecord {
 			URI: "/v3/modules/acme-widget", Slug: "acme-widget", Name: "widget",
 			Owner: f.owner(),
 		},
-		Version: v, Metadata: f.manifest(v), Tags: []string{}, Supported: true,
+		Version: v, Metadata: f.metadata(v), Tags: []string{}, Supported: true,
 		FileURI: "/v3/files/acme-widget-" + v + ".tar.gz", FileSize: len(data),
 		FileMD5: md5Hex(data), FileSHA256: checksum(data), Downloads: f.downloads(v),
 		Readme: "# acme-widget " + v, License: "Apache License",
@@ -287,9 +326,20 @@ func (f *cappedForge) record(v string) releaseRecord {
 	}
 }
 
-// moduleRecord is the module as a remote answers it, from its releases:
-// their downloads summed, the oldest release's created_at and the newest's
-// updated_at, and the newest's owner and links.
+// metadata is the metadata a remote's record of version v answers: the
+// upstream's whole metadata.json, the fields 7.x writes first in its order
+// and null where the file has none (#1325).
+func (f *cappedForge) metadata(v string) json.RawMessage {
+	return json.RawMessage(`{"name":"acme-widget","version":"` + v + `","source":null,` +
+		`"author":null,"license":null,"summary":"forge","description":null,` +
+		`"project_page":"` + forgeHomepage + `","issues_url":null,"tags":null,"dependencies":[]}`)
+}
+
+// moduleRecord is the module as a remote answers it, relaying the Forge's
+// module record (upstreamModule), and as a virtual repository over it
+// answers it from the releases: their downloads summed, the oldest
+// release's created_at and the newest's updated_at, and the newest's owner
+// and links.
 func (f *cappedForge) moduleRecord() moduleRecord {
 	out := moduleRecord{
 		URI: "/v3/modules/acme-widget", Slug: "acme-widget", Name: "widget",
@@ -392,21 +442,34 @@ func pagedRemote(t *testing.T, up *cappedForge) *remoteWorld {
 	return w
 }
 
-// A Puppet remote asks its upstream for 100 releases a page and starts the
-// next page after the releases a page held, so a module with more
-// releases than the Forge serves a page lists, resolves and serves every
-// one of them, through the remote and through a virtual repository over
-// it. A page that says it serves fewer than 100 is read as complete
-// (#1285).
+// A Puppet remote asks its upstream for 20 releases a page, without the
+// fields no record answers (#1300), and starts the next page after the
+// releases a page held, so a module with more releases than the Forge
+// serves a page lists, resolves and serves every one of them, through the
+// remote and through a virtual repository over it. A page that says it
+// serves fewer than 20 is read as complete (#1285).
 func TestAccPuppetRemoteReadsEveryForgePage(t *testing.T) {
 	const remote = "/artifactory/api/puppet/remote"
 	t.Run("the Forge's cap of 100", func(t *testing.T) {
 		up := newCappedForge(t, 150, 100, false)
 		w := pagedRemote(t, up)
 		up.wantAnswers(t, w, remote, "reader")
-		if got := up.pagesAsked(); !slices.Equal(got,
-			[]string{"limit=100&offset=0", "limit=100&offset=100"}) {
+		want := []string{}
+		for offset := 0; offset < 150; offset += 20 {
+			want = append(want, fmt.Sprintf("limit=20&offset=%d", offset))
+		}
+		slices.Sort(want)
+		if got := up.pagesAsked(); !slices.Equal(got, want) {
 			t.Fatalf("pages asked: %v", got)
+		}
+		up.mu.Lock()
+		excluded := slices.Sorted(maps.Keys(up.excluded))
+		up.mu.Unlock()
+		if !slices.Equal(excluded, []string{
+			"module: current_release releases",
+			"releases: reference tasks plans pdk validation_score malware_scan deleted_for",
+		}) {
+			t.Fatalf("exclude_fields asked: %q", excluded)
 		}
 		v := *repo.Defaults(&repo.Config{
 			Key: "pvirtual", Class: repo.Virtual, PackageType: repo.Puppet,
@@ -418,11 +481,11 @@ func TestAccPuppetRemoteReadsEveryForgePage(t *testing.T) {
 		up.wantAnswers(t, w, "/artifactory/api/puppet/pvirtual", "admin")
 	})
 	t.Run("a smaller limit the upstream states", func(t *testing.T) {
-		up := newCappedForge(t, 150, 20, false)
+		up := newCappedForge(t, 150, 10, false)
 		up.wantAnswers(t, pagedRemote(t, up), remote, "reader")
 		want := []string{}
-		for offset := 0; offset < 150; offset += 20 {
-			want = append(want, fmt.Sprintf("limit=100&offset=%d", offset))
+		for offset := 0; offset < 150; offset += 10 {
+			want = append(want, fmt.Sprintf("limit=20&offset=%d", offset))
 		}
 		slices.Sort(want)
 		if got := up.pagesAsked(); !slices.Equal(got, want) {
@@ -464,4 +527,57 @@ func TestAccPuppetRemotePagingKeepsItsOtherAnswers(t *testing.T) {
 			t.Fatal("an archive was fetched from a refused release list")
 		}
 	})
+}
+
+// A module whose release pages carry a REFERENCE.md of 200 KiB a release
+// comes to over 16 MiB a page at the Forge's 100, the most metadata a
+// remote reads, as puppetlabs-apache's REFERENCE.md of 398,265 bytes in its
+// sources would. A remote asks for 20 a page without reference, so it lists
+// every release (#1300). The Puppet client's own exclude_fields leaves its
+// fields out of the remote's answer, and is not asked of the upstream
+// (#1327) [I].
+func TestAccPuppetRemoteLargeReleasePages(t *testing.T) {
+	const remote = "/artifactory/api/puppet/remote"
+	up := newCappedForge(t, 100, 100, false)
+	up.reference = 200 << 10
+	w := pagedRemote(t, up)
+	up.wantAnswers(t, w, remote, "reader")
+	const client = "readme,changelog,license,uri,module,tags,supported,file_size," +
+		"downloads,created_at,updated_at,deleted_at"
+	type trimmed struct {
+		Slug       string          `json:"slug"`
+		Version    string          `json:"version"`
+		Metadata   json.RawMessage `json:"metadata"`
+		FileURI    string          `json:"file_uri"`
+		FileMD5    string          `json:"file_md5"`
+		FileSHA256 string          `json:"file_sha256"`
+	}
+	results := []trimmed{}
+	for _, v := range up.versions[2:4] {
+		rec := up.record(v)
+		results = append(results, trimmed{
+			rec.Slug, rec.Version, rec.Metadata, rec.FileURI, rec.FileMD5, rec.FileSHA256,
+		})
+	}
+	var want bytes.Buffer
+	e := json.NewEncoder(&want)
+	e.SetEscapeHTML(false)
+	if err := e.Encode(struct {
+		Pagination pageObject `json:"pagination"`
+		Results    []trimmed  `json:"results"`
+	}{newPageObject("/v3/releases", "module=acme-widget&sort_by=version&exclude_fields="+
+		url.QueryEscape(client), 2, 2, 100), results}); err != nil {
+		t.Fatal(err)
+	}
+	r := w.request("GET", remote+"/v3/releases?module=acme-widget&sort_by=version&exclude_fields="+
+		client+"&limit=2&offset=2", "reader", "")
+	if r.Code != 200 || r.Body.String() != want.String() {
+		t.Fatalf("got %d %s\nwant 200 %s", r.Code, r.Body.String(), want.String())
+	}
+	up.mu.Lock()
+	defer up.mu.Unlock()
+	if _, ok := up.excluded["releases: reference tasks plans pdk validation_score malware_scan deleted_for"]; !ok ||
+		len(up.excluded) != 2 {
+		t.Fatalf("exclude_fields asked: %v", up.excluded)
+	}
 }

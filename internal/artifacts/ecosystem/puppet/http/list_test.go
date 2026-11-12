@@ -103,9 +103,21 @@ const hostedOwner = `{"uri":"/v3/users/acme","slug":"acme","username":"acme","gr
 // releaseJSON is the record every route answers for hosted release rel, an
 // archive moduleArchive built, downloaded downloads times.
 func releaseJSON(rel listRelease, downloads ...int) string {
-	return recordJSON(rel, fmt.Sprintf(
-		`{"name":"%[1]s","version":"%[2]s","summary":"%[1]s %[2]s","dependencies":[]}`,
-		rel.name, rel.version), sumCounts(downloads))
+	return recordJSON(rel, metadataJSON(rel.name, rel.version, rel.name+" "+rel.version, "[]", ""),
+		sumCounts(downloads))
+}
+
+// metadataJSON is the metadata a release record answers for a metadata.json
+// that gives name, version, summary and dependencies: the fields 7.x
+// writes first, in its order, null where the file gives none, and links,
+// when set, as its project_page and issues_url (#1325).
+func metadataJSON(name, version, summary, dependencies, links string) string {
+	if links == "" {
+		links = `"project_page":null,"issues_url":null`
+	}
+	return fmt.Sprintf(`{"name":%q,"version":%q,"source":null,"author":null,"license":null,`+
+		`"summary":%q,"description":null,%s,"tags":null,"dependencies":%s}`,
+		name, version, summary, links, dependencies)
 }
 
 // recordJSON is the record every route answers for hosted release rel,

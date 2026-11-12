@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 )
 
 // linkedManifest is the metadata.json of acme-widget at version that
@@ -30,12 +31,18 @@ func linkedManifest(version string) string {
 // only linkedManifest.
 func linkedArchive(t *testing.T, version string) []byte {
 	t.Helper()
-	manifest := linkedManifest(version)
+	return manifestArchive(t, "acme-widget-"+version, linkedManifest(version))
+}
+
+// manifestArchive returns an archive that holds only manifest, as
+// dir/metadata.json.
+func manifestArchive(t *testing.T, dir, manifest string) []byte {
+	t.Helper()
 	var out bytes.Buffer
 	gz := gzip.NewWriter(&out)
 	tw := tar.NewWriter(gz)
 	if err := tw.WriteHeader(&tar.Header{
-		Name: "acme-widget-" + version + "/metadata.json", Mode: 0o644,
+		Name: dir + "/metadata.json", Mode: 0o644,
 		Size: int64(len(manifest)),
 	}); err != nil {
 		t.Fatal(err)
@@ -53,11 +60,13 @@ func linkedArchive(t *testing.T, version string) []byte {
 }
 
 // linkedMetadata is the metadata a release record answers for
-// linkedManifest: the manifest's fields, which leave its links out.
+// linkedManifest: the whole manifest, its links included, in 7.x's order
+// (#1325).
 func linkedMetadata(version string) string {
-	return fmt.Sprintf(`{"name":"acme-widget","version":"%s","summary":"widget %s",`+
-		`"dependencies":[{"name":"acme/helper","version_requirement":">= 1.0.0 < 2.0.0"}]}`,
-		version, version)
+	return metadataJSON("acme-widget", version, "widget "+version,
+		`[{"name":"acme/helper","version_requirement":">= 1.0.0 < 2.0.0"}]`,
+		`"project_page":"https://example.invalid/widget?tab=a&b",`+
+			`"issues_url":"https://example.invalid/issues"`)
 }
 
 // A hosted release answers every field of JFrog's reference and of 7.x's
@@ -155,7 +164,8 @@ func upstreamRelease(t *testing.T, version string, extra map[string]any) map[str
 // A remote relays the upstream's values of a release record's fields, as
 // 7.x relays the Forge's (RTFACT-19130); a value of another type answers
 // as a hosted release's would, and the page stays valid. Its module record
-// takes the module-wide fields from the releases [I] (#1288).
+// relays the module-wide fields of the upstream's own module record, not
+// the ones the releases would give (#1326) [I].
 func TestUnitRemoteRecordsRelayTheUpstream(t *testing.T) {
 	newer := upstreamRelease(t, "1.1.0", map[string]any{
 		"uri": "/v3/releases/acme-widget-1.1.0", "slug": "acme-widget-1.1.0",
@@ -181,9 +191,16 @@ func TestUnitRemoteRecordsRelayTheUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	upstreamModule := `{"uri":"/v3/modules/acme-widget","slug":"acme-widget","name":"widget",` +
+		`"downloads":90210,"created_at":"2010-03-04 05:06:07 -0800",` +
+		`"updated_at":"2026-10-29 01:02:03 -0700","deprecated_at":null,"supported":false,` +
+		`"endorsement":"approved","module_group":"base",` +
+		`"owner":{"uri":"/v3/users/acme","slug":"acme","username":"acme","gravatar_id":"0badc0de"},` +
+		`"homepage_url":"https://example.invalid/acme/puppet-widget","issues_url":null}`
 	src := metadataSource{
-		body:  string(page),
-		check: func(context.Context, string) error { return nil },
+		body:     string(page),
+		check:    func(context.Context, string) error { return nil },
+		moduleAt: func(source.Resource) (string, bool) { return upstreamModule, false },
 	}
 	f := newFixtureWith(t, repo.Remote, func(p *pkgroute.Protocol) { p.Sources[repo.Remote] = src })
 	const remoteOwner = `{"uri":"/v3/users/acme","slug":"acme","username":"acme","gravatar_id":"fdd009b7"}`
@@ -206,13 +223,14 @@ func TestUnitRemoteRecordsRelayTheUpstream(t *testing.T) {
 		`"created_at":"2011-05-24 18:34:58 -0700","updated_at":"yesterday",` +
 		`"deleted_at":"2012-01-01 00:00:00 +0000"}`
 	module := `{"uri":"/v3/modules/acme-widget","slug":"acme-widget","name":"widget",` +
-		`"downloads":42,"created_at":"2011-05-24 18:34:58 -0700",` +
-		`"updated_at":"2026-10-28 04:20:14 -0700","supported":true,"endorsement":null,` +
-		`"module_group":"base","owner":` + remoteOwner + `,"current_release":` + relayed + `,` +
+		`"downloads":90210,"created_at":"2010-03-04 05:06:07 -0800",` +
+		`"updated_at":"2026-10-29 01:02:03 -0700","supported":false,"endorsement":"approved",` +
+		`"module_group":"base",` +
+		`"owner":{"uri":"/v3/users/acme","slug":"acme","username":"acme","gravatar_id":"0badc0de"},` +
+		`"current_release":` + relayed + `,` +
 		`"releases":[{"uri":"/v3/releases/acme-widget-1.1.0","version":"1.1.0"},` +
 		`{"uri":"/v3/releases/acme-widget-1.0.0","version":"1.0.0"}],` +
-		`"homepage_url":"https://example.invalid/widget?tab=a&b",` +
-		`"issues_url":"https://example.invalid/issues"}`
+		`"homepage_url":"https://example.invalid/acme/puppet-widget","issues_url":null}`
 	wantBody(t, f.do("GET", base+"/v3/releases/acme-widget-1.1.0", "admin"), relayed+"\n")
 	wantBody(t, f.do("GET", base+"/v3/releases/acme-widget-1.0.0", "admin"), defaulted+"\n")
 	wantBody(t, f.do("GET", base+"/v3/releases?module=acme-widget", "admin"),
@@ -222,9 +240,11 @@ func TestUnitRemoteRecordsRelayTheUpstream(t *testing.T) {
 		listJSON("/v3/modules?query=acme-widget", 20, 0, 1, module))
 }
 
-// A module none of whose releases gives a date in the Forge's form answers
-// null for its own dates.
-func TestUnitRemoteModuleWithoutDates(t *testing.T) {
+// A remote's module record answers a field of the upstream's record whose
+// value has another type as a hosted module's would: null dates,
+// endorsement, links and gravatar, no downloads, not supported, and the
+// base group, as a release's fields do (#1326) [I].
+func TestUnitRemoteModuleFieldsOfAnotherType(t *testing.T) {
 	page, err := json.Marshal(map[string]any{
 		"results":    []any{upstreamRelease(t, "1.0.0", map[string]any{"created_at": 1})},
 		"pagination": map[string]any{"offset": 0, "total": 1, "next": nil},
@@ -232,14 +252,32 @@ func TestUnitRemoteModuleWithoutDates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	src := metadataSource{
-		body:  string(page),
-		check: func(context.Context, string) error { return nil },
-	}
-	f := newFixtureWith(t, repo.Remote, func(p *pkgroute.Protocol) { p.Sources[repo.Remote] = src })
-	r := f.do("GET", base+"/v3/modules/acme-widget", "admin")
-	if r.Code != 200 || !strings.Contains(r.Body.String(),
-		`"downloads":0,"created_at":null,"updated_at":null,`) {
-		t.Fatalf("module dates: %d %s", r.Code, r.Body.String())
+	for name, record := range map[string]string{
+		"other types": `{"slug":"acme-widget","downloads":"many","created_at":1,"updated_at":false,` +
+			`"supported":"yes","endorsement":3,"module_group":7,"owner":"acme",` +
+			`"homepage_url":{},"issues_url":[]}`,
+		"no downloads": `{"slug":"acme-widget","downloads":-5,"owner":{"gravatar_id":1}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			src := metadataSource{
+				body:     string(page),
+				check:    func(context.Context, string) error { return nil },
+				moduleAt: func(source.Resource) (string, bool) { return record, false },
+			}
+			f := newFixtureWith(
+				t,
+				repo.Remote,
+				func(p *pkgroute.Protocol) { p.Sources[repo.Remote] = src },
+			)
+			r := f.do("GET", base+"/v3/modules/acme-widget", "admin")
+			const want = `{"uri":"/v3/modules/acme-widget","slug":"acme-widget","name":"widget",` +
+				`"downloads":0,"created_at":null,"updated_at":null,"supported":false,` +
+				`"endorsement":null,"module_group":"base","owner":` + hostedOwner + `,"current_release":`
+			const links = `"homepage_url":null,"issues_url":null}` + "\n"
+			if body := r.Body.String(); r.Code != 200 || !strings.HasPrefix(body, want) ||
+				!strings.HasSuffix(body, links) {
+				t.Fatalf("module: %d %s", r.Code, body)
+			}
+		})
 	}
 }
