@@ -19,7 +19,7 @@ original tested versions.
 | [`cocoapods.Dockerfile`](../../test/acceptance/clients/cocoapods.Dockerfile) | `ruby:4.0.9-slim@sha256:d8cb2c0714bdaba0f318af897a01d2dbde3cfa8e62d47e99cea55feb13c0e90d` | CocoaPods 1.17.0; Ruby 4.0.9 | [Ruby](https://www.ruby-lang.org/en/downloads/releases/), [CocoaPods](https://rubygems.org/gems/cocoapods/versions/1.17.0) |
 | [`composer.Dockerfile`](../../test/acceptance/clients/composer.Dockerfile) | `alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf` | Composer 2.11.1; Composer 1.10.28 local compatibility | [Composer releases](https://getcomposer.org/download/) |
 | [`conda.Dockerfile`](../../test/acceptance/clients/conda.Dockerfile) | `mambaorg/micromamba:2.10.0-debian13-slim@sha256:e1476182cd40eb1f7c0cfae4adec9bfd78f3d7f05c61368306abfdc8939c1198` | micromamba 2.10.0 (Conda package protocol) | [micromamba 2.10.0](https://github.com/mamba-org/micromamba-releases/releases/tag/2.10.0-0) |
-| [`dart.Dockerfile`](../../test/acceptance/clients/dart.Dockerfile) | `dart:3.13.7@sha256:854f3c50b1cbd4a5a54c9fa67d4f5b6702ac49b4a26d21a80e7712a72528b215` | Dart/pub 3.13.7 | [Dart archive](https://dart.dev/get-dart/archive) |
+| [`dart.Dockerfile`](../../test/acceptance/clients/dart.Dockerfile) | `dart:3.14.0@sha256:9ba97850b3154383a90f67844b09ea77751f7835836d8b2662ad2ffe03f60c8c` | Dart/pub 3.14.0 | [Dart archive](https://dart.dev/get-dart/archive) |
 | [`debian.Dockerfile`](../../test/acceptance/clients/debian.Dockerfile) | `ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2` | APT bundled with Ubuntu 26.10 (immutable image) | [Ubuntu releases](https://ubuntu.com/project/docs/release-team/list-of-releases/) |
 | [`dotnet-10/Dockerfile`](../../test/acceptance/clients/dotnet-10/Dockerfile) | `mcr.microsoft.com/dotnet/sdk:10.0@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb` | NuGet bundled with the .NET SDK 10.0 image | [.NET downloads](https://dotnet.microsoft.com/en-us/download) |
 | [`dotnet.Dockerfile`](../../test/acceptance/clients/dotnet.Dockerfile) | `mcr.microsoft.com/dotnet/sdk:11.0@sha256:65f3c7c6a25a239ab3e6719f2896147e7b68242ff2d8818dd70498bde6ef8bea` | NuGet bundled with the .NET SDK 11.0 image | [.NET downloads](https://dotnet.microsoft.com/en-us/download) |
@@ -67,6 +67,16 @@ as any client image. The official `elixir` image has few tags, but they name onl
 the OTP major, so the declared pins could no longer name the exact OTP release.
 Dependabot also misorders those tags: from `1.20.5-otp-29-alpine` it would
 propose `1.20-otp-28-alpine`.
+
+Every base is a stable release. `tools/depsync/sync.py` refuses an acceptance
+Dockerfile whose `FROM` tag carries a prerelease marker after its version, such
+as `-118.1.beta`, `a1`, `rc1`, `-dev` or `-preview`, and names the file, the tag
+and the marker. Variant suffixes such as `-slim`, `-alpine` or `-bookworm` pass.
+Dependabot proposes such tags for `python` and `dart`, whose `latest` tag shares
+its digest with no full version tag, so `.github/dependabot.yml` ignores their
+prereleases by version range
+([#1223](https://github.com/weaveplatform/artifactweave/issues/1223),
+[#1304](https://github.com/weaveplatform/artifactweave/issues/1304)).
 
 Purposeful compatibility lanes retain their declared runtimes. Updating a pin
 regenerates this inventory, recipe labels and secondary version assertions; it
