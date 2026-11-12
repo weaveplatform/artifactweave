@@ -227,18 +227,31 @@ var generatedRoutes = map[string]bool{
 	"PUT /access/api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}":    true,
 	"DELETE /access/api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}": true,
 
-	// The multi-architecture tag delete (#226).
-	"DELETE /artifactory/api/docker/{repoKey}/v2/delete": true,
+	// The multi-architecture tag delete (#226), the promotion and the parent
+	// manifest lookup. test/server/artifacts/docker holds their rows
+	// (support.DockerRoutes).
+	"DELETE /artifactory/api/docker/{repoKey}/v2/delete":         true,
+	"POST /artifactory/api/docker/{repo-key}/v2/promote":         true,
+	"POST /artifactory/api/docker/{repo-key}/v2/parentManifests": true,
+
+	// PyPI's JSON API, which RegisterPypiMetadataRoutes mounts over the
+	// generated routes, as Puppet's v3 reads are; test/server/artifacts/pypi
+	// holds their rows (support.PyPIRoutes).
+	"GET /artifactory/api/pypi/{repository}/pypi/{package}/json":           true,
+	"GET /artifactory/api/pypi/{repository}/pypi/{package}/{version}/json": true,
 }
 
 // TestAccUnimplementedOperationsAnswer501 proves the generated stubs reach the
 // client: a specified but unimplemented operation answers 501 rather than 404
-// (which would tell clients the endpoint does not exist) or 500. testHandler
-// has no store, and a real handler that needs one answers 501 without it
-// (itemkit.Kit.Content), so an implemented operation missing from implemented
-// still passes here.
+// (which would tell clients the endpoint does not exist) or 500. It also
+// guards implemented, which the API reliability ledger reads: an operation
+// left out of it is recorded there as "stub: 501". So the requests go to the
+// status fixture as an administrator. A router without a store would not
+// do: a real handler answers 501 without one (itemkit.Kit.Content), and 16
+// served operations passed here as stubs that way (#1202).
 func TestAccUnimplementedOperationsAnswer501(t *testing.T) {
-	h := testHandler()
+	h := statusFixture(t, false)
+	admin := basic("admin", "pw")["Authorization"]
 	checked := 0
 	for _, name := range specFiles {
 		doc := loadSpec(t, name)
@@ -269,6 +282,7 @@ func TestAccUnimplementedOperationsAnswer501(t *testing.T) {
 				if contentType != "" {
 					req.Header.Set("Content-Type", contentType)
 				}
+				req.Header.Set("Authorization", admin)
 				for _, p := range params {
 					if p.Value.Required && p.Value.In == "header" {
 						req.Header.Set(p.Value.Name, plausibleValue(p.Value))
