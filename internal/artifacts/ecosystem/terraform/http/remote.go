@@ -31,7 +31,7 @@ func (h handler) moduleMetadata(
 	// the document a client asks for is checked at its 7.x cache path
 	// before any read (remoteModule), and a signed download's own archive
 	// read applies the policy to the file. So only the blackout refuses a
-	// lookup, and patterns on the module folder no longer do (rulings R4).
+	// lookup, and patterns on the module folder no longer do (R4).
 	resource := source.Resource{
 		Kind:                   source.ResourceKindMetadata,
 		Path:                   path,
@@ -343,7 +343,7 @@ func readCheck(r source.Result) func(context.Context, string) error { return r.C
 
 // permissionCheck checks a path a listing discloses against Read
 // permission alone: a release whose file the patterns reject stays listed
-// (rulings R3), where CheckRead's refusal of one archive refused the whole
+// (R3), where CheckRead's refusal of one archive refused the whole
 // list. A document built from files it fetched, such as a provider's
 // package metadata, loses nothing by it: each file's result fences its own
 // policy, at the path its read checked, through its Revalidate.

@@ -55,7 +55,7 @@
 //
 //   - A release is listed when the caller may read its archive, whatever
 //     the include and exclude patterns say of the archive, which only the
-//     archive route refuses (rulings R3). A hosted release whose stored
+//     archive route refuses (R3). A hosted release whose stored
 //     index entry or archive does not match fails with 502 rather than
 //     being advertised.
 //   - The download policy (decision 0032) comes after Read permission. A

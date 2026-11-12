@@ -120,8 +120,8 @@ func (h handler) remoteInfo(r *http.Request, path string, nar bool) (located, er
 	// Read permission alone at the other: patterns rejecting only the NAR
 	// leave the narinfo served, where CheckRead's refusal of the NAR made
 	// the narinfo a 502 that turns the Nix client's substituter off
-	// (rulings R1, R3), and a NAR request is not refused at the narinfo it
-	// was found through (rulings R4).
+	// (R1, R3), and a NAR request is not refused at the narinfo it
+	// was found through (R4).
 	checkInfo, checkNAR := result.CheckRead, result.CheckPermission
 	if nar {
 		checkInfo, checkNAR = result.CheckPermission, result.CheckRead

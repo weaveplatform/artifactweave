@@ -47,7 +47,7 @@ func excludes(patterns string) func(*repo.Config) {
 }
 
 // wantProblem checks that rec answers status as a problem detail whose
-// detail is message, with none of an archive's headers (rulings R7).
+// detail is message, with none of an archive's headers (R7).
 func wantProblem(t *testing.T, rec *httptest.ResponseRecorder, status int, message string) {
 	t.Helper()
 	var body struct {
@@ -107,7 +107,7 @@ func (f *fixture) publish(key, version string, zip []byte) {
 // list and release metadata at the requested path before anything is
 // computed and the archive with the policy's own message. Patterns that
 // reject the archive refuse only the archive: the list keeps the release,
-// and its metadata and Package.swift answer as before (rulings R2a, R3, R6).
+// and its metadata and Package.swift answer as before (R2a, R3, R6).
 func TestUnitSwiftLocalReadsFollowTheDownloadPolicy(t *testing.T) {
 	for _, class := range []repo.Class{repo.Local, repo.Federated} {
 		t.Run(string(class), func(t *testing.T) {
@@ -187,7 +187,7 @@ func TestUnitSwiftRemoteReadsFollowTheRemotePolicy(t *testing.T) {
 // list and passes over a member that refuses the archive, remote members
 // included, keeping a release whose archive a member's patterns reject
 // listed and answered. Its own patterns refuse only the archive, with "No
-// repository found to serve the request" (rulings R5).
+// repository found to serve the request" (R5).
 func TestUnitSwiftVirtualReadsFollowTheDownloadPolicy(t *testing.T) {
 	f := newRemoteFixture(t)
 	remoteZIP := f.seed(t, "correct")

@@ -235,7 +235,7 @@ func (h handler) remoteArchive(r *http.Request, p swiftfmt.Package) (source.Resu
 // policy with Read permission for an archive it serves, Read permission
 // alone for the archives a release list, release metadata or Package.swift
 // names, which stay answered when the patterns reject the archive
-// (rulings R3).
+// (R3).
 func fence(
 	result *source.Result,
 	metadata source.Result,
@@ -311,7 +311,7 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, q request) {
 				continue
 			}
 			// A release whose archive the remote's patterns reject stays
-			// listed (rulings R3), so the rows take Read permission alone.
+			// listed (R3), so the rows take Read permission alone.
 			if err := result.CheckPermission(r.Context(), path); errors.Is(err, source.ErrDenied) {
 				delete(out.Releases, version)
 				continue

@@ -101,7 +101,7 @@ func wantDenied(t *testing.T, rec *httptest.ResponseRecorder) {
 // through the download path: a blackout and patterns that reject the
 // manifest's own path refuse it, after Read permission, while patterns
 // that reject one rock refuse only the rock, which the manifest still
-// lists (rulings R1, R3).
+// lists (R1, R3).
 func TestAccLocalManifestAndRocksFollowTheDownloadPolicy(t *testing.T) {
 	for _, class := range []repo.Class{repo.Local, repo.Federated} {
 		t.Run(string(class), func(t *testing.T) {
@@ -187,7 +187,7 @@ func TestAccRemoteManifestAndRocksFollowTheRemotePolicy(t *testing.T) {
 // member's patterns reject listed, passing over that member for the file,
 // and leaves out a member whose patterns reject the manifest. Its own
 // patterns refuse the manifest and a rock with "No repository found to
-// serve the request" (rulings R5).
+// serve the request" (R5).
 func TestAccVirtualManifestAndRocksFollowTheDownloadPolicy(t *testing.T) {
 	f := newVirtualFixture(t)
 	localSpec := append(spec("visible", "1.0-1"), []byte("-- local\n")...)

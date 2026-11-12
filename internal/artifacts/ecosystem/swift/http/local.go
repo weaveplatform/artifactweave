@@ -56,7 +56,7 @@ func (h handler) localRead(w http.ResponseWriter, r *http.Request, q request) {
 	switch {
 	case pkgroute.IsRefusal(err):
 		// The policy's own 404 says why the archive is refused
-		// (RTDEV-47144, rulings R6), and no archive header is set first (R7).
+		// (RTDEV-47144, R6), and no archive header is set first (R7).
 		h.k.Error(w, r, err)
 		return
 	case errors.Is(err, kernel.ErrNotFound), err == nil && f.Item.Folder:
@@ -83,7 +83,7 @@ func (h handler) localRead(w http.ResponseWriter, r *http.Request, q request) {
 // The archive's download is refused by the download policy. Release
 // metadata and Package.swift, which 7.x answers from documents of its own
 // (RTFACT-29202), are refused by the blackout alone, at the requested path,
-// before anything is computed (rulings R2a): no source shows the archive's
+// before anything is computed (R2a): no source shows the archive's
 // patterns refusing them, so they answer as main did when the patterns
 // reject only the archive (R3).
 func (h handler) localArchive(r *http.Request, kind, path string) (pkgroute.Found, error) {
@@ -107,7 +107,7 @@ func (h handler) localReleases(w http.ResponseWriter, r *http.Request, p swiftfm
 	}
 	// 7.x answers the list from a stored Releases.json (RTFACT-29202),
 	// which a blacked-out repository does not serve, so the blackout
-	// refuses it before the index is read (rulings R2a); patterns that
+	// refuses it before the index is read (R2a); patterns that
 	// reject one release's archive leave the release listed (R3).
 	if err := h.k.CheckBlackedOut(r, folder); err != nil {
 		h.k.Error(w, r, err)

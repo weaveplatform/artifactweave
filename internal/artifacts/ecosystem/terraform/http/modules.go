@@ -79,7 +79,7 @@ func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 		h.remoteModule(w, r, q)
 		return
 	}
-	// A blacked-out repository serves no resolution metadata (rulings R9,
+	// A blacked-out repository serves no resolution metadata (R9,
 	// R2a), so it refuses the version list before the index is read. 7.x
 	// keeps a module.json per module (RTFACT-31372) at a path not shown, so
 	// the refusal names the request's own path and patterns do not refuse
@@ -116,7 +116,7 @@ func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 		if !h.k.Require(w, r, v.item.FullPath(), api.ActionRead) {
 			return
 		}
-		// The 204 answers as the GET of its URL would (rulings R9): no URL
+		// The 204 answers as the GET of its URL would (R9): no URL
 		// for an archive the download policy refuses.
 		if err := h.k.CheckDownload(r, v.item.FullPath()); err != nil {
 			h.k.Error(w, r, err)

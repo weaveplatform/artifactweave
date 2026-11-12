@@ -171,7 +171,7 @@ func TestUnitHostedBlackoutRefusesEveryRouteButTheSearch(t *testing.T) {
 
 // Patterns that reject one release's archive leave the release in every
 // listing, and refuse only its archive, with the patterns' 404 checked
-// before the release is looked up (rulings R3; decision 0032).
+// before the release is looked up (R3; decision 0032).
 func TestUnitPatternsRefuseOnlyTheArchive(t *testing.T) {
 	f := newFixture(t, repo.Local)
 	older, newer := variantArchive(t, "1.0.0", "older"), variantArchive(t, "2.0.0", "newer")
@@ -219,7 +219,7 @@ func TestUnitPatternsRefuseOnlyTheArchive(t *testing.T) {
 // that refuses only a release's archive, and serves each archive from the
 // first member that holds the version and accepts it, whose checksum the
 // listing gives; a version no member serves stays listed and answers
-// "Puppet release not found" (rulings R5).
+// "Puppet release not found" (R5).
 func TestUnitVirtualMembersRefusingTheArchive(t *testing.T) {
 	first, second := variantArchive(t, "1.0.0", "first"), variantArchive(t, "1.0.0", "second")
 	for _, tc := range []struct {
@@ -281,7 +281,7 @@ func TestUnitVirtualMembersRefusingTheArchive(t *testing.T) {
 }
 
 // The virtual repository's own patterns refuse a release's archive with
-// its "No repository found" 404 and leave the release listed (rulings R3,
+// its "No repository found" 404 and leave the release listed (R3,
 // R5).
 func TestUnitVirtualPatternsRefuseOnlyTheArchive(t *testing.T) {
 	f := newFixture(t, repo.Local)
@@ -306,7 +306,7 @@ func TestUnitVirtualPatternsRefuseOnlyTheArchive(t *testing.T) {
 // .puppet/<m>/releases.json, for a listing, and with the blackout alone to
 // find an archive; a release whose archive the remote's patterns reject
 // stays listed, and the archive is refused before the source is read
-// (rulings R3, R4).
+// (R3, R4).
 func TestUnitRemoteReleasePagesAndRejectedArchive(t *testing.T) {
 	data := fixtureArchive(t)
 	var reads []source.Resource

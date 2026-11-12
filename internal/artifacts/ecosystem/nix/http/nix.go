@@ -186,7 +186,7 @@ func write(w http.ResponseWriter, r *http.Request, data []byte, mediaType string
 // without the path, and one whose download policy refuses it, a remote
 // member's included, since 7.x ignores a blacked-out member when it
 // resolves and resolves nothing from a member whose patterns reject the
-// path (rulings R5). An upstream fault is neither, so the virtual
+// path (R5). An upstream fault is neither, so the virtual
 // repository fails closed on it.
 func missing(err error) bool {
 	var e *apierror.Error
@@ -200,10 +200,10 @@ func missing(err error) bool {
 // checked at the path the client asked for alone, before the narinfo is
 // read: a narinfo request at the narinfo's path, so that patterns
 // rejecting only its NAR leave the stored narinfo served, as 7.x serves a
-// stored document whose release's file is refused (rulings R1, R3); a NAR
+// stored document whose release's file is refused (R1, R3); a NAR
 // request at the NAR's path, so that the narinfo read on the way is a
-// lookup the patterns do not refuse and a refusal names the NAR (rulings
-// R4, R5, R10). A virtual repository checks its own patterns once, at that
+// lookup the patterns do not refuse and a refusal names the NAR
+// (R4, R5, R10). A virtual repository checks its own patterns once, at that
 // path, and never drops a member's narinfo for them.
 func (h handler) lookup(r *http.Request, path, archive string) (located, error) {
 	c := pkgroute.RequestFrom(r).Repo

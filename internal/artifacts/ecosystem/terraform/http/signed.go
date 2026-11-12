@@ -156,7 +156,7 @@ func (h handler) signed(w http.ResponseWriter, r *http.Request) {
 	// after the URL's principal is rechecked: a principal that lost Read
 	// learns nothing of how the repository is set (DV-057), and a
 	// blacked-out repository or a path its patterns reject answers the
-	// policy's own 404 and message (rulings R6, R9).
+	// policy's own 404 and message (R6, R9).
 	f, err := h.k.StoredItem(r, c.Path)
 	if errors.Is(err, kernel.ErrNotFound) || err == nil && f.Item.Folder {
 		h.k.Error(w, r, missing())

@@ -479,7 +479,7 @@ func TestUnitRemoteModuleDeliveryRejectsUnreadableAndRevokedSources(t *testing.T
 	}
 	// A listing's fence checks Read permission alone, never the policy that
 	// CheckRead applies, so a release whose file the patterns reject stays
-	// listed (rulings R3); a result without the check fences nothing more.
+	// listed (R3); a result without the check fences nothing more.
 	checked = nil
 	fence = combineModuleFences([]source.Result{{
 		CheckRead: func(context.Context, string) error {

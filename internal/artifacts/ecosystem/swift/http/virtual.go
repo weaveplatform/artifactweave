@@ -150,7 +150,7 @@ func (h handler) virtualArchive(
 	path := p.ArchivePath()
 	// The virtual repository's own patterns leave it no member to search,
 	// which 6.20's VirtualRepoDownloadStrategy answers "No repository found
-	// to serve the request" (decision 0032, rulings R5).
+	// to serve the request" (decision 0032, R5).
 	if err := h.k.CheckDownload(r, path); err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -162,7 +162,7 @@ func (h handler) virtualArchive(
 		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
 			result, err := h.remoteArchive(mr, p)
 			// A remote member whose own patterns refuse the archive is passed
-			// over as a missing one is (rulings R5); the virtual repository's
+			// over as a missing one is (R5); the virtual repository's
 			// patterns were checked above.
 			if errors.Is(err, kernel.ErrNotFound) || pkgroute.IsRefusal(err) {
 				continue

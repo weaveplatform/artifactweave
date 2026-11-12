@@ -343,7 +343,7 @@ func (h handler) archive(w http.ResponseWriter, r *http.Request) {
 	// The archive is a download, which Artifactory refuses at its own path
 	// before it looks the release up (decision 0032; RTFACT-13710 shows the
 	// Puppet service reading archives through that check): the blackout
-	// 404 (rulings R9), the patterns 404 or a virtual repository's own
+	// 404 (R9), the patterns 404 or a virtual repository's own
 	// "No repository found" 404, with the policy's message rather than
 	// "Puppet release not found" (R6, R10). CheckDocument rather than
 	// CheckDownload, because it checks a remote repository's own policy
@@ -389,7 +389,7 @@ func (h handler) authority(r *http.Request, releases []release) error {
 			}
 		}
 		// Read permission only: a listed release whose archive the
-		// patterns reject stays listed (rulings R3), and remoteArchive
+		// patterns reject stays listed (R3), and remoteArchive
 		// checks the policy when the archive itself is read.
 		if rel.checkPermission != nil {
 			if err := rel.checkPermission(r.Context(), rel.meta.Path); err != nil {
@@ -472,7 +472,7 @@ func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	for _, v := range versions {
 		path := puppetfmt.Path(name, v.Version)
 		// A release whose archive the include and exclude patterns reject
-		// stays listed, and only the archive is refused (rulings R3): 7.x
+		// stays listed, and only the archive is refused (R3): 7.x
 		// writes Puppet's listings as stored documents (RTFACT-26143),
 		// which list such a release as the other formats' do.
 		if !h.k.Can(r, path, api.ActionRead) {
@@ -531,7 +531,7 @@ func (h handler) virtual(r *http.Request, name string, u use) ([]release, error)
 			// A member whose patterns reject only a release's archive
 			// stays in the merge with the release listed, and the archive
 			// comes from the first member that holds the version and
-			// serves it (rulings R5, RTFACT-25571), so the listing gives
+			// serves it (R5, RTFACT-25571), so the listing gives
 			// that member's checksum. The virtual repository's own
 			// patterns leave the release listed too (R3); the archive
 			// route refuses its archive.

@@ -52,7 +52,7 @@ func validateRemoteManifest(
 // that reject it refuse it: RTFACT-30802 shows 7.x checking a remote's
 // patterns at a metadata file's cache path. remoteRock's lookup of a rock
 // in the manifest (lookup true) is part of the rock's download, which the
-// rock's own path decides, so only the blackout refuses it (rulings R4).
+// rock's own path decides, so only the blackout refuses it (R4).
 func (h handler) upstreamManifest(
 	r *http.Request,
 	path string,
@@ -95,7 +95,7 @@ func (h handler) upstreamManifest(
 // of the manifest that disclosed paths and check on each of them: the
 // download policy with Read permission for a rock the result serves, Read
 // permission alone for the rocks a manifest lists, which stay listed when
-// the patterns reject their files (rulings R3).
+// the patterns reject their files (R3).
 func fenceDisclosures(
 	result *source.Result,
 	manifest func(context.Context) error,
@@ -200,7 +200,7 @@ func (h handler) remoteManifest(
 	}
 	var checkErr error
 	// A rock whose file the remote's patterns reject stays listed and only
-	// its download is refused (rulings R3), so the rows take Read permission
+	// its download is refused (R3), so the rows take Read permission
 	// alone.
 	data, paths, err := manifest.filtered(func(path string) bool {
 		if !h.k.Can(r, path, api.ActionRead) {

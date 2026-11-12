@@ -724,7 +724,7 @@ func TestAccLateReadRevocationAndArchiveManifestMismatch(t *testing.T) {
 		}
 	}
 	// Patterns that reject the module's archives leave its releases listed
-	// and refuse only the archives (rulings R3).
+	// and refuse only the archives (R3).
 	f := newFixture(t, repo.Local)
 	f.deploy(f.c, data)
 	f.c.ExcludesPattern = new("acme-widget/**")
@@ -815,7 +815,7 @@ func TestAccCachedMetadataAuthorityAndURLFence(t *testing.T) {
 
 func TestAccVirtualMemberFailuresAndFiltering(t *testing.T) {
 	// The virtual repository's own patterns rejecting a release's archive
-	// leave the release listed (rulings R3); its archive answers the
+	// leave the release listed (R3); its archive answers the
 	// virtual repository's 404 (TestUnitVirtualPatternsRefuseOnlyTheArchive).
 	for _, tc := range []struct {
 		name                string

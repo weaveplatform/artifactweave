@@ -139,7 +139,7 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, path string
 	}
 	// The virtual repository's own patterns leave it no member to search,
 	// which 6.20's VirtualRepoDownloadStrategy answers "No repository found
-	// to serve the request" (decision 0032, rulings R5), not the "Could not
+	// to serve the request" (decision 0032, R5), not the "Could not
 	// find resource" of a rock no member holds.
 	if err := h.k.CheckDownload(r, path); err != nil {
 		h.k.Error(w, r, err)
@@ -192,7 +192,7 @@ func (h handler) memberManifest(
 			}
 		}
 		// A rock whose file the member's patterns reject stays in the merge
-		// (rulings R3, R5), so the rows take Read permission alone.
+		// (R3, R5), so the rows take Read permission alone.
 		filtered, paths, err := filteredMemberManifest(
 			r.Context(),
 			r,
@@ -280,7 +280,7 @@ func (h handler) virtualManifest(w http.ResponseWriter, r *http.Request, path st
 	// The virtual repository's own patterns rejecting the manifest refuse
 	// it, and a member that is blacked out or whose patterns reject the
 	// manifest's path is left out, remote members included: 7.x ignores a
-	// blacked-out repository when it resolves (rulings R5).
+	// blacked-out repository when it resolves (R5).
 	members, err := h.k.MergeMembers(r, path)
 	if err != nil {
 		h.k.Error(w, r, err)

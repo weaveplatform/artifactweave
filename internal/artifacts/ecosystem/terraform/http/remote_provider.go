@@ -22,8 +22,8 @@ import (
 )
 
 // providerMetadata reads one upstream metadata document. A lookup, a read
-// on the way to another answer, is refused by the blackout alone (rulings
-// R4): the registry's documents a client asks for are checked at their 7.x
+// on the way to another answer, is refused by the blackout alone
+// (R4): the registry's documents a client asks for are checked at their 7.x
 // cache paths before any read (remoteProvider), and each file a bundle
 // fetches at its cache path, where the remote cache admits it too. The
 // upstream mirror's documents, which have no 7.x counterpart, keep the

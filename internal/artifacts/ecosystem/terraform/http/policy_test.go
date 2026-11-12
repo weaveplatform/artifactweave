@@ -59,7 +59,7 @@ func wantListed(t *testing.T, w *httptest.ResponseRecorder, versions ...string) 
 }
 
 // A local module repository follows the download policy: a blackout
-// refuses the version list and every archive (rulings R9, R2a), patterns
+// refuses the version list and every archive (R9, R2a), patterns
 // refuse only the archive they reject, which stays listed (R3), and the
 // 204 answers as the GET of its URL would. Read permission is checked
 // first, for the signed URL's principal too (DV-057).
@@ -103,7 +103,7 @@ func TestAccLocalModuleRoutesFollowTheDownloadPolicy(t *testing.T) {
 }
 
 // A local provider repository's version list, package metadata and mirror
-// documents are refused by a blackout at the request's path (rulings R9,
+// documents are refused by a blackout at the request's path (R9,
 // R2a), and each signed file by the download policy; patterns that reject
 // one platform's archive leave the platform listed and its package
 // metadata served (R3), and refuse only the archive's download.
@@ -150,7 +150,7 @@ func TestAccLocalProviderRoutesFollowTheDownloadPolicy(t *testing.T) {
 // A remote module repository checks its patterns at the metadata's 7.x
 // cache path under .terraform/ (RTFACT-30802, RTFACT-31026), where the
 // blackout's refusal names it too; the lookups on the way to a document or
-// an archive are refused by the blackout alone (rulings R4); and a version
+// an archive are refused by the blackout alone (R4); and a version
 // whose archive the patterns reject stays listed (R3), where it answered
 // the whole list with an error.
 func TestAccRemoteModuleRoutesFollowTheRemotePolicy(t *testing.T) {
@@ -196,7 +196,7 @@ func TestAccRemoteModuleRoutesFollowTheRemotePolicy(t *testing.T) {
 // documents' 7.x cache paths under .terraform/providers/ (RTFACT-31026,
 // RTFACT-30802), where the blackout's refusal names them too, and each
 // file at its cache path. A platform whose archive the patterns reject
-// stays listed (rulings R3), and only what is built from the archive is
+// stays listed (R3), and only what is built from the archive is
 // refused.
 func TestAccRemoteProviderRoutesFollowTheRemotePolicy(t *testing.T) {
 	const (

@@ -89,7 +89,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		}
 		// 7.x stores the manifest files at the repository root and reads
 		// them through the download path, so a blackout, or patterns that
-		// reject the manifest's own path, refuse it (rulings R1); patterns
+		// reject the manifest's own path, refuse it (R1); patterns
 		// that reject one rock leave the manifest listing it (R3).
 		if err := h.k.CheckDocument(r, p.String()); err != nil {
 			h.k.Error(w, r, err)

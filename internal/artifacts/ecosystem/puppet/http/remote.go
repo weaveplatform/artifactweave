@@ -229,7 +229,7 @@ func (h handler) remotePage(
 	for _, rel := range releases {
 		// Read permission alone decides whether a release is listed: one
 		// whose archive the remote's patterns reject stays listed, and the
-		// archive route refuses the archive (rulings R3, R4).
+		// archive route refuses the archive (R3, R4).
 		if !h.k.Can(r, rel.meta.Path, api.ActionRead) {
 			continue
 		}

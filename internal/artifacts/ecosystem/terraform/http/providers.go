@@ -129,7 +129,7 @@ func (h handler) provider(w http.ResponseWriter, r *http.Request, q providerOp) 
 	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
-	// A blacked-out repository serves no resolution metadata (rulings R9,
+	// A blacked-out repository serves no resolution metadata (R9,
 	// R2a): the version list, a platform's package metadata and the mirror's
 	// documents are refused at the request's own path before the index is
 	// read. 7.x's storage path for them is not shown, so patterns do not
