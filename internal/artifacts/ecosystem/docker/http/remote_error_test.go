@@ -99,8 +99,11 @@ func TestUnitRemoteErrorEnvelopes(t *testing.T) {
 			r = r.WithContext(kernel.WithPrincipal(r.Context(), p))
 			w := httptest.NewRecorder()
 			q := Request{
-				Kind: KindManifest, RepoKey: "remote", Repo: repo.Config{Key: "remote", Class: repo.Remote},
-				Name: "image", Reference: "latest",
+				Kind:      KindManifest,
+				RepoKey:   "remote",
+				Repo:      repo.Config{Key: "remote", Class: repo.Remote},
+				Name:      "image",
+				Reference: "latest",
 			}
 			(&Registry{}).remoteError(w, r, q, c.err)
 			if w.Code != c.status || w.Body.String() != c.body+"\n" ||
