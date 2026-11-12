@@ -70,7 +70,8 @@ func TestAccModuleLocationProjectionCacheRefreshOfflineAndNoStore(t *testing.T) 
 			if err != nil {
 				t.Fatal(err)
 			}
-			if mode != "stored" {
+			// An upstream no-store is kept as any answer is (mustNotPersist).
+			if mode == "no-local-store" {
 				for _, e := range entries {
 					if e.Blob.Checksums.SHA256 != "" {
 						t.Fatal("transient projection persisted")

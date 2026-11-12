@@ -13,6 +13,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/registry"
@@ -45,7 +46,8 @@ func (g *Registry) registerManifests() {
 // the media type it was pushed with. A GET goes through the download
 // redirect policy as a blob GET does (decision 0029); a HEAD is always
 // answered here, since containerd and oras resolve a tag with it and a URL
-// signed for GET refuses a HEAD.
+// signed for GET refuses a HEAD. Both answer with the whole manifest
+// whatever Range asks for (wholeRequest).
 func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request) {
 	if err := q.Require(r, q.Name+"/", api.ActionRead); err != nil {
 		Write(w, err)
@@ -87,11 +89,19 @@ func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request
 	h.Set("Content-Type", mediaType)
 	h.Set(contentDigestHeader, "sha256:"+it.Actual.SHA256)
 	h.Set(RegistryHeader, q.Repo.Key)
+	// A manifest file carries the headers of any downloaded file, as 7.5.7
+	// (RTFACT-23106) and 7.33.12 (RTFACT-27199) answered a local manifest:
+	// its checksums, its name, and no-store. A redirect keeps the checksums
+	// and the name, as a blob's does, and sends its own Cache-Control.
+	pkgroute.SetChecksums(h, it.Actual)
+	setFileHeaders(h, it.Name)
+	h.Set("Cache-Control", noStore)
 	// The ETag is the manifest file's bare SHA-1, as any stored file's is:
 	// 7.5.7 answered a local manifest GET with it, equal to X-Checksum-Sha1
 	// (RTFACT-23106), and 7.33.12 a HEAD the same way (RTFACT-27199). A
 	// redirect answers its conditional requests against it too.
 	w, r = itemkit.BareETag(w, r, it.Actual.SHA1)
+	r = wholeRequest(r)
 	if g.redirectManifest != nil && g.redirectManifest(w, r, q.Repo, it, mediaType) {
 		return
 	}

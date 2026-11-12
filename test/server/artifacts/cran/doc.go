@@ -19,6 +19,9 @@
 //     internal/artifacts/ecosystem/cran/testdata, read root-relative
 //     through repopath, remote sources over stub backends (sourceIdentity,
 //     sourceBackend), and archives from support.TarGz (conanTestArchive).
+//   - The harness's remote world (harness.NewRemoteWorld): a CRAN remote
+//     over a chi upstream the test serves, through the remote cache and its
+//     validation.
 //
 // # Outputs
 //
@@ -34,6 +37,9 @@
 //     index checked at its own path, never at its feed folder.
 //   - cran_archive_test.go: the archive migration, its rollback, refusals,
 //     collisions, destination policy and storage failure.
+//   - cran_xz_test.go: a .tar.xz source package that lost its xz index and
+//     footer, refused at deploy, from a remote's upstream and through a
+//     virtual over that remote (#1331).
 //
 // # References
 //
@@ -47,8 +53,9 @@
 //     suites).
 //   - docs/testing/server-test-ownership.md: how CI selection gives the
 //     package an owner.
-//   - https://github.com/weaveplatform/artifactweave/issues/1068 and
-//     https://github.com/weaveplatform/artifactweave/issues/1084
+//   - https://github.com/weaveplatform/artifactweave/issues/1068,
+//     https://github.com/weaveplatform/artifactweave/issues/1084 and
+//     https://github.com/weaveplatform/artifactweave/issues/1331
 //
 // # Status
 //

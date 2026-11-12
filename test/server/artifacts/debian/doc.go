@@ -36,6 +36,10 @@
 //     a user without read and an anonymous caller (#1330).
 //   - debian_reindex_async_test.go: Calculate Debian Repository Metadata
 //     with each async value, queued or run before it answers, or refused.
+//   - debian_xz_test.go: a package whose control.tar.xz or data.tar.xz,
+//     or a Packages.xz, lost its xz index and footer, refused at deploy,
+//     from a remote's upstream and through a virtual over that remote
+//     (#1331).
 //
 // # References
 //
@@ -49,8 +53,9 @@
 //   - docs/testing/server-test-ownership.md: how CI selection gives the
 //     package an owner.
 //   - https://github.com/weaveplatform/artifactweave/issues/1068,
-//     https://github.com/weaveplatform/artifactweave/issues/1083 and
-//     https://github.com/weaveplatform/artifactweave/issues/1273
+//     https://github.com/weaveplatform/artifactweave/issues/1083,
+//     https://github.com/weaveplatform/artifactweave/issues/1273 and
+//     https://github.com/weaveplatform/artifactweave/issues/1331
 //
 // # Status
 //

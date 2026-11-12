@@ -71,7 +71,10 @@ func TestAccNuGetEmptyFeedCacheRefreshOfflineAndNoStore(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if mode != "stored" {
+			// An upstream no-store answer is kept like any other
+			// (remote.mustNotPersist); only the repository's own setting keeps
+			// the projected feed transient.
+			if mode == "repository-no-store" {
 				for _, e := range entries {
 					if e.Blob.Checksums.SHA256 != "" {
 						t.Fatal("transient feed persisted")

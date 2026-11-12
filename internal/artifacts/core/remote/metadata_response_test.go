@@ -68,7 +68,10 @@ func TestAccMetadataResponseBaseAdmissionCacheOfflineAndNoStore(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if mode != "stored" {
+			// An upstream no-store is kept as any answer is, as 6.20's remote
+			// fetch and a 7.x remote over a 7.x upstream keep it
+			// (mustNotPersist); only a repository that stores nothing does not.
+			if mode == "no-local-store" {
 				for _, entry := range entries {
 					if entry.Blob.Checksums.SHA256 != "" {
 						t.Fatal("no-store persisted body")

@@ -54,9 +54,14 @@
 //     100, a larger limit served as 100 (RTFACT-30529), under the Forge's
 //     pagination object with first, previous, current and next links
 //     before the results (RTFACT-14557); release and module records with
-//     the fields of JFrog's reference and 7.x's answers (record.go);
-//     archives. JSON answers write "<", ">" and "&" as they are, as 7.x
-//     does, and every one is marked private, no-store.
+//     the fields of JFrog's reference and 7.x's answers (record.go), a
+//     release's metadata being its whole metadata.json with the fields
+//     7.x writes first in its order (RTFACT-19130, #1325) [I]; archives.
+//     One module's release list leaves out the top-level record fields
+//     exclude_fields names, separated by commas or spaces, and its links
+//     keep sort_by and exclude_fields after the module (#1327) [I]. JSON
+//     answers write "<", ">" and "&" as they are, as 7.x does, and every
+//     one is marked private, no-store.
 //
 // # Invariants
 //
@@ -88,22 +93,31 @@
 //     what a remote lists.
 //   - A hosted release's record takes its file_md5 from the archive item,
 //     its downloads from the item's download count and its dates from the
-//     item's creation and last update, in the Forge's form in UTC; its
-//     readme, changelog and license are null. A remote relays the
-//     upstream's values of those fields and of supported and the module's
+//     item's creation and last update, in the Forge's form in UTC, and its
+//     tags from metadata.json, as the Forge derives them; its readme,
+//     changelog and license are null. A remote relays the upstream's
+//     values of those fields, of tags and supported, and of the module's
 //     owner gravatar_id and deprecated_at (RTFACT-19130), and answers a
-//     value of another type as a hosted release would. A module record
-//     takes its downloads, dates, owner and links from its releases [I].
-//   - A remote builds each Forge query itself (module, limit, offset and
-//     sort_by), never follows an upstream next link, and reads at most
-//     16 MiB a page. It asks for 100 releases a page, since the Forge
-//     serves at most 100 whatever limit is asked (it answered limit=1000
-//     with "limit": 100 on 2026-11-12) and so do 7.x's own lists
-//     (RTFACT-30529); what 7.x's remote asks is [I] (#216). Each page
-//     starts after the releases the last one held, and a page short of 100
-//     with more after it is accepted only when the upstream's
+//     value of another type as a hosted release would. A hosted or virtual
+//     module record takes its downloads, dates, owner and links from its
+//     releases [I]. A remote's relays those of the upstream's own record,
+//     v3/modules/<m>, asked without its current release and release list
+//     and read under the release pages' authority, and answers 404, and
+//     an empty search, when the upstream answers 404 for it (#1326) [I].
+//   - A remote builds each Forge query itself (module, limit, offset,
+//     sort_by and exclude_fields), never forwards a client's, never
+//     follows an upstream next link, and reads at most 16 MiB a page. It
+//     asks for 20 releases a page, the Forge's own default (RTFACT-14274),
+//     without the fields no record answers, REFERENCE.md's text among
+//     them, so that a module whose readme, changelog and license run to
+//     hundreds of KB a release still fits (#1300); the Forge serves at
+//     most 100 whatever limit is asked (it answered limit=1000 with
+//     "limit": 100 on 2026-11-12). What 7.x's remote asks is [I] (#216).
+//     Each page starts after the releases the last one held, and a page
+//     short of 20 with more after it is accepted only when the upstream's
 //     pagination.limit equals what the page held; short for any other
-//     reason, it answers 502. Metadata and archive URLs must stay under the
+//     reason, it answers 502. A release whose metadata.json is above the
+//     1 MiB an archive's may be is invalid upstream metadata. Metadata and archive URLs must stay under the
 //     configured Forge origin and path, and an archive enters the cache only
 //     once its size, SHA-256, identity and manifest match the release that
 //     advertised it. A cache hit rechecks the source's authority and the
@@ -141,8 +155,12 @@
 //     https://github.com/weaveplatform/artifactweave/issues/1045,
 //     https://github.com/weaveplatform/artifactweave/issues/1086,
 //     https://github.com/weaveplatform/artifactweave/issues/1089,
-//     https://github.com/weaveplatform/artifactweave/issues/1287 and
-//     https://github.com/weaveplatform/artifactweave/issues/1288
+//     https://github.com/weaveplatform/artifactweave/issues/1287,
+//     https://github.com/weaveplatform/artifactweave/issues/1288,
+//     https://github.com/weaveplatform/artifactweave/issues/1300,
+//     https://github.com/weaveplatform/artifactweave/issues/1325,
+//     https://github.com/weaveplatform/artifactweave/issues/1326 and
+//     https://github.com/weaveplatform/artifactweave/issues/1327
 //
 // # Status
 //
@@ -160,10 +178,15 @@
 //     answers, the one-module list's refusals they leave unchanged, and
 //     store failures.
 //   - paging_test.go: the one-module list's and the module search's pages,
-//     links, limits and refusals.
+//     links, limits and refusals, and exclude_fields.
 //   - record_test.go: a hosted release's and module's exact records on
 //     every route that answers them, directly and through a virtual
 //     repository, and a remote's relayed fields and their defaults.
+//   - metadata_test.go: a release's whole metadata.json and tags on every
+//     route, and an index entry without the document.
+//   - remote_module_test.go: a remote's metadata and tags, its module
+//     record relayed from the upstream's, the upstream's 404 for it, the
+//     queries a remote asks its upstream, and a module record's failures.
 //   - remote_paging_test.go: the page sizes a remote asks for and accepts.
 //   - policy_test.go: the blackout on every hosted route and the module
 //     search's empty answer under it, a release whose archive the patterns

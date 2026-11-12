@@ -36,6 +36,10 @@
 //     no-store and native routes, invalid index children, integrity and
 //     denied paths, foreign layers, a revocation during a fetch, and the
 //     answers to an upstream's 401, 403, 429 and 502.
+//   - TestAcc results for download headers and ranges
+//     (registry_download_headers_test.go): the file headers of a local and a
+//     remote manifest and blob, and the whole content a GET or HEAD with
+//     Range gets through the Docker API (issues 1336, 1337 and 1338).
 //   - TestAcc results for refusals (registry_refusal_test.go): 7.x's 403
 //     UNAUTHORIZED for a pull, a blob read, a tags list, a push and a
 //     delete the caller's permissions refuse, by password, registry token

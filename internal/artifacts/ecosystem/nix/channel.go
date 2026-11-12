@@ -6,6 +6,8 @@ import (
 	"io"
 	"regexp"
 	"strings"
+
+	"github.com/weaveplatform/artifactweave/internal/platform/xzfile"
 )
 
 const (
@@ -84,14 +86,14 @@ func IsChannelPath(path string) bool {
 // nixexprs.tar.xz, so a gzip or bzip2 tarball, or an xz stream of anything
 // else, is refused. The tarball must have an entry,
 // stay within MaxChannelBytes expanded, and size must be 1 to
-// MaxArchiveBytes; the decoder is bounded to 64 MiB of memory. Every
-// refusal is ErrInvalid.
+// MaxArchiveBytes; its block headers may name no dictionary above
+// xzfile.MaxDict. Every refusal is ErrInvalid.
 func ReadChannel(input io.Reader, size int64) error {
 	if size <= 0 || size > MaxArchiveBytes {
 		return ErrInvalid
 	}
 	compressed := &io.LimitedReader{R: input, N: size + 1}
-	r, err := newXZReader(compressed)
+	r, err := xzfile.NewReader(compressed, MaxChannelBytes+1)
 	if err != nil {
 		return ErrInvalid
 	}

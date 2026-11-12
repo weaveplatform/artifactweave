@@ -105,8 +105,9 @@ projects a bodyless upstream 204 into a validated empty Atom feed only on feed/q
 endpoints. Service/schema 204 remains invalid. Pins in v2 `PackageHash`/`PackageHashAlgorithm`
 (SHA-512, SHA-256 or SHA-1) are enforced independently of optional checksum-header policy,
 with the same complete archive validation used by v3. Raw XML stays separate from rewritten,
-permission-filtered public responses. Upstream no-store and disabled local storage remain
-transient; metadata expiry and outage policy use the shared retrieval contract.
+permission-filtered public responses. Disabled local storage remains transient; an upstream
+`Cache-Control: no-store` answer is cached like any other. Metadata expiry and outage policy
+use the shared retrieval contract.
 
 Chocolatey's configured URL retains the existing 14,400-second minimum metadata interval.
 This implements the bounded feed contract; a native Chocolatey client/version matrix remains

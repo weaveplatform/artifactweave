@@ -97,8 +97,10 @@ cache-only reads. Complete response validation uses an owned temporary file with
 bounded memory; closing the result removes that file. It publishes no item, blob
 reference, package index, raw metadata or negative entry.
 
-An upstream no-store response or unsupported Vary dimension cannot be shared as a
-stream. A shared candidate is discarded and each waiter fetches its own transient
+A response with an unsupported Vary dimension cannot be shared as a stream. An
+upstream `Cache-Control: no-store` does not make a response transient; the cache keeps
+it under the repository's retrieval cache period, as the
+[retrieval contract](remote-retrieval-contract.md) explains. A shared candidate is discarded and each waiter fetches its own transient
 response. The initial bounded attempt can leave an empty fencing record, never a
 cached representation. This extra request is intentional to retain independent
 body ownership and complete validation.

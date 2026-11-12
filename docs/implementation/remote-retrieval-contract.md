@@ -191,12 +191,21 @@ Range request with storage enabled fetches a complete 200 into the ordinary inge
 path, then serves the requested range; an upstream 206 is never labeled complete. A
 no-store range may relay a validated 206 without durable caching ([#621](https://github.com/weaveplatform/artifactweave/issues/621)).
 
-`storeArtifactsLocally=false` is a repository setting; upstream `Cache-Control: no-store`
-is a separate response instruction. Treat either as nonpersistent. A response marked
+`storeArtifactsLocally=false` is a repository setting, and treated as nonpersistent. An
+upstream `Cache-Control: no-store` is not: the remote keeps that answer like any other,
+under the repository's retrieval cache period, and serves it offline and as failure-time
+stale. 6.20's remote fetch (`HttpRepo`) never reads the upstream Cache-Control. 7.x sends
+`no-store` on Docker manifests (RTFACT-27199) and on Maven metadata and snapshots
+(RTFACT-15016, RTFACT-6983) for the proxies in front of it (RTFACT-17758), and a 7.x
+remote over a 7.x upstream still caches that metadata (RTFACT-30785, an edge's Smart
+Remote over its main server). Honouring it would leave a remote over artifactweave or
+Artifactory with nothing to serve offline. A response whose `Vary` names anything but
+`Accept` and `Accept-Encoding` stays nonpersistent, as above. A response marked
 `private` is restricted to its configured repository/source identity; `no-cache` requires
 validation, and `must-revalidate` forbids failure-time stale fallback. Do not expose a
-cached authenticated response to another repository. HTTP header interaction and the
-repository TTL override are [I] RC-3: P9 takes the more restrictive freshness requirement.
+cached authenticated response to another repository. The other HTTP header interaction
+and the repository TTL override are [I] RC-3: P9 takes the more restrictive freshness
+requirement.
 
 No-store artifacts use bounded buffers and do not promise a clean error status after
 headers have been sent: a truncated stream must terminate with a read/framing error,
@@ -422,7 +431,7 @@ status/headers/body hashes and cache/storage observations. P9 proceeds without a
 |---|---|
 | RC-1 | Expired vs zapped metadata, immutable and non-unique binary, normal vs `-cache` GET/HEAD; change upstream bytes and delay response to distinguish synchronous refresh from background serving. Repeat zap with a fresh negative. |
 | RC-2 | HEAD success/disagreement/405/501/404; conditional 304 without body; refresh 404/401/403/429/5xx, timeout and disconnect with warm/cold cache and hardFail on/off; record envelopes and stale choices. |
-| RC-3 | Toggle no-store with an existing cache; normal/offline/alias HEAD/GET/Range and upstream Cache-Control/Vary; inspect negative persistence, checksum reads, truncation and downstream validators after rewrite/base-URL change. |
+| RC-3 | Toggle no-store with an existing cache; normal/offline/alias HEAD/GET/Range and upstream Cache-Control (`no-cache`, `must-revalidate`, `max-age`, `private`; upstream `no-store` is kept, as settled above)/Vary; inspect negative persistence, checksum reads, truncation and downstream validators after rewrite/base-URL change. |
 | RC-4 | Rotate source URL, credentials, proxy/certificate and metadata endpoints during a blocked fill; race zap/delete/recreate/restore/reindex; distinguish retained bytes from reusable normal-read state. |
 | RC-5 | Cleanup eligibility after GET/range/HEAD/signed redirect/probe/failed read and restart; observe exclusions, trash and sidecar/index behavior. |
 | RC-6 | Credential and sensitive-header/cookie behavior across same/cross-origin redirects with lenient auth on/off, HTTPS downgrade, metadata external URL and token realm; never use production credentials. |

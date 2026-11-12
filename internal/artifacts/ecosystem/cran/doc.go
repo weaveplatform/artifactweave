@@ -42,7 +42,8 @@
 //     package index (artifacts/core/pkgindex), and lists a repository's
 //     files by AQL (artifacts/core/aql); Enqueue asks for the index rebuild
 //     when the write commits; and Derive and Underive write and remove the
-//     indexes. xz (github.com/ulikunitz/xz) reads a .tar.xz source archive.
+//     indexes. The shared xz reader (platform/xzfile) reads a .tar.xz
+//     source archive whole, as R reads it through liblzma.
 //     The generic deploy policy (artifacts/ecosystem/generic) is the first
 //     check Admit applies.
 //   - Settings: none. The archive migration's switch
@@ -143,6 +144,8 @@
 //     storage and work queue failures, regenerating only advertised
 //     packages, removing a feed's index after its last package, archives
 //     and unrelated files kept out of the index, and the refusals.
+//   - xz_test.go: a .tar.xz source package whose xz stream lost its index
+//     and footer, refused at both package paths (#1331).
 //
 // testdata holds the unchanged CRAN assertthat 0.2.1 source archive and
 // Windows binary and its published PACKAGES entry, which the suites in

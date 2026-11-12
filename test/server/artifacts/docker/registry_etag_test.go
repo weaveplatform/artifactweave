@@ -12,7 +12,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
 // The dates the conditional requests below send: one after every file's
@@ -94,8 +93,9 @@ func TestAccRegistryBlobHeadSendsTheGetHeaders(t *testing.T) {
 			"Accept-Ranges":          "bytes",
 			"Last-Modified":          it.Modified.UTC().Format(http.TimeFormat),
 			"X-Artifactory-Filename": name,
-			"Content-Disposition":    blob.Disposition(name),
-			"Location":               "",
+			// The quoted name alone, as 7.x's Docker API sends it (#1336).
+			"Content-Disposition": `attachment; filename="` + name + `"`,
+			"Location":            "",
 		}
 		notModified := map[string]string{
 			"ETag":                  sum.sha1,
@@ -149,14 +149,16 @@ func TestAccRegistryBlobHeadSendsTheGetHeaders(t *testing.T) {
 	}})
 	wantAnswer(t, "GET If-None-Match", w.do(http.MethodGet, target, "admin", "",
 		"If-None-Match", sum.sha1), answer{304, "", map[string]string{"ETag": sum.sha1}})
+	// The Docker API answers a range with the whole blob, as 7.71.4 does
+	// (RTFACT-30157, #1337).
 	wantAnswer(
 		t,
 		"GET Range",
 		w.do(http.MethodGet, target, "admin", "", "Range", "bytes=1-3"),
 		answer{
-			206,
-			layer[1:4],
-			map[string]string{"Content-Range": "bytes 1-3/" + strconv.Itoa(len(layer))},
+			200,
+			layer,
+			map[string]string{"Content-Range": "", "Content-Length": strconv.Itoa(len(layer))},
 		},
 	)
 	// A redirecting repository still redirects the GET.
@@ -167,10 +169,11 @@ func TestAccRegistryBlobHeadSendsTheGetHeaders(t *testing.T) {
 
 // A remote blob's ETag is its bare SHA-1, equal to X-Checksum-Sha1, as
 // 7.55.8 answered a remote blob GET (RTFACT-29977), on its first fetch and
-// from the cache, stored or not, GET and HEAD alike. If-None-Match and
-// If-Range take it in the forms the item route takes; the digest, the ETag
-// before, no longer matches. A remote manifest keeps its digest as ETag: no
-// capture shows what 7.x sends for one (#1317).
+// from the cache, stored or not, GET and HEAD alike. If-None-Match takes
+// it in the forms the item route takes; the digest, the ETag before, no
+// longer matches. A range gets the whole blob whatever If-Range names
+// (#1337). A remote manifest keeps its digest as ETag: no capture shows what
+// 7.x sends for one (#1317).
 func TestAccRegistryRemoteBlobETagIsTheBareSHA1(t *testing.T) {
 	for _, store := range []bool{true, false} {
 		t.Run("store="+strconv.FormatBool(store), func(t *testing.T) {
@@ -234,12 +237,11 @@ func TestAccRegistryRemoteBlobETagIsTheBareSHA1(t *testing.T) {
 						{"If-None-Match weak", []string{"If-None-Match", `W/"` + sum.sha1 + `"`}, answer{304, "", notModified}},
 						{"If-None-Match list", []string{"If-None-Match", `"x", ` + sum.sha1}, answer{304, "", notModified}},
 						{"If-None-Match digest", []string{"If-None-Match", `"` + digest + `"`}, answer{200, whole, file}},
-						{"If-Range bare", []string{"Range", "bytes=1-3", "If-Range", sum.sha1}, answer{206, rangeOf(method, layer), map[string]string{
-							"ETag": sum.sha1, "Content-Range": "bytes 1-3/" + strconv.Itoa(len(layer)),
-						}}},
-						{"If-Range quoted", []string{"Range", "bytes=1-3", "If-Range", `"` + sum.sha1 + `"`}, answer{206, rangeOf(method, layer), map[string]string{
-							"ETag": sum.sha1, "Content-Range": "bytes 1-3/" + strconv.Itoa(len(layer)),
-						}}},
+						// The Docker API answers a range with the whole
+						// blob (RTFACT-30157, #1337), and a HEAD ignores
+						// Range (#1338), whatever If-Range names.
+						{"If-Range bare", []string{"Range", "bytes=1-3", "If-Range", sum.sha1}, answer{200, whole, file}},
+						{"If-Range quoted", []string{"Range", "bytes=1-3", "If-Range", `"` + sum.sha1 + `"`}, answer{200, whole, file}},
 						{"If-Range digest", []string{"Range", "bytes=1-3", "If-Range", `"` + digest + `"`}, answer{200, whole, file}},
 					} {
 						wantAnswer(t, method+" "+target+" "+c.label,
@@ -268,21 +270,12 @@ func TestAccRegistryRemoteBlobETagIsTheBareSHA1(t *testing.T) {
 	}
 }
 
-// rangeOf is what a request for bytes 1-3 of body gets back: the bytes on a
-// GET, nothing on a HEAD.
-func rangeOf(method string, body []byte) string {
-	if method == http.MethodHead {
-		return ""
-	}
-	return string(body[1:4])
-}
-
 // A local manifest's ETag is the manifest file's bare SHA-1, as 7.5.7
 // answered a local manifest GET (RTFACT-23106) and 7.33.12 a HEAD
-// (RTFACT-27199), on GET and HEAD, by tag and by digest. If-None-Match and
-// If-Range take it in the forms the item route takes, a redirecting
-// repository answers them before it signs a URL, and the digest no longer
-// matches (#1317).
+// (RTFACT-27199), on GET and HEAD, by tag and by digest. If-None-Match
+// takes it in the forms the item route takes, a redirecting repository
+// answers it before it signs a URL, and the digest no longer matches
+// (#1317). A range gets the whole manifest whatever If-Range names (#1337).
 func TestAccRegistryManifestETagIsTheBareSHA1(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := t.Context()
@@ -330,6 +323,8 @@ func TestAccRegistryManifestETagIsTheBareSHA1(t *testing.T) {
 			}
 			wantAnswer(t, "GET If-None-Match digest", w.do(http.MethodGet, target, "admin", "",
 				"If-None-Match", `"`+digest+`"`), answer{200, body, stored})
+			// The Docker API answers a range with the whole manifest, as
+			// it does a blob's (RTFACT-30157, #1337).
 			wantAnswer(t, "GET If-Range bare", w.do(
 				http.MethodGet,
 				target,
@@ -339,9 +334,7 @@ func TestAccRegistryManifestETagIsTheBareSHA1(t *testing.T) {
 				"bytes=1-3",
 				"If-Range",
 				sum.sha1,
-			), answer{206, body[1:4], map[string]string{
-				"ETag": sum.sha1, "Content-Range": "bytes 1-3/" + strconv.Itoa(len(body)),
-			}})
+			), answer{200, body, stored})
 			wantAnswer(t, "GET If-Range digest", w.do(http.MethodGet, target, "admin", "",
 				"Range", "bytes=1-3", "If-Range", `"`+digest+`"`), answer{200, body, stored})
 		}

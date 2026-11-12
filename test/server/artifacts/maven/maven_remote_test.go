@@ -638,30 +638,47 @@ func TestAccMavenColdChecksumHeadDoesNotAdmitOwner(t *testing.T) {
 	}
 }
 
-func TestAccMavenUpstreamNoStoreDoesNotScheduleCompanion(t *testing.T) {
-	w := newMavenRemoteWorld(t)
-	w.c.FetchJarsEagerly = new(true)
-	w.update()
-	p := "org/acme/app/1.0/app-1.0"
-	w.up.Set(
-		"/"+p+".pom",
-		fakeupstream.Resource{
-			Body:   []byte(sourcePOM("app", "1.0")),
-			Header: http.Header{"Content-Type": {"application/xml"}, "Cache-Control": {"no-store"}},
-		},
-	)
-	w.up.Set("/"+p+".jar", fakeupstream.Resource{Body: sourceJAR(t, "must not fetch")})
-	remoteStatus(t, w.request("GET", "/artifactory/remote/"+p+".pom", "reader", ""), 200)
-	stats, err := w.rt.Store.WorkQueue().Stats(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, stat := range stats {
-		if stat.Kind == maven.MavenCompanionKind && stat.Pending+stat.Leased+stat.Parked > 0 {
-			t.Fatal("no-store response scheduled companion", stat)
-		}
-	}
-	if w.up.Count("GET", "/"+p+".jar") != 0 {
-		t.Fatal("no-store response fetched companion")
+// A POM the upstream marks Cache-Control: no-store is kept like any other
+// answer (remote.mustNotPersist), as 7.x's remote keeps the no-store answers
+// an Artifactory upstream sends, so it schedules its eager jar like any other
+// kept POM. Only the repository's own setting keeps a POM transient, and a
+// transient POM schedules and fetches nothing.
+func TestAccMavenNoStorePOMSchedulesCompanionOnlyWhenKept(t *testing.T) {
+	for _, mode := range []string{"upstream", "repository"} {
+		t.Run(mode, func(t *testing.T) {
+			w := newMavenRemoteWorld(t)
+			w.c.FetchJarsEagerly = new(true)
+			header := http.Header{"Content-Type": {"application/xml"}}
+			if mode == "upstream" {
+				header.Set("Cache-Control", "no-store")
+			} else {
+				w.c.StoreArtifactsLocally = new(false)
+			}
+			w.update()
+			p := "org/acme/app/1.0/app-1.0"
+			w.up.Set(
+				"/"+p+".pom",
+				fakeupstream.Resource{Body: []byte(sourcePOM("app", "1.0")), Header: header},
+			)
+			w.up.Set("/"+p+".jar", fakeupstream.Resource{Body: sourceJAR(t, "companion")})
+			remoteStatus(t, w.request("GET", "/artifactory/remote/"+p+".pom", "reader", ""), 200)
+			stats, err := w.rt.Store.WorkQueue().Stats(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			scheduled := false
+			for _, stat := range stats {
+				if stat.Kind == maven.MavenCompanionKind &&
+					stat.Pending+stat.Leased+stat.Parked > 0 {
+					scheduled = true
+				}
+			}
+			if scheduled != (mode == "upstream") {
+				t.Fatalf("%s no-store POM scheduled companion: %v", mode, scheduled)
+			}
+			if mode == "repository" && w.up.Count("GET", "/"+p+".jar") != 0 {
+				t.Fatal("transient POM fetched companion")
+			}
+		})
 	}
 }
