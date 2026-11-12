@@ -132,7 +132,7 @@
   "test/acceptance/jetbrains_steps_test.go": "c8f2f2972928e916ba6472ee3ce1946ae30be929c202b524af69101aaa76ba50",
   "test/acceptance/luarocks_steps_test.go": "0981469586f4b2f2579e444d42c767f6b1e8c317aaa33b9ed30c3b210c4d62d6",
   "test/acceptance/machinelearning_steps_test.go": "1ba0b690de8af2e42e22e35eaca6feb3b422e7686504505b99ce29133ceb7a31",
-  "test/acceptance/nix_steps_test.go": "c77bb29f787c0f9a43d0a9f127b69f0b21b45f847bc59e833e428867ca3aef8a",
+  "test/acceptance/nix_steps_test.go": "027a933bda92a7eaf9624dbd23fd2df2fed30ac6e90fddf2eff60b9d69f0a889",
   "test/acceptance/opkg_steps_test.go": "1cfb75807f6eaea881b8b069f7b0885f181ea145c70637888b41e0a1fe1d499c",
   "test/acceptance/p2_steps_test.go": "bc40b967df32ac224f9d0f515f1588672bbaebf05fa14f9bd884508c829d4610",
   "test/acceptance/pub_steps_test.go": "60326d30e49d950c1f5afca1d38527f0c55d63313e624ac31af6cf156d08d1ce",

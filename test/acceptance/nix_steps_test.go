@@ -247,11 +247,13 @@ func (w *world) nixChannelTarball(name string) error {
 // nixChannel uploads a snapshot with curl as the JFrog guide does, follows
 // the channel with nix-channel --add and --update, then uploads a newer
 // snapshot and updates again, checking the unpacked channel each time.
-// Credentials come from a netrc file: Nix 2.35 drops a URL's user and
-// password from the effective URL it appends nixexprs.tar.xz to, so a
-// channel URL's own credentials reach only the first request. Nix keeps a
-// downloaded channel for tarball-ttl seconds (an hour by default), so the
-// second update sets it to 0 to ask the registry again.
+// Credentials come from a netrc file: nix-channel appends nixexprs.tar.xz
+// to the effective URL libcurl reports, and libcurl 8.23.0, which this
+// image links, leaves a URL's user and password out of it (curl commit
+// 7a6bd027d0), so a channel URL's own credentials reach only the first
+// request whatever the server answers. Nix keeps a downloaded channel for
+// tarball-ttl seconds (an hour by default), so the second update sets it to
+// 0 to ask the registry again.
 func (w *world) nixChannel(key string) error {
 	for _, name := range []string{"first", "second"} {
 		if err := w.nixChannelTarball(name); err != nil {

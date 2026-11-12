@@ -68,9 +68,11 @@ nix-channel --add \
 nix-channel --update
 ```
 
-The JFrog guide puts the credentials in the channel URL. Nix 2.35 sends
-those only with the first request: it drops them from the URL it then
-downloads `nixexprs.tar.xz` from, so that download is anonymous. For a
+The JFrog guide puts the credentials in the channel URL. `nix-channel`
+downloads that URL, then downloads `nixexprs.tar.xz` below the final URL
+libcurl reports, and libcurl 8.23.0 and later leave the credentials out of
+that URL. The pinned Nix 2.35.5 image has libcurl 8.23.0, so the tarball
+download carries no credentials, whatever the server answers. For a
 repository that needs a login, give Nix the credentials in its netrc file
 (`netrc-file`, `/etc/nix/netrc` by default), as for the binary cache.
 

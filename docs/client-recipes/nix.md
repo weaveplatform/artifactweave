@@ -37,7 +37,7 @@ PYCODE
 AW_NIX_URL="$AW_AUTH_URL/artifactory/api/nix/$AW_REPO"
 ```
 
-Channels need the netrc file: Nix 2.35 drops credentials in a channel URL from the URL it downloads nixexprs.tar.xz from, so only the first request would carry them.
+Channels need the netrc file: nix-channel downloads nixexprs.tar.xz below the effective URL libcurl reports, and libcurl 8.23.0 and later leave a URL's credentials out of it, so credentials in the channel URL reach only the first request.
 
 ```sh
 AW_HOST=$(python3 -c 'import os; from urllib.parse import urlsplit; print(urlsplit(os.environ["AW_URL"]).hostname)')
