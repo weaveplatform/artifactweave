@@ -1434,9 +1434,10 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributeartifact.md
   /api/download/{repoKey}/{filePath}:
     get:
-      description: Downloads a file while emitting progress marks so clients with short timeouts stay connected
-        during a slow remote fetch. With `content=none` only the marks are sent; with `content=progress` the marks
-        precede the content. Resolution and statistics behave as for the plain download.
+      description: 'Not implemented; answers 501. It would download a file while emitting progress marks, so clients
+        with short timeouts stay connected during a slow remote fetch: with `content=none` only the marks are sent,
+        and with `content=progress` the marks precede the content. Resolution and statistics would behave as for the
+        plain download.'
       operationId: artifactSyncDownload
       parameters:
       - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
@@ -1523,6 +1524,7 @@ paths:
       - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/artifactsyncdownload.md
+      x-tier: stub
   /api/gems/{repoName}/names:
     get:
       operationId: getRubyGemsCompactNames
