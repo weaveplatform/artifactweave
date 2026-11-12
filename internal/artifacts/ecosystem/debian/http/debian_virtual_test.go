@@ -30,9 +30,9 @@ func refuseSources(t *testing.T) func(*overlayConfig) {
 }
 
 // TestAccDebianVirtualMetadataRefusals: a virtual repository's metadata is
-// refused to a request with a query or a caller who may not read it, and is
-// not found when the virtual repository names no members, when no member
-// publishes the distribution, and for an InRelease it cannot sign. When the
+// refused to a caller who may not read it, and is not found when the
+// virtual repository names no members, when no member publishes the
+// distribution, and for an InRelease it cannot sign. When the
 // virtual repository's own patterns reject the document's path, it answers
 // that no repository serves it, once read permission is settled.
 func TestAccDebianVirtualMetadataRefusals(t *testing.T) {
@@ -56,10 +56,6 @@ func TestAccDebianVirtualMetadataRefusals(t *testing.T) {
 		status              int
 		message             string
 	}{
-		{
-			"query", "deb-virtual", debRelease + "?x=1", "admin",
-			http.StatusForbidden, "Forbidden",
-		},
 		{
 			"caller who may not read", "deb-virtual", debRelease, "user",
 			http.StatusForbidden, "Forbidden",
@@ -459,8 +455,8 @@ func TestUnitDebianMemberBytesRefusesAPathTheSourceCannotName(t *testing.T) {
 // TestAccDebianVirtualPackage: a virtual repository serves a package from
 // the first member, in order, that may serve it and holds it as a file,
 // skipping members that are absent, blacked out, hold a folder there or
-// whose upstream lacks it. A query or a caller who may not read it is
-// refused; a member that cannot be looked up or read, is of another type,
+// whose upstream lacks it. A caller who may not read it is refused; a
+// member that cannot be looked up or read, is of another type,
 // or is remote on a server without remote sources is a server fault; a
 // remote member's upstream fault answers 502, its stream is relayed and its
 // revoked cached copy is refused.
@@ -478,10 +474,6 @@ func TestAccDebianVirtualPackage(t *testing.T) {
 		status  int
 		message string
 	}{
-		{
-			name: "query", members: []string{"deb-local"}, target: debAlpha + "?x=1",
-			status: http.StatusForbidden, message: "Forbidden",
-		},
 		{
 			name: "caller who may not read", members: []string{"deb-local"}, as: "user",
 			status: http.StatusForbidden, message: "Forbidden",

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -18,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	cheffmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/chef"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
@@ -411,143 +411,6 @@ func (h handler) remove(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, r, 200, map[string]string{"name": name, "version": version})
 }
 
-func (h handler) catalog(w http.ResponseWriter, r *http.Request) {
-	q, err := url.ParseQuery(r.URL.RawQuery)
-	if err != nil {
-		h.k.Error(w, r, apierror.New(400, "invalid search query"))
-		return
-	}
-	for key, values := range q {
-		if len(values) != 1 || key != "start" && key != "items" && key != "q" {
-			h.k.Error(w, r, apierror.New(400, "unsupported search query"))
-			return
-		}
-	}
-	start, limit := 0, 1000
-	if q.Has("start") {
-		start, err = strconv.Atoi(q.Get("start"))
-	}
-	if err == nil && q.Has("items") {
-		limit, err = strconv.Atoi(q.Get("items"))
-	}
-	query := q.Get("q")
-	if err != nil || start < 0 || start > maxVersions || limit < 1 || limit > 1000 ||
-		len(query) > 128 {
-		h.k.Error(w, r, apierror.New(400, "invalid search bounds"))
-		return
-	}
-	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
-		return
-	}
-	names, err := h.names(r)
-	if err != nil {
-		h.k.Error(w, r, err)
-		return
-	}
-	out := []map[string]any{}
-	checks := []release{}
-	for _, name := range names {
-		if query != "" && !strings.Contains(strings.ToLower(name), strings.ToLower(query)) ||
-			!h.k.CanFolder(r, name, api.ActionRead) {
-			continue
-		}
-		found, e := h.lookup(r, name)
-		if e != nil {
-			h.k.Error(w, r, e)
-			return
-		}
-		if len(found) == 0 {
-			continue
-		}
-		checks = append(checks, found...)
-		m := found[0].meta
-		out = append(
-			out,
-			map[string]any{
-				"cookbook_name":        name,
-				"cookbook_description": m.Manifest.Description,
-				"cookbook_maintainer":  m.Manifest.Maintainer,
-				"cookbook":             base(r) + "/api/v1/cookbooks/" + name,
-			},
-		)
-	}
-	if err = h.authority(r, checks); err != nil {
-		h.k.Error(w, r, err)
-		return
-	}
-	total := len(out)
-	offset := min(start, total)
-	out = out[offset:min(offset+limit, total)]
-	writeJSON(w, r, 200, map[string]any{"total": total, "start": start, "items": out})
-}
-
-func (h handler) names(r *http.Request) ([]string, error) {
-	c := pkgroute.RequestFrom(r).Repo
-	if c.Class == repo.Remote {
-		return h.remoteNames(r)
-	}
-	if c.Class == repo.Virtual {
-		unique := map[string]bool{}
-		for _, key := range c.Repositories {
-			member, err := h.k.DB().Repos().Get(r.Context(), key)
-			if errors.Is(err, kernel.ErrNotFound) {
-				continue
-			}
-			if err != nil {
-				return nil, fmt.Errorf("chef: member: %w", err)
-			}
-			// 7.x ignores a blacked-out member when it resolves (R5), so
-			// a blacked-out remote member's refused catalog does not
-			// refuse the virtual repository's.
-			if generic.CheckBlackedOut(member, "") != nil {
-				continue
-			}
-			mr, err := h.k.MemberRequest(r, member)
-			if err != nil {
-				return nil, fmt.Errorf("chef: member request: %w", err)
-			}
-			if !h.k.CanFolder(mr, "", api.ActionRead) {
-				continue
-			}
-			names, err := h.names(mr)
-			if err != nil {
-				return nil, err
-			}
-			for _, n := range names {
-				unique[n] = true
-			}
-			if len(unique) > maxVersions {
-				return nil, apierror.New(503, "cookbook catalog exceeds limit")
-			}
-		}
-		out := make([]string, 0, len(unique))
-		for name := range unique {
-			out = append(out, name)
-		}
-		slices.Sort(out)
-		return out, nil
-	}
-	out := []string{}
-	page := kernel.Page{Limit: kernel.MaxLimit}
-	for {
-		packages, next, err := h.k.DB().Packages().List(r.Context(), c.Key, page)
-		if err != nil {
-			return nil, fmt.Errorf("chef: catalog: %w", err)
-		}
-		for _, p := range packages {
-			out = append(out, p.Name)
-		}
-		if len(out) > maxVersions {
-			return nil, apierror.New(503, "cookbook catalog exceeds limit")
-		}
-		if next == "" {
-			break
-		}
-		page.After = next
-	}
-	return out, nil
-}
-
 func (h handler) authority(r *http.Request, releases []release) error {
 	for _, rel := range releases {
 		if rel.revalidate != nil {
@@ -572,12 +435,18 @@ func (h handler) lookup(r *http.Request, name string) ([]release, error) {
 	case repo.Remote:
 		return h.remoteVersions(r, name)
 	case repo.Virtual:
-		return h.virtual(r, name)
+		return h.virtual(r, name, func(mr *http.Request) ([]release, error) {
+			return h.lookup(mr, name)
+		})
 	default:
 		return nil, source.ErrUnsupported
 	}
 }
 
+// hosted returns the versions of name that the repository's package index
+// holds and the caller may read: a local or federated repository's own,
+// or a remote's cache, whose archives the index links in the cache
+// (pkgindex.Stored), which a remote's search lists (catalog).
 func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	q := pkgroute.RequestFrom(r)
 	p, err := h.k.DB().Packages().Find(r.Context(), q.Repo.Key, name)
@@ -611,7 +480,9 @@ func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 			meta.Version != v.Version || meta.Path != path {
 			return nil, apierror.New(http.StatusBadGateway, "invalid stored Chef package index")
 		}
-		item, err := h.k.DB().Items().Get(r.Context(), q.Repo.Key, false, path)
+		item, err := h.k.DB().Items().Get(
+			r.Context(), q.Repo.Key, pkgindex.Stored(q.Repo).Cached, path,
+		)
 		if err != nil || item.Folder || meta.SHA256 == "" || meta.SHA256 != item.Actual.SHA256 {
 			return nil, apierror.New(http.StatusBadGateway, "invalid stored Chef archive")
 		}
@@ -621,7 +492,14 @@ func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	return out, nil
 }
 
-func (h handler) virtual(r *http.Request, name string) ([]release, error) {
+// virtual merges the versions of name that find returns for each member
+// of a virtual repository, in order, the first member that holds a
+// version supplying it.
+func (h handler) virtual(
+	r *http.Request,
+	name string,
+	find func(*http.Request) ([]release, error),
+) ([]release, error) {
 	q := pkgroute.RequestFrom(r)
 	byVersion := map[string]release{}
 	for _, key := range q.Repo.Repositories {
@@ -643,7 +521,7 @@ func (h handler) virtual(r *http.Request, name string) ([]release, error) {
 		if !h.k.CanFolder(mr, name, api.ActionRead) {
 			continue
 		}
-		found, err := h.lookup(mr, name)
+		found, err := find(mr)
 		if err != nil {
 			var response *apierror.Error
 			if errors.Is(err, kernel.ErrNotFound) ||

@@ -3974,12 +3974,21 @@ paths:
           schema:
             description: Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
             type: string
-        - description: Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
+        - description: Optional query parameter. 1 queues the work and returns at once; 0 or omitted waits for the work to finish. The strings "true" and "false" are accepted as 1 and 0.
           in: query
           name: async
           schema:
-            description: When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
-            type: boolean
+            description: 1 queues the work, 0 waits for it. The strings "true" and "false" are accepted as 1 and 0.
+            enum:
+              - 0
+              - 1
+            type: integer
+            # JFrog declares 0 and 1; its earlier REST API reference wrote false and true for the
+            # Debian and opkg operations, and 0 and 1 for YUM's. Bound as a Go bool:
+            # strconv.ParseBool reads 0 and 1 as it reads false and true, so both spellings work.
+            # It also reads t, f, TRUE and the like, kept until 7.x is compared (#216); any other
+            # value answers 400.
+            x-go-type: bool
         - description: Optional query parameter. 1 writes package coordinates as item properties during the rebuild (default); 0 rebuilds indexes without writing them.
           in: query
           name: writeProps
@@ -7197,12 +7206,21 @@ paths:
           schema:
             description: Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
             type: string
-        - description: Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
+        - description: Optional query parameter. 1 queues the work and returns at once; 0 or omitted waits for the work to finish. The strings "true" and "false" are accepted as 1 and 0.
           in: query
           name: async
           schema:
-            description: When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
-            type: boolean
+            description: 1 queues the work, 0 waits for it. The strings "true" and "false" are accepted as 1 and 0.
+            enum:
+              - 0
+              - 1
+            type: integer
+            # JFrog declares 0 and 1; its earlier REST API reference wrote false and true for the
+            # Debian and opkg operations, and 0 and 1 for YUM's. Bound as a Go bool:
+            # strconv.ParseBool reads 0 and 1 as it reads false and true, so both spellings work.
+            # It also reads t, f, TRUE and the like, kept until 7.x is compared (#216); any other
+            # value answers 400.
+            x-go-type: bool
         - description: Optional query parameter. 1 writes package coordinates as item properties during the rebuild, 0 skips them.
           in: query
           name: writeProps
@@ -17577,12 +17595,21 @@ paths:
           schema:
             description: Sub-path to limit a virtual repository calculation to.
             type: string
-        - description: Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
+        - description: Optional query parameter. 1 queues the work and returns at once; 0 or omitted waits for the work to finish. The strings "true" and "false" are accepted as 1 and 0.
           in: query
           name: async
           schema:
-            description: When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
-            type: boolean
+            description: 1 queues the work, 0 waits for it. The strings "true" and "false" are accepted as 1 and 0.
+            enum:
+              - 0
+              - 1
+            type: integer
+            # JFrog declares 0 and 1; its earlier REST API reference wrote false and true for the
+            # Debian and opkg operations, and 0 and 1 for YUM's. Bound as a Go bool:
+            # strconv.ParseBool reads 0 and 1 as it reads false and true, so both spellings work.
+            # It also reads t, f, TRUE and the like, kept until 7.x is compared (#216); any other
+            # value answers 400.
+            x-go-type: bool
       responses:
         '200':
           content:
@@ -20810,10 +20837,13 @@ components:
             - $ref: '#/components/schemas/ChecksumPolicyType'
           description: Optional within this object. How a client-supplied checksum that disagrees with the uploaded bytes is handled. client-checksums rejects, server-generated-checksums accepts and records both values.
         ddebSupported:
-          description: Optional within this object. When true a debian repository also indexes debug symbol packages (.ddeb). Stored only.
+          # JFrog's Debian guide: "Enable indexing with debug symbols (.ddeb)".
+          description: Optional within this object. When true a Debian repository accepts debug symbol packages (.ddeb), checks them and lists them in its Packages indexes as it does a .deb; when false or unset a .ddeb deploy answers 400.
           type: boolean
         debianTrivialLayout:
-          description: Optional within this object. When true the Debian repository uses the trivial (flat) layout. Stored only.
+          # JFrog's Debian guide: the trivial layout does not support source packages, and a
+          # virtual repository includes only repositories with the automatic layout.
+          description: Optional within this object. When true the Debian repository uses the deprecated trivial layout, which takes no source packages, so a .dsc deploy answers 400, and which no virtual repository may include.
           type: boolean
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server. Reads carry it, as an empty string when unset.
@@ -20902,7 +20932,9 @@ components:
           description: Optional within this object. Free text for operators. Not interpreted by the server. Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows an empty string.
           type: string
         optionalIndexCompressionFormats:
-          description: Optional within this object. Additional compression formats generated for Debian index files, for example bz2 or lzma. Stored only.
+          # JFrog's Debian guide, Optional Index Compression Formats; RTFACT-24246 (7.15.3) for a
+          # virtual repository. That a value other than bz2, lzma and xz adds nothing is inferred (#216).
+          description: Optional within this object. The forms besides plain and gzip, any of bz2, lzma and xz, that a Debian repository writes each Packages index in, from its next index rebuild, and that its Release lists. Other values add nothing.
           items:
             description: Optional within this object. A compression format name.
             type: string
@@ -21651,10 +21683,13 @@ components:
               type: object
           type: object
         ddebSupported:
-          description: Optional within this object. When true a debian repository also indexes debug symbol packages (.ddeb). Stored only.
+          # JFrog's Debian guide: "Enable indexing with debug symbols (.ddeb)".
+          description: Optional within this object. When true a Debian repository accepts debug symbol packages (.ddeb), checks them and lists them in its Packages indexes as it does a .deb; when false or unset a .ddeb deploy answers 400.
           type: boolean
         debianTrivialLayout:
-          description: Optional within this object. When true the Debian repository uses the trivial (flat) layout. Stored only.
+          # JFrog's Debian guide: the trivial layout does not support source packages, and a
+          # virtual repository includes only repositories with the automatic layout.
+          description: Optional within this object. When true the Debian repository uses the deprecated trivial layout, which takes no source packages, so a .dsc deploy answers 400, and which no virtual repository may include.
           type: boolean
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server. Reads carry it, as an empty string when unset.
@@ -21725,7 +21760,9 @@ components:
           description: Optional within this object. Free text for operators. Not interpreted by the server. Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows an empty string.
           type: string
         optionalIndexCompressionFormats:
-          description: Optional within this object. Additional compression formats generated for Debian index files, for example bz2 or lzma. Stored only.
+          # JFrog's Debian guide, Optional Index Compression Formats; RTFACT-24246 (7.15.3) for a
+          # virtual repository. That a value other than bz2, lzma and xz adds nothing is inferred (#216).
+          description: Optional within this object. The forms besides plain and gzip, any of bz2, lzma and xz, that a Debian repository writes each Packages index in, from its next index rebuild, and that its Release lists. Other values add nothing.
           items:
             description: Optional within this object. A compression format name.
             type: string
@@ -24647,7 +24684,9 @@ components:
           description: Optional within this object. Comma-separated architectures used when generating aggregated Debian metadata. Stored only.
           type: string
         debianTrivialLayout:
-          description: Optional within this object. When true the Debian repository uses the trivial (flat) layout. Stored only.
+          # JFrog's Debian guide: a virtual repository includes only repositories with the
+          # automatic layout, so the trivial layout is not one a virtual repository has.
+          description: Optional within this object. Stored only. A virtual Debian repository has no trivial layout of its own; it refuses a member whose debianTrivialLayout is true.
           type: boolean
         defaultDeploymentRepo:
           description: Optional within this object. Key of the member that receives uploads sent to the virtual repository. Must be one of repositories and must not be a remote.
@@ -24703,7 +24742,9 @@ components:
           description: Optional within this object. Free text for operators. Not interpreted by the server. Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows an empty string.
           type: string
         optionalIndexCompressionFormats:
-          description: Optional within this object. Additional compression formats generated for Debian index files, for example bz2 or lzma. Stored only.
+          # JFrog's Debian guide, Optional Index Compression Formats; RTFACT-24246 (7.15.3) for a
+          # virtual repository. That a value other than bz2, lzma and xz adds nothing is inferred (#216).
+          description: Optional within this object. The forms besides plain and gzip, any of bz2, lzma and xz, that a virtual Debian repository composes each Packages index in, and that its Release lists. Other values add nothing.
           items:
             description: Optional within this object. A compression format name.
             type: string

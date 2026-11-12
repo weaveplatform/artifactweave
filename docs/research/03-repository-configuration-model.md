@@ -606,9 +606,11 @@ of its own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `blockPushingSchema1` | `false` | Docker. |
 | `archiveBrowsingEnabled` | `false` | |
 | `enableFileListsIndexing` | `false` | |
-| `optionalIndexCompressionFormats` | `[]` | Debian. |
-| `debianTrivialLayout`, `calculateYumMetadata`, `yumRootDepth` | | Accepted and persisted; Debian and RPM metadata behavior is planned in P29. |
-| `yumGroupFileNames`, `ddebSupported`, `enableConanSupport`, `cargoAnonymousAccess`, `cargoInternalIndex` | | RPM, Debian, Conan and Cargo keys the clients send ("Keys known only from the Terraform provider"); accepted and persisted. |
+| `optionalIndexCompressionFormats` | `[]` | Debian, implemented with [#1274](https://github.com/weaveplatform/artifactweave/issues/1274): the forms besides plain and gzip (`bz2`, `lzma`, `xz`) each Packages index is written in from the next index rebuild, and the Release lists ([D] [debian-repositories](https://docs.jfrog.com/artifactory/docs/debian-repositories.md), Optional Index Compression Formats). Other values add nothing **[I]**. |
+| `debianTrivialLayout` | | Debian, implemented in P9c ([#758](https://github.com/weaveplatform/artifactweave/issues/758)): the deprecated trivial layout takes no source packages, so a `.dsc` deploy answers 400, and no virtual repository may include the repository ([D] debian-repositories). |
+| `calculateYumMetadata`, `yumRootDepth` | | Accepted and persisted; RPM metadata behavior is planned in P29. |
+| `ddebSupported` | | Debian, implemented in P9c ([#758](https://github.com/weaveplatform/artifactweave/issues/758)): `.ddeb` debug packages are admitted and indexed only when it is true ("Enable indexing with debug symbols (.ddeb)", [D] debian-repositories). A key the clients send ("Keys known only from the Terraform provider"). |
+| `yumGroupFileNames`, `enableConanSupport`, `cargoAnonymousAccess`, `cargoInternalIndex` | | RPM, Conan and Cargo keys the clients send ("Keys known only from the Terraform provider"); accepted and persisted. |
 | `terraformType` | | `MODULE` or `PROVIDER`. Local and federated repositories. No default: the provider's two resources always send it, and a repository without it serves neither Terraform registry ([decision 0040](decisions/0040-terraform.md#terraformtype)). |
 | `encryptStates` | `true` | `terraformbackend`: seals state files under the master key. Replication between instances needs it `false` (7.77, [D] terraform-opentofu-and-terraform-backend-repositories); a change applies to later writes ([decision 0041](decisions/0041-terraform-backend.md)). 7.x's v1 read sends it for other local types too ([J] RTFACT-31100). |
 | `forceNugetAuthentication`, `forceP2Authentication`, `forceConanAuthentication` | `false` | |
@@ -691,7 +693,8 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 | `resolveDockerTagsByTimestamp` | `false` | |
 | `useNamespaces` | `false` | Helm. |
 | `dockerApiVersion` | `V2` | |
-| `debianTrivialLayout`, `debianDefaultArchitectures`, `optionalIndexCompressionFormats` | | Accepted; effective Debian metadata behavior is planned in P29. |
+| `optionalIndexCompressionFormats` | | Debian, implemented with [#1274](https://github.com/weaveplatform/artifactweave/issues/1274): the forms besides plain and gzip (`bz2`, `lzma`, `xz`) the virtual repository composes each Packages index in, which its Release lists (RTFACT-24246, 7.15.3). Other values add nothing **[I]**. |
+| `debianTrivialLayout`, `debianDefaultArchitectures` | | Debian; accepted and stored only. A virtual repository has no trivial layout of its own, and refuses a member that uses it, as only repositories with the automatic layout may be members ([D] [debian-repositories](https://docs.jfrog.com/artifactory/docs/debian-repositories.md)). |
 | `p2Urls` | | P2 virtual repositories: the update sites aggregated; `p2.urls` in the YAML form. Each is `local://<key>[/<suffix>]`, 7.x's form for a local member and its path suffix (RTFACT-29915), or an http or https URL. The composite lists one child per site at the serving member's key and the rest of the URL, as 7.x serves `<repository key>/<sub-path>` (RTFACT-7631, RTFACT-29198); without `p2Urls` it lists each member at its key (#1257). A create, or an update that sends `p2Urls`, through the repositories API adds the P2 remote covering each URL, creating one keyed `<host>` or `<host>-<port>` when none does (RTFACT-30256), and the local repository a `local://` entry names; it never removes a member. A YAML apply stores them as given. |
 
 ## Federated fields
@@ -843,7 +846,7 @@ virtualRepositories:
 | generic | | `propagateQueryParams`, `retrieveSha256FromServer` | |
 | cargo | `cargoAnonymousAccess`, `cargoInternalIndex` | `gitRegistryUrl`, `cargoAnonymousAccess`, `cargoInternalIndex` | |
 | rpm | `calculateYumMetadata`, `yumRootDepth`, `enableFileListsIndexing`, `yumGroupFileNames` | | |
-| debian | `debianTrivialLayout`, `optionalIndexCompressionFormats`, `ddebSupported` | | `debianDefaultArchitectures` |
+| debian | `debianTrivialLayout`, `optionalIndexCompressionFormats`, `ddebSupported` | | `debianDefaultArchitectures`, `optionalIndexCompressionFormats` |
 | conan | `forceConanAuthentication`, `enableConanSupport` | `forceConanAuthentication`, `enableConanSupport` | |
 | p2 | | `forceP2Authentication` | `p2Urls` |
 | cocoapods | | `podsSpecsRepoUrl` | |

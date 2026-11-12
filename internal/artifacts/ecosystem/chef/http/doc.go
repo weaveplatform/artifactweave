@@ -42,8 +42,14 @@
 //     /artifactory/api/chef/{repoKey}/reindex, which refuses any query with
 //     400, answers its text once the reindex has run, and writes errors in
 //     the Artifactory envelope.
-//   - Answers: catalogs paged by start and items, at most 1,000 entries a
-//     page; cookbook and version records whose links name the serving
+//   - Answers: catalogs and searches paged by start and items, at most
+//     1,000 entries a page, a larger items, such as Knife's 9999999, clamped
+//     to that, and Knife's order and user taken and ignored (#1305); a
+//     search looks in each cookbook's name, description and maintainer, and
+//     a remote's, or a virtual repository's remote members', is forwarded
+//     to the upstream's search and merged after the cookbooks the cache or
+//     hosted members hold (JFrog, "Search for Chef Cookbooks"); cookbook
+//     and version records whose links name the serving
 //     repository; archives; the version record of a published cookbook; and
 //     the name and version a delete removed. Every JSON answer is marked
 //     private, no-store.
@@ -66,16 +72,21 @@
 //     A virtual repository leaves a blacked-out member out, and its own
 //     patterns refuse a download with "No repository found to serve the
 //     request".
-//   - A hosted or virtual catalog, and a cookbook's versions, hold at most
-//     4,096 entries (503 beyond); a remote accepts no more from its
-//     upstream.
+//   - A hosted catalog, the cookbooks a virtual repository's members index,
+//     and a cookbook's versions hold at most 4,096 entries (503 beyond), and
+//     a remote accepts no more versions of a cookbook from its upstream. An
+//     upstream's catalog has no such bound: a remote's catalog, and a
+//     virtual repository's with a remote member, take a start up to 2^30
+//     and an upstream total up to that (#1306).
 //   - A published version is immutable: publishing it again answers 409.
 //   - A remote builds its own paging queries: it asks its upstream for 100
-//     cookbooks a catalog page, as many as Supermarket serves, and starts
-//     the next page after the cookbooks a page held. A page with more
-//     after it that holds fewer than 100 fails with 502, since
-//     Supermarket's page states no limit that would explain it, and so
-//     does a page of more than 1,000 (#1298).
+//     cookbooks a page, as many as Supermarket serves. A catalog page reads
+//     only the upstream pages that cover its offsets, from the 100-aligned
+//     page that holds start, at most 11 for a page of 1,000, and never a
+//     cookbook or version record (#1306); a search forwards its query once.
+//     A catalog page with more after it that holds fewer than 100 fails
+//     with 502, since Supermarket's page states no limit that would explain
+//     it, and so does any page of more than 1,000 (#1298).
 //   - A remote reads at most 4 MiB a document, and keeps metadata and
 //     archive links under the configured Supermarket origin and path. An
 //     archive enters the cache only once its size, its SHA-256 where the
@@ -109,9 +120,14 @@
 //     and #p9d-modular-monolith-migration, epics ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943) and WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
+//   - JFrog, "Search for Chef Cookbooks", in the 7.x Chef Cookbook
+//     Repositories guide: how local, remote and virtual repositories
+//     answer knife search.
 //   - https://github.com/weaveplatform/artifactweave/issues/783,
-//     https://github.com/weaveplatform/artifactweave/issues/1045 and
-//     https://github.com/weaveplatform/artifactweave/issues/1086
+//     https://github.com/weaveplatform/artifactweave/issues/1045,
+//     https://github.com/weaveplatform/artifactweave/issues/1086,
+//     https://github.com/weaveplatform/artifactweave/issues/1305 and
+//     https://github.com/weaveplatform/artifactweave/issues/1306
 //
 // # Status
 //
@@ -121,6 +137,10 @@
 //
 // # Testing
 //
+//   - catalog_test.go: Knife's list and search queries on every class, the
+//     fields a search looks in, a remote's search merged after its cache,
+//     and a virtual catalog that lists hosted cookbooks, then an
+//     upstream's.
 //   - chef_test.go: hosted publish, resolve, delete and reindex, multipart
 //     publish and whole-cookbook delete, invalid requests, remote
 //     validation, authority, pagination and caching, virtual order and
@@ -130,6 +150,6 @@
 //     the source boundary from a fake upstream Supermarket.
 //   - metadata_test.go: upstream version identity and URL boundaries,
 //     catalog bounds, version order and empty dependency objects.
-//   - remote_paging_test.go: the upstream catalog page sizes a remote
+//   - remote_paging_test.go: the upstream catalog and search pages a remote
 //     accepts and refuses.
 package chefhttp

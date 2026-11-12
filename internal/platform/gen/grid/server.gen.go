@@ -115,6 +115,48 @@ func (e ListJPDsParamsStatus) Valid() bool {
 	}
 }
 
+// Defines values for GetMonitoringEntityListParamsEntityType.
+const (
+	GetMonitoringEntityListParamsEntityTypeEnvironments     GetMonitoringEntityListParamsEntityType = "environments"
+	GetMonitoringEntityListParamsEntityTypeGroups           GetMonitoringEntityListParamsEntityType = "groups"
+	GetMonitoringEntityListParamsEntityTypePermissions      GetMonitoringEntityListParamsEntityType = "permissions"
+	GetMonitoringEntityListParamsEntityTypeProjectGroups    GetMonitoringEntityListParamsEntityType = "projectGroups"
+	GetMonitoringEntityListParamsEntityTypeProjectResources GetMonitoringEntityListParamsEntityType = "projectResources"
+	GetMonitoringEntityListParamsEntityTypeProjectUsers     GetMonitoringEntityListParamsEntityType = "projectUsers"
+	GetMonitoringEntityListParamsEntityTypeProjects         GetMonitoringEntityListParamsEntityType = "projects"
+	GetMonitoringEntityListParamsEntityTypeRoles            GetMonitoringEntityListParamsEntityType = "roles"
+	GetMonitoringEntityListParamsEntityTypeTokens           GetMonitoringEntityListParamsEntityType = "tokens"
+	GetMonitoringEntityListParamsEntityTypeUsers            GetMonitoringEntityListParamsEntityType = "users"
+)
+
+// Valid indicates whether the value is a known member of the GetMonitoringEntityListParamsEntityType enum.
+func (e GetMonitoringEntityListParamsEntityType) Valid() bool {
+	switch e {
+	case GetMonitoringEntityListParamsEntityTypeEnvironments:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeGroups:
+		return true
+	case GetMonitoringEntityListParamsEntityTypePermissions:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeProjectGroups:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeProjectResources:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeProjectUsers:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeProjects:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeRoles:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeTokens:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeUsers:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetMonitoringEntityListParamsStatus.
 const (
 	GetMonitoringEntityListParamsStatusFailure    GetMonitoringEntityListParamsStatus = "failure"
@@ -130,6 +172,48 @@ func (e GetMonitoringEntityListParamsStatus) Valid() bool {
 	case GetMonitoringEntityListParamsStatusInProgress:
 		return true
 	case GetMonitoringEntityListParamsStatusSuccess:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetMonitoringEntityDetailParamsEntityType.
+const (
+	GetMonitoringEntityDetailParamsEntityTypeEnvironments     GetMonitoringEntityDetailParamsEntityType = "environments"
+	GetMonitoringEntityDetailParamsEntityTypeGroups           GetMonitoringEntityDetailParamsEntityType = "groups"
+	GetMonitoringEntityDetailParamsEntityTypePermissions      GetMonitoringEntityDetailParamsEntityType = "permissions"
+	GetMonitoringEntityDetailParamsEntityTypeProjectGroups    GetMonitoringEntityDetailParamsEntityType = "projectGroups"
+	GetMonitoringEntityDetailParamsEntityTypeProjectResources GetMonitoringEntityDetailParamsEntityType = "projectResources"
+	GetMonitoringEntityDetailParamsEntityTypeProjectUsers     GetMonitoringEntityDetailParamsEntityType = "projectUsers"
+	GetMonitoringEntityDetailParamsEntityTypeProjects         GetMonitoringEntityDetailParamsEntityType = "projects"
+	GetMonitoringEntityDetailParamsEntityTypeRoles            GetMonitoringEntityDetailParamsEntityType = "roles"
+	GetMonitoringEntityDetailParamsEntityTypeTokens           GetMonitoringEntityDetailParamsEntityType = "tokens"
+	GetMonitoringEntityDetailParamsEntityTypeUsers            GetMonitoringEntityDetailParamsEntityType = "users"
+)
+
+// Valid indicates whether the value is a known member of the GetMonitoringEntityDetailParamsEntityType enum.
+func (e GetMonitoringEntityDetailParamsEntityType) Valid() bool {
+	switch e {
+	case GetMonitoringEntityDetailParamsEntityTypeEnvironments:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeGroups:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypePermissions:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeProjectGroups:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeProjectResources:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeProjectUsers:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeProjects:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeRoles:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeTokens:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeUsers:
 		return true
 	default:
 		return false
@@ -424,7 +508,7 @@ type ListJPDsParamsStatus string
 // GetMonitoringEntityListParams defines parameters for GetMonitoringEntityList.
 type GetMonitoringEntityListParams struct {
 	// EntityType Required query parameter. Entity type public key: users, groups, permissions, tokens, projects, environments, roles, projectGroups, projectUsers and projectResources. Users, groups, permissions and tokens are replicated through Access federation; the other types report zero counts.
-	EntityType string `form:"entity_type" json:"entity_type"`
+	EntityType GetMonitoringEntityListParamsEntityType `form:"entity_type" json:"entity_type"`
 
 	// Status Optional query parameter. Return only entities with at least one target in this state; omitted means any state.
 	Status *GetMonitoringEntityListParamsStatus `form:"status,omitempty" json:"status,omitempty"`
@@ -432,6 +516,9 @@ type GetMonitoringEntityListParams struct {
 	// PageToken Optional query parameter. The next_page_token from the previous page; omitted for the first page.
 	PageToken *string `form:"page_token,omitempty" json:"page_token,omitempty"`
 }
+
+// GetMonitoringEntityListParamsEntityType defines parameters for GetMonitoringEntityList.
+type GetMonitoringEntityListParamsEntityType string
 
 // GetMonitoringEntityListParamsStatus defines parameters for GetMonitoringEntityList.
 type GetMonitoringEntityListParamsStatus string
@@ -447,6 +534,9 @@ type GetMonitoringSummaryParams struct {
 	// ShowSystemEntities Optional query parameter. When true, also count the project-scoped types projectUsers, projectGroups and projectResources. Defaults to false.
 	ShowSystemEntities *bool `form:"show_system_entities,omitempty" json:"show_system_entities,omitempty"`
 }
+
+// GetMonitoringEntityDetailParamsEntityType defines parameters for GetMonitoringEntityDetail.
+type GetMonitoringEntityDetailParamsEntityType string
 
 // CreateGridTopologyJSONRequestBody defines body for CreateGridTopology for application/json ContentType.
 type CreateGridTopologyJSONRequestBody = CreateTopologyRequest
@@ -482,7 +572,7 @@ type ServerInterface interface {
 	GetMonitoringSummary(w http.ResponseWriter, r *http.Request, key string, params GetMonitoringSummaryParams)
 	// GetMonitoringEntityDetail Get one entity's sync state
 	// (GET /api/v1/topology/{key}/monitoring/entities/{entity_type}/{entity_id})
-	GetMonitoringEntityDetail(w http.ResponseWriter, r *http.Request, key string, entityType string, entityId string)
+	GetMonitoringEntityDetail(w http.ResponseWriter, r *http.Request, key string, entityType GetMonitoringEntityDetailParamsEntityType, entityId string)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -539,7 +629,7 @@ func (_ Unimplemented) GetMonitoringSummary(w http.ResponseWriter, r *http.Reque
 
 // GetMonitoringEntityDetail Get one entity's sync state
 // (GET /api/v1/topology/{key}/monitoring/entities/{entity_type}/{entity_id})
-func (_ Unimplemented) GetMonitoringEntityDetail(w http.ResponseWriter, r *http.Request, key string, entityType string, entityId string) {
+func (_ Unimplemented) GetMonitoringEntityDetail(w http.ResponseWriter, r *http.Request, key string, entityType GetMonitoringEntityDetailParamsEntityType, entityId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -882,7 +972,7 @@ func (siw *ServerInterfaceWrapper) GetMonitoringEntityDetail(w http.ResponseWrit
 	}
 
 	// ------------- Path parameter "entity_type" -------------
-	var entityType string
+	var entityType GetMonitoringEntityDetailParamsEntityType
 
 	err = runtime.BindStyledParameterWithOptions("simple", "entity_type", chi.URLParam(r, "entity_type"), &entityType, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
 	if err != nil {
@@ -1731,9 +1821,9 @@ func (response GetMonitoringSummary500JSONResponse) VisitGetMonitoringSummaryRes
 }
 
 type GetMonitoringEntityDetailRequestObject struct {
-	Key        string `json:"key"`
-	EntityType string `json:"entity_type"`
-	EntityId   string `json:"entity_id"`
+	Key        string                                    `json:"key"`
+	EntityType GetMonitoringEntityDetailParamsEntityType `json:"entity_type"`
+	EntityId   string                                    `json:"entity_id"`
 }
 
 type GetMonitoringEntityDetailResponseObject interface {
@@ -2115,7 +2205,7 @@ func (sh *strictHandler) GetMonitoringSummary(w http.ResponseWriter, r *http.Req
 }
 
 // GetMonitoringEntityDetail operation middleware
-func (sh *strictHandler) GetMonitoringEntityDetail(w http.ResponseWriter, r *http.Request, key string, entityType string, entityId string) {
+func (sh *strictHandler) GetMonitoringEntityDetail(w http.ResponseWriter, r *http.Request, key string, entityType GetMonitoringEntityDetailParamsEntityType, entityId string) {
 	var request GetMonitoringEntityDetailRequestObject
 
 	request.Key = key
@@ -2147,87 +2237,88 @@ func (sh *strictHandler) GetMonitoringEntityDetail(w http.ResponseWriter, r *htt
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

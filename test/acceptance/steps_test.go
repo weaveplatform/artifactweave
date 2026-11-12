@@ -172,6 +172,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerHex(sc)
 	w.registerPub(sc)
 	w.registerChef(sc)
+	w.registerChefCatalog(sc)
 	w.registerPuppet(sc)
 	w.registerNix(sc)
 	w.registerAlpine(sc)

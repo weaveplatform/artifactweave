@@ -110,6 +110,48 @@ func (e ListJPDsParamsStatus) Valid() bool {
 	}
 }
 
+// Defines values for GetMonitoringEntityListParamsEntityType.
+const (
+	GetMonitoringEntityListParamsEntityTypeEnvironments     GetMonitoringEntityListParamsEntityType = "environments"
+	GetMonitoringEntityListParamsEntityTypeGroups           GetMonitoringEntityListParamsEntityType = "groups"
+	GetMonitoringEntityListParamsEntityTypePermissions      GetMonitoringEntityListParamsEntityType = "permissions"
+	GetMonitoringEntityListParamsEntityTypeProjectGroups    GetMonitoringEntityListParamsEntityType = "projectGroups"
+	GetMonitoringEntityListParamsEntityTypeProjectResources GetMonitoringEntityListParamsEntityType = "projectResources"
+	GetMonitoringEntityListParamsEntityTypeProjectUsers     GetMonitoringEntityListParamsEntityType = "projectUsers"
+	GetMonitoringEntityListParamsEntityTypeProjects         GetMonitoringEntityListParamsEntityType = "projects"
+	GetMonitoringEntityListParamsEntityTypeRoles            GetMonitoringEntityListParamsEntityType = "roles"
+	GetMonitoringEntityListParamsEntityTypeTokens           GetMonitoringEntityListParamsEntityType = "tokens"
+	GetMonitoringEntityListParamsEntityTypeUsers            GetMonitoringEntityListParamsEntityType = "users"
+)
+
+// Valid indicates whether the value is a known member of the GetMonitoringEntityListParamsEntityType enum.
+func (e GetMonitoringEntityListParamsEntityType) Valid() bool {
+	switch e {
+	case GetMonitoringEntityListParamsEntityTypeEnvironments:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeGroups:
+		return true
+	case GetMonitoringEntityListParamsEntityTypePermissions:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeProjectGroups:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeProjectResources:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeProjectUsers:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeProjects:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeRoles:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeTokens:
+		return true
+	case GetMonitoringEntityListParamsEntityTypeUsers:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetMonitoringEntityListParamsStatus.
 const (
 	GetMonitoringEntityListParamsStatusFailure    GetMonitoringEntityListParamsStatus = "failure"
@@ -125,6 +167,48 @@ func (e GetMonitoringEntityListParamsStatus) Valid() bool {
 	case GetMonitoringEntityListParamsStatusInProgress:
 		return true
 	case GetMonitoringEntityListParamsStatusSuccess:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetMonitoringEntityDetailParamsEntityType.
+const (
+	GetMonitoringEntityDetailParamsEntityTypeEnvironments     GetMonitoringEntityDetailParamsEntityType = "environments"
+	GetMonitoringEntityDetailParamsEntityTypeGroups           GetMonitoringEntityDetailParamsEntityType = "groups"
+	GetMonitoringEntityDetailParamsEntityTypePermissions      GetMonitoringEntityDetailParamsEntityType = "permissions"
+	GetMonitoringEntityDetailParamsEntityTypeProjectGroups    GetMonitoringEntityDetailParamsEntityType = "projectGroups"
+	GetMonitoringEntityDetailParamsEntityTypeProjectResources GetMonitoringEntityDetailParamsEntityType = "projectResources"
+	GetMonitoringEntityDetailParamsEntityTypeProjectUsers     GetMonitoringEntityDetailParamsEntityType = "projectUsers"
+	GetMonitoringEntityDetailParamsEntityTypeProjects         GetMonitoringEntityDetailParamsEntityType = "projects"
+	GetMonitoringEntityDetailParamsEntityTypeRoles            GetMonitoringEntityDetailParamsEntityType = "roles"
+	GetMonitoringEntityDetailParamsEntityTypeTokens           GetMonitoringEntityDetailParamsEntityType = "tokens"
+	GetMonitoringEntityDetailParamsEntityTypeUsers            GetMonitoringEntityDetailParamsEntityType = "users"
+)
+
+// Valid indicates whether the value is a known member of the GetMonitoringEntityDetailParamsEntityType enum.
+func (e GetMonitoringEntityDetailParamsEntityType) Valid() bool {
+	switch e {
+	case GetMonitoringEntityDetailParamsEntityTypeEnvironments:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeGroups:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypePermissions:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeProjectGroups:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeProjectResources:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeProjectUsers:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeProjects:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeRoles:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeTokens:
+		return true
+	case GetMonitoringEntityDetailParamsEntityTypeUsers:
 		return true
 	default:
 		return false
@@ -419,7 +503,7 @@ type ListJPDsParamsStatus string
 // GetMonitoringEntityListParams defines parameters for GetMonitoringEntityList.
 type GetMonitoringEntityListParams struct {
 	// EntityType Required query parameter. Entity type public key: users, groups, permissions, tokens, projects, environments, roles, projectGroups, projectUsers and projectResources. Users, groups, permissions and tokens are replicated through Access federation; the other types report zero counts.
-	EntityType string `form:"entity_type" json:"entity_type"`
+	EntityType GetMonitoringEntityListParamsEntityType `form:"entity_type" json:"entity_type"`
 
 	// Status Optional query parameter. Return only entities with at least one target in this state; omitted means any state.
 	Status *GetMonitoringEntityListParamsStatus `form:"status,omitempty" json:"status,omitempty"`
@@ -427,6 +511,9 @@ type GetMonitoringEntityListParams struct {
 	// PageToken Optional query parameter. The next_page_token from the previous page; omitted for the first page.
 	PageToken *string `form:"page_token,omitempty" json:"page_token,omitempty"`
 }
+
+// GetMonitoringEntityListParamsEntityType defines parameters for GetMonitoringEntityList.
+type GetMonitoringEntityListParamsEntityType string
 
 // GetMonitoringEntityListParamsStatus defines parameters for GetMonitoringEntityList.
 type GetMonitoringEntityListParamsStatus string
@@ -442,6 +529,9 @@ type GetMonitoringSummaryParams struct {
 	// ShowSystemEntities Optional query parameter. When true, also count the project-scoped types projectUsers, projectGroups and projectResources. Defaults to false.
 	ShowSystemEntities *bool `form:"show_system_entities,omitempty" json:"show_system_entities,omitempty"`
 }
+
+// GetMonitoringEntityDetailParamsEntityType defines parameters for GetMonitoringEntityDetail.
+type GetMonitoringEntityDetailParamsEntityType string
 
 // CreateGridTopologyJSONRequestBody defines body for CreateGridTopology for application/json ContentType.
 type CreateGridTopologyJSONRequestBody = CreateTopologyRequest
@@ -606,7 +696,7 @@ type ClientInterface interface {
 	// Returns the delivery state of one entity to every target in the topology, including the last error for failed targets. Administrators only.
 	//
 	// Corresponds with GET /api/v1/topology/{key}/monitoring/entities/{entity_type}/{entity_id} (the `GetMonitoringEntityDetail` operationId).
-	GetMonitoringEntityDetail(ctx context.Context, key string, entityType string, entityId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetMonitoringEntityDetail(ctx context.Context, key string, entityType GetMonitoringEntityDetailParamsEntityType, entityId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // ListJPDs List known instances
@@ -792,7 +882,7 @@ func (c *Client) GetMonitoringSummary(ctx context.Context, key string, params *G
 // Returns the delivery state of one entity to every target in the topology, including the last error for failed targets. Administrators only.
 //
 // Corresponds with GET /api/v1/topology/{key}/monitoring/entities/{entity_type}/{entity_id} (the `GetMonitoringEntityDetail` operationId).
-func (c *Client) GetMonitoringEntityDetail(ctx context.Context, key string, entityType string, entityId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) GetMonitoringEntityDetail(ctx context.Context, key string, entityType GetMonitoringEntityDetailParamsEntityType, entityId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetMonitoringEntityDetailRequest(c.Server, key, entityType, entityId)
 	if err != nil {
 		return nil, err
@@ -1243,7 +1333,7 @@ func NewGetMonitoringSummaryRequest(server string, key string, params *GetMonito
 }
 
 // NewGetMonitoringEntityDetailRequest constructs an http.Request for the GetMonitoringEntityDetail method
-func NewGetMonitoringEntityDetailRequest(server string, key string, entityType string, entityId string) (*http.Request, error) {
+func NewGetMonitoringEntityDetailRequest(server string, key string, entityType GetMonitoringEntityDetailParamsEntityType, entityId string) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1431,7 +1521,7 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/topology/{key}/monitoring/entities/{entity_type}/{entity_id} (the `GetMonitoringEntityDetail` operationId).
-	GetMonitoringEntityDetailWithResponse(ctx context.Context, key string, entityType string, entityId string, reqEditors ...RequestEditorFn) (*GetMonitoringEntityDetailResponse, error)
+	GetMonitoringEntityDetailWithResponse(ctx context.Context, key string, entityType GetMonitoringEntityDetailParamsEntityType, entityId string, reqEditors ...RequestEditorFn) (*GetMonitoringEntityDetailResponse, error)
 }
 
 type ListJPDsResponse struct {
@@ -2240,7 +2330,7 @@ func (c *ClientWithResponses) GetMonitoringSummaryWithResponse(ctx context.Conte
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/v1/topology/{key}/monitoring/entities/{entity_type}/{entity_id} (the `GetMonitoringEntityDetail` operationId).
-func (c *ClientWithResponses) GetMonitoringEntityDetailWithResponse(ctx context.Context, key string, entityType string, entityId string, reqEditors ...RequestEditorFn) (*GetMonitoringEntityDetailResponse, error) {
+func (c *ClientWithResponses) GetMonitoringEntityDetailWithResponse(ctx context.Context, key string, entityType GetMonitoringEntityDetailParamsEntityType, entityId string, reqEditors ...RequestEditorFn) (*GetMonitoringEntityDetailResponse, error) {
 	rsp, err := c.GetMonitoringEntityDetail(ctx, key, entityType, entityId, reqEditors...)
 	if err != nil {
 		return nil, err
