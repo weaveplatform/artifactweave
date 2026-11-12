@@ -84,6 +84,9 @@
 //   - A virtual or remote repository serves a package only when the index
 //     of the repository that holds it lists that path, and pins a remote's
 //     download to the MD5 that index gives.
+//   - A server built without a remote source service answers a remote
+//     index or package read, made directly or through a virtual
+//     repository, 500, a fault of its own, not the upstream's.
 //   - An upload is spooled up to 512 MiB and read in full before the item
 //     service commits it, under the file name its archive's name and
 //     version give in the feed the URL names; it needs write on both.
@@ -115,8 +118,9 @@
 //     and #p9d-modular-monolith-migration, epic WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
 //   - https://github.com/weaveplatform/artifactweave/issues/778,
-//     https://github.com/weaveplatform/artifactweave/issues/1084 and
-//     https://github.com/weaveplatform/artifactweave/issues/1090
+//     https://github.com/weaveplatform/artifactweave/issues/1084,
+//     https://github.com/weaveplatform/artifactweave/issues/1090 and
+//     https://github.com/weaveplatform/artifactweave/issues/1247
 //
 // # Status
 //
@@ -142,6 +146,8 @@
 //     cancelled, then completed through the archive migration operation.
 //     Its requests run through the artifacts module's item routes and the
 //     artifactory strict handler with the CRAN partial alone.
+//   - cran_nosource_test.go: remote reads, direct and through a virtual
+//     repository, on a server built without a remote source service.
 //
 // The route suite test/server/artifacts/cran checks the protocol through
 // the router, the download policy's answers and the packages it keeps

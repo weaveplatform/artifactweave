@@ -30,6 +30,28 @@ import (
 
 const p2ExternalPrefix = "__p2_ext"
 
+// errNoRemoteSources is p2Read's error on a server built without a remote
+// source service. It is source.ErrUnavailable, so a caller that only asks
+// whether the source failed sees a failure, but writeP2SourceError answers
+// it apart from the upstream's faults. p2Read returns it instead of the
+// handler checking the service first, so a composite child path that is
+// not well formed keeps the answer it gets before any read.
+var errNoRemoteSources = fmt.Errorf("p2: no remote source service: %w", source.ErrUnavailable)
+
+// writeP2SourceError writes SourceError's answer for err, except that a
+// missing service answers 500 "internal error", as Alpine's and opkg's
+// remote reads do: the fault is this server's own, so it is not the
+// upstream's 502.
+func (s p2Items) writeP2SourceError(
+	w http.ResponseWriter, r *http.Request, err error, p kernel.Principal,
+) {
+	if errors.Is(err, errNoRemoteSources) {
+		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "P2 source", err))
+		return
+	}
+	httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+}
+
 func p2CompositeName(name string) bool {
 	if strings.Contains(name, "/") {
 		return false
@@ -161,7 +183,7 @@ func (s p2Items) p2Read(r *http.Request, c repo.Config, cached bool,
 	expected ...kernel.Checksums,
 ) (p2ReadResult, error) {
 	if s.RemoteSources == nil {
-		return p2ReadResult{}, source.ErrUnavailable
+		return p2ReadResult{}, errNoRemoteSources
 	}
 	rootArchive := false
 	if external == nil && p2CompositeName(pathName) {
@@ -477,7 +499,7 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 	if strings.HasPrefix(name, p2ExternalPrefix+"/") {
 		target, err = s.p2ResolveExternal(r, c, cached, name, p, acc)
 		if err != nil {
-			httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+			s.writeP2SourceError(w, r, err, p)
 			return
 		}
 	}
@@ -503,13 +525,13 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 	if target != nil && p2.Classify(filename) == p2.KindArtifact {
 		expected, err = s.p2ArtifactChecksums(r, c, cached, name, target, filename, p, acc)
 		if err != nil {
-			httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+			s.writeP2SourceError(w, r, err, p)
 			return
 		}
 	}
 	result, err := s.p2Read(r, c, cached, name, external, archiveEntry, p, acc, expected)
 	if err != nil {
-		httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+		s.writeP2SourceError(w, r, err, p)
 		return
 	}
 	body := result.body
