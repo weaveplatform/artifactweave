@@ -41,7 +41,7 @@
   "test/acceptance/clients/git-lfs.Dockerfile": "bb25363970ccbe79cfff23f03846660a607d52537476d73dbef24f551db6ceb4",
   "test/acceptance/clients/hex.Dockerfile": "1134f7709119dccef62756c2c1df54c46abc665188cb5b051a3bc15ba3933483",
   "test/acceptance/clients/jetbrains.Dockerfile": "b29f0e8fc52707c766466d3d922b67aea11749eebaa84e5b9975f7c4b1bc09ef",
-  "test/acceptance/clients/luarocks.Dockerfile": "2516c1b869b4ca57381d172705308ea14664776eb4045fdd5da4101dc06fb285",
+  "test/acceptance/clients/luarocks.Dockerfile": "937b5050a1fb123f579f9784abb52073ad481267318094bb85567139c95f2218",
   "test/acceptance/clients/maven-3.9/Dockerfile": "8250fe49f9ca3425030933b1200262ac429efc81003f6e00679fde123a8dfa78",
   "test/acceptance/clients/maven.Dockerfile": "6d80acfa233cd2b00d7e2042b41335e086fc7c46ce793a7f9d6bd21bbc0dc29b",
   "test/acceptance/clients/nix.Dockerfile": "a654a036f5f09ce14af401ad65b521666c1a8e7a7036cb508e25aa8ed6536c25",
