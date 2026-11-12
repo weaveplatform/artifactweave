@@ -43,7 +43,10 @@ Deleting or restoring a package also reconciles metadata. A remote repository
 validates Release and index structure, package bytes and cache freshness;
 plain, gzip, xz, bzip2 and zstd index encodings are accepted. A virtual
 repository merges authorized package records in member order and signs its
-own view.
+own view. Any other file under `dists/`, such as a component Release, a
+Contents index, a translation, an installer file or a Sources index, comes
+from the first member, in member order, that may serve it and holds it. The
+virtual repository's Release does not list those files.
 
 For source packages, deploy the `.dsc` with `dsc.distribution` and
 `dsc.component`, plus every archive named by that descriptor at the same
@@ -65,9 +68,11 @@ POST /artifactory/api/deb/<source-repo>/snapshot?async=0
 
 `async=1` queues durable work; `async=0` or omission waits for completion.
 The caller needs Read on the source metadata and packages and Write/Manage on
-the target snapshot path. The server copies checksum-verified metadata only,
-stores `deb.snapshot.source` on the snapshot folder, and rejects reuse of a
-completed tag. Point apt at the snapshot root:
+the target snapshot path. A caller who may read the source's Release but not
+a file the snapshot copies, or a package an index lists, gets 403, or 401
+when anonymous, and no snapshot is created. The server copies
+checksum-verified metadata only, stores `deb.snapshot.source` on the snapshot
+folder, and rejects reuse of a completed tag. Point apt at the snapshot root:
 
 ```text
 deb [signed-by=/etc/apt/keyrings/artifactweave.asc] https://<host>/artifactory/api/deb/<target-repo>/snapshots/first stable main
