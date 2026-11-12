@@ -810,7 +810,7 @@ keeps a release whose file the patterns reject (R3).
 | Maven | `maven-metadata.xml` and files, through the item routes | none | Version tokens skip rejected releases; a remote's refused `maven-metadata.xml` counts as absent [I]. `.index/` files take the blackout alone. |
 | Docker, OCI, Helm OCI | `<image>/<tag>/manifest.json`, `<image>/sha256:<hex>/manifest.json`, `<image>/_uploads/sha256__<hex>` [I] | `tags/list`, referrers (`<image>`) | `_catalog` leaves out rejected images; a local repository's tags lists keep rejected tags. |
 | p2 | composites and files, through the item routes, a virtual's member files at `<member key>/<path>` and its composite's children from `p2Urls` (#1257); a remote repository over a `site.zip!/` URL at the entry's path | none | `p2.index` takes the blackout alone. A virtual leaves a blacked-out member out. |
-| Debian | `Packages*`, `Sources*`, by-hash, `Release`, `InRelease`, `Release.gpg`; a snapshot's `snapshots/<tag>/<path>` | none | |
+| Debian | `Packages*`, `Sources*`, by-hash, `Release`, `InRelease`, `Release.gpg`; a snapshot's `snapshots/<tag>/<path>` | none | A remote repository's installer `Packages` index, any by-hash file and a `.lzma` index answer the same since the remote asks its upstream for them (#1273); before, it answered a bare 404 without asking. |
 | RPM | `repodata/repomd.xml` and the other repodata | none | |
 | Alpine | `<branch>/<repo>/<arch>/APKINDEX.tar.gz` | none | |
 | Opkg | `<feed>/Packages`, `Packages.gz` | none | |

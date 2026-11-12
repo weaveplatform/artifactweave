@@ -586,7 +586,8 @@ func TestAccDebianVirtualPackage(t *testing.T) {
 // TestUnitDebianRemoteVirtualPackageRefusesAPathTheSourceCannotName: the
 // remote member read answers not found, without asking the source, for a
 // package path its Debian source request refuses. The virtual package
-// route passes only valid binary paths, so only a direct call reaches it.
+// route passes only valid binary paths, which the request admits by their
+// grammar before any other check (#1273), so only a direct call reaches it.
 func TestUnitDebianRemoteVirtualPackageRefusesAPathTheSourceCannotName(t *testing.T) {
 	w := newOverlayWorld(t, refuseSources(t))
 	w.debRepos(repo.Config{Key: "deb-remote", Class: repo.Remote})

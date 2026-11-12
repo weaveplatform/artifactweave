@@ -20,6 +20,13 @@ import (
 
 const maxPublishMetadata = 64 << 10
 
+// invalidArchive refuses a source archive that holds no valid package. The
+// registry specification (4.6.1) gives 422 for a release the server will not
+// publish.
+func invalidArchive() error {
+	return bad(http.StatusUnprocessableEntity, "invalid Swift source archive")
+}
+
 // decodeReader retains a malformed transfer encoding error even when the
 // upload service translates its read error into a generic item error.
 type decodeReader struct {
@@ -57,7 +64,7 @@ func (h handler) localPublish(w http.ResponseWriter, r *http.Request, p swiftfmt
 	_, inspectErr := swiftfmt.InspectArchive(r.Context(), rc, info.Size)
 	_ = rc.Close()
 	if inspectErr != nil {
-		h.k.Error(w, r, bad(http.StatusUnprocessableEntity, "invalid Swift source archive"))
+		h.k.Error(w, r, invalidArchive())
 		return
 	}
 	props := model.Properties{}
@@ -134,11 +141,18 @@ func (h handler) uploadRelease(w http.ResponseWriter, r *http.Request) (blob.Inf
 				}
 				return blob.Info{}, nil, fmt.Errorf("swift: upload source archive: %w", err)
 			}
-			if info.Size == 0 || info.Size > swiftfmt.MaxArchiveBytes {
+			if info.Size > swiftfmt.MaxArchiveBytes {
 				return blob.Info{}, nil, bad(
 					http.StatusRequestEntityTooLarge,
 					"Swift source archive exceeds limit",
 				)
+			}
+			// An empty archive is not too large but holds no package, so it
+			// gets the answer of any other archive that is not one (#1235).
+			// Refusing it here, as the size check did, keeps the order in
+			// which a form's faults are found.
+			if info.Size == 0 {
+				return blob.Info{}, nil, invalidArchive()
 			}
 		case "metadata":
 			if gotMetadata {

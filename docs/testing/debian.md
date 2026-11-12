@@ -36,17 +36,26 @@ PUT /artifactory/<repo>/pool/main/a/alpha/alpha_1.0_amd64.deb;deb.distribution=s
 
 The server checks the dpkg control and data archive, file name and declared
 coordinates, then builds Packages, Packages.gz, Release, InRelease,
-Release.gpg and SHA-256 by-hash metadata. The repository's Release signer
-binds the index checksum; apt checks both the Release signature and package
-checksum. `POST /artifactory/api/deb/reindex/<repo>` rebuilds a local index.
-Deleting or restoring a package also reconciles metadata. A remote repository
-validates Release and index structure, package bytes and cache freshness;
-plain, gzip, xz, bzip2 and zstd index encodings are accepted. A virtual
+Release.gpg and SHA-256 by-hash metadata. Set the repository's
+`optionalIndexCompressionFormats` to any of `bz2`, `lzma` and `xz` to also
+write Packages.bz2, Packages.lzma and Packages.xz; the Release lists each
+form with its by-hash copy, and the setting takes effect at the next index
+rebuild. A Sources index keeps its plain and gzip forms. The repository's
+Release signer binds the index checksum; apt checks both the Release
+signature and package checksum. `POST /artifactory/api/deb/reindex/<repo>`
+rebuilds a local index. Deleting or restoring a package also reconciles
+metadata. A remote repository validates Release and index structure, package
+bytes and cache freshness; plain, gzip, xz, bzip2, lzma and zstd index
+encodings are accepted. It also asks its upstream for an installer's
+Packages index, checked as an index of `.udeb` files, and for any
+`by-hash/SHA256` file, checked against the SHA-256 its name gives. A virtual
 repository merges authorized package records in member order and signs its
-own view. Any other file under `dists/`, such as a component Release, a
-Contents index, a translation, an installer file or a Sources index, comes
-from the first member, in member order, that may serve it and holds it. The
-virtual repository's Release does not list those files.
+own view, in plain and gzip forms and the forms its own
+`optionalIndexCompressionFormats` names. Any other file under `dists/`, such
+as a component Release, a Contents index, a translation, an installer file
+or a Sources index, comes from the first member, in member order, that may
+serve it and holds it; a remote member asks its upstream. The virtual
+repository's Release does not list those files.
 
 For source packages, deploy the `.dsc` with `dsc.distribution` and
 `dsc.component`, plus every archive named by that descriptor at the same

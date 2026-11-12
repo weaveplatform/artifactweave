@@ -18,6 +18,7 @@ func (w *world) registerPuppet(sc *godog.ScenarioContext) {
 	sc.Step(`^the Puppet fixtures are ready$`, w.puppetFixtures)
 	sc.Step(`^I install Puppet module "([^"]*)" from "([^"]*)" into "([^"]*)"$`, w.puppetInstall)
 	sc.Step(`^a Puppet upstream serves the controlled modules$`, w.puppetUpstream)
+	w.registerPuppetPaging(sc)
 }
 
 func (w *world) puppetFixtures() error {
@@ -39,6 +40,12 @@ func (w *world) puppetFixtures() error {
 }
 
 func (w *world) puppetInstall(name, repoKey, destination string) error {
+	return w.puppetInstallWith(name, repoKey, destination)
+}
+
+// puppetInstallWith installs module name as puppetInstall does, with extra
+// arguments after its own.
+func (w *world) puppetInstallWith(name, repoKey, destination string, extra ...string) error {
 	if err := w.clientReachable("Puppet"); err != nil {
 		return err
 	}
@@ -63,7 +70,7 @@ func (w *world) puppetInstall(name, repoKey, destination string) error {
 		"--forge_authorization",
 		"Bearer " + w.vars["puppet-token"],
 	}
-	return w.runContainer(w.puppetImage, nil, args)
+	return w.runContainer(w.puppetImage, nil, append(args, extra...))
 }
 
 func (w *world) puppetUpstream() error {

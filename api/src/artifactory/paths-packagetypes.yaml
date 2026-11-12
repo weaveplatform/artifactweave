@@ -192,7 +192,9 @@ paths:
       x-tier: native
   /api/conan/{repoKey}/reindex:
     post:
-      description: Not implemented for the Conan ecosystem; answers 501.
+      description: Queues a rebuild of the package index of a local or federated Conan repository from its
+        completed recipe and package revisions, and returns once the work is queued. Requires Manage on the
+        repository; other package types and classes are rejected with 400.
       operationId: calculateConanRepositoryMetadata
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -204,22 +206,21 @@ paths:
           description: Key of the repository to act on. The repository's package type must match this
             operation's ecosystem; a mismatch is rejected with 400.
           type: string
-      - description: Optional query parameter. When true the server queues the work and returns at once; when
-          false or omitted the response waits for the work to finish.
+      - description: Optional query parameter. Accepted with either value; the work is always queued and the
+          response returns once it is queued.
         in: query
         name: async
         schema:
-          description: When true the server queues the work and returns at once; when false or omitted the
-            response waits for the work to finish.
+          description: Accepted with either value; the work is always queued.
           type: boolean
       responses:
         '200':
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text acknowledgement of the queued reindex.
                 type: string
-          description: Not returned.
+          description: The Conan reindex was scheduled.
         '401':
           content:
             application/json:
@@ -245,7 +246,9 @@ paths:
       x-tier: stub
   /api/conda/{repoKey}/reindex:
     post:
-      description: Not implemented for the Conda ecosystem; answers 501.
+      description: Rebuilds the channel indexes of a local or federated Conda repository from its stored package
+        archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other
+        package types and classes are rejected with 400.
       operationId: calculateCondaRepositoryMetadata
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -270,9 +273,9 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text acknowledgement of the reindex.
                 type: string
-          description: Not returned.
+          description: The Conda reindex ran, or was scheduled when async is true.
         '401':
           content:
             application/json:
@@ -298,7 +301,9 @@ paths:
       x-tier: stub
   /api/cran/reindex/{repoKey}:
     post:
-      description: Not implemented for the CRAN ecosystem; answers 501.
+      description: Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives.
+        Waits for the work to finish unless async is true. Requires Manage on the repository; other package
+        types, and federated, remote and virtual repositories, are rejected with 400.
       operationId: calculateCranRepositoryMetadata
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -323,9 +328,9 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text acknowledgement of the reindex.
                 type: string
-          description: Not returned.
+          description: The CRAN reindex ran, or was scheduled when async is true.
         '401':
           content:
             application/json:
@@ -1429,7 +1434,12 @@ paths:
       x-tier: native
   /api/puppet/{repoKey}/v3/modules:
     get:
-      description: Not implemented for the Puppet ecosystem; answers 501.
+      description: Lists the Puppet modules the caller may read, in pages. With `query` naming one module,
+        the page holds that module when the caller may read a release of it, and is empty otherwise; local,
+        federated, remote and virtual repositories answer it. Without `query`, the pages list every module
+        a local or federated repository hosts, ordered by name; a virtual repository answers 404 and a remote
+        repository 400. A page holds 20 modules unless `limit` asks for up to 100, and a larger `limit` is
+        served as 100. Each module lists only the releases the caller may read.
       operationId: getPuppetModules
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -1441,42 +1451,44 @@ paths:
           description: Key of the repository to act on. The repository's package type must match this
             operation's ecosystem; a mismatch is rejected with 400.
           type: string
+      - description: Optional query parameter. Exact name of the one module to answer, as `<owner>-<name>`,
+          for example `puppetlabs-stdlib`. Any other search, a repeated parameter or a parameter other than
+          `query`, `limit` and `offset` is rejected with 400.
+        in: query
+        name: query
+        schema:
+          description: Exact module name, as `<owner>-<name>`.
+          type: string
+      - description: Optional query parameter. Most modules a page holds, at least 1. Defaults to 20; a value
+          above 100 is served as 100.
+        in: query
+        name: limit
+        schema:
+          description: Most modules a page holds, at least 1.
+          minimum: 1
+          type: integer
+      - description: Optional query parameter. Number of modules before the page, at least 0. Defaults to 0;
+          an offset past the last module answers an empty page.
+        in: query
+        name: offset
+        schema:
+          description: Number of modules before the page, at least 0.
+          minimum: 0
+          type: integer
       responses:
         '200':
           content:
             application/json:
               schema:
-                description: Puppet Forge style paginated listing. Not returned.
-                properties:
-                  current:
-                    description: Optional within this object. URL of the current page of results.
-                    type: string
-                  limit:
-                    description: Optional within this object. Page size the upstream Forge API applied.
-                    type: integer
-                  next:
-                    description: Optional within this object. URL of the next page, or null on the last
-                      page.
-                    type: string
-                  offset:
-                    description: Optional within this object. Index of the first result on this page.
-                    type: integer
-                  previous:
-                    description: Optional within this object. URL of the previous page, or null on the
-                      first page.
-                    type: string
-                  results:
-                    description: Optional within this object. Forge module or release records for this
-                      page.
-                    items:
-                      description: One element of the list.
-                      type: object
-                    type: array
-                  total:
-                    description: Optional within this object. Total number of records across all pages.
-                    type: integer
-                type: object
-          description: Not returned.
+                $ref: '#/components/schemas/PuppetModulePage'
+          description: One page of modules.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The query is malformed or names something other than one module, or the repository
+            is a remote repository asked for every module; the body carries the error envelope.
         '401':
           content:
             application/json:
@@ -1490,19 +1502,42 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs; the body carries the error
             envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository does not exist or is blacked out, or is a virtual repository asked
+            for every module; the body carries the error envelope.
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The server failed while processing the request; the body carries the error envelope.
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A remote repository's upstream answered release metadata that does not validate, or
+            a stored release no longer matches its archive; the body carries the error envelope.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The module has more than 4,096 releases, or the repository more than 4,096 modules or
+            65,536 releases; the body carries the error envelope.
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpuppetmodules.md
-      x-tier: stub
+      x-tier: native
   /api/puppet/{repoKey}/v3/modules/{userModule}:
     get:
-      description: Not implemented for the Puppet ecosystem; answers 501.
+      description: Returns one Puppet module, its newest release and the list of its releases the caller
+        may read, from a local, federated, remote or virtual repository. A module with no release the caller
+        may read answers 404. Any query parameter is rejected with 400.
       operationId: getPuppetModuleInfo
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -1526,9 +1561,15 @@ paths:
           content:
             application/json:
               schema:
-                description: Free-form JSON document. Not returned.
-                type: object
-          description: Not returned.
+                $ref: '#/components/schemas/PuppetModule'
+          description: The module.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The module name is not `<owner>-<name>`, or the request carries a query; the body
+            carries the error envelope.
         '401':
           content:
             application/json:
@@ -1555,13 +1596,30 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The server failed while processing the request; the body carries the error envelope.
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A remote repository's upstream answered release metadata that does not validate, or
+            a stored release no longer matches its archive; the body carries the error envelope.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The module has more than 4,096 releases; the body carries the error envelope.
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpuppetmoduleinfo.md
-      x-tier: stub
+      x-tier: native
   /api/puppet/{repoKey}/v3/releases:
     get:
-      description: Not implemented for the Puppet ecosystem; answers 501.
+      description: Lists the Puppet module releases the caller may read, in pages, newest version first.
+        With `module`, the pages list that one module's releases; local, federated, remote and virtual
+        repositories answer them. Without `module`, the pages list every release a local or federated
+        repository hosts, by module name; a virtual repository answers 404 and a remote repository 400. A
+        page holds 20 releases unless `limit` asks for up to 100, and a larger `limit` is served as 100.
       operationId: getPuppetReleases
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -1573,42 +1631,59 @@ paths:
           description: Key of the repository to act on. The repository's package type must match this
             operation's ecosystem; a mismatch is rejected with 400.
           type: string
+      - description: Optional query parameter. Module whose releases to list, as `<owner>-<name>`, for
+          example `puppetlabs-stdlib`. A repeated parameter, or a parameter other than `module`, `limit`,
+          `offset`, `sort_by` and `exclude_fields`, is rejected with 400.
+        in: query
+        name: module
+        schema:
+          description: Module name, as `<owner>-<name>`.
+          type: string
+      - description: Optional query parameter. Most releases a page holds, at least 1. Defaults to 20; a
+          value above 100 is served as 100.
+        in: query
+        name: limit
+        schema:
+          description: Most releases a page holds, at least 1.
+          minimum: 1
+          type: integer
+      - description: Optional query parameter. Number of releases before the page, at least 0, and with
+          `module` at most 4,096. Defaults to 0; an offset past the last release answers an empty page.
+        in: query
+        name: offset
+        schema:
+          description: Number of releases before the page, at least 0.
+          minimum: 0
+          type: integer
+      - description: Optional query parameter. Accepted with `module` as `version`, the order the releases
+          are listed in; any other value is rejected with 400.
+        in: query
+        name: sort_by
+        schema:
+          description: The release order, `version`.
+          enum:
+          - version
+          type: string
+      - description: Optional query parameter. Accepted with `module`; every record keeps all its fields.
+        in: query
+        name: exclude_fields
+        schema:
+          description: Names of record fields, separated by spaces.
+          type: string
       responses:
         '200':
           content:
             application/json:
               schema:
-                description: Puppet Forge style paginated listing. Not returned.
-                properties:
-                  current:
-                    description: Optional within this object. URL of the current page of results.
-                    type: string
-                  limit:
-                    description: Optional within this object. Page size the upstream Forge API applied.
-                    type: integer
-                  next:
-                    description: Optional within this object. URL of the next page, or null on the last
-                      page.
-                    type: string
-                  offset:
-                    description: Optional within this object. Index of the first result on this page.
-                    type: integer
-                  previous:
-                    description: Optional within this object. URL of the previous page, or null on the
-                      first page.
-                    type: string
-                  results:
-                    description: Optional within this object. Forge module or release records for this
-                      page.
-                    items:
-                      description: One element of the list.
-                      type: object
-                    type: array
-                  total:
-                    description: Optional within this object. Total number of records across all pages.
-                    type: integer
-                type: object
-          description: Not returned.
+                $ref: '#/components/schemas/PuppetReleasePage'
+          description: One page of releases.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The query is malformed, names an invalid module or page, or the repository is a
+            remote repository asked for every release; the body carries the error envelope.
         '401':
           content:
             application/json:
@@ -1622,19 +1697,41 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs; the body carries the error
             envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository does not exist or is blacked out, or is a virtual repository asked
+            for every release; the body carries the error envelope.
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The server failed while processing the request; the body carries the error envelope.
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A remote repository's upstream answered release metadata that does not validate, or
+            a stored release no longer matches its archive; the body carries the error envelope.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The module has more than 4,096 releases, or the repository more than 4,096 modules or
+            65,536 releases; the body carries the error envelope.
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpuppetreleases.md
-      x-tier: stub
+      x-tier: native
   /api/puppet/{repoKey}/v3/releases/{userModuleVersion}:
     get:
-      description: Not implemented for the Puppet ecosystem; answers 501.
+      description: Returns one Puppet module release the caller may read, from a local, federated, remote
+        or virtual repository. Any query parameter is rejected with 400.
       operationId: getPuppetReleaseInfo
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -1658,9 +1755,15 @@ paths:
           content:
             application/json:
               schema:
-                description: Free-form JSON document. Not returned.
-                type: object
-          description: Not returned.
+                $ref: '#/components/schemas/PuppetRelease'
+          description: The release.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The release is not named `<owner>-<name>-<version>`, or the request carries a query;
+            the body carries the error envelope.
         '401':
           content:
             application/json:
@@ -1687,10 +1790,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The server failed while processing the request; the body carries the error envelope.
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A remote repository's upstream answered release metadata that does not validate, or
+            the stored release no longer matches its archive; the body carries the error envelope.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The module has more than 4,096 releases; the body carries the error envelope.
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpuppetreleaseinfo.md
-      x-tier: stub
+      x-tier: native
   /api/pypi/{repoKey}/reindex:
     post:
       description: Rebuilds the package metadata index from distribution files in a local or federated
@@ -3475,3 +3591,376 @@ paths:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateyumrepositorymetadata.md
       x-tier: native
+# The Puppet Forge v3 records the four Puppet operations answer. The reference schema of
+# Get Puppet Releases and Get Puppet Modules draws total, limit, offset, current, next and
+# previous at the top level of a list; the sample answer of Get Puppet Modules (archived
+# reference pages) and the release list quoted in RTFACT-14557 nest them under
+# pagination, in the Forge's shape, which the Forge clients read. These schemas follow
+# the answers, and api/parity-baseline.json records the reference's top-level fields as
+# missing.
+components:
+  schemas:
+    PuppetDependency:
+      description: One module a release depends on, from its metadata.json.
+      properties:
+        name:
+          description: Required within this object. The module depended on, as `<owner>/<name>` or
+            `<owner>-<name>`.
+          type: string
+        version_requirement:
+          description: Required within this object. The versions accepted, in Puppet's range syntax, for
+            example `>= 1.0.0 < 2.0.0`.
+          type: string
+      required:
+      - name
+      - version_requirement
+      type: object
+    PuppetManifest:
+      description: The validated fields of a release's metadata.json.
+      properties:
+        author:
+          description: Optional within this object. The module's author; omitted when metadata.json has none.
+          type: string
+        dependencies:
+          description: Required within this object. The modules the release depends on; empty when it has
+            none.
+          items:
+            $ref: '#/components/schemas/PuppetDependency'
+          type: array
+        license:
+          description: Optional within this object. The license name metadata.json gives; omitted when it
+            gives none.
+          type: string
+        name:
+          description: Required within this object. The module's name, as `<owner>-<name>`.
+          type: string
+        source:
+          description: Optional within this object. The module's source repository URL; omitted when
+            metadata.json gives none.
+          type: string
+        summary:
+          description: Optional within this object. One-line summary of the module; omitted when
+            metadata.json gives none.
+          type: string
+        version:
+          description: Required within this object. The release's semantic version.
+          type: string
+      required:
+      - name
+      - version
+      - dependencies
+      type: object
+    PuppetModule:
+      description: A Puppet module, with its newest release and every release the caller may read.
+      properties:
+        created_at:
+          description: Required within this object. When the module's first release was published, as
+            `YYYY-MM-DD hh:mm:ss ±hhmm`; null when no release gives a date in that form.
+          nullable: true
+          type: string
+        current_release:
+          allOf:
+          - $ref: '#/components/schemas/PuppetRelease'
+          description: Required within this object. The module's newest release the caller may read.
+        downloads:
+          description: Required within this object. Downloads of the module's releases, summed.
+          type: integer
+        endorsement:
+          description: Required within this object. The module's endorsement; null.
+          nullable: true
+          type: string
+        homepage_url:
+          description: Required within this object. The newest release's metadata.json `project_page`; null
+            when it gives none.
+          nullable: true
+          type: string
+        issues_url:
+          description: Required within this object. The newest release's metadata.json `issues_url`; null
+            when it gives none.
+          nullable: true
+          type: string
+        module_group:
+          description: Required within this object. The module's group, `base`.
+          type: string
+        name:
+          description: Required within this object. The module's name without its owner.
+          type: string
+        owner:
+          allOf:
+          - $ref: '#/components/schemas/PuppetOwner'
+          description: Required within this object. The module's owner.
+        releases:
+          description: Required within this object. Every release of the module the caller may read, newest
+            version first.
+          items:
+            $ref: '#/components/schemas/PuppetReleaseLink'
+          type: array
+        slug:
+          description: Required within this object. The module's name, as `<owner>-<name>`.
+          type: string
+        supported:
+          description: Required within this object. Whether the newest release is a supported module; false
+            unless a remote repository's upstream says otherwise.
+          type: boolean
+        updated_at:
+          description: Required within this object. When a release of the module last changed, as
+            `YYYY-MM-DD hh:mm:ss ±hhmm`; null when no release gives a date in that form.
+          nullable: true
+          type: string
+        uri:
+          description: Required within this object. The module's path, `/v3/modules/<owner>-<name>`.
+          type: string
+      required:
+      - uri
+      - slug
+      - name
+      - downloads
+      - created_at
+      - updated_at
+      - supported
+      - endorsement
+      - module_group
+      - owner
+      - current_release
+      - releases
+      - homepage_url
+      - issues_url
+      type: object
+    PuppetModulePage:
+      description: One page of Puppet modules.
+      properties:
+        pagination:
+          allOf:
+          - $ref: '#/components/schemas/PuppetPagination'
+          description: Required within this object. Where the page sits in the list, and the links to the
+            pages around it.
+        results:
+          description: Required within this object. The modules on this page.
+          items:
+            $ref: '#/components/schemas/PuppetModule'
+          type: array
+      required:
+      - pagination
+      - results
+      type: object
+    PuppetOwner:
+      description: The owner of a Puppet module, the part of its name before the dash.
+      properties:
+        gravatar_id:
+          description: Required within this object. The owner's Gravatar hash; null unless a remote
+            repository's upstream gives one.
+          nullable: true
+          type: string
+        slug:
+          description: Required within this object. The owner's name.
+          type: string
+        uri:
+          description: Required within this object. The owner's path, `/v3/users/<owner>`.
+          type: string
+        username:
+          description: Required within this object. The owner's name.
+          type: string
+      required:
+      - uri
+      - slug
+      - username
+      - gravatar_id
+      type: object
+    PuppetPagination:
+      description: Where a page sits in a Puppet list. Each link is a path relative to the repository's
+        Forge root that names the filter first, then `limit` and `offset`, for example
+        `/v3/releases?module=puppetlabs-stdlib&limit=20&offset=20`.
+      properties:
+        current:
+          description: Required within this object. Link to this page.
+          type: string
+        first:
+          description: Required within this object. Link to the first page.
+          type: string
+        limit:
+          description: Required within this object. Most entries a page holds.
+          type: integer
+        next:
+          description: Required within this object. Link to the next page; null on the last page.
+          nullable: true
+          type: string
+        offset:
+          description: Required within this object. Number of entries before this page.
+          type: integer
+        previous:
+          description: Required within this object. Link to the previous page; null on the first page.
+          nullable: true
+          type: string
+        total:
+          description: Required within this object. Number of entries in the whole list.
+          type: integer
+      required:
+      - limit
+      - offset
+      - first
+      - previous
+      - current
+      - next
+      - total
+      type: object
+    PuppetRelease:
+      description: A Puppet module release.
+      properties:
+        changelog:
+          description: Required within this object. The release's changelog text; null unless a remote
+            repository's upstream gives one.
+          nullable: true
+          type: string
+        created_at:
+          description: Required within this object. When the release was published, as
+            `YYYY-MM-DD hh:mm:ss ±hhmm`, in UTC for a hosted release; a remote repository gives its
+            upstream's value as it is.
+          nullable: true
+          type: string
+        deleted_at:
+          description: Required within this object. When the release was deleted upstream; null unless a
+            remote repository's upstream gives a date.
+          nullable: true
+          type: string
+        downloads:
+          description: Required within this object. How many times the release's archive was downloaded
+            from the repository; a remote repository gives its upstream's count.
+          type: integer
+        file_md5:
+          description: Required within this object. MD5 of the archive in hex; null when none is known.
+          nullable: true
+          type: string
+        file_sha256:
+          description: Required within this object. SHA-256 of the archive in hex, which the client checks
+            the download against.
+          type: string
+        file_size:
+          description: Required within this object. Size of the archive in bytes.
+          type: integer
+        file_uri:
+          description: Required within this object. The archive's path,
+            `/v3/files/<owner>-<name>-<version>.tar.gz`, relative to the repository's Forge root.
+          type: string
+        license:
+          description: Required within this object. The release's license text; null unless a remote
+            repository's upstream gives one.
+          nullable: true
+          type: string
+        metadata:
+          allOf:
+          - $ref: '#/components/schemas/PuppetManifest'
+          description: Required within this object. The release's metadata.json, as validated.
+        module:
+          allOf:
+          - $ref: '#/components/schemas/PuppetReleaseModule'
+          description: Required within this object. The module the release belongs to.
+        readme:
+          description: Required within this object. The release's README text; null unless a remote
+            repository's upstream gives one.
+          nullable: true
+          type: string
+        slug:
+          description: Required within this object. The release's name, as `<owner>-<name>-<version>`.
+          type: string
+        supported:
+          description: Required within this object. Whether the release is a supported module; false unless a
+            remote repository's upstream says otherwise.
+          type: boolean
+        tags:
+          description: Required within this object. The release's tags; empty.
+          items:
+            description: One tag.
+            type: string
+          type: array
+        updated_at:
+          description: Required within this object. When the release last changed, as
+            `YYYY-MM-DD hh:mm:ss ±hhmm`, in UTC for a hosted release; a remote repository gives its
+            upstream's value as it is.
+          nullable: true
+          type: string
+        uri:
+          description: Required within this object. The release's path,
+            `/v3/releases/<owner>-<name>-<version>`.
+          type: string
+        version:
+          description: Required within this object. The release's semantic version.
+          type: string
+      required:
+      - uri
+      - slug
+      - module
+      - version
+      - metadata
+      - tags
+      - supported
+      - file_uri
+      - file_size
+      - file_md5
+      - file_sha256
+      - downloads
+      - readme
+      - changelog
+      - license
+      - created_at
+      - updated_at
+      - deleted_at
+      type: object
+    PuppetReleaseLink:
+      description: One release a Puppet module lists.
+      properties:
+        uri:
+          description: Required within this object. The release's path,
+            `/v3/releases/<owner>-<name>-<version>`.
+          type: string
+        version:
+          description: Required within this object. The release's semantic version.
+          type: string
+      required:
+      - uri
+      - version
+      type: object
+    PuppetReleaseModule:
+      description: The module a Puppet release belongs to.
+      properties:
+        deprecated_at:
+          description: Required within this object. When the module was deprecated; null unless a remote
+            repository's upstream gives a date.
+          nullable: true
+          type: string
+        name:
+          description: Required within this object. The module's name without its owner.
+          type: string
+        owner:
+          allOf:
+          - $ref: '#/components/schemas/PuppetOwner'
+          description: Required within this object. The module's owner.
+        slug:
+          description: Required within this object. The module's name, as `<owner>-<name>`.
+          type: string
+        uri:
+          description: Required within this object. The module's path, `/v3/modules/<owner>-<name>`.
+          type: string
+      required:
+      - uri
+      - slug
+      - name
+      - owner
+      - deprecated_at
+      type: object
+    PuppetReleasePage:
+      description: One page of Puppet module releases.
+      properties:
+        pagination:
+          allOf:
+          - $ref: '#/components/schemas/PuppetPagination'
+          description: Required within this object. Where the page sits in the list, and the links to the
+            pages around it.
+        results:
+          description: Required within this object. The releases on this page.
+          items:
+            $ref: '#/components/schemas/PuppetRelease'
+          type: array
+      required:
+      - pagination
+      - results
+      type: object

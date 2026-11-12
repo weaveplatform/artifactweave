@@ -125,15 +125,19 @@ func (s DebianAPI) buildVirtualDebianView(
 			}
 			plain.Write(row.Raw)
 		}
-		compressed, err := debian.GzipIndex(plain.Bytes())
+		// The JFrog guide gives a virtual repository its own Optional Index
+		// Compression Formats, and RTFACT-24246 (7.15.3) put the setting in
+		// its REST configuration, so the composed index takes the virtual
+		// repository's formats, not its members'.
+		forms, err := debian.IndexForms(plain.Bytes(), c.OptionalIndexCompressionFormats)
 		if err != nil {
-			return debianVirtualView{}, fmt.Errorf("debian virtual Packages gzip: %w", err)
+			return debianVirtualView{}, fmt.Errorf("debian virtual Packages forms: %w", err)
 		}
 		base := "dists/" + distribution + "/"
-		for _, file := range []debian.ReleaseEntry{
-			{Path: strings.TrimPrefix(indexPath, base), Body: plain.Bytes()},
-			{Path: strings.TrimPrefix(indexPath, base) + ".gz", Body: compressed},
-		} {
+		for _, form := range forms {
+			file := debian.ReleaseEntry{
+				Path: strings.TrimPrefix(indexPath, base) + form.Suffix, Body: form.Body,
+			}
 			files[base+file.Path] = file.Body
 			entries = append(entries, file)
 			sha := sha256.Sum256(file.Body)
@@ -379,13 +383,12 @@ func (s DebianAPI) serveRemoteVirtualDebianFile(
 	}
 	q, err := itemkit.DebianSourceRequest(q)
 	if errors.Is(err, kernel.ErrNotFound) && strings.HasPrefix(req.Path, "dists/") {
-		// Under dists/ the request admits only the Release files and the
-		// indexes it can validate, so the member answers its own GET of an
-		// installer's Packages index or a translation's by-hash copy not
-		// found. It lacks the file, and the walk asks the next member, as
-		// 7.x passes over a member that does not serve a path (decision
-		// 0032, R5); otherwise a remote member listed first would hide the
-		// installer files a later local member holds (RTFACT-30014). A
+		// Under dists/ the request refuses only a name shaped like a
+		// by-hash file or an index apt reads that is not one, such as a
+		// by-hash name that is no SHA-256, without asking the upstream
+		// (#1273). The member answers its own GET of it not found, so it
+		// lacks the file, and the walk asks the next member, as 7.x passes
+		// over a member that does not serve a path (decision 0032, R5). A
 		// package path the request refuses keeps its answer from before
 		// #1254.
 		return false

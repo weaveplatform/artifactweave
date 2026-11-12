@@ -7,12 +7,17 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"path"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/dsnet/compress/bzip2"
+	"github.com/ulikunitz/xz"
+	"github.com/ulikunitz/xz/lzma"
 
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
@@ -142,6 +147,94 @@ func GzipIndex(body []byte) ([]byte, error) {
 	}
 	if err := z.Close(); err != nil {
 		return nil, fmt.Errorf("debian: finish gzip index: %w", err)
+	}
+	return out.Bytes(), nil
+}
+
+// IndexForm is one file a repository writes for an index: the suffix after
+// the index's name, empty for the plain index, and the file's bytes.
+type IndexForm struct {
+	Suffix string
+	Body   []byte
+}
+
+// optionalIndexForms are the optionalIndexCompressionFormats values 7.x
+// writes an index in besides gzip, which the JFrog Debian guide says is
+// "created for every Debian repository and cannot be disabled". Its
+// Compression Formats section lists Bzip2 (.bz2), LZMA (.lzma) and XZ (.xz),
+// and JFrog's repository configuration JSON gives their values as bz2, lzma
+// and xz.
+var optionalIndexForms = []struct {
+	name, suffix string
+	compress     func([]byte) ([]byte, error)
+}{
+	{"bz2", ".bz2", bzip2Index},
+	{"lzma", ".lzma", lzmaIndex},
+	{"xz", ".xz", xzIndex},
+}
+
+// IndexForms returns the files a repository writes for the plain index
+// body: body itself, its gzip copy, and a copy in each format formats, a
+// repository's optionalIndexCompressionFormats, names. Each form comes once
+// in that fixed order whatever the setting's order or repeats. A value
+// other than bz2, lzma and xz adds nothing [I]: gz is written anyway, and
+// 7.x offers no other.
+func IndexForms(body []byte, formats []string) ([]IndexForm, error) {
+	compressed, err := GzipIndex(body)
+	if err != nil {
+		return nil, err
+	}
+	out := []IndexForm{{Body: body}, {Suffix: ".gz", Body: compressed}}
+	for _, form := range optionalIndexForms {
+		if !slices.Contains(formats, form.name) {
+			continue
+		}
+		compressed, err := form.compress(body)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, IndexForm{Suffix: form.suffix, Body: compressed})
+	}
+	return out, nil
+}
+
+// bzip2Index compresses at level 9, the bzip2 tool's default and so the
+// level Debian's archive tools write Packages.bz2 at.
+func bzip2Index(body []byte) ([]byte, error) {
+	var out bytes.Buffer
+	z, err := bzip2.NewWriter(&out, &bzip2.WriterConfig{Level: bzip2.BestCompression})
+	if err != nil {
+		return nil, fmt.Errorf("debian: bzip2 index: %w", err)
+	}
+	return finishIndex(&out, z, "bzip2", body)
+}
+
+// lzmaIndex writes the .lzma (LZMA alone) form apt reads through liblzma,
+// with an unknown size and an end marker as xz --format=lzma writes it.
+func lzmaIndex(body []byte) ([]byte, error) {
+	var out bytes.Buffer
+	z, err := lzma.NewWriter(&out)
+	if err != nil {
+		return nil, fmt.Errorf("debian: lzma index: %w", err)
+	}
+	return finishIndex(&out, z, "lzma", body)
+}
+
+func xzIndex(body []byte) ([]byte, error) {
+	var out bytes.Buffer
+	z, err := xz.NewWriter(&out)
+	if err != nil {
+		return nil, fmt.Errorf("debian: xz index: %w", err)
+	}
+	return finishIndex(&out, z, "xz", body)
+}
+
+func finishIndex(out *bytes.Buffer, z io.WriteCloser, name string, body []byte) ([]byte, error) {
+	if _, err := z.Write(body); err != nil {
+		return nil, fmt.Errorf("debian: %s index: %w", name, err)
+	}
+	if err := z.Close(); err != nil {
+		return nil, fmt.Errorf("debian: finish %s index: %w", name, err)
 	}
 	return out.Bytes(), nil
 }

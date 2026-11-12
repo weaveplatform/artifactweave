@@ -34,7 +34,8 @@
 //
 //   - Protocol and Options: the routes, the source of each repository
 //     class, the reserved reindex operation and the Swift registry error
-//     profile (RFC 7807 problem JSON).
+//     profile (RFC 7807 problem JSON with Content-Version 1, which SwiftPM
+//     needs before it shows an error's detail).
 //   - Answers, with Content-Version 1: a release list whose URLs name this
 //     repository; a release's metadata, with its source archive's SHA-256
 //     and the metadata its publisher gave; a manifest, Package.swift or the
@@ -51,10 +52,11 @@
 //   - Only local and federated repositories publish, with PUT
 //     /{scope}/{name}/{version} (405), and write permission on the
 //     archive's path. The multipart form carries one source-archive part,
-//     binary or base64, of at most 512 MiB, and an optional metadata JSON
-//     object of at most 64 KiB; a signed release is refused (422) until
-//     signatures are validated, an invalid archive is refused (422), and a
-//     stored release is never replaced (409).
+//     binary or base64, of at most 512 MiB (413), and an optional metadata
+//     JSON object of at most 64 KiB; a signed release is refused (422)
+//     until signatures are validated, an invalid archive, an empty one
+//     included, is refused (422), and a stored release is never replaced
+//     (409).
 //   - Release lists show only the releases the caller may read; a stored
 //     release whose archive is gone is not listed.
 //   - A remote filters upstream release lists by the caller's permissions,
@@ -87,8 +89,8 @@
 //     repositories).
 //   - docs/testing/swift.md (connecting SwiftPM, the native operations,
 //     signed releases and the evidence), and docs/client-recipes/swift.md
-//     (the client recipe, whose evidence is swift_test.go and
-//     remote_test.go).
+//     (the client recipe, whose evidence is swift_test.go, remote_test.go
+//     and problem_test.go).
 //   - JFrog Swift repositories:
 //     https://docs.jfrog.com/artifactory/docs/swift-repositories, and the
 //     Swift Package Registry specification:
@@ -103,11 +105,16 @@
 //   - https://github.com/weaveplatform/artifactweave/issues/766,
 //     https://github.com/weaveplatform/artifactweave/issues/1048 and
 //     https://github.com/weaveplatform/artifactweave/issues/1089
+//   - https://github.com/weaveplatform/artifactweave/issues/1278 (the
+//     errors' Content-Version) and
+//     https://github.com/weaveplatform/artifactweave/issues/1235 (an empty
+//     archive).
 //
 // # Status
 //
 // Implemented P9c, which delivered the plan's P30 group (issues #762 to
-// #768). Moved here in P9d.
+// #768). Moved here in P9d. Errors carry Content-Version 1 (#1278), and an
+// empty source archive is refused as invalid, not as too large (#1235).
 //
 // # Testing
 //
@@ -128,6 +135,12 @@
 //   - policy_test.go: the download policy on local, remote and virtual
 //     reads: blackout, patterns on one archive, members passed over or
 //     left out, and the virtual repository's own patterns.
+//   - problem_test.go: Content-Version 1 on the errors of the handlers,
+//     the authentication middleware and the request limiter through the
+//     production router, and none on the reindex operation's; an empty
+//     archive refused as invalid; the archive size limit at its boundary;
+//     and SwiftPM printing a refused publish's detail
+//     (TestAccSwiftPMPrintsProblemDetails).
 //
 // The TestAccSwiftPM tests skip unless ARTIFACTWEAVE_SWIFT_IMAGE names the
 // SwiftPM client image or ARTIFACTWEAVE_SWIFT_CLIENT_LOCAL=1 is set with

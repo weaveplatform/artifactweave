@@ -30,6 +30,42 @@ Feature: Debian repositories deliver signed apt metadata and real packages
       | local     | deb-local |
       | federated | deb-fed   |
 
+  # The client image keeps apt's indexes compressed and asks for gzip first;
+  # setting the Order value itself (not a list entry) replaces that list, so
+  # apt asks for <form> by name first and would fall back to <next> only if
+  # that failed. Install then reads the index apt kept in the <form> form.
+  @debian_index_forms
+  Scenario Outline: apt reads the <form> index a repository's optionalIndexCompressionFormats adds
+    Given the registry is running
+    And the Debian client can reach the registry
+    When I create a Debian signing pair "deb-sign"
+    Then the response status is 201
+    When I PUT "/artifactory/api/repositories/deb-forms" as admin with body:
+      """
+      {"rclass":"local","packageType":"debian","primaryKeyPairRef":"deb-sign","optionalIndexCompressionFormats":["bz2","lzma","xz"]}
+      """
+    Then the response status is 200
+    Given a dpkg-built Debian package "alpha" at "1.0" under "debian"
+    When I deploy the file "debian/alpha_1.0_amd64.deb" to "/artifactory/deb-forms/pool/main/a/alpha/alpha_1.0_amd64.deb;deb.distribution=stable;deb.component=main;deb.architecture=amd64" as admin
+    Then the response status is 201
+    When I GET "/artifactory/deb-forms/dists/stable/InRelease" as admin until the response status is 200
+    Then the response status is 200
+    Given the apt repository is "deb-forms"
+    When I run apt "-o Acquire::CompressionTypes::Order=<form> -o Acquire::By-Hash=no -o Debug::Acquire::http=true update"
+    Then the command succeeds
+    And the response body contains "/dists/stable/main/binary-amd64/Packages.<form> HTTP/1.1"
+    And the response body does not contain "/binary-amd64/Packages.<next> HTTP/1.1"
+    And the response body does not contain "/binary-amd64/Packages.gz HTTP/1.1"
+    When I run apt "install -y alpha"
+    Then the command succeeds
+    And the response body contains "Setting up alpha"
+
+    Examples:
+      | form | next |
+      | bz2  | xz   |
+      | lzma | xz   |
+      | xz   | bz2  |
+
   @debian_remote
   Scenario: apt installs through a remote cache and reuses it offline
     Given the registry is running
