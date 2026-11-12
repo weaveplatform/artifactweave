@@ -33,9 +33,9 @@
 //     p2Urls, and the repositories core (artifacts/core/repos) plans the
 //     members a P2 virtual repository's p2Urls need, with ParseSiteURL,
 //     Covers and SiteChild.
-//   - Driven: none. It reads only the bytes or reader it is given, with xz
-//     (github.com/ulikunitz/xz) for the .xml.xz metadata form, and keeps
-//     no state.
+//   - Driven: none. It reads only the bytes or reader it is given, with
+//     the shared xz reader (platform/xzfile) for the .xml.xz metadata form,
+//     and github.com/ulikunitz/xz to write it, and keeps no state.
 //   - Settings: none. A remote's url (an update-site directory, or a
 //     site.zip!/ archive) and its p2ChildOrigins, the other origins its
 //     composite children may name, are read by the protocol.
@@ -122,6 +122,10 @@
 //     corrupt member bytes.
 //   - urls_test.go: the p2Urls entries ParseSiteURL accepts and refuses,
 //     and the member and child SiteChild gives each.
+//   - xz_test.go: .xml.xz metadata whose xz stream lost its index and
+//     footer, refused wherever it is read (#1331), and a block header that
+//     names a 1.5 GiB dictionary read within MaxMetadata, or one that names
+//     4 GiB refused (#1332).
 //
 // testdata holds unmodified files of the published Eclipse GLSP 2.7.0 update
 // site (p2.index, the content and artifacts metadata as .jar and .xml.xz,

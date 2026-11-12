@@ -5468,51 +5468,64 @@ type PuppetDependency struct {
 	VersionRequirement string `json:"version_requirement"`
 }
 
-// PuppetManifest The validated fields of a release's metadata.json.
+// PuppetManifest A release's whole metadata.json. The fields below come first, in the order name, version, source, author, license, summary, description, project_page, issues_url, tags and dependencies, each null when metadata.json has none; the file's other keys, such as operatingsystem_support and requirements, follow in the file's order with their values as the file gives them.
 type PuppetManifest struct {
-	// Author Optional within this object. The module's author; omitted when metadata.json has none.
-	Author *string `json:"author,omitempty"`
+	// Author Required within this object. The module's author; null when metadata.json has none.
+	Author *string `json:"author"`
 
-	// Dependencies Required within this object. The modules the release depends on; empty when it has none.
-	Dependencies []PuppetDependency `json:"dependencies"`
+	// Dependencies Required within this object. The modules the release depends on; null when metadata.json has none.
+	Dependencies *[]PuppetDependency `json:"dependencies"`
 
-	// License Optional within this object. The license name metadata.json gives; omitted when it gives none.
-	License *string `json:"license,omitempty"`
+	// Description Required within this object. The module's description, as metadata.json gives it; null when it has none.
+	Description interface{} `json:"description"`
+
+	// IssuesUrl Required within this object. The module's issue tracker URL, as metadata.json gives it; null when it has none.
+	IssuesUrl interface{} `json:"issues_url"`
+
+	// License Required within this object. The license name metadata.json gives; null when it gives none.
+	License *string `json:"license"`
 
 	// Name Required within this object. The module's name, as `<owner>-<name>`.
 	Name string `json:"name"`
 
-	// Source Optional within this object. The module's source repository URL; omitted when metadata.json gives none.
-	Source *string `json:"source,omitempty"`
+	// ProjectPage Required within this object. The module's project page URL, as metadata.json gives it; null when it has none.
+	ProjectPage interface{} `json:"project_page"`
 
-	// Summary Optional within this object. One-line summary of the module; omitted when metadata.json gives none.
-	Summary *string `json:"summary,omitempty"`
+	// Source Required within this object. The module's source repository URL; null when metadata.json gives none.
+	Source *string `json:"source"`
+
+	// Summary Required within this object. One-line summary of the module; null when metadata.json gives none.
+	Summary *string `json:"summary"`
+
+	// Tags Required within this object. The tags metadata.json gives, as it gives them, a list of names in a module the Puppet Development Kit wrote; null when it gives none.
+	Tags interface{} `json:"tags"`
 
 	// Version Required within this object. The release's semantic version.
-	Version string `json:"version"`
+	Version              string                 `json:"version"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
-// PuppetModule A Puppet module, with its newest release and every release the caller may read.
+// PuppetModule A Puppet module, with its newest release and every release the caller may read. A remote repository gives the module-wide fields of its upstream's own record of the module.
 type PuppetModule struct {
-	// CreatedAt Required within this object. When the module's first release was published, as `YYYY-MM-DD hh:mm:ss ±hhmm`; null when no release gives a date in that form.
+	// CreatedAt Required within this object. When the module's first release was published, as `YYYY-MM-DD hh:mm:ss ±hhmm`; null when no release gives a date in that form. A remote repository gives its upstream's value.
 	CreatedAt *string `json:"created_at"`
 
 	// CurrentRelease Required within this object. The module's newest release the caller may read.
 	CurrentRelease PuppetRelease `json:"current_release"`
 
-	// Downloads Required within this object. Downloads of the module's releases, summed.
+	// Downloads Required within this object. Downloads of the module's releases, summed; a remote repository gives its upstream's count.
 	Downloads int `json:"downloads"`
 
-	// Endorsement Required within this object. The module's endorsement; null.
+	// Endorsement Required within this object. The module's endorsement; null unless a remote repository's upstream gives one.
 	Endorsement *string `json:"endorsement"`
 
-	// HomepageUrl Required within this object. The newest release's metadata.json `project_page`; null when it gives none.
+	// HomepageUrl Required within this object. The newest release's metadata.json `project_page`; null when it gives none. A remote repository gives its upstream's value.
 	HomepageUrl *string `json:"homepage_url"`
 
-	// IssuesUrl Required within this object. The newest release's metadata.json `issues_url`; null when it gives none.
+	// IssuesUrl Required within this object. The newest release's metadata.json `issues_url`; null when it gives none. A remote repository gives its upstream's value.
 	IssuesUrl *string `json:"issues_url"`
 
-	// ModuleGroup Required within this object. The module's group, `base`.
+	// ModuleGroup Required within this object. The module's group, `base` unless a remote repository's upstream gives another.
 	ModuleGroup string `json:"module_group"`
 
 	// Name Required within this object. The module's name without its owner.
@@ -5530,7 +5543,7 @@ type PuppetModule struct {
 	// Supported Required within this object. Whether the newest release is a supported module; false unless a remote repository's upstream says otherwise.
 	Supported bool `json:"supported"`
 
-	// UpdatedAt Required within this object. When a release of the module last changed, as `YYYY-MM-DD hh:mm:ss ±hhmm`; null when no release gives a date in that form.
+	// UpdatedAt Required within this object. When a release of the module last changed, as `YYYY-MM-DD hh:mm:ss ±hhmm`; null when no release gives a date in that form. A remote repository gives its upstream's value.
 	UpdatedAt *string `json:"updated_at"`
 
 	// Uri Required within this object. The module's path, `/v3/modules/<owner>-<name>`.
@@ -5561,7 +5574,7 @@ type PuppetOwner struct {
 	Username string `json:"username"`
 }
 
-// PuppetPagination Where a page sits in a Puppet list. Each link is a path relative to the repository's Forge root that names the filter first, then `limit` and `offset`, for example `/v3/releases?module=puppetlabs-stdlib&limit=20&offset=20`.
+// PuppetPagination Where a page sits in a Puppet list. Each link is a path relative to the repository's Forge root that names the filter first, then `limit` and `offset`, for example `/v3/releases?module=puppetlabs-stdlib&limit=20&offset=20`. A release list's filter keeps the request's `sort_by` and `exclude_fields` after `module`.
 type PuppetPagination struct {
 	// Current Required within this object. Link to this page.
 	Current string `json:"current"`
@@ -5585,7 +5598,7 @@ type PuppetPagination struct {
 	Total int `json:"total"`
 }
 
-// PuppetRelease A Puppet module release.
+// PuppetRelease A Puppet module release. A release list asked with `exclude_fields` leaves out the top-level fields it names.
 type PuppetRelease struct {
 	// Changelog Required within this object. The release's changelog text; null unless a remote repository's upstream gives one.
 	Changelog *string `json:"changelog"`
@@ -5614,7 +5627,7 @@ type PuppetRelease struct {
 	// License Required within this object. The release's license text; null unless a remote repository's upstream gives one.
 	License *string `json:"license"`
 
-	// Metadata Required within this object. The release's metadata.json, as validated.
+	// Metadata Required within this object. The release's whole metadata.json.
 	Metadata PuppetManifest `json:"metadata"`
 
 	// Module Required within this object. The module the release belongs to.
@@ -5629,7 +5642,7 @@ type PuppetRelease struct {
 	// Supported Required within this object. Whether the release is a supported module; false unless a remote repository's upstream says otherwise.
 	Supported bool `json:"supported"`
 
-	// Tags Required within this object. The release's tags; empty.
+	// Tags Required within this object. The release's tags, from its metadata.json when they are a list of names; a remote repository gives its upstream's. Empty otherwise.
 	Tags []string `json:"tags"`
 
 	// UpdatedAt Required within this object. When the release last changed, as `YYYY-MM-DD hh:mm:ss ±hhmm`, in UTC for a hosted release; a remote repository gives its upstream's value as it is.
@@ -7262,7 +7275,7 @@ type CalculatePubRepositoryMetadataParams struct {
 
 // GetPuppetModulesParams defines parameters for GetPuppetModules.
 type GetPuppetModulesParams struct {
-	// Query Optional query parameter. Exact name of the one module to answer, as `<owner>-<name>`, for example `puppetlabs-stdlib`. Any other search, a repeated parameter or a parameter other than `query`, `limit` and `offset` is rejected with 400.
+	// Query Optional query parameter. Exact name of the one module to answer, as `<owner>-<name>`, for example `puppetlabs-stdlib`. A remote repository answers the module only when its upstream serves the module's record. Any other search, a repeated parameter or a parameter other than `query`, `limit` and `offset` is rejected with 400.
 	Query *string `form:"query,omitempty" json:"query,omitempty"`
 
 	// Limit Optional query parameter. Most modules a page holds, at least 1. Defaults to 20; a value above 100 is served as 100.
@@ -7283,10 +7296,10 @@ type GetPuppetReleasesParams struct {
 	// Offset Optional query parameter. Number of releases before the page, at least 0, and with `module` at most 4,096. Defaults to 0; an offset past the last release answers an empty page.
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 
-	// SortBy Optional query parameter. Accepted with `module` as `version`, the order the releases are listed in; any other value is rejected with 400.
+	// SortBy Optional query parameter. Accepted with `module` as `version`, the order the releases are listed in, and kept in the page's links; any other value is rejected with 400.
 	SortBy *GetPuppetReleasesParamsSortBy `form:"sort_by,omitempty" json:"sort_by,omitempty"`
 
-	// ExcludeFields Optional query parameter. Accepted with `module`; every record keeps all its fields.
+	// ExcludeFields Optional query parameter. Accepted with `module`. Each record leaves out the top-level fields it names, separated by commas, as the Puppet client sends them, or by spaces; a name no record has leaves nothing out. The page's links keep it.
 	ExcludeFields *string `form:"exclude_fields,omitempty" json:"exclude_fields,omitempty"`
 }
 
@@ -8637,6 +8650,204 @@ func (a ArchiveSearchCriteriaForm) MarshalJSON() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'lastDownloadedBeforeInDays': %w", err)
 		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PuppetManifest. Returns the specified
+// element and whether it was found
+func (a PuppetManifest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PuppetManifest
+func (a *PuppetManifest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PuppetManifest to handle AdditionalProperties
+func (a *PuppetManifest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["author"]; found {
+		err = json.Unmarshal(raw, &a.Author)
+		if err != nil {
+			return fmt.Errorf("error reading 'author': %w", err)
+		}
+		delete(object, "author")
+	}
+
+	if raw, found := object["dependencies"]; found {
+		err = json.Unmarshal(raw, &a.Dependencies)
+		if err != nil {
+			return fmt.Errorf("error reading 'dependencies': %w", err)
+		}
+		delete(object, "dependencies")
+	}
+
+	if raw, found := object["description"]; found {
+		err = json.Unmarshal(raw, &a.Description)
+		if err != nil {
+			return fmt.Errorf("error reading 'description': %w", err)
+		}
+		delete(object, "description")
+	}
+
+	if raw, found := object["issues_url"]; found {
+		err = json.Unmarshal(raw, &a.IssuesUrl)
+		if err != nil {
+			return fmt.Errorf("error reading 'issues_url': %w", err)
+		}
+		delete(object, "issues_url")
+	}
+
+	if raw, found := object["license"]; found {
+		err = json.Unmarshal(raw, &a.License)
+		if err != nil {
+			return fmt.Errorf("error reading 'license': %w", err)
+		}
+		delete(object, "license")
+	}
+
+	if raw, found := object["name"]; found {
+		err = json.Unmarshal(raw, &a.Name)
+		if err != nil {
+			return fmt.Errorf("error reading 'name': %w", err)
+		}
+		delete(object, "name")
+	}
+
+	if raw, found := object["project_page"]; found {
+		err = json.Unmarshal(raw, &a.ProjectPage)
+		if err != nil {
+			return fmt.Errorf("error reading 'project_page': %w", err)
+		}
+		delete(object, "project_page")
+	}
+
+	if raw, found := object["source"]; found {
+		err = json.Unmarshal(raw, &a.Source)
+		if err != nil {
+			return fmt.Errorf("error reading 'source': %w", err)
+		}
+		delete(object, "source")
+	}
+
+	if raw, found := object["summary"]; found {
+		err = json.Unmarshal(raw, &a.Summary)
+		if err != nil {
+			return fmt.Errorf("error reading 'summary': %w", err)
+		}
+		delete(object, "summary")
+	}
+
+	if raw, found := object["tags"]; found {
+		err = json.Unmarshal(raw, &a.Tags)
+		if err != nil {
+			return fmt.Errorf("error reading 'tags': %w", err)
+		}
+		delete(object, "tags")
+	}
+
+	if raw, found := object["version"]; found {
+		err = json.Unmarshal(raw, &a.Version)
+		if err != nil {
+			return fmt.Errorf("error reading 'version': %w", err)
+		}
+		delete(object, "version")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PuppetManifest to handle AdditionalProperties
+func (a PuppetManifest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["author"], err = json.Marshal(a.Author)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'author': %w", err)
+	}
+
+	if a.Dependencies != nil {
+		object["dependencies"], err = json.Marshal(a.Dependencies)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'dependencies': %w", err)
+		}
+	}
+
+	object["description"], err = json.Marshal(a.Description)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'description': %w", err)
+	}
+
+	object["issues_url"], err = json.Marshal(a.IssuesUrl)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'issues_url': %w", err)
+	}
+
+	object["license"], err = json.Marshal(a.License)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'license': %w", err)
+	}
+
+	object["name"], err = json.Marshal(a.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'name': %w", err)
+	}
+
+	object["project_page"], err = json.Marshal(a.ProjectPage)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'project_page': %w", err)
+	}
+
+	object["source"], err = json.Marshal(a.Source)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'source': %w", err)
+	}
+
+	object["summary"], err = json.Marshal(a.Summary)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'summary': %w", err)
+	}
+
+	object["tags"], err = json.Marshal(a.Tags)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'tags': %w", err)
+	}
+
+	object["version"], err = json.Marshal(a.Version)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'version': %w", err)
 	}
 
 	for fieldName, field := range a.AdditionalProperties {

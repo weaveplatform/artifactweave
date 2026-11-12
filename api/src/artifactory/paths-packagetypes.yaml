@@ -1468,7 +1468,8 @@ paths:
             operation's ecosystem; a mismatch is rejected with 400.
           type: string
       - description: Optional query parameter. Exact name of the one module to answer, as `<owner>-<name>`,
-          for example `puppetlabs-stdlib`. Any other search, a repeated parameter or a parameter other than
+          for example `puppetlabs-stdlib`. A remote repository answers the module only when its upstream
+          serves the module's record. Any other search, a repeated parameter or a parameter other than
           `query`, `limit` and `offset` is rejected with 400.
         in: query
         name: query
@@ -1536,8 +1537,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: A remote repository's upstream answered release metadata that does not validate, or
-            a stored release no longer matches its archive; the body carries the error envelope.
+          description: A remote repository's upstream answered release metadata or a module record that does
+            not validate, or a stored release no longer matches its archive; the body carries the error
+            envelope.
         '503':
           content:
             application/json:
@@ -1604,8 +1606,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The repository, package or path named in the request does not exist; the body carries
-            the error envelope.
+          description: The repository, package or path named in the request does not exist, or a remote
+            repository's upstream does not serve the module's record; the body carries the error envelope.
         '500':
           content:
             application/json:
@@ -1617,8 +1619,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: A remote repository's upstream answered release metadata that does not validate, or
-            a stored release no longer matches its archive; the body carries the error envelope.
+          description: A remote repository's upstream answered release metadata or a module record that does
+            not validate, or a stored release no longer matches its archive; the body carries the error
+            envelope.
         '503':
           content:
             application/json:
@@ -1672,7 +1675,7 @@ paths:
           minimum: 0
           type: integer
       - description: Optional query parameter. Accepted with `module` as `version`, the order the releases
-          are listed in; any other value is rejected with 400.
+          are listed in, and kept in the page's links; any other value is rejected with 400.
         in: query
         name: sort_by
         schema:
@@ -1680,11 +1683,13 @@ paths:
           enum:
           - version
           type: string
-      - description: Optional query parameter. Accepted with `module`; every record keeps all its fields.
+      - description: Optional query parameter. Accepted with `module`. Each record leaves out the top-level
+          fields it names, separated by commas, as the Puppet client sends them, or by spaces; a name no
+          record has leaves nothing out. The page's links keep it.
         in: query
         name: exclude_fields
         schema:
-          description: Names of record fields, separated by spaces.
+          description: Names of top-level record fields, separated by commas or spaces.
           type: string
       responses:
         '200':
@@ -3640,46 +3645,78 @@ components:
       - version_requirement
       type: object
     PuppetManifest:
-      description: The validated fields of a release's metadata.json.
+      additionalProperties: true
+      description: A release's whole metadata.json. The fields below come first, in the order name,
+        version, source, author, license, summary, description, project_page, issues_url, tags and
+        dependencies, each null when metadata.json has none; the file's other keys, such as
+        operatingsystem_support and requirements, follow in the file's order with their values as the file
+        gives them.
       properties:
         author:
-          description: Optional within this object. The module's author; omitted when metadata.json has none.
+          description: Required within this object. The module's author; null when metadata.json has none.
+          nullable: true
           type: string
         dependencies:
-          description: Required within this object. The modules the release depends on; empty when it has
-            none.
+          description: Required within this object. The modules the release depends on; null when
+            metadata.json has none.
           items:
             $ref: '#/components/schemas/PuppetDependency'
+          nullable: true
           type: array
+        description:
+          description: Required within this object. The module's description, as metadata.json gives it;
+            null when it has none.
+        issues_url:
+          description: Required within this object. The module's issue tracker URL, as metadata.json gives
+            it; null when it has none.
         license:
-          description: Optional within this object. The license name metadata.json gives; omitted when it
-            gives none.
+          description: Required within this object. The license name metadata.json gives; null when it gives
+            none.
+          nullable: true
           type: string
         name:
           description: Required within this object. The module's name, as `<owner>-<name>`.
           type: string
+        project_page:
+          description: Required within this object. The module's project page URL, as metadata.json gives
+            it; null when it has none.
         source:
-          description: Optional within this object. The module's source repository URL; omitted when
+          description: Required within this object. The module's source repository URL; null when
             metadata.json gives none.
+          nullable: true
           type: string
         summary:
-          description: Optional within this object. One-line summary of the module; omitted when
-            metadata.json gives none.
+          description: Required within this object. One-line summary of the module; null when metadata.json
+            gives none.
+          nullable: true
           type: string
+        tags:
+          description: Required within this object. The tags metadata.json gives, as it gives them, a list of
+            names in a module the Puppet Development Kit wrote; null when it gives none.
         version:
           description: Required within this object. The release's semantic version.
           type: string
       required:
       - name
       - version
+      - source
+      - author
+      - license
+      - summary
+      - description
+      - project_page
+      - issues_url
+      - tags
       - dependencies
       type: object
     PuppetModule:
-      description: A Puppet module, with its newest release and every release the caller may read.
+      description: A Puppet module, with its newest release and every release the caller may read. A remote
+        repository gives the module-wide fields of its upstream's own record of the module.
       properties:
         created_at:
           description: Required within this object. When the module's first release was published, as
-            `YYYY-MM-DD hh:mm:ss ±hhmm`; null when no release gives a date in that form.
+            `YYYY-MM-DD hh:mm:ss ±hhmm`; null when no release gives a date in that form. A remote repository
+            gives its upstream's value.
           nullable: true
           type: string
         current_release:
@@ -3687,24 +3724,27 @@ components:
           - $ref: '#/components/schemas/PuppetRelease'
           description: Required within this object. The module's newest release the caller may read.
         downloads:
-          description: Required within this object. Downloads of the module's releases, summed.
+          description: Required within this object. Downloads of the module's releases, summed; a remote
+            repository gives its upstream's count.
           type: integer
         endorsement:
-          description: Required within this object. The module's endorsement; null.
+          description: Required within this object. The module's endorsement; null unless a remote
+            repository's upstream gives one.
           nullable: true
           type: string
         homepage_url:
           description: Required within this object. The newest release's metadata.json `project_page`; null
-            when it gives none.
+            when it gives none. A remote repository gives its upstream's value.
           nullable: true
           type: string
         issues_url:
           description: Required within this object. The newest release's metadata.json `issues_url`; null
-            when it gives none.
+            when it gives none. A remote repository gives its upstream's value.
           nullable: true
           type: string
         module_group:
-          description: Required within this object. The module's group, `base`.
+          description: Required within this object. The module's group, `base` unless a remote repository's
+            upstream gives another.
           type: string
         name:
           description: Required within this object. The module's name without its owner.
@@ -3728,7 +3768,8 @@ components:
           type: boolean
         updated_at:
           description: Required within this object. When a release of the module last changed, as
-            `YYYY-MM-DD hh:mm:ss ±hhmm`; null when no release gives a date in that form.
+            `YYYY-MM-DD hh:mm:ss ±hhmm`; null when no release gives a date in that form. A remote repository
+            gives its upstream's value.
           nullable: true
           type: string
         uri:
@@ -3793,7 +3834,8 @@ components:
     PuppetPagination:
       description: Where a page sits in a Puppet list. Each link is a path relative to the repository's
         Forge root that names the filter first, then `limit` and `offset`, for example
-        `/v3/releases?module=puppetlabs-stdlib&limit=20&offset=20`.
+        `/v3/releases?module=puppetlabs-stdlib&limit=20&offset=20`. A release list's filter keeps the
+        request's `sort_by` and `exclude_fields` after `module`.
       properties:
         current:
           description: Required within this object. Link to this page.
@@ -3828,7 +3870,8 @@ components:
       - total
       type: object
     PuppetRelease:
-      description: A Puppet module release.
+      description: A Puppet module release. A release list asked with `exclude_fields` leaves out the
+        top-level fields it names.
       properties:
         changelog:
           description: Required within this object. The release's changelog text; null unless a remote
@@ -3873,7 +3916,7 @@ components:
         metadata:
           allOf:
           - $ref: '#/components/schemas/PuppetManifest'
-          description: Required within this object. The release's metadata.json, as validated.
+          description: Required within this object. The release's whole metadata.json.
         module:
           allOf:
           - $ref: '#/components/schemas/PuppetReleaseModule'
@@ -3891,7 +3934,8 @@ components:
             remote repository's upstream says otherwise.
           type: boolean
         tags:
-          description: Required within this object. The release's tags; empty.
+          description: Required within this object. The release's tags, from its metadata.json when they
+            are a list of names; a remote repository gives its upstream's. Empty otherwise.
           items:
             description: One tag.
             type: string

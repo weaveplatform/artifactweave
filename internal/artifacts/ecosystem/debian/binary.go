@@ -13,7 +13,8 @@ import (
 	"strings"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/ulikunitz/xz"
+
+	"github.com/weaveplatform/artifactweave/internal/platform/xzfile"
 )
 
 const (
@@ -144,7 +145,15 @@ func unpackMember(body io.ReaderAt, m arMember) (io.Reader, func(), error) {
 		}
 		return z, func() { _ = z.Close() }, nil
 	case strings.HasSuffix(m.name, ".xz"):
-		z, err := xz.NewReader(r)
+		// liblzma, which dpkg decodes a member with, refuses an xz file
+		// whose index and footer are missing, so the whole member is read
+		// (#1331). No more is read than readControl and validateData read,
+		// which bounds the dictionary (#1332).
+		limit := int64(maxControlTar)
+		if strings.HasPrefix(m.name, "data.tar") {
+			limit = maxDataTar
+		}
+		z, err := xzfile.NewReader(r, limit+1)
 		if err != nil {
 			return nil, nil, fmt.Errorf("%w: xz member: %w", errInvalidBinary, err)
 		}

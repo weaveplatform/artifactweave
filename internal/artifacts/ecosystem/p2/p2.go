@@ -12,7 +12,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/ulikunitz/xz"
+	"github.com/weaveplatform/artifactweave/internal/platform/xzfile"
 )
 
 // MaxMetadata, MaxArtifact, MaxChildren, MaxDepth and MaxChildURL bound
@@ -105,7 +105,9 @@ func Validate(name string, src io.ReadSeeker, size int64) error {
 		return validateIndex(src, size)
 	}
 	if strings.HasSuffix(name, ".xml.xz") {
-		r, err := xz.NewReader(src)
+		// The p2 client's XZInputStream refuses a file whose index and
+		// footer are missing, so the whole file is read (#1331).
+		r, err := xzfile.NewReader(src, MaxMetadata+1)
 		if err != nil {
 			return ErrInvalid
 		}

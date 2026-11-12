@@ -263,7 +263,7 @@ func (h handler) listModules(w http.ResponseWriter, r *http.Request, q url.Value
 		if len(releases) == 0 {
 			continue
 		}
-		out = append(out, newModuleRecord(releases))
+		out = append(out, newModuleRecord(releases, derivedModule(releases)))
 	}
 	writeJSON(w, r, http.StatusOK, struct {
 		Pagination listPage       `json:"pagination"`
