@@ -117,7 +117,10 @@ type explodeFile struct {
 // folder they landed in. The archive is spooled to a temporary file, checked
 // against d.Declared, and read twice: once to validate every entry name and
 // the limits, so nothing is written for an archive that would be refused,
-// then to store the entries.
+// then to store the entries. Only the archive's own faults are
+// ErrBadArchive: a failed read of the spooled archive, or a blob store that
+// fails to write an entry, returns its own error, which the routes answer
+// 500.
 func (s *Service) Explode(ctx context.Context, d Explode) (model.Item, error) {
 	declared, err := ParseChecksums(d.Declared)
 	if err != nil {
@@ -128,7 +131,10 @@ func (s *Service) Explode(ctx context.Context, d Explode) (model.Item, error) {
 		return model.Item{}, err
 	}
 	defer func() { _ = f.Close(); _ = os.Remove(f.Name()) }()
-	kind := archive.KindOf(f, d.Path)
+	kind, err := sniff(f, d.Path)
+	if err != nil {
+		return model.Item{}, fmt.Errorf("item: read archive: %w", err)
+	}
 	dir := path.Dir(strings.Trim(d.Path, "/"))
 	if dir == "." {
 		dir = ""
@@ -284,13 +290,21 @@ func (s *Service) uploadEntries(
 			return e.Wrap(err)
 		}
 		lr := &io.LimitedReader{R: r, N: budget + 1}
+		entry := &entryReader{r: lr}
 		u, err := s.Blobs.BeginUpload(ctx)
 		if err != nil {
 			return fmt.Errorf("item: begin upload: %w", err)
 		}
-		if _, err := u.Append(ctx, lr); err != nil {
+		if _, err := u.Append(ctx, entry); err != nil {
 			_ = u.Abort(context.WithoutCancel(ctx))
-			return e.Wrap(err)
+			// A read of the entry that failed is reported as the walk
+			// reports one: the archive's fault, or a failed read of the
+			// spooled upload. A store that fails the write is the server's
+			// fault, which answers 500, not 400 "unusable archive".
+			if entry.failed != nil {
+				return e.Wrap(entry.failed)
+			}
+			return fmt.Errorf("item: store %s: %w", e.Name, err)
 		}
 		if lr.N == 0 {
 			_ = u.Abort(context.WithoutCancel(ctx))
@@ -306,6 +320,38 @@ func (s *Service) uploadEntries(
 		return nil
 	})
 	return files, err //nolint:wrapcheck // archive's ErrUnusable or failed read, or ours from the walk
+}
+
+// entryReader reads an archive entry into a blob upload and keeps the
+// first error a read of it gave, other than io.EOF. Append returns the
+// error of either side of its copy, so only this tells a failed read of
+// the entry from a store that failed to write it.
+type entryReader struct {
+	r      io.Reader
+	failed error
+}
+
+func (e *entryReader) Read(p []byte) (int, error) {
+	n, err := e.r.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) && e.failed == nil {
+		e.failed = err
+	}
+	return n, err //nolint:wrapcheck // a pass-through reader
+}
+
+// sniff tells the kind of the archive in ra, named name, from its first
+// bytes. archive.KindOf ignores its read's error, so content that cannot be
+// read would pass for a file that is no archive, which the item routes
+// refuse as bad content; a failed read returns its error instead. io.EOF
+// ends content shorter than archive.SniffLen on every blob store:
+// archive.ReaderAt answers a read past the end as bytes.Reader does.
+func sniff(ra io.ReaderAt, name string) (ArchiveKind, error) {
+	head := make([]byte, archive.SniffLen)
+	n, err := ra.ReadAt(head, 0)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return NotArchive, err //nolint:wrapcheck // the caller names what it read
+	}
+	return archive.Sniff(head[:n], name), nil
 }
 
 // spool copies body to a temporary file, refusing more than MaxExplodeBytes,
@@ -370,16 +416,10 @@ func (s *Service) ArchiveEntry(
 	}
 	defer func() { _ = content.Close() }()
 	ra := archive.ReaderAt(content)
-	// archive.KindOf sniffs whatever its read returned, so a blob that cannot
-	// be read would pass for a file that is no archive. The read stops at
-	// the blob's size: past it, archive.ReaderAt over a store without
-	// ReadAt reports io.ErrUnexpectedEOF rather than io.EOF.
-	head := make([]byte, min(archive.SniffLen, info.Size))
-	n, err := ra.ReadAt(head, 0)
-	if err != nil && !errors.Is(err, io.EOF) {
+	kind, err := sniff(ra, it.Name)
+	if err != nil {
 		return fmt.Errorf("item: read %s: %w", it.FullPath(), err)
 	}
-	kind := archive.Sniff(head[:n], it.Name)
 	if kind == NotArchive {
 		return ErrNotFound
 	}

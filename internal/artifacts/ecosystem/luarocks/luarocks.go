@@ -78,7 +78,8 @@ type inspection struct {
 // (Parse) before the write's transaction, so Admit need not check it
 // again. A write to any other path, or without content, inspects nothing.
 // Content that fails ValidateContent is refused (400, or 413 for a
-// rockspec over 1 MiB); content that cannot be opened fails the write.
+// rockspec over 1 MiB); content that cannot be opened or read fails the
+// write (500).
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
