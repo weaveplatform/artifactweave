@@ -10,6 +10,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/azure/azurite"
 	"github.com/testcontainers/testcontainers-go/modules/fakegcsserver"
 	tcminio "github.com/testcontainers/testcontainers-go/modules/minio"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 // The emulator images are pinned by digest so an emulator release cannot
@@ -17,6 +18,10 @@ import (
 const (
 	// MinIOImage is Chainguard's build of MinIO: MinIO stopped publishing
 	// minio/minio on Docker Hub and its quay.io images need credentials.
+	// This digest carries RELEASE.2026-09-22T19-25-18Z of
+	// github.com/chainguard-forks/minio (`minio --version`), the release
+	// RunMinIO's readiness wait was checked against; recheck that wait on a
+	// bump.
 	MinIOImage = "cgr.dev/chainguard/minio@sha256:" +
 		"dc455cdd4db6e390b1b26514f15ff37681a777bf8dab41aac445a0259f751e56"
 	// FakeGCSImage is fake-gcs-server 1.56.1.
@@ -58,9 +63,18 @@ func MinIO(t *testing.T) MinIOEndpoint {
 
 // RunMinIO starts MinIO and returns its endpoint and a function that
 // removes it, for callers without a *testing.T such as acceptance steps;
-// check CheckLinux first.
+// check CheckLinux first. It returns once MinIO serves S3 requests.
 func RunMinIO(ctx context.Context) (MinIOEndpoint, func(), error) {
-	ctr, err := tcminio.Run(ctx, MinIOImage)
+	// The module waits only for /minio/health/live, which answers 200 as soon
+	// as MinIO serves HTTP; /minio/health/ready does the same. Until the
+	// object layer exists, S3 calls answer 503 XMinioServerNotInitialized,
+	// and a CreateBucket in that window failed CI twice (#1307).
+	// /minio/health/cluster answers 503 until the object layer, bucket
+	// metadata and IAM are all initialised (cmd/healthcheck-handler.go,
+	// checkHealth, at the release MinIOImage carries).
+	ctr, err := tcminio.Run(ctx, MinIOImage, testcontainers.WithAdditionalWaitStrategy(
+		wait.ForHTTP("/minio/health/cluster").WithPort("9000"),
+	))
 	stop := func() { _ = testcontainers.TerminateContainer(ctr) }
 	if err != nil {
 		stop()
