@@ -1,4 +1,4 @@
-package artifacts_test
+package generic_test
 
 import (
 	"crypto/sha1" //nolint:gosec // the wire checksum
@@ -45,8 +45,8 @@ func wantWholeHead(t *testing.T, label string, rec *httptest.ResponseRecorder, c
 // RFC 9110 section 14.2 lets a server ignore it on any method but GET [I].
 // A GET still applies the range (#1338).
 func TestAccItemHeadIgnoresRange(t *testing.T) {
-	w := newItemWorld(t, false)
-	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&repo.Config{
+	w := harness.NewItemWorld(t, false)
+	if err := w.DB.Repos().Create(t.Context(), *repo.Defaults(&repo.Config{
 		Key: "pypi-local", Class: repo.Local, PackageType: repo.PyPI,
 	})); err != nil {
 		t.Fatal(err)
@@ -59,7 +59,7 @@ func TestAccItemHeadIgnoresRange(t *testing.T) {
 		"/artifactory/redirect-local/p/file.bin",
 		"/artifactory/pypi-local/demo/demo-1.0.tar.gz",
 	} {
-		wantStatus(t, w.do(http.MethodPut, put, "admin", content), http.StatusCreated)
+		harness.WantStatus(t, w.Do(http.MethodPut, put, "admin", content), http.StatusCreated)
 	}
 	for _, path := range []string{
 		"/artifactory/libs-local/p/file.bin",
@@ -70,10 +70,10 @@ func TestAccItemHeadIgnoresRange(t *testing.T) {
 	} {
 		for _, h := range headRanges(sum) {
 			wantWholeHead(t, "HEAD "+path+" "+strings.Join(h, " "),
-				w.do(http.MethodHead, path, "admin", "", h...), content)
+				w.Do(http.MethodHead, path, "admin", "", h...), content)
 		}
 	}
-	part := w.do(
+	part := w.Do(
 		http.MethodGet,
 		"/artifactory/libs-local/p/file.bin",
 		"admin",
@@ -85,7 +85,7 @@ func TestAccItemHeadIgnoresRange(t *testing.T) {
 		part.Header().Get("Content-Range") != "bytes 2-5/"+strconv.Itoa(len(content)) {
 		t.Fatalf("GET Range: %d %q %v", part.Code, part.Body, part.Header())
 	}
-	wantStatus(t, w.do(http.MethodGet, "/artifactory/libs-local/p/file.bin", "admin", "",
+	harness.WantStatus(t, w.Do(http.MethodGet, "/artifactory/libs-local/p/file.bin", "admin", "",
 		"Range", "bytes=1000-2000"), http.StatusRequestedRangeNotSatisfiable)
 }
 
@@ -97,7 +97,7 @@ func TestAccRemoteItemHeadIgnoresRange(t *testing.T) {
 		t.Run("store="+strconv.FormatBool(store), func(t *testing.T) {
 			w := harness.NewRemoteWorld(t)
 			if !store {
-				w.Repo.StoreArtifactsLocally = ptr(false)
+				w.Repo.StoreArtifactsLocally = new(false)
 				w.Update()
 			}
 			for i := range headRanges("") {

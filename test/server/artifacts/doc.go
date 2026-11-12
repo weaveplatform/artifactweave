@@ -78,8 +78,6 @@
 //     metadata under the download policy (issues 1237 and 1251).
 //   - folder_archive_policy_test.go: the folder archive download's policy
 //     (issue 1253).
-//   - head_range_test.go: a HEAD with Range on a local, redirecting,
-//     virtual, PyPI and remote file (issue 1338).
 //   - multipart_test.go: the JFrog CLI's multipart upload.
 //
 // # References
