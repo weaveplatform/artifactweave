@@ -70,13 +70,18 @@
 //     4,096 entries (503 beyond); a remote accepts no more from its
 //     upstream.
 //   - A published version is immutable: publishing it again answers 409.
-//   - A remote builds its own paging queries, reads at most 4 MiB a
-//     document, and keeps metadata and archive links under the configured
-//     Supermarket origin and path. An archive enters the cache only once its
-//     size, its SHA-256 where the version declares one, its identity and its
-//     dependencies and platforms match the version that advertised it. A
-//     cache hit rechecks the source's authority and the caller's read
-//     permission.
+//   - A remote builds its own paging queries: it asks its upstream for 100
+//     cookbooks a catalog page, as many as Supermarket serves, and starts
+//     the next page after the cookbooks a page held. A page with more
+//     after it that holds fewer than 100 fails with 502, since
+//     Supermarket's page states no limit that would explain it, and so
+//     does a page of more than 1,000 (#1298).
+//   - A remote reads at most 4 MiB a document, and keeps metadata and
+//     archive links under the configured Supermarket origin and path. An
+//     archive enters the cache only once its size, its SHA-256 where the
+//     version declares one, its identity and its dependencies and platforms
+//     match the version that advertised it. A cache hit rechecks the
+//     source's authority and the caller's read permission.
 //   - A virtual repository resolves its members in order, the first member
 //     that holds a version supplying it; a download passes over a member
 //     whose own policy refuses the archive to the next one that holds the
@@ -125,4 +130,6 @@
 //     the source boundary from a fake upstream Supermarket.
 //   - metadata_test.go: upstream version identity and URL boundaries,
 //     catalog bounds, version order and empty dependency objects.
+//   - remote_paging_test.go: the upstream catalog page sizes a remote
+//     accepts and refuses.
 package chefhttp

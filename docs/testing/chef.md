@@ -57,7 +57,15 @@ membership. Nested virtual membership returns 400 through the shared seam.
 
 For R, configure the repository URL as the Supermarket root, normally
 `https://supermarket.chef.io`. The adapter generates its own bounded pagination
-queries; `propagateQueryParams` need not be enabled. Downloads may redirect to
+queries; `propagateQueryParams` need not be enabled. It reads the upstream
+catalog 100 cookbooks a page (`start=<n>&items=100`), since Supermarket serves
+at most `API_ITEM_LIMIT` a page, 100 when that is not set, whatever `items`
+asks; on **2026-11-12** `https://supermarket.chef.io/api/v1/cookbooks?start=0&items=1000`
+answered 100 of its 4,078 cookbooks. Each page starts after the cookbooks the
+last one held. Supermarket's page states no limit, so a page with more after it
+that holds fewer than 100 answers 502, as does a page of more than 1,000 or a
+catalog of more than 4,096 cookbooks
+([#1298](https://github.com/weaveplatform/artifactweave/issues/1298)). Downloads may redirect to
 object storage. Source DNS/SSRF and redirect limits apply, and credentials are
 not forwarded across origins. Metadata links stay within the configured
 registry origin and path. The shared source policy governs cache TTL, offline
