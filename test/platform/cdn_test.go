@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -120,9 +119,9 @@ func expiredSignatureRefused(t *testing.T, h *harness, sign edgeSigner) {
 
 	expired := sign(t, h, key, time.Now().Add(-2*time.Hour))
 	resp := fetch(t, h, expired, http.Header{"Range": {"bytes=0-1023"}})
-	drain(t, resp)
+	body := drain(t, resp)
 	if resp.StatusCode != http.StatusForbidden {
-		t.Fatalf("an expired signature got %d, want 403", resp.StatusCode)
+		t.Fatalf("an expired signature got %s, want 403", describe(resp, body))
 	}
 }
 
@@ -275,7 +274,7 @@ func waitForCloudCDN(t *testing.T, h *harness) {
 	started := time.Now()
 	last := ""
 	for {
-		why, ready := probeCloudCDN(
+		class, why, ready := probeCloudCDN(
 			t,
 			h,
 			redirectIn(t, h, readyRepo, "ready.bin", nil),
@@ -285,13 +284,13 @@ func waitForCloudCDN(t *testing.T, h *harness) {
 			t.Logf("Cloud CDN served the blob after %s", time.Since(started).Round(time.Second))
 			return
 		}
-		if why != last {
+		if class != last {
 			t.Logf(
 				"after %s, the edge is not ready: %s",
 				time.Since(started).Round(time.Second),
 				why,
 			)
-			last = why
+			last = class
 		}
 		if time.Since(started) > cloudCDNWait {
 			t.Fatalf("Cloud CDN was not ready within %s; last: %s", cloudCDNWait, why)
@@ -301,8 +300,15 @@ func waitForCloudCDN(t *testing.T, h *harness) {
 }
 
 // probeCloudCDN reads the first KiB of a blob through the edge and reports
-// what came back, without the URL, whose query is a credential.
-func probeCloudCDN(t *testing.T, h *harness, u *url.URL, want []byte) (why string, ready bool) {
+// what came back, without the URL, whose query is a credential: class, the
+// status and body, changes only when the kind of answer does, so the wait
+// logs each kind once; why adds the request IDs that change every time.
+func probeCloudCDN(
+	t *testing.T,
+	h *harness,
+	u *url.URL,
+	want []byte,
+) (class, why string, ready bool) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
@@ -313,17 +319,15 @@ func probeCloudCDN(t *testing.T, h *harness, u *url.URL, want []byte) (why strin
 	req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", len(want)-1))
 	resp, err := h.plain.Do(req)
 	if err != nil {
-		var ue *url.Error
-		if errors.As(err, &ue) {
-			err = ue.Err
-		}
-		return err.Error(), false
+		msg := withoutURL(err).Error()
+		return msg, msg, false
 	}
 	body := drain(t, resp)
 	if resp.StatusCode == http.StatusPartialContent && bytes.Equal(body, want) {
-		return "", true
+		return "", "", true
 	}
-	return fmt.Sprintf("%d %s", resp.StatusCode, tail(strings.TrimSpace(string(body)), 200)), false
+	return fmt.Sprintf("%d %s", resp.StatusCode, tail(strings.TrimSpace(string(body)), 200)),
+		describe(resp, body), false
 }
 
 // deployData deploys data to repo/p with its checksums.
@@ -363,8 +367,8 @@ func overridesOnACacheFill(t *testing.T, h *harness) {
 	}
 	resp, got := fetchAll(t, h, loc, nil)
 	if resp.StatusCode != http.StatusOK || !bytes.Equal(got, data) {
-		t.Fatalf("the edge served %d with %d bytes, want 200 with the %d deployed",
-			resp.StatusCode, len(got), len(data))
+		t.Fatalf("the edge served %d bytes, want 200 with the %d deployed: %s",
+			len(got), len(data), describe(resp, got))
 	}
 	disposition, mediaType := resp.Header.Get(
 		"Content-Disposition",
@@ -462,15 +466,16 @@ func fetchRange(t *testing.T, h *harness, u *url.URL, from, to int) *http.Respon
 	resp := fetch(t, h, u, http.Header{"Range": {fmt.Sprintf("bytes=%d-%d", from, to)}})
 	got := drain(t, resp)
 	if resp.StatusCode != http.StatusPartialContent {
-		t.Fatalf("GET %s with Range: %d, want 206", redact(u), resp.StatusCode)
+		t.Fatalf("GET %s with Range: %s, want 206", redact(u), describe(resp, got))
 	}
 	if !bytes.Equal(got, file.data[from:to+1]) {
 		t.Fatalf(
-			"%s served %d bytes that differ from bytes %d-%d",
+			"%s served %d bytes that differ from bytes %d-%d, %s",
 			u.Hostname(),
 			len(got),
 			from,
 			to,
+			describe(resp, nil),
 		)
 	}
 	return resp
