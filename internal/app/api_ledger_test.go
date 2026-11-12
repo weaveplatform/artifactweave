@@ -88,6 +88,14 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 						".openapi.yaml",
 					) + "/unimplemented.gen.go"
 				}
+				// The spec's tier is the served contract's own account of the
+				// operation; TestAccUnimplementedOperationsAnswer501 holds
+				// implemented to what the router serves (#1328).
+				tier, _ := op.Extensions["x-tier"].(string)
+				if tier == "stub" && implemented[route] {
+					t.Errorf("%s (%s) is served, but %s tiers it x-tier: stub",
+						route, op.OperationID, spec)
+				}
 				for _, p := range append(append(openapi3.Parameters{}, item.Parameters...), op.Parameters...) {
 					name := strings.ToLower(p.Value.Name)
 					if strings.Contains(name, "page") || strings.Contains(name, "cursor") ||
