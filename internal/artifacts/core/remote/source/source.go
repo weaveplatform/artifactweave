@@ -274,6 +274,11 @@ type Result struct {
 	// token. The delivery adapter calls it after a successful GET/range or signed
 	// URL issuance, never on lookup, HEAD, 304 or a failed body. Nil for no-store.
 	Used func(context.Context) error
+	// Refused is set on a result served from an expired cached file
+	// because the upstream's label was refused, as 7.x's
+	// RemoteRepoBase.internalGetInfo serves it: the refusal, which Read
+	// remembers for the requests after this one.
+	Refused *MIMERefusal
 }
 
 // Backend resolves one already-authorized request. It owns freshness, fetching
@@ -342,9 +347,8 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 		return Result{}, ErrUnsupported
 	}
 	result, err := backend.Read(ctx, q, p)
-	var refused *MIMERefusal
-	if remember && errors.As(err, &refused) {
-		remembered.put(q.Repo, identity, q.Resource.Path, refused)
+	if remember {
+		rememberRefusal(q, identity, result, err)
 	}
 	if err == nil {
 		err = validateResult(q, result)
@@ -387,6 +391,19 @@ func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
 // missed-retrieval cache (ZapServiceImpl, RemoteRepoBase.removeFromCaches).
 func (s *Service) ForgetRefusals(repoKey, path string) {
 	remembered.forget(repoKey, path)
+}
+
+// rememberRefusal keeps the MIME refusal a read met, its error or the one
+// on the expired file it was served (Result.Refused), for the path's next
+// reads.
+func rememberRefusal(q Request, identity model.SourceIdentity, result Result, err error) {
+	var refused *MIMERefusal
+	if !errors.As(err, &refused) && err == nil {
+		refused = result.Refused
+	}
+	if refused != nil {
+		remembered.put(q.Repo, identity, q.Resource.Path, refused)
+	}
 }
 
 // maxRefusals bounds the remembered refusals. 7.x's missed-retrieval cache

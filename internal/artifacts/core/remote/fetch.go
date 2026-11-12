@@ -141,7 +141,7 @@ func (p *Policy) fetch(
 					return out, stateErr
 				}
 				if refused := mimeRefusal(q, res, cacheErr); refused != nil {
-					return out, refused
+					return p.refuse(ctx, q, permit, opts.Revision, token, e, refused)
 				}
 				return p.fallback(q, key, e, failure)
 			}
@@ -163,7 +163,7 @@ func (p *Policy) fetch(
 			return out, stateErr
 		}
 		if refused := mimeRefusal(q, res, err); refused != nil {
-			return out, refused
+			return p.refuse(ctx, q, permit, opts.Revision, token, e, refused)
 		}
 		return p.fallback(q, key, e, failure)
 	}
@@ -304,7 +304,13 @@ func (p *Policy) directOnce(
 	}
 	if q.Resource.Method == http.MethodHead {
 		if refused := headMIME(q, res); refused != nil {
-			return source.Result{}, refused
+			served, err := p.refuse(ctx, q, permit, opts.Revision, token, old, refused)
+			if err != nil {
+				return source.Result{}, err
+			}
+			result, err := p.resultFor(ctx, q, served.entry)
+			result.Refused = served.refused
+			return result, err
 		}
 		claimed, parseErr := item.ParseChecksums(kernel.Checksums{
 			SHA256: res.Header.Get(
@@ -504,6 +510,49 @@ func mimeRefusal(q source.Request, res *http.Response, err error) error {
 		Message: refused.Message(requestURL(res)) +
 			"; Path: '" + q.Repo.Key + ":" + q.Resource.Path + "'",
 	}}
+}
+
+// refuse answers a read whose upstream label mimeRefusal refused. With
+// complete cached bytes for the path, which a fetch means have expired,
+// 7.x serves them on this request (RemoteRepoBase.internalGetInfo: the
+// rejected resource "doesn't exist remotely but is expired in the caches
+// - returning expired cached resource") and resets their age
+// (RemoteRepoBase.getInfo, unexpireIfExists, DbCacheRepo.unexpire), so the
+// entry is served with the refusal riding on it for the source service to
+// remember, and made fresh again. hardFail does not change this: 7.x reads
+// it only for an exception (handleGenericException), which a refusal is
+// not; nor does the entry's Cache-Control, which 7.x never reads [I].
+// Without such bytes, as for a stream that stores nothing, the refusal.
+func (p *Policy) refuse(
+	ctx context.Context,
+	q source.Request,
+	permit source.Permit,
+	revision string,
+	token model.RemoteCacheToken,
+	e model.RemoteCacheEntry,
+	refused error,
+) (fillResult, error) {
+	var refusal *source.MIMERefusal
+	if !errors.As(refused, &refusal) || e.Blob.Checksums.SHA256 == "" || !e.NegativeUntil.IsZero() {
+		return fillResult{key: token.Key}, refused
+	}
+	e.ValidatedAt = p.now()
+	var updated model.RemoteCacheEntry
+	err := p.Store.Tx(ctx, func(tx context.Context) error {
+		if currentErr := p.Check(tx, q, permit, revision); currentErr != nil {
+			return currentErr
+		}
+		var putErr error
+		updated, putErr = p.Store.RemoteCache().Put(tx, token, e)
+		if putErr != nil {
+			return fmt.Errorf("unexpire remote cache: %w", putErr)
+		}
+		return nil
+	})
+	if err != nil {
+		return fillResult{key: token.Key}, PolicyError(err)
+	}
+	return fillResult{key: token.Key, entry: updated, refused: refusal}, nil
 }
 
 // requestURL is the URL 7.x names in a refusal: the one it asked for,

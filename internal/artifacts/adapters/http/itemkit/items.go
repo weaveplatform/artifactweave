@@ -510,7 +510,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 		s.listFolder(w, r, st, c, f, acc)
 		return
 	}
-	s.ServeFile(w, r, st, f, p)
+	s.ServeItemFile(w, r, st, f, p)
 }
 
 // matchesMatrix applies download matrix parameters (model.Matrix.Matches).
@@ -577,12 +577,12 @@ func (s *Kit) getSidecar(
 // RTFACT-4653).
 const contentTypeProperty = "artifactory.content-type"
 
-// fileContentType is the Content-Type a file downloads with, GET and HEAD:
-// its contentTypeProperty value, as 7.x's DbStoringRepoMixin.setMimeType
-// puts it on the resource its download answers from, otherwise the type
-// recorded from its path. 7.x's storage info, deploy answer, archive
-// entries and signed URLs type a file by its path alone, and so do this
-// server's.
+// fileContentType is the Content-Type a file downloads with on the item
+// route, GET and HEAD: its contentTypeProperty value, as 7.x's
+// DbStoringRepoMixin.setMimeType puts it on the resource its download
+// answers from, otherwise the type recorded from its path. 7.x's storage
+// info, deploy answer, archive entries and signed URLs type a file by its
+// path alone, and so do this server's.
 func fileContentType(ctx context.Context, st Store, it model.Item) (string, error) {
 	props, err := st.Items().Properties(ctx, it.ID)
 	if errors.Is(err, kernel.ErrNotFound) {
@@ -612,16 +612,54 @@ func checksumType(r *http.Request, name string) string {
 	return item.MimeType(name)
 }
 
-// ServeFile streams a file's content with the headers the JFrog CLI reads
-// (Content-Length, Accept-Ranges and the X-Checksum headers); ranges on a
-// GET and conditional requests are http.ServeContent's. A Content-Disposition
-// already in w's headers is kept, so a protocol can send its own form.
+// ServeFile streams a file's content, typed by its path, with the headers
+// the JFrog CLI reads (Content-Length, Accept-Ranges and the X-Checksum
+// headers); ranges on a GET and conditional requests are
+// http.ServeContent's. A Content-Disposition already in w's headers is
+// kept, so a protocol can send its own form. The native APIs and the
+// Docker registry serve their files with it.
 func (s *Kit) ServeFile(
 	w http.ResponseWriter,
 	r *http.Request,
 	st Store,
 	f Found,
 	p kernel.Principal,
+) {
+	s.serveFile(w, r, st, f, p, f.Item.MimeType)
+}
+
+// ServeItemFile is ServeFile for a download on the item route,
+// /artifactory/<repo>/<path>, for every package type and repository
+// class: the file is typed by its artifactory.content-type property when
+// that is set (fileContentType). 7.x answers that route through
+// RepoFilter and DownloadServiceImpl.process, which take the type from the
+// resource the repository's getInfo returns, typed by the property in
+// DbStoringRepoMixin.setMimeType for a local or cache repository of any
+// package type, and send it on a GET and a HEAD (RequestResponseHelper).
+// The native APIs and the Docker registry keep ServeFile's type: their
+// 7.x code is not in the OSS sources, and JFrog's docs do not name them.
+func (s *Kit) ServeItemFile(
+	w http.ResponseWriter,
+	r *http.Request,
+	st Store,
+	f Found,
+	p kernel.Principal,
+) {
+	contentType, err := fileContentType(r.Context(), st, f.Item)
+	if err != nil {
+		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "item properties", err))
+		return
+	}
+	s.serveFile(w, r, st, f, p, contentType)
+}
+
+func (s *Kit) serveFile(
+	w http.ResponseWriter,
+	r *http.Request,
+	st Store,
+	f Found,
+	p kernel.Principal,
+	contentType string,
 ) {
 	ctx := r.Context()
 	it := f.Item
@@ -630,11 +668,6 @@ func (s *Kit) ServeFile(
 		// 416, for the reasons pkgroute.ServeStream gives (6.20's
 		// sendHeadResponse; RFC 9110 section 14.2) [I].
 		r = pkgroute.WithoutRange(r)
-	}
-	contentType, err := fileContentType(ctx, st, it)
-	if err != nil {
-		httpkit.WriteErr(w, r, s.InternalError(ctx, "item properties", err))
-		return
 	}
 	h := w.Header()
 	pkgroute.SetChecksums(h, it.Actual)

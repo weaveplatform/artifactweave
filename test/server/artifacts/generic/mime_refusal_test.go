@@ -134,6 +134,49 @@ func TestAccGenericRemoteMIMERefusal(t *testing.T) {
 	)
 }
 
+// TestAccGenericRemoteMIMERefusalServesExpiredFile: when a cached file
+// has expired and its upstream's label is now refused, the request that
+// met the refusal is served the cached file, GET or HEAD, and the
+// requests after it answer the refusal without an upstream request, as
+// 7.x's RemoteRepoBase.internalGetInfo serves an expired file for a
+// rejected resource and its missed-retrieval cache answers the path
+// (addRejectedResourceToMissedCache).
+func TestAccGenericRemoteMIMERefusalServesExpiredFile(t *testing.T) {
+	w := newRemoteWorld(t)
+	set := func(path, label, body string) {
+		// max-age=0 expires the cached file at once.
+		w.up.Set(path, fakeupstream.Resource{Body: []byte(body), Header: http.Header{
+			"Content-Type": {label}, "Cache-Control": {"max-age=0"},
+		}})
+	}
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		path := "/expired/" + method + "/file.jar"
+		set(path, javaArchive, "jar bytes")
+		wantDownload(t, w.request(http.MethodGet, "/artifactory/remote"+path, "reader", ""),
+			http.MethodGet, javaArchive, "jar bytes")
+		set(path, "text/html", loginPage)
+		before := w.up.Count("", path)
+		wantDownload(t, w.request(method, "/artifactory/remote"+path, "reader", ""),
+			method, javaArchive, "jar bytes")
+		if w.up.Count("", path) == before {
+			t.Fatalf("%s %s: the expired file was served without asking the upstream", method, path)
+		}
+		before = w.up.Count("", path)
+		message := refusalOf(w, path, javaArchive, "text/html", path[1:])
+		for _, again := range []string{http.MethodGet, http.MethodHead} {
+			wantRefusal(
+				t,
+				w.request(again, "/artifactory/remote"+path, "reader", ""),
+				again,
+				message,
+			)
+		}
+		if after := w.up.Count("", path); after != before {
+			t.Fatalf("%s: remembered refusal made %d upstream requests", path, after-before)
+		}
+	}
+}
+
 // TestAccGenericRemoteMIMEAccept: the label is checked against the
 // client's Accept types, without parameters and lowercased, so a client
 // that accepts text/html is served the file and one that accepts another

@@ -431,7 +431,7 @@ func (s opkgItems) serveOpkgPackage(
 			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
-		s.ServeFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
+		s.ServeItemFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
 		return
 	}
 	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
@@ -481,6 +481,6 @@ func (s opkgItems) serveRemoteOpkgPackage(
 		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "Opkg source", source.ErrInvalidResult))
 		return
 	}
-	s.ServeFile(w, r, s.Store,
+	s.ServeItemFile(w, r, s.Store,
 		itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }

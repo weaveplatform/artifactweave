@@ -141,7 +141,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 				_ = result.Used(ctx)
 			}
 		} else {
-			s.ServeFile(w, r, s.Store, Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
+			s.ServeItemFile(w, r, s.Store, Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 		}
 	}
 	return true

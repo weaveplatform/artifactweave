@@ -3058,7 +3058,8 @@ paths:
         while it has sent none (every deploy records the SHA-256); under `server-generated-checksums`, for
         `maven-metadata.xml` and in a remote cache, the computed one. A remote that refuses an upstream file for its
         `Content-Type` label, checked against the types in the request `Accept` header or else the type of the path,
-        answers 409, and answers the path so until `missedRetrievalCachePeriodSecs` pass.'
+        answers 409, or serves its expired cached copy of the file on that request, and answers the path 409 until
+        `missedRetrievalCachePeriodSecs` pass.'
       operationId: retrieveArtifact
       parameters:
       - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as

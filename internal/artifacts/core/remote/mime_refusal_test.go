@@ -3,7 +3,9 @@ package remote_test
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
@@ -80,5 +82,75 @@ func TestAccPolicyMIMERefusal(t *testing.T) {
 	}
 	if !errors.Is(item.RefuseLabel(w.c, "a.jar", "text/html", nil), item.ErrRemoteMIME) {
 		t.Fatal("RefuseLabel no longer refuses the label this test serves")
+	}
+}
+
+// TestAccPolicyMIMERefusalServesExpiredEntry: a refused label on a read
+// whose cached file has expired serves that file, GET and HEAD, with the
+// refusal on the result for the source service to remember, and makes the
+// entry fresh again, as 7.x's RemoteRepoBase.internalGetInfo serves an
+// expired file for a rejected resource and getInfo unexpires it. hardFail
+// does not stop it. A format route's read (no ClientMIME) still fails 502.
+func TestAccPolicyMIMERefusalServesExpiredEntry(t *testing.T) {
+	w := policyFixture(t)
+	resource := func(label, body string) fakeupstream.Resource {
+		return fakeupstream.Resource{Body: []byte(body), Header: http.Header{
+			"Content-Type": {label}, "Cache-Control": {"max-age=10"},
+		}}
+	}
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		path := strings.ToLower(method) + ".jar"
+		w.up.Set("/"+path, resource("application/java-archive", "jar bytes"))
+		q := w.request(path, source.ResourceKindArtifact)
+		q.Resource.ClientMIME = &source.ClientMIME{}
+		q.Repo.HardFail = ptr(true)
+		w.mustRead(q, "jar bytes")
+		w.clock.Advance(11 * time.Second)
+		w.up.Set("/"+path, resource("text/html", "<html>login</html>"))
+		q.Resource.Method = method
+		before := w.up.Count("", "/"+path)
+		result, err := w.read(q)
+		if err != nil || result.Refused == nil || result.Refused.Status != http.StatusConflict ||
+			!strings.Contains(
+				result.Refused.Message,
+				"and this repo blocks text/html on mismatch",
+			) {
+			t.Fatalf(
+				"%s expired %s: %+v, %v; want the cached file and the refusal",
+				method,
+				path,
+				result,
+				err,
+			)
+		}
+		if w.up.Count("", "/"+path) == before {
+			t.Fatalf("%s expired %s: no upstream request", method, path)
+		}
+		if result.Item == nil || result.Item.MimeType != "application/java-archive" {
+			t.Fatalf("%s expired %s: item %+v, want the cached file", method, path, result.Item)
+		}
+		if method == http.MethodGet && w.bytes(result) != "jar bytes" {
+			t.Fatalf("GET expired %s: body %q", path, w.bytes(result))
+		}
+
+		// Unexpired: the next read within max-age is a hit.
+		before = w.up.Count("", "/"+path)
+		q.Resource.Method = http.MethodGet
+		if again := w.mustRead(q, "jar bytes"); again.Refused != nil {
+			t.Fatalf("%s: a hit carries a refusal", path)
+		}
+		if w.up.Count("", "/"+path) != before {
+			t.Fatalf("%s: the served entry was not made fresh again", path)
+		}
+	}
+
+	w.up.Set("/format.jar", resource("application/java-archive", "jar bytes"))
+	q := w.request("format.jar", source.ResourceKindArtifact)
+	w.mustRead(q, "jar bytes")
+	w.clock.Advance(11 * time.Second)
+	w.up.Set("/format.jar", resource("text/html", "<html>login</html>"))
+	var failure *source.HTTPError
+	if _, err := w.read(q); !errors.As(err, &failure) || failure.Status != http.StatusBadGateway {
+		t.Fatalf("format route on an expired entry: %v, want 502", err)
 	}
 }
