@@ -63,7 +63,7 @@ func TestAccServeStreamHeadIgnoresRange(t *testing.T) {
 
 // WithoutRange drops Range and If-Range from a copy and returns a request
 // without either as it is.
-func TestWithoutRange(t *testing.T) {
+func TestUnitWithoutRange(t *testing.T) {
 	plain := httptest.NewRequest(http.MethodGet, "/", nil)
 	plain.Header.Set("Accept", "*/*")
 	if pkgroute.WithoutRange(plain) != plain {
