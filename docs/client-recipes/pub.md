@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Dart/pub 3.13.7**. Registered classes: **local, remote, virtual, federated**.
+Client: **Dart/pub 3.15.0**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/pub/${AW_REPO}`
 

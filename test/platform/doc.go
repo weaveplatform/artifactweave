@@ -9,8 +9,11 @@
 //
 // # Inputs
 //
-// The suite runs only when ARTIFACTWEAVE_SCENARIO names the scenario, so go
-// test ./... passes over it. The workflow sets:
+// TestAccScenario runs only when ARTIFACTWEAVE_SCENARIO names the scenario,
+// so go test ./... passes over it. The TestUnit tests of the suite's own
+// helpers run without it; make test's package list leaves test/platform out,
+// so they run with go test ./test/platform/... and in every scenario run.
+// The workflow sets:
 //
 //	ARTIFACTWEAVE_SCENARIO               <cloud>/<scenario>, for example gcp/single-bucket
 //	ARTIFACTWEAVE_SCENARIO_CONFIG        the scenario's artifactweave_config output (YAML)
