@@ -1613,7 +1613,8 @@ paths:
       description: Returns minimal details for every repository the caller may see, optionally filtered by class,
         package type and project. Admins, and tokens scoped artifact:*:r or system:info:r, see every repository;
         other callers see the repositories they can read. The type value is lower case here but upper case in the
-        response. Remote caches are never listed.
+        response. Remote caches are never listed. The list is ordered by key. limit and offset page it; without
+        limit the whole list comes back with no paging headers.
       operationId: getRepositoriesByTypeAndProject
       parameters:
       - description: Optional query parameter. Repository class to list. distribution is accepted and always yields an
@@ -1673,6 +1674,25 @@ paths:
         schema:
           description: The parameter value.
           type: string
+      - description: Optional query parameter. Page size, from 1 to 1000. With it the answer holds at most limit
+          repositories from offset on, and carries X-Total-Count, X-Result-Offset and X-Result-Limit. Without it
+          the whole filtered list is returned and those headers are not sent. A value outside 1 to 1000 answers 400.
+        in: query
+        name: limit
+        schema:
+          description: The parameter value.
+          maximum: 1000
+          minimum: 1
+          type: integer
+      - description: Optional query parameter. Zero-based index into the filtered list of the first repository to
+          return; 0 when omitted. It needs limit, and a negative value answers 400. An offset past the end gives an
+          empty page.
+        in: query
+        name: offset
+        schema:
+          description: The parameter value.
+          minimum: 0
+          type: integer
       responses:
         '200':
           content:
@@ -1741,7 +1761,32 @@ paths:
                   type: object
                 type: array
           description: The matching repositories, as plain JSON or the vendor list media type when the client asks
-            for it.
+            for it. With limit, only that page of them.
+          headers:
+            X-Result-Limit:
+              description: Sent only with limit. The limit asked for.
+              schema:
+                description: The page size.
+                type: integer
+            X-Result-Offset:
+              description: Sent only with limit. The offset applied, 0 when none was sent.
+              schema:
+                description: The zero-based index of the page's first repository.
+                type: integer
+            X-Total-Count:
+              description: Sent only with limit. How many repositories the filters match among those the caller may
+                see, on every page together.
+              schema:
+                description: The number of repositories.
+                type: integer
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Invalid paging parameters. The message is `offset requires limit` for an offset sent without
+            limit, `limit must be between 1 and 1000` for a limit outside that range, and `offset must be greater
+            than or equal to 0` for a negative offset.
         '401':
           content:
             application/json:
