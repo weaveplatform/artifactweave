@@ -36,3 +36,19 @@ Feature: Swift package registry metadata follows stored source archives
       | class     | repo       |
       | local     | swift-local |
       | federated | swift-fed   |
+
+  Scenario: a Swift registry error carries the API version SwiftPM reads
+    SwiftPM shows an error's problem details only when its Content-Version
+    is 1, the version of the registry's other answers.
+
+    Given the registry is running
+    When I PUT "/artifactory/api/repositories/swift-errors" as admin with body:
+      """
+      {"rclass":"local","packageType":"swift"}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/swift/swift-errors/acme/Missing" as admin
+    Then the response status is 404
+    And the response header "Content-Version" contains "1"
+    And the response header "Content-Type" contains "application/problem+json"
+    And the JSON field "detail" equals "Swift package not found"

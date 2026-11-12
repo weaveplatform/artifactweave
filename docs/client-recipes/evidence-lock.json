@@ -13,6 +13,7 @@
   "internal/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go": "6e940745e65c5dc7394166d3ab8e479b537037bb03abade401b4e4f4f6f92979",
   "internal/artifacts/ecosystem/huggingface/http/migration_scope_test.go": "d7cde7e663a7d894c16bec33561b1dc784cc1b698f888f816ff5a22bdf95bda7",
   "internal/artifacts/ecosystem/huggingface/http/migration_test.go": "09531c49d7d12e0e80d7a1ee397671e203a1b9a61034619edb6a8c51890c604a",
+  "internal/artifacts/ecosystem/swift/http/problem_test.go": "4ec2b8ad0316fb35f28ce7152c9102ac0d181e38ed952df605b35f16de6d9da0",
   "internal/artifacts/ecosystem/swift/http/remote_test.go": "88c8ef0dae01633c4bb94e13c097f4d99e8246f2c376163606e77b4fc036bc82",
   "internal/artifacts/ecosystem/swift/http/swift_test.go": "06575ba79dfe73a81cf08e8c29f8cfead3a9216e5c532f600be5fd00fd91843b",
   "internal/artifacts/ecosystem/vcs/http/archive_git_test.go": "fc4ef97591c049be131d6eee187450609d2a55fc7530295e259ebe0334e2d278",
