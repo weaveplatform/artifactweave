@@ -101,11 +101,11 @@
 //     permission on every package it lists, which the generic item route
 //     cannot check. A Debian installer's Packages index, which a remote
 //     repository relays as metadata, is read with the permission on its
-//     own path, as a translation or a Contents index is [I]. The download policy does not
-//     filter or refuse an index for the packages it lists: a package whose
-//     file the include and exclude patterns reject stays listed and only its
-//     download is refused, as in Artifactory's indexes (RTFACT-30830,
-//     RTFACT-30656).
+//     own path, as a translation or a Contents index is [I]. The download
+//     policy does not filter or refuse an index for the packages it lists:
+//     a package whose file the include and exclude patterns reject stays
+//     listed and only its download is refused, as in Artifactory's indexes
+//     (RTFACT-30830, RTFACT-30656).
 //   - An index, a virtual repository's metadata and a virtual package are
 //     read under the download policy at their own path, after the Read
 //     permission check (DV-057): a blacked-out repository, or patterns that
@@ -193,6 +193,17 @@
 //     artifactory strict handler with the Debian partial alone.
 //   - debian_source_test.go: the kit's Debian source request checks a
 //     remote's packages and metadata.
+//   - debian_source_request_test.go: the source request names what apt
+//     reads from an upstream (#1273): an installer's Packages index, any
+//     by-hash file, a .lzma index and a package under a by-hash folder,
+//     each checked as it streams, with the 64 MiB bound on an index's
+//     by-hash copy alone; names it cannot check stay not found.
+//   - debian_upstream_paths_test.go: a remote repository asks its upstream
+//     for those paths and a virtual repository for its remote member's
+//     installer index; a virtual repository composes the forms its own
+//     optionalIndexCompressionFormats names (#1274); a local .lzma index is
+//     read as an index; and a snapshot of a remote copies the installer and
+//     .lzma indexes its Release lists.
 //   - debian_index_test.go: Packages and Sources indexes refused with a
 //     query, to a caller who may not read them or a package they list, and
 //     with the download policy's 404 in a blacked-out repository, local or
@@ -212,8 +223,8 @@
 //     server built without remote sources.
 //   - debian_virtual_files_test.go: the dists/ files a virtual repository
 //     does not compose, each kind from a local or a remote member and from
-//     the first member that serves it, past a remote member whose source
-//     request cannot name it; refused to a caller who may not read
+//     the first member that serves it, past a remote member whose upstream
+//     lacks it; refused to a caller who may not read
 //     them, by the virtual repository's patterns and by an upstream fault,
 //     not found where no member holds them or with a query; and a member's
 //     Sources index refused to a caller who may not read a file it lists,
@@ -246,6 +257,7 @@
 // TryDebianItem as the only overlay (overlay_fixture_test.go).
 //
 // The route suite test/server/artifacts/debian checks the snapshot reads'
-// guards through the router, and the @debian acceptance partition
+// guards and a remote's relay of upstream files through the router, and
+// the @debian acceptance partition
 // (test/acceptance/features/debian.feature) is the native apt evidence.
 package debianhttp

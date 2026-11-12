@@ -37,8 +37,8 @@
 //     upstream metadata or a package before a remote caches it (the *Path
 //     predicates, ByHashPath, ValidateReleaseMetadata, DecodePackagesIndex,
 //     DecodeInstallerPackagesIndex, DecodeSourcesIndex, ReadBinary,
-//     ReadSource), and whose item GET sends a
-//     remote's downloads through the remote source (Serves); and the
+//     ReadSource), and whose item GET sends a remote's downloads through
+//     the remote source (Serves); and the
 //     artifacts module's item delete (artifacts/adapters/http), which permits
 //     a whole snapshot folder's delete (WithSnapshotDelete).
 //   - Driven: the format hooks' environment (format.Env): its blobs hold
@@ -75,8 +75,8 @@
 //     ReadSource.
 //   - The index rules: IndexedBinary and Packages, IndexedSource,
 //     SourceArchive and Sources, GzipIndex, IndexForm and IndexForms,
-//     ReleaseEntry and Release,
-//     SignedRelease and SignRelease, ValidBinaryPath and ValidSourcePath.
+//     ReleaseEntry and Release, SignedRelease and SignRelease,
+//     ValidBinaryPath and ValidSourcePath.
 //   - The upstream metadata rules: PackagesIndexPath, SourcesIndexPath,
 //     InstallerPackagesIndexPath, ReleaseMetadataPath, ByHashPath,
 //     ByHashMetadataPath, ValidateReleaseMetadata,
@@ -165,6 +165,12 @@
 //   - work_test.go and source_work_test.go: Release and every
 //     architecture's index, signing through Env.Keys, and only complete
 //     source packages published.
+//   - index_forms_test.go and work_forms_test.go: the optional bz2, lzma
+//     and xz index forms, checked by the system's bzip2 and xz tools where
+//     present, written and listed in Release with by-hash copies when
+//     optionalIndexCompressionFormats names them (#1274), and plain and gzip
+//     alone otherwise; the installer and by-hash names apt reads; and the
+//     LZMA alone header check.
 //   - contract_test.go: the format contract suite (artifacts/core/formattest)
 //     with KindIndex as the repository's work.
 //
