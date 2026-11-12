@@ -13,7 +13,7 @@ Feature: Helm pulls from a derived repository index
     Then the response status is 200
     When I GET "/artifactory/helm-local/index.yaml" as admin
     Then the response status is 200
-    And the response header "Content-Type" contains "application/x-yaml"
+    And the response header "Content-Type" contains "text/plain"
     And the response body contains "entries: {}"
     When I run helm "create acme"
     Then the command succeeds

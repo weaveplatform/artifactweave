@@ -44,7 +44,7 @@ func derivedIndex(t *testing.T, w *world, c repo.Config) (helm.Index, []byte) {
 		t.Fatal(err)
 	}
 	if it.CreatedBy != "_system_" || it.ModifiedBy != "_system_" ||
-		it.MimeType != "application/x-yaml" {
+		it.MimeType != "text/plain" {
 		t.Fatalf("derived item %+v", it)
 	}
 	rc, _, err := w.items.Blobs.Open(w.ctx, it.Actual.SHA256)

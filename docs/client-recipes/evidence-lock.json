@@ -84,7 +84,7 @@
   "test/acceptance/features/gems.feature": "3f0a45f7c0d1f8e4bba571b02c4e55d7a745da453584f611e2479dbd5e1bbcda",
   "test/acceptance/features/gitlfs.feature": "6ab52e368a2df894078c3d8802af063995de6133870555f2de40802f8b6c5c9f",
   "test/acceptance/features/go.feature": "2d42a8e9f4c47f2aa99c111f6d186130f42e968b7d2510390e8e12d0ec0d3451",
-  "test/acceptance/features/helm_classic.feature": "1bc684d6917dfc57af18ec8e1162453b71449a53dd5d218841f735d5b961fcf4",
+  "test/acceptance/features/helm_classic.feature": "a67d0c466eaa6de631ac4449d5951f8f82058d4250947b6587f02def185f58ee",
   "test/acceptance/features/helm_oci.feature": "6957d384715b7df2eb29bd4ff573135fb8db9a53e5ba0c6051b81238e7263270",
   "test/acceptance/features/helm_remote.feature": "8a7fd75f686c7ef5450e4d42de579aa3d449b4b6bb1b224cbecfbb0d455ab016",
   "test/acceptance/features/hex.feature": "3fb37d377de26ce0b5f0d331997e6bafc190531a260edf1d142bb94cc1c74f7e",
