@@ -45,6 +45,42 @@ original tested versions.
 | [`vagrant.Dockerfile`](../../test/acceptance/clients/vagrant.Dockerfile) | `ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2` | Vagrant 2.4.9 (Linux amd64) | [HashiCorp stable installer](https://developer.hashicorp.com/vagrant/install), [release checksums](https://releases.hashicorp.com/vagrant/2.4.9/vagrant_2.4.9_SHA256SUMS) |
 | [`vscode.Dockerfile`](../../test/acceptance/clients/vscode.Dockerfile) | `ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2` | VS Code official archive commit `261c84cb1eddf11235f9e2c921425e9663fbe556`; Ubuntu 26.10 | [VS Code stable update API](https://update.code.visualstudio.com/api/update/linux-x64/stable/latest) |
 
+## Download sources
+
+The images not listed below take their client from the base image or from the
+package manager they run (apk, APT, pip, gem, npm or mix). The images below also
+download a file while they build. Each file is pinned to the digest its upstream
+publishes: a SHA-256, or the SHA-512 that Maven Central and Eclipse publish for
+Ivy and Eclipse. Where a second host serves the same bytes, the build falls back
+to it, so one host being down does not fail the build
+([#1321](https://github.com/weaveplatform/artifactweave/issues/1321),
+[#1322](https://github.com/weaveplatform/artifactweave/issues/1322)).
+[`fetch-pinned.sh`](../../test/acceptance/clients/fetch-pinned.sh) tries each
+source in turn and keeps the first file whose digest matches the pin. It passes
+over a source that answers with other bytes as it does one that does not answer,
+so a second source never changes what runs. When every source is down, the build
+fails. A pin names the first URL only; `make deps-sync` moves the second URL with
+it.
+
+| Dockerfile | Download | First source | Second source |
+|---|---|---|---|
+| [`composer.Dockerfile`](../../test/acceptance/clients/composer.Dockerfile) | Composer 2.11.1 and 1.10.28 phars | `getcomposer.org/download/` | The `composer.phar` asset of Composer's GitHub releases [2.11.1](https://github.com/composer/composer/releases/tag/2.11.1) and [1.10.28](https://github.com/composer/composer/releases/tag/1.10.28) |
+| [`git-lfs.Dockerfile`](../../test/acceptance/clients/git-lfs.Dockerfile) | Git LFS 3.8.1 tarball | GitHub release `git-lfs/git-lfs` | None. No other host serves it; packagecloud holds `.deb` and `.rpm` packages, which are other bytes |
+| [`jetbrains.Dockerfile`](../../test/acceptance/clients/jetbrains.Dockerfile) | IntelliJ IDEA 2026.2.4 tarballs | `download.jetbrains.com` | None. `cache-redirector.jetbrains.com` only redirects to it, and `download-cdn.jetbrains.com` refuses a request without the signed query it adds |
+| [`luarocks.Dockerfile`](../../test/acceptance/clients/luarocks.Dockerfile) | Lua 5.5.1 tarball | `www.lua.org/ftp/` | [`www.tecgraf.puc-rio.br/lua/ftp/`](https://www.tecgraf.puc-rio.br/lua/ftp/), the PUC-Rio mirror that [lua.org's mirrors page](https://www.lua.org/mirrors.html) names |
+| [`luarocks.Dockerfile`](../../test/acceptance/clients/luarocks.Dockerfile) | LuaRocks 3.13.0 tarball | `luarocks.org/releases/` | [`luarocks.github.io/luarocks/releases/`](https://luarocks.github.io/luarocks/releases/), where `luarocks.org` redirects. It covers `luarocks.org` being down, not GitHub Pages |
+| [`maven.Dockerfile`](../../test/acceptance/clients/maven.Dockerfile) | Ivy 2.6.0 jar | `repo.maven.apache.org` | [Google's mirror of Maven Central](https://maven-central.storage-download.googleapis.com/maven2/org/apache/ivy/ivy/2.6.0/ivy-2.6.0.jar), which [maven.apache.org](https://maven.apache.org/repository/) names |
+| [`maven.Dockerfile`](../../test/acceptance/clients/maven.Dockerfile) | Gradle 9.8.2 distribution | `services.gradle.org/distributions/` | [GitHub release `gradle/gradle-distributions` v9.8.2](https://github.com/gradle/gradle-distributions/releases/tag/v9.8.2), where `services.gradle.org` redirects. It covers the redirector being down, not GitHub |
+| [`opkg.Dockerfile`](../../test/acceptance/clients/opkg.Dockerfile) | opkg 0.10.0 tarball | `downloads.yoctoproject.org/releases/opkg/` | [`mirrors.kernel.org/yocto/opkg/`](https://mirrors.kernel.org/yocto/opkg/opkg-0.10.0.tar.gz), kernel.org's copy of the Yocto releases |
+| [`p2.Dockerfile`](../../test/acceptance/clients/p2.Dockerfile) | Eclipse Platform 4.41 archives | `archive.eclipse.org` | [`ftp2.osuosl.org/pub/eclipse/`](https://ftp2.osuosl.org/pub/eclipse/eclipse/downloads/), OSU Open Source Lab, on Eclipse's mirror list. It holds only the releases `download.eclipse.org` still holds |
+| [`sbt.Dockerfile`](../../test/acceptance/clients/sbt.Dockerfile) | sbt 2.0.12 tgz | GitHub release `sbt/sbt` | None. SDKMAN redirects to the same release, and Maven Central holds no launcher tgz |
+| [`vagrant.Dockerfile`](../../test/acceptance/clients/vagrant.Dockerfile) | Vagrant 2.4.9 `.deb` | `releases.hashicorp.com/vagrant/` | [HashiCorp's apt repository](https://apt.releases.hashicorp.com/pool/amd64/main/vagrant_2.4.9-1_amd64.deb) |
+| [`vscode.Dockerfile`](../../test/acceptance/clients/vscode.Dockerfile) | VS Code archive | `vscode.download.prss.microsoft.com` | None. `update.code.visualstudio.com` redirects to the same host |
+
+`luarocks.Dockerfile` keeps the fallback #1321 gave it, which came before
+`fetch-pinned.sh`: it tries the second host when curl fails on the first, then
+checks the SHA-256 of what it fetched.
+
 The Puppet image stays on Ruby 3.3 through a Dependabot entry of its own,
 because the pinned Puppet cannot extract a module archive on Ruby 3.4
 ([#1126](https://github.com/weaveplatform/artifactweave/issues/1126)). The
