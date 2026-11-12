@@ -1,5 +1,5 @@
 // Package opkg runs the Opkg routes of the assembled server: the signing of
-// a virtual feed.
+// a virtual feed, and the async values of the opkg reindex.
 //
 // # Role
 //
@@ -21,6 +21,8 @@
 // Assertions only:
 //   - opkg_test.go: a virtual feed is signed only with the configured GPG
 //     key.
+//   - opkg_reindex_async_test.go: Calculate Opkg Repository Metadata with
+//     each async value, queued or run before it answers, or refused.
 //
 // # References
 //

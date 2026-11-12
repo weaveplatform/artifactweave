@@ -10,7 +10,6 @@ import (
 	"maps"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
@@ -25,12 +24,12 @@ import (
 const (
 	maxMetadataBytes = 4 << 20
 	// upstreamPage is the page of cookbooks a remote asks its upstream
-	// Supermarket for. Supermarket serves at most API_ITEM_LIMIT a page, 100
-	// when that is not set, whatever items asks (chef/supermarket,
-	// v1_controller.rb, init_params and item_limit), and supermarket.chef.io
-	// answered items=1000 with 100 of its 4,078 cookbooks on 2026-11-12.
-	// Asking for more only makes every page short. What 7.x's remote asks
-	// is unknown [I].
+	// Supermarket for, in a catalog or a search. Supermarket serves at most
+	// API_ITEM_LIMIT a page, 100 when that is not set, whatever items asks
+	// (chef/supermarket, v1_controller.rb, init_params and item_limit), and
+	// supermarket.chef.io answered items=1000 with 100 of its 4,078
+	// cookbooks on 2026-11-12. Asking for more only makes every page short.
+	// What 7.x's remote asks is unknown [I].
 	upstreamPage = 100
 )
 
@@ -55,7 +54,9 @@ type catalogDocument struct {
 	Total int `json:"total"`
 	Start int `json:"start"`
 	Items []struct {
-		Name string `json:"cookbook_name"`
+		Name        string `json:"cookbook_name"`
+		Description string `json:"cookbook_description"`
+		Maintainer  string `json:"cookbook_maintainer"`
 	} `json:"items"`
 }
 
@@ -374,24 +375,29 @@ func (h handler) remoteVersions(r *http.Request, name string) ([]release, error)
 	return out, nil
 }
 
-// parseCatalog reads the upstream catalog page that starts at offset and
-// reports whether more cookbooks follow it.
-func parseCatalog(data []byte, offset int) (catalogDocument, bool, error) {
+// parseCatalog reads the upstream catalog or search page that starts at
+// offset and reports whether more cookbooks follow it. The total is bounded
+// only by maxPosition: a remote lists an upstream of any size a page at a
+// time (#1306). A page past the end is empty and keeps its total, as
+// Supermarket answers it: a remote asks for the pages a client's page
+// covers, which may lie past the upstream's last cookbook.
+func parseCatalog(data []byte, offset int, search bool) (catalogDocument, bool, error) {
 	var doc catalogDocument
-	if decode(data, &doc) != nil || doc.Start != offset ||
-		doc.Total < offset+len(doc.Items) ||
-		doc.Total > maxVersions ||
-		len(doc.Items) > 1000 {
+	if decode(data, &doc) != nil || doc.Start != offset || doc.Total < 0 ||
+		len(doc.Items) > 0 && doc.Total < offset+len(doc.Items) ||
+		doc.Total > maxPosition ||
+		len(doc.Items) > pageLimit {
 		return doc, false, invalidUpstream()
 	}
 	more := offset+len(doc.Items) < doc.Total
-	// Supermarket's page states no limit, unlike the Forge's (#1285). A page
-	// with more after it that holds fewer cookbooks than the remote asked
-	// for may come from a smaller API_ITEM_LIMIT or may have left cookbooks
-	// out, and nothing on the page tells which, so it is refused (#1298). A
-	// page that holds more than was asked is not short: the next page starts
-	// after what it held.
-	if more && len(doc.Items) < upstreamPage {
+	// Supermarket's page states no limit, unlike the Forge's (#1285). A
+	// catalog page with more after it that holds fewer cookbooks than the
+	// remote asked for may come from a smaller API_ITEM_LIMIT or may have
+	// left cookbooks out, and nothing on the page tells which, so it is
+	// refused (#1298). A page that holds more than was asked is not short:
+	// the next page starts after what it held. A search page is not held to
+	// this, since its total counts every cookbook rather than the matches.
+	if !search && more && len(doc.Items) < upstreamPage {
 		return doc, false, invalidUpstream()
 	}
 	for _, entry := range doc.Items {
@@ -400,42 +406,6 @@ func parseCatalog(data []byte, offset int) (catalogDocument, bool, error) {
 		}
 	}
 	return doc, more, nil
-}
-
-func (h handler) remoteNames(r *http.Request) ([]string, error) {
-	names := []string{}
-	seen := map[string]bool{}
-	// The next page starts after the cookbooks this one held, not after the
-	// page asked for: an upstream that ignores items may serve more.
-	for offset := 0; offset < maxVersions; {
-		var doc catalogDocument
-		var more bool
-		_, _, err := h.metadata(
-			r,
-			"/api/v1/cookbooks",
-			"",
-			url.Values{"start": {strconv.Itoa(offset)}, "items": {strconv.Itoa(upstreamPage)}},
-			func(data []byte) (e error) {
-				doc, more, e = parseCatalog(data, offset)
-				return e
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
-		for _, entry := range doc.Items {
-			if seen[entry.Name] {
-				return nil, invalidUpstream()
-			}
-			seen[entry.Name] = true
-			names = append(names, entry.Name)
-		}
-		if !more {
-			return names, nil
-		}
-		offset += len(doc.Items)
-	}
-	return nil, invalidUpstream()
 }
 
 func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, rel release) {
