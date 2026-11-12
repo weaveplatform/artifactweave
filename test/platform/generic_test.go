@@ -9,13 +9,16 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -232,10 +235,10 @@ func redirectToStorage(t *testing.T, h *harness) {
 	loc := redirectLocation(t, h, nil)
 	resp, got := fetchAll(t, h, loc, nil)
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("signed URL: %d", resp.StatusCode)
+		t.Fatalf("signed URL: %s", describe(resp, got))
 	}
 	if sum := sha256.Sum256(got); hex.EncodeToString(sum[:]) != file.sha256 {
-		t.Fatalf("signed URL served different content: %d bytes", len(got))
+		t.Fatalf("signed URL served different content: %d bytes, %s", len(got), describe(resp, nil))
 	}
 }
 
@@ -248,10 +251,11 @@ func rangedRedirect(t *testing.T, h *harness) {
 	resp := fetch(t, h, loc, rng)
 	got := drain(t, resp)
 	if resp.StatusCode != http.StatusPartialContent {
-		t.Fatalf("signed URL with Range: %d, want 206", resp.StatusCode)
+		t.Fatalf("signed URL with Range: %s, want 206", describe(resp, got))
 	}
 	if !bytes.Equal(got, file.data[from:to+1]) {
-		t.Fatalf("signed URL served %d bytes that differ from bytes %d-%d", len(got), from, to)
+		t.Fatalf("signed URL served %d bytes that differ from bytes %d-%d, %s",
+			len(got), from, to, describe(resp, nil))
 	}
 }
 
@@ -265,15 +269,17 @@ func unsignedRefused(t *testing.T, h *harness) {
 	drain(t, resp)
 	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusPartialContent {
 		t.Fatalf(
-			"storage served the blob without a signature (%d): the store is public",
-			resp.StatusCode,
+			"storage served the blob without a signature (%s): the store is public",
+			describe(resp, nil),
 		)
 	}
 	t.Logf("unsigned request refused with %d", resp.StatusCode)
 }
 
 // fetch requests a storage URL as a package client would after leaving the
-// registry: no credentials.
+// registry: no credentials. A request to one of the scenario's storage hosts
+// also carries the scenario's edgeHeader, which asks only for diagnostic
+// headers.
 func fetch(t *testing.T, h *harness, u *url.URL, header http.Header) *http.Response {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
@@ -282,12 +288,17 @@ func fetch(t *testing.T, h *harness, u *url.URL, header http.Header) *http.Respo
 	if err != nil {
 		t.Fatal(err)
 	}
+	if h.storageHosts[u.Hostname()] {
+		for k, v := range h.edgeHeader {
+			req.Header[k] = v
+		}
+	}
 	for k, v := range header {
 		req.Header[k] = v
 	}
 	resp, err := h.plain.Do(req)
 	if err != nil {
-		t.Fatalf("GET %s: %v", redact(u), err)
+		t.Fatalf("GET %s: %v", redact(u), withoutURL(err))
 	}
 	return resp
 }
@@ -308,23 +319,95 @@ func fetchAll(t *testing.T, h *harness, u *url.URL, header http.Header) (*http.R
 			return resp, b
 		}
 		t.Logf("GET %s: reading the body failed on attempt %d (%s, %d bytes read, %s): %v",
-			redact(u), attempt, resp.Proto, len(b), providerRequestID(resp.Header), err)
+			redact(u), attempt, resp.Proto, len(b), describe(resp, nil), err)
 		if attempt == 2 {
 			t.Fatalf("GET %s: %v", redact(u), err)
 		}
 	}
 }
 
-// providerRequestID names a response's request in the provider's own logs.
-func providerRequestID(h http.Header) string {
-	for _, k := range []string{
-		"X-Ms-Request-Id", "X-Azure-Ref", "X-Amz-Request-Id", "X-Amz-Cf-Id", "X-Guploader-Uploadid",
-	} {
-		if v := h.Get(k); v != "" {
-			return k + " " + v
+// answerHeaders are the response headers that say which tier answered a
+// request and name it in that provider's logs. A status alone cannot: in run
+// 42979295008 Front Door answered 404 and the log could not show whether an
+// edge server, the account or something else had refused (#1211).
+//   - Front Door: X-Azure-Ref finds the request in its access log; X-Cache
+//     says whether the edge answered from its cache; X-Azure-OriginStatusCode,
+//     X-Azure-InternalError and X-Azure-ExternalError, sent only to a request
+//     that carries X-Azure-DebugInfo, give the origin's status and Front
+//     Door's own error.
+//   - Azure Storage: X-Ms-Error-Code and X-Ms-Request-Id, which only the
+//     account sets, so through Front Door they show the account answered.
+//   - CloudFront and S3: X-Cache ("Error from cloudfront"), X-Amz-Cf-Pop,
+//     X-Amz-Cf-Id and X-Amz-Request-Id.
+//   - Cloud CDN and GCS: Via ("1.1 google") for Google's front end, Age for a
+//     cached copy, and X-Guploader-Uploadid for the bucket's request.
+var answerHeaders = []string{
+	"X-Azure-Ref", "X-Cache", "X-Azure-OriginStatusCode", "X-Azure-InternalError",
+	"X-Azure-ExternalError", "X-Ms-Error-Code", "X-Ms-Request-Id", "X-Amz-Cf-Pop", "X-Amz-Cf-Id",
+	"X-Amz-Request-Id", "Via", "Age", "X-Guploader-Uploadid",
+}
+
+// answerBodyBytes bounds the body a description quotes: Azure, S3 and GCS
+// put an error's code and message in the first few hundred bytes of their
+// XML, and Front Door's own error page names itself near its start.
+const answerBodyBytes = 512
+
+// describe tells what answered a storage or edge request, for a check that
+// did not expect the answer: the status, the answerHeaders present, and the
+// start of body. A nil body (not read, or the payload itself) is left out.
+func describe(resp *http.Response, body []byte) string {
+	var b strings.Builder
+	b.WriteString(resp.Status)
+	var found []string
+	for _, k := range answerHeaders {
+		if v := resp.Header.Get(k); v != "" {
+			found = append(found, k+": "+v)
 		}
 	}
-	return "no provider request ID"
+	if len(found) == 0 {
+		b.WriteString(" [no provider headers]")
+	} else {
+		b.WriteString(" [" + strings.Join(found, ", ") + "]")
+	}
+	if body != nil {
+		b.WriteString(" body: " + bodyStart(body))
+	}
+	return b.String()
+}
+
+// bodyStart quotes the start of an answer's body with its whitespace
+// collapsed, or says it is not text: a blob served where an error was due
+// would only flood the log.
+func bodyStart(body []byte) string {
+	if len(body) == 0 {
+		return "empty"
+	}
+	p, cut := body, false
+	if len(p) > answerBodyBytes {
+		p, cut = p[:answerBodyBytes], true
+		// The cut may split a character; drop its leading bytes.
+		for i := 1; i < utf8.UTFMax && !utf8.Valid(p); i++ {
+			p = p[:len(p)-1]
+		}
+	}
+	if !utf8.Valid(p) {
+		return "not text"
+	}
+	s := strconv.Quote(strings.Join(strings.Fields(string(p)), " "))
+	if cut {
+		s += " …"
+	}
+	return s
+}
+
+// withoutURL drops the request URL that the HTTP client puts in its errors:
+// a signed URL's query is a credential, which redact keeps out of messages.
+func withoutURL(err error) error {
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		return ue.Err
+	}
+	return err
 }
 
 func drain(t *testing.T, resp *http.Response) []byte {
