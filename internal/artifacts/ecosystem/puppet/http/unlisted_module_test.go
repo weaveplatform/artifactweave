@@ -154,25 +154,33 @@ func TestUnitRemoteUnlistedModuleFailures(t *testing.T) {
 			s.moduleAt = func(source.Resource) (string, bool) { return "", true }
 		}, 404, "Puppet module not found"},
 		{"no releases", record(`{"slug":"acme-widget"}`), 404, "Puppet module not found"},
-		{"null releases", record(`{"slug":"acme-widget","releases":null}`), 404,
-			"Puppet module not found"},
-		{"every release deleted", record(peRecord(t, [2]string{"1.0.0", "2020-01-01 00:00:00 +0000"})),
-			404, "Puppet module not found"},
+		{
+			"null releases", record(`{"slug":"acme-widget","releases":null}`), 404,
+			"Puppet module not found",
+		},
+		{
+			"every release deleted", record(peRecord(t, [2]string{"1.0.0", "2020-01-01 00:00:00 +0000"})),
+			404, "Puppet module not found",
+		},
 		{"no readable release", with(func(s *metadataSource) {
 			s.check = func(context.Context, string) error { return source.ErrDenied }
 		}), 404, "Puppet module not found"},
 		{"releases not a list", record(`{"slug":"acme-widget","releases":{}}`), 502, invalid},
 		{"invalid version", record(peRecord(t, [2]string{"1.x", ""})), 502, invalid},
-		{"repeated version", record(peRecord(t, [2]string{"1.0.0", ""}, [2]string{"1.0.0", ""})),
-			502, invalid},
+		{
+			"repeated version", record(peRecord(t, [2]string{"1.0.0", ""}, [2]string{"1.0.0", ""})),
+			502, invalid,
+		},
 		{"too many releases", record(`{"slug":"acme-widget","releases":[` +
 			strings.TrimSuffix(strings.Repeat(`{"version":"1.0.0"},`, 4097), ",") + `]}`), 502, invalid},
 		{"no current record", with(func(s *metadataSource) { s.release.at = nil }), 502, invalid},
 		{"invalid current record", with(func(s *metadataSource) {
 			served(releaseBody(t, "1.0.1", nil), nil)(s)
 		}), 502, invalid},
-		{"no authority", with(func(s *metadataSource) { s.moduleNoAuthority = true }), 502,
-			"Bad Gateway"},
+		{
+			"no authority", with(func(s *metadataSource) { s.moduleNoAuthority = true }), 502,
+			"Bad Gateway",
+		},
 		{"authority failure", with(func(s *metadataSource) {
 			s.check = func(context.Context, string) error { return source.ErrUnavailable }
 		}), 502, "Bad Gateway"},
@@ -196,12 +204,16 @@ func TestUnitRemoteUnlistedModuleFailures(t *testing.T) {
 // release list the record gets wrong changes nothing.
 func TestUnitRemoteListedModuleIgnoresTheRecordReleases(t *testing.T) {
 	var reads []source.Resource
-	f := remoteFixture(t, remotePageBody(t, upstreamRelease(t, "1.0.0", nil)), func(s *metadataSource) {
-		s.moduleAt = func(source.Resource) (string, bool) {
-			return `{"slug":"acme-widget","releases":[{"version":"x"},{"version":"9.0.0"}]}`, false
-		}
-		served(releaseBody(t, "9.0.0", nil), &reads)(s)
-	})
+	f := remoteFixture(
+		t,
+		remotePageBody(t, upstreamRelease(t, "1.0.0", nil)),
+		func(s *metadataSource) {
+			s.moduleAt = func(source.Resource) (string, bool) {
+				return `{"slug":"acme-widget","releases":[{"version":"x"},{"version":"9.0.0"}]}`, false
+			}
+			served(releaseBody(t, "9.0.0", nil), &reads)(s)
+		},
+	)
 	r := f.do("GET", base+"/v3/modules/acme-widget", "admin")
 	if r.Code != 200 || !strings.Contains(r.Body.String(),
 		`"releases":[{"uri":"/v3/releases/acme-widget-1.0.0","version":"1.0.0"}]`) {

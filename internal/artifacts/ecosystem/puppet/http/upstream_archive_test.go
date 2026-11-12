@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
-
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
@@ -29,7 +28,12 @@ func recordOf(t *testing.T, version string, data []byte, tags ...string) string 
 // 1.0.0 in its release pages, serves body as the record of every release
 // it is asked for, recording each read in reads, and serves archive as
 // every archive.
-func archiveSource(t *testing.T, body string, archive []byte, reads *[]source.Resource) metadataSource {
+func archiveSource(
+	t *testing.T,
+	body string,
+	archive []byte,
+	reads *[]source.Resource,
+) metadataSource {
 	t.Helper()
 	s := metadataSource{
 		body:       remotePageBody(t, upstreamRelease(t, "1.0.0", nil)),
@@ -198,7 +202,10 @@ func tunedMembers(
 	}
 	f := newFixtureWith(t, repo.Remote, func(p *pkgroute.Protocol) { p.Sources[repo.Remote] = src })
 	f.create(repo.Config{
-		Key: "other", Class: repo.Remote, PackageType: repo.Puppet, URL: "https://other.example/puppet/",
+		Key:         "other",
+		Class:       repo.Remote,
+		PackageType: repo.Puppet,
+		URL:         "https://other.example/puppet/",
 	})
 	f.create(repo.Config{Key: "hosted", Class: repo.Local, PackageType: repo.Puppet})
 	f.create(repo.Config{
@@ -273,8 +280,13 @@ func TestUnitVirtualRecordMembersPassedOver(t *testing.T) {
 	data := linkedArchive(t, "2.0.0")
 	second := recordOf(t, "2.0.0", data, "second")
 	t.Run("unreadable member", func(t *testing.T) {
-		f := remoteMembers(t, map[string]string{"example.com": second, "other.example": second}, data,
-			"puppet-local", "other")
+		f := remoteMembers(
+			t,
+			map[string]string{"example.com": second, "other.example": second},
+			data,
+			"puppet-local",
+			"other",
+		)
 		f.grant(map[string]accesstest.Target{"other": {}, "virtual": {}})
 		if r := f.do("GET", v+"/v3/releases/acme-widget-2.0.0", "viewer"); r.Code != 200 ||
 			!strings.Contains(r.Body.String(), `"tags":["second"]`) {
@@ -283,8 +295,13 @@ func TestUnitVirtualRecordMembersPassedOver(t *testing.T) {
 	})
 	t.Run("archive refused by a member", func(t *testing.T) {
 		first := recordOf(t, "2.0.0", data, "first")
-		f := remoteMembers(t, map[string]string{"example.com": first, "other.example": second}, data,
-			"puppet-local", "other")
+		f := remoteMembers(
+			t,
+			map[string]string{"example.com": first, "other.example": second},
+			data,
+			"puppet-local",
+			"other",
+		)
 		c, err := f.db.Repos().Get(t.Context(), "puppet-local")
 		if err != nil {
 			t.Fatal(err)
