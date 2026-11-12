@@ -36,6 +36,14 @@
 //     no-store and native routes, invalid index children, integrity and
 //     denied paths, foreign layers, a revocation during a fetch, and the
 //     answers to an upstream's 401, 403, 429 and 502.
+//   - TestAcc results for refusals (registry_refusal_test.go): 7.x's 403
+//     UNAUTHORIZED for a pull, a blob read, a tags list, a push and a
+//     delete the caller's permissions refuse, by password, registry token
+//     and anonymous token, in a local repository and a remote's cache, with
+//     the 401s that stay (#1276); and a remote whose upstream refuses its
+//     credentials, whose 401 challenge with error="invalid_request" lets a
+//     containerd-style client reach the upstream twice per request, not
+//     five times (#1277).
 //
 // # References
 //

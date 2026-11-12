@@ -77,6 +77,26 @@ func (g *Registry) challenge(r *http.Request) string {
 	return v
 }
 
+// upstreamChallenge is the challenge on the 401 a remote relays when its
+// upstream refused the remote's own credentials (remoteError): the
+// registry's, with error="invalid_request". A 401 must carry a challenge
+// (RFC 9110, 15.5.2), but the caller's credentials were never the problem.
+// Without an error parameter containerd keeps its token and sends the
+// request again until five attempts are spent (retryRequest and
+// AddResponses in core/remotes/docker), and each reaches the upstream with
+// the refused credentials, since the retrieval contract keeps no negative
+// entry for an upstream's 401. With one, it fetches a token once and gives
+// up on the second 401 (invalidAuthorization). invalid_token would stop it
+// as well, but the Docker daemon reads it as UNAUTHORIZED and prints
+// "unauthorized: authentication required" instead of the body's
+// "Invalid username/password configured for Remote Docker repository:
+// <key>", which it printed as "unknown: ..." for 7.x (RTFACT-30467); it
+// ignores any other error and prints the body (HandleErrorResponse in
+// distribution's registry client). No capture shows 7.x's challenge [I].
+func (g *Registry) upstreamChallenge(r *http.Request) string {
+	return g.challenge(r) + `,error="invalid_request"`
+}
+
 // challengeTarget is the repository key a request's realm names and the
 // scope it asks for: repository:<name>:<actions> for an operation on an
 // image, with <name> as the client wrote it, so that it is what the client

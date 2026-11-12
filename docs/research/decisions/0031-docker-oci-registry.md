@@ -52,7 +52,7 @@ each code with the reference registry's status (R23 1.3):
 | `BLOB_UNKNOWN` | 404 | `NAME_INVALID` | 400 |
 | `BLOB_UPLOAD_INVALID` | 404, or 416 for an out-of-order chunk | `NAME_UNKNOWN` | 404 |
 | `BLOB_UPLOAD_UNKNOWN` | 404 | `SIZE_INVALID` | 400, or 413 for a manifest over the limit |
-| `DIGEST_INVALID` | 400 | `UNAUTHORIZED` | 401, with the challenge |
+| `DIGEST_INVALID` | 400 | `UNAUTHORIZED` | 401, with the challenge, or 403 for a permission refusal (below) |
 | `MANIFEST_BLOB_UNKNOWN` | 400 | `DENIED` | 403 |
 | `MANIFEST_INVALID` | 400 | `UNSUPPORTED` | 405, or 404 for an unknown operation |
 | `MANIFEST_UNKNOWN` | 404 | `TOOMANYREQUESTS` | 429 |
@@ -113,14 +113,70 @@ exception's detail and is left out **[I]**. JFrog's
 gives the same message when the remote's NVIDIA NGC key "is missing or incorrect", so it
 does not depend on credentials being configured. Every capture is a refusal at the
 upstream's token endpoint; the 401 takes the message for every upstream refusal the
-remote relays as a 401 **[I]**. The 403, 429 and 5xx follow the 401's envelope **[I]**. A
-caller whose own permission the remote refuses still answers `DENIED`, or `UNAUTHORIZED`
-with the challenge when anonymous.
+remote relays as a 401 **[I]**. The 403, 429 and 5xx follow the 401's envelope **[I]**.
+
+That 401 carries the registry's challenge with `error="invalid_request"` (amended
+2026-11-12, [#1277](https://github.com/weaveplatform/artifactweave/issues/1277)). A 401 must
+carry a challenge (RFC 9110, 15.5.2), but the caller's credentials were never the problem.
+Without an `error` parameter containerd keeps its token and sends the request again until
+five attempts are spent (`retryRequest` and `AddResponses` in `core/remotes/docker`), and
+each attempt reaches the upstream with the refused credentials, since the retrieval contract
+keeps no negative entry for an upstream's 401. With one, it fetches a token once and gives
+up on the second 401 (`invalidAuthorization`), so one client request reaches the upstream
+twice, not five times. `invalid_token` would stop it as well, but Docker's registry client
+reads that as `UNAUTHORIZED` and prints "authentication required" in place of the body's
+message; it ignores any other value and prints the body as `unknown: <message>`, as docker
+printed 7.x's (`HandleErrorResponse` in distribution's registry client). No capture shows
+7.x's status or challenge for this refusal **[I]**. A caller whose own permission the
+remote finds gone during the fetch answers as the next paragraph says.
+
+A request the caller's permissions refuse answers 403 with the code `UNAUTHORIZED` and 7.x's
+message, not the reference registry's `DENIED` (amended 2026-11-12,
+[#1276](https://github.com/weaveplatform/artifactweave/issues/1276)). Docker printed 7.x's
+refused pulls as `unauthorized: The client does not have permission for manifest: Download
+request for repo:path '<repo>:<path>' is forbidden for user: '<user>'.`
+([RTFACT-27049](https://jfrog.atlassian.net/browse/RTFACT-27049) on 7.37.14,
+[RTFACT-27228](https://jfrog.atlassian.net/browse/RTFACT-27228) on 7.38.8, logged as a 403,
+[RTFACT-30133](https://jfrog.atlassian.net/browse/RTFACT-30133),
+[RTFACT-30774](https://jfrog.atlassian.net/browse/RTFACT-30774)). The Docker daemon prints
+`DENIED` as "pull access denied ... may require 'docker login'", which 7.x keeps for an Xray
+block, "Artifact download request rejected" since 7.29.8
+([RTFACT-26140](https://jfrog.atlassian.net/browse/RTFACT-26140), RTFACT-30133).
+- A pull names what it reads: `manifest`, and by the same rule `blob`, `tags` and
+  `referrers` **[I]**.
+- `<repo>` is a remote's cache, `<key>-cache`, as every capture of a remote names it, and
+  any other repository's own key.
+- `<path>` is the file the pull reads in this decision's layout: `<image>/<tag>/manifest.json`
+  by tag; by digest `<image>/sha256__<hex>/manifest.json` in a remote's cache (RTFACT-30133)
+  and `<image>/sha256:<hex>/manifest.json` in a local repository **[I]**; `<image>/sha256__<hex>`
+  for a blob, and the image for a tags list or referrers **[I]**. 7.x names
+  `list.manifest.json` for an index (RTFACT-27049), which only a lookup tells; the caller
+  may not read the image, so none is made **[I]**.
+- `<user>` is the user's name, `token:<name>` for a token whose user need not be stored, a
+  transient or synthetic identity (RTFACT-27228, RTFACT-30774), and `anonymous`.
+- A push answers "The client does not have permission to push to the repository.", the
+  distribution specification's description of `UNAUTHORIZED` for a manifest PUT, which
+  docker printed for 5.5.1 to 6.5.2
+  ([RTFACT-15115](https://jfrog.atlassian.net/browse/RTFACT-15115),
+  [RTFACT-17727](https://jfrog.atlassian.net/browse/RTFACT-17727),
+  [RTFACT-17858](https://jfrog.atlassian.net/browse/RTFACT-17858),
+  [RTFACT-21122](https://jfrog.atlassian.net/browse/RTFACT-21122)) **[I]**, and a delete
+  "The client does not have permission to delete from the repository." **[I]**.
+- An anonymous caller, which reaches the permissions only while anonymous access is on,
+  gets the same 403 with the user `anonymous` and no challenge. 6.19 and 6.20 answered an
+  anonymous pull so ([RTFACT-21825](https://jfrog.atlassian.net/browse/RTFACT-21825),
+  [RTFACT-22867](https://jfrog.atlassian.net/browse/RTFACT-22867)) **[I]**, and a 401 would
+  only make containerd fetch another anonymous token and ask again.
 
 A 401, 403 or 429 written with no registry code, by the request limiter or the
 authentication middleware for example, carries the code the table gives its status:
 `UNAUTHORIZED`, `DENIED` or `TOOMANYREQUESTS`, never the JAX-RS name, such as `FORBIDDEN`
 or `TOO_MANY_REQUESTS`, that the other surfaces' codes take (amended 2026-11-12, #1248).
+The authentication middleware's 403s, for a locked account, an expired password or an API
+restriction, keep `DENIED`: they refuse the caller whatever it asks for, not a path its
+permissions cover, and 7.x answers `DENIED` for a refusal that is no permission's, the Xray
+block (RTFACT-26140, RTFACT-30133). No capture shows 7.x's answer to them under `/v2`
+**[I]**.
 Docker's client reads a code the specification does not name as unknown, and the Docker
 daemon retries a layer that failed with unknown but gives up at once on these three. A
 status the table gives no single code keeps its JAX-RS name: a 400 that is no registry
@@ -138,7 +194,11 @@ its status alone.
   answer 200; invalid ones answer 401.
 - On every repository operation the effective actions are those the token grants,
   intersected with what the caller's permissions allow at the time of the request, so a
-  removed permission takes effect without waiting for the token to expire.
+  removed permission takes effect without waiting for the token to expire. The permissions
+  are asked first (amended 2026-11-12, #1276): a caller they refuse gets the 403 above,
+  where the token endpoint's dropped scope would otherwise answer a docker pull 401 and
+  containerd would ask again, and only a caller they allow whose token lacks the action
+  gets 401 `UNAUTHORIZED` with the challenge for the scope it needs.
 
 ### Blobs
 

@@ -959,10 +959,10 @@ func TestAccRequire(t *testing.T) {
 			reader,
 			"pub/app/v1/manifest.json",
 			accessapi.ActionWrite,
-			CodeDenied,
+			CodeUnauthorized,
 		},
-		{"reader outside the pattern", reader, "priv/app", accessapi.ActionRead, CodeDenied},
-		{"nobody", nobody, "pub/app", accessapi.ActionRead, CodeDenied},
+		{"reader outside the pattern", reader, "priv/app", accessapi.ActionRead, CodeUnauthorized},
+		{"nobody", nobody, "pub/app", accessapi.ActionRead, CodeUnauthorized},
 		{"anonymous reads", anonOn, "pub/app", accessapi.ActionRead, ""},
 		{"anonymous cannot write", anonOn, "pub/app", accessapi.ActionWrite, CodeUnauthorized},
 		{"anonymous while off", anonOff, "pub/app", accessapi.ActionRead, CodeUnauthorized},
@@ -982,7 +982,7 @@ func TestAccRequire(t *testing.T) {
 				t.Fatalf("%s: %s", c.name, rec.Body)
 			}
 			code = body.Errors[0].Code
-			if want := map[string]int{CodeDenied: 403, CodeUnauthorized: 401}[code]; rec.Code != want {
+			if rec.Code != http.StatusForbidden {
 				t.Fatalf("%s: status %d for %s", c.name, rec.Code, code)
 			}
 		}
@@ -1023,8 +1023,8 @@ func TestAccAuthenticatedRegistryRefusesWithoutDecider(t *testing.T) {
 		code   string
 	}{
 		"no principal": {nil, http.StatusUnauthorized, CodeUnauthorized},
-		"anonymous":    {&anonymous, http.StatusUnauthorized, CodeUnauthorized},
-		"user":         {&admin, http.StatusForbidden, CodeDenied},
+		"anonymous":    {&anonymous, http.StatusForbidden, CodeUnauthorized},
+		"user":         {&admin, http.StatusForbidden, CodeUnauthorized},
 	} {
 		t.Run(name, func(t *testing.T) {
 			h := stored(authenticated, c.p)

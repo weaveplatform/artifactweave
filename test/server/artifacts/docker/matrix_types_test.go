@@ -178,7 +178,9 @@ var matrixPrincipals = []matrixPrincipal{
 	// route outside the registry answers it 401.
 	{name: "tok-registry", user: "member", token: true, registry: true, narrowed: true},
 	// The registry token of a transient user from an OIDC exchange, who is
-	// not stored (#248): it answers exactly as tok-registry does.
+	// not stored (#248) and holds nothing: it answers as tok-registry does
+	// where member holds nothing either, and 403 where tok-registry's 401
+	// is its token's (#1276).
 	{
 		name: "tok-registry-oidc", user: "ci-oidc", token: true, registry: true, narrowed: true,
 		identity: kernel.IdentityTransient,
@@ -274,13 +276,36 @@ func (r matrixRow) want(p matrixPrincipal) int {
 	if p.bad || p.registry && !registryroute.IsRegistryPath(path) {
 		return http.StatusUnauthorized
 	}
-	if p.registry && imageOperation(path) && (r.who(p) != 0 || r.ok < 300) {
-		return http.StatusUnauthorized
+	if p.registry && imageOperation(path) {
+		// The registry asks the token's user's permissions before the
+		// token's grant (#1276): a user they refuse gets 7.x's 403, and
+		// only one they allow gets the 401 of a token that grants nothing.
+		// A mount's 202 for a user who may not read the source is no
+		// refusal: the token is still asked.
+		if status := r.who(p.tokenUser()); status >= http.StatusBadRequest {
+			return status
+		}
+		if r.who(p) != 0 || r.ok < 300 {
+			return http.StatusUnauthorized
+		}
 	}
 	if status := r.who(p); status != 0 {
 		return status
 	}
 	return r.ok
+}
+
+// tokenUser is the user a registry token acts for, with that user's own
+// grants: the principal of the same name, or one holding nothing for a
+// user no principal stands for (tok-registry-oidc's ci-oidc).
+func (p matrixPrincipal) tokenUser() matrixPrincipal {
+	i := slices.IndexFunc(matrixPrincipals, func(o matrixPrincipal) bool {
+		return o.name == p.user && !o.token
+	})
+	if i < 0 {
+		return matrixPrincipal{name: p.user, user: p.user}
+	}
+	return matrixPrincipals[i]
 }
 
 func imageOperation(path string) bool {

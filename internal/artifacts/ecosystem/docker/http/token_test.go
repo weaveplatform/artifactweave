@@ -704,11 +704,17 @@ func TestAccRequireRegistryToken(t *testing.T) {
 		r = r.WithContext(w.as(r.Context(), kernel.Principal{Name: "writer", Registry: tc.have}))
 		err := tc.q.Require(r, "app/v1/manifest.json", tc.expected)
 		var e *apierror.Error
+		// The permissions are asked before the grant, and writer holds no
+		// Manage, so that row is refused 403 before the token is read.
+		want := http.StatusUnauthorized
+		if tc.expected == accessapi.ActionManage {
+			want = http.StatusForbidden
+		}
 		switch {
 		case tc.ok && err != nil:
 			t.Errorf("%s: %v", tc.name, err)
-		case !tc.ok && (!errors.As(err, &e) || e.Status != http.StatusUnauthorized):
-			t.Errorf("%s: %v, want 401", tc.name, err)
+		case !tc.ok && (!errors.As(err, &e) || e.Status != want):
+			t.Errorf("%s: %v, want %d", tc.name, err, want)
 		}
 	}
 	// A DELETE needs delete itself; push does not cover it.
@@ -727,7 +733,7 @@ func TestAccRequireRegistryToken(t *testing.T) {
 		}
 	}
 	// The grant does not override the permissions: reader's token for
-	// priv/ still answers DENIED.
+	// priv/ still answers 7.x's 403.
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	r = r.WithContext(
 		w.as(
@@ -742,7 +748,7 @@ func TestAccRequireRegistryToken(t *testing.T) {
 		"priv",
 		accessapi.ActionRead,
 	); !errors.As(err, &e) ||
-		e.Code != CodeDenied {
+		e.Status != http.StatusForbidden || e.Code != CodeUnauthorized {
 		t.Fatalf("permissions: %v", err)
 	}
 }

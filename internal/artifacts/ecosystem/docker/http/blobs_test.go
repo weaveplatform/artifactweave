@@ -484,17 +484,17 @@ func TestAccPermissions(t *testing.T) {
 		code                string
 	}{
 		{"reader", "GET", blobPath, 200, ""},
-		{"nobody", "GET", blobPath, 403, CodeDenied},
-		{kernel.AnonymousUser, "HEAD", blobPath, 401, ""},
-		{"reader", "POST", uploads, 403, CodeDenied},
-		{kernel.AnonymousUser, "POST", uploads, 401, CodeUnauthorized},
+		{"nobody", "GET", blobPath, 403, CodeUnauthorized},
+		{kernel.AnonymousUser, "HEAD", blobPath, 403, ""},
+		{"reader", "POST", uploads, 403, CodeUnauthorized},
+		{kernel.AnonymousUser, "POST", uploads, 403, CodeUnauthorized},
 		{"writer", "POST", uploads, 202, ""},
 		// writer may not read oci-local, so the mount opens a session.
 		{"writer", "POST", uploads + "?mount=" + d + "&from=oci-local/base", 202, ""},
-		{"reader", "PATCH", uploads + strings.Repeat("0", 32), 403, CodeDenied},
-		{"reader", "PUT", uploads + strings.Repeat("0", 32) + "?digest=" + d, 403, CodeDenied},
-		{"reader", "GET", uploads + strings.Repeat("0", 32), 403, CodeDenied},
-		{"reader", "DELETE", uploads + strings.Repeat("0", 32), 403, CodeDenied},
+		{"reader", "PATCH", uploads + strings.Repeat("0", 32), 403, CodeUnauthorized},
+		{"reader", "PUT", uploads + strings.Repeat("0", 32) + "?digest=" + d, 403, CodeUnauthorized},
+		{"reader", "GET", uploads + strings.Repeat("0", 32), 403, CodeUnauthorized},
+		{"reader", "DELETE", uploads + strings.Repeat("0", 32), 403, CodeUnauthorized},
 	} {
 		rec := send(as(c.who), c.method, c.target, "", nil)
 		if c.method == http.MethodHead {
