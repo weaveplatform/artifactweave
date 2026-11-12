@@ -27,14 +27,39 @@ import (
 const (
 	maxMetadataBytes = 16 << 20
 	maxVersions      = 4096
-	// upstreamPage is the page of releases a remote asks its upstream for.
-	// The Forge serves at most 100 whatever limit is asked (it answered
-	// limit=1000 with "limit": 100 on 2026-11-12), and so do 7.x's own lists
-	// (RTFACT-30529), so a remote over either reads 100 a page. Asking for
-	// more only makes every page short. What 7.x's remote asks is unknown;
-	// RTFACT-13687 shows a 5.1 virtual asking a member for limit=100.
-	upstreamPage = 100
+	// upstreamPage is the page of releases a remote asks its upstream for:
+	// 20, the Forge's own default page (its v3 API description;
+	// RTFACT-14274). A page carries each release's readme, changelog and
+	// license, which a remote's records answer, and the Forge's 100 a page
+	// of theforeman-foreman came to 9,947,601 bytes on 2026-11-12, near
+	// maxMetadataBytes, while puppetlabs-apache's README, CHANGELOG and
+	// license in its sources come to about 240 KB a release without
+	// REFERENCE.md, so 100 of them would pass it. Twenty a page keeps such a
+	// module under it with room to spare (#1300). The Forge serves at most
+	// 100 whatever limit is asked (it answered limit=1000 with "limit": 100
+	// on 2026-11-12), so a smaller page costs only more requests. What 7.x's
+	// remote asks is [I]; RTFACT-13687 shows a 5.1 remote asking its
+	// upstream's search for limit=100.
+	upstreamPage = 20
 )
+
+// releaseExclusions are the Forge release fields a remote asks its upstream
+// to leave out of each release page, as exclude_fields: the ones no record
+// answers, among them REFERENCE.md's text, which runs to 400 KB a release
+// in puppetlabs-apache's sources (#1300). readme, changelog and license
+// stay, since a remote's records relay them (#1288). The Forge leaves out
+// what the parameter names (its v3 API description gives "readme changelog
+// license reference" as the example), and a name it does not know leaves
+// nothing out. Whether 7.x's remote asks the same is [I].
+var releaseExclusions = []string{
+	"reference", "tasks", "plans", "pdk", "validation_score", "malware_scan", "deleted_for",
+}
+
+// moduleExclusions are the Forge module fields a remote asks its upstream
+// to leave out of a module record: the current release, with its readme,
+// changelog, license and reference, and the release list, which a remote
+// answers from its release pages instead, filtered by read permission.
+var moduleExclusions = []string{"current_release", "releases"}
 
 type upstreamVersion struct {
 	Version    string           `json:"version"`
@@ -42,6 +67,10 @@ type upstreamVersion struct {
 	FileSHA256 string           `json:"file_sha256"`
 	FileSize   int64            `json:"file_size"`
 	Metadata   upstreamManifest `json:"metadata"`
+	// Tags are relayed as the upstream gives them [I]: the Forge's include
+	// tags its metadata.json does not (puppetlabs-stdlib's on 2026-11-12),
+	// which a remote has no other source for.
+	Tags json.RawMessage `json:"tags"`
 	// The rest are relayed to the remote's records as the upstream gave
 	// them, as 7.x relays the Forge's (RTFACT-19130 quotes a 6.8 remote's
 	// release record carrying the Forge's module owner, gravatar_id and
@@ -60,18 +89,29 @@ type upstreamVersion struct {
 }
 
 // upstreamManifest is an upstream release's metadata: the validated
-// manifest, and the project_page and issues_url a module record answers.
+// manifest, the whole document, which the release's record answers
+// (#1325), and the project_page and issues_url a module record answers.
 type upstreamManifest struct {
 	puppetfmt.Manifest
+	document               json.RawMessage
 	projectPage, issuesURL string
 }
 
 // UnmarshalJSON decodes the manifest as an archive's is decoded, and reads
-// its links beside it.
+// its links beside it. The document is held compacted, and refused above
+// puppetfmt.MaxManifestBytes, the most an archive's metadata.json may be,
+// so the archive it describes could never match it.
 func (m *upstreamManifest) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &m.Manifest); err != nil {
 		return fmt.Errorf("puppet: upstream manifest: %w", err)
 	}
+	var document bytes.Buffer
+	// encoding/json hands UnmarshalJSON one valid JSON value, so it compacts.
+	_ = json.Compact(&document, data)
+	if document.Len() > puppetfmt.MaxManifestBytes {
+		return invalidUpstream()
+	}
+	m.document = document.Bytes()
 	m.projectPage, m.issuesURL = puppetfmt.ManifestLinks(data)
 	return nil
 }
@@ -113,6 +153,7 @@ func (v upstreamVersion) relayed() details {
 		d.deprecatedAt = rawText(module.DeprecatedAt)
 		d.gravatarID = rawText(module.Owner.GravatarID)
 	}
+	d.tags = stringList(v.Tags)
 	return d
 }
 
@@ -164,6 +205,9 @@ func parseVersions(data []byte, name, responseBase string, offset int) ([]releas
 		if !archiveWithinFeed(base, u) {
 			return nil, false, invalidUpstream()
 		}
+		// ValidateManifest has read a name and version from the document, so
+		// it is a JSON object.
+		metadata, _, _ := releaseMetadata(v.Metadata.document)
 		out = append(
 			out,
 			release{
@@ -174,9 +218,11 @@ func parseVersions(data []byte, name, responseBase string, offset int) ([]releas
 					SHA256:      v.FileSHA256,
 					Size:        v.FileSize,
 					Manifest:    v.Metadata.Manifest,
+					Document:    v.Metadata.document,
 					ProjectPage: v.Metadata.projectPage,
 					IssuesURL:   v.Metadata.issuesURL,
 				},
+				metadata:  metadata,
 				details:   v.relayed(),
 				remoteURL: u.String(),
 			},
@@ -243,6 +289,26 @@ func (h handler) remoteVersions(r *http.Request, name string, u use) ([]release,
 	return nil, invalidUpstream()
 }
 
+// upstreamURL returns the address of path under remote c's upstream with
+// query beside any query its URL has. Forge query parameters identify a
+// protocol resource; they are not caller query propagation. An explicit
+// same-source URL keeps them in cache identity even when
+// propagateQueryParams is false.
+func upstreamURL(c repo.Config, path string, query url.Values) (string, error) {
+	base, err := url.Parse(c.URL)
+	if err != nil || !validArchiveURL(base) {
+		return "", invalidUpstream()
+	}
+	base.Path = strings.TrimRight(base.Path, "/") + path
+	base.RawPath = ""
+	all := base.Query()
+	for key, values := range query {
+		all[key] = values
+	}
+	base.RawQuery = all.Encode()
+	return base.String(), nil
+}
+
 // remotePage returns the releases of the upstream page at offset that the
 // caller may read, how many releases the page held, and whether more follow.
 func (h handler) remotePage(
@@ -251,25 +317,20 @@ func (h handler) remotePage(
 	offset int,
 	u use,
 ) ([]release, int, bool, error) {
-	// Forge query parameters identify a protocol resource; they are not caller
-	// query propagation. An explicit same-source URL keeps them in cache identity
-	// even when propagateQueryParams is false.
-	base, err := url.Parse(pkgroute.RequestFrom(r).Repo.URL)
-	if err != nil || !validArchiveURL(base) {
-		return nil, 0, false, invalidUpstream()
+	external, err := upstreamURL(pkgroute.RequestFrom(r).Repo, "/v3/releases", url.Values{
+		"module":         {name},
+		"limit":          {strconv.Itoa(upstreamPage)},
+		"offset":         {strconv.Itoa(offset)},
+		"sort_by":        {"version"},
+		"exclude_fields": {strings.Join(releaseExclusions, " ")},
+	})
+	if err != nil {
+		return nil, 0, false, err
 	}
-	base.Path = strings.TrimRight(base.Path, "/") + "/v3/releases"
-	base.RawPath = ""
-	query := base.Query()
-	query.Set("module", name)
-	query.Set("limit", strconv.Itoa(upstreamPage))
-	query.Set("offset", strconv.Itoa(offset))
-	query.Set("sort_by", "version")
-	base.RawQuery = query.Encode()
 	resource := source.Resource{
 		Kind:              source.ResourceKindMetadata,
 		Path:              "v3/releases/" + name,
-		ExternalURL:       base.String(),
+		ExternalURL:       external,
 		NoCrossOriginAuth: true,
 		CheckURL: func(_ context.Context, target *url.URL) error {
 			return checkRegistryURL(pkgroute.RequestFrom(r).Repo, target)
@@ -288,8 +349,10 @@ func (h handler) remotePage(
 		// 404 for the module folder (R2b), and no pattern refuses it,
 		// since its releases stay listed whatever the patterns say of
 		// their archives (R3).
-		BlackoutOnly:        u != listing,
-		Variant:             "puppet-forge-v3-releases-v1",
+		BlackoutOnly: u != listing,
+		// v2 since a page keeps each release's whole metadata.json and
+		// refuses one above puppetfmt.MaxManifestBytes.
+		Variant:             "puppet-forge-v3-releases-v2",
 		ExpectedContentType: mediaType,
 		ValidateMetadata: func(_ context.Context, body io.ReadSeeker, _ int64, meta source.MetadataResponse) error {
 			data, err := io.ReadAll(io.LimitReader(body, maxMetadataBytes+1))
@@ -353,6 +416,163 @@ func (h handler) remotePage(
 		out = append(out, rel)
 	}
 	return out, len(releases), more, nil
+}
+
+// remoteModule returns the details of module name that the remote's
+// upstream's module record, v3/modules/<m>, gives, and false when the
+// upstream answers 404 for it (#1326). A remote relays the upstream's
+// module-wide fields, its downloads, dates, endorsement and module group,
+// rather than taking them from the releases [I]. RTFACT-19130 reports a
+// 6.8.6 remote answering 404 for puppetlabs-sqlserver, a module whose
+// upstream record the Forge served, while it served the module's releases;
+// that is the fault the report names, so a remote answers the record its
+// upstream serves. The record is read with the release pages' authority:
+// Read on the module folder, the download policy where 7.x caches the
+// module's release pages for a listing, and the blackout alone for the
+// search (remotePage). Where 7.x caches the record is [I].
+func (h handler) remoteModule(r *http.Request, name string, u use) (moduleDetails, bool, error) {
+	c := pkgroute.RequestFrom(r).Repo
+	// The remote has read its release pages first, from the same address,
+	// so the address is valid here.
+	external, _ := upstreamURL(c, "/v3/modules/"+name, url.Values{
+		"exclude_fields": {strings.Join(moduleExclusions, " ")},
+	})
+	resource := source.Resource{
+		Kind:              source.ResourceKindMetadata,
+		Path:              "v3/modules/" + name,
+		ExternalURL:       external,
+		NoCrossOriginAuth: true,
+		CheckURL: func(_ context.Context, target *url.URL) error {
+			return checkRegistryURL(c, target)
+		},
+		Method:              http.MethodGet,
+		PermissionFolder:    true,
+		PermissionPath:      name,
+		BlackoutOnly:        u != listing,
+		Variant:             "puppet-forge-v3-module-v1",
+		ExpectedContentType: mediaType,
+		ValidateMetadata: func(_ context.Context, body io.ReadSeeker, _ int64, meta source.MetadataResponse) error {
+			data, err := io.ReadAll(io.LimitReader(body, maxMetadataBytes+1))
+			if err != nil {
+				return invalidUpstream()
+			}
+			if _, _, ok := withinRegistry(c, meta.BaseURL); !ok {
+				return invalidUpstream()
+			}
+			_, err = parseModule(data, name, meta.BaseURL)
+			return err
+		},
+	}
+	if u != search {
+		resource.PolicyPath = ".puppet/" + name + "/releases.json"
+	}
+	result, err := h.k.Read(r, resource)
+	if missingRecord(err) {
+		return moduleDetails{}, false, nil
+	}
+	if err != nil {
+		return moduleDetails{}, false, fmt.Errorf(
+			"puppet: module record: %w",
+			pkgroute.SourceError(err, false),
+		)
+	}
+	data, err := h.metadataBytes(r, result)
+	if err != nil {
+		return moduleDetails{}, false, err
+	}
+	if result.Revalidate == nil {
+		return moduleDetails{}, false, fmt.Errorf(
+			"puppet: missing authority: %w",
+			pkgroute.SourceError(source.ErrInvalidResult, false),
+		)
+	}
+	if _, _, ok := withinRegistry(c, result.Metadata.BaseURL); !ok {
+		return moduleDetails{}, false, invalidUpstream()
+	}
+	d, err := parseModule(data, name, result.Metadata.BaseURL)
+	if err != nil {
+		return moduleDetails{}, false, err
+	}
+	if err = result.Revalidate(r.Context()); err != nil {
+		return moduleDetails{}, false, fmt.Errorf(
+			"puppet: authority: %w",
+			pkgroute.SourceError(err, false),
+		)
+	}
+	return d, true, nil
+}
+
+// missingRecord reports whether err is the upstream's 404 for a record,
+// which the source boundary reports as kernel.ErrNotFound and a remote
+// source answers as a 404, rather than the download policy's refusal, whose
+// 404 is the remote's own answer and says nothing of the upstream.
+func missingRecord(err error) bool {
+	if pkgroute.IsRefusal(err) {
+		return false
+	}
+	var failure *apierror.Error
+	return errors.Is(err, kernel.ErrNotFound) ||
+		errors.As(err, &failure) && failure.Status == http.StatusNotFound
+}
+
+// upstreamModule is the part of an upstream's module record a remote
+// relays. Each field is read raw, as a release's are, so a value of another
+// type answers as a hosted module's would.
+type upstreamModule struct {
+	Slug        json.RawMessage `json:"slug"`
+	Downloads   json.RawMessage `json:"downloads"`
+	CreatedAt   json.RawMessage `json:"created_at"`
+	UpdatedAt   json.RawMessage `json:"updated_at"`
+	Supported   json.RawMessage `json:"supported"`
+	Endorsement json.RawMessage `json:"endorsement"`
+	ModuleGroup json.RawMessage `json:"module_group"`
+	Owner       json.RawMessage `json:"owner"`
+	HomepageURL json.RawMessage `json:"homepage_url"`
+	IssuesURL   json.RawMessage `json:"issues_url"`
+}
+
+// parseModule returns the details the upstream's record of module name
+// gives, read from responseBase. A record that is not one JSON object of at
+// most maxMetadataBytes, that names another module, or that was read from
+// anywhere but that module's record is invalid upstream metadata (502).
+func parseModule(data []byte, name, responseBase string) (moduleDetails, error) {
+	if len(data) == 0 || len(data) > maxMetadataBytes {
+		return moduleDetails{}, invalidUpstream()
+	}
+	base, err := url.Parse(responseBase)
+	if err != nil || !validArchiveURL(base) || !strings.HasSuffix(base.Path, "/v3/modules/"+name) {
+		return moduleDetails{}, invalidUpstream()
+	}
+	var doc upstreamModule
+	if json.Unmarshal(data, &doc) != nil {
+		return moduleDetails{}, invalidUpstream()
+	}
+	if slug := rawText(doc.Slug); slug == nil || *slug != name {
+		return moduleDetails{}, invalidUpstream()
+	}
+	// module_group is "base" for every module but a Puppet Enterprise one
+	// (the Forge's v3 API description), and a hosted module's in JFrog's
+	// sample answer, so a value of another type answers it [I].
+	d := moduleDetails{
+		created: rawText(doc.CreatedAt), updated: rawText(doc.UpdatedAt),
+		endorsement: rawText(doc.Endorsement), group: "base",
+		homepage: rawText(doc.HomepageURL), issues: rawText(doc.IssuesURL),
+	}
+	if group := rawText(doc.ModuleGroup); group != nil {
+		d.group = *group
+	}
+	_ = json.Unmarshal(doc.Supported, &d.supported)
+	var downloads int64
+	if json.Unmarshal(doc.Downloads, &downloads) == nil && downloads > 0 {
+		d.downloads = downloads
+	}
+	var owner struct {
+		GravatarID json.RawMessage `json:"gravatar_id"`
+	}
+	if json.Unmarshal(doc.Owner, &owner) == nil {
+		d.gravatarID = rawText(owner.GravatarID)
+	}
+	return d, nil
 }
 
 func (h handler) metadataBytes(r *http.Request, result source.Result) ([]byte, error) {

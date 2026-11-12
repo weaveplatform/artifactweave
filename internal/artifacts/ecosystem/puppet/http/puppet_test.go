@@ -125,7 +125,20 @@ func newFixtureStore(
 }
 
 type metadataSource struct {
-	bodyAt                 func(source.Resource) string
+	bodyAt func(source.Resource) string
+	// moduleAt answers a read of a module record, v3/modules/<m>: its body,
+	// or the upstream's 404 when missing is set. Without it, a module record
+	// read answers one that names the module and gives nothing else.
+	moduleAt func(source.Resource) (body string, missing bool)
+	// moduleBase, moduleReadError, moduleNoRevalidate, moduleNoStream and
+	// moduleRevalidateError change a module record read's answer as
+	// metadataBase, readError, missingRevalidate, missingStream and
+	// revalidateError change a release page's.
+	moduleBase             string
+	moduleReadError        error
+	moduleNoRevalidate     bool
+	moduleNoStream         bool
+	moduleRevalidateError  error
 	metadataBase           string
 	cachedItem             *artmodel.Item
 	skipMetadataValidation bool
@@ -201,6 +214,9 @@ func (s metadataSource) Read(
 			Revalidate: revalidate,
 		}, nil
 	}
+	if resource.Variant == "puppet-forge-v3-module-v1" {
+		return s.moduleRecord(r, resource)
+	}
 	body := s.body
 	if s.bodyAt != nil {
 		body = s.bodyAt(resource)
@@ -253,6 +269,52 @@ func (s metadataSource) Read(
 	if s.cachedItem != nil {
 		result.Stream = nil
 		result.Item = s.cachedItem
+	}
+	return result, nil
+}
+
+// moduleRecord answers a read of a module record, from the address the
+// remote asked for, as the source boundary does.
+func (s metadataSource) moduleRecord(
+	r *http.Request,
+	resource source.Resource,
+) (source.Result, error) {
+	body := `{"slug":"` + strings.TrimPrefix(resource.Path, "v3/modules/") + `"}`
+	if s.moduleAt != nil {
+		var missing bool
+		if body, missing = s.moduleAt(resource); missing {
+			return source.Result{}, kernel.ErrNotFound
+		}
+	}
+	if s.moduleReadError != nil {
+		return source.Result{}, s.moduleReadError
+	}
+	at, err := url.Parse(resource.ExternalURL)
+	if err != nil {
+		return source.Result{}, err
+	}
+	at.RawQuery = ""
+	result := source.Result{
+		Stream: &source.Stream{
+			Body: io.NopCloser(strings.NewReader(body)), Status: 200, Size: int64(len(body)),
+		},
+		Metadata: source.MetadataResponse{BaseURL: at.String()},
+	}
+	if s.moduleBase != "" {
+		result.Metadata.BaseURL = s.moduleBase
+	}
+	if !s.moduleNoRevalidate {
+		result.Revalidate = func(context.Context) error { return s.moduleRevalidateError }
+	}
+	if s.moduleNoStream {
+		result.Stream = nil
+	}
+	if !s.skipMetadataValidation {
+		if err := resource.ValidateMetadata(
+			r.Context(), strings.NewReader(body), int64(len(body)), result.Metadata,
+		); err != nil {
+			return source.Result{}, err
+		}
 	}
 	return result, nil
 }

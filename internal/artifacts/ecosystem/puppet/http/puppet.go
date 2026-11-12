@@ -1,6 +1,7 @@
 package puppethttp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/mod/semver"
@@ -98,7 +100,10 @@ func Protocol(o Options) pkgroute.Protocol {
 
 type release struct {
 	meta puppetfmt.Metadata
-	item model.Item
+	// metadata is the release's metadata.json as its record answers it
+	// (releaseMetadata).
+	metadata json.RawMessage
+	item     model.Item
 	// details are the record's fields that the archive's metadata does not
 	// give: a hosted release's from its archive item, a remote's as its
 	// upstream gave them.
@@ -177,15 +182,102 @@ func (h handler) releases(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
+	omit := excludedFields(query)
 	start, end := window(offset, limit, len(releases))
-	out := make([]releaseRecord, 0, end-start)
+	out := make([]trimmedRecord, 0, end-start)
 	for _, rel := range releases[start:end] {
-		out = append(out, record(rel))
+		out = append(out, trimmedRecord{record(rel), omit})
 	}
 	writeJSON(w, r, http.StatusOK, struct {
 		Pagination listPage        `json:"pagination"`
-		Results    []releaseRecord `json:"results"`
-	}{newListPage("/v3/releases", "module="+name, limit, offset, len(releases)), out})
+		Results    []trimmedRecord `json:"results"`
+	}{newListPage("/v3/releases", releaseFilter(query), limit, offset, len(releases)), out})
+}
+
+// releaseFilter returns the part of a one-module release list's links
+// before limit and offset: the module, then sort_by and exclude_fields when
+// the request names them, each as the request gives it, so that the client
+// reads every page as it asked for the first (#1327). The Forge keeps
+// exclude_fields in its links (it answered
+// "/v3/releases?module=puppetlabs-stdlib&limit=1&exclude_fields=readme+changelog+license&offset=1"
+// on 2026-11-12); where 7.x writes them is [I], so they follow the module
+// in the order the Puppet client sends them, and limit and offset close the
+// link as they do in RTFACT-14557's.
+func releaseFilter(query url.Values) string {
+	filter := "module=" + query.Get("module")
+	for _, key := range []string{"sort_by", "exclude_fields"} {
+		if query.Has(key) {
+			filter += "&" + key + "=" + url.QueryEscape(query.Get(key))
+		}
+	}
+	return filter
+}
+
+// excludedFields returns the record fields exclude_fields names. The
+// Forge's v3 API description gives it as a list separated by spaces, and
+// the Puppet client has sent it separated by commas since PUP-9364
+// ("readme,changelog,license,uri,module,tags,supported,file_size,
+// downloads,created_at,updated_at,deleted_at"), which the Forge honours, as
+// that change cut stdlib's release pages from 2.5 MB to 77 KB; so both
+// separate names. A name no record has leaves nothing out.
+func excludedFields(query url.Values) map[string]bool {
+	names := strings.FieldsFunc(query.Get("exclude_fields"), func(r rune) bool {
+		return r == ',' || unicode.IsSpace(r)
+	})
+	if len(names) == 0 {
+		return nil
+	}
+	out := make(map[string]bool, len(names))
+	for _, name := range names {
+		out[name] = true
+	}
+	return out
+}
+
+// trimmedRecord is a release record without the top-level fields omit
+// names, as the Forge answers a release list with exclude_fields ("List of
+// top level keys to exclude from response object", its v3 API
+// description). Whether 7.x leaves them out is [I]; the Puppet client asks
+// to, and reads none of the fields it names.
+type trimmedRecord struct {
+	record releaseRecord
+	omit   map[string]bool
+}
+
+// MarshalJSON writes the record's fields in its own order, leaving out
+// those omit names.
+func (t trimmedRecord) MarshalJSON() ([]byte, error) {
+	var full bytes.Buffer
+	enc := json.NewEncoder(&full)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(t.record); err != nil {
+		return nil, fmt.Errorf("puppet: release record: %w", err)
+	}
+	if len(t.omit) == 0 {
+		return full.Bytes(), nil
+	}
+	dec := json.NewDecoder(&full)
+	var out bytes.Buffer
+	out.WriteByte('{')
+	// The record is a struct this package encoded, so its tokens read back.
+	_, _ = dec.Token()
+	for dec.More() {
+		token, _ := dec.Token()
+		key, _ := token.(string)
+		var value json.RawMessage
+		_ = dec.Decode(&value)
+		if t.omit[key] {
+			continue
+		}
+		if out.Len() > 1 {
+			out.WriteByte(',')
+		}
+		out.Write(jsonString(key))
+		out.WriteByte(':')
+		out.Write(value)
+	}
+	out.WriteByte('}')
+	return out.Bytes(), nil
 }
 
 func (h handler) release(w http.ResponseWriter, r *http.Request) {
@@ -237,7 +329,33 @@ func (h handler) module(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	writeJSON(w, r, 200, newModuleRecord(releases))
+	d, found, err := h.moduleDetails(r, name, releases, listing)
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	if !found {
+		h.k.Error(w, r, apierror.New(404, "Puppet module not found"))
+		return
+	}
+	writeJSON(w, r, 200, newModuleRecord(releases, d))
+}
+
+// moduleDetails returns the details of the module record of name, whose
+// releases the caller may read are releases, for u, and false when the
+// module has none to answer. A remote takes them from its upstream's
+// v3/modules/<m> record (remoteModule); any other repository from the
+// releases (derivedModule).
+func (h handler) moduleDetails(
+	r *http.Request,
+	name string,
+	releases []release,
+	u use,
+) (moduleDetails, bool, error) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		return h.remoteModule(r, name, u)
+	}
+	return derivedModule(releases), true, nil
 }
 
 // modules answers v3/modules: the whole-repository list when the query
@@ -277,7 +395,14 @@ func (h handler) modules(w http.ResponseWriter, r *http.Request) {
 	}
 	found := []moduleRecord{}
 	if len(releases) > 0 {
-		found = append(found, newModuleRecord(releases))
+		d, ok, err := h.moduleDetails(r, name, releases, search)
+		if err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+		if ok {
+			found = append(found, newModuleRecord(releases, d))
+		}
 	}
 	start, end := window(offset, limit, len(found))
 	writeJSON(w, r, http.StatusOK, struct {
@@ -466,6 +591,12 @@ func (h handler) stored(r *http.Request, name string, v model.PackageVersion) (r
 		meta.Version != v.Version || meta.Path != path {
 		return release{}, apierror.New(http.StatusBadGateway, "invalid stored Puppet package index")
 	}
+	// An entry without metadata.json's document has no metadata to answer,
+	// and fails as an entry that does not match its archive does.
+	metadata, tags, err := releaseMetadata(meta.Document)
+	if err != nil {
+		return release{}, apierror.New(http.StatusBadGateway, "invalid stored Puppet package index")
+	}
 	key := pkgroute.RequestFrom(r).Repo.Key
 	item, err := h.k.DB().Items().Get(r.Context(), key, false, path)
 	if err != nil || item.Folder || meta.SHA256 == "" || meta.SHA256 != item.Actual.SHA256 {
@@ -475,7 +606,9 @@ func (h handler) stored(r *http.Request, name string, v model.PackageVersion) (r
 	if err != nil {
 		return release{}, fmt.Errorf("puppet: statistics of %s/%s: %w", key, path, err)
 	}
-	return release{meta: meta, item: item, details: hostedDetails(item, stats)}, nil
+	d := hostedDetails(item, stats)
+	d.tags = tags
+	return release{meta: meta, metadata: metadata, item: item, details: d}, nil
 }
 
 func (h handler) virtual(r *http.Request, name string, u use) ([]release, error) {

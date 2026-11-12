@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -180,18 +181,30 @@ func puppetArchive(t *testing.T, version, summary string) ([]byte, []byte) {
 	return out.Bytes(), manifest
 }
 
-// forge is an upstream Forge that serves acme-widget's release page and
-// archives and counts the requests for each path.
+// forge is an upstream Forge that serves acme-widget's release page,
+// archives and module record, and counts the requests for each path. It
+// answers 404 for the module record while module is nil.
 type forge struct {
 	*httptest.Server
 	archives map[string][]byte
 	mu       sync.Mutex
 	hits     map[string]int
+	module   map[string]any
+	// moduleQueries are the queries the module record was asked with.
+	moduleQueries []string
 }
 
 func newForge(t *testing.T, summary string, versions ...string) *forge {
 	t.Helper()
-	f := &forge{archives: map[string][]byte{}, hits: map[string]int{}}
+	f := &forge{
+		archives: map[string][]byte{},
+		hits:     map[string]int{},
+		module: map[string]any{
+			"uri":  "/v3/modules/acme-widget",
+			"slug": "acme-widget",
+			"name": "widget",
+		},
+	}
 	results := []any{}
 	for _, v := range versions {
 		data, manifest := puppetArchive(t, v, summary)
@@ -206,7 +219,16 @@ func newForge(t *testing.T, summary string, versions ...string) *forge {
 	f.Server = httptest.NewServer(http.HandlerFunc(func(out http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		f.hits[r.URL.Path]++
+		module := f.module
+		if r.URL.Path == "/v3/modules/acme-widget" {
+			f.moduleQueries = append(f.moduleQueries, r.URL.RawQuery)
+		}
 		f.mu.Unlock()
+		if r.URL.Path == "/v3/modules/acme-widget" && module != nil {
+			out.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(out).Encode(module)
+			return
+		}
 		if r.URL.Path == "/v3/releases" && r.URL.Query().Get("module") == "acme-widget" {
 			out.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(out).Encode(map[string]any{
@@ -535,4 +557,109 @@ func TestAccPuppetVirtualOverARemoteMember(t *testing.T) {
 			}
 		})
 	}
+}
+
+// searchPage is the module search's answer for acme-widget with results,
+// total of them.
+func searchPage(total int, results ...string) string {
+	const link = `"/v3/modules?query=acme-widget&limit=20&offset=0"`
+	return `{"pagination":{"limit":20,"offset":0,"first":` + link + `,"previous":null,` +
+		`"current":` + link + `,"next":null,"total":` + strconv.Itoa(total) + `},` +
+		`"results":[` + strings.Join(results, ",") + `]}` + "\n"
+}
+
+// A Puppet remote's module record relays the module-wide fields of the
+// upstream's own record, v3/modules/<m>, asked without its current release
+// and release list, which the remote answers from its release pages
+// (#1326) [I]. When the upstream answers 404 for the record, the remote's
+// v3/modules/<m> answers 404 and its search finds nothing, while the
+// module's releases stay listed: RTFACT-19130 reports a 6.8.6 remote
+// answering 404 for a module the Forge served, a fault rather than an
+// answer to keep.
+func TestAccPuppetRemoteModuleRecordRelaysTheForge(t *testing.T) {
+	const remote = "/artifactory/api/puppet/remote"
+	setup := func(t *testing.T, module map[string]any) (*remoteWorld, *forge) {
+		t.Helper()
+		w := newRemoteWorld(t)
+		up := newForge(t, "remote", "1.0.0", "1.1.0")
+		up.module = module
+		w.c.PackageType = repo.Puppet
+		w.c.URL = up.URL
+		w.update()
+		return w, up
+	}
+	t.Run("relayed", func(t *testing.T) {
+		w, up := setup(t, map[string]any{
+			"uri": "/v3/modules/acme-widget", "slug": "acme-widget", "name": "widget",
+			"downloads": 90210, "created_at": "2010-03-04 05:06:07 -0800",
+			"updated_at": "2026-10-29 01:02:03 -0700", "deprecated_at": nil, "supported": false,
+			"endorsement": "approved", "module_group": "base",
+			"owner": map[string]any{
+				"uri":         "/v3/users/acme",
+				"slug":        "acme",
+				"username":    "acme",
+				"gravatar_id": "0badc0de",
+			},
+			"homepage_url": "https://example.invalid/acme/puppet-widget?tab=a&b", "issues_url": nil,
+		})
+		data := up.archives["1.1.0"]
+		current := `{"uri":"/v3/releases/acme-widget-1.1.0","slug":"acme-widget-1.1.0",` +
+			`"module":{"uri":"/v3/modules/acme-widget","slug":"acme-widget","name":"widget",` +
+			`"owner":{"uri":"/v3/users/acme","slug":"acme","username":"acme","gravatar_id":null},` +
+			`"deprecated_at":null},"version":"1.1.0","metadata":{"name":"acme-widget",` +
+			`"version":"1.1.0","source":null,"author":null,"license":null,"summary":"remote",` +
+			`"description":null,"project_page":null,"issues_url":null,"tags":null,` +
+			`"dependencies":[]},"tags":[],"supported":false,` +
+			`"file_uri":"/v3/files/acme-widget-1.1.0.tar.gz","file_size":` + strconv.Itoa(len(data)) +
+			`,"file_md5":null,"file_sha256":"` + checksum(data) + `","downloads":0,` +
+			`"readme":null,"changelog":null,"license":null,"created_at":null,"updated_at":null,` +
+			`"deleted_at":null}`
+		module := `{"uri":"/v3/modules/acme-widget","slug":"acme-widget","name":"widget",` +
+			`"downloads":90210,"created_at":"2010-03-04 05:06:07 -0800",` +
+			`"updated_at":"2026-10-29 01:02:03 -0700","supported":false,"endorsement":"approved",` +
+			`"module_group":"base","owner":{"uri":"/v3/users/acme","slug":"acme","username":"acme",` +
+			`"gravatar_id":"0badc0de"},"current_release":` + current + `,` +
+			`"releases":[{"uri":"/v3/releases/acme-widget-1.1.0","version":"1.1.0"},` +
+			`{"uri":"/v3/releases/acme-widget-1.0.0","version":"1.0.0"}],` +
+			`"homepage_url":"https://example.invalid/acme/puppet-widget?tab=a&b","issues_url":null}`
+		for route, want := range map[string]string{
+			"/v3/modules/acme-widget":       module + "\n",
+			"/v3/modules?query=acme-widget": searchPage(1, module),
+		} {
+			r := w.request("GET", remote+route, "reader", "")
+			if r.Code != 200 || r.Body.String() != want {
+				t.Fatalf("%s: got %d %s\nwant 200 %s", route, r.Code, r.Body.String(), want)
+			}
+		}
+		up.mu.Lock()
+		defer up.mu.Unlock()
+		if len(up.moduleQueries) == 0 {
+			t.Fatal("the module record was not asked for")
+		}
+		for _, query := range up.moduleQueries {
+			if query != "exclude_fields=current_release+releases" {
+				t.Fatalf("module record asked with %q", query)
+			}
+		}
+	})
+	t.Run("not served", func(t *testing.T) {
+		w, _ := setup(t, nil)
+		r := w.request("GET", remote+"/v3/modules/acme-widget", "reader", "")
+		const missing = `{"errors":[{"message":"Puppet module not found","status":404}]}` + "\n"
+		if r.Code != 404 || r.Body.String() != missing {
+			t.Fatalf("module: %d %s", r.Code, r.Body.String())
+		}
+		r = w.request("GET", remote+"/v3/modules?query=acme-widget", "reader", "")
+		if r.Code != 200 || r.Body.String() != searchPage(0) {
+			t.Fatalf("search: %d %s", r.Code, r.Body.String())
+		}
+		if got := listed(
+			t,
+			w.request("GET", remote+"/v3/releases?module=acme-widget", "reader", ""),
+		); len(
+			got,
+		) != 2 {
+			t.Fatalf("releases: %v", got)
+		}
+	})
 }

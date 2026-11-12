@@ -62,6 +62,14 @@ writes `&`, `<` and `>` as they are. The Puppet client follows `next`, and
 `puppet_forge` walks from `first`. Whether 7.x caps the release list and the
 search at 100 as it caps the modules list is [I] (#216).
 
+The release list honours `exclude_fields`, which the Puppet client sends
+separated by commas (`readme,changelog,license,uri,module,tags,supported,`
+`file_size,downloads,created_at,updated_at,deleted_at`, since PUP-9364) and the
+Forge's v3 API description gives separated by spaces: the top-level record
+fields it names are left out, and a name no record has leaves nothing out. Its
+links then keep `sort_by` and `exclude_fields` after `module`, so every page
+answers as the first did. Both are [I] (#1327).
+
 Release and module records carry the fields of JFrog's REST API reference for
 the four Forge operations (archived jfrog.com/help pages) with the ones 7.x's
 answers add: a release's `slug`, `module` (with its `owner` and
@@ -70,11 +78,26 @@ answers add: a release's `slug`, `module` (with its `owner` and
 `endorsement`, `module_group`, `owner` (with `slug` and `gravatar_id`),
 `homepage_url` and `issues_url`. A hosted release takes `file_md5`,
 `downloads` and its dates from its archive item, written in the Forge's form
-(`2017-07-16 12:07:00 +0000`) in UTC; its `readme`, `changelog` and `license`
-are null, since 7.x reads only an archive's metadata.json. A remote relays its
-upstream's values ([RTFACT-19130](https://jfrog.atlassian.net/browse/RTFACT-19130)).
-A module takes its downloads (summed), dates (earliest and latest) and links
-(the current release's `project_page` and `issues_url`) from its releases [I].
+(`2017-07-16 12:07:00 +0000`) in UTC, and its `tags` from metadata.json, as the
+Forge derives them; its `readme`, `changelog` and `license` are null, since 7.x
+reads only an archive's metadata.json. A remote relays its upstream's values
+([RTFACT-19130](https://jfrog.atlassian.net/browse/RTFACT-19130)), `tags`
+included. A release's `metadata` is its whole metadata.json: `name`, `version`,
+`source`, `author`, `license`, `summary`, `description`, `project_page`,
+`issues_url`, `tags` and `dependencies` first, in the order RTFACT-19130's
+6.8.6 answer writes them and null where the file has none, then the file's
+other keys in the file's order (#1325) [I].
+
+A hosted or virtual module takes its downloads (summed), dates (earliest and
+latest) and links (the current release's `project_page` and `issues_url`) from
+its releases [I]. A remote's module relays the downloads, dates, `supported`,
+`endorsement`, `module_group`, owner `gravatar_id` and links of its upstream's
+own record, `v3/modules/<m>`, asked with `exclude_fields=current_release
+releases`, and lists the releases its release pages give the caller. When the
+upstream answers 404 for that record, `v3/modules/<m>` answers 404 and the
+search finds nothing, while the release list still lists the module's releases
+(#1326) [I]. RTFACT-19130 reports a 6.8.6 remote answering 404 for a module the
+Forge served; that is the fault the report names, not an answer to keep.
 
 `GET .../v3/releases` and `GET .../v3/modules` with no query list every release
 and module a local or federated repository hosts that the caller may read, as
@@ -95,7 +118,8 @@ Delete and trash restore use the normal item APIs and update the native view.
 `POST /artifactory/api/puppet/{repo}/reindex` is the Artifactweave maintenance
 endpoint for rebuilding hosted module indexes from archives. It requires Manage
 and runs the existing persistent reindex worker. Remote metadata refresh uses
-`POST /artifactory/api/zap/{repo}-cache/v3/releases`; the ordinary source policy
+`POST /artifactory/api/zap/{repo}-cache/v3/releases` (and `.../v3/modules` for
+the module records); the ordinary source policy
 controls TTL, offline access, and fallback to complete cached metadata during a
 transient upstream outage. A cold upstream failure cannot create a release.
 
@@ -109,15 +133,24 @@ archive entries and 256 dependencies. Release metadata is limited to 16 MiB per
 page and 4,096 releases overall; the adapter constructs each pagination request
 and never follows upstream pagination URLs.
 
-A remote asks its upstream for 100 releases a page. The Forge serves at most
-100 whatever `limit` asks (it answered `limit=1000` with `"limit": 100` on
-2026-11-12), and so do 7.x's own lists
-([RTFACT-30529](https://jfrog.atlassian.net/browse/RTFACT-30529)); what 7.x's
-remote asks is [I] (#216). Each page starts after the releases the last one
-held. A page short of 100 with more after it is accepted only when the
-upstream's `pagination.limit` equals what the page held; short for any other
-reason, it answers 502, since the remote cannot tell where the next page
-starts.
+A remote asks its upstream for 20 releases a page, the Forge's own default
+([RTFACT-14274](https://jfrog.atlassian.net/browse/RTFACT-14274)), with
+`exclude_fields=reference tasks plans pdk validation_score malware_scan
+deleted_for`: the fields no record answers, REFERENCE.md's text among them.
+A page keeps each release's `readme`, `changelog` and `license`, which the
+records relay, and the Forge's 100 a page of theforeman-foreman came to
+9,947,601 bytes on 2026-11-12; puppetlabs-apache's README, CHANGELOG and
+LICENSE come to about 240 KB a release and its REFERENCE.md to 398 KB in its
+sources, so 100 of them would pass the 16 MiB a page (#1300). The Forge serves
+at most 100 whatever `limit` asks (it answered `limit=1000` with
+`"limit": 100` on 2026-11-12), so a smaller page costs only more requests.
+What 7.x's remote asks is [I] (#216). A client's own `exclude_fields` is not
+passed on. Each page starts after the releases the last one held. A page short
+of 20 with more after it is accepted only when the upstream's
+`pagination.limit` equals what the page held; short for any other reason, it
+answers 502, since the remote cannot tell where the next page starts. A
+release whose metadata.json is larger than the 1 MiB an archive's may be is
+invalid upstream metadata (502), since no archive could match it.
 
 Remote metadata and archive URLs must remain under the configured Forge origin
 and path. Every archive redirect is checked against that boundary. Download
