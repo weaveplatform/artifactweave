@@ -12,7 +12,7 @@ Feature: npm audit signatures verifies what an npm local repository signs
     Given the registry is running
 
   @npm
-  Scenario Outline: <npm> verifies the signatures of an npm local repository, and again after its key pair rotates
+  Scenario Outline: <npm> verifies the signatures of an npm local repository after a key pair rotates, and refuses a tampered one
     Given the <npm> client can reach the registry
     When I PUT "/artifactory/api/repositories/npm-signed" as admin with body:
       """
@@ -85,6 +85,14 @@ Feature: npm audit signatures verifies what an npm local repository signs
     When I run npm "audit signatures --prefix consumer"
     Then the command succeeds
     And the output contains "2 packages have verified registry signatures"
+
+    # A tampered signature, made by the listed key over another package's
+    # message, is refused.
+    When the npm signature of "acme-early" at "1.0.0" in "npm-signed" is replaced by that of "acme-late"
+    And I run npm "audit signatures --prefix consumer"
+    Then the command fails
+    And the output contains "1 package has an invalid registry signature"
+    And the output contains "acme-early@1.0.0"
 
     Examples:
       | npm    |

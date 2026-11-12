@@ -2,14 +2,19 @@ package acceptance
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"database/sql"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"path/filepath"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
@@ -23,6 +28,8 @@ func (w *world) registerNPMSignatures(sc *godog.ScenarioContext) {
 		w.createECDSAKeyPair)
 	sc.Step(`^I create the ECDSA key pair "([^"]*)" with alias "([^"]*)" from a gpg export as admin$`,
 		w.createGPGECDSAKeyPair)
+	sc.Step(`^the npm signature of "([^"]*)" at "([^"]*)" in "([^"]*)" is replaced by that of "([^"]*)"$`,
+		w.tamperNPMSignature)
 }
 
 // createECDSAKeyPair posts a freshly generated P-256 pair as PEM.
@@ -96,4 +103,66 @@ func armored(typ string, write func(io.Writer) error) (string, error) {
 		return "", err
 	}
 	return out.String(), nil
+}
+
+// tamperNPMSignature gives name's version in repo the signature of other's
+// same version, as an attacker who rewrote the stored metadata would: a
+// signature by a listed key, over another package's message. The registry
+// itself never serves one, since every signature is made from the version's
+// own integrity and a pair's halves must match, so the step writes the
+// running binary's SQLite store directly. The packument is built from that
+// row on each read (DV-042), so the next read serves the tampered signature.
+func (w *world) tamperNPMSignature(name, version, repo, other string) error {
+	u := url.URL{
+		Scheme:   "file",
+		Path:     filepath.Join(w.dataDir, "artifactweave.db"),
+		RawQuery: "_pragma=busy_timeout(10000)",
+	}
+	db, err := sql.Open("sqlite", u.String())
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	ctx := context.Background()
+	sigOf := func(pkg string) (string, error) {
+		var raw string
+		if err := db.QueryRowContext(ctx, `SELECT v.metadata FROM package_versions v
+			JOIN packages p ON p.id = v.package_id
+			WHERE p.repo_key = ? AND p.name = ? AND v.version = ?`,
+			repo, pkg, version).Scan(&raw); err != nil {
+			return "", fmt.Errorf("metadata of %s@%s: %w", pkg, version, err)
+		}
+		var m struct {
+			Dist struct {
+				Signatures []struct {
+					Sig string `json:"sig"`
+				} `json:"signatures"`
+			} `json:"dist"`
+		}
+		if err := json.Unmarshal([]byte(raw), &m); err != nil {
+			return "", err
+		}
+		if len(m.Dist.Signatures) != 1 {
+			return "", fmt.Errorf("%s@%s has %d signatures", pkg, version, len(m.Dist.Signatures))
+		}
+		return m.Dist.Signatures[0].Sig, nil
+	}
+	sig, err := sigOf(name)
+	if err != nil {
+		return err
+	}
+	replacement, err := sigOf(other)
+	if err != nil {
+		return err
+	}
+	res, err := db.ExecContext(ctx, `UPDATE package_versions SET metadata = replace(metadata, ?, ?)
+		WHERE version = ? AND package_id = (SELECT id FROM packages WHERE repo_key = ? AND name = ?)`,
+		sig, replacement, version, repo, name)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil || n != 1 {
+		return fmt.Errorf("tamper %s@%s: %d rows, %v", name, version, n, err)
+	}
+	return nil
 }
