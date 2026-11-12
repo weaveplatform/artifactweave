@@ -32,6 +32,8 @@
 //     and release downloads, denials before upstream, upstream failures on
 //     every documented route, the nested grammar, unknown refs and missing
 //     files, malformed upstream refs and property-constrained archives.
+//   - vcs_policy_test.go: the download policy checked at the references'
+//     7.x path.
 //   - vcs_legacy_test.go and vcs_delivery_test.go: commit resolution and
 //     redirect changes, peer tag and branch bounds, rootless file precedence
 //     and peer file usage.
