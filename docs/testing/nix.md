@@ -73,8 +73,10 @@ refresh without changing that identity. Concurrent publications serialize on the
 store hash. It validates the NAR grammar, zero padding, ordered directory
 entries, bounded recursion and safe entry names. Limits are 1 MiB narinfo,
 512 MiB compressed NAR, 2 GiB expanded NAR, 100,000 nodes, depth 128, 4,096
-references and 32 incoming signatures. Decoder dictionaries are bounded to
-64 MiB. Responses rewrite archive URLs to associate every download with its
+references and 32 incoming signatures. The zstd decoder holds at most 64 MiB
+of history. An xz block header that names a dictionary above 1.5 GiB is refused
+with the same 400, as XZ for Java, which Artifactory decodes xz with, refuses
+it. Responses rewrite archive URLs to associate every download with its
 narinfo and permission checks. Query parameters in HTTP requests are rejected;
 Nix store URL options such as `compression=xz` are consumed by the client.
 

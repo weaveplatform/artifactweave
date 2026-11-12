@@ -28,6 +28,10 @@
 //   - debian_remote_upstream_test.go: the files apt reads that a remote
 //     asks its upstream for and serves (#1273), and a by-hash file whose
 //     bytes do not match its name refused and not cached.
+//   - debian_xz_test.go: a package whose control.tar.xz or data.tar.xz,
+//     or a Packages.xz, lost its xz index and footer, refused at deploy,
+//     from a remote's upstream and through a virtual over that remote
+//     (#1331).
 //
 // # References
 //
@@ -41,8 +45,9 @@
 //   - docs/testing/server-test-ownership.md: how CI selection gives the
 //     package an owner.
 //   - https://github.com/weaveplatform/artifactweave/issues/1068,
-//     https://github.com/weaveplatform/artifactweave/issues/1083 and
-//     https://github.com/weaveplatform/artifactweave/issues/1273
+//     https://github.com/weaveplatform/artifactweave/issues/1083,
+//     https://github.com/weaveplatform/artifactweave/issues/1273 and
+//     https://github.com/weaveplatform/artifactweave/issues/1331
 //
 // # Status
 //

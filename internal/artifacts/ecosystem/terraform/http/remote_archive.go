@@ -14,9 +14,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/ulikunitz/xz"
-
 	"github.com/weaveplatform/artifactweave/internal/platform/archive"
+	"github.com/weaveplatform/artifactweave/internal/platform/xzfile"
 )
 
 const (
@@ -132,7 +131,10 @@ func validateSelectedArchive(
 	case strings.HasSuffix(name, ".bz2"):
 		stream = bzip2.NewReader(stream)
 	case strings.HasSuffix(name, ".xz"):
-		xr, err := (xz.ReaderConfig{DictCap: 64 << 20}).NewReader(stream)
+		// The whole file is read, as liblzma reads it, so a module whose
+		// index and footer are missing is refused (#1331). The inflation
+		// budget bounds what is read, and so the dictionary (#1332).
+		xr, err := xzfile.NewReader(stream, inflated+1)
 		if err != nil {
 			return remoteModuleError()
 		}

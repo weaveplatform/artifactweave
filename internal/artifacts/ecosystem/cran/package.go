@@ -12,7 +12,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/ulikunitz/xz"
+	"github.com/weaveplatform/artifactweave/internal/platform/xzfile"
 )
 
 const (
@@ -145,7 +145,10 @@ func readTar(ctx context.Context, raw io.Reader, p, name string) (map[string]str
 	case strings.HasSuffix(p, ".tar.bz2"):
 		stream = bzip2.NewReader(raw)
 	case strings.HasSuffix(p, ".tar.xz"):
-		xr, err := xz.NewReader(raw)
+		// R reads a .tar.xz through liblzma, which refuses a file whose
+		// index and footer are missing, so the drain below reads the whole
+		// file (#1331).
+		xr, err := xzfile.NewReader(raw, maxUnpacked+1)
 		if err != nil {
 			return nil, ErrPackage
 		}

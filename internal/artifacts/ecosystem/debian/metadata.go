@@ -17,8 +17,9 @@ import (
 
 	"github.com/ProtonMail/go-crypto/openpgp/clearsign"
 	"github.com/klauspost/compress/zstd"
-	"github.com/ulikunitz/xz"
 	"github.com/ulikunitz/xz/lzma"
+
+	"github.com/weaveplatform/artifactweave/internal/platform/xzfile"
 )
 
 const (
@@ -299,7 +300,9 @@ func decodeIndexCompression(body []byte) ([]byte, error) {
 		}
 		reader, closeReader = z, func() { _ = z.Close() }
 	case bytes.HasPrefix(body, []byte{0xfd, '7', 'z', 'X', 'Z', 0x00}):
-		z, err := xz.NewReader(bytes.NewReader(body))
+		// liblzma, which apt decodes an index with, refuses an xz file whose
+		// index and footer are missing, so the whole file is read (#1331).
+		z, err := xzfile.NewReader(bytes.NewReader(body), maxPackagesIndex+1)
 		if err != nil {
 			return nil, fmt.Errorf("%w: xz index: %w", errInvalidBinary, err)
 		}

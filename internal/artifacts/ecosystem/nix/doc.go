@@ -70,9 +70,11 @@
 //     trust.
 //   - An archive is admitted only when it decompresses to exactly one
 //     well-formed NAR within the limits and its SHA-256 is the one its path
-//     names; decoders are bounded to 64 MiB of memory. An xz file is read
-//     whole, as liblzma reads it: every stream must end in an index that
-//     lists the blocks read and a footer that matches it (xz.go).
+//     names. The zstd decoder holds at most 64 MiB of history. An xz file
+//     is read whole, as liblzma reads it: every stream must end in an
+//     index that lists the blocks read and a footer that matches it, and
+//     an xz block header that names a dictionary above 1.5 GiB is refused,
+//     as XZ for Java refuses it (platform/xzfile).
 //   - A hosted repository stores a store path's narinfo and archive only
 //     in its folder under binary-cache, and an archive at nar/<file> only
 //     until the narinfo that names it is published; a remote's cache keeps
@@ -118,7 +120,8 @@
 //
 // Implemented P9c, which delivered the plan's P33 group (issues #782 to
 // #788). Moved here in P9d. Channels added by #1263; the binary-cache
-// layout by #1296 and the whole xz stream by #1297.
+// layout by #1296 and the whole xz stream by #1297, whose reader #1331
+// moved to platform/xzfile, where #1332 bounded its dictionary.
 //
 // # Testing
 //
@@ -133,8 +136,10 @@
 //   - layout_test.go: the binary-cache layout's paths, inspection by
 //     layout, indexing a store path's folder, releasing the held upload,
 //     and a remote cache's paths.
-//   - xz_test.go: whole xz files of each check type, several blocks and
-//     streams, and every part of the container broken or cut short.
+//   - xz_test.go: a NAR and a channel tarball cut by their index and footer
+//     are refused, and a NAR whose xz block header names a 4 GiB
+//     dictionary is refused without allocating it. platform/xzfile tests
+//     the container itself.
 //   - contract_test.go: the format's lifecycle through the item service,
 //     and concurrent first publications of one store path.
 //   - channel_test.go: snapshot paths, channel tarballs and their faults,

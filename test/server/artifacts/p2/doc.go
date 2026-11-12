@@ -20,6 +20,9 @@
 //     internal/artifacts/ecosystem/p2/testdata, read root-relative through
 //     repopath, and remote sources over stub backends (sourceIdentity,
 //     sourceBackend).
+//   - The harness's remote world (harness.NewRemoteWorld): a P2 remote over
+//     a chi upstream the test serves, through the remote cache and its
+//     validation.
 //
 // # Outputs
 //
@@ -36,6 +39,9 @@
 //     p2_external_cache_integrity_test.go: external composite children,
 //     their depth, origins and authority, metadata fallback, archive
 //     corruption, forged member selection and a changed published checksum.
+//   - p2_xz_test.go: a remote's upstream content.xml.xz or
+//     artifacts.xml.xz that lost its xz index and footer, refused through
+//     the remote and through a virtual over it (#1331).
 //
 // # References
 //
@@ -50,8 +56,9 @@
 //   - docs/testing/server-test-ownership.md: how CI selection gives the
 //     package an owner.
 //   - https://github.com/weaveplatform/artifactweave/issues/1068,
-//     https://github.com/weaveplatform/artifactweave/issues/1084 and
-//     https://github.com/weaveplatform/artifactweave/issues/1257
+//     https://github.com/weaveplatform/artifactweave/issues/1084,
+//     https://github.com/weaveplatform/artifactweave/issues/1257 and
+//     https://github.com/weaveplatform/artifactweave/issues/1331
 //
 // # Status
 //

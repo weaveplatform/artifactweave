@@ -9,9 +9,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/ulikunitz/xz"
-
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/xzfile"
 )
 
 // ArtifactChecksums reads the checksums declared for a standard P2 artifact
@@ -123,7 +122,7 @@ func metadataXML(name string, body []byte) ([]byte, error) {
 	case strings.HasSuffix(name, ".xml"):
 		return body, nil
 	case strings.HasSuffix(name, ".xml.xz"):
-		r, err := xz.NewReader(bytes.NewReader(body))
+		r, err := xzfile.NewReader(bytes.NewReader(body), MaxMetadata+1)
 		if err != nil {
 			return nil, ErrInvalid
 		}
