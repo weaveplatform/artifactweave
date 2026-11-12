@@ -12,6 +12,7 @@ Endpoint: `${AW_URL}/artifactory/${AW_REPO}/cursor-marketplace.json`
 
 - Local agentplugins repository.
 - A plugin/ directory containing .cursor-plugin/plugin.json with name hello-plugin and version 1.0.0.
+- For the Agent Plugins Standard, a standard/ directory whose root plugin.json sets $schema to https://agent-plugins.org/schemas/1.0.0/plugin.schema.json and name to hello-standard, and validates against that schema.
 
 Authentication: READ permission is required to resolve metadata and bytes; DEPLOY is additionally required to publish. Supply an unexpired Access token in AW_TOKEN; Basic authentication uses AW_USER matching the token subject. Token scope must retain the repository permissions; a token cannot grant access that its principal lacks.
 
@@ -44,13 +45,24 @@ Classes: **local**. Only local repositories are supported.
 env HOME="$AW_PLUGIN_HOME" jf agent plugins publish plugin --repo "$AW_REPO" --version 1.0.0
 ```
 
+A root plugin.json that does not validate against the Agent Plugins 1.0.0 schema is not the standard layout: on its own the upload answers 409.
+
+```sh
+env HOME="$AW_PLUGIN_HOME" jf agent plugins publish standard --repo "$AW_REPO" --version 1.0.0
+```
+
 ## Install or resolve
 
-Classes: **local**. The native CLI installs the Cursor plugin into the isolated home.
+Classes: **local**. The native CLI installs the Cursor plugin, and the standard plugin for VS Code and Cursor, into the isolated home. VS Code discovers it under .copilot/installed-plugins/<repository key>/.
 
 ```sh
 env HOME="$AW_PLUGIN_HOME" jf agent plugins install hello-plugin --harness cursor --repo "$AW_REPO" --version 1.0.0
 env HOME="$AW_PLUGIN_HOME" jf agent plugins list --harness cursor --format json
+```
+
+```sh
+env HOME="$AW_PLUGIN_HOME" jf agent plugins install hello-standard --harness vscode --repo "$AW_REPO" --version 1.0.0
+env HOME="$AW_PLUGIN_HOME" jf agent plugins install hello-standard --harness cursor --repo "$AW_REPO" --version 1.0.0
 ```
 
 ## Limits
@@ -58,6 +70,8 @@ env HOME="$AW_PLUGIN_HOME" jf agent plugins list --harness cursor --format json
 Classes outside **local** are not registered for this format. Commands above apply only to each operation's listed classes. Federated evidence is for one node; it does not establish cross-vendor replication.
 
 - Claude marketplace JSON and ZIP authorization are tested, but this recipe claims the actual Cursor adapter install performed by JFrog CLI, not a Claude desktop install.
+- vscode-marketplace.json is served and tested as JSON, but no pinned client reads it: JFrog CLI installs --harness vscode from marketplace.json, and VS Code has no native connection to an HTTP marketplace of ZIP sources.
+- Pass --version to jf agent plugins install. Without it the CLI looks the marketplace file up with an AQL search, which does not find the marketplace files the registry renders for each reader.
 - Remote, virtual and federated classes are unsupported.
 
 ## Verification sources

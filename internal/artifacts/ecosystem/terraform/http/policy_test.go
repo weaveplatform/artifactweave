@@ -156,7 +156,9 @@ func TestAccLocalProviderRoutesFollowTheDownloadPolicy(t *testing.T) {
 func TestAccRemoteModuleRoutesFollowTheRemotePolicy(t *testing.T) {
 	f := newRemoteFixture(t)
 	f.modules("1.0.0", "2.0.0")
-	const archive = "ns/name/aws/1.0.0.zip"
+	// The fixture's archive URL is <upstream>/archives/1.0.0.zip, cached
+	// at its path below the remote's URL.
+	const archive = "archives/1.0.0.zip"
 	signed := f.signed("1.0.0", "reader")
 	set := func(change func(*repo.Config)) { patchRepo(t, f.fixture, "remote", change) }
 
@@ -195,22 +197,24 @@ func TestAccRemoteModuleRoutesFollowTheRemotePolicy(t *testing.T) {
 // A remote provider repository checks its patterns at the registry
 // documents' 7.x cache paths under .terraform/providers/ (RTFACT-31026,
 // RTFACT-30802), where the blackout's refusal names them too, and each
-// file at its cache path. A platform whose archive the patterns reject
-// stays listed (R3), and only what is built from the archive is
-// refused.
+// file at its cache path, its URL's path below the Providers URL. A
+// platform whose archive the patterns reject stays listed (R3), and only
+// what is built from the archive is refused.
 func TestAccRemoteProviderRoutesFollowTheRemotePolicy(t *testing.T) {
 	const (
-		archive = "hashicorp/null/1.0.0/terraform-provider-null_1.0.0_linux_amd64.zip"
+		archive = "terraform-provider-null/1.0.0/terraform-provider-null_1.0.0_linux_amd64.zip"
 		pkg     = remoteProviderBase + "1.0.0/download/linux/amd64"
 	)
 	f := newProviderFixture(t)
+	f.release(f.up, "hashicorp/null", "1.0.0", "/terraform-provider-null/1.0.0")
+	f.grant("terraform-provider-null/**")
 	upstream, _ := url.Parse(f.up.URL)
 	mirror := prefix + "remote/providers/" + upstream.Host + "/hashicorp/null/"
 	set := func(change func(*repo.Config)) { patchRepo(t, f.fixture, "remote", change) }
 
 	// RTFACT-30802: include patterns that leave out .terraform/** refuse
 	// the metadata, and JFrog's fix is to add it.
-	set(func(c *repo.Config) { c.IncludesPattern = new("hashicorp/null/**") })
+	set(func(c *repo.Config) { c.IncludesPattern = new("terraform-provider-null/**") })
 	wantErrors(t, f.get("reader", remoteProviderBase+"versions"), 404,
 		rejected("remote", ".terraform/providers/hashicorp/null/versions"))
 	wantErrors(t, f.get("reader", mirror+"index.json"), 404,
@@ -218,7 +222,8 @@ func TestAccRemoteProviderRoutesFollowTheRemotePolicy(t *testing.T) {
 	wantErrors(t, f.get("reader", pkg), 404,
 		rejected("remote", ".terraform/providers/hashicorp/null/1.0.0/download/linux/amd64"))
 
-	set(func(c *repo.Config) { c.IncludesPattern = new("hashicorp/null/**,.terraform/**") })
+	const admitted = "terraform-provider-null/**,.terraform/**"
+	set(func(c *repo.Config) { c.IncludesPattern = new(admitted) })
 	wantListed(t, f.get("reader", remoteProviderBase+"versions"), "1.0.0")
 	wantListed(t, f.get("reader", mirror+"index.json"), "1.0.0")
 	response := f.get("reader", pkg)

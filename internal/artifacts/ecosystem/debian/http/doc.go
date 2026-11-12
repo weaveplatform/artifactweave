@@ -2,8 +2,9 @@
 // Packages and Sources indexes, under the download policy at their own path
 // and handed only to a caller with Read permission on every package they
 // list; a virtual repository's apt metadata, composed from its
-// members and signed with its key pair when it names one, and the packages
-// that metadata lists; the artifactory spec's metadata calculation (POST
+// members and signed with its key pair when it names one, the packages
+// that metadata lists, and every other file under dists/ from the first
+// member that holds it; the artifactory spec's metadata calculation (POST
 // /api/deb/reindex/{repoKey}); and snapshots, which copy a distribution's
 // metadata into a local repository (POST /api/deb/{repoKey}/snapshot), run
 // as queued work, and are read under /api/deb/{repoKey}/snapshots/{tag}/.
@@ -52,9 +53,9 @@
 //     CreateDebianSnapshot answers the snapshot creation: queued and, unless
 //     async=1, awaited, or run at once when the kit has no work queue.
 //   - TryDebianItem: the overlay that serves the Packages and Sources
-//     indexes and their by-hash copies, a virtual repository's metadata under
-//     dists/ and its binary packages, and leaves every other request to the
-//     overlays after it and the generic lookup.
+//     indexes and their by-hash copies, a virtual repository's files under
+//     dists/, composed or from a member, and its binary packages, and leaves
+//     every other request to the overlays after it and the generic lookup.
 //   - RegisterDebianSnapshotRoutes: mounts GET and HEAD of
 //     /artifactory/api/deb/{repoKey}/snapshots/{tag}/*, which serve a
 //     snapshot's metadata from the target repository and redirect a package
@@ -91,10 +92,14 @@
 //     download policy at their own path, after the Read permission check
 //     (DV-057): a blacked-out source, or patterns that reject one of them,
 //     answer the policy's 404 and message naming <source>:<path>, as a GET
-//     of that file would, and the target gets no snapshot.
-//   - A Packages or Sources index, stored, cached or in a snapshot, reaches
-//     only a caller with Read permission on every package it lists, which
-//     the generic item route cannot check. The download policy does not
+//     of that file would, and the target gets no snapshot. A caller who may
+//     read the Release, which the request checks first, but not a file the
+//     snapshot then reads, or a package an index lists, is refused as that
+//     first check refuses: 403, or 401 to an anonymous caller.
+//   - A Packages or Sources index, stored, cached, in a snapshot or passed
+//     through a virtual repository, reaches only a caller with Read
+//     permission on every package it lists, which the generic item route
+//     cannot check. The download policy does not
 //     filter or refuse an index for the packages it lists: a package whose
 //     file the include and exclude patterns reject stays listed and only its
 //     download is refused, as in Artifactory's indexes (RTFACT-30830,
@@ -104,8 +109,19 @@
 //     permission check (DV-057): a blacked-out repository, or patterns that
 //     reject the path, answer the item route's 404 and message, and a
 //     virtual repository's own patterns answer that no repository serves
-//     the request. A virtual package's GET passes over a member that refuses
-//     it to the next member.
+//     the request. A virtual repository's GET of a package, or of a dists/
+//     file it does not compose, passes over a member that refuses it to the
+//     next member.
+//   - A virtual repository composes only its Release, InRelease and
+//     Release.gpg, its Packages indexes and their by-hash copies. Any other
+//     file under dists/, such as a component Release, a Contents index, a
+//     translation, an installer file or a Sources index, comes from the
+//     first member, in order, that may serve it and holds it (RTFACT-19086,
+//     RTFACT-30014); the order is the configured one until #1252 settles
+//     it. A remote member lacks a file its Debian source request cannot
+//     name, such as an installer's Packages index, as its own GET answers.
+//     Such a path with a matrix parameter or a query answers 404, as every
+//     such path did before the virtual repository served them.
 //   - A virtual repository's metadata is composed for each request from its
 //     members in order, at most 128. A member of another type, a virtual
 //     member or one with the trivial layout is refused, a member that
@@ -142,8 +158,10 @@
 //     and #p9d-modular-monolith-migration, epic WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
 //   - https://github.com/weaveplatform/artifactweave/issues/758,
-//     https://github.com/weaveplatform/artifactweave/issues/1083 and
-//     https://github.com/weaveplatform/artifactweave/issues/1090
+//     https://github.com/weaveplatform/artifactweave/issues/1083,
+//     https://github.com/weaveplatform/artifactweave/issues/1090,
+//     https://github.com/weaveplatform/artifactweave/issues/1254 and
+//     https://github.com/weaveplatform/artifactweave/issues/1258
 //
 // # Status
 //
@@ -187,6 +205,14 @@
 //     through its source; virtual packages served from the first member
 //     that holds them; and remote index and virtual package reads on a
 //     server built without remote sources.
+//   - debian_virtual_files_test.go: the dists/ files a virtual repository
+//     does not compose, each kind from a local or a remote member and from
+//     the first member that serves it, past a remote member whose source
+//     request cannot name it; refused to a caller who may not read
+//     them, by the virtual repository's patterns and by an upstream fault,
+//     not found where no member holds them or with a query; and a member's
+//     Sources index refused to a caller who may not read a file it lists,
+//     and failing closed when it cannot be read, parsed or checked.
 //   - debian_operations_test.go: the rebuild that writes no properties, for
 //     an absent repository, an unreadable package and a queue that refuses
 //     it.
@@ -203,12 +229,16 @@
 //     snapshot's metadata refused by a blacked-out target or its patterns;
 //     and a snapshot whose source is blacked out, or whose patterns reject
 //     its Release, an index or its InRelease, answering the policy's 404 and
-//     message, while a caller who may not read an index still fails it as
-//     before.
+//     message, while a caller who may not read an index is refused 403.
+//   - debian_snapshot_permission_test.go: a real permission target that
+//     lets the caller read the source's Release but not the indexes it
+//     declares; the snapshot answers 403, or 401 to an anonymous caller, at
+//     once and through the work queue, also where patterns reject the
+//     index, and the target gets no snapshot.
 //
-// debian_index_test.go and debian_virtual_test.go serve their item GETs
-// through the kit with TryDebianItem as the only overlay
-// (overlay_fixture_test.go).
+// debian_index_test.go, debian_virtual_test.go and
+// debian_virtual_files_test.go serve their item GETs through the kit with
+// TryDebianItem as the only overlay (overlay_fixture_test.go).
 //
 // The route suite test/server/artifacts/debian checks the snapshot reads'
 // guards through the router, and the @debian acceptance partition

@@ -72,6 +72,9 @@
 //     10,000 entries and 256 MiB unpacked, holding only regular files and
 //     folders at clean paths, every entry read to its end, and an embedded
 //     <name>-<version>.rockspec that passes the same check.
+//   - Only content that breaks those rules is refused. A stored rockspec or
+//     rock that cannot be read is no fault of the file: the read's error
+//     returns as it is and fails the write (500).
 //   - The manifests are derived only in local and federated repositories,
 //     never in a remote's cache, and hold at most 100,000 entries and
 //     32 MiB. A manifest read there waits for owed work, and a read of a
@@ -121,6 +124,9 @@
 //   - edge_test.go: stored-content checks, the manifest hooks' boundaries,
 //     admission and manifest size bounds, read faults, a missing package or
 //     version, and a search fault that publishes no manifest.
+//   - readfault_test.go: a rock whose content fails a read at any point, on
+//     a store with ReadAt or one that can only seek, returns the read's
+//     error, and bad rocks keep their 400 refusals.
 //   - contract_test.go (external, luarocks_test): the format contract
 //     (artifacts/core/formattest) and the public registry's dotted package
 //     names.

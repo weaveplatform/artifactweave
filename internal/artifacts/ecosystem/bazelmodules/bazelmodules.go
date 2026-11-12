@@ -127,9 +127,10 @@ type (
 // MODULE.bazel must parse with ParseModule and match its path, and an
 // archive must have the type its name gives and hold only clean regular
 // files and folders, within 10,000 entries and 512 MiB. The outcome, valid
-// or not, is returned for Admit, so an upload is read once; only failing
-// to open the stored content is an error. A remote's cached write and a
-// checksum deploy inspect nothing.
+// or not, is returned for Admit, so an upload is read once. Failing to open
+// or read the stored content is an error, which fails the write (500): it
+// says nothing of whether the upload is valid, so Admit's 409 does not
+// answer it. A remote's cached write and a checksum deploy inspect nothing.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -159,26 +160,31 @@ func (Handler) Inspect(
 			}, nil
 		}
 		body, e := io.ReadAll(io.LimitReader(rc, maxModuleBytes+1))
-		if e == nil {
-			var name, version string
-			name, version, e = ParseModule(body)
-			if e == nil && (name != f.Name || version != f.Version) {
-				e = errIdentityMismatch
-			}
+		if e != nil {
+			return nil, fmt.Errorf("bazelmodules: read upload: %w", e)
+		}
+		name, version, e := ParseModule(body)
+		if e == nil && (name != f.Name || version != f.Version) {
+			e = errIdentityMismatch
 		}
 		return &inspection{sha: w.Checksums.SHA256, err: e}, nil
 	}
 	kind, ok := archive.ParseKind(f.ArchiveType)
-	if !ok || archive.KindOf(archive.ReaderAt(rc), w.Path) != kind {
-		return &inspection{
-			sha: w.Checksums.SHA256,
-			err: errArchiveTypeMismatch,
-		}, nil
+	ra := archive.ReaderAt(rc)
+	// archive.KindOf ignores its read's error: it would judge a read that
+	// failed by the bytes it got, or by the name alone.
+	head := make([]byte, archive.SniffLen)
+	n, err := ra.ReadAt(head, 0)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("bazelmodules: read upload: %w", err)
+	}
+	if !ok || archive.Sniff(head[:n], w.Path) != kind {
+		return &inspection{sha: w.Checksums.SHA256, err: errArchiveTypeMismatch}, nil
 	}
 	limit := archive.Limits{Entries: 10000, Inflated: 512 << 20, File: 512 << 20}
 	var total int64
 	err = archive.Scan(
-		archive.ReaderAt(rc),
+		ra,
 		info.Size,
 		kind,
 		limit,
@@ -190,13 +196,23 @@ func (Handler) Inspect(
 				return nil
 			}
 			data, e := archive.ReadEntry(entry, limit)
+			if e != nil {
+				// ErrUnusable for a bad entry, the failed read otherwise.
+				return fmt.Errorf("bazelmodules: read archive entry: %w", e)
+			}
 			total += int64(len(data))
-			if e != nil || total > limit.Inflated {
+			if total > limit.Inflated {
 				return archive.ErrUnusable
 			}
 			return nil
 		},
 	)
+	// Every refusal of the walk and its callback is ErrUnusable; anything
+	// else is a failed read of the upload, which the walk returns as the
+	// reader gave it.
+	if err != nil && !errors.Is(err, archive.ErrUnusable) {
+		return nil, fmt.Errorf("bazelmodules: read upload: %w", err)
+	}
 	return &inspection{sha: w.Checksums.SHA256, err: err}, nil
 }
 

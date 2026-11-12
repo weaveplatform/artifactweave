@@ -106,19 +106,25 @@ func newItemWorld(t *testing.T) *itemWorld {
 	t.Helper()
 	k := kittest.New(t, inmem.New())
 	ops := DebianAPI{newKit(withAccess(t, Config{Store: k.Store, Blobs: k.Blobs}))}
+	return &itemWorld{t: t, db: k.Store, blobs: k.Blobs, h: strictHandler(&ops)}
+}
+
+// strictHandler is the artifactory spec's strict handler with ops as its
+// Debian partial, built as the router builds its own: binding and handler
+// errors are written as the router writes them.
+func strictHandler(ops *DebianAPI) http.Handler {
 	opts := artgen.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
 		ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 	}
-	h := artgen.HandlerWithOptions(
-		artgen.NewStrictHandlerWithOptions(debianServer{DebianAPI: &ops}, nil, opts),
+	return artgen.HandlerWithOptions(
+		artgen.NewStrictHandlerWithOptions(debianServer{DebianAPI: ops}, nil, opts),
 		artgen.ChiServerOptions{
 			BaseURL:          "/artifactory",
 			BaseRouter:       chi.NewRouter(),
 			ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 		},
 	)
-	return &itemWorld{t: t, db: k.Store, blobs: k.Blobs, h: h}
 }
 
 // do serves method on path, with body and the header pairs in headers, as

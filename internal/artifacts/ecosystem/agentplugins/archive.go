@@ -25,10 +25,14 @@ const (
 	MaxFiles = 512
 )
 
+// StandardSchema is the $schema a root plugin.json sets to declare the
+// Agent Plugins Standard 1.0.0, the only version 7.173.8 indexes.
+const StandardSchema = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
+
 var (
 	// ErrArchive is what ReadArchive returns for every bundle it refuses;
-	// Deployed and Reindex wrap it for a stored bundle without a harness
-	// manifest.
+	// Deployed and Reindex wrap it for a stored bundle that has neither a
+	// harness manifest nor a conforming root plugin.json.
 	ErrArchive   = errors.New("agentplugins: invalid agent plugin bundle")
 	namePattern  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 	harnessPaths = map[string]string{
@@ -36,6 +40,9 @@ var (
 		"cursor": ".cursor-plugin/plugin.json",
 		"codex":  ".codex-plugin/plugin.json",
 	}
+	// standardName is the schema's name pattern without its lookahead, which
+	// Go's regexp lacks; conformsToStandard refuses "--" and ".." itself.
+	standardName = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$`)
 )
 
 // Metadata records only bounded manifest data. Path identity replaces any
@@ -48,7 +55,31 @@ type Metadata struct {
 	SHA1      string                     `json:"sha1,omitempty"`
 	Harnesses []string                   `json:"harnesses"`
 	Manifests map[string]json.RawMessage `json:"manifests"`
-	Root      bool                       `json:"root"`
+	// Root is set for any root plugin.json with a name, Standard only for
+	// one that conforms to the Agent Plugins Standard 1.0.0. A harness
+	// bundle may carry a root plugin.json of its own that predates the
+	// standard; 7.x discovers the standard layout only from a conforming
+	// one, so that bundle keeps its harness-only listing.
+	Root     bool            `json:"root"`
+	Standard json.RawMessage `json:"standard,omitempty"`
+}
+
+// Indexed reports whether the bundle has a layout 7.x indexes: a harness
+// manifest or a conforming root plugin.json.
+func (m Metadata) Indexed() bool { return len(m.Harnesses) > 0 || len(m.Standard) > 0 }
+
+// Types is the multi-valued agentplugins.type property: the harnesses whose
+// manifests the bundle carries and, for a conforming root plugin.json,
+// generic, vscode and cursor, the values the Agent Plugins Repositories
+// docs give for the standard layout. A bundle with both layouts takes the
+// union [I]; the values are sorted, as the harnesses always were.
+func (m Metadata) Types() []string {
+	types := slices.Clone(m.Harnesses)
+	if len(m.Standard) > 0 {
+		types = append(types, "generic", "vscode", "cursor")
+	}
+	slices.Sort(types)
+	return slices.Compact(types)
 }
 
 // ValidName reports whether v is a plugin name the registry accepts: a
@@ -86,8 +117,11 @@ func ParsePath(p string) (name, version string, ok bool) {
 }
 
 // ReadArchive checks every ZIP member, including CRC and total decompressed
-// size. The pinned 7.161.32 target indexes harness manifests; root-only
-// Agent Plugins Standard bundles arrived in a later JFrog release.
+// size, and reads the harness manifests and the root plugin.json. Each must
+// be a JSON object with a name, or the bundle is refused; the root one is
+// kept as Standard only when it conforms to the Agent Plugins Standard
+// 1.0.0 (self-managed 7.173.8). A bundle with neither kind of manifest is
+// refused.
 func ReadArchive(r io.Reader, size int64) (Metadata, error) {
 	if size < 0 || size > MaxArchiveBytes {
 		return Metadata{}, ErrArchive
@@ -135,6 +169,9 @@ func ReadArchive(r io.Reader, size int64) (Metadata, error) {
 				return Metadata{}, ErrArchive
 			}
 			meta.Root = true
+			if conformsToStandard(content) {
+				meta.Standard = content
+			}
 		}
 	}
 	if len(meta.Harnesses) == 0 && !meta.Root {
@@ -185,6 +222,90 @@ func validManifest(data []byte) bool {
 	}
 	name, ok := m["name"].(string)
 	return ok && strings.TrimSpace(name) != ""
+}
+
+// conformsToStandard reports whether a root plugin.json validates against
+// the Agent Plugins 1.0.0 schema (schemas/1.0.0/plugin.schema.json in
+// agentplugins/agent-plugins-spec): $schema set to StandardSchema, a name
+// the spec's section 5.5 allows, the typed metadata fields of section 5.4,
+// an extensions object of objects, and no other field. The JFrog docs index
+// only a "conforming" root plugin.json. The spec lets a loading client
+// ignore an unknown field or a malformed extensions field, but says such a
+// manifest "does not conform to the schema", so the registry, which
+// validates rather than loads, does not index it as the standard [I].
+func conformsToStandard(data []byte) bool {
+	m, ok := object(data)
+	if !ok {
+		return false
+	}
+	var schema, name string
+	if json.Unmarshal(m["$schema"], &schema) != nil || schema != StandardSchema ||
+		json.Unmarshal(m["name"], &name) != nil || len(name) > 64 ||
+		!standardName.MatchString(name) ||
+		strings.Contains(name, "--") || strings.Contains(name, "..") {
+		return false
+	}
+	for key, raw := range m {
+		switch key {
+		case "$schema", "name":
+			ok = true
+		case "version", "description", "homepage", "repository", "license":
+			ok = isString(raw)
+		case "author":
+			ok = objectOf(raw, func(k string, v json.RawMessage) bool {
+				return (k == "name" || k == "email" || k == "url") && isString(v)
+			})
+		case "keywords":
+			var items []json.RawMessage
+			ok = !isNull(raw) && json.Unmarshal(raw, &items) == nil &&
+				!slices.ContainsFunc(items, func(v json.RawMessage) bool { return !isString(v) })
+		case "extensions":
+			ok = objectOf(raw, func(_ string, v json.RawMessage) bool {
+				_, isObject := object(v)
+				return isObject
+			})
+		default:
+			ok = false
+		}
+		if !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// object decodes raw as a JSON object; encoding/json would take null for
+// an empty map, which the schema does not.
+func object(raw json.RawMessage) (map[string]json.RawMessage, bool) {
+	var m map[string]json.RawMessage
+	if isNull(raw) || json.Unmarshal(raw, &m) != nil {
+		return nil, false
+	}
+	return m, true
+}
+
+func objectOf(raw json.RawMessage, member func(string, json.RawMessage) bool) bool {
+	m, ok := object(raw)
+	if !ok {
+		return false
+	}
+	for k, v := range m {
+		if !member(k, v) {
+			return false
+		}
+	}
+	return true
+}
+
+// isString reports whether raw is a JSON string; encoding/json would take
+// null for an empty one.
+func isString(raw json.RawMessage) bool {
+	var s string
+	return !isNull(raw) && json.Unmarshal(raw, &s) == nil
+}
+
+func isNull(raw json.RawMessage) bool {
+	return bytes.Equal(bytes.TrimSpace(raw), []byte("null"))
 }
 
 func safeName(name string) bool {

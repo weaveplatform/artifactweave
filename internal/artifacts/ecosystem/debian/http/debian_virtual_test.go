@@ -65,7 +65,7 @@ func TestAccDebianVirtualMetadataRefusals(t *testing.T) {
 			http.StatusForbidden, "Forbidden",
 		},
 		{
-			"metadata path outside the composed view", "deb-virtual",
+			"file outside the composed view that no member holds", "deb-virtual",
 			"dists/stable/main/i18n/Translation-en", "admin",
 			http.StatusNotFound, "Could not find resource",
 		},
@@ -592,9 +592,9 @@ func TestUnitDebianRemoteVirtualPackageRefusesAPathTheSourceCannotName(t *testin
 	w.debRepos(repo.Config{Key: "deb-remote", Class: repo.Remote})
 	rec := httptest.NewRecorder()
 	req := itemkit.ItemRequest{Key: "deb-virtual", Path: "pool/../alpha.deb"}
-	if !(DebianAPI{w.kit}).serveRemoteVirtualDebianPackage(rec,
+	if !(DebianAPI{w.kit}).serveRemoteVirtualDebianFile(rec,
 		w.request("deb-virtual", "pool/alpha.deb", "admin"), w.debRepo("deb-remote"), req,
-		kittest.Admin, kittest.AdminAccess()) {
+		kittest.Admin, kittest.AdminAccess(), "package") {
 		t.Error("the read left a refused path to the next member")
 	}
 	wantError(t, rec, http.StatusNotFound, "Could not find resource")
@@ -631,9 +631,9 @@ func TestUnitDebianRemoteReadsWithoutRemoteSources(t *testing.T) {
 		{"remote member package read", func(t *testing.T) *httptest.ResponseRecorder {
 			rec := httptest.NewRecorder()
 			req := itemkit.ItemRequest{Key: "deb-virtual", Path: debAlpha}
-			if !(DebianAPI{w.kit}).serveRemoteVirtualDebianPackage(rec,
+			if !(DebianAPI{w.kit}).serveRemoteVirtualDebianFile(rec,
 				w.request("deb-virtual", debAlpha, "admin"), w.debRepo("deb-remote"), req,
-				kittest.Admin, kittest.AdminAccess()) {
+				kittest.Admin, kittest.AdminAccess(), "package") {
 				t.Error("the read left the missing service to the next member")
 			}
 			return rec

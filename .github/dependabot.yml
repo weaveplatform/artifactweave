@@ -156,10 +156,10 @@ updates:
       prefix: "chore"
       include: "scope"
 
-  # The .NET client holds the SDK's LTS line, .NET 10, beside the newest line
-  # in dotnet-11.Dockerfile (#534). The image has a directory of its own
+  # The .NET 10 client holds the SDK's LTS line beside the newest line in
+  # dotnet.Dockerfile (#534, #1241). The image has a directory of its own
   # because an ignore applies to a whole entry: on /test/acceptance/clients it
-  # would also stop dotnet-11.Dockerfile taking the next .NET major.
+  # would also stop dotnet.Dockerfile taking the next .NET major.
   # Dependabot names the image dotnet/sdk, without its registry, and an ignore
   # under any other name matches nothing. Updates within 10.0 still arrive.
   - package-ecosystem: "docker"

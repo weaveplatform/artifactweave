@@ -228,7 +228,7 @@ tests run as part of `make deploy-check`.
 | Job | Runner | Added in | What |
 |---|---|---|---|
 | `acceptance` | `ubuntu-26.04` | P0 | Builds `artifactweave` with `-cover` and runs the core deterministic godog scenarios with pinned clients; full runs delegate NuGet and JVM recipes to separate required partitions. Uploads `cover-accept` |
-| `acceptance-nuget` | `ubuntu-latest` | P9 | Runs all `@nuget` scenarios with pinned .NET 10 and 11 images and JFrog CLI. Uploads `cover-accept-nuget` |
+| `acceptance-nuget` | `ubuntu-latest` | P9 | Runs all `@nuget` scenarios with the pinned .NET 10 LTS and newest .NET SDK images and JFrog CLI, then prints each image's SDK version. Uploads `cover-accept-nuget` |
 | `acceptance-jvm` | `ubuntu-latest` | P9c | Full runs execute the 13 Ivy, direct Gradle and sbt recipe scenarios in parallel with the core suite. Uploads required `cover-accept-jvm`; narrow Maven runs retain these scenarios in `acceptance` |
 | `acceptance-gradle` | `ubuntu-latest` | P9 | Runs the `@gradle` scenario independently as informational evidence, records its outcome and uploads `cover-gradle` when available. Its outcome does not gate merge |
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestAccSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline records unimplemented product contracts and explicitly assigned gaps, including the project-scoped remote fields and admin endpoints in [#487](https://github.com/weaveplatform/artifactweave/issues/487). Passing parity means no unrecorded drift, not that every operation is implemented. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes |
@@ -559,8 +559,8 @@ Dockerfile, pinned digest, binary version, release source and compatibility lane
   | `maven.Dockerfile` | Primary Maven 3 image on Eclipse Temurin | every Maven scenario |
   | `maven-3.9/Dockerfile` | Maven 3.9 on Eclipse Temurin, in a directory of its own so that its Dependabot entry can hold the 3.9 line | the release and snapshot round trip again, as a Scenario Outline over `Maven` and `Maven 3.9` |
   | `python.Dockerfile` | The newest Python 3 (`slim`) with `pip`, `twine`, `uv` and `poetry` installed at versions pinned in the file and moved by hand; poetry has a virtual environment of its own | every `@pypi` scenario (`Python`) |
-  | `dotnet-10/Dockerfile` | The .NET SDK's LTS lane, .NET 10, whose `dotnet` carries NuGet's client; in a directory of its own so that its Dependabot entry can hold it below .NET 11 | every `@nuget` scenario (`.NET`) |
-  | `dotnet-11.Dockerfile` | The SDK's newer compatibility lane, with its exact tag and digest in the generated image inventory | every `dotnet` scenario again: each is a Scenario Outline over `.NET` and `.NET 11` |
+  | `dotnet.Dockerfile` | The .NET SDK's newest line, whose `dotnet` carries NuGet's client; Dependabot moves it to each new major, so its file, image and label (`.NET`) name no version (#1241) | every `@nuget` scenario (`.NET`) |
+  | `dotnet-10/Dockerfile` | The SDK's LTS line, .NET 10, in a directory of its own so that its Dependabot entry can hold it below .NET 11 | every `dotnet` scenario again: each is a Scenario Outline over `.NET` and `.NET 10` |
   | `r.Dockerfile` | Digest-pinned R with `Rscript` and `install.packages()` | `@cran` source install, cache and virtual scenarios |
   | `puppet/Dockerfile` | Puppet 8.10.0 on Ruby 3.3, in a directory of its own so that its Dependabot entry can hold it below Ruby 3.4, where Puppet cannot extract a module archive (#1126); every Facter 4 release excludes Ruby 4 as well | every `@puppet` scenario |
   | `frogml/Dockerfile` | FrogML 3.0.0 on Python 3.13, in a directory of its own so that its Dependabot entry can hold it below Python 3.14, which the SDK excludes | every `@machinelearning` scenario |
@@ -574,6 +574,14 @@ raises the move on `deps/hex-image`, which `auto-merge.yml` never merges, so it
 gets the same review as Dependabot's client image PRs. The
 [client image inventory](ci-client-images.md) records how the script chooses the
 tag.
+
+The .NET and Maven images pin a line tag such as `sdk:10.0` or `maven:3` by
+digest, so the tag does not name the release the scenarios ran, and their
+client recipes point to the CI logs for it. After the scenarios, the
+`acceptance-nuget` job's "NuGet client versions" step prints `dotnet --version`
+for both .NET images, and the `acceptance` job's "Maven client versions" step
+prints `mvn --version` (Maven and JDK) for both Maven images whenever it runs
+Maven scenarios (#1241).
 
 The `@cran` selector builds this R image when CRAN code changes and runs its
 native client scenarios in the Linux acceptance lane. The image is also built
@@ -754,12 +762,20 @@ The pinned SDK images have neither `nuget.exe` nor Mono, so this matrix does not
 claim legacy `nuget.exe list` or `jf nuget restore` coverage. It exercises v2
 NuGet.Protocol through `dotnet package search`/`restore` and `jf dotnet`.
 
-The .NET 11 RC2 NativeAOT CLI can finish search/push HTTP work but hang on exit;
-#547 reproduced push on the pinned ARM64 image. These commands, including JFrog's
-push subprocess, use Microsoft's documented
-[`DOTNET_CLI_ENABLEAOT=false` fallback](https://github.com/dotnet/core/blob/main/release-notes/11.0/preview/preview7/sdk.md).
-Restore, pack and delete retain their normal execution. Every successful client
-command must still exit zero.
+The NativeAOT `dotnet` host, the default since .NET 11, prints a NuGet command's
+result and then never exits when it is the container's PID 1 and `HOME` has no
+`~/.dotnet` first-use files, which is the case in every new scenario. On the
+.NET 11 RC2 image, #547 saw push hang this way, and the scenarios gave search,
+push, sign and verify Microsoft's documented
+[`DOTNET_CLI_ENABLEAOT=false` fallback](https://github.com/dotnet/core/blob/main/release-notes/11.0/preview/preview7/sdk.md),
+which swaps in the managed host. #1241 found the same hang on the released SDK
+11.0.100 (linux/arm64), and its cause: each of those commands, and even
+`dotnet nuget --version`, exits at once under Docker's init, with a `HOME` that
+already holds the image's `~/.dotnet` files, or with the fallback. So
+`runDotnet` and `runVerifiedDotnet` start the container with `docker run --init`,
+and every command, restore, pack and delete included, runs on the SDK's default
+host. `jf dotnet` needs neither: jf is the container's PID 1 and starts dotnet as
+its child. Every successful client command must still exit zero.
 
 Local Linux ARM64 Docker measurements, with warm images and excluding the binary
 build and Docker probe:
@@ -770,7 +786,7 @@ build and Docker probe:
 | Expanded publish outline | 2 | 30.77 s |
 | New JFrog build-info outlines | 2 | 17.91 s |
 | New snapshot retention outlines | 2 | 4.50 s |
-| Added .NET 11 v2 search/restore example | 1 | 3.85 s |
+| Added v2 search/restore example on the second .NET image (then a .NET 11 release candidate) | 1 | 3.85 s |
 | Complete final `@nuget` matrix (518 steps) | 16 | 71.31 s |
 
 The approximately 48 s increment is the expanded outline's difference plus the
@@ -816,8 +832,9 @@ Pinned-client boundaries are part of the evidence, not skipped success assertion
 JFrog Poetry's pinned install source rewriting omits `/simple`, so native Poetry proves
 installation and JFrog Poetry proves publishing/build-info. The .NET SDK images have no
 nuget.exe/Mono, and JFrog's observed native-mode `--nuget-v2` behavior is bypassed with an
-explicit v2 source whose Download requests are asserted. The .NET 11 RC2 managed CLI
-fallback is limited to the affected search and push commands, which still must exit zero.
+explicit v2 source whose Download requests are asserted. The .NET client containers
+run under Docker's init, so the SDK's default NativeAOT host exits after each command
+(#1241, described under the NuGet exit checks above); every command still must exit zero.
 The Terraform backend exercises pasted-token login and saved-token reuse; `login.v1`
 browser approval remains deferred to #262.
 
@@ -1361,7 +1378,7 @@ to the gitignored `dist/`.
 | `make gate` | Local vet, formatting/lint, Go unit and package acceptance tests, coverage, vulnerability scan and cross-compilation. Generation/parity, native acceptance, OCI conformance and Terraform checks are separate targets; this is not the complete CI gate |
 | `make test` | Run anchored `TestUnit` tests and the reviewed fuzz seed corpora; CI supplies the affected package list and exact name expression |
 | `make accept-go` | Run anchored `TestAcc` package tests on Linux and write `cover/accept-go`; CI supplies the affected package list and exact name expression |
-| `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN`, `ARTIFACTWEAVE_CRANE_BIN`, `ARTIFACTWEAVE_ORAS_BIN`, `ARTIFACTWEAVE_COSIGN_BIN`, `ARTIFACTWEAVE_HELM_BIN` and `ARTIFACTWEAVE_TERRAFORM_BIN` name the pinned `jf` (`.github/actions/jfrog-cli`) and `crane`, `oras`, `cosign`, `helm` and `terraform` (`.github/actions/registry-clients`); their scenarios skip without them, and the `docker` scenarios run on Linux only, where the daemon shares the binary's 127.0.0.1. `ARTIFACTWEAVE_NODE_IMAGE`, `ARTIFACTWEAVE_NPM12_IMAGE`, `ARTIFACTWEAVE_MAVEN_IMAGE`, `ARTIFACTWEAVE_MAVEN39_IMAGE`, `ARTIFACTWEAVE_PYTHON_IMAGE`, `ARTIFACTWEAVE_DOTNET_IMAGE` and `ARTIFACTWEAVE_DOTNET11_IMAGE` name the npm 11, npm 12, Maven 3.10, Maven 3.9, Python, .NET 10 and .NET 11 images built from `test/acceptance/clients`, and their scenarios skip without them or off Linux; `jf mvn` needs the Maven 3.9 image too. `jf npm` and `jf gradle` run the `npm` and `gradle` on `PATH` and skip without them. `ARTIFACTWEAVE_ACCEPT_TAGS` takes a godog tag expression, such as `~@gradle`. `ARTIFACTWEAVE_MAVEN_REPO` moves the Maven repository they mount from `~/.m2/repository`. The `@go` scenarios need only `go` on `PATH` |
+| `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN`, `ARTIFACTWEAVE_CRANE_BIN`, `ARTIFACTWEAVE_ORAS_BIN`, `ARTIFACTWEAVE_COSIGN_BIN`, `ARTIFACTWEAVE_HELM_BIN` and `ARTIFACTWEAVE_TERRAFORM_BIN` name the pinned `jf` (`.github/actions/jfrog-cli`) and `crane`, `oras`, `cosign`, `helm` and `terraform` (`.github/actions/registry-clients`); their scenarios skip without them, and the `docker` scenarios run on Linux only, where the daemon shares the binary's 127.0.0.1. `ARTIFACTWEAVE_NODE_IMAGE`, `ARTIFACTWEAVE_NPM12_IMAGE`, `ARTIFACTWEAVE_MAVEN_IMAGE`, `ARTIFACTWEAVE_MAVEN39_IMAGE`, `ARTIFACTWEAVE_PYTHON_IMAGE`, `ARTIFACTWEAVE_DOTNET_IMAGE` and `ARTIFACTWEAVE_DOTNET10_IMAGE` name the npm 11, npm 12, Maven 3.10, Maven 3.9, Python, newest .NET and .NET 10 images built from `test/acceptance/clients`, and their scenarios skip without them or off Linux; `jf mvn` needs the Maven 3.9 image too. `jf npm` and `jf gradle` run the `npm` and `gradle` on `PATH` and skip without them. `ARTIFACTWEAVE_ACCEPT_TAGS` takes a godog tag expression, such as `~@gradle`. `ARTIFACTWEAVE_MAVEN_REPO` moves the Maven repository they mount from `~/.m2/repository`. The `@go` scenarios need only `go` on `PATH` |
 | `make oci-conformance` | The OCI conformance job (needs network the first time, to fetch and build the suite into `.tools/`); reports in `oci-report/` |
 | `make generate` | Regenerate servers and clients; CI fails on drift |
 | `make terraform TERRAFORM_MODE=apply` | The terraform job (needs `terraform`; without the mode it only validates) |
@@ -1427,7 +1444,7 @@ policies and remaining per-workflow proof owners.
 
 ## NuGet v3 remote native evidence
 
-`@nuget_remote` runs the pinned .NET 10 and .NET 11 SDKs against a private controlled
+`@nuget_remote` runs the pinned .NET 10 LTS and newest .NET SDKs against a private controlled
 v3 upstream. The fixture creates an author certificate and real signed packages with
 a dependency; only that certificate is added to the container's code-signing trust
 bundle, and `NuGet.Config` requires its trusted author signature. Restore begins with
@@ -1435,10 +1452,10 @@ an empty package cache and no client HTTP cache. Exact signed-archive comparison
 `dotnet nuget verify --all` prove preservation and native verification. A second restore
 uses a different empty package directory after the upstream stops and repeats the
 verification. A tampered archive retains its real signature and valid ZIP CRCs;
-`dotnet nuget verify` rejects the changed content with NU3008. The .NET 11 RC2
-NativeAOT CLI hangs during signing, so sign/verify use its documented
-`DOTNET_CLI_ENABLEAOT=false` managed fallback, as the existing NuGet push/search
-fixtures do; restore uses the normal CLI. Lock hashes compare unsigned content
+`dotnet nuget verify` rejects the changed content with NU3008. Sign, verify and
+restore run on the SDK's default NativeAOT host under Docker's init, as every NuGet
+fixture does; without the init the host hangs on exit (#1241, described under the
+NuGet exit checks above). Lock hashes compare unsigned content
 because NuGet excludes signatures from that identity. Existing local v2/v3, push, search, symbol and JFrog scenarios remain
 under `@nuget`. The controlled upstream proves artifactweave behavior; N9-1..N9-4 retain
 live Artifactory comparisons in P19/#216.
@@ -1492,7 +1509,7 @@ guide](../operations/upstream-search.md) names the remaining #216/P19 comparison
 ## NuGet v2 and upstream symbol evidence
 
 `@nuget_v2_remote` and `@nuget_remote_symbols` are separate P9 exit workflows under the
-normal `@nuget` gate. The pinned .NET 10/11 matrix runs four scenarios: v2 search and
+normal `@nuget` gate. The pinned .NET matrix (10.0 LTS and newest) runs four scenarios: v2 search and
 cold restore through a private upstream with custom feed/download contexts, relative
 continuation links after redirects, exact package bytes, and a new empty-cache restore
 after upstream shutdown; then SDK-generated Portable PDB GET/HEAD/range/offline reads
