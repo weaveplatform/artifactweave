@@ -1,6 +1,7 @@
 // Package generic runs the generic remote repository routes of the
 // assembled application: downloads through the remote cache, sidecars,
-// authorization and its revocation, restarts and signed delivery.
+// authorization and its revocation, restarts and signed delivery. It also
+// holds the headers every stored file downloads with.
 //
 // # Role
 //
@@ -20,6 +21,8 @@
 //   - Runtimes the restart tests open and close themselves (testConfig and
 //     openRuntime over the harness's configuration and costs), and a blob
 //     store that signs CDN URLs.
+//   - The harness's item world (harness.NewItemWorld) with a Vagrant local
+//     repository, for the download headers.
 //
 // # Outputs
 //
@@ -28,6 +31,9 @@
 //     upstream failures, authorization and revocation, trace fetches,
 //     cache identity across a restart, which no configuration descriptor
 //     exposes, and cold and warm signed delivery with its checksums.
+//   - download_headers_test.go: a file's ETag, the bare SHA-1, and the
+//     conditional requests that send it back, and a box's media type, on
+//     the item route and the Vagrant box file route (#1266, #1267).
 //
 // # References
 //
