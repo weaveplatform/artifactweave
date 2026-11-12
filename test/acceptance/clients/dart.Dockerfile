@@ -1,5 +1,5 @@
-# Client pins: Dart/pub 3.15.0.
-FROM dart:3.15.0-118.1.beta@sha256:47460f87d4c1a8424dec7a7a0d8fef5312412fc05560349d7058eb4e42b995c0
+# Client pins: Dart/pub 3.14.0.
+FROM dart:3.14.0@sha256:9ba97850b3154383a90f67844b09ea77751f7835836d8b2662ad2ffe03f60c8c
 COPY dart-entrypoint.sh /usr/local/bin/artifactweave-dart
 RUN chmod 0755 /usr/local/bin/artifactweave-dart
 

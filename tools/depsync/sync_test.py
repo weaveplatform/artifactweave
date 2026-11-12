@@ -179,6 +179,77 @@ class ReferenceTests(unittest.TestCase):
         go.write_text(go.read_text() + "\ngo 1.28\n")
         self.assertIn("found 2", failure("go"))
 
+    def test_a_dart_beta_base_is_refused_before_any_reference_moves(self):
+        # #1301: Dependabot moved the Dart client to this beta, and the
+        # version pattern read it as the release 3.15.0.
+        outputs = ["docs/client-recipes/src/pub.json", "docs/testing/ci-client-images.md"]
+        before = {path: self.read(path) for path in outputs}
+        self.set_pin("dart.image", "dart:3.15.0-118.1.beta@sha256:"
+                     "47460f87d4c1a8424dec7a7a0d8fef5312412fc05560349d7058eb4e42b995c0")
+        for check in [True, False]:
+            with self.assertRaises(ValueError) as caught:
+                sync.sync(self.root, check=check)
+            self.assertEqual("test/acceptance/clients/dart.Dockerfile: dart:3.15.0-118.1.beta is a prerelease, "
+                             "marked beta after its version 3.15.0; pin the newest stable release",
+                             str(caught.exception))
+        self.assertEqual(before, {path: self.read(path) for path in outputs})
+
+    def test_a_python_alpha_base_is_refused_by_marker_in_every_file(self):
+        # #1217 moved both Python clients to this alpha. Each file is named,
+        # and the marker is reported rather than the version pattern's miss.
+        alpha = "python:3.16.0a1-slim@sha256:df293ba3b89f458e1aad6051b62ff1c4fad7b3b52b8147ae9cc4b667f9cf2741"
+        self.set_pin("ansible.image", alpha)
+        self.set_pin("python.image", alpha)
+        with self.assertRaises(ValueError) as caught:
+            sync.sync(self.root, check=True)
+        self.assertEqual([
+            "test/acceptance/clients/ansible.Dockerfile: python:3.16.0a1-slim is a prerelease, "
+            "marked a1 after its version 3.16.0; pin the newest stable release",
+            "test/acceptance/clients/python.Dockerfile: python:3.16.0a1-slim is a prerelease, "
+            "marked a1 after its version 3.16.0; pin the newest stable release",
+        ], str(caught.exception).splitlines())
+
+    def test_prerelease_markers_are_refused_and_variant_suffixes_pass(self):
+        for tag, marker in [
+            ("3.15.0-118.1.beta", "beta"),
+            ("3.16.0a1-slim", "a1"),
+            ("3.16.0b2", "b2"),
+            ("3.16.0rc1-slim", "rc1"),
+            ("3.16.0-12.0.dev", "dev"),
+            ("11.0-preview", "preview"),
+            ("11.0.100-rc.2", "rc"),
+            ("3.5.0-preview1-slim", "preview1"),
+            ("4.0.0-rc-4-eclipse-temurin-21", "rc"),
+            ("1.20.5-erlang-29.0-rc1-alpine-3.24.3", "rc1"),
+            ("3.23.0_alpha20250612", "alpha20250612"),
+            ("27-ea-jdk", "ea"),
+            ("3.15.2-slim", None),
+            ("26.13.0-bookworm-slim", None),
+            ("3.24-alpine", None),
+            ("20-alpine3.20", None),
+            ("3.13-bullseye", None),
+            ("2.10.0-debian13-slim", None),
+            ("1.20.5-erlang-29.1.2-alpine-3.24.3", None),
+            ("3-eclipse-temurin-27", None),
+            ("6.4.2-jammy", None),
+            ("3.12.1.post1", None),
+            ("latest", None),
+        ]:
+            with self.subTest(tag=tag):
+                self.assertEqual(marker, sync.prerelease_marker(tag))
+
+    def test_every_current_client_pin_is_a_stable_release(self):
+        versions = {name: pin for name, pin in self.catalog["pins"].items() if name.endswith(".version")}
+        self.assertEqual(len(self.catalog["images"]), len(versions))
+        for name, pin in sorted(versions.items()):
+            with self.subTest(pin=name):
+                references = sync.FROM.findall(self.read(pin["path"]))
+                self.assertTrue(references)
+                for reference in references:
+                    tag = reference.split("@", 1)[0].rsplit("/", 1)[-1].partition(":")[2]
+                    self.assertIsNone(sync.prerelease_marker(tag), reference)
+        sync.refuse_prerelease_images(self.root, self.catalog)
+
     def test_new_images_and_recipes_cannot_silently_miss_the_inventory(self):
         for name in ["test/acceptance/clients/unknown.Dockerfile", "docs/client-recipes/src/unknown.json"]:
             path = self.root / name

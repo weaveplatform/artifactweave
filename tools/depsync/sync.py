@@ -13,6 +13,22 @@ import re
 ROOT = Path(__file__).resolve().parents[2]
 CATALOG = Path(__file__).with_name("catalog.json")
 TOKEN = re.compile(r"\{\{([a-zA-Z0-9_.-]+)\}\}")
+FROM = re.compile(r"^FROM\s+(?:--\S+\s+)*(\S+)", re.MULTILINE)
+TAG_VERSION = re.compile(r"v?[0-9]+(?:\.[0-9]+)*")
+# What follows a tag's version is split into parts at -, ., _ and +, and a
+# part that is one of these words, with or without a number, marks a
+# prerelease: 3.15.0-118.1.beta (Dart), 3.16.0a1 and 3.16.0rc1 (Python),
+# 1.19.0-rc.0 (Elixir), 4.0.0-rc-4 (Maven), 3.5.0-preview1 (Ruby),
+# 3.23.0_alpha20250612 (Alpine). A whole part has to match, so variants such
+# as alpine, bookworm or bullseye pass. Python's a and b need their number,
+# since no one marks a prerelease with a bare a or b. Every part counts, not
+# only the first: the Hex tag names an Erlang/OTP release after the Elixir
+# one, and an OTP release candidate there is a prerelease client too. The
+# catalog's version patterns stop at the first character after the number,
+# so without this check depsync records 3.15.0-118.1.beta as the release
+# 3.15.0 (#1304).
+PRERELEASE = re.compile(r"[ab][0-9]+|(?:rc|alpha|beta|dev|pre|preview|ea|nightly|snapshot|canary|unstable)[0-9]*",
+                        re.IGNORECASE)
 
 
 def safe_path(root, name):
@@ -31,6 +47,31 @@ def expand(template, values):
     return TOKEN.sub(lambda match: values[match[1]], template)
 
 
+def prerelease_marker(tag):
+    version = TAG_VERSION.match(tag)
+    if not version:
+        return None
+    for part in re.split(r"[-._+]", tag[version.end():]):
+        if PRERELEASE.fullmatch(part):
+            return part
+    return None
+
+
+def refuse_prerelease_images(root, catalog):
+    refused = []
+    for path in sorted(catalog["images"]):
+        for reference in FROM.findall(safe_path(root, path).read_text()):
+            name = reference.split("@", 1)[0].rsplit("/", 1)[-1]
+            tag = name.partition(":")[2]
+            marker = prerelease_marker(tag)
+            if marker:
+                refused.append(path + ": " + name + " is a prerelease, marked " + marker
+                               + " after its version " + TAG_VERSION.match(tag)[0]
+                               + "; pin the newest stable release")
+    if refused:
+        raise ValueError("\n".join(refused))
+
+
 def pins(root, catalog):
     values = {}
     for name, source in catalog["pins"].items():
@@ -47,6 +88,9 @@ def pins(root, catalog):
 
 
 def render(root, catalog, templates):
+    # Before pins: a Python alpha such as 3.16.0a1-slim matches no version
+    # pattern, and the refusal should name the marker, not a missing pin.
+    refuse_prerelease_images(root, catalog)
     values = pins(root, catalog)
     outputs = {}
     recipe_paths = set(p.name[:-5] for p in (root / "docs/client-recipes/src").glob("*.json"))
