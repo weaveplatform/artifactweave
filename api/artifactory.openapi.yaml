@@ -4506,7 +4506,7 @@ paths:
         - specific
   /api/download/{repoKey}/{filePath}:
     get:
-      description: Downloads a file while emitting progress marks so clients with short timeouts stay connected during a slow remote fetch. With `content=none` only the marks are sent; with `content=progress` the marks precede the content. Resolution and statistics behave as for the plain download.
+      description: 'Not implemented; answers 501. It would download a file while emitting progress marks, so clients with short timeouts stay connected during a slow remote fetch: with `content=none` only the marks are sent, and with `content=progress` the marks precede the content. Resolution and statistics would behave as for the plain download.'
       operationId: artifactSyncDownload
       parameters:
         - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual repository resolves through its members.
@@ -4587,6 +4587,7 @@ paths:
         - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/artifactsyncdownload.md
+      x-tier: stub
   /api/export/system:
     get:
       description: Not implemented; answers 501.
@@ -8276,7 +8277,7 @@ paths:
       x-unverified: true
   /api/replication/execute/{repoPath}:
     post:
-      description: 'Starts a replication now, independently of any schedule. The direction follows the repository class: a local repository pushes to the targets in the body or, when the body is omitted, to its stored configuration; a remote repository pulls from its upstream into the cache, and its body may name at most one target. The path may name a folder below the repository to limit the run. The run is scheduled and the call answers 200 with an empty body as soon as it is accepted; progress and per-file messages go to the server log, and the status operation reports the outcome. A body with more than one target is rejected with 400. Callers other than administrators are limited to the user query result limit when choosing files. The caller needs manage permission on the repository.'
+      description: 'Not implemented; answers 501. It would start a replication now, independently of any schedule. The direction would follow the repository class: a local repository pushes to the targets in the body or, when the body is omitted, to its stored configuration; a remote repository pulls from its upstream into the cache, and its body may name at most one target. The path may name a folder below the repository to limit the run. The run would be scheduled and the call would answer 200 with an empty body as soon as it is accepted; progress and per-file messages would go to the server log, and the status operation would report the outcome. A body with more than one target would be rejected with 400. Callers other than administrators would be limited to the user query result limit when choosing files. The caller would need manage permission on the repository.'
       operationId: executePullPushReplication
       parameters:
         - description: Required path parameter. Repository key, optionally followed by a folder path, for example libs-release-local or libs-release-local/org/acme. May span several segments.
@@ -8331,9 +8332,10 @@ paths:
         - replication
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/executepullpushreplication.md
+      x-tier: stub
   /api/replication/{repoPath}:
     get:
-      description: Reports the outcome of the last replication that touched a repository or a folder in it, read from the replication properties the run annotated on the items. The caller needs read permission on the repository.
+      description: Not implemented; answers 501. It would report the outcome of the last replication that touched a repository or a folder in it, read from the replication properties the run annotated on the items. The caller would need read permission on the repository.
       operationId: getReplicationStatus
       parameters:
         - description: Required path parameter. Repository key, optionally followed by a folder path. May span several segments.
@@ -8374,6 +8376,7 @@ paths:
         - replication
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreplicationstatus.md
+      x-tier: stub
   /api/replications/channels/release:
     post:
       description: Not implemented; answers 501. It would close every event-based pull replication channel other instances hold open against this one, forcing them to reconnect.
@@ -9825,7 +9828,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getrestoreprocessstatus.md
   /api/retention/search:
     post:
-      description: Runs an AQL items query against archived items only, with the same grammar and limits as the AQL search. Platform administrators only.
+      description: Not implemented; answers 501. It would run an AQL items query against archived items only, with the same grammar and limits as the AQL search. Platform administrators only.
       operationId: searchArchives
       requestBody:
         content:
@@ -9853,6 +9856,7 @@ paths:
         - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/administration/reference/searcharchives.md
+      x-tier: stub
   /api/retention/searchPackages:
     post:
       description: Finds archived package versions by type, repository, name, version and archive time. Platform administrators see global archives; with projectKey, a project's. Project administrators must pass projectKey.
@@ -12639,7 +12643,7 @@ paths:
       x-tier: stub
   /api/system/configuration/baseUrl:
     put:
-      description: 'Sets the urlBase section of the descriptor: the scheme, host and optional path prefix that embedded links use when no `X-JFrog-Override-Base-Url` or `X-Forwarded-*` header is present (decision 0002). Sending an empty body clears it, after which links derive from the request. Admin only.'
+      description: 'Not implemented; answers 501. It would set the urlBase section of the descriptor: the scheme, host and optional path prefix that embedded links use when no `X-JFrog-Override-Base-Url` or `X-Forwarded-*` header is present (decision 0002). An empty body would clear it, after which links derive from the request. Admin only.'
       operationId: updateCustomUrlBase
       requestBody:
         content:
@@ -12668,6 +12672,7 @@ paths:
         - system
         - handwritten
       x-handwritten: true
+      x-tier: stub
   /api/system/configuration/reverseProxy/nginx:
     get:
       description: 'Renders an nginx server block from the stored reverse proxy configuration: the server name, the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered; APACHE answers 400. Admin only.'
@@ -14806,7 +14811,7 @@ paths:
       x-unverified: true
   /api/v1/service_trust/pairing/{usecase}:
     delete:
-      description: Removes the trust relationship with one peer for the use case and deletes its stored keys. Federations that use the peer stop syncing with it. With `force=true` the local trust is removed even when the peer cannot be told. Administrators only.
+      description: Not implemented; answers 501. It would remove the trust relationship with one peer for the use case and delete its stored keys, so federations that use the peer stop syncing with it. With `force=true` the local trust would be removed even when the peer cannot be told. Administrators only.
       operationId: unregisterPairingToken
       parameters:
         - description: 'Required path parameter. The trust use case: `federated-repo/*` for two-way federated repository trust or `federated-repo/r` for receive-only trust. The value contains a slash. Any other value, including the `artifactory-cold` use cases, answers 404.'
@@ -14869,8 +14874,9 @@ paths:
         - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/unregisterpairingtoken.md
+      x-tier: stub
     post:
-      description: Creates a one-time pairing token for establishing trust with another instance of this server (decision 0021). The token is a signed JWT whose subject is the administrator who requested it; it can be redeemed once and expires 300 seconds after creation. An administrator hands it to the peer, which redeems it with the exchange operation; the two instances then hold each other's keys and authenticate every sync call in both directions. The peer must be another instance of this server. Administrators only.
+      description: 'Not implemented; answers 501. It would create a one-time pairing token for establishing trust with another instance of this server (decision 0021). The token would be a signed JWT whose subject is the administrator who requested it; it could be redeemed once and would expire 300 seconds after creation. An administrator would hand it to the peer, which redeems it with the exchange operation; the two instances would then hold each other''s keys and authenticate every sync call in both directions. The peer must be another instance of this server. Administrators only.'
       operationId: generatePairingToken
       parameters:
         - description: 'Required path parameter. The trust use case: `federated-repo/*` for two-way federated repository trust or `federated-repo/r` for receive-only trust. The value contains a slash. Any other value, including the `artifactory-cold` use cases, answers 404.'
@@ -14912,8 +14918,9 @@ paths:
         - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md
+      x-tier: stub
     put:
-      description: Redeems a pairing token generated on the peer, completing trust between the two instances for the use case. Run it on the instance that did not generate the token, with the same use case. Administrators only.
+      description: Not implemented; answers 501. It would redeem a pairing token generated on the peer, completing trust between the two instances for the use case. It would run on the instance that did not generate the token, with the same use case. Administrators only.
       operationId: exchangePairingToken
       parameters:
         - description: 'Required path parameter. The trust use case: `federated-repo/*` for two-way federated repository trust or `federated-repo/r` for receive-only trust. The value contains a slash. Any other value, including the `artifactory-cold` use cases, answers 404.'
@@ -14973,6 +14980,7 @@ paths:
         - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/exchangepairingtoken.md
+      x-tier: stub
   /api/v1/system/liveness:
     get:
       description: Returns OK while the process serves requests. It probes no store. Answers without credentials.

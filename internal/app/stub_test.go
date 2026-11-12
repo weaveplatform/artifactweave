@@ -2,13 +2,17 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/test/server/support"
@@ -249,9 +253,14 @@ var generatedRoutes = map[string]bool{
 // status fixture as an administrator. A router without a store would not
 // do: a real handler answers 501 without one (itemkit.Kit.Content), and 16
 // served operations passed here as stubs that way (#1202).
+//
+// Every hand-written operation is called too, and must answer handwrittenStub's
+// 501 exactly when stubbedHandwritten, which the ledger also reads, lists it:
+// ten that answer it were recorded there as served (#1386).
 func TestAccUnimplementedOperationsAnswer501(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := basic("admin", "pw")["Authorization"]
+	stubbed := stubbedHandwritten(t)
 	checked := 0
 	for _, name := range specFiles {
 		doc := loadSpec(t, name)
@@ -262,9 +271,7 @@ func TestAccUnimplementedOperationsAnswer501(t *testing.T) {
 				if implemented[key] {
 					continue
 				}
-				if v, ok := op.Extensions["x-handwritten"]; ok && v == true {
-					continue
-				}
+				handwritten, _ := op.Extensions["x-handwritten"].(bool)
 				params := append(openapi3.Parameters{}, item.Parameters...)
 				params = append(params, op.Parameters...)
 				url := prefix + fillParams(path)
@@ -290,6 +297,33 @@ func TestAccUnimplementedOperationsAnswer501(t *testing.T) {
 				}
 				rec := httptest.NewRecorder()
 				h.ServeHTTP(rec, req)
+				if handwritten {
+					// handwrittenStub names the operation in its message, so
+					// no other handler's 501 can pass for it.
+					want := httptest.NewRecorder()
+					apierror.Write(want, errorProfileFor(req.URL.Path), apierror.New(
+						http.StatusNotImplemented,
+						fmt.Sprintf(
+							"%s %s is specified but not implemented yet",
+							method,
+							prefix+path,
+						),
+					))
+					answered := rec.Code == http.StatusNotImplemented &&
+						sameBody(want.Body.Bytes(), rec.Body.Bytes())
+					switch {
+					case stubbed[key] && !answered:
+						t.Errorf("%s: mounted as handwrittenStub, but status %d, body %s; "+
+							"list it in implementedHandwritten with its status rows",
+							key, rec.Code, rec.Body.String())
+					case answered && !stubbed[key]:
+						t.Errorf(
+							"%s answers handwrittenStub's 501, but the ledger records it as served",
+							key,
+						)
+					}
+					continue
+				}
 				checked++
 				if rec.Code != http.StatusNotImplemented {
 					t.Errorf("%s: status %d, body %s", key, rec.Code, rec.Body.String())
@@ -308,6 +342,31 @@ func TestAccUnimplementedOperationsAnswer501(t *testing.T) {
 	if checked < 100 {
 		t.Fatalf("only %d unimplemented operations checked; the specs look truncated", checked)
 	}
+}
+
+// stubbedHandwritten lists, as "METHOD pattern", the routes the router mounts
+// with handwrittenStub, which the API reliability ledger records as
+// "stub: 501". It leaves out implementedHandwritten's: HelmPartialReindex
+// serves its route before routing, so the stub chi walks there never answers.
+func stubbedHandwritten(t *testing.T) map[string]bool {
+	t.Helper()
+	stub := runtime.FuncForPC(reflect.ValueOf(handwrittenStub("", "")).Pointer()).Name()
+	routes := map[string]bool{}
+	err := chi.Walk(
+		NewRouter(RouterConfig{}).(chi.Routes),
+		func(method, route string, h http.Handler, _ ...func(http.Handler) http.Handler) error {
+			key := method + " " + route
+			if runtime.FuncForPC(reflect.ValueOf(h).Pointer()).Name() == stub &&
+				!implementedHandwritten[key] {
+				routes[key] = true
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return routes
 }
 
 // fillParams substitutes a plausible value for every path parameter so the

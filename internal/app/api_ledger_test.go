@@ -55,6 +55,7 @@ type apiReviewHandler struct {
 func TestAccAPIReliabilityLedger(t *testing.T) {
 	root := repopath.Root(t)
 	handlers := apiReviewHandlers(t)
+	stubbed := stubbedHandwritten(t)
 	entries := map[string]apiReviewOperation{}
 	for _, spec := range specFiles {
 		doc := loadSpec(t, spec)
@@ -70,6 +71,8 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 				handwritten, _ := op.Extensions["x-handwritten"].(bool)
 				h, hasHandler := handlers[strings.TrimSuffix(spec, ".openapi.yaml")+":"+strings.ToLower(op.OperationID)]
 				switch {
+				case stubbed[route]:
+					e.State, e.Handler = "stub: 501", handwrittenStubHandler
 				case handwritten:
 					e.State = "partial: native dispatch; supported modes follow the contract"
 					e.Handler = "internal/app/router.go: NewRouter -> protocol/handwritten route"
@@ -90,11 +93,21 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 				}
 				// The spec's tier is the served contract's own account of the
 				// operation; TestAccUnimplementedOperationsAnswer501 holds
-				// implemented to what the router serves (#1328).
+				// implemented and stubbed to what the router serves (#1328,
+				// #1386). Many generated stubs carry no tier, so only a
+				// hand-written one must carry x-tier: stub.
 				tier, _ := op.Extensions["x-tier"].(string)
-				if tier == "stub" && implemented[route] {
+				switch {
+				case tier == "stub" && (implemented[route] || handwritten && !stubbed[route]):
 					t.Errorf("%s (%s) is served, but %s tiers it x-tier: stub",
 						route, op.OperationID, spec)
+				case stubbed[route] && tier != "stub":
+					t.Errorf(
+						"%s (%s) answers 501 from handwrittenStub, but %s does not tier it x-tier: stub",
+						route,
+						op.OperationID,
+						spec,
+					)
 				}
 				for _, p := range append(append(openapi3.Parameters{}, item.Parameters...), op.Parameters...) {
 					name := strings.ToLower(p.Value.Name)
@@ -161,6 +174,14 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 			if strings.Contains(filepath.ToSlash(rel), "internal/platform/gen/") {
 				return fmt.Errorf("generated route missing from specs: %s", route)
 			}
+			if stubbed[route] {
+				entries[route] = apiReviewOperation{
+					Route:   route,
+					State:   "stub: 501",
+					Handler: handwrittenStubHandler,
+				}
+				return nil
+			}
 			entries[route] = apiReviewOperation{
 				Route: route,
 				State: "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
@@ -213,6 +234,10 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 		len(specFiles),
 	)
 }
+
+// handwrittenStubHandler is the ledger's handler for a route that
+// stubbedHandwritten lists.
+const handwrittenStubHandler = "internal/app/router.go: handwrittenStub"
 
 func apiReviewPartial(op *openapi3.Operation) bool {
 	text := strings.ToLower(op.Description)

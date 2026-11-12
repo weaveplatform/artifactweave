@@ -20,21 +20,25 @@ Each entry includes the operation ID, served contract, actual implementation
 state, handler, direct source calls where a generated operation has a concrete
 method, effect/retry classification, incoming cost policy, declared pagination
 controls, response collection locations, persistence review family and evidence.
-The 365 generated stub operations are explicitly marked 501 with no business
-query or effect. Their schemas do not establish implementation. Partial entries
-retain unsupported modes and native dispatch limitations; neither repository CRUD
-nor a mounted wildcard proves full native support.
+The 381 stub bindings are explicitly marked 501 with no business query or effect:
+365 generated operations, and 10 hand-written operations and 6 of their aliases
+that the router mounts with `handwrittenStub`. Their schemas do not establish
+implementation. Partial entries retain unsupported modes and native dispatch
+limitations; neither repository CRUD nor a mounted wildcard proves full native
+support.
 
 `TestAccAPIReliabilityLedger` rebuilds this join and rejects drift. After reviewing
 an implementation change, refresh the retained evidence with `make api-ledger`.
 This refresh is not a substitute for reviewing semantics: source method presence
 does not establish idempotency or bounded execution. The status and principal
 matrices separately verify served behavior; `TestAccUnimplementedOperationsAnswer501`
-proves the stub classification against the router. It calls every operation the ledger
-records as a stub as an administrator of a seeded server, so a served operation left out
-of the implemented table answers its own status and fails it, where a router without a
-store would answer 501 for it too. The ledger test fails when a generated operation it
-records as served carries `x-tier: stub` in its spec.
+proves the stub classification against the router. It calls every generated operation the
+ledger records as a stub, and every hand-written operation, as an administrator of a seeded
+server. A served operation left out of the implemented table answers its own status and
+fails it, where a router without a store would answer 501 for it too; a hand-written
+operation fails it when whether it answers `handwrittenStub`'s 501 disagrees with the
+ledger. The ledger test fails when an operation it records as served carries
+`x-tier: stub` in its spec, and when a hand-written operation it records as a stub does not.
 
 ## Effects and retry decisions
 

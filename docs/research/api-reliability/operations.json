@@ -1981,43 +1981,33 @@
   },
   {
     "route": "DELETE /artifactory/api/v1/service_trust/pairing/*",
-    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/app/router.go: internal/app.handwrittenStub.func1",
+    "state": "stub: 501",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
-    "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
     "route": "DELETE /artifactory/api/v1/service_trust/pairing/{usecase}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "unregisterPairingToken",
-    "state": "partial: native dispatch; supported modes follow the contract",
-    "contract": "Removes the trust relationship with one peer for the use case and deletes its stored keys. Federations that use the peer stop syncing with it. With `force=true` the local trust is removed even when the peer cannot be told. Administrators only.",
-    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "state": "stub: 501",
+    "contract": "Not implemented; answers 501. It would remove the trust relationship with one peer for the use case and delete its stored keys, so federations that use the peer stop syncing with it. With `force=true` the local trust would be removed even when the peer cannot be told. Administrators only.",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
-    "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
@@ -5329,43 +5319,33 @@
   },
   {
     "route": "GET /artifactory/api/download/{repoKey}/*",
-    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/app/router.go: internal/app.handwrittenStub.func1",
+    "state": "stub: 501",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
-    "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
     "route": "GET /artifactory/api/download/{repoKey}/{filePath}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "artifactSyncDownload",
-    "state": "partial: native dispatch; supported modes follow the contract",
-    "contract": "Downloads a file while emitting progress marks so clients with short timeouts stay connected during a slow remote fetch. With `content=none` only the marks are sent; with `content=progress` the marks precede the content. Resolution and statistics behave as for the plain download.",
-    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "state": "stub: 501",
+    "contract": "Not implemented; answers 501. It would download a file while emitting progress marks, so clients with short timeouts stay connected during a slow remote fetch: with `content=none` only the marks are sent, and with `content=progress` the marks precede the content. Resolution and statistics would behave as for the plain download.",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
-    "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
@@ -7139,46 +7119,36 @@
   },
   {
     "route": "GET /artifactory/api/replication/*",
-    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/app/router.go: internal/app.handwrittenStub.func1",
+    "state": "stub: 501",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
-    "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
     "route": "GET /artifactory/api/replication/{repoPath}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getReplicationStatus",
-    "state": "partial: native dispatch; supported modes follow the contract",
-    "contract": "Reports the outcome of the last replication that touched a repository or a folder in it, read from the replication properties the run annotated on the items. The caller needs read permission on the repository.",
-    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "state": "stub: 501",
+    "contract": "Not implemented; answers 501. It would report the outcome of the last replication that touched a repository or a folder in it, read from the replication properties the run annotated on the items. The caller would need read permission on the repository.",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
-    "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.targets[]"
     ],
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
@@ -8890,22 +8860,17 @@
     "route": "GET /artifactory/api/system/configuration",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getSystemConfiguration",
-    "state": "partial: native dispatch; supported modes follow the contract",
+    "state": "stub: 501",
     "contract": "Not implemented; answers 501.",
-    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
-    "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
@@ -17359,43 +17324,33 @@
   },
   {
     "route": "POST /artifactory/api/replication/execute/*",
-    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/app/router.go: internal/app.handwrittenStub.func1",
+    "state": "stub: 501",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "resource mutation/action; see served contract and handler calls",
-    "retry": "no key support; reconcile ambiguous completion before retrying",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
     "route": "POST /artifactory/api/replication/execute/{repoPath}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "executePullPushReplication",
-    "state": "partial: native dispatch; supported modes follow the contract",
-    "contract": "Starts a replication now, independently of any schedule. The direction follows the repository class: a local repository pushes to the targets in the body or, when the body is omitted, to its stored configuration; a remote repository pulls from its upstream into the cache, and its body may name at most one target. The path may name a folder below the repository to limit the run. The run is scheduled and the call answers 200 with an empty body as soon as it is accepted; progress and per-file messages go to the server log, and the status operation reports the outcome. A body with more than one target is rejected with 400. Callers other than administrators are limited to the user query result limit when choosing files. The caller needs manage permission on the repository.",
-    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "state": "stub: 501",
+    "contract": "Not implemented; answers 501. It would start a replication now, independently of any schedule. The direction would follow the repository class: a local repository pushes to the targets in the body or, when the body is omitted, to its stored configuration; a remote repository pulls from its upstream into the cache, and its body may name at most one target. The path may name a folder below the repository to limit the run. The run would be scheduled and the call would answer 200 with an empty body as soon as it is accepted; progress and per-file messages would go to the server log, and the status operation would report the outcome. A body with more than one target would be rejected with 400. Callers other than administrators would be limited to the user query result limit when choosing files. The caller would need manage permission on the repository.",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "resource mutation/action; see served contract and handler calls",
-    "retry": "no key support; reconcile ambiguous completion before retrying",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
@@ -17618,25 +17573,20 @@
     "route": "POST /artifactory/api/retention/search",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "searchArchives",
-    "state": "partial: native dispatch; supported modes follow the contract",
-    "contract": "Runs an AQL items query against archived items only, with the same grammar and limits as the AQL search. Platform administrators only.",
-    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "state": "stub: 501",
+    "contract": "Not implemented; answers 501. It would run an AQL items query against archived items only, with the same grammar and limits as the AQL search. Platform administrators only.",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "resource mutation/action; see served contract and handler calls",
-    "retry": "no key support; reconcile ambiguous completion before retrying",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "response_collections": [
       "200 application/json.results[]"
     ],
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
@@ -18287,22 +18237,17 @@
     "route": "POST /artifactory/api/system/configuration",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "saveSystemConfiguration",
-    "state": "partial: native dispatch; supported modes follow the contract",
+    "state": "stub: 501",
     "contract": "Not implemented; answers 501. The YAML PATCH form covers every managed section.",
-    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "resource mutation/action; see served contract and handler calls",
-    "retry": "no key support; reconcile ambiguous completion before retrying",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
@@ -19023,43 +18968,33 @@
   },
   {
     "route": "POST /artifactory/api/v1/service_trust/pairing/*",
-    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/app/router.go: internal/app.handwrittenStub.func1",
+    "state": "stub: 501",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "resource mutation/action; see served contract and handler calls",
-    "retry": "no key support; reconcile ambiguous completion before retrying",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
     "route": "POST /artifactory/api/v1/service_trust/pairing/{usecase}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "generatePairingToken",
-    "state": "partial: native dispatch; supported modes follow the contract",
-    "contract": "Creates a one-time pairing token for establishing trust with another instance of this server (decision 0021). The token is a signed JWT whose subject is the administrator who requested it; it can be redeemed once and expires 300 seconds after creation. An administrator hands it to the peer, which redeems it with the exchange operation; the two instances then hold each other's keys and authenticate every sync call in both directions. The peer must be another instance of this server. Administrators only.",
-    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "state": "stub: 501",
+    "contract": "Not implemented; answers 501. It would create a one-time pairing token for establishing trust with another instance of this server (decision 0021). The token would be a signed JWT whose subject is the administrator who requested it; it could be redeemed once and would expire 300 seconds after creation. An administrator would hand it to the peer, which redeems it with the exchange operation; the two instances would then hold each other's keys and authenticate every sync call in both directions. The peer must be another instance of this server. Administrators only.",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "resource mutation/action; see served contract and handler calls",
-    "retry": "no key support; reconcile ambiguous completion before retrying",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
@@ -22078,22 +22013,17 @@
     "route": "PUT /artifactory/api/system/configuration/baseUrl",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "updateCustomUrlBase",
-    "state": "partial: native dispatch; supported modes follow the contract",
-    "contract": "Sets the urlBase section of the descriptor: the scheme, host and optional path prefix that embedded links use when no `X-JFrog-Override-Base-Url` or `X-Forwarded-*` header is present (decision 0002). Sending an empty body clears it, after which links derive from the request. Admin only.",
-    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "state": "stub: 501",
+    "contract": "Not implemented; answers 501. It would set the urlBase section of the descriptor: the scheme, host and optional path prefix that embedded links use when no `X-JFrog-Override-Base-Url` or `X-Forwarded-*` header is present (decision 0002). An empty body would clear it, after which links derive from the request. Admin only.",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
-    "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
@@ -22136,43 +22066,33 @@
   },
   {
     "route": "PUT /artifactory/api/v1/service_trust/pairing/*",
-    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/app/router.go: internal/app.handwrittenStub.func1",
+    "state": "stub: 501",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
-    "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
     "route": "PUT /artifactory/api/v1/service_trust/pairing/{usecase}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "exchangePairingToken",
-    "state": "partial: native dispatch; supported modes follow the contract",
-    "contract": "Redeems a pairing token generated on the peer, completing trust between the two instances for the use case. Run it on the instance that did not generate the token, with the same use case. Administrators only.",
-    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "state": "stub: 501",
+    "contract": "Not implemented; answers 501. It would redeem a pairing token generated on the peer, completing trust between the two instances for the use case. It would run on the instance that did not generate the token, with the same use case. Administrators only.",
+    "handler": "internal/app/router.go: handwrittenStub",
     "review_family": "content-and-configuration",
-    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
-    "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
+    "effects": "no operation effect; middleware still authenticates/admit-limits",
+    "retry": "501 is not transient; do not retry until support changes",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "schema-only; no collection query executes",
     "evidence": [
-      "internal/app/router.go",
-      "internal/artifacts/adapters/http/items.go",
-      "internal/artifacts/adapters/http/storage.go",
-      "internal/artifacts/adapters/sql/content_items.go",
-      "internal/access/adapters/sql/projects.go",
-      "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/router.go: handwrittenStub",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
