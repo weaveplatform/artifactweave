@@ -1,8 +1,8 @@
 // Package debian runs the Debian snapshot routes of the assembled server,
 // with their read guards and their refusals of unavailable or corrupt
-// indexes, a remote Debian repository's relay of upstream files, index
-// reads with a query or matrix parameters, and the async values of the
-// Debian reindex.
+// indexes, a remote Debian repository's relay of upstream files, its .ddeb
+// cache, index reads with a query or matrix parameters, a malformed
+// package stored unindexed, and the async values of the Debian reindex.
 //
 // # Role
 //
@@ -34,12 +34,23 @@
 //     repository's indexes, and a virtual repository's other files, asked
 //     for with a query or matrix parameters by an administrator, a reader,
 //     a user without read and an anonymous caller (#1330).
+//   - debian_remote_query_test.go: a remote repository's indexes and
+//     by-hash file, and a virtual repository's over it, asked for with a
+//     query, served as without one with the upstream asked for the path
+//     alone, and a matrix parameter still refused without asking (#1349).
+//   - debian_remote_ddeb_test.go: a remote repository's .ddeb served and
+//     cached, and a local or federated .ddeb deploy refused without
+//     ddebSupported (#1352).
+//   - debian_malformed_test.go: a package that is not readable stored by a
+//     local or federated repository with deb.index.status, left out of
+//     Packages and Release, found by AQL, and indexed once a readable
+//     package replaces it (#1355).
 //   - debian_reindex_async_test.go: Calculate Debian Repository Metadata
 //     with each async value, queued or run before it answers, or refused.
 //   - debian_xz_test.go: a package whose control.tar.xz or data.tar.xz,
-//     or a Packages.xz, lost its xz index and footer, refused at deploy,
-//     from a remote's upstream and through a virtual over that remote
-//     (#1331).
+//     or a Packages.xz, lost its xz index and footer, stored unindexed at
+//     deploy (#1355), and refused from a remote's upstream and through a
+//     virtual over that remote (#1331).
 //
 // # References
 //
@@ -54,8 +65,11 @@
 //     package an owner.
 //   - https://github.com/weaveplatform/artifactweave/issues/1068,
 //     https://github.com/weaveplatform/artifactweave/issues/1083,
-//     https://github.com/weaveplatform/artifactweave/issues/1273 and
-//     https://github.com/weaveplatform/artifactweave/issues/1331
+//     https://github.com/weaveplatform/artifactweave/issues/1273,
+//     https://github.com/weaveplatform/artifactweave/issues/1331,
+//     https://github.com/weaveplatform/artifactweave/issues/1349,
+//     https://github.com/weaveplatform/artifactweave/issues/1352 and
+//     https://github.com/weaveplatform/artifactweave/issues/1355
 //
 // # Status
 //

@@ -354,9 +354,10 @@ func (s DebianAPI) serveVirtualDebianSources(
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	ctx := r.Context()
-	// A remote member's own GET of its index refuses a query or a matrix
-	// parameter (serveDebianIndex), so that member lacks the file here.
-	if member.Class == repo.Remote && (len(req.Props) != 0 || r.URL.RawQuery != "") {
+	// A remote member's own GET of its index refuses matrix parameters
+	// (serveDebianIndex), so that member lacks the file here. It takes a
+	// query, which it passes on as its own GET would (#1349).
+	if member.Class == repo.Remote && len(req.Props) != 0 {
 		return false
 	}
 	if member.Class != repo.Remote && len(req.Props) != 0 {
@@ -372,7 +373,8 @@ func (s DebianAPI) serveVirtualDebianSources(
 			return true
 		}
 	}
-	body, checkPermission, err := s.debianMemberBytes(ctx, st, member, req.Path, p, acc)
+	body, checkPermission, err := s.debianMemberRead(ctx, st, member, req.Path,
+		itemkit.RemoteResource(r, req.Path).Query, p, acc)
 	if errors.Is(err, kernel.ErrNotFound) || errors.Is(err, source.ErrDenied) {
 		return false
 	}
@@ -494,6 +496,15 @@ func (s DebianAPI) debianMemberBytes(
 	ctx context.Context, st itemkit.Store, member repo.Config, path string,
 	p kernel.Principal, acc itemkit.Access,
 ) ([]byte, func(context.Context, string) error, error) {
+	return s.debianMemberRead(ctx, st, member, path, "", p, acc)
+}
+
+// debianMemberRead is debianMemberBytes for a request that carried query,
+// which a remote member passes to its upstream as its own GET would.
+func (s DebianAPI) debianMemberRead(
+	ctx context.Context, st itemkit.Store, member repo.Config, path, query string,
+	p kernel.Principal, acc itemkit.Access,
+) ([]byte, func(context.Context, string) error, error) {
 	if !acc.File(member, path, accessapi.ActionRead) {
 		return nil, nil, source.ErrDenied
 	}
@@ -509,6 +520,7 @@ func (s DebianAPI) debianMemberBytes(
 			Project: member.ProjectKey,
 			Resource: source.Resource{
 				Path: path, EscapedPath: httpkit.EscapePath(path), Method: http.MethodGet,
+				Query: query,
 			},
 		}
 		q, err := itemkit.DebianSourceRequest(q)

@@ -216,12 +216,15 @@ func TestUnitInspectionReadsCommittedDebianContent(t *testing.T) {
 	} else if _, ok := got.(inspection); !ok {
 		t.Fatalf("checksum inspection: %+v", got)
 	}
-	if _, err := h.Inspect(t.Context(), format.Env{Blobs: debianFixtureBlobs{[]byte("bad")}}, c,
+	// A binary it cannot read is malformed, kept with its reason (#1355).
+	got, err := h.Inspect(t.Context(), format.Env{Blobs: debianFixtureBlobs{[]byte("bad")}}, c,
 		format.Write{
 			Op: format.OpDeploy, Path: "pool/bad.deb",
 			Checksums: kernel.Checksums{SHA256: "bad"},
-		}); err == nil {
-		t.Fatal("invalid committed binary inspected successfully")
+		})
+	if in, ok := got.(inspection); err != nil || !ok ||
+		in.fault != "debian: invalid binary package: archive size" {
+		t.Fatalf("invalid committed binary inspected as %+v, %v", got, err)
 	}
 	if _, err := h.Inspect(t.Context(), format.Env{Blobs: debianFixtureBlobs{[]byte("bad")}}, c,
 		format.Write{
@@ -246,7 +249,7 @@ func TestUnitAdmissionRechecksStaleInspectionAgainstStoredBytes(t *testing.T) {
 				PropDistribution: {"stable"}, PropComponent: {"main"},
 				PropArchitecture: {"amd64"},
 			},
-			inspection{sha: "stale", path: "pool/alpha.deb", binary: Binary{Name: "forged"}},
+			inspection{sha: "stale", path: "pool/alpha.deb", fault: "forged"},
 		},
 		{
 			"pool/alpha.dsc", "testdata/alpha_1.0-1.dsc",
@@ -267,9 +270,19 @@ func TestUnitAdmissionRechecksStaleInspectionAgainstStoredBytes(t *testing.T) {
 			if _, err := h.Admit(t.Context(), env, c, w); err != nil {
 				t.Fatalf("valid stored bytes rejected after stale inspection: %v", err)
 			}
-			env.Blobs = debianFixtureBlobs{[]byte("bad")}
+			if tc.path == "pool/alpha.deb" {
+				// The stale inspection calls the package malformed, which
+				// would leave its architecture unchecked; the stored bytes
+				// are an amd64 package, which i386 does not describe.
+				w.Properties = model.Properties{
+					PropDistribution: {"stable"}, PropComponent: {"main"},
+					PropArchitecture: {"i386"},
+				}
+			} else {
+				env.Blobs = debianFixtureBlobs{[]byte("bad")}
+			}
 			if _, err := h.Admit(t.Context(), env, c, w); err == nil {
-				t.Fatal("stale inspection bypassed corrupt stored bytes")
+				t.Fatal("stale inspection bypassed the stored bytes")
 			}
 		})
 	}
@@ -348,18 +361,18 @@ func TestUnitLifecycleRejectsUnavailablePackageContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	env := format.Env{Store: st, Blobs: debianFixtureBlobs{[]byte("bad")}}
+	env := format.Env{Store: st, Blobs: unavailableBlobs{}}
 	if err := h.Deployed(t.Context(), env, c, it); err == nil {
-		t.Fatal("invalid package entered the index on deployment")
+		t.Fatal("unavailable package entered the index on deployment")
 	}
 	if err := h.Deleted(t.Context(), env, c, []model.Item{it}); err == nil {
-		t.Fatal("invalid deleted package silently altered the index")
+		t.Fatal("unavailable deleted package silently altered the index")
 	}
 	if err := h.Reindex(t.Context(), env, c); err == nil {
-		t.Fatal("reindex silently accepted corrupt stored package")
+		t.Fatal("reindex silently accepted an unavailable stored package")
 	}
 	if err := h.Work(t.Context(), env, work.WorkItem{Kind: KindIndex, Key: c.Key}); err == nil {
-		t.Fatal("apt metadata was derived from corrupt stored package")
+		t.Fatal("apt metadata was derived without an unavailable stored package")
 	}
 	body, err := os.ReadFile("testdata/alpha_1.0_amd64_0.deb")
 	if err != nil {
@@ -382,8 +395,21 @@ func TestUnitLifecycleRejectsUnavailablePackageContent(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	env.Blobs = debianFixtureBlobs{[]byte("bad")}
+	env.Blobs = unavailableBlobs{}
 	if err := h.Deployed(t.Context(), env, c, it); err == nil {
-		t.Fatal("version reconciliation ignored a corrupt peer package")
+		t.Fatal("version reconciliation ignored an unavailable peer package")
 	}
 }
+
+// unavailableBlobs is a blob store whose content cannot be opened.
+type unavailableBlobs struct{}
+
+func (unavailableBlobs) Open(context.Context, string) (io.ReadSeekCloser, blob.Info, error) {
+	return nil, blob.Info{}, errUnavailableBlob
+}
+
+func (unavailableBlobs) Stat(context.Context, string) (blob.Info, error) {
+	return blob.Info{}, errUnavailableBlob
+}
+
+var errUnavailableBlob = errors.New("blob unavailable")

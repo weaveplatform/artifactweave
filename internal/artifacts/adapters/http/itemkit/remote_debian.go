@@ -28,6 +28,18 @@ import (
 // translation or a Contents index for one, passes through unchecked; a
 // path in none of these shapes that only resembles one answers not found
 // without asking the upstream, as it did before.
+//
+// A query refuses no index and no by-hash file (#1349). 7.x reads a remote
+// Debian file through its generic remote download, as the ?trace of
+// RTFACT-18414 (6.7.1) and RTFACT-26349 (7.25.7) show, and passes a query to
+// the upstream only when the repository's Propagate Query Params is set,
+// which JFrog's Remote Repositories page lists among the settings of a
+// Generic remote repository (6.20 HttpRepo.addQueryParams). The source
+// boundary already applies that rule to q.Resource.Query, and the cache key
+// holds the query only then. A Release or InRelease file still refuses a
+// query other than the server's own controls, which the item route strips,
+// with 400. The same sources point to serving it; that change is left to
+// a follow-up of #1349.
 func DebianSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
 	switch {
@@ -66,7 +78,7 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 		}
 	case strings.Contains(p, "/by-hash/SHA256/"):
 		expected, ok := debian.ByHashPath(p)
-		if !ok || q.Resource.Query != "" {
+		if !ok {
 			return q, kernel.ErrNotFound
 		}
 		// The index route (TryDebianItem) reads a binary-<arch> or source
@@ -110,8 +122,6 @@ func debianIndexSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
 	var decodes func([]byte) bool
 	switch {
-	case q.Resource.Query != "":
-		return q, kernel.ErrNotFound
 	case debian.PackagesIndexPath(p):
 		q.Resource.PermissionFolder = true
 		q.Resource.Variant = "debian-packages-v2"

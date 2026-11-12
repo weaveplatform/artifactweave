@@ -88,10 +88,13 @@ func debOf(t *testing.T, control, data []byte) []byte {
 const badGateway = `{"errors":[{"message":"Bad Gateway","status":502}]}`
 
 // A package whose control.tar.xz or data.tar.xz lost its index and footer,
-// which dpkg refuses, is refused at deploy with the 400 any unreadable
-// package gets, and a remote's upstream package or Packages.xz cut the same
-// way answers the 502 of any invalid upstream file and is not served
-// (#1331). The whole files are still admitted.
+// which dpkg refuses, is stored at deploy and left unindexed with the reason
+// in deb.index.status, as any unreadable package is (#1355; RTFACT-16378
+// says 7.x stores a package whose control.tar.xz it cannot read and does not
+// index it), and a whole package that replaces it clears the reason. A
+// remote's upstream package or Packages.xz cut the same way answers the 502
+// of any invalid upstream file and is not served (#1331). The whole files
+// are still admitted.
 func TestAccDebianRefusesAnXZStreamWithoutItsIndex(t *testing.T) {
 	const control = "Package: hello\nVersion: 1.0-1\nArchitecture: amd64\n" +
 		"Maintainer: A <a@example.com>\nDescription: hello\n"
@@ -123,11 +126,22 @@ func TestAccDebianRefusesAnXZStreamWithoutItsIndex(t *testing.T) {
 		"data.tar.xz":    {debOf(t, controlXZ, xzCut(t, dataXZ)), "data tar exceeds limit"},
 		"control.tar.xz": {debOf(t, xzCut(t, controlXZ), dataXZ), "missing or excessive control data"},
 	} {
-		r := w.Request(http.MethodPut, "/artifactory/deb-local/"+pkg, "admin", string(c.body))
-		want := `"message":"Invalid Debian package: debian: invalid binary package: ` + c.want + `"`
-		if r.Code != http.StatusBadRequest || !strings.Contains(r.Body.String(), want) {
+		harness.WantStatus(
+			t,
+			w.Request(http.MethodPut, "/artifactory/deb-local/"+pkg, "admin", string(c.body)),
+			http.StatusCreated,
+		)
+		r := w.Request(
+			http.MethodGet,
+			"/artifactory/api/storage/deb-local/"+pkg+"?properties",
+			"admin",
+			"",
+		)
+		want := `{"properties":{"deb.index.status":["debian: invalid binary package: ` + c.want +
+			`"]},"uri":"http://example.com/artifactory/api/storage/deb-local/` + pkg + `"}`
+		if r.Code != http.StatusOK || strings.TrimSpace(r.Body.String()) != want {
 			t.Errorf(
-				"deploy without the %s index answered %d %s, want 400 %s",
+				"package without the %s index has properties %d %s, want 200 %s",
 				name,
 				r.Code,
 				r.Body,
@@ -140,6 +154,16 @@ func TestAccDebianRefusesAnXZStreamWithoutItsIndex(t *testing.T) {
 		w.Request(http.MethodPut, "/artifactory/deb-local/"+pkg, "admin", string(whole)),
 		http.StatusCreated,
 	)
+	r := w.Request(
+		http.MethodGet,
+		"/artifactory/api/storage/deb-local/"+pkg+"?properties",
+		"admin",
+		"",
+	)
+	if r.Code != http.StatusOK || strings.Contains(r.Body.String(), debian.PropIndexStatus) {
+		t.Errorf("whole package has properties %d %s, want no %s", r.Code, r.Body,
+			debian.PropIndexStatus)
+	}
 	for _, p := range []string{pkg, "pool/main/h/hello/hello_1.0-2_amd64.deb", "dists/stable/main/binary-amd64/Packages.xz"} {
 		r := w.Request(http.MethodGet, "/artifactory/remote/"+p, "admin", "")
 		if r.Code != http.StatusBadGateway || strings.TrimSpace(r.Body.String()) != badGateway {

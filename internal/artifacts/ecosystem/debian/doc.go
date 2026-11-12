@@ -58,20 +58,23 @@
 //     applies.
 //   - Settings: none. A repository's primaryKeyPairRef (keyPair for a
 //     virtual repository) names its signing pair, ddebSupported admits
-//     .ddeb debug packages, debianTrivialLayout refuses source packages,
+//     .ddeb debug packages to a local or federated repository (a remote
+//     caches them whatever it says, #1352), debianTrivialLayout refuses
+//     source packages,
 //     and optionalIndexCompressionFormats names the forms besides plain
 //     and gzip (bz2, lzma, xz) each Packages index is written in.
 //
 // # Outputs
 //
 //   - Handler: the hooks that read a package before its transaction
-//     (Inspect), admit only a valid package with valid coordinates and
-//     keep clients out of apt metadata and snapshots (Admit, Deleting),
-//     keep the package index and properties in step with deploys and
-//     deletes (Deployed, Deleting, Deleted), class apt metadata as derived
-//     (Classify), make a metadata read wait for its rebuild (Owed), derive
-//     the metadata (WorkKinds, Work) and rebuild the package index
-//     (Reindex).
+//     (Inspect), admit a package with valid coordinates and keep clients
+//     out of apt metadata and snapshots (Admit, Deleting), keep the
+//     package index and properties in step with deploys and deletes,
+//     marking a package they cannot read with deb.index.status
+//     (PropIndexStatus, #1355) (Deployed, Deleting, Deleted), class apt
+//     metadata as derived (Classify), make a metadata read wait for its
+//     rebuild (Owed), derive the metadata (WorkKinds, Work) and rebuild the
+//     package index (Reindex).
 //   - The package rules: Binary and ReadBinary; Source, SourcePart and
 //     ReadSource.
 //   - The index rules: IndexedBinary and Packages, IndexedSource,
@@ -98,7 +101,11 @@
 //   - A binary is listed only under the deb.distribution, deb.component
 //     and deb.architecture it was deployed with, which must name its own
 //     architecture unless it is Architecture: all; one deployed without
-//     them is stored but never indexed. An Architecture: all package is
+//     them is stored but never indexed. A binary ReadBinary refuses is
+//     stored too but never indexed or given a version: it carries the
+//     reason in deb.index.status in place of deb.name and deb.version
+//     until a readable package replaces it, as JFrog's "Use Debian Metadata
+//     Validation" describes (#1355). An Architecture: all package is
 //     listed under binary-all, under every other architecture of its
 //     distribution and component, and under amd64 even when nothing else
 //     names it, so a fresh amd64 apt client finds it.
@@ -162,7 +169,8 @@
 //   - sign_test.go: SignRelease binds both apt signature forms.
 //   - handler_security_test.go: admission of generated metadata,
 //     snapshots and package coordinates, stale inspections, class-specific
-//     work, the source lifecycle and unavailable content.
+//     work, the source lifecycle, a malformed binary kept with its reason
+//     and unavailable content.
 //   - work_test.go and source_work_test.go: Release and every
 //     architecture's index, signing through Env.Keys, and only complete
 //     source packages published.
@@ -176,7 +184,8 @@
 //     with KindIndex as the repository's work.
 //   - xz_test.go: a package whose control.tar.xz or data.tar.xz, and a
 //     Packages, installer Packages or Sources index, whose xz stream lost
-//     its index and footer, refused (#1331).
+//     its index and footer, refused by ReadBinary and the index decoders
+//     (#1331).
 //
 // testdata holds the contract packages, the dpkg-source fixture alpha_1.0-1
 // and generate-source.sh, which builds it; the protocol's tests

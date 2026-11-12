@@ -35,7 +35,12 @@ PUT /artifactory/<repo>/pool/main/a/alpha/alpha_1.0_amd64.deb;deb.distribution=s
 ```
 
 The server checks the dpkg control and data archive, file name and declared
-coordinates, then builds Packages, Packages.gz, Release, InRelease,
+coordinates. A `.deb` it cannot read as a package is still stored, as JFrog's
+"Use Debian Metadata Validation" describes, but left out of every index: its
+`deb.index.status` property gives the reason, so a property search or an AQL
+query on `deb.index.status` finds it, and a readable package deployed in its
+place is indexed and loses the property. The server then builds Packages,
+Packages.gz, Release, InRelease,
 Release.gpg and SHA-256 by-hash metadata. Set the repository's
 `optionalIndexCompressionFormats` to any of `bz2`, `lzma` and `xz` to also
 write Packages.bz2, Packages.lzma and Packages.xz; the Release lists each
@@ -48,7 +53,10 @@ rebuilds a local index: `async=1` queues the rebuild and answers at once, and
 earlier REST API reference wrote them. Deleting or restoring a package also
 reconciles metadata. A remote repository validates Release and index structure, package
 bytes and cache freshness; plain, gzip, xz, bzip2, lzma and zstd index
-encodings are accepted. It also asks its upstream for an installer's
+encodings are accepted. It caches a `.ddeb` whatever `ddebSupported`
+says, since that setting governs a local repository's indexing; a local or
+federated repository without it refuses a `.ddeb` deploy with 400. It also
+asks its upstream for an installer's
 Packages index, checked as an index of `.udeb` files, and for any
 `by-hash/SHA256` file, checked against the SHA-256 its name gives. A virtual
 repository merges authorized package records in member order and signs its
@@ -65,9 +73,11 @@ the query parameters Artifactory documents for any file, such as
 properties as on any other GET, once the caller's read permission is settled.
 A virtual repository's composed metadata carries no properties, so only a
 mandatory key (`;key+=value`) refuses it, and a member whose file does not
-match is passed over for the next. A remote repository's index refuses a
-query or matrix parameters with 404 until it is settled whether a remote
-passes them on to its upstream.
+match is passed over for the next. A remote repository's index takes a
+query as any remote file does: it reaches the upstream only when the
+repository's Propagate Query Params is set. Its index still refuses matrix
+parameters with 404 until the remote read appends them to the upstream URL
+as 7.x does, and its Release still refuses a query with 400 (#1349).
 
 For source packages, deploy the `.dsc` with `dsc.distribution` and
 `dsc.component`, plus every archive named by that descriptor at the same

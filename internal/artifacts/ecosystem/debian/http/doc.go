@@ -133,10 +133,12 @@
 //     Properties in Deployment and Resolution). A virtual repository's
 //     composed metadata carries none [I], so only a mandatory key refuses
 //     it, and a member whose file does not match is passed over for the
-//     next [I]. A remote repository's index still answers 404 to a query or
-//     a matrix parameter, after the read check, since whether a remote
-//     passes them on to its upstream is unsettled; a virtual repository
-//     passes over a remote member for its Sources index so.
+//     next [I]. A remote repository's index takes a query as any remote
+//     file does, passing it to the upstream only under Propagate Query
+//     Params (#1349). It still answers 404 to a matrix parameter, after the
+//     read check, since 7.x appends them to the upstream URL (RTFACT-26349)
+//     and the remote read does not yet [I]; a virtual repository passes over
+//     a remote member for its Sources index so.
 //   - A virtual repository's metadata is composed for each request from its
 //     members in order, at most 128. A member of another type, a virtual
 //     member or one with the trivial layout is refused, a member that
@@ -207,7 +209,8 @@
 //     reads from an upstream (#1273): an installer's Packages index, any
 //     by-hash file, a .lzma index and a package under a by-hash folder,
 //     each checked as it streams, with the 64 MiB bound on an index's
-//     by-hash copy alone; names it cannot check stay not found.
+//     by-hash copy alone; names it cannot check stay not found; an index
+//     or by-hash file asked for with a query keeps it (#1349).
 //   - debian_upstream_paths_test.go: a remote repository asks its upstream
 //     for those paths and a virtual repository for its remote member's
 //     installer index; a virtual repository composes the forms its own
@@ -243,11 +246,11 @@
 //     virtual package and a virtual Sources index failing closed when the
 //     file's properties cannot be read; a virtual repository passing over a
 //     member, a remote member's stream or cached file included, whose file
-//     they do not match; and its Sources index passing over a remote member
-//     for a query or a matrix parameter without asking its upstream.
+//     they do not match; and its Sources index asking a remote member's
+//     upstream for a query and passing over it for a matrix parameter.
 //   - debian_operations_test.go: the rebuild that writes no properties, for
-//     an absent repository, an unreadable package and a queue that refuses
-//     it.
+//     an absent repository, an unreadable package it leaves out (#1355) and
+//     a queue that refuses it.
 //   - debian_snapshot_fault_test.go: snapshot requests and reads without a
 //     store or a caller, and requests whose caller's permissions cannot be
 //     read; queued snapshots over the work key bound or refused by the

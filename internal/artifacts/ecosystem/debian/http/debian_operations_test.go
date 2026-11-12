@@ -2,7 +2,6 @@ package debianhttp
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -47,9 +46,11 @@ func wantAPIError(t *testing.T, err error, status int, message string) {
 }
 
 // TestAccDebianReindexWithoutPropertiesFailures: the rebuild that writes no
-// properties answers 404 for a repository that does not exist, and, since
-// the caller waits for it, the format's 400 for a stored package it cannot
-// read, rather than reporting the rebuild accepted.
+// properties answers 404 for a repository that does not exist. A stored
+// package it cannot read is left out of the indexes rather than failing the
+// rebuild the caller waits for: 7.x keeps such a package unindexed, and
+// RTFACT-12513 (fixed in 5.0.0) says a package with bad metadata must not
+// break indexing (#1355).
 func TestAccDebianReindexWithoutPropertiesFailures(t *testing.T) {
 	w := newItemWorld(t)
 	w.debRepos(repo.Config{Key: "deb-local", Class: repo.Local})
@@ -60,15 +61,9 @@ func TestAccDebianReindexWithoutPropertiesFailures(t *testing.T) {
 		t.Errorf("absent repository answered %d %s, want 404", rec.Code, rec.Body)
 	}
 	rec = w.do(http.MethodPost, "/artifactory/api/deb/reindex/deb-local?writeProps=0", "admin", "")
-	var body struct {
-		Errors []struct {
-			Message string `json:"message"`
-		} `json:"errors"`
-	}
-	if rec.Code != http.StatusBadRequest || json.Unmarshal(rec.Body.Bytes(), &body) != nil ||
-		len(body.Errors) != 1 ||
-		!strings.HasPrefix(body.Errors[0].Message, "Invalid Debian package") {
-		t.Errorf("unreadable package answered %d %s, want the format's 400", rec.Code, rec.Body)
+	if rec.Code != http.StatusOK ||
+		rec.Body.String() != "Debian repository deb-local metadata recalculation accepted" {
+		t.Errorf("unreadable package answered %d %q, want 200", rec.Code, rec.Body)
 	}
 }
 

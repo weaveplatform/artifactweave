@@ -251,9 +251,12 @@ func collectAptGroups(
 		if !isBinary(p) {
 			continue
 		}
-		b, err := packageFor(ctx, env, it)
+		b, fault, err := packageFor(ctx, env, it)
 		if err != nil {
 			return nil, nil, err
+		}
+		if fault != "" {
+			continue // malformed (#1355): stored, marked, never indexed
 		}
 		props, err := env.Store.Items().Properties(ctx, it.ID)
 		if err != nil {

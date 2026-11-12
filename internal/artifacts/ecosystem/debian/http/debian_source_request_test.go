@@ -186,23 +186,55 @@ func TestUnitDebianSourceRequestBoundsOnlyAnIndexCopy(t *testing.T) {
 }
 
 // TestUnitDebianSourceRequestKeepsRefusingWhatItCannotName: a by-hash name
-// that is no SHA-256, a Packages name of no index apt reads, an index or
-// by-hash path with a query, and a package path its grammar refuses still
-// answer not found without asking the upstream.
+// that is no SHA-256, a Packages name of no index apt reads and a package
+// path its grammar refuses still answer not found without asking the
+// upstream, with a query or without one.
 func TestUnitDebianSourceRequestKeepsRefusingWhatItCannotName(t *testing.T) {
-	sum := strings.Repeat("a", 64)
 	for _, tc := range []struct{ path, query string }{
 		{"dists/stable/main/i18n/by-hash/SHA256/abc", ""},
-		{"dists/stable/main/i18n/by-hash/SHA256/" + sum, "x=1"},
+		{"dists/stable/main/i18n/by-hash/SHA256/abc", "x=1"},
 		{"dists/stable/main/debian-installer/binary-amd64/Packages.lz4", ""},
-		{"dists/stable/main/debian-installer/binary-amd64/Packages", "x=1"},
-		{"dists/stable/main/binary-amd64/Packages.lzma", "x=1"},
+		{"dists/stable/main/debian-installer/binary-amd64/Packages.lz4", "x=1"},
 		{"dists/stable/Packages", ""},
 		{"pool/bad name.deb", ""},
 		{"pool/../bad.dsc", ""},
 	} {
 		if _, err := debianRequest(tc.path, tc.query); !errors.Is(err, kernel.ErrNotFound) {
 			t.Errorf("%s?%s: %v; want ErrNotFound", tc.path, tc.query, err)
+		}
+	}
+}
+
+// TestUnitDebianSourceRequestKeepsTheQueryOfAnIndex (#1349): a Packages or
+// Sources index and a by-hash file asked for with a query are named as
+// without one, with the same checks, and keep the query, which the source
+// boundary passes to the upstream only under Propagate Query Params. Before,
+// each answered not found without asking the upstream.
+func TestUnitDebianSourceRequestKeepsTheQueryOfAnIndex(t *testing.T) {
+	for _, path := range []string{
+		"dists/stable/main/binary-amd64/Packages",
+		"dists/stable/main/binary-amd64/Packages.lzma",
+		"dists/stable/main/debian-installer/binary-amd64/Packages",
+		"dists/stable/main/source/Sources.gz",
+		"dists/stable/main/binary-amd64/by-hash/SHA256/" + strings.Repeat("a", 64),
+		"dists/stable/main/i18n/by-hash/SHA256/" + strings.Repeat("a", 64),
+	} {
+		plain, err := debianRequest(path, "")
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		got, err := debianRequest(path, "x=1")
+		if err != nil {
+			t.Errorf("%s?x=1: %v; want the request named", path, err)
+			continue
+		}
+		if got.Resource.Query != "x=1" ||
+			got.Resource.PermissionFolder != plain.Resource.PermissionFolder ||
+			got.Resource.Variant != plain.Resource.Variant ||
+			(got.Resource.ValidateMetadata == nil) != (plain.Resource.ValidateMetadata == nil) {
+			t.Errorf("%s?x=1: query %q, folder %v, variant %q; want x=1 and %v, %q as without it",
+				path, got.Resource.Query, got.Resource.PermissionFolder, got.Resource.Variant,
+				plain.Resource.PermissionFolder, plain.Resource.Variant)
 		}
 	}
 }
