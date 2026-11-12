@@ -12,6 +12,7 @@ Endpoint: `${AW_URL}/artifactory/api/nix/${AW_REPO}`
 
 - A disposable Nix environment; the acceptance container runs as root.
 - The exact /nix/store path to copy and an independently verified public signing key.
+- For a channel, a nixexprs.tar.xz: an xz-compressed tar archive with one top-level folder, the channel name AW_NIX_CHANNEL and a new snapshot name AW_NIX_SNAPSHOT.
 
 Authentication: Use an access or reference token as the HTTP Basic password, with AW_USER equal to its subject. The subject needs read permission for installation and deploy permission for publication on the selected repository; token scopes cannot exceed that identity. The same clients also accept a user password when Basic password authentication is enabled. Use HTTPS.
 
@@ -36,6 +37,15 @@ PYCODE
 AW_NIX_URL="$AW_AUTH_URL/artifactory/api/nix/$AW_REPO"
 ```
 
+Channels need the netrc file: nix-channel downloads nixexprs.tar.xz below the effective URL libcurl reports, and libcurl 8.23.0 and later leave a URL's credentials out of it, so credentials in the channel URL reach only the first request.
+
+```sh
+AW_HOST=$(python3 -c 'import os; from urllib.parse import urlsplit; print(urlsplit(os.environ["AW_URL"]).hostname)')
+printf 'machine %s login %s password %s\n' "$AW_HOST" "$AW_USER" "$AW_TOKEN" > "$AW_WORK/netrc"
+export NIX_CONFIG="netrc-file = $AW_WORK/netrc"
+AW_CHANNEL_URL="$AW_URL/artifactory/api/nix/$AW_REPO/channels/$AW_NIX_CHANNEL"
+```
+
 ## Publish
 
 Classes: **local, federated**. Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.
@@ -45,6 +55,12 @@ payload is a directory of files. The server must have its Nix signing key config
 ```sh
 AW_STORE_PATH=$(nix-store --add ./payload)
 env HOME="$AW_WORK/home" nix --extra-experimental-features nix-command copy --to "$AW_NIX_URL?compression=xz" "$AW_STORE_PATH"
+```
+
+Publishes a channel snapshot, as the JFrog guide uploads it; the flavor segment is nixpkgs or nixos. The channel then names the snapshot uploaded last.
+
+```sh
+curl -fsS --netrc-file "$AW_WORK/netrc" -X PUT -T nixexprs.tar.xz "$AW_CHANNEL_URL/nixpkgs/$AW_NIX_SNAPSHOT"
 ```
 
 ## Install or resolve
@@ -57,12 +73,20 @@ Supply the exact store path from the producer. A new local store root ensures su
 env HOME="$AW_WORK/home" nix --extra-experimental-features nix-command --option require-sigs true --option trusted-public-keys "$AW_NIX_PUBLIC_KEY" copy --from "$AW_NIX_URL" --to "local?root=$AW_WORK/consumer" "$AW_STORE_PATH"
 ```
 
+Follows the channel to its newest snapshot. Nix reuses a downloaded channel for tarball-ttl seconds (an hour by default); add tarball-ttl = 0 to NIX_CONFIG to see a newer snapshot at once. A remote repository resolves official channel names, such as nixos-25.05, at the NixOS Channel Registry.
+
+```sh
+env HOME="$AW_WORK/home" nix-channel --add "$AW_CHANNEL_URL" nixpkgs
+env HOME="$AW_WORK/home" nix-channel --update nixpkgs
+```
+
 ## Limits
 
 Classes outside **local, remote, virtual, federated** are not registered for this format. Commands above apply only to each operation's listed classes. Federated evidence is for one node; it does not establish cross-vendor replication.
 
 - Store signatures stay required; do not solve failures with require-sigs=false.
 - Federated behavior covers one node.
+- A remote repository serves only the snapshot its channel names now.
 
 ## Verification sources
 

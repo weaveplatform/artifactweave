@@ -483,6 +483,15 @@ Nix 2.35.4 copy/substitution in fresh stores provides L/R/V/F evidence. The
 [contract and limits](../../testing/nix.md) document trust configuration, bounded
 parsing, lifecycle behavior and the binary-cache scope of this inventory row.
 
+Channels (#1263) follow the shape `nix-channel --update` expects of
+`channels.nixos.org`: `channels/<name>` answers 302 to the newest snapshot,
+`<flavor>/<snapshot>`, whose folder answers a page and holds
+`nixexprs.tar.xz`. The JFrog guide gives the client and upload URLs; the
+redirect, the page and storing the upload as
+`channels/<name>/<flavor>/<snapshot>/nixexprs.tar.xz` are inferred [I]. A
+remote resolves the name at the NixOS Channel Registry and caches the
+release's tarball; a virtual follows its first member that has the channel.
+
 ## P9c Machine Learning adapter (#780)
 
 FrogML publication uses the existing item service and metadata transaction: stage
@@ -794,7 +803,7 @@ keeps a release whose file the patterns reject (R3).
 | Swift | none | release list `<scope>/<name>`; release info `<v>`, `<v>.json`, `<v>/Package.swift` | Archive at `<scope>/<name>/<name>-<v>.zip`, refused with no archive headers. A remote repository names the package folder `<scope>/<name>` [I]. |
 | Terraform | a remote repository's documents under `.terraform/modules/` and `.terraform/providers/` [I] | module `versions`; provider `versions`, package metadata, mirror `index.json` and `<v>.json` | A module's `<v>/download` answers as a GET of its archive would (R9): `<ns>/<name>/<system>/<v>.zip` in a local repository, its cache path in a remote. A remote caches a provider file at its URL path below the Providers URL, else at `external/<host>/<path>`, and a GitHub module at its VCS tag path (#1260, decision 0040). Signed files pass the policy's message on. |
 | Git LFS | none | none | A transfer is checked at `objects/<xx>/<yy>/<oid>`. A download batch answers a caller who may not read 403 per object. Locks are unchanged. |
-| Nix | `nix-cache-info`, `<hash>.narinfo` | none | A NAR is checked at its own `nar/<file>`, so patterns on the NARs leave the narinfo served. |
+| Nix | `nix-cache-info`, `<hash>.narinfo` | `channels/<name>`, a snapshot's page `channels/<name>/<flavor>/<snapshot>` [I] | A NAR is checked at its own `nar/<file>`, so patterns on the NARs leave the narinfo served. A channel tarball is checked at `channels/<name>/<flavor>/<snapshot>/nixexprs.tar.xz` [I], and the channel still names a snapshot whose tarball the patterns reject. |
 | VCS | a remote repository's refs at `<owner>/<name>/gitrefs` | none | Read permission stays on the project folder. `downloadCommit` reads no refs. |
 | Puppet | a remote repository's `.puppet/<m>/releases.json` [I] | `v3/releases`, with or without `module`; `v3/releases/<slug>`; `v3/modules/<m>`; `v3/modules` without `query` | Module search (`v3/modules?query=`) kept (R2b). The lists of every release and module keep a release whose archive the patterns reject (R3); 7.x writes Puppet's listings as stored documents, an `all.json` among them (RTFACT-26143). Archive at `<m>/<m>-<v>.tar.gz`. |
 | Vagrant | none | the box catalog `<box>`, to a caller who could see one of its boxes | Other callers get "Vagrant box not found" as before. The catalog leaves out an entry whose box the patterns reject until P19 [I]. A box file is checked at its own `<path>.box` (#1259). |

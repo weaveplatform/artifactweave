@@ -10,6 +10,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -59,6 +60,11 @@ type fixture struct {
 	data, meta []byte
 	public     ed25519.PublicKey
 	private    ed25519.PrivateKey
+	// remote is the source service the router serves remote repositories
+	// through, and channels and releases the channel registry and release
+	// origin it was mounted with (nixhttp.Options).
+	remote             *source.Service
+	channels, releases *url.URL
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -112,19 +118,26 @@ func newFixture(t *testing.T) *fixture {
 
 func (f *fixture) mount(remote *source.Service, tune ...func(*pkgroute.Protocol)) {
 	principalOf := func(r *http.Request) kernel.Principal {
-		if user := r.Header.Get("X-User"); user != "" {
+		switch user := r.Header.Get("X-User"); user {
+		case "":
+			return kernel.Principal{Name: "admin", Admin: true}
+		case "anonymous":
+			return kernel.Principal{Name: user, Anonymous: true}
+		default:
 			return kernel.Principal{Name: user}
 		}
-		return kernel.Principal{Name: "admin", Admin: true}
 	}
 	router := chi.NewRouter()
 	router.Use(accesstest.Over(f.t, f.db).Middleware(f.t, false, principalOf))
 	// Bound over f.st, the store the router kit serves, as a server binds it.
 	api := accesstest.Over(f.t, f.st).API()
+	f.remote = remote
 	p := nixhttp.Protocol(nixhttp.Options{
 		RemoteSources: remote,
 		Authorizer:    api.Authorizer,
 		KeyPairs:      api.Keys,
+		Channels:      f.channels,
+		Releases:      f.releases,
 	})
 	for _, apply := range tune {
 		apply(&p)

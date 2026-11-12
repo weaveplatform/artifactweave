@@ -4,7 +4,10 @@
 // with PUT and DELETE, and a rebuild of the repository's index with POST
 // reindex. A hosted repository signs each narinfo it serves with its
 // Ed25519 key pair, and a remote one verifies upstream signatures against
-// its own. Metadata and archive rules are the format package's
+// its own. It also serves channels for nix-channel: channels/<name>
+// redirects to the channel's newest snapshot, whose folder answers a page
+// and holds nixexprs.tar.xz, and a PUT to a snapshot's folder publishes
+// it. Metadata and archive rules are the format package's
 // (artifacts/ecosystem/nix); this package answers HTTP with them.
 //
 // # Role
@@ -26,8 +29,9 @@
 //     before a hosted or virtual repository's narinfo or archive is served,
 //     and the key pairs, which sign a hosted narinfo and verify a remote's;
 //     the remote source service (Options.RemoteSources), which fetches
-//     upstream narinfo and archives into the remote cache; and the format
-//     package.
+//     upstream narinfo and archives into the remote cache, and a remote's
+//     channels from the NixOS Channel Registry and its releases
+//     (Options.Channels and Options.Releases); and the format package.
 //
 // # Outputs
 //
@@ -38,6 +42,13 @@
 //     to nar/<store hash>/<file> so that every archive download passes its
 //     narinfo's checks; the archive; and 201 for a publication, 204 for a
 //     deletion and 200 for a reindex.
+//   - Channels: 302 from channels/<name> to the newest snapshot
+//     <flavor>/<snapshot> the caller may read, relative so the client's
+//     host and path prefix carry over; 200 with a page linking the tarball
+//     for the snapshot's folder; the tarball itself; and 201 for a
+//     snapshot's upload. A hosted channel's newest snapshot is the one
+//     uploaded last, a remote's is the one the registry names now, and a
+//     virtual's is its first member's in order that has one.
 //
 // # Invariants
 //
@@ -61,6 +72,13 @@
 //     through. A virtual repository checks its own patterns at that path
 //     ("No repository found to serve the request") and passes over a
 //     member whose policy refuses it, a remote member's included.
+//   - A channel and a snapshot's page are computed, so Read permission
+//     comes first and then only the blackout refuses them, at the path
+//     asked for; a snapshot's tarball is refused by the blackout and
+//     patterns at its own path. A remote resolves a channel only at the
+//     channel registry and fetches its tarball only from the releases
+//     origin, never with the remote's credentials, and serves only the
+//     snapshot the registry names now.
 //   - A request with a query string is refused, publication needs a local
 //     or federated repository, and a virtual repository cannot be
 //     reindexed.
@@ -85,13 +103,17 @@
 //   - Plan: docs/implementation/plan.md#p33-automation-and-source-repositories
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
-//   - https://github.com/weaveplatform/artifactweave/issues/788 and
-//     https://github.com/weaveplatform/artifactweave/issues/1037
+//   - NixOS nix-channel, which follows the channel's redirect and downloads
+//     nixexprs.tar.xz below it:
+//     https://github.com/NixOS/nix/blob/master/src/nix/nix-channel/nix-channel.cc.
+//   - https://github.com/weaveplatform/artifactweave/issues/788,
+//     https://github.com/weaveplatform/artifactweave/issues/1037 and
+//     https://github.com/weaveplatform/artifactweave/issues/1263
 //
 // # Status
 //
 // Implemented P9c, which delivered the plan's P33 group (issues #782 to
-// #788). Moved here in P9d.
+// #788). Moved here in P9d. Channels added by #1263.
 //
 // # Testing
 //
@@ -108,4 +130,13 @@
 //     and remote repositories, Read permission first, and a virtual
 //     repository's own patterns and its pass-over of refusing local and
 //     remote members.
+//   - channel_test.go: channel publication and following, refused
+//     uploads, the answers kept outside channel paths, permission and
+//     policy, and virtual channels.
+//   - remote_channel_test.go: a remote's channels from the registry, bad
+//     upstream answers, following a moved channel and offline reads,
+//     policy, and a virtual over a remote member.
+//   - channel_fault_test.go: paged listings, readable snapshots only, a
+//     folder in a tarball's place, store faults and a remote source's
+//     authority.
 package nixhttp
