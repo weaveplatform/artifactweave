@@ -99,7 +99,9 @@
 //   - A Packages or Sources index, stored, cached, in a snapshot or passed
 //     through a virtual repository, reaches only a caller with Read
 //     permission on every package it lists, which the generic item route
-//     cannot check. The download policy does not
+//     cannot check. A Debian installer's Packages index, which a remote
+//     repository relays as metadata, is read with the permission on its
+//     own path, as a translation or a Contents index is [I]. The download policy does not
 //     filter or refuse an index for the packages it lists: a package whose
 //     file the include and exclude patterns reject stays listed and only its
 //     download is refused, as in Artifactory's indexes (RTFACT-30830,
@@ -113,13 +115,16 @@
 //     file it does not compose, passes over a member that refuses it to the
 //     next member.
 //   - A virtual repository composes only its Release, InRelease and
-//     Release.gpg, its Packages indexes and their by-hash copies. Any other
+//     Release.gpg, its Packages indexes and their by-hash copies, each
+//     index plain, gzipped and in each of the virtual repository's own
+//     optionalIndexCompressionFormats (bz2, lzma, xz). Any other
 //     file under dists/, such as a component Release, a Contents index, a
 //     translation, an installer file or a Sources index, comes from the
 //     first member, in order, that may serve it and holds it (RTFACT-19086,
 //     RTFACT-30014); the order is the configured one until #1252 settles
-//     it. A remote member lacks a file its Debian source request cannot
-//     name, such as an installer's Packages index, as its own GET answers.
+//     it. A remote member's upstream is asked for any such file; the member
+//     lacks only a name its Debian source request refuses, such as a
+//     by-hash name that is no SHA-256, as its own GET answers.
 //     Such a path with a matrix parameter or a query answers 404, as every
 //     such path did before the virtual repository served them.
 //   - A virtual repository's metadata is composed for each request from its

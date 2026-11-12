@@ -5,9 +5,11 @@ import (
 	"compress/bzip2"
 	"compress/gzip"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
+	"math"
 	"path"
 	"slices"
 	"strconv"
@@ -16,6 +18,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp/clearsign"
 	"github.com/klauspost/compress/zstd"
 	"github.com/ulikunitz/xz"
+	"github.com/ulikunitz/xz/lzma"
 )
 
 const (
@@ -58,16 +61,38 @@ func SourcesIndexPath(p string) bool {
 		indexName(parts[4], "Sources")
 }
 
+// indexExtensions are the compressions an index name may carry, in the
+// order a virtual merge prefers them when a member's Release declares no
+// plain index. The JFrog Debian guide's Compression Formats lists gzip,
+// bzip2, LZMA and xz as the forms Artifactory writes; zstd stays a form a
+// remote repository may relay, which no 7.x source says Artifactory writes.
+var indexExtensions = []string{".gz", ".xz", ".bz2", ".zst", ".lzma"}
+
 func indexName(got, want string) bool {
 	if got == want {
 		return true
 	}
-	for _, ext := range []string{".gz", ".xz", ".bz2", ".zst"} {
+	for _, ext := range indexExtensions {
 		if got == want+ext {
 			return true
 		}
 	}
 	return false
+}
+
+// InstallerPackagesIndexPath names the Packages index of the Debian
+// installer's udebs, dists/<d>/<c>/debian-installer/binary-<arch>/Packages,
+// plain or in any form an index name may take. A remote repository relays
+// it as metadata, as RTFACT-18414 made the installer's SHA256SUMS; it is
+// not one of the binary-<arch> indexes a repository composes or that
+// PackagesIndexPath names.
+func InstallerPackagesIndexPath(p string) bool {
+	parts := strings.Split(p, "/")
+	return len(parts) == 6 && parts[0] == "dists" &&
+		architecture.MatchString(parts[1]) && architecture.MatchString(parts[2]) &&
+		parts[3] == "debian-installer" && strings.HasPrefix(parts[4], "binary-") &&
+		architecture.MatchString(strings.TrimPrefix(parts[4], "binary-")) &&
+		path.Clean(p) == p && indexName(parts[5], "Packages")
 }
 
 // ReleaseMetadataPath names one of the metadata files apt checks before it
@@ -77,6 +102,24 @@ func ReleaseMetadataPath(p string) bool {
 	return len(parts) == 3 && parts[0] == "dists" &&
 		architecture.MatchString(parts[1]) &&
 		(parts[2] == "Release" || parts[2] == "InRelease" || parts[2] == "Release.gpg")
+}
+
+// ByHashPath names any checksum-addressed file, one whose path ends
+// by-hash/SHA256/<sha256>, and returns that SHA-256 in lower case. Apt reads
+// every file a Release lists this way when the Release says Acquire-By-Hash,
+// translations and Contents indexes as much as Packages indexes
+// (RTFACT-29275 shows a 7.x remote repository serving a component's
+// by-hash/SHA256 file), so only the name's shape is checked here.
+func ByHashPath(p string) (string, bool) {
+	parts := strings.Split(p, "/")
+	if len(parts) < 4 || parts[len(parts)-3] != "by-hash" || parts[len(parts)-2] != "SHA256" ||
+		len(parts[len(parts)-1]) != sha256.Size*2 || !validIndexPath(p) {
+		return "", false
+	}
+	if _, err := hex.DecodeString(parts[len(parts)-1]); err != nil {
+		return "", false
+	}
+	return strings.ToLower(parts[len(parts)-1]), true
 }
 
 // ByHashMetadataPath names a checksum-addressed Packages or Sources index.
@@ -181,7 +224,7 @@ func ReleasePackageIndexes(distribution string, body []byte) ([]PackageIndexRef,
 }
 
 func indexBase(p string) string {
-	for _, ext := range []string{".gz", ".xz", ".bz2", ".zst"} {
+	for _, ext := range indexExtensions {
 		if strings.HasSuffix(p, ext) {
 			return strings.TrimSuffix(p, ext)
 		}
@@ -190,7 +233,7 @@ func indexBase(p string) string {
 }
 
 func indexRank(p string) int {
-	for i, ext := range []string{".gz", ".xz", ".bz2", ".zst"} {
+	for i, ext := range indexExtensions {
 		if strings.HasSuffix(p, ext) {
 			return i + 1
 		}
@@ -219,9 +262,9 @@ func ReleaseIndexRefs(distribution string, body []byte) ([]PackageIndexRef, erro
 	return out, nil
 }
 
-// DecodePackagesIndex accepts the plain and mandatory gzip index encodings.
-// The bound applies after decompression, so a small compressed bomb cannot
-// enter the remote cache or a virtual index.
+// DecodePackagesIndex accepts the plain index and each compression an index
+// name may carry. The bound applies after decompression, so a small
+// compressed bomb cannot enter the remote cache or a virtual index.
 func DecodePackagesIndex(body []byte) ([]PackageRecord, error) {
 	var err error
 	body, err = decodeIndexCompression(body)
@@ -229,6 +272,20 @@ func DecodePackagesIndex(body []byte) ([]PackageRecord, error) {
 		return nil, err
 	}
 	return ParsePackagesIndex(body)
+}
+
+// DecodeInstallerPackagesIndex checks an installer's Packages index
+// (InstallerPackagesIndexPath) as DecodePackagesIndex checks a binary-<arch>
+// one, except that its rows name .udeb files, the installer's packages.
+func DecodeInstallerPackagesIndex(body []byte) ([]PackageRecord, error) {
+	var err error
+	body, err = decodeIndexCompression(body)
+	if err != nil {
+		return nil, err
+	}
+	return parsePackagesIndex(body, func(p string) bool {
+		return validIndexPath(p) && strings.HasSuffix(p, ".udeb")
+	})
 }
 
 func decodeIndexCompression(body []byte) ([]byte, error) {
@@ -255,6 +312,15 @@ func decodeIndexCompression(body []byte) ([]byte, error) {
 			return nil, fmt.Errorf("%w: zstd index: %w", errInvalidBinary, err)
 		}
 		reader, closeReader = z, z.Close
+	case lzmaAloneHeader(body):
+		// The dictionary the header asks for is allocated before a byte is
+		// decoded, so it is bounded as the decoded index is: 64 MiB is also
+		// the largest dictionary of xz's presets (-9).
+		z, err := lzma.ReaderConfig{DictCap: maxPackagesIndex}.NewReader(bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("%w: lzma index: %w", errInvalidBinary, err)
+		}
+		reader = z
 	default:
 		return body, nil
 	}
@@ -268,10 +334,37 @@ func decodeIndexCompression(body []byte) ([]byte, error) {
 	return plain, nil
 }
 
+// lzmaAloneHeader reports whether body starts with the header of a .lzma
+// file, which, unlike the other forms, has no magic number. It applies the
+// checks xz's own format detection makes: a properties byte below 225, a
+// dictionary size of 2^n or 2^n+2^(n-1), and a known size of at most 2^38
+// or the unknown size. A plain index can never pass: its first bytes are
+// text, and those dictionary sizes need at least two zero bytes.
+func lzmaAloneHeader(body []byte) bool {
+	if len(body) < lzma.HeaderLen || body[0] >= 9*5*5 {
+		return false
+	}
+	dict := binary.LittleEndian.Uint32(body[1:5])
+	if dict == 0 {
+		return false
+	}
+	if low := dict & -dict; dict != low && dict != 3*low {
+		return false
+	}
+	size := binary.LittleEndian.Uint64(body[5:13])
+	return size == math.MaxUint64 || size <= 1<<38
+}
+
 // ParsePackagesIndex checks the complete apt Packages representation before
 // it can be cached or combined into a virtual index. A malformed stanza must
 // not make apt resolve a package that the registry cannot safely address.
 func ParsePackagesIndex(body []byte) ([]PackageRecord, error) {
+	return parsePackagesIndex(body, validPackagePath)
+}
+
+// parsePackagesIndex is ParsePackagesIndex with validFilename deciding which
+// Filename a row may give.
+func parsePackagesIndex(body []byte, validFilename func(string) bool) ([]PackageRecord, error) {
 	if len(body) > maxPackagesIndex || bytes.IndexByte(body, 0) >= 0 {
 		return nil, fmt.Errorf("%w: Packages index size or contents", errInvalidBinary)
 	}
@@ -300,7 +393,7 @@ func ParsePackagesIndex(body []byte) ([]PackageRecord, error) {
 			!packageName.MatchString(fields["Package"]) ||
 			fields["Version"] == "" || strings.ContainsAny(fields["Version"], " \t\r\n/") ||
 			!architecture.MatchString(fields["Architecture"]) ||
-			!validPackagePath(fields["Filename"]) ||
+			!validFilename(fields["Filename"]) ||
 			len(fields["SHA256"]) != sha256.Size*2 {
 			return nil, fmt.Errorf("%w: invalid Packages coordinates", errInvalidBinary)
 		}

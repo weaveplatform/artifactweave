@@ -30,13 +30,14 @@
 //     caller with Read permission on every package it lists (a permission
 //     rule: a package the download policy refuses stays listed), composes
 //     and signs a virtual repository's metadata (DecodePackagesIndex,
-//     ReleasePackageIndexes, GzipIndex, Release, SignRelease), copies
+//     ReleasePackageIndexes, IndexForms, Release, SignRelease), copies
 //     checksum-bound metadata into a snapshot (ReleaseIndexRefs) under
 //     WithSnapshotWrite, and queues KindReindexNoProps; the item kit
 //     (artifacts/adapters/http/itemkit), whose remote source request checks
 //     upstream metadata or a package before a remote caches it (the *Path
-//     predicates, ValidateReleaseMetadata, DecodePackagesIndex,
-//     DecodeSourcesIndex, ReadBinary, ReadSource), and whose item GET sends a
+//     predicates, ByHashPath, ValidateReleaseMetadata, DecodePackagesIndex,
+//     DecodeInstallerPackagesIndex, DecodeSourcesIndex, ReadBinary,
+//     ReadSource), and whose item GET sends a
 //     remote's downloads through the remote source (Serves); and the
 //     artifacts module's item delete (artifacts/adapters/http), which permits
 //     a whole snapshot folder's delete (WithSnapshotDelete).
@@ -49,13 +50,16 @@
 //     the GPG signing pair, which the OpenPGP library
 //     (github.com/ProtonMail/go-crypto) unlocks and signs with. xz
 //     (github.com/ulikunitz/xz) and zstd (github.com/klauspost/compress)
-//     read a package's compressed control and data members. The generic
+//     read a package's compressed control and data members; xz, its lzma
+//     package and bzip2 (github.com/dsnet/compress, as the standard
+//     library only reads bzip2) write an index's optional forms. The generic
 //     deploy policy (artifacts/ecosystem/generic) is a check Admit
 //     applies.
 //   - Settings: none. A repository's primaryKeyPairRef (keyPair for a
 //     virtual repository) names its signing pair, ddebSupported admits
-//     .ddeb debug packages, and debianTrivialLayout refuses source
-//     packages.
+//     .ddeb debug packages, debianTrivialLayout refuses source packages,
+//     and optionalIndexCompressionFormats names the forms besides plain
+//     and gzip (bz2, lzma, xz) each Packages index is written in.
 //
 // # Outputs
 //
@@ -70,13 +74,15 @@
 //   - The package rules: Binary and ReadBinary; Source, SourcePart and
 //     ReadSource.
 //   - The index rules: IndexedBinary and Packages, IndexedSource,
-//     SourceArchive and Sources, GzipIndex, ReleaseEntry and Release,
+//     SourceArchive and Sources, GzipIndex, IndexForm and IndexForms,
+//     ReleaseEntry and Release,
 //     SignedRelease and SignRelease, ValidBinaryPath and ValidSourcePath.
 //   - The upstream metadata rules: PackagesIndexPath, SourcesIndexPath,
-//     ReleaseMetadataPath, ByHashMetadataPath, ValidateReleaseMetadata,
+//     InstallerPackagesIndexPath, ReleaseMetadataPath, ByHashPath,
+//     ByHashMetadataPath, ValidateReleaseMetadata,
 //     PackageIndexRef with ReleasePackageIndexes and ReleaseIndexRefs,
-//     PackageRecord with DecodePackagesIndex and ParsePackagesIndex, and
-//     SourceIndexRecord with DecodeSourcesIndex.
+//     PackageRecord with DecodePackagesIndex, DecodeInstallerPackagesIndex
+//     and ParsePackagesIndex, and SourceIndexRecord with DecodeSourcesIndex.
 //   - Snapshot guards: WithSnapshotWrite and WithSnapshotDelete.
 //   - The stored names: KindIndex, KindReindexNoProps and the Prop*
 //     property names.

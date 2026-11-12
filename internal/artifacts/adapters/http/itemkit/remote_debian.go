@@ -3,6 +3,7 @@ package itemkit
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,16 @@ import (
 // DebianSourceRequest admits remote package bytes only after the same bounded
 // parser used for local uploads has checked them. A .dsc is verified before it
 // can enter the cache; the Sources index additionally checks its parts.
+//
+// Otherwise a remote repository relays what its upstream serves, as 7.x
+// proxies and caches it (#1273). A package is admitted by its own grammar
+// first, so a folder named by-hash or a file name that starts Packages does
+// not hide it. Any by-hash file is checked against the SHA-256 its name
+// gives, and an index apt reads by the name Packages or Sources, a Debian
+// installer's included, is validated as metadata. Every other path, a
+// translation or a Contents index for one, passes through unchecked; a
+// path in none of these shapes that only resembles one answers not found
+// without asking the upstream, as it did before.
 func DebianSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
 	switch {
@@ -31,64 +42,7 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 		) error {
 			return validateDebianRemoteRelease(p, r, size)
 		}
-	case strings.Contains(p, "/by-hash/SHA256/"):
-		expected, ok := debian.ByHashMetadataPath(p)
-		if !ok || q.Resource.Query != "" {
-			return q, kernel.ErrNotFound
-		}
-		q.Resource.Kind = source.ResourceKindMetadata
-		q.Resource.Variant = "debian-by-hash-v1"
-		q.Resource.ValidateMetadata = func(
-			_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse,
-		) error {
-			return validateDebianRemoteHash(expected, r, size)
-		}
-	case strings.HasPrefix(path.Base(p), "Packages") ||
-		strings.HasPrefix(path.Base(p), "Sources"):
-		if !debian.PackagesIndexPath(p) && !debian.SourcesIndexPath(p) ||
-			q.Resource.Query != "" {
-			return q, kernel.ErrNotFound
-		}
-		q.Resource.Kind = source.ResourceKindMetadata
-		q.Resource.PermissionFolder = true
-		if debian.PackagesIndexPath(p) {
-			q.Resource.Variant = "debian-packages-v2"
-		} else {
-			q.Resource.Variant = "debian-sources-v2"
-		}
-		q.Resource.ValidateMetadata = func(
-			_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse,
-		) error {
-			if size < 0 || size > 64<<20 {
-				return &source.HTTPError{
-					Status: http.StatusBadGateway,
-					Kind:   source.FailureKindIntegrity,
-				}
-			}
-			body, err := io.ReadAll(io.LimitReader(r, 64<<20+1))
-			if err != nil || int64(len(body)) != size {
-				return &source.HTTPError{
-					Status: http.StatusBadGateway,
-					Kind:   source.FailureKindIntegrity,
-				}
-			}
-			if debian.PackagesIndexPath(p) {
-				_, err = debian.DecodePackagesIndex(body)
-			} else {
-				_, err = debian.DecodeSourcesIndex(body)
-			}
-			if err != nil {
-				return &source.HTTPError{
-					Status: http.StatusBadGateway,
-					Kind:   source.FailureKindIntegrity,
-				}
-			}
-			return nil
-		}
-	case strings.HasSuffix(p, ".deb") || strings.HasSuffix(p, ".ddeb"):
-		if !debian.ValidBinaryPath(p) {
-			return q, kernel.ErrNotFound
-		}
+	case debian.ValidBinaryPath(p):
 		q.Resource.Variant = "debian-binary-v1"
 		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
 			if _, err := debian.ReadBinary(ctx, seekReaderAt{r}, size); err != nil {
@@ -99,10 +53,7 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 			}
 			return nil
 		}
-	case strings.HasSuffix(p, ".dsc"):
-		if !debian.ValidSourcePath(p) {
-			return q, kernel.ErrNotFound
-		}
+	case debian.ValidSourcePath(p):
 		q.Resource.Variant = "debian-source-v1"
 		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
 			if _, err := debian.ReadSource(ctx, r, size); err != nil {
@@ -113,6 +64,95 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 			}
 			return nil
 		}
+	case strings.Contains(p, "/by-hash/SHA256/"):
+		expected, ok := debian.ByHashPath(p)
+		if !ok || q.Resource.Query != "" {
+			return q, kernel.ErrNotFound
+		}
+		// The index route (TryDebianItem) reads a binary-<arch> or source
+		// index's copy whole, so that copy keeps the route's 64 MiB bound.
+		// Any other copy, of a Contents index for one, is hashed as it
+		// streams and bounded only as every remote file is.
+		limit := int64(0)
+		if _, index := debian.ByHashMetadataPath(p); index {
+			limit = 64 << 20
+		}
+		q.Resource.Kind = source.ResourceKindMetadata
+		q.Resource.Variant = "debian-by-hash-v1"
+		q.Resource.ValidateMetadata = func(
+			_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse,
+		) error {
+			return validateDebianRemoteHash(expected, r, size, limit)
+		}
+	case strings.HasPrefix(path.Base(p), "Packages") ||
+		strings.HasPrefix(path.Base(p), "Sources"):
+		return debianIndexSourceRequest(q)
+	case strings.HasSuffix(p, ".deb") || strings.HasSuffix(p, ".ddeb") ||
+		strings.HasSuffix(p, ".dsc"):
+		return q, kernel.ErrNotFound
+	}
+	return q, nil
+}
+
+// debianIndexSourceRequest prepares the read of a file whose name starts
+// Packages or Sources: an index apt reads, validated as metadata, or not
+// found for any other such name.
+//
+// An installer's Packages index (debian.InstallerPackagesIndexPath) is
+// metadata, so the retrieval cache period renews it, as RTFACT-18414
+// (7.3.0) made the installer's SHA256SUMS metadata beside it [I]. It is
+// read with the permission on its own path, as a translation or a Contents
+// index is, not with the check the index route makes of every package a
+// binary-<arch> or source index lists: 7.x documents only path permissions
+// for Debian metadata, and the installer's index is not one artifactweave
+// composes or snapshots as an index [I].
+func debianIndexSourceRequest(q source.Request) (source.Request, error) {
+	p := q.Resource.Path
+	var decodes func([]byte) bool
+	switch {
+	case q.Resource.Query != "":
+		return q, kernel.ErrNotFound
+	case debian.PackagesIndexPath(p):
+		q.Resource.PermissionFolder = true
+		q.Resource.Variant = "debian-packages-v2"
+		decodes = func(body []byte) bool {
+			_, err := debian.DecodePackagesIndex(body)
+			return err == nil
+		}
+	case debian.SourcesIndexPath(p):
+		q.Resource.PermissionFolder = true
+		q.Resource.Variant = "debian-sources-v2"
+		decodes = func(body []byte) bool {
+			_, err := debian.DecodeSourcesIndex(body)
+			return err == nil
+		}
+	case debian.InstallerPackagesIndexPath(p):
+		q.Resource.Variant = "debian-installer-packages-v1"
+		decodes = func(body []byte) bool {
+			_, err := debian.DecodeInstallerPackagesIndex(body)
+			return err == nil
+		}
+	default:
+		return q, kernel.ErrNotFound
+	}
+	q.Resource.Kind = source.ResourceKindMetadata
+	q.Resource.ValidateMetadata = func(
+		_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse,
+	) error {
+		if size < 0 || size > 64<<20 {
+			return &source.HTTPError{
+				Status: http.StatusBadGateway,
+				Kind:   source.FailureKindIntegrity,
+			}
+		}
+		body, err := io.ReadAll(io.LimitReader(r, 64<<20+1))
+		if err != nil || int64(len(body)) != size || !decodes(body) {
+			return &source.HTTPError{
+				Status: http.StatusBadGateway,
+				Kind:   source.FailureKindIntegrity,
+			}
+		}
+		return nil
 	}
 	return q, nil
 }
@@ -145,12 +185,15 @@ func validateDebianRemoteRelease(path string, r io.ReadSeeker, size int64) error
 	return nil
 }
 
-func validateDebianRemoteHash(expected string, r io.ReadSeeker, size int64) error {
-	body, err := readDebianRemoteMetadata(r, size, 64<<20)
-	if err != nil {
-		return err
+// validateDebianRemoteHash accepts a by-hash file of size bytes, at most
+// limit when limit is above zero, whose SHA-256 is expected.
+func validateDebianRemoteHash(expected string, r io.ReadSeeker, size, limit int64) error {
+	if size <= 0 || limit > 0 && size > limit {
+		return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.FailureKindIntegrity}
 	}
-	if fmt.Sprintf("%x", sha256.Sum256(body)) != expected {
+	sum := sha256.New()
+	n, err := io.Copy(sum, io.LimitReader(r, size+1))
+	if err != nil || n != size || hex.EncodeToString(sum.Sum(nil)) != expected {
 		return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.FailureKindIntegrity}
 	}
 	return nil
