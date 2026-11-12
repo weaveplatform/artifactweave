@@ -21,8 +21,9 @@
 //     deployed, deleted and annotated through the ordinary item API, where
 //     the format's hooks keep the index; this package only reads.
 //   - Driven: the router kit (pkgroute.Kit), which resolves the repository
-//     and the caller, checks permissions and reads the package index, the
-//     items and their properties in one transaction; the generic download
+//     and the caller, checks permissions and the blackout, and reads the
+//     package index, the items and their properties in one transaction;
+//     the generic download
 //     policy (generic.CheckDownload), which drops a box the repository's
 //     include and exclude patterns refuse; the request's base URL
 //     (platform/httpkit/baseurl), from which download URLs are built; and
@@ -36,8 +37,9 @@
 //   - Answers: the catalog as JSON, its name and its versions, each with
 //     its providers' name, url, checksum_type (sha256), checksum and
 //     optional architecture, versions and providers sorted, private and
-//     kept by no cache (Cache-Control: private, no-store); and 404 when the
-//     box is unknown or no version has a box to list.
+//     kept by no cache (Cache-Control: private, no-store); 404 when the
+//     box is unknown or no version has a box to list; and the blackout 404
+//     when a blacked-out repository's catalog would list a box.
 //
 // # Invariants
 //
@@ -49,6 +51,11 @@
 //     patterns allow it and its recorded properties verify. Of several
 //     boxes for one version, provider and architecture, the most recently
 //     updated is listed, with the path as the tie-break.
+//   - A blacked-out repository refuses a catalog that would list a box the
+//     caller may read with the blackout 404, naming the box the request
+//     names (R2a, R9, R10). Read permission comes first (DV-057): a caller
+//     who may read none of the box's entries answers 404 "Vagrant box not
+//     found", as for an unknown box.
 //   - Download URLs name the item under /artifactory/{repo}/ and never
 //     carry a token.
 //   - A catalog lists at most 10,000 versions and 10,000 boxes (503
@@ -90,6 +97,10 @@
 //     forged and changed properties, copies, moves, deletes, restores and
 //     reindex, statuses and permissions, refused boxes, store failures,
 //     and the newest readable box for a duplicate provider.
+//   - policy_test.go (external too): the blackout 404 to a caller who
+//     would see a box, as reader or administrator, with matrix parameters
+//     and by HEAD, and "Vagrant box not found" to one who would not, with
+//     and without the blackout.
 //
 // The @vagrant acceptance scenarios drive the Vagrant client against local
 // and one-node federated repositories.

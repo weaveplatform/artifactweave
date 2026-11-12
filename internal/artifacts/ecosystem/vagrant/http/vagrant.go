@@ -138,6 +138,14 @@ func (h handler) catalog(r *http.Request, name string, matrix model.Matrix) (cat
 	if len(out.Versions) == 0 {
 		return out, notFound()
 	}
+	// The blackout refuses the catalog with its 404, naming the box the
+	// request names (R2a, R9, R10), after read permission as every policy
+	// check is (DV-057): a caller who may read none of the box's entries,
+	// or whose matrix parameters match none, still answers "Vagrant box not
+	// found".
+	if err := h.k.CheckBlackedOut(r, name); err != nil {
+		return out, fmt.Errorf("vagrant catalog: %w", err)
+	}
 	slices.SortFunc(
 		out.Versions,
 		func(a, b version) int { return strings.Compare(a.Version, b.Version) },
@@ -161,6 +169,11 @@ func (h handler) providers(
 	}
 	*remaining -= len(ids)
 	c := pkgroute.RequestFrom(r).Repo
+	// Only the patterns leave a box out here. Leaving every box out under
+	// the blackout would answer "Vagrant box not found" to a caller who
+	// could see one, which catalog refuses with the blackout 404 instead.
+	open := c
+	open.BlackedOut = nil
 	var items []model.Item
 	for _, id := range ids {
 		it, err := h.k.DB().Items().GetByID(r.Context(), id)
@@ -172,7 +185,7 @@ func (h handler) providers(
 		}
 		if it.Folder || it.Cached || it.RepoKey != c.Key ||
 			!h.k.Can(r, it.FullPath(), api.ActionRead) ||
-			generic.CheckDownload(c, it.FullPath(), false) != nil {
+			generic.CheckDownload(open, it.FullPath(), false) != nil {
 			continue
 		}
 		items = append(items, it)
