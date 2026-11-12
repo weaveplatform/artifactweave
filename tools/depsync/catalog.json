@@ -740,13 +740,13 @@
       "path": "test/acceptance/clients/luarocks.Dockerfile",
       "pattern": "(lua-)[0-9]+(?:\\.[0-9]+)*",
       "replacement": "\\g<1>{{lua}}",
-      "count": 4
+      "count": 5
     },
     {
       "path": "test/acceptance/clients/luarocks.Dockerfile",
       "pattern": "(luarocks-)[0-9]+(?:\\.[0-9]+)*",
       "replacement": "\\g<1>{{luarocks}}",
-      "count": 3
+      "count": 4
     },
     {
       "path": "test/acceptance/clients/maven.Dockerfile",
