@@ -8,7 +8,7 @@ components:
       schema:
         type: string
     groupName:
-      description: Required path parameter. The group name.
+      description: Required path parameter. The group name, matched exactly, case included.
       in: path
       name: name
       required: true
@@ -299,9 +299,9 @@ components:
             type: string
           type: array
         name:
-          description: Required within this object. The group name; unique, case-insensitive. A create or replace
-            by name (PUT) may send it empty or leave it out and takes the name in the path; any other value must
-            equal the name in the path.
+          description: Required within this object. The group name; unique and case-sensitive, so ops and Ops are
+            two groups. A create or replace by name (PUT) may send it empty or leave it out and takes the name in
+            the path; any other value must equal the name in the path, case included.
           type: string
         policy_manager:
           default: false

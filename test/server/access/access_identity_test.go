@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"testing"
@@ -750,4 +751,210 @@ func TestAccGroupListPagesAndFilters(t *testing.T) {
 		http.StatusBadRequest,
 		nil,
 	)
+}
+
+// groupExchange is one request of the group name tests and the exact answer
+// it gets.
+type groupExchange struct {
+	method, path, body string
+	want               int
+	wantBody           string
+}
+
+// exchangeAll sends each request as creds, a body as JSON, and checks the
+// status and the whole body.
+func exchangeAll(t *testing.T, h http.Handler, creds map[string]string, steps []groupExchange) {
+	t.Helper()
+	for _, s := range steps {
+		headers := creds
+		if s.body != "" {
+			headers = jsonAs(creds)
+		}
+		rec := do(t, h, s.method, s.path, headers, s.body)
+		if got := strings.TrimSpace(rec.Body.String()); rec.Code != s.want || got != s.wantBody {
+			t.Fatalf("%s %s %s: %d %s, want %d %s", s.method, s.path, s.body, rec.Code, got,
+				s.want, s.wantBody)
+		}
+	}
+}
+
+const v2Groups = "/access/api/v2/groups"
+
+func v2GroupDoc(name string) string {
+	return `{"admin_privileges":false,"auto_join":false,"manage_resources":false,` +
+		`"manage_webhook":false,"members":[],"name":"` + name + `","policy_manager":false,` +
+		`"policy_viewer":false,"realm":"internal","reports_manager":false,"watch_manager":false}`
+}
+
+func legacyGroupDoc(name string) string {
+	return `{"adminPrivileges":false,"autoJoin":false,"name":"` + name + `","policyManager":false,` +
+		`"realm":"internal","reportsManager":false,"watchManager":false}`
+}
+
+func v2GroupMissing(name string) string {
+	return `{"errors":[{"code":"NOT_FOUND","message":"Group '` + name + `' does not exist"}]}`
+}
+
+func legacyGroupMissing(name string) string {
+	return `{"errors":[{"message":"Group '` + name + `' does not exist","status":404}]}`
+}
+
+// TestAccGroupNamesKeepTheirCase creates ops and then Ops on each route that
+// creates a group, and reads OPS (#1309). 7.x keeps a group name as given
+// and compares it exactly: JFrog's Get Permissions page matches "group names
+// exactly", its SAML SSO page searches "for a case-sensitive match to an
+// existing group", and the KB's SAML with ADFS article says "Internal
+// Artifactory groups are case sensitive". So Ops is a second group, not a
+// conflict or a replacement of ops, and OPS names neither. Only usernames
+// are folded to lower case.
+func TestAccGroupNamesKeepTheirCase(t *testing.T) {
+	reads := []groupExchange{
+		{http.MethodGet, v2Groups + "/OPS", "", http.StatusNotFound, v2GroupMissing("OPS")},
+		{http.MethodGet, secGroups + "/OPS", "", http.StatusNotFound, legacyGroupMissing("OPS")},
+		{http.MethodGet, v2Groups + "/ops", "", http.StatusOK, v2GroupDoc("ops")},
+		{http.MethodGet, v2Groups + "/Ops", "", http.StatusOK, v2GroupDoc("Ops")},
+		{http.MethodGet, secGroups + "/ops", "", http.StatusOK, legacyGroupDoc("ops")},
+		{http.MethodGet, secGroups + "/Ops", "", http.StatusOK, legacyGroupDoc("Ops")},
+		{http.MethodGet, v2Groups, "", http.StatusOK, `{"groups":[` +
+			`{"group_name":"Ops","uri":"http://example.com/access/api/v2/groups/Ops"},` +
+			`{"group_name":"ops","uri":"http://example.com/access/api/v2/groups/ops"},` +
+			`{"group_name":"readers","uri":"http://example.com/access/api/v2/groups/readers"}]}`},
+		{http.MethodGet, secGroups, "", http.StatusOK, `[` +
+			`{"name":"Ops","uri":"http://example.com/artifactory/api/security/groups/Ops"},` +
+			`{"name":"ops","uri":"http://example.com/artifactory/api/security/groups/ops"},` +
+			`{"name":"readers","uri":"http://example.com/artifactory/api/security/groups/readers"}]`},
+	}
+	for _, tc := range []struct {
+		route   string
+		creates []groupExchange
+	}{
+		{"POST " + v2Groups, []groupExchange{
+			{http.MethodPost, v2Groups, `{"name":"ops"}`, http.StatusCreated, v2GroupDoc("ops")},
+			{http.MethodPost, v2Groups, `{"name":"Ops"}`, http.StatusCreated, v2GroupDoc("Ops")},
+			// Only the same spelling is taken.
+			{
+				http.MethodPost, v2Groups, `{"name":"ops"}`, http.StatusConflict,
+				`{"errors":[{"code":"CONFLICT","message":"Group 'ops' already exists"}]}`,
+			},
+		}},
+		{"PUT " + v2Groups + "/{name}", []groupExchange{
+			{http.MethodPut, v2Groups + "/ops", `{}`, http.StatusCreated, v2GroupDoc("ops")},
+			// 201: Ops is created, not a replacement of ops.
+			{http.MethodPut, v2Groups + "/Ops", `{}`, http.StatusCreated, v2GroupDoc("Ops")},
+			// The body's name must be "the same as the name in the path",
+			// and a name that differs in case names another group.
+			{
+				http.MethodPut, v2Groups + "/ops", `{"name":"OPS"}`, http.StatusBadRequest,
+				`{"errors":[{"code":"BAD_REQUEST","message":"the group name in the body must match the path"}]}`,
+			},
+			{http.MethodPut, v2Groups + "/ops", `{"name":"ops"}`, http.StatusOK, v2GroupDoc("ops")},
+		}},
+		{"PUT " + secGroups + "/{groupName}", []groupExchange{
+			{http.MethodPut, secGroups + "/ops", `{"name":"ops"}`, http.StatusCreated, ""},
+			{http.MethodPut, secGroups + "/Ops", `{"name":"Ops"}`, http.StatusCreated, ""},
+			{
+				http.MethodPut, secGroups + "/ops", `{"name":"OPS"}`, http.StatusBadRequest,
+				`{"errors":[{"message":"the group name in the body must match the path","status":400}]}`,
+			},
+		}},
+	} {
+		t.Run(tc.route, func(t *testing.T) {
+			w := newIdentityWorld(t)
+			exchangeAll(t, w.h, admin, append(slices.Clone(tc.creates), reads...))
+		})
+	}
+}
+
+// TestAccGroupNamesMatchExactly checks the case rule of the group row holds
+// wherever a group name is matched: the group routes, permissions, user
+// memberships and group-scoped tokens, in the Access and the legacy forms
+// (#1309). OPS reaches nothing that ops has. That a permission, a
+// membership or a token scope compares group names exactly is inferred from
+// the documented rule for the group row and for the Get Permissions group
+// filter; no 7.x source states it for each.
+func TestAccGroupNamesMatchExactly(t *testing.T) {
+	h := tokenFixture(t, allowBasicTokens)
+	const opsPerm = `{"name":"ops-perm","repo":{"actions":{"groups":{"ops":["read","manage"]}},` +
+		`"exclude-patterns":[],"include-patterns":["**"],"repositories":["ANY LOCAL"]}}`
+	exchangeAll(t, h, admin, []groupExchange{
+		{http.MethodPost, v2Groups, `{"name":"ops"}`, http.StatusCreated, v2GroupDoc("ops")},
+		{http.MethodPut, permV2 + "/ops-perm", opsPerm, http.StatusOK, ""},
+		{
+			http.MethodPut, permV2 + "/ops-upper", strings.ReplaceAll(
+				strings.ReplaceAll(opsPerm, `"ops"`, `"OPS"`), "ops-perm", "ops-upper"),
+			http.StatusBadRequest,
+			`{"errors":[{"message":"Group 'OPS' does not exist","status":400}]}`,
+		},
+		{http.MethodGet, permAcc + "?group=OPS", "", http.StatusNotFound, v2GroupMissing("OPS")},
+		{
+			http.MethodGet,
+			permAcc + "?group=ops",
+			"",
+			http.StatusOK,
+			`{"permissions":[{"name":"ops-perm","uri":"https://reg.example/access/api/v2/permissions/ops-perm"}]}`,
+		},
+		// The 400's message is the in-memory store's own error text; the SQL
+		// stores word it differently.
+		{
+			http.MethodPatch, "/access/api/v2/users/user/groups", `{"add":["OPS"]}`,
+			http.StatusBadRequest,
+			`{"errors":[{"code":"BAD_REQUEST","message":"group OPS: store: not found"}]}`,
+		},
+		{
+			http.MethodPatch, v2Groups + "/OPS/members", `{"add":["user"]}`, http.StatusNotFound,
+			v2GroupMissing("OPS"),
+		},
+		{
+			http.MethodPatch, v2Groups + "/OPS", `{"description":"d"}`, http.StatusNotFound,
+			v2GroupMissing("OPS"),
+		},
+		{http.MethodDelete, v2Groups + "/OPS", "", http.StatusNotFound, v2GroupMissing("OPS")},
+		{
+			http.MethodPost, secGroups + "/OPS", `{"description":"d"}`, http.StatusNotFound,
+			legacyGroupMissing("OPS"),
+		},
+		{http.MethodDelete, secGroups + "/OPS", "", http.StatusNotFound, legacyGroupMissing("OPS")},
+		{http.MethodGet, v2Groups + "/ops", "", http.StatusOK, v2GroupDoc("ops")},
+	})
+
+	// A groups scope acts through the group it names, spelled exactly: the
+	// Access form, and the legacy member-of-groups form that stands for it.
+	accessToken := func(scope string) map[string]string {
+		created := mintAdmin(t, h, `{"username":"user","scope":"`+scope+`"}`)
+		tok, _ := created["access_token"].(string)
+		return bearerAuth(tok)
+	}
+	legacyToken := func(scope string) map[string]string {
+		rec := do(t, h, http.MethodPost, legacyTokenPath, formAs(admin),
+			"username=user&scope="+url.QueryEscape(scope))
+		created := decodeObject(t, rec.Body.String())
+		tok, _ := created["access_token"].(string)
+		if rec.Code != http.StatusOK || tok == "" {
+			t.Fatalf("legacy token %s: %d %s", scope, rec.Code, rec.Body)
+		}
+		return bearerAuth(tok)
+	}
+	const forbidden = `{"errors":[{"message":"Forbidden","status":403}]}`
+	for _, tc := range []struct {
+		scope    string
+		creds    map[string]string
+		want     int
+		wantBody string
+	}{
+		{
+			"applied-permissions/groups:OPS", accessToken("applied-permissions/groups:OPS"),
+			http.StatusForbidden, forbidden,
+		},
+		{
+			"applied-permissions/groups:ops", accessToken("applied-permissions/groups:ops"),
+			http.StatusOK, opsPerm,
+		},
+		{"member-of-groups:OPS", legacyToken("member-of-groups:OPS"), http.StatusForbidden, forbidden},
+		{"member-of-groups:ops", legacyToken("member-of-groups:ops"), http.StatusOK, opsPerm},
+	} {
+		rec := do(t, h, http.MethodGet, permV2+"/ops-perm", tc.creds, "")
+		if got := strings.TrimSpace(rec.Body.String()); rec.Code != tc.want || got != tc.wantBody {
+			t.Fatalf("%s: %d %s, want %d %s", tc.scope, rec.Code, got, tc.want, tc.wantBody)
+		}
+	}
 }

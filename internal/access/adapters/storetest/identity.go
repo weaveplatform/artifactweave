@@ -22,6 +22,7 @@ func runIdentity(t *testing.T, newStore Factory) {
 	t.Run("Users", func(t *testing.T) { testUsers(t, newStore(t)) })
 	t.Run("UserLockout", func(t *testing.T) { testUserLockout(t, newStore(t)) })
 	t.Run("Groups", func(t *testing.T) { testGroups(t, newStore(t)) })
+	t.Run("GroupNameCase", func(t *testing.T) { testGroupNameCase(t, newStore(t)) })
 	t.Run("Memberships", func(t *testing.T) { testMemberships(t, newStore(t)) })
 	t.Run("Permissions", func(t *testing.T) { testPermissions(t, newStore(t)) })
 	t.Run("Tokens", func(t *testing.T) { testTokens(t, newStore(t)) })

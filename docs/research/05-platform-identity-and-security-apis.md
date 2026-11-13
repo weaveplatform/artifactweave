@@ -226,6 +226,26 @@ Create body: `{name,description,auto_join,admin_privileges,external_id,import_fr
 details add `realm` and `realm_attributes`. The `roles` field needs Artifactory ≥7.128.0;
 there is no other version gate on groups.
 
+**Group names keep their case and are compared exactly**
+([#1309](https://github.com/weaveplatform/artifactweave/issues/1309)), unlike usernames,
+which Access lowercases. [Get Permissions](https://docs.jfrog.com/administration/reference/getpermissions)
+says "Usernames are matched case-insensitively, group names exactly"; the
+[SAML SSO](https://docs.jfrog.com/administration/docs/saml-sso) group attribute makes "a
+case-sensitive match to an existing group"; and the KB article on
+[SAML SSO with ADFS](https://jfrog.com/help/r/artifactory-how-do-i-configure-artifactory-saml-sso-with-adfs-2022)
+says "Internal Artifactory groups are case sensitive". Only groups imported from LDAP are
+lowercased ([Create a Group](https://docs.jfrog.com/administration/reference/creategroup);
+the [LDAP](https://docs.jfrog.com/administration/docs/ldap) page asks for lower case when such a
+group is created over REST). The clients agree: `platform_group` and `artifactory_group` send
+the name as written and read it back unchanged. So, in artifactweave as in 7.x, `Ops` created
+beside `ops` is a second group on `POST` and `PUT /access/api/v2/groups` and on the legacy
+`PUT /api/security/groups/{groupName}`, and `GET .../groups/OPS` answers 404 on both APIs.
+The same exact match holds wherever a group name is matched: a permission's grants, a
+user's groups, a group's members, the `group` permission filter and the
+`applied-permissions/groups` and `member-of-groups` token scopes. Only the `groupName` list
+filter ignores case, as a search. No 7.x source states each of these one by one, so the
+create conflict, the lookup and the matches outside the group row are **[I]**.
+
 ### Permissions v2 (Artifactory ≥7.72.0)
 
 | Method | Path | Status | Notes |
