@@ -31,12 +31,21 @@
 //     passwords that follow a changed password revoked.
 //   - ErrInvalid (with ErrProtected for a change to a built-in principal)
 //     and ErrExists for a refused request; store errors, kernel.ErrNotFound
-//     among them, come back for the handlers to map.
+//     among them, come back for the handlers to map. The service words an
+//     unknown group in a user write, and an unknown member in a legacy group
+//     write, itself ("Group 'x' does not exist"), so the answer is the same
+//     on every store (#1433).
 //
 // # Invariants
 //
 //   - A change that takes several store calls runs in one transaction of
 //     the Store, so a write that fails part way leaves nothing behind.
+//   - Every user name a method is given is folded (model.FoldUsername)
+//     before it reaches a store, so the stores hold lower-case names only and
+//     BOB names bob everywhere (#1432). A user row stored in mixed case
+//     before that rule is not rewritten: the preview has no data upgrades,
+//     so it is no longer reached by name, and is recreated under the
+//     lower-case name instead.
 //   - The last administrator cannot be deleted or demoted, and the seeded
 //     admin and anonymous users cannot be deleted.
 //   - A changed or expired password revokes the user's encrypted password,
@@ -65,7 +74,8 @@
 // password endpoints (pull request 466) and login suspension, filters and
 // limits (pull request 470). Moved here in P9d, where Service takes Store.
 // Access v2's create or replace of a group (ReplaceGroup) came with issue
-// 1200.
+// 1200, and the user name rule and the service's wording of an unknown group
+// or member with issues 1432 and 1433.
 //
 // # Testing
 //
@@ -83,6 +93,10 @@
 //   - replace_group_test.go: TestUnitReplaceGroupCreates,
 //     TestUnitReplaceGroupResetsEachField, TestUnitReplaceGroupSetsEachField,
 //     TestUnitReplaceGroupRefusals and TestUnitReplaceGroupOneTransaction.
+//   - username_test.go: TestUnitUsernamesFold, TestUnitUsernameTokensRevoked,
+//     TestUnitUnknownGroupOrMember and TestUnitUnknownGroupStoreFailures
+//     (user names in any case, and the service's wording of an unknown group
+//     or member, #1432 and #1433).
 //
 // The tests run on the metadata store's in-memory store, seeded with the
 // built-in principals through a stand-in for the artifacts module's

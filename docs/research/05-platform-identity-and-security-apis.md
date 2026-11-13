@@ -211,6 +211,49 @@ no longer at `/artifactory/api/access` ([7.90.5 self-managed release notes](http
 details and project groups and roles, which the `system:` scopes below already allow; that
 change is not yet in self-managed 7.161.32.
 
+**User names are matched without regard to case and stored in lower case**
+([#1432](https://github.com/weaveplatform/artifactweave/issues/1432)). The
+[SCIM](https://docs.jfrog.com/administration/docs/scim) page (7.17.0+) says "User names are the
+unique identifiers for users in Access. User names are case-insensitive";
+[Get Permissions](https://docs.jfrog.com/administration/reference/getpermissions) matches
+"Usernames ... case-insensitively, group names exactly"; and
+[RTFACT-29660](https://jfrog.atlassian.net/browse/RTFACT-29660) (7.55.13) says a user created
+"with capitalization" is stored lower-case, as RTFACT-7243, RTFACT-9966 and RTFACT-12337 say for
+earlier versions and OSS 6.20 `SecurityServiceImpl` does on create and update **[I]**. So
+artifactweave folds every user name it is given, on both APIs: `POST /access/api/v2/users` and
+the legacy `PUT /api/security/users/Dan` store `dan`; `BOB` names `bob` in every user path,
+including a legacy body's `name`, in Basic logins (a password, an encrypted password or an
+access token, with the lock count and suspension shared), in group `members` and `userNames`,
+in permission grants and the `users/{userName}` permission view, in unlocks, password expiry
+and changes, in the API restrictions, and in the user a token is minted for or refreshed by.
+The built-in `admin` and `anonymous` stay protected in any case. JFrog bugs that split by case
+are not followed: RTFACT-29660 (`unlockUsers` with `TEST_user` does nothing, and failed logins
+counted apart), RTFACT-23893 (`"userNames":["TESTUSER"]` adds nobody), RTFACT-10141 (an API key
+or encrypted password with an upper-case name, fixed in 7.17.2) and
+[RTFACT-23454](https://jfrog.atlassian.net/browse/RTFACT-23454) (an access token with a Basic
+name in another case, "Token principal mismatch"). A user row stored in mixed case before this
+rule is not rewritten (the preview has no data upgrades); it is no longer reached by name and
+is recreated under the lower-case name. No source settles these, all **[I]**:
+
+- a found user answers with its stored name, so `GET /access/api/v2/users/BOB` shows `bob`;
+- `POST /access/api/v2/users` with `BOB` beside `bob` is 409 "User 'bob' already exists", and
+  the legacy `PUT` of `DAN` replaces `dan` (201);
+- a text answer repeats the request's spelling ("User 'BOB' was unlocked"), as does the 404 of
+  an unknown name;
+- a permission naming one user in two spellings holds the union of their actions;
+- a token minted for a user that does not exist (transient) is minted for the folded name,
+  while a transient or OIDC token issued before keeps the subject's spelling.
+
+**An unknown group in a user request** (`POST /access/api/v2/users`, `PATCH
+/access/api/v2/users/{username}/groups`, the legacy user `PUT` and `POST`) answers 400
+"Group 'nope' does not exist", and an unknown member in a legacy group `PUT` or `POST` 400
+"User 'ghost' does not exist", worded by the identity service and the same on every store
+([#1433](https://github.com/weaveplatform/artifactweave/issues/1433)), as the permission
+routes word theirs. [Add or Remove User from Groups](https://docs.jfrog.com/administration/reference/updateusergroups)
+documents only 400 "Bad Request - Invalid input" and [Create a User](https://docs.jfrog.com/administration/reference/createuser)
+400 for an invalid object; the message is **[I]**. The Access v2 group routes keep their 404
+for an unknown member.
+
 ### Groups v2
 
 | Method | Path | Status | Notes |

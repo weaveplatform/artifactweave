@@ -4183,6 +4183,7 @@
       "httpkit.Deref",
       "kernel.Cursor",
       "kernel.RequireAdmin",
+      "model.FoldUsername",
       "s.deps.Store.APIRestrictions",
       "s.deps.Store.APIRestrictions().History"
     ],
@@ -14828,10 +14829,10 @@
       "httpkit.BadRequestf",
       "httpkit.Deref",
       "httpkit.DerefSlice",
+      "model.FoldUsername",
       "s.adminIdentity",
       "s.identityErr",
       "s.userDetails",
-      "strings.ToLower",
       "svc.CreateUser"
     ],
     "review_family": "identity-pages",
@@ -17957,6 +17958,7 @@
       "artgen.ChangePassword200TextResponse",
       "httpkit.BadRequestf",
       "kernel.RequireAuthenticated",
+      "model.SameUsername",
       "s.content",
       "s.identity",
       "s.identity().ChangePassword",
@@ -20633,6 +20635,7 @@
     "direct_calls": [
       "httpkit.BadRequestf",
       "kernel.RequireAuthenticated",
+      "model.SameUsername",
       "s.identity",
       "s.identityErr",
       "svc.SetPassword"

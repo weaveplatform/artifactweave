@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
@@ -22,6 +23,8 @@ func WithAPIRecovery(ctx context.Context) context.Context {
 
 // CheckAPIRestriction checks current persisted policy without a permission
 // cache. Missing policy means unrestricted; backend failures fail closed.
+// Restrictions are stored under folded user names, and user is folded to
+// match: a token issued for BOB is held to bob's restriction.
 func CheckAPIRestriction(
 	ctx context.Context,
 	restrictions port.APIRestrictionStore,
@@ -31,7 +34,7 @@ func CheckAPIRestriction(
 	if recovery, _ := ctx.Value(apiRecoveryKey{}).(bool); recovery {
 		return nil
 	}
-	r, err := restrictions.Get(ctx, user)
+	r, err := restrictions.Get(ctx, model.FoldUsername(user))
 	if errors.Is(err, kernel.ErrNotFound) {
 		return nil
 	}

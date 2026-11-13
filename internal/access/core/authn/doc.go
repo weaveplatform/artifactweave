@@ -124,6 +124,8 @@
 //     TestUnitDownloadCredentialRestoration and
 //     TestUnitDownloadCredentialRejectsUnverifiedAndMixedReferences.
 //   - api_restriction_test.go: TestUnitAPIRestrictionCredentialsAndRecovery.
+//   - username_test.go: TestUnitUsernamesFold and TestUnitUsernameLockFolds
+//     (logins, locks and restrictions name a user in any case, #1432).
 //   - authorize_test.go and principal_test.go: TestUnitAuthorize,
 //     TestUnitDeciderFrom, TestUnitWithAuthorized and
 //     TestUnitDeciderSharedWithAccessAPI (one context key for this package

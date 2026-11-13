@@ -102,13 +102,21 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 		return token.Issued{}, apierror.New(http.StatusForbidden,
 			"A token with a narrowed scope cannot create tokens")
 	}
+	// A user name names its user in any case. The caller's own token keeps
+	// the caller's name as it authenticated: a transient caller's is the
+	// subject it was issued with, which its tokens must repeat to be listed
+	// and revoked as its own. Another user's name is folded, as the user's
+	// own tokens are: one minted for BOB is bob's, and stays bob's once a
+	// user bob exists.
 	username := m.username
-	if username == "" {
+	switch {
+	case username == "" || model.SameUsername(username, p.Name):
 		username = p.Name
-	}
-	if username != p.Name && !p.Admin {
+	case !p.Admin:
 		return token.Issued{}, apierror.New(http.StatusForbidden,
 			"Only an administrator can create tokens for other users")
+	default:
+		username = model.FoldUsername(username)
 	}
 	req := token.Request{
 		Username: username, Refreshable: m.isRefreshable, ForceRevocable: m.shouldForceRevocable,
@@ -214,7 +222,7 @@ func (t tokenAPI) refresh(
 		}
 	}
 	if presented {
-		if check.Username != "" && check.Username != of.User {
+		if check.Username != "" && !model.SameUsername(check.Username, of.User) {
 			return token.Issued{}, errRefreshOtherUser
 		}
 		check = token.RefreshCheck{Username: of.User, TokenID: of.TokenID}

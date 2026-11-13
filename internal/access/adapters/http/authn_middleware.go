@@ -11,6 +11,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authz"
+	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -185,7 +186,7 @@ func ownPasswordChange(r *http.Request, user string) bool {
 	}
 	rest, ok := strings.CutPrefix(r.URL.Path, "/access/api/v2/users/")
 	name, ok2 := strings.CutSuffix(rest, "/password")
-	return r.Method == http.MethodPut && ok && ok2 && user != "" && name == user
+	return r.Method == http.MethodPut && ok && ok2 && user != "" && model.SameUsername(name, user)
 }
 
 // credentials verifies whatever credential the request presents, reporting
