@@ -64,10 +64,11 @@
 //   - *AcceptedError: a deploy or checksum upload that Admit takes without
 //     storing it. The HTTP layer answers Status with an empty body, and an
 //     exploded archive leaves the entry out.
-//   - ErrStorageFault: a failed read of the server's own copy of a file
-//     while a check reads it, such as a remote file a Validate hook
-//     checks. The remote source boundary passes it on as it is, and the
-//     HTTP layer answers it as any server fault, 500 "internal error"
+//   - ErrStorageFault: a failure of the server's own storage while it
+//     keeps a file, such as a failed read of a remote file's copy a
+//     Validate hook checks, or a failed write of that copy. The remote
+//     source boundary passes it on as it is, and the HTTP layer answers it
+//     as any server fault, 500 "internal error"
 //     (https://github.com/weaveplatform/artifactweave/issues/1269).
 //   - What Admit and Resolve decide: the Write as it should happen, and the
 //     path a download reads instead of the one requested.

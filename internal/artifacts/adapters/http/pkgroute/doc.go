@@ -107,8 +107,9 @@
 //     protocol builds a virtual repository's merged document from the
 //     members MergeMembers returns, which leave out a member that is
 //     blacked out or would refuse the document's path.
-//   - SourceError answers a failed read of the server's own copy under
-//     check (format.ErrStorageFault) as the router's internal fault, 500
+//   - SourceError answers a failure of the server's own storage while it
+//     keeps a remote file (format.ErrStorageFault) as the router's
+//     internal fault, 500
 //     "internal error", whatever the store's error wraps, never as the
 //     upstream's 502 or 504
 //     (https://github.com/weaveplatform/artifactweave/issues/1269).

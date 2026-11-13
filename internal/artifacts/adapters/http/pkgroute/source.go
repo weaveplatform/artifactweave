@@ -171,9 +171,10 @@ func SourceError(err error, anonymous bool) error {
 	case err == nil:
 		return nil
 	case errors.Is(err, format.ErrStorageFault):
-		// The server's storage failed a read of its own copy: the router's
-		// internal fault, 500, even when the store's error wraps a timeout
-		// or a short read that would otherwise read as the upstream's.
+		// The server's storage failed to read or keep its own copy: the
+		// router's internal fault, 500, even when the store's error wraps a
+		// timeout or a short read that would otherwise read as the
+		// upstream's.
 		return err
 	case errors.As(err, &rejected):
 		return &sourceRefusal{

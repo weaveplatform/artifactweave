@@ -434,6 +434,11 @@ func (s *Service) putFile(
 		actual: actual, size: size, declared: declared, shouldReplace: replace,
 	}, now)
 	if err != nil {
+		if d.Cached {
+			// The remote cache's write of a file it keeps: a failed call of
+			// the store is the server's, not the upstream's (Cache).
+			return model.Item{}, storeFault(ctx, err)
+		}
 		return model.Item{}, err
 	}
 	if err := h.Deployed(ctx, env, d.Repo, stored); err != nil {

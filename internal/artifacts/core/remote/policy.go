@@ -628,16 +628,18 @@ func isHex(c byte) bool {
 // slices return it unwrapped, as the policy does, so that the source
 // service maps their failures as it maps the policy's own.
 //
-// A failed read of the server's own copy under check (*item.StorageFault)
-// passes through as it is, a server fault, where its check's refusal on
-// its own maps to a 502 that serves no stale copy and that the
+// A failure of the server's own storage while it keeps a remote file
+// (*item.StorageFault: a failed read of the copy under check, a failed
+// write of the copy, a failed call of the store that publishes it) passes
+// through as it is, a server fault, where the error it brought about maps
+// on its own to a 502 that serves no stale copy and that the
 // assumed-offline circuit does not count (storageFault). Elsewhere, as for
-// a read that timed out or ended short, the refusal maps as before, so the
-// stale copy and the circuit are as they were.
+// a read or write that timed out or ended short, that error maps as
+// before, so the stale copy and the circuit are as they were.
 func PolicyError(err error) error {
 	var fault *item.StorageFault
 	if errors.As(err, &fault) {
-		return storageFault(err, PolicyError(fault.Refusal))
+		return storageFault(err, PolicyError(fault.Err))
 	}
 	var typed *source.HTTPError
 	if errors.As(err, &typed) {
@@ -679,15 +681,15 @@ func PolicyError(err error) error {
 	}
 }
 
-// storageFault is fault, a failed read of the server's own copy, when
-// before, what the check's refusal maps to on its own, is a security,
-// integrity or protocol failure answering 502 Bad Gateway: one that serves
-// no stale copy (fallback) and that the assumed-offline circuit does not
-// count (RecordFailure). That 502 blamed the upstream for a fault of the
-// server's storage, which answers 500 "internal error" instead [I]: no
-// JFrog source says what 7.x answers when its own storage fails, and a
-// live capture cannot make it fail. Any other mapping is kept, so a stale
-// copy is served where it was.
+// storageFault is fault, a failure of the server's own storage, when
+// before, what the error it brought about maps to on its own, is a
+// security, integrity or protocol failure answering 502 Bad Gateway: one
+// that serves no stale copy (fallback) and that the assumed-offline
+// circuit does not count (RecordFailure). That 502 blamed the upstream for
+// a fault of the server's storage, which answers 500 "internal error"
+// instead [I]: no JFrog source says what 7.x answers when its own storage
+// fails, and a live capture cannot make it fail. Any other mapping is
+// kept, so a stale copy is served where it was.
 //
 // Leaving the fault out of the circuit matches 7.x, which assumes a remote
 // offline only for its HTTP client's failures, the upstream's unavailable

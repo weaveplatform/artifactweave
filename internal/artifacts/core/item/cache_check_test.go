@@ -105,10 +105,10 @@ func TestUnitCheckCopyMarksAFailedRead(t *testing.T) {
 			var fault *StorageFault
 			if !errors.As(err, &fault) || !errors.Is(err, format.ErrStorageFault) ||
 				!errors.Is(err, errDropped) || errors.Is(err, errBadCopy) ||
-				!errors.Is(fault.Refusal, errBadCopy) {
+				!errors.Is(fault.Err, errBadCopy) {
 				t.Fatalf("ReadAt %v, %d sound reads: %v", at, sound, err)
 			}
-			if got := err.Error(); got != "cache check: format: storage fault: "+errDropped.Error() {
+			if got := err.Error(); got != "remote cache: format: storage fault: "+errDropped.Error() {
 				t.Fatalf("ReadAt %v, %d sound reads: text %q", at, sound, got)
 			}
 			failed++
@@ -285,7 +285,7 @@ func (h *inspecting) Deployed(
 // cache checks it, by the hook or by the format's inspection, is a
 // StorageFault, and the cache keeps neither an entry nor an item. A
 // refusal of a sound copy keeps the check's own error. The publication's
-// hooks get the service's own blob store and the inspection.
+// hooks get the inspection, and read the service's own blob store.
 func TestUnitCacheMarksAFailedReadOfItsCopy(t *testing.T) {
 	sha := sums("payload").SHA256
 	refuse := func(context.Context, io.ReadSeeker, int64) error { return errBadCopy }
@@ -320,7 +320,7 @@ func TestUnitCacheMarksAFailedReadOfItsCopy(t *testing.T) {
 			}
 			if tc.marked &&
 				(!errors.Is(err, errDropped) || !errors.Is(err, format.ErrStorageFault) ||
-					!errors.Is(fault.Refusal, errBadCopy) && fault.Refusal != fault.Read) {
+					!errors.Is(fault.Err, errBadCopy) && fault.Err != fault.Cause) {
 				t.Fatalf("fault %v", err)
 			}
 			if _, err = w.db.RemoteCache().
@@ -345,9 +345,16 @@ func TestUnitCacheMarksAFailedReadOfItsCopy(t *testing.T) {
 	if _, err := w.svc.Cache(t.Context(), u); err != nil {
 		t.Fatal(err)
 	}
-	if len(h.deployed) != 1 || h.deployed[0].Inspection != "inspected payload" ||
-		h.deployed[0].Blobs != format.Blobs(w.svc.Blobs) {
+	if len(h.deployed) != 1 || h.deployed[0].Inspection != "inspected payload" {
 		t.Fatalf("publication environment: %+v", h.deployed)
+	}
+	r, _, err := h.deployed[0].Blobs.Open(t.Context(), sha)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	if b, err := io.ReadAll(r); err != nil || string(b) != "payload" {
+		t.Fatalf("publication blob store: %q %v", b, err)
 	}
 }
 

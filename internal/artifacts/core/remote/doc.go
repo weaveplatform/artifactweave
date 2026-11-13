@@ -59,12 +59,14 @@
 //   - Cache aliases and explicit offline mode make no upstream call.
 //   - The sentinel texts, cache key terms and remote. log names stay
 //     byte-identical.
-//   - A failed open or read of the server's own copy while the cache
-//     checks it (item.StorageFault), the 304 re-admission's read of cached
-//     metadata included, is no upstream failure: PolicyError passes it on
-//     where its check's refusal would answer a 502 that serves no stale
-//     copy and that the assumed-offline circuit does not count, and
-//     otherwise maps that refusal as before
+//   - A failure of the server's own storage while the cache keeps a file
+//     (item.StorageFault: a failed open or read of the copy under check,
+//     the 304 re-admission's read of cached metadata included, or a failed
+//     write of the copy or store call that publishes it) is no upstream
+//     failure: PolicyError passes it on where the error it brought about
+//     would answer a 502 that serves no stale copy and that the
+//     assumed-offline circuit does not count, and otherwise maps that
+//     error as before
 //     (https://github.com/weaveplatform/artifactweave/issues/1269).
 //
 // # References
@@ -95,7 +97,8 @@
 //     holds the policy fixture, with policy_fault_test.go,
 //     policy_format_test.go, cache_maintenance_test.go,
 //     metadata_response_test.go, module_location_test.go and
-//     storage_fault_test.go, a failed read of the cache's own copy; and
+//     storage_fault_test.go, a failed read, write or publication of the
+//     cache's own copy, a Hex tarball's Deployed hook among them; and
 //     discovery_test.go, discovery_contract_test.go, listing_test.go and
 //     listing_smart_test.go cover discovery and listings. helpers_test.go
 //     holds their small helpers, and export_test.go opens the policy's

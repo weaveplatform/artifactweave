@@ -12,12 +12,17 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	hexfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/hex"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
 var errDropped = errors.New("the store dropped the connection")
@@ -60,8 +65,8 @@ func TestUnitPolicyErrorPassesAStorageFault(t *testing.T) {
 		fault := fmt.Errorf(
 			"cache adapter representation: %w",
 			&item.StorageFault{
-				Read:    errDropped,
-				Refusal: fmt.Errorf("cache validation: %w", tc.refusal),
+				Cause: errDropped,
+				Err:   fmt.Errorf("cache validation: %w", tc.refusal),
 			},
 		)
 		got := remote.PolicyError(fault)
@@ -294,5 +299,226 @@ func TestAccPolicyFailedReadOfARevalidatedCopy(t *testing.T) {
 			b.open, b.read = nil, nil
 			w.mustRead(q, "good")
 		})
+	}
+}
+
+// writeFaults is a blob store whose uploads fail at Append with write, or
+// at Commit with commit, as a store that cannot keep the copy does.
+type writeFaults struct {
+	blob.Store
+	write, commit error
+}
+
+func (b *writeFaults) BeginUpload(
+	ctx context.Context,
+	opts ...blob.UploadOption,
+) (blob.Upload, error) {
+	u, err := b.Store.BeginUpload(ctx, opts...)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // the store's own error
+	}
+	return failingUpload{Upload: u, write: b.write, commit: b.commit}, nil
+}
+
+type failingUpload struct {
+	blob.Upload
+	write, commit error
+}
+
+func (u failingUpload) Append(ctx context.Context, r io.Reader) (int64, error) {
+	if u.write != nil {
+		return 0, u.write
+	}
+	return u.Upload.Append(ctx, r) //nolint:wrapcheck // the store's own error
+}
+
+func (u failingUpload) Commit(ctx context.Context, want blob.Digests) (blob.Info, error) {
+	if u.commit != nil {
+		return blob.Info{}, u.commit
+	}
+	return u.Upload.Commit(ctx, want) //nolint:wrapcheck // the store's own error
+}
+
+// publishFaults is the item service's store whose publication of a cache
+// entry fails with err.
+type publishFaults struct {
+	item.Store
+	err error
+}
+
+func (s *publishFaults) RemoteCache() port.RemoteCacheStore {
+	return failingPut{RemoteCacheStore: s.Store.RemoteCache(), err: s.err}
+}
+
+type failingPut struct {
+	port.RemoteCacheStore
+	err error
+}
+
+func (f failingPut) Put(
+	ctx context.Context,
+	token model.RemoteCacheToken,
+	e model.RemoteCacheEntry,
+) (model.RemoteCacheEntry, error) {
+	if f.err != nil {
+		return model.RemoteCacheEntry{}, f.err
+	}
+	return f.RemoteCacheStore.Put(ctx, token, e) //nolint:wrapcheck // the store's own error
+}
+
+// storeFaults puts a writeFaults blob store and a publishFaults store
+// under w's item service, failing as write, commit and publish say, and
+// returns the function that cures them.
+func (w *policyWorld) storeFaults(write, commit, publish error) func() {
+	b := &writeFaults{Store: w.blobs, write: write, commit: commit}
+	s := &publishFaults{Store: w.db, err: publish}
+	w.p.Items.Blobs, w.p.Items.Store = b, s
+	return func() { b.write, b.commit, s.err = nil, nil, nil }
+}
+
+// A new remote file whose copy the blob store fails to write or commit, or
+// whose cache entry the store fails to publish, is a storage fault, not
+// the 502 protocol failure it was: nothing is cached, the circuit is
+// untouched, and once the store works again the file is fetched and kept.
+func TestAccPolicyFailedWriteOfANewCopyIsAStorageFault(t *testing.T) {
+	for name, tc := range map[string]struct{ write, commit, publish error }{
+		"write":   {write: errDropped},
+		"commit":  {commit: errDropped},
+		"publish": {publish: errDropped},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := policyFixture(t)
+			w.up.Set("/file.bin", fakeupstream.Resource{Body: []byte("content")})
+			q := w.request("file.bin", source.ResourceKindArtifact)
+			cure := w.storeFaults(tc.write, tc.commit, tc.publish)
+			_, err := w.read(q)
+			wantStorageFault(t, err)
+			if !errors.Is(err, errDropped) || w.circuit() != 0 {
+				t.Fatalf("%v, circuit %d", err, w.circuit())
+			}
+			if _, err = w.db.Items().
+				Get(t.Context(), w.c.Key, true, "file.bin"); !errors.Is(
+				err,
+				kernel.ErrNotFound,
+			) {
+				t.Fatalf("cached after a storage fault: %v", err)
+			}
+			cure()
+			w.mustRead(q, "content")
+			if got := w.up.Count(http.MethodGet, "/file.bin"); got != 2 {
+				t.Fatalf("upstream GETs %d, want 2", got)
+			}
+		})
+	}
+}
+
+// A refresh of expired metadata whose new copy the blob store fails to
+// write answers as before wherever that served the stale copy: a write
+// that timed out or ended short still serves it and counts toward the
+// circuit, as main does. A write or publication that fails otherwise
+// answered a 502 with no stale copy, and is now a storage fault. The
+// stale entry is kept either way.
+func TestAccPolicyFailedWriteOfARefreshedCopyKeepsStaleRules(t *testing.T) {
+	short := fmt.Errorf("blob/s3: put x: %w", io.ErrUnexpectedEOF)
+	for name, tc := range map[string]struct {
+		write, publish error
+		stale          bool
+		circuit        int
+	}{
+		"write dropped":   {write: errDropped},
+		"write timeout":   {write: timedOut{}, stale: true, circuit: 1},
+		"write short":     {write: short, stale: true, circuit: 1},
+		"publish dropped": {publish: errDropped},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := policyFixture(t)
+			w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good")})
+			q := w.request("meta.txt", source.ResourceKindMetadata)
+			w.mustRead(q, "good")
+			w.clock.Advance(time.Hour)
+			w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("newer")})
+			w.storeFaults(tc.write, nil, tc.publish)
+			r, err := w.read(q)
+			if tc.stale {
+				if err != nil || w.bytes(r) != "good" {
+					t.Fatalf("stale copy: %v", err)
+				}
+			} else {
+				wantStorageFault(t, err)
+			}
+			if got := w.circuit(); got != tc.circuit {
+				t.Fatalf("circuit %d, want %d", got, tc.circuit)
+			}
+			q.Repo.Offline = ptr(true)
+			w.mustRead(q, "good")
+		})
+	}
+}
+
+// nthOpen is a blob store whose open number fail of sha, counted from 0,
+// fails with errDropped.
+type nthOpen struct {
+	blob.Store
+	sha         string
+	fail, opens int
+}
+
+func (b *nthOpen) Open(ctx context.Context, sha string) (io.ReadSeekCloser, blob.Info, error) {
+	if sha == b.sha {
+		b.opens++
+		if b.opens-1 == b.fail {
+			return nil, blob.Info{}, errDropped
+		}
+	}
+	return b.Store.Open(ctx, sha) //nolint:wrapcheck // the store's own error
+}
+
+// A Hex tarball's copy is read by the format's inspection and again by
+// its Deployed hook inside the publication, which links the package
+// index. A failed open of either is a storage fault, where both answered
+// the 502 protocol failure of an upstream's bad tarball: nothing is
+// cached, the circuit is untouched, and the next request fetches the
+// tarball again.
+func TestAccPolicyFailedReadOfAHexTarballsHooksIsAStorageFault(t *testing.T) {
+	tarball := repopath.Read(t, "internal/artifacts/ecosystem/hex/testdata/ecto-3.12.5.tar")
+	w := policyFixture(t)
+	w.c.PackageType = repo.Hex
+	err := w.db.Repos().Update(t.Context(), w.c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w.permit.Identity, err = w.db.RemoteCache().Source(t.Context(), w.c.Key); err != nil {
+		t.Fatal(err)
+	}
+	w.p.Items.Formats = func(repo.PackageType) format.Handler { return hexfmt.Handler{} }
+	w.up.Set("/tarballs/ecto-3.12.5.tar", fakeupstream.Resource{Body: tarball})
+	q := w.request("tarballs/ecto-3.12.5.tar", source.ResourceKindArtifact)
+	b := &nthOpen{Store: w.blobs, sha: shaOf(string(tarball))}
+	w.p.Items.Blobs = b
+	failed := 0
+	for ; ; b.fail++ {
+		b.opens = 0
+		_, err = w.read(q)
+		if err == nil {
+			break
+		}
+		wantStorageFault(t, err)
+		if !errors.Is(err, errDropped) || w.circuit() != 0 {
+			t.Fatalf("open %d: %v, circuit %d", b.fail, err, w.circuit())
+		}
+		if _, err = w.db.Items().
+			Get(t.Context(), w.c.Key, true, "tarballs/ecto-3.12.5.tar"); !errors.Is(
+			err,
+			kernel.ErrNotFound,
+		) {
+			t.Fatalf("open %d: cached after a storage fault: %v", b.fail, err)
+		}
+		failed++
+	}
+	if failed < 2 {
+		t.Fatalf("only %d opens failed: the inspection and Deployed each must", failed)
+	}
+	if got := w.up.Count(http.MethodGet, "/tarballs/ecto-3.12.5.tar"); got != failed+1 {
+		t.Fatalf("upstream GETs %d, want %d", got, failed+1)
 	}
 }

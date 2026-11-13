@@ -78,8 +78,9 @@ the manifest work. No JFrog source says what 7.x answers for these names, so
 the 404 is [I] on #216. An uploaded rock or rockspec whose stored content
 fails a read while it is checked answers 500 and is not stored: only content
 that breaks the rules is refused 400. A remote rock or manifest whose cached
-copy fails a read while it is checked answers 500 "internal error" and is not
-cached; an upstream rock or manifest that breaks the rules still answers 502
+copy fails a read while it is checked, or that the server's storage fails to
+write, commit or publish, answers 500 "internal error" and is not cached; an
+upstream rock or manifest that breaks the rules still answers 502
 ([#1269](https://github.com/weaveplatform/artifactweave/issues/1269); the 500
 is [I] on #216).
 

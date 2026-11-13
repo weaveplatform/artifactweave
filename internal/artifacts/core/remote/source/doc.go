@@ -58,8 +58,8 @@
 //     *format.RejectionError, from Read and from CheckRead and CheckFolder
 //     alike, since artifactweave writes its message: a listing that checks
 //     each disclosed release can keep one whose file is refused, and a read
-//     answers the policy's 404 (#1237). A failed read of the server's own
-//     copy under check (format.ErrStorageFault) leaves as it is too, in
+//     answers the policy's 404 (#1237). A failure of the server's own
+//     storage (format.ErrStorageFault) leaves as it is too, in
 //     the store's words, so a router answers it as a server fault rather
 //     than as ErrUnavailable (#1269).
 //   - The package opens no store transaction and propagates none.
