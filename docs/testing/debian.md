@@ -81,9 +81,9 @@ A virtual repository's composed metadata carries no properties, so only a
 mandatory key (`;key+=value`) refuses it, and a member whose file does not
 match is passed over for the next. A remote repository's Release and index
 take a query as any remote file does: it reaches the upstream only when the
-repository's Propagate Query Params is set. Its index still refuses matrix
-parameters with 404 until the remote read appends them to the upstream URL
-as 7.x does (#1371).
+repository's Propagate Query Params is set. Its index takes matrix
+parameters as any remote file does: they go to the upstream after the path,
+and a copy the cache already holds is matched against them first (#1371).
 
 For source packages, deploy the `.dsc` with `dsc.distribution` and
 `dsc.component`, plus every archive named by that descriptor at the same

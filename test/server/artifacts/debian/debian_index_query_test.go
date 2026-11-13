@@ -326,19 +326,3 @@ func TestAccDebianVirtualFilesWithQueryOrMatrixParameters(t *testing.T) {
 		}
 	}
 }
-
-// TestAccDebianRemoteIndexRefusesAMatrixParameterOnceReadIsSettled
-// (#1330, #1349): 7.x appends a request's matrix parameters to a remote
-// repository's upstream URL (RTFACT-26349), which artifactweave's remote
-// read does not do yet, so a remote Packages index keeps refusing one as
-// not found, but only to a caller who may read it: one who may not is
-// refused 403 first, as without a matrix parameter (DV-057). A query is
-// served as without one (debian_remote_query_test.go).
-func TestAccDebianRemoteIndexRefusesAMatrixParameterOnceReadIsSettled(t *testing.T) {
-	w := newQueryWorld(t)
-	target := queryPackages + ";x=1"
-	queryRefusal(t, w.do(http.MethodGet, "/artifactory/deb-remote/"+target, "reader", ""),
-		http.StatusNotFound, "Could not find resource")
-	queryRefusal(t, w.do(http.MethodGet, "/artifactory/deb-remote/"+target, "user", ""),
-		http.StatusForbidden, "Forbidden")
-}

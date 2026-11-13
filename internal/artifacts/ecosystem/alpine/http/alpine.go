@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/alpine"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
@@ -40,6 +41,9 @@ type alpineIndexView struct {
 	checkPermission func(context.Context, string) error
 	revalidate      func(context.Context) error
 	used            func(context.Context) error
+	// stored is a local or federated repository's index item, whose
+	// properties a request's matrix parameters are matched against.
+	stored *model.Item
 }
 
 type alpineCandidate struct {
@@ -85,8 +89,7 @@ func (s alpineItems) serveAlpineIndex(
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	ctx := r.Context()
-	if _, _, _, ok := alpine.ParseIndexPath(req.Path); !ok || len(req.Props) != 0 ||
-		r.URL.RawQuery != "" {
+	if _, _, _, ok := alpine.ParseIndexPath(req.Path); !ok {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
@@ -108,6 +111,31 @@ func (s alpineItems) serveAlpineIndex(
 	if cached && c.Class != repo.Remote {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
+	}
+	// An index takes a query and matrix parameters as any other file's GET
+	// does (#1350): 7.x documents skipUpdateStats and trace for a GET of any
+	// file (RTFACT-25636, 7.21.3), so a query changes nothing here, and
+	// matrix parameters "make resolution conditional on properties"
+	// (JFrog's guide, Using Properties in Deployment and Resolution). A
+	// virtual repository's composed index carries no properties [I], so
+	// only a mandatory key refuses it; a stored index is matched below, and
+	// a remote's as any remote file is (#1371).
+	switch c.Class {
+	case repo.Virtual:
+		if !req.Matrix().Matches(nil) {
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+			return
+		}
+	case repo.Remote:
+		matches, err := itemkit.RemoteCopyMatches(ctx, st, c, req.Path, req)
+		if err != nil {
+			httpkit.WriteErr(w, r, s.InternalError(ctx, "Alpine index properties", err))
+			return
+		}
+		if !matches {
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+			return
+		}
 	}
 	var body []byte
 	var used func(context.Context) error
@@ -133,10 +161,23 @@ func (s alpineItems) serveAlpineIndex(
 			return
 		}
 	} else {
-		view, err := s.alpineMemberIndex(ctx, st, c, cached, req.Path, p, acc)
+		view, err := s.alpineIndexRead(ctx, st, c, cached, req.Path,
+			itemkit.RemoteResource(r, req.Path).Query, pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
+			p, acc)
 		if err != nil {
 			httpkit.WriteErr(w, r, s.ItemError(ctx, "Alpine index", err))
 			return
+		}
+		if view.stored != nil {
+			matches, err := itemkit.MatchesMatrix(ctx, st, *view.stored, req)
+			if err != nil {
+				httpkit.WriteErr(w, r, s.InternalError(ctx, "Alpine index properties", err))
+				return
+			}
+			if !matches {
+				httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+				return
+			}
 		}
 		if view.revalidate != nil {
 			if err := view.revalidate(ctx); err != nil {
@@ -189,9 +230,24 @@ func alpinePackageReadable(
 	return true, nil
 }
 
+// alpineMemberIndex reads the index at path of a local, federated or
+// remote repository as a lookup: a virtual index's member, which the client
+// did not ask for, so nothing of the client's request goes to a remote's
+// upstream.
 func (s alpineItems) alpineMemberIndex(
 	ctx context.Context, st itemkit.Store, c repo.Config, cached bool, path string,
 	p kernel.Principal, acc itemkit.Access,
+) (alpineIndexView, error) {
+	return s.alpineIndexRead(ctx, st, c, cached, path, "", "", p, acc)
+}
+
+// alpineIndexRead reads the index at path as alpineMemberIndex does, and
+// passes a remote's upstream the client's query (only under Propagate
+// Query Params, which the source boundary applies) and its matrix
+// parameters (source.Request.MatrixParams), as for any remote file.
+func (s alpineItems) alpineIndexRead(
+	ctx context.Context, st itemkit.Store, c repo.Config, cached bool,
+	path, rawQuery, matrix string, p kernel.Principal, acc itemkit.Access,
 ) (alpineIndexView, error) {
 	view := alpineIndexView{repo: c}
 	if c.Class == repo.Remote {
@@ -200,8 +256,8 @@ func (s alpineItems) alpineMemberIndex(
 		}
 		query := source.Request{
 			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
-			CacheOnly: cached,
-			Resource:  source.Resource{Path: path, Method: http.MethodGet},
+			CacheOnly: cached, MatrixParams: matrix,
+			Resource: source.Resource{Path: path, Method: http.MethodGet, Query: rawQuery},
 		}
 		query, err := itemkit.AlpineSourceRequest(query)
 		if err != nil {
@@ -241,6 +297,7 @@ func (s alpineItems) alpineMemberIndex(
 		if it.Folder {
 			return view, kernel.ErrNotFound
 		}
+		view.stored = &it
 		view.raw, err = s.readAlpineBlob(ctx, it.Actual.SHA256)
 		if err != nil {
 			return view, err
@@ -271,7 +328,10 @@ func (s alpineItems) readAlpineBlob(ctx context.Context, sha string) ([]byte, er
 }
 
 // alpineCandidates walks ordered virtual members. A duplicate path belongs to
-// the first readable member. A member whose download policy refuses its
+// the first readable member; for a package GET (download true) the later
+// members' rows for it follow, so a GET whose matrix parameters the first
+// member's file does not match can pass over to the next
+// (serveVirtualAlpinePackage). A member whose download policy refuses its
 // index takes no part in the index, and only a blacked-out one in a package
 // GET (alpineMemberRefusesIndex). With download false, for the index, a row
 // stays when the member's or the virtual repository's patterns reject its
@@ -338,7 +398,7 @@ func (s alpineItems) alpineCandidates(
 			return nil, fmt.Errorf("alpine member %s index: %w", key, err)
 		}
 		for _, entry := range entries {
-			if selected[entry.packageInfo.Path] ||
+			if !download && selected[entry.packageInfo.Path] ||
 				!acc.File(c, entry.packageInfo.Path, accessapi.ActionRead) {
 				continue
 			}
@@ -372,8 +432,7 @@ func (s alpineItems) serveVirtualAlpinePackage(
 	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
-	if _, _, _, _, ok := alpine.ParsePath(req.Path); !ok || len(req.Props) != 0 ||
-		r.URL.RawQuery != "" {
+	if _, _, _, _, ok := alpine.ParsePath(req.Path); !ok {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
@@ -392,24 +451,45 @@ func (s alpineItems) serveVirtualAlpinePackage(
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Alpine virtual package", err))
 		return
 	}
+	// A member's file that the matrix parameters do not match does not
+	// serve the GET, and the next member that lists the package is asked,
+	// as 7.x's virtual download passes over a member that does not find the
+	// file (ArtifactoryVirtualDownloadStrategy.processStandard, 7.161.26),
+	// a property mismatch among the reasons (DbStoringRepoMixin.getInfo)
+	// [I]. A remote member's copy is matched only when its cache holds one.
 	for _, candidate := range candidates {
 		if candidate.packageInfo.Path != req.Path {
 			continue
 		}
+		var matches bool
 		if candidate.repo.Class == repo.Remote {
-			s.serveRemoteAlpinePackage(w, r, candidate.repo, req, p, acc)
-			return
+			matches, err = itemkit.RemoteCopyMatches(r.Context(), st, candidate.repo, req.Path, req)
+		} else {
+			var it model.Item
+			it, err = st.Items().Get(r.Context(), candidate.repo.Key, false, req.Path)
+			if err != nil {
+				httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Alpine virtual member", err))
+				return
+			}
+			if it.Folder {
+				httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+				return
+			}
+			matches, err = itemkit.MatchesMatrix(r.Context(), st, it, req)
+			if err == nil && matches {
+				s.ServeItemFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
+				return
+			}
 		}
-		it, err := st.Items().Get(r.Context(), candidate.repo.Key, false, req.Path)
 		if err != nil {
-			httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Alpine virtual member", err))
+			httpkit.WriteErr(w, r,
+				s.InternalError(r.Context(), "Alpine virtual member properties", err))
 			return
 		}
-		if it.Folder {
-			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
-			return
+		if !matches {
+			continue
 		}
-		s.ServeItemFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
+		s.serveRemoteAlpinePackage(w, r, candidate.repo, req, p, acc)
 		return
 	}
 	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
@@ -425,15 +505,19 @@ func (s alpineItems) serveRemoteAlpinePackage(
 		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "Alpine source", source.ErrUnavailable))
 		return
 	}
+	// The upstream is asked with the client's query, under Propagate Query
+	// Params, and its matrix parameters, as for any remote file (#1371).
 	query := source.Request{
-		Repo:    c,
-		Subject: accessapi.SubjectOf(p),
-		Access:  acc.Decider,
-		Project: c.ProjectKey,
+		Repo:         c,
+		Subject:      accessapi.SubjectOf(p),
+		Access:       acc.Decider,
+		Project:      c.ProjectKey,
+		MatrixParams: pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
 		Resource: source.Resource{
 			Kind:   source.ResourceKindArtifact,
 			Path:   req.Path,
 			Method: r.Method,
+			Query:  itemkit.RemoteResource(r, req.Path).Query,
 		},
 	}
 	query, err := itemkit.AlpineSourceRequest(query)

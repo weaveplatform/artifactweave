@@ -114,13 +114,18 @@ func (s ArtifactoryAPI) readerFor(
 }
 
 // GetRepositoriesByTypeAndProject lists the repositories the caller may
-// see, narrowed by class, package type and project. The distribution class
-// lists nothing, because no distribution repository is served here, and the
-// list takes the details-list vendor media type when the client asks for it.
+// see, narrowed by class, package type and project, and paged by limit and
+// offset. The distribution class lists nothing, because no distribution
+// repository is served here, and the list takes the details-list vendor
+// media type when the client asks for it.
 func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 	ctx context.Context,
 	req artgen.GetRepositoriesByTypeAndProjectRequestObject,
 ) (artgen.GetRepositoriesByTypeAndProjectResponseObject, error) {
+	page, err := newRepoPage(req.Params.Limit, req.Params.Offset)
+	if err != nil {
+		return nil, err
+	}
 	st, err := s.content()
 	if err != nil {
 		return nil, err
@@ -129,10 +134,11 @@ func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 	if err != nil {
 		return nil, err
 	}
+	out := artgen.GetRepositoriesByTypeAndProject200JSONResponse{}
 	var f port.RepoFilter
 	if req.Params.Type != nil {
 		if *req.Params.Type == artgen.GetRepositoriesByTypeAndProjectParamsTypeDistribution {
-			return artgen.GetRepositoriesByTypeAndProject200JSONResponse{}, nil
+			return page.of(ctx, out), nil
 		}
 		f.Class = repo.Class(strings.ToLower(string(*req.Params.Type)))
 	}
@@ -144,7 +150,6 @@ func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 		return nil, s.InternalError(ctx, "list repositories", err)
 	}
 	base := baseurl.From(ctx)
-	out := artgen.GetRepositoriesByTypeAndProject200JSONResponse{}
 	for _, c := range all {
 		// The documented package type enumeration is stale, so any value
 		// filters, compared without case. The listed spelling matches too,
@@ -157,8 +162,8 @@ func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 		if !can(c) {
 			continue
 		}
-		out = append(out, artgen.GetRepositoriesByTypeAndProject200JSONResponse{{}}[0])
-		e := &out[len(out)-1]
+		body, e := appendZero(out.Body)
+		out.Body = body
 		e.Key, e.Type = c.Key, strings.ToUpper(string(c.Class))
 		e.PackageType = repo.PackageTypeName(string(c.PackageType))
 		e.Url = base + "/artifactory/" + c.Key
@@ -167,12 +172,62 @@ func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 			e.Description = &d
 		}
 	}
+	return page.of(ctx, out), nil
+}
+
+// maxRepoPage is the largest limit Get Repositories takes: "limit must be
+// between 1 and 1000 inclusive" (getrepositoriesbytypeandproject, 7.173).
+const maxRepoPage = 1000
+
+// repoPage is the window of the repository list that limit and offset ask
+// for. paged is false without limit, which keeps the list whole and sends no
+// paging headers, as every Artifactory before 7.173 answered.
+type repoPage struct {
+	limit, offset int
+	paged         bool
+}
+
+// newRepoPage checks limit and offset as JFrog's page lists them: "offset
+// requires limit" and "limit must be between 1 and 1000" are its examples
+// of the 400. The page names no message for a negative offset, nor which
+// check comes first when several fail; both are inferred.
+func newRepoPage(limit, offset *int) (repoPage, error) {
+	switch {
+	case limit == nil && offset != nil:
+		return repoPage{}, httpkit.BadRequestf("offset requires limit")
+	case limit == nil:
+		return repoPage{}, nil
+	case *limit < 1 || *limit > maxRepoPage:
+		return repoPage{}, httpkit.BadRequestf("limit must be between 1 and %d", maxRepoPage)
+	case offset != nil && *offset < 0:
+		return repoPage{}, httpkit.BadRequestf("offset must be greater than or equal to 0")
+	}
+	return repoPage{limit: *limit, offset: httpkit.Deref(offset), paged: true}, nil
+}
+
+// of answers the page of list. JFrog's page says the server "still
+// enumerates the full authorized filtered set, then returns a slice", so
+// list holds only what the caller may see and X-Total-Count counts that,
+// not every repository the filters match.
+func (p repoPage) of(
+	ctx context.Context,
+	list artgen.GetRepositoriesByTypeAndProject200JSONResponse,
+) artgen.GetRepositoriesByTypeAndProjectResponseObject {
+	if p.paged {
+		total := len(list.Body)
+		start := min(p.offset, total)
+		list.Body = list.Body[start:min(start+p.limit, total)]
+		list.Headers.XTotalCount = &total
+		list.Headers.XResultOffset, list.Headers.XResultLimit = &p.offset, &p.limit
+	}
+	// A nil body would be null on the wire; an empty list or page is [].
+	list.Body = orEmpty(list.Body)
 	if httpkit.Accepts(ctx, mediaDetails) {
 		return artgen.GetRepositoriesByTypeAndProject200ApplicationVndOrgJfrogArtifactoryRepositoriesRepositoryDetailsListPlusJSONResponse(
-			out,
-		), nil
+			list,
+		)
 	}
-	return out, nil
+	return list
 }
 
 // GetAllRepositoryConfigurations returns every repository's configuration,
@@ -225,6 +280,22 @@ func (s ArtifactoryAPI) GetAllRepositoryConfigurations(
 		), nil
 	}
 	return out, nil
+}
+
+// appendZero appends a zero element to s and returns s and that element,
+// for the generated list bodies, whose element type has no name.
+func appendZero[E any](s []E) ([]E, *E) {
+	var zero E
+	s = append(s, zero)
+	return s, &s[len(s)-1]
+}
+
+// orEmpty returns s, or an empty slice for nil.
+func orEmpty[E any](s []E) []E {
+	if s == nil {
+		return []E{}
+	}
+	return s
 }
 
 // set is a comma-separated filter; an empty one matches everything.

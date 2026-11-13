@@ -56,11 +56,18 @@ ledger. The ledger test fails when an operation it records as served carries
 | Administrative restrictions | Every accepted set/clear appends an audit entry. Repeating a change may add another entry even if current restriction state converges. The recovery reserve still requires administrator authorization. |
 | Stubbed products/actions | 501 performs no business operation; it is not a transient failure and should not be retried until support changes. Middleware may still verify credentials and account for admission. |
 
-Keys are intentionally supported only for build append in this delivery. Imports,
-replication, webhooks, other fan-out actions and generated product stubs do not
-gain a fictional replay guarantee. A timeout/500 is not proof of rollback, and a
-422 mismatch can follow a successful earlier request. See the
-[generated-client retry example](retrying.md).
+A key is accepted exactly where an operation is declared `x-idempotency: key` and
+declares the shared `IdempotencyKey` parameter, as decision 0043's
+[Idempotency classes](../decisions/0043-api-reliability.md#idempotency-classes)
+set out; today build append is the only such operation. Every other operation is
+`safe`, `natural` (its request names the target it converges on), or `none` with a
+listed reason, and a key sent to it answers 400 before authentication. Imports,
+replication, webhook tests and other actions that wait on another service are
+`none` with `external-effect`, and token issuance is `none` with
+`secret-response`, so none of them gains a fictional replay guarantee. A generated
+product stub declares its intended class but accepts no key while it answers 501.
+A timeout/500 is not proof of rollback, and a 422 mismatch can follow a successful
+earlier request. See the [generated-client retry example](retrying.md).
 
 ## Persistence and collection execution
 
@@ -119,6 +126,105 @@ simultaneous requests; format-specific execution/index improvements remain
 separate compatibility work. The raw ledger repeats the exact served descriptions
 and declared parameters so a consumer can distinguish a collection from an array
 inside a singular business document.
+
+## 7.x evidence for the operation rules
+
+Research for [#1401](https://github.com/weaveplatform/artifactweave/issues/1401)
+on 2026-11-12, in the project's order: JFrog's documentation pages fetched as
+`.md`, the release notes, the KB, public Jira. The documentation search covered the
+1696 pages that the Artifactory, Administration, Integrations, Projects,
+Installation, Releases, User Management and Setup sections of
+[llms.txt](https://docs.jfrog.com/llms.txt) list.
+[Decision 0043](../decisions/0043-api-reliability.md#rules-for-every-operation)
+holds the rules built on it. [I] marks what no source settles; each is for
+[#216/P19](https://github.com/weaveplatform/artifactweave/issues/216).
+
+**Idempotency keys.** No page, release note or KB article documents
+`Idempotency-Key` or any other request deduplication header. Where pages call
+something idempotent, they mean one operation or command:
+[Delete Bridge](https://docs.jfrog.com/administration/reference/deletebridge.md)
+answers 204 "even if bridge does not exist", and
+[managing configuration entities](https://docs.jfrog.com/artifactory/docs/managing-configuration-entities.md)
+warns that `jf rt repo-create` "is not idempotent" because Artifactory refuses an
+existing key. Public Jira has no request for the header;
+[RTFACT-31371](https://jfrog.atlassian.net/browse/RTFACT-31371) (open) reports a
+409 when two promotions of one Release Bundle v2 overlap, in a pipeline that relies
+on promotion converging. So 7.x's retry safety comes from requests that name their
+target. [I]: whether 7.x ignores or refuses an `Idempotency-Key` it does not
+support; artifactweave refuses it with 400.
+
+**429, 503 and their headers.**
+
+- [AQL performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md),
+  "How Do I Configure AQL Rate Limiting?": from 7.84 self-managed Artifactory limits
+  how many search and AQL requests run at once, and from 7.146.7 (7.136.0 on SaaS)
+  how many one user runs. At either limit, after waiting
+  `artifactory.aql.queries.pending.timeout.millis` (10000), it "returns HTTP 429
+  Too Many Requests until a query finishes". `artifactory.aql.queries.limit.enabled`
+  defaults to `false` from 7.84.16.
+  [AQL query execution](https://docs.jfrog.com/artifactory/docs/aql-query-execution.md)
+  lists the 429 with "Retry after a brief delay". The KB article
+  [Protecting Self-Hosted Artifactory from AQL Issues with Rate Limiting](https://jfrog.com/help/r/artifactory-protecting-self-hosted-artifactory-from-aql-issues-with-rate-limiting)
+  (first published 2025-04-21, modified 2026-10-22) describes the same 429 and
+  properties. None names a response header. [Decision 0012](../decisions/0012-search-and-aql.md)
+  records that artifactweave sets no such limit.
+- The [7.125.4 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases.md)
+  (2025-10-30) add "a new rate-limiting mechanism for search APIs" for NuGet, with
+  no status, header or limit documented.
+- 503 appears only on the JFConnect probes
+  ([readiness](https://docs.jfrog.com/administration/reference/checkreadiness.md),
+  [liveness](https://docs.jfrog.com/administration/reference/checkliveness.md)) and
+  on [Get Cluster Locks](https://docs.jfrog.com/administration/reference/getclusterlocks.md)
+  without PostgreSQL advisory locking.
+- No page documents `Retry-After`, `RateLimit`, `RateLimit-Policy` or
+  `X-RateLimit-*` on a JFrog answer. The other 429s in the reference pages belong to
+  MyJFrog's cloud APIs at `my.jfrog.com`
+  ([usage data](https://docs.jfrog.com/administration/reference/getusagedata.md),
+  [IP allowlist](https://docs.jfrog.com/administration/reference/addiptoallowlist.md)),
+  not to self-managed Artifactory. The `rateLimit` block of
+  [system.yaml](https://docs.jfrog.com/installation/docs/artifactory-system-yaml.md)
+  limits outgoing webhook events, not incoming requests. Public Jira's 429 issues
+  concern Docker Hub's upstream limits
+  ([RTFACT-23250](https://jfrog.atlassian.net/browse/RTFACT-23250)).
+- [I]: the headers and body of 7.x's AQL and NuGet 429s.
+
+**IETF drafts.** On 2026-11-12 the IETF datatracker lists
+`draft-ietf-httpapi-idempotency-key-header-08` (2026-10-22, expires 2027-04-25)
+and `draft-ietf-httpapi-ratelimit-headers-11` (2026-05-23, expires 2026-11-24) as
+the current revisions; both are working-group documents not yet with the IESG.
+Neither has a revision after the ones decision 0043 cites.
+
+**List paging.** The reference pages' own OpenAPI definitions, for each list
+operation in the seven specs whose page documents paging. The class is the one
+decision 0043's [paging classes](../decisions/0043-api-reliability.md#paging-classes-and-the-next-pointer)
+give it.
+
+| Operation | 7.x paging | Next pointer 7.x gives | Class |
+| --- | --- | --- | --- |
+| [Get Repositories](https://docs.jfrog.com/artifactory/reference/getrepositoriesbytypeandproject.md) (`getRepositoriesByTypeAndProject`) | `limit` 1 to 1000 and `offset` 0 or more, `offset` only with `limit`, "introduced in 7.173.x"; with `limit`, `X-Total-Count`, `X-Result-Offset` and `X-Result-Limit` ([#1367](https://github.com/weaveplatform/artifactweave/issues/1367)) | None | `offset` |
+| [Access v2 users](https://docs.jfrog.com/administration/reference/getuserlist.md) and [groups](https://docs.jfrog.com/administration/reference/getgrouplist.md) (`getUserList`, `getGroupList`) | `cursor`, `limit` (default 1000) | Envelope `cursor` | `cursor` |
+| [Access v2 permissions](https://docs.jfrog.com/administration/reference/getpermissions.md) (`getPermissions`) | `cursor` (a permission name), `limit` (1 to 99,999) | Envelope `cursor` | `cursor` |
+| [Projects for a global role](https://docs.jfrog.com/projects/reference/getprojectsforrole.md) (`getProjectsForRole`, stub) | `cursor`, `limit` (default 1000) | Envelope `cursor` | `cursor` |
+| [Grid monitoring entities](https://docs.jfrog.com/administration/reference/getmonitoringentitylist.md) (`getMonitoringEntityList`, stub) | `page_token` | Envelope `next_page_token`, empty after the last page | `cursor` |
+| [Retention history](https://docs.jfrog.com/artifactory/reference/getretentionoperationshistory.md) and [policy report](https://docs.jfrog.com/artifactory/reference/getconfiguredretentionpolicieslist.md) (stubs) | `offset` (default 0), `limit` (default 100), `order_by`, `direction` | Body `total` only | `offset` |
+| [Release bundles](https://docs.jfrog.com/artifactory/reference/getallbundles-1.md) and [their versions](https://docs.jfrog.com/artifactory/reference/getreleasebundlev1versionsbyname.md) (`getAllBundles`, `getReleaseBundleV1VersionsByName`, stubs) | `start_pos`, no size | None | `offset` |
+| [SCIM users](https://docs.jfrog.com/administration/reference/getscimusers.md) and [groups](https://docs.jfrog.com/administration/reference/getscimgroups.md) (stubs) | `startIndex`, `count` | Body `totalResults`, `itemsPerPage` | `offset` |
+| [Failed federation binary tasks](https://docs.jfrog.com/artifactory/reference/getlistoffailedbinarytasks.md) (stub) | `page` from 1, `limit` (default 1000) | None | `page` |
+| [Cleanup policy runs](https://docs.jfrog.com/administration/reference/getcleanuppolicyrunsview.md) (stub) | `page`, `pageSize`, `sortBy` | None | `page` |
+| [Distribution edge nodes](https://docs.jfrog.com/artifactory/reference/getdistributionedgenodes.md) (stub) | `limit` only, a cap | None | `complete` |
+| [Webhook troubleshooting](https://docs.jfrog.com/integrations/reference/streamwebhooktroubleshooting.md) and [Worker execution history](https://docs.jfrog.com/administration/reference/getworkerexecutionhistory.md) (stubs) | `start` is a Unix-time filter; the webhook list's `count` caps it | None | `complete` |
+| [Docker catalog](https://docs.jfrog.com/artifactory/reference/listdockerrepositories.md) and [tags](https://docs.jfrog.com/artifactory/reference/listdockertags.md) | `n`, `last` | `Link`, as the [OCI distribution specification](https://github.com/opencontainers/distribution-spec/blob/main/spec.md#listing-tags) defines it | `native` |
+| [Puppet modules](https://docs.jfrog.com/artifactory/reference/getpuppetmodules.md) and releases | No parameter on the page; the Forge v3 fields `offset`, `limit`, `total` and `next` in the body, at the top level in the reference schema and under `pagination` in the Forge's shape that artifactweave answers (`api/parity-baseline.json` records the difference) | Body `next` | `native` |
+| [AQL](https://docs.jfrog.com/artifactory/docs/aql-query-output.md) (`searchAql`), "Display Limits and Pagination" | `.offset()` and `.limit()` in the query; `range` in the response | None: the next request needs a body | `native` |
+| Every other list in the ledger: legacy users, groups and permission targets, builds and runs, tokens, roles, environments, the convenience searches, certificates, key pairs, VCS branches and tags | None | None | `complete` |
+
+Public Jira shows that 7.x left those last lists whole:
+[RTFACT-27073](https://jfrog.atlassian.net/browse/RTFACT-27073) (Get Users slow
+with 18,000 users, closed as deferred),
+[RTFACT-30933](https://jfrog.atlassian.net/browse/RTFACT-30933) (group members,
+open) and [RTFACT-29669](https://jfrog.atlassian.net/browse/RTFACT-29669) (SCIM,
+open). [I]: whether 7.x's `complete` lists stream or build in memory, and what they
+answer when the store fails part way.
 
 ## Validation and compatibility boundaries
 

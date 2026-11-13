@@ -69,9 +69,13 @@ Feature: Build-info
     Then the command succeeds
     When I run jf "rt bp accept-app 7 --detailed-summary --url {url} --user admin --password {password}"
     Then the command succeeds
-    # The summary's sha256 is the X-Checksum-Sha256 the publish answered.
+    # The summary's sha256 is the X-Checksum-Sha256 the publish answered,
+    # and that is the SHA-256 of the run's document in artifactory-build-info.
     And I keep the JSON field "sha256" of the output as "published"
     And the server answered 204 to PUT "/artifactory/api/build"
+    When I GET "/artifactory/api/search/checksum?sha256={published}" as admin
+    Then the response status is 200
+    And the response body contains "/artifactory/api/storage/artifactory-build-info/accept-app/7-"
     When I GET "/artifactory/api/build/accept-app/7" as admin
     Then the response status is 200
     And the JSON field "buildInfo.name" equals "accept-app"

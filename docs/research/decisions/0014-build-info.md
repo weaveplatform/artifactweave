@@ -20,10 +20,13 @@ client checks this record relies on.
 the status codes and headers the CLI checks:
 - **`PUT /api/build`** accepts the `application/vnd.org.jfrog.artifactory+json` content type,
   answers 204 with no body, and sets `X-Checksum-Sha256` to the stored document's SHA-256,
-  as [uploadbuild-1](https://docs.jfrog.com/integrations/reference/uploadbuild-1.md)
-  documents and Artifactory 6.20's `BuildResource.addBuild` answers (its twin page
-  [uploadbuild](https://docs.jfrog.com/integrations/reference/uploadbuild.md) still says
-  200). The JFrog CLI accepts 200, 201 and 204 (jfrog-client-go `PublishBuildInfo`).
+  as Artifactory 6.20's `BuildResource.addBuild` answers and
+  [RTFACT-20291](https://jfrog.atlassian.net/browse/RTFACT-20291) describes. The
+  [uploadbuild](https://docs.jfrog.com/integrations/reference/uploadbuild.md) page documents
+  200 and no header, but no 7.x release note or Jira issue records a move from 204, so the
+  204 is [I] for P19 ([#1381](https://github.com/weaveplatform/artifactweave/issues/1381)).
+  The JFrog CLI accepts 200, 201 and 204, and reads the header for `--detailed-summary`
+  (jfrog-client-go `PublishBuildInfo`).
   `buildRepo`, "the build-info repository key that stores the build", is checked as append
   checks it: it must name the project's build-info repository, and another key answers 400.
 - **Reads:**

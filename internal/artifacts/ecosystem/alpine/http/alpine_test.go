@@ -93,9 +93,10 @@ func rsaKeyPEM(t *testing.T) string {
 }
 
 // TestAccAlpineRefusesPathsOutsideTheLayout: an index or package path
-// outside apk's branch/component/architecture layout, or one that carries
-// a query or matrix parameters, is not found, as Artifactory answers a
-// path its Alpine layout does not name.
+// outside apk's branch/component/architecture layout is not found, as
+// Artifactory answers a path its Alpine layout does not name. A query or
+// matrix parameters are taken as any file's GET takes them
+// (alpine_query_test.go).
 func TestAccAlpineRefusesPathsOutsideTheLayout(t *testing.T) {
 	w := newItemWorld(t)
 	w.repos(
@@ -107,9 +108,6 @@ func TestAccAlpineRefusesPathsOutsideTheLayout(t *testing.T) {
 	for _, target := range []string{
 		"/artifactory/alpine-local/hello-1.0-r0.apk",
 		"/artifactory/alpine-local/v3.20/main/APKINDEX.tar.gz",
-		"/artifactory/alpine-local/" + apkIndexPath + "?x=1",
-		"/artifactory/alpine-local/" + apkIndexPath + ";x=1",
-		"/artifactory/alpine/" + apkHelloPath + "?x=1",
 	} {
 		t.Run(target, func(t *testing.T) {
 			rec := w.do(http.MethodGet, target, kittest.Admin.Name)

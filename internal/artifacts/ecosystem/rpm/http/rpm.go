@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/rpm"
@@ -72,8 +73,7 @@ func (s RPMAPI) serveVirtualRPMMetadata(
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	root, name, ok := strings.Cut(req.Path, "repodata/")
-	if !ok || name == "" || strings.Contains(name, "/") || len(req.Props) != 0 ||
-		r.URL.RawQuery != "" {
+	if !ok || name == "" || strings.Contains(name, "/") {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
@@ -88,6 +88,16 @@ func (s RPMAPI) serveVirtualRPMMetadata(
 	// VirtualRepoDownloadStrategy), once read permission is settled.
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM virtual metadata download", err))
+		return
+	}
+	// 7.x serves the stored repodata through its virtual download path, as
+	// any other file (#1350): a query, such as skipUpdateStats
+	// (RTFACT-25636, 7.21.3), changes nothing, and matrix parameters "make
+	// resolution conditional on properties" (JFrog's guide, Using
+	// Properties in Deployment and Resolution). The composed repodata
+	// carries none [I], so only a mandatory key refuses it.
+	if !req.Matrix().Matches(nil) {
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	candidates, err := s.rpmCandidates(r.Context(), st, c, root, p, acc, false, map[string]bool{})
@@ -147,10 +157,6 @@ func (s RPMAPI) serveVirtualRPMPackage(
 	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
-	if len(req.Props) != 0 || r.URL.RawQuery != "" {
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
-		return
-	}
 	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
 		!acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
@@ -174,24 +180,49 @@ func (s RPMAPI) serveVirtualRPMPackage(
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM virtual members", err))
 		return
 	}
+	// A query changes nothing, and a member's file that the matrix
+	// parameters do not match does not serve the GET (#1350): the next
+	// member that lists the package is asked, as 7.x's virtual download
+	// passes over a member that does not find the file
+	// (ArtifactoryVirtualDownloadStrategy.processStandard, 7.161.26), a
+	// property mismatch among the reasons (DbStoringRepoMixin.getInfo) [I].
+	// A remote member's copy is matched only when its cache holds one.
 	for _, candidate := range candidates {
 		if candidate.pkg.Path != req.Path {
 			continue
 		}
+		var matches bool
 		if candidate.repo.Class == repo.Remote {
-			s.serveVirtualRemoteRPMPackage(w, r, candidate.repo, req, candidate.pkg.SHA256, p, acc)
-			return
+			matches, err = itemkit.RemoteCopyMatches(r.Context(), st, candidate.repo, req.Path, req)
+		} else {
+			var it model.Item
+			it, err = st.Items().Get(r.Context(), candidate.repo.Key, false, req.Path)
+			if err != nil {
+				httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM virtual package", err))
+				return
+			}
+			if it.Folder || it.Actual.SHA256 != candidate.pkg.SHA256 {
+				httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+				return
+			}
+			matches, err = itemkit.MatchesMatrix(r.Context(), st, it, req)
+			if err == nil && matches {
+				s.ServeItemFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
+				return
+			}
 		}
-		it, err := st.Items().Get(r.Context(), candidate.repo.Key, false, req.Path)
 		if err != nil {
-			httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM virtual package", err))
+			httpkit.WriteErr(
+				w,
+				r,
+				s.InternalError(r.Context(), "RPM virtual package properties", err),
+			)
 			return
 		}
-		if it.Folder || it.Actual.SHA256 != candidate.pkg.SHA256 {
-			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
-			return
+		if !matches {
+			continue
 		}
-		s.ServeItemFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
+		s.serveVirtualRemoteRPMPackage(w, r, candidate.repo, req, candidate.pkg.SHA256, p, acc)
 		return
 	}
 	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
@@ -205,15 +236,19 @@ func (s RPMAPI) serveVirtualRemoteRPMPackage(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
+	// The upstream is asked with the client's query, under Propagate Query
+	// Params, and its matrix parameters, as for any remote file (#1371).
 	q := source.Request{
-		Repo:    c,
-		Subject: accessapi.SubjectOf(p),
-		Access:  acc.Decider,
-		Project: c.ProjectKey,
+		Repo:         c,
+		Subject:      accessapi.SubjectOf(p),
+		Access:       acc.Decider,
+		Project:      c.ProjectKey,
+		MatrixParams: pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
 		Resource: source.Resource{
 			Kind:   source.ResourceKindArtifact,
 			Path:   req.Path,
 			Method: r.Method,
+			Query:  itemkit.RemoteResource(r, req.Path).Query,
 		},
 	}
 	q, err := itemkit.RPMSourceRequest(q)
@@ -261,7 +296,10 @@ func (s RPMAPI) serveVirtualRemoteRPMPackage(
 }
 
 // rpmCandidates returns the packages the members of the virtual repository
-// c list below root, the first member's row for each path. A member whose
+// c list below root, the first member's row for each path; for a package GET
+// (download true) the later members' rows for it follow, so a GET whose
+// matrix parameters the first member's file does not match can pass over to
+// the next (serveVirtualRPMPackage). A member whose
 // download policy refuses its repodata takes no part in the repodata, and
 // only a blacked-out one in a package GET (rpmMemberRefusesMetadata). With
 // download false, for repodata, a row stays when the member's or the
@@ -315,7 +353,8 @@ func (s RPMAPI) rpmCandidates(
 			return nil, fmt.Errorf("rpm: member %s index: %w", key, err)
 		}
 		for _, entry := range entries {
-			if selected[entry.pkg.Path] || !acc.File(c, entry.pkg.Path, accessapi.ActionRead) ||
+			if !download && selected[entry.pkg.Path] ||
+				!acc.File(c, entry.pkg.Path, accessapi.ActionRead) ||
 				!acc.File(entry.repo, entry.pkg.Path, accessapi.ActionRead) {
 				continue
 			}

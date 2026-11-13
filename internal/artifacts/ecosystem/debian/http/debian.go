@@ -81,20 +81,15 @@ func (s DebianAPI) serveDebianIndex(
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
-	// A stored index takes a query and matrix parameters as every other
-	// file does: 7.x documents skipUpdateStats for a GET of any file
+	// An index takes a query and matrix parameters as every other file
+	// does: 7.x documents skipUpdateStats for a GET of any file
 	// (RTFACT-25636, 7.21.3), so a query changes nothing, and the matrix
 	// parameters are matched below. A remote index takes a query as any
-	// remote file does (itemkit.DebianSourceRequest, #1349). It still
-	// refuses matrix parameters once read permission is settled (DV-057):
-	// 7.x appends them to the upstream URL (6.20
-	// HttpRepo.downloadResource; "Appending matrix params to remote request
-	// URL" in the ?trace of RTFACT-26349, 7.25.7), which the generic remote
-	// read does not do for any format yet (#1371).
-	if c.Class == repo.Remote && len(req.Props) != 0 {
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
-		return
-	}
+	// remote file does (itemkit.DebianSourceRequest, #1349), and its matrix
+	// parameters as any remote file does too (#1371): a copy the cache
+	// holds is matched, and the upstream is asked with them, as 7.x appends
+	// them to the remote request URL ("Appending matrix params to remote
+	// request URL" in the ?trace of RTFACT-26349, 7.25.7).
 	// 7.x stores a local index and caches a remote one at this path and
 	// reads it through the download path, so a blacked-out repository, or
 	// patterns that reject the index's own path, answer the policy's 404
@@ -132,9 +127,16 @@ func (s DebianAPI) serveDebianIndex(
 			err = source.ErrUnavailable
 			break
 		}
+		var matches bool
+		if matches, err = itemkit.RemoteCopyMatches(ctx, st, c, req.Path, req); err != nil {
+			break
+		} else if !matches {
+			err = kernel.ErrNotFound
+			break
+		}
 		query := source.Request{
 			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
-			CacheOnly: cached,
+			CacheOnly: cached, MatrixParams: pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
 			Resource: source.Resource{
 				Path: req.Path, Method: r.Method,
 				// The query less the server's own controls, which the
