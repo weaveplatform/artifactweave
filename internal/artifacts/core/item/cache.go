@@ -75,9 +75,12 @@ type CacheUpload struct {
 	// ClientAccept is the client's Accept values for a file with no format
 	// hint, which 7.x's MIME check takes the requested types from
 	// (HttpRepo.getAcceptableHeaders); nil, as for a format route, takes
-	// the path's type. Only that check reads it: it is not part of the
-	// cache identity.
+	// the type of RequestURL. Only that check reads it: it is not part of
+	// the cache identity.
 	ClientAccept []string
+	// RequestURL is the URL the upstream was asked for, the one 7.x's
+	// refusal names (requestedName); empty takes the path's type.
+	RequestURL string
 }
 
 // CacheResult is either committed content or an owned transient reader. Close
@@ -432,8 +435,9 @@ func (e *MIMERefusal) Message(url string) string {
 
 // RefuseLabel is the check Cache makes of a file with no format hint, for
 // an upstream answer whose body is not cached, such as a HEAD's: a
-// *MIMERefusal when c refuses label for path under the client's accept
-// values, nil otherwise.
+// *MIMERefusal when c refuses label for path, the URL asked for or the
+// file's path (requestedName), under the client's accept values, nil
+// otherwise.
 func RefuseLabel(c repo.Config, path, label string, accept []string) error {
 	if c.BlockMismatchingMimeTypes != nil && !*c.BlockMismatchingMimeTypes {
 		return nil
@@ -470,9 +474,22 @@ func requestedMIME(u CacheUpload) []string {
 		all = append(all, javaHashSetOrder(types)...)
 	}
 	if len(u.ClientAccept) == 0 || len(all) == 0 && wildcard {
-		return []string{mediaTypeOf(MimeType(u.Token.Key.Path))}
+		return []string{mediaTypeOf(MimeType(requestedName(u)))}
 	}
 	return javaHashSetOrder(all)
+}
+
+// requestedName is the name whose type 7.x's MIME check requests when the
+// client sent no Accept: the URL it downloads, whose extension
+// NamingUtils.getMimeType reads (HttpRepo.getAcceptableHeaders, 7.161.26),
+// and which its refusal names. It can differ from the path's: a NuGet v2
+// download asks for packages/<id>/<version>, which has no type, for a path
+// ending .nupkg. Without a URL it is the path.
+func requestedName(u CacheUpload) string {
+	if u.RequestURL != "" {
+		return u.RequestURL
+	}
+	return u.Token.Key.Path
 }
 
 // javaSplitComma is Java's value.split(","): a value without a comma is

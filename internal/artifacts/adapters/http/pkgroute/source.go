@@ -41,6 +41,21 @@ func (s Remote) Read(
 	if s.Service == nil {
 		return source.Result{}, apierror.ErrNotImplemented
 	}
+	if resource.ClientMIME == nil && !resource.ChecksumOnly &&
+		resource.ExpectedContentType == "" && len(resource.ExpectedContentTypes) == 0 {
+		// 7.x refuses an upstream's label through
+		// HttpRepo.blockMismatchingMimeTypes on every remote read, whichever
+		// API asked for it, and answers 409, which its missed-retrieval
+		// cache remembers (7.161.26), as the item route answers it. A
+		// format route sends no Accept here, so the label is checked
+		// against the type of the URL asked for, as 7.x checks it without
+		// one: the native clients' Accept values, such as pip's text/html
+		// for its index, are not what they download [I]. A resource with a
+		// format hint keeps the adapter's own, stricter check of raw
+		// metadata and its 502, which is not 7.x's block list
+		// (https://github.com/weaveplatform/artifactweave/issues/1392).
+		resource.ClientMIME = &source.ClientMIME{}
+	}
 	p, _ := kernel.FromContext(r.Context())
 	d, _ := accessapi.DeciderFrom(r.Context())
 	result, err := s.Service.Read(r.Context(), source.Request{

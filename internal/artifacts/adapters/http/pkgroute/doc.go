@@ -51,10 +51,14 @@
 //   - Permission helpers: Can, CanFolder, Require and RequireFolder.
 //   - Download helpers: DownloadItem, ResolveDownloadItem, ServeItem,
 //     ServeFound, Read, CheckDownload, ServeResult, ServeStream and
-//     SourceError.
+//     SourceError; and 7.x's download's conditional answers, which the item
+//     kit shares: UnevaluatedPreconditions, WithoutUnevaluatedPreconditions,
+//     WithoutHeaders, FileNotModified, ETagValue, WriteNotModified and
+//     RangeRefusalWriter.
 //   - Metadata helpers: StoredItem, ResolveStoredItem, ServeMetadata,
 //     ServeFoundMetadata, ReadMetadata, CheckDocument, CheckBlackedOut,
-//     MergeMembers and IsRefusal.
+//     MergeMembers and IsRefusal; and ReadServed and ServedReadFault, a
+//     protocol's read of the copy the source service served it.
 //   - Deploy helpers: Store, StoreOnce, StoreNew, StoreResolved, Upload,
 //     Deploy, DeployItem, Created, Annotate, Delete and DeleteTree.
 //   - Multipart helpers: ReadForm, ReadFormLimited and ReadFormWith; path
@@ -107,12 +111,33 @@
 //     protocol builds a virtual repository's merged document from the
 //     members MergeMembers returns, which leave out a member that is
 //     blacked out or would refuse the document's path.
+//   - Remote.Read holds every format route's remote read without a format
+//     hint to 7.x's block list of upstream labels as the item route is held
+//     (source.ClientMIME, with no Accept, so the type of the URL asked for
+//     is the one requested): a refused label answers 409 with 7.x's message
+//     in the protocol's envelope, remembered for the missed-retrieval
+//     period, never the upstream's 502. A read with a format hint keeps the
+//     adapter's stricter check and its 502
+//     (https://github.com/weaveplatform/artifactweave/issues/1392).
+//   - ServeStream answers If-Match and If-Unmodified-Since never, as 7.x's
+//     download reads neither, on every stream. A stream with a SHA-1, a
+//     file, answers If-None-Match and If-Modified-Since as that download's
+//     isNotModified does (FileNotModified), and a range past its end with
+//     416 and Content-Range alone; a document a protocol builds per request
+//     keeps http.ServeContent's answers to both
+//     (https://github.com/weaveplatform/artifactweave/issues/1468,
+//     https://github.com/weaveplatform/artifactweave/issues/1469).
 //   - SourceError answers a failure of the server's own storage while it
 //     keeps a remote file (format.ErrStorageFault) as the router's
 //     internal fault, 500
 //     "internal error", whatever the store's error wraps, never as the
 //     upstream's 502 or 504
-//     (https://github.com/weaveplatform/artifactweave/issues/1269).
+//     (https://github.com/weaveplatform/artifactweave/issues/1269). A
+//     protocol that reads the copy the source service served it, the
+//     server's cached file or spool file, marks a failed read the same way
+//     (ReadServed, ServedReadFault), and keeps its own 502 for a copy that
+//     reads but does not parse or is over its limit
+//     (https://github.com/weaveplatform/artifactweave/issues/1462).
 //
 // # References
 //
@@ -155,7 +180,8 @@
 // document_test.go, which covers CheckDocument and CheckBlackedOut, a
 // read's policy path and a remote member's refusal against a fake source
 // boundary; source_result_test.go tests ServeResult from inside the
-// package. Every
+// package; conditional_test.go covers ServeStream's conditional answers and
+// FileNotModified. Every
 // native protocol's route suite under test/server/artifacts reaches it
 // through the router.
 package pkgroute

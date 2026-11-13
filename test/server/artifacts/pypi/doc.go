@@ -23,6 +23,9 @@
 //   - TestAcc results for the JSON routes, uploads with Basic or token
 //     credentials, PUT through the item deploy, the pip install sequence and
 //     reindex.
+//   - TestAccPypiRemoteFileMIMERefusal fails while an upstream file whose
+//     label the remote's block list refuses answers other than 7.x's 409,
+//     remembered, without asking the upstream again (issue 1392).
 //
 // # References
 //

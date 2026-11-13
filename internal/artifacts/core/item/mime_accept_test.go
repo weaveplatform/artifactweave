@@ -114,6 +114,54 @@ func TestUnitRefuseLabel(t *testing.T) {
 	}
 }
 
+// TestUnitMIMERequestsTheURLsType: without Accept, the requested type is
+// the type of the URL the upstream was asked for, as 7.x's
+// HttpRepo.getAcceptableHeaders reads NamingUtils.getMimeType of its
+// download URL, not the path's: a NuGet v2 download's
+// packages/<id>/<version> has no type, so its label is not refused, where
+// its path's .nupkg would refuse it (#1392). Without a URL it is the path.
+func TestUnitMIMERequestsTheURLsType(t *testing.T) {
+	const html = "<!DOCTYPE html><html>login</html>"
+	for _, tc := range []struct {
+		url       string
+		requested []string // nil when the file is cached
+	}{
+		{"http://up.example/packages/Acme/1.0.0", nil},
+		{"http://up.example/api/v1/crates/acme/1.0.0/download", nil},
+		{"http://up.example/files/acme-1.0.0.zip", []string{"application/zip"}},
+		{"", []string{"application/x-nupkg"}},
+	} {
+		w, u := remoteWorld(t)
+		u.Token.Key.Path = "acme/1.0.0/acme.1.0.0.nupkg"
+		u.ContentType = "text/html"
+		u.RequestURL = tc.url
+		u.Body, u.Length = strings.NewReader(html), int64(len(html))
+		var err error
+		u.Token, err = w.db.RemoteCache().Begin(t.Context(), u.Token.Key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		result, err := w.svc.Cache(t.Context(), u)
+		if tc.requested == nil {
+			if err != nil {
+				t.Fatalf("%q refused: %v", tc.url, err)
+			}
+			if result.Body != nil {
+				_ = result.Body.Close()
+			}
+			continue
+		}
+		var refused *MIMERefusal
+		if !errors.As(err, &refused) || !slices.Equal(refused.Requested, tc.requested) {
+			t.Fatalf("%q: %v, want a refusal requesting %q", tc.url, err, tc.requested)
+		}
+	}
+	c := repo.Config{Key: "r", Class: repo.Remote}
+	if err := RefuseLabel(c, "http://up.example/packages/Acme/1.0.0", "text/html", nil); err != nil {
+		t.Fatalf("HEAD of a URL with no type: %v", err)
+	}
+}
+
 // TestUnitJavaHashSetOrder: the order follows java.util.HashSet's buckets,
 // including the table's doubling past twelve values.
 func TestUnitJavaHashSetOrder(t *testing.T) {
