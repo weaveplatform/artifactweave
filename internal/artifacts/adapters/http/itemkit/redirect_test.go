@@ -3,6 +3,7 @@ package itemkit
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
 
@@ -224,10 +226,12 @@ func TestUnitServeContentAnswersAsTheDownload(t *testing.T) {
 
 // fileNotModified decides as 7.x's isNotModified: a header line of
 // If-None-Match that is the SHA-1, bare, quoted or weak, matches, and
-// decides alone; "*" and a list on one line do not match; otherwise
+// decides alone; "*" and a list on one line do not match; the MD5 matches
+// only under a true X-Artifactory-If-None-Match-MD5; otherwise
 // If-Modified-Since matches a file unchanged since, to the second.
 func TestUnitFileNotModified(t *testing.T) {
 	const sha = "0123456789abcdef0123456789abcdef01234567"
+	const md5 = "0123456789abcdef0123456789abcdef"
 	modified := time.Unix(1700000000, 900_000_000).UTC()
 	same := modified.Truncate(time.Second).Format(http.TimeFormat)
 	before := modified.Add(-time.Hour).Format(http.TimeFormat)
@@ -249,6 +253,32 @@ func TestUnitFileNotModified(t *testing.T) {
 		{"list on one line", sha, modified, [][2]string{{"If-None-Match", `"other", "` + sha + `"`}}, false},
 		{"second line", sha, modified, [][2]string{{"If-None-Match", `"other"`}, {"If-None-Match", sha}}, true},
 		{"no SHA-1", "", modified, [][2]string{{"If-None-Match", `""`}}, false},
+		{"MD5", sha, modified, [][2]string{{"If-None-Match", md5}}, false},
+		{
+			"MD5 asked for", sha, modified,
+			[][2]string{{"If-None-Match", `"` + md5 + `"`}, {"X-Artifactory-If-None-Match-MD5", "True"}},
+			true,
+		},
+		{
+			"MD5 asked for with yes", sha, modified,
+			[][2]string{{"If-None-Match", md5}, {"X-Artifactory-If-None-Match-MD5", "yes"}},
+			true,
+		},
+		{
+			"MD5 not asked for", sha, modified,
+			[][2]string{{"If-None-Match", md5}, {"X-Artifactory-If-None-Match-MD5", "false"}},
+			false,
+		},
+		{
+			"SHA-1 when the MD5 is asked for", sha, modified,
+			[][2]string{{"If-None-Match", sha}, {"X-Artifactory-If-None-Match-MD5", "true"}},
+			true,
+		},
+		{
+			"MD5 asked for, none known", "", modified,
+			[][2]string{{"If-None-Match", `""`}, {"X-Artifactory-If-None-Match-MD5", "true"}},
+			false,
+		},
 		{
 			"If-None-Match decides alone", sha, modified,
 			[][2]string{{"If-None-Match", `"other"`}, {"If-Modified-Since", after}},
@@ -269,79 +299,129 @@ func TestUnitFileNotModified(t *testing.T) {
 		for _, h := range c.headers {
 			r.Header.Add(h[0], h[1])
 		}
-		if got := fileNotModified(r, c.sha1, c.modified); got != c.want {
+		sums := kernel.Checksums{SHA1: c.sha1}
+		if c.sha1 != "" {
+			sums.MD5 = md5
+		}
+		if got := fileNotModified(r, sums, c.modified); got != c.want {
 			t.Errorf("%s: %t, want %t", c.label, got, c.want)
 		}
 	}
 }
 
-// serveChecksum answers 304 with the file's Last-Modified and no body or
-// type when the file is unchanged, ignores If-Match and If-Unmodified-Since,
-// applies a GET's Range and answers a HEAD's with the whole length.
+// serveChecksum answers as 7.x's download answers a checksum file: a 304
+// with the file's headers, a HEAD with the checksum's type and length and
+// the file's headers whatever Range it sends, and a GET with the checksum
+// alone, dated now, its Range applied whatever If-Range says, without the
+// file's headers or Accept-Ranges. If-Match and If-Unmodified-Since are
+// never read.
 func TestUnitServeChecksum(t *testing.T) {
 	const sha = "0123456789abcdef0123456789abcdef01234567"
+	sums := kernel.Checksums{
+		SHA1:   sha,
+		SHA256: strings.Repeat("2", 64),
+		MD5:    strings.Repeat("5", 32),
+	}
 	modified := time.Unix(1700000000, 0).UTC()
-	serve := func(method string, sum string, at time.Time, headers ...string) *httptest.ResponseRecorder {
-		r := httptest.NewRequest(method, "/libs-local/a.bin.sha1", nil)
+	serve := func(method string, file kernel.Checksums, at time.Time, headers ...string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, "/libs-local/dir/a.bin.sha1", nil)
 		for i := 0; i+1 < len(headers); i += 2 {
 			r.Header.Set(headers[i], headers[i+1])
 		}
 		rec := httptest.NewRecorder()
-		serveChecksum(rec, r, "a.bin.sha1", sha, sum, at)
+		serveChecksum(rec, r, "dir/a.bin.sha1", sha, file, at)
 		return rec
 	}
+	fileHeaders := map[string]string{
+		"Last-Modified":          modified.Format(http.TimeFormat),
+		"ETag":                   sha,
+		"X-Checksum-Sha1":        sha,
+		"X-Checksum-Sha256":      sums.SHA256,
+		"X-Checksum-Md5":         sums.MD5,
+		"X-Artifactory-Filename": "a.bin",
+		"Content-Disposition":    `attachment; filename="a.bin"; filename*=UTF-8''a.bin`,
+		"Accept-Ranges":          "bytes",
+	}
+	wantHeaders := func(label string, rec *httptest.ResponseRecorder, want map[string]string) {
+		t.Helper()
+		for k, v := range want {
+			if got := rec.Header().Get(k); got != v {
+				t.Errorf("%s: %s %q, want %q", label, k, got, v)
+			}
+		}
+	}
 	for _, method := range []string{http.MethodGet, http.MethodHead} {
-		rec := serve(method, sha, modified, "If-None-Match", sha)
-		if rec.Code != http.StatusNotModified || rec.Body.Len() != 0 ||
-			rec.Header().Get("Last-Modified") != modified.Format(http.TimeFormat) ||
-			rec.Header().Get("Content-Type") != "" {
-			t.Errorf("%s If-None-Match: %d %v %q", method, rec.Code, rec.Header(), rec.Body)
+		rec := serve(method, sums, modified, "If-None-Match", sha)
+		if rec.Code != http.StatusNotModified || rec.Body.Len() != 0 {
+			t.Errorf("%s If-None-Match: %d %q", method, rec.Code, rec.Body)
 		}
-		rec = serve(method, sha, time.Time{}, "If-None-Match", sha)
-		if rec.Code != http.StatusNotModified || rec.Header().Get("Last-Modified") != "" {
-			t.Errorf("%s If-None-Match, no time: %d %v", method, rec.Code, rec.Header())
+		wantHeaders(method+" 304", rec, fileHeaders)
+		// A file whose checksums and time are not known sends none of them.
+		rec = serve(
+			method,
+			kernel.Checksums{},
+			time.Time{},
+			"If-Modified-Since",
+			modified.Format(http.TimeFormat),
+		)
+		if rec.Code != http.StatusOK {
+			t.Errorf("%s nothing known: %d", method, rec.Code)
 		}
-		for _, h := range [][]string{
-			{"If-Match", `"other"`},
-			{"If-Unmodified-Since", modified.Add(-time.Hour).Format(http.TimeFormat)},
-			{"If-None-Match", sha},
+		for _, k := range []string{"ETag", "X-Checksum-Sha1", "X-Checksum-Sha256", "X-Checksum-Md5"} {
+			if _, sent := rec.Header()[k]; sent {
+				t.Errorf("%s nothing known: %s sent", method, k)
+			}
+		}
+	}
+	for _, h := range [][]string{
+		nil,
+		{"If-Match", `"other"`},
+		{"If-Unmodified-Since", modified.Add(-time.Hour).Format(http.TimeFormat)},
+		{"Range", "bytes=2-5"},
+		{"Range", "bytes=1000-2000"},
+		{"Range", "bytes=2-5", "If-Range", `"other"`},
+	} {
+		rec := serve(http.MethodHead, sums, modified, h...)
+		if rec.Code != http.StatusOK || rec.Body.Len() != 0 ||
+			rec.Header().Get("Content-Range") != "" {
+			t.Errorf("HEAD %v: %d %v", h, rec.Code, rec.Header())
+		}
+		wantHeaders(fmt.Sprintf("HEAD %v", h), rec, fileHeaders)
+		wantHeaders(fmt.Sprintf("HEAD %v", h), rec, map[string]string{
+			"Content-Type": "application/x-checksum", "Content-Length": "40",
+		})
+	}
+	for _, c := range []struct {
+		headers                    []string
+		status                     int
+		body, length, contentRange string
+	}{
+		{nil, http.StatusOK, sha, "40", ""},
+		{[]string{"If-Match", `"other"`}, http.StatusOK, sha, "40", ""},
+		{[]string{"If-None-Match", `"other"`}, http.StatusOK, sha, "40", ""},
+		{[]string{"Range", "bytes=2-5"}, http.StatusPartialContent, sha[2:6], "4", "bytes 2-5/40"},
+		{[]string{"Range", "bytes=2-5", "If-Range", `"other"`}, http.StatusPartialContent, sha[2:6], "4", "bytes 2-5/40"},
+		{[]string{"Range", "bytes=2-5", "If-Range", modified.Add(-time.Hour).Format(http.TimeFormat)}, http.StatusPartialContent, sha[2:6], "4", "bytes 2-5/40"},
+		{[]string{"Range", "bytes=1000-2000"}, http.StatusRequestedRangeNotSatisfiable, "", "0", "bytes */40"},
+	} {
+		start := time.Now().Truncate(time.Second)
+		rec := serve(http.MethodGet, sums, modified, c.headers...)
+		h := rec.Header()
+		dated, err := http.ParseTime(h.Get("Last-Modified"))
+		answered := rec.Code == c.status && rec.Body.String() == c.body
+		sized := h.Get("Content-Length") == c.length && h.Get("Content-Range") == c.contentRange
+		typed := h.Get("Content-Type") == "application/x-checksum"
+		if !answered || !sized || !typed || err != nil || dated.Before(start) {
+			t.Errorf("GET %v: %d %v %q", c.headers, rec.Code, h, rec.Body)
+		}
+		for _, k := range []string{
+			"ETag", "X-Checksum-Sha1", "X-Artifactory-Filename", "Content-Disposition", "Accept-Ranges",
+			"X-Content-Type-Options",
 		} {
-			sum := sha
-			if h[0] == "If-None-Match" {
-				sum = "" // the file's SHA-1 is not known
-			}
-			rec := serve(method, sum, modified, h...)
-			want := sha
-			if method == http.MethodHead {
-				want = ""
-			}
-			if rec.Code != http.StatusOK || rec.Body.String() != want ||
-				rec.Header().Get("Content-Length") != "40" {
-				t.Errorf("%s %v: %d %v %q", method, h, rec.Code, rec.Header(), rec.Body)
+			if _, sent := h[k]; sent {
+				t.Errorf("GET %v: %s sent", c.headers, k)
 			}
 		}
-	}
-	if rec := serve(
-		http.MethodGet,
-		sha,
-		modified,
-		"Range",
-		"bytes=2-5",
-	); rec.Code != http.StatusPartialContent ||
-		rec.Body.String() != sha[2:6] ||
-		rec.Header().Get("Content-Range") != "bytes 2-5/40" {
-		t.Errorf("GET Range: %d %v %q", rec.Code, rec.Header(), rec.Body)
-	}
-	if rec := serve(
-		http.MethodHead,
-		sha,
-		modified,
-		"Range",
-		"bytes=2-5",
-	); rec.Code != http.StatusOK ||
-		rec.Header().Get("Content-Range") != "" ||
-		rec.Header().Get("Content-Length") != "40" {
-		t.Errorf("HEAD Range: %d %v", rec.Code, rec.Header())
 	}
 }
 

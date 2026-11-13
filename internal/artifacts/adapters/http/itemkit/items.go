@@ -568,7 +568,7 @@ func (s *Kit) getSidecar(
 			"Checksum not found for "+f.Item.FullPath()))
 		return
 	}
-	serveChecksum(w, r, p, value, f.Item.Actual.SHA1, f.Item.Modified)
+	serveChecksum(w, r, p, value, f.Item.Actual, f.Item.Modified)
 }
 
 // contentTypeProperty is the property whose first value, when not blank,

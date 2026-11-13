@@ -95,10 +95,12 @@
 //     whole length whatever Range it sends. A checksum file, local, virtual
 //     or remote, answers as 7.x's download answers one: an If-None-Match
 //     naming its file's SHA-1, or an If-Modified-Since its file has not
-//     changed since, answers 304, If-Match and If-Unmodified-Since are
-//     never read, a HEAD answers 200 with the checksum's length and a GET
-//     applies Range. A folder listing and an archive entry keep their own
-//     answers.
+//     changed since, answers 304 with the file's headers, If-Match and
+//     If-Unmodified-Since are never read, a HEAD answers 200 with the
+//     checksum's length and the file's headers, and a GET sends the
+//     checksum alone, dated now, with Range applied whatever If-Range says
+//     and a 416 without a body.
+//     A folder listing and an archive entry keep their own answers.
 //
 // # References
 //

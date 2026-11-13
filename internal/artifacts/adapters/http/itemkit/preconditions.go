@@ -3,10 +3,16 @@ package itemkit
 import (
 	"io"
 	"net/http"
+	"path"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
 // unevaluatedPreconditions are the conditional headers Artifactory's
@@ -72,57 +78,139 @@ func ServeContent(
 	http.ServeContent(w, downloadRequest(r), name, modified, content)
 }
 
-// serveChecksum answers a GET or HEAD of a checksum file whose content is
-// value, the checksum of a file whose SHA-1 is sha1 and which last changed
-// at modified, as 7.x answers one on a local, virtual and remote
-// repository alike (DownloadServiceImpl.respond, 7.161.26):
-//   - its file's isNotModified decides first, so an If-None-Match naming
-//     the file's SHA-1, or an If-Modified-Since the file has not changed
-//     since, answers 304 (fileNotModified);
+// serveChecksum answers a GET or HEAD of a checksum file at name whose
+// content is value, the checksum of a file whose checksums are sums (those
+// known) and which last changed at modified, as 7.x answers one on a local,
+// virtual and remote repository alike (Artifactory OSS 7.161.26 sources,
+// DownloadServiceImpl.respond and respondForChecksumRequest, and
+// RequestResponseHelper):
+//   - its file's isNotModified decides first (fileNotModified), and its 304
+//     is the file's: sendNotModifiedResponse is handed the file's resource,
+//     so it carries the file's headers (fileHeaders);
 //   - If-Match and If-Unmodified-Since are never read;
-//   - a HEAD answers 200 with the checksum's length (sendHeadResponse,
-//     which never reads Range);
-//   - a GET applies Range (sendBodyResponseForChecksum).
-//
-// The 304 carries the Last-Modified the 200 does. An empty sha1 matches no
-// If-None-Match, as isNoneMatch treats a blank SHA-1 (7.161.26).
+//   - a HEAD answers 200 with the checksum's type and length and otherwise
+//     the file's headers: sendHeadResponse is handed a ChecksumResource,
+//     whose information is its file's (ResolvedResource without
+//     overrideResourceInfoChecksums), and it never reads Range;
+//   - a GET is sendBodyResponseForChecksum's: the checksum's type and
+//     length, Last-Modified the time of the response, Range applied with
+//     any If-Range ignored ("If-Range is not supported"), none of the
+//     file's headers, Accept-Ranges included, and a 416 without a body.
 func serveChecksum(
 	w http.ResponseWriter,
 	r *http.Request,
-	name, value, sha1 string,
+	name, value string,
+	sums kernel.Checksums,
 	modified time.Time,
 ) {
-	r = downloadRequest(r)
-	if fileNotModified(r, sha1, modified) {
-		if !modified.IsZero() {
-			w.Header().Set("Last-Modified", modified.UTC().Format(http.TimeFormat))
-		}
+	r = withoutUnevaluatedPreconditions(r)
+	artifact, _, _ := item.Sidecar(name)
+	h := w.Header()
+	if fileNotModified(r, sums, modified) {
+		fileHeaders(h, path.Base(artifact), sums, modified)
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
-	w.Header().Set("Content-Type", checksumType(r, name))
-	// Decided above against the file, so ServeContent must not decide
-	// them again against the checksum, which has no ETag of its own.
-	r = withoutHeaders(r, "If-None-Match", "If-Modified-Since")
-	http.ServeContent(w, r, "", modified, strings.NewReader(value))
+	h.Set("Content-Type", checksumType(r, name))
+	if r.Method == http.MethodHead {
+		fileHeaders(h, path.Base(artifact), sums, modified)
+		h.Set("Content-Length", strconv.Itoa(len(value)))
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	h.Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
+	// Decided above against the file, so ServeContent must not decide them
+	// again against the checksum, which has no ETag of its own.
+	r = withoutHeaders(r, "If-None-Match", "If-Modified-Since", "If-Range")
+	http.ServeContent(&checksumBodyWriter{
+		ResponseWriter: w, contentType: h.Get("Content-Type"),
+		date: h.Get("Last-Modified"),
+	}, r, "", time.Time{}, strings.NewReader(value))
+}
+
+// fileHeaders sets the headers 7.x's download sends from a file's own
+// information (RequestResponseHelper.setBasicHeaders, 7.161.26): its
+// Last-Modified, its SHA-1 as the ETag, bare as 7.x sends it, its
+// checksums, its name, Content-Disposition and Accept-Ranges, as this
+// server's file download sends them (serveFile). A checksum or a time that
+// is not known is left out rather than sent empty.
+func fileHeaders(h http.Header, name string, sums kernel.Checksums, modified time.Time) {
+	if !modified.IsZero() {
+		h.Set("Last-Modified", modified.UTC().Format(http.TimeFormat))
+	}
+	if sums.SHA1 != "" {
+		h.Set("ETag", sums.SHA1)
+	}
+	for k, v := range map[string]string{
+		"X-Checksum-Sha1": sums.SHA1, "X-Checksum-Sha256": sums.SHA256, "X-Checksum-Md5": sums.MD5,
+	} {
+		if v != "" {
+			h.Set(k, v)
+		}
+	}
+	h.Set("X-Artifactory-Filename", name)
+	h.Set("Content-Disposition", blob.Disposition(name))
+	h.Set("Accept-Ranges", "bytes")
+}
+
+// checksumBodyWriter answers a checksum GET as 7.x's
+// sendBodyResponseForChecksum does where http.ServeContent differs
+// (7.161.26): it sends no Accept-Ranges, which only setBasicHeaders sends,
+// and it answers a range that does not overlap with 416, the checksum's
+// type and date and Content-Range only, where ServeContent sends
+// http.Error's text in its place.
+type checksumBodyWriter struct {
+	http.ResponseWriter
+
+	contentType, date string
+	unsatisfiable     bool
+}
+
+func (w *checksumBodyWriter) WriteHeader(status int) {
+	h := w.Header()
+	h.Del("Accept-Ranges")
+	if status == http.StatusRequestedRangeNotSatisfiable {
+		w.unsatisfiable = true
+		h.Del("X-Content-Type-Options")
+		h.Set("Content-Type", w.contentType)
+		h.Set("Last-Modified", w.date)
+		h.Set("Content-Length", "0")
+	}
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *checksumBodyWriter) Write(p []byte) (int, error) {
+	if w.unsatisfiable {
+		return len(p), nil
+	}
+	return w.ResponseWriter.Write(p) //nolint:wrapcheck // the writer's own error
 }
 
 // fileNotModified reports whether r's If-None-Match or If-Modified-Since
-// finds the file unchanged, as 7.x's DownloadServiceImpl.isNotModified and
+// finds the file whose checksums are sums, and which last changed at
+// modified, unchanged, as 7.x's DownloadServiceImpl.isNotModified and
 // isNonMatch decide it (7.161.26). An If-None-Match decides alone: it
 // matches when one of its header lines, less a W/ prefix and its quotes,
 // is the file's SHA-1, so neither "*" nor a list of tags on one line
-// matches (ArtifactoryRequestBase.isNoneMatch and parseETagValue).
-// Otherwise an If-Modified-Since matches when the file has not changed
-// since, to the second (isNewerThan).
-func fileNotModified(r *http.Request, sha1 string, modified time.Time) bool {
+// matches (ArtifactoryRequestBase.isNoneMatch and parseETagValue). A
+// request whose first X-Artifactory-If-None-Match-MD5 line is true, as
+// Commons Lang's BooleanUtils.toBoolean reads it, may name the MD5
+// instead (isSha1AndMd5NotMatch). Otherwise an If-Modified-Since matches
+// when the file has not changed since, to the second (isNewerThan).
+func fileNotModified(r *http.Request, sums kernel.Checksums, modified time.Time) bool {
 	if tags := r.Header.Values("If-None-Match"); len(tags) > 0 {
+		md5 := ""
+		if flags := r.Header.Values("X-Artifactory-If-None-Match-MD5"); len(flags) > 0 &&
+			slices.Contains([]string{"true", "on", "yes", "y", "t"}, strings.ToLower(flags[0])) {
+			md5 = sums.MD5
+		}
 		for _, tag := range tags {
 			tag = strings.TrimSpace(tag)
 			if strings.HasPrefix(tag, "W/") {
 				tag = strings.ReplaceAll(tag, "W/", "")
 			}
-			if sha1 != "" && strings.ReplaceAll(tag, `"`, "") == sha1 {
+			tag = strings.ReplaceAll(tag, `"`, "")
+			if (sums.SHA1 != "" && tag == sums.SHA1) || (md5 != "" && tag == md5) {
 				return true
 			}
 		}
