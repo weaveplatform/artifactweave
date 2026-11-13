@@ -301,7 +301,7 @@ func (h handler) resultBytes(ctx context.Context, result source.Result) ([]byte,
 		defer func() { _ = result.Stream.Body.Close() }()
 		body, err := io.ReadAll(io.LimitReader(result.Stream.Body, 64<<20+1))
 		if err != nil {
-			return nil, fmt.Errorf("conda: read upstream repodata stream: %w", err)
+			return nil, fmt.Errorf("conda: read upstream repodata stream: %w", pkgroute.ServedReadFault(ctx, err))
 		}
 		return body, nil
 	}
@@ -315,7 +315,7 @@ func (h handler) resultBytes(ctx context.Context, result source.Result) ([]byte,
 	defer func() { _ = rc.Close() }()
 	body, err := io.ReadAll(io.LimitReader(rc, 64<<20+1))
 	if err != nil {
-		return nil, fmt.Errorf("conda: read cached repodata: %w", err)
+		return nil, fmt.Errorf("conda: read cached repodata: %w", pkgroute.ServedReadFault(ctx, err))
 	}
 	return body, nil
 }

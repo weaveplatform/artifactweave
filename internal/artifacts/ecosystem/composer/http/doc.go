@@ -111,6 +111,8 @@
 //     that selects a remote's archive.
 //   - download_policy_test.go: the download policy on hosted, virtual and
 //     remote repositories.
+//   - served_copy_fault_test.go: a cached root or p2 document whose copy
+//     fails a read as the route reads it answers 500 and stays cached.
 //
 // The router's guard TestAccNativeComposerRoutesAvoidHandwrittenStubs
 // (internal/app) and the @composer acceptance scenarios, with the native

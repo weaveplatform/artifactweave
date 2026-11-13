@@ -166,9 +166,9 @@ func (h handler) gitPackage(r *http.Request, name string) (gitPointer, error) {
 		return gitPointer{}, remoteInvalid()
 	}
 	defer result.Stream.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(result.Stream.Body, maxRefsBytes+1))
+	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, maxRefsBytes, remoteInvalid())
 	if err != nil {
-		return gitPointer{}, remoteInvalid()
+		return gitPointer{}, err
 	}
 	if result.Revalidate != nil {
 		if err := result.Revalidate(r.Context()); err != nil {
@@ -309,9 +309,9 @@ func (h handler) gitRefsForPointer(
 		return nil, source.Result{}, remoteInvalid()
 	}
 	defer result.Stream.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(result.Stream.Body, maxGitRefsBytes+1))
+	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, maxGitRefsBytes, remoteInvalid())
 	if err != nil {
-		return nil, source.Result{}, remoteInvalid()
+		return nil, source.Result{}, err
 	}
 	refs, err := parseGitRefs(data)
 	return refs, result, err
@@ -529,9 +529,9 @@ func (h handler) gitPackageNames(r *http.Request, query string) ([]string, error
 		return nil, remoteInvalid()
 	}
 	defer result.Stream.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(result.Stream.Body, maxGitCatalogBytes+1))
+	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, maxGitCatalogBytes, remoteInvalid())
 	if err != nil {
-		return nil, remoteInvalid()
+		return nil, err
 	}
 	names, err := parseGitCatalog(c, data)
 	if err != nil {

@@ -79,8 +79,11 @@ func (h handler) upstreamManifest(
 		return source.Result{}, remoteManifest{}, remoteFailure()
 	}
 	defer result.Stream.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(result.Stream.Body, remoteManifestLimit+1))
-	if err != nil || len(data) > remoteManifestLimit {
+	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, remoteManifestLimit, remoteFailure())
+	if err != nil {
+		return source.Result{}, remoteManifest{}, err
+	}
+	if len(data) > remoteManifestLimit {
 		return source.Result{}, remoteManifest{}, remoteFailure()
 	}
 	manifest, err := parseRemoteManifest(data)

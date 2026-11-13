@@ -127,9 +127,9 @@ func (h handler) remoteRefs(r *http.Request, name string) ([]remoteRef, source.R
 		return nil, source.Result{}, remoteInvalid()
 	}
 	defer result.Stream.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(result.Stream.Body, maxRefsBytes+1))
+	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, maxRefsBytes, remoteInvalid())
 	if err != nil {
-		return nil, source.Result{}, remoteInvalid()
+		return nil, source.Result{}, err
 	}
 	vs, err := parseRefs(data)
 	if err != nil {
@@ -193,9 +193,9 @@ func (h handler) remotePackageNames(r *http.Request, query string) ([]string, er
 		return nil, remoteInvalid()
 	}
 	defer result.Stream.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(result.Stream.Body, maxRefsBytes+1))
+	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, maxRefsBytes, remoteInvalid())
 	if err != nil {
-		return nil, remoteInvalid()
+		return nil, err
 	}
 	return parsePackages(data)
 }
