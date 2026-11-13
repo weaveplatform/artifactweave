@@ -116,9 +116,11 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 		strings.Contains(strings.ToLower(u.CacheControl), "no-store") {
 		return s.cacheTransient(ctx, u, d)
 	}
+	var reads faultLog
+	d.Body = upstreamBody{r: d.Body, log: &reads}
 	info, err := s.Upload(ctx, d)
 	if err != nil {
-		return out, err
+		return out, uploadFault(ctx, err, &reads)
 	}
 	if err = remoteLength(u, info.Size); err != nil {
 		return out, err
@@ -131,8 +133,9 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 	}
 	actual := digestsOf(info)
 	var envInspection func(context.Context) (model.Item, error)
+	var hooks faultLog
 	if u.Kind != model.RemoteMetadata || u.PublishMetadata {
-		env, err := s.inspected(ctx, d, actual, info.Size)
+		env, err := s.inspectedCopy(ctx, d, actual, info.Size, &hooks)
 		if err != nil {
 			return out, err
 		}
@@ -140,9 +143,14 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 			return s.putFile(ctx, env, d, actual, info.Size, d.Declared, s.now())
 		}
 	}
-	err = s.Store.Tx(ctx, func(ctx context.Context) error {
+	// publish publishes the copy: its entry, and its item when
+	// envInspection is set. A failed call of the store is a StorageFault
+	// (storeFault), and so is a failure of the item's publication after one
+	// of its hooks' opens or reads of stored content failed, as checkCopy
+	// marks a check's refusal.
+	publish := func(ctx context.Context) error {
 		if err := s.Store.RemoteCache().Check(ctx, u.Token); err != nil {
-			return fmt.Errorf("cache fence: %w", err)
+			return storeFault(ctx, fmt.Errorf("cache fence: %w", err))
 		}
 		if u.CheckCurrent != nil {
 			if err := u.CheckCurrent(ctx, s.Store); err != nil {
@@ -170,6 +178,9 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 			var err error
 			out.Item, err = s.cacheItem(ctx, u, &d, &e, envInspection)
 			if err != nil {
+				if cause := hooks.failure(); cause != nil {
+					return MarkStorageFault(ctx, cause, err)
+				}
 				return err
 			}
 		}
@@ -177,17 +188,27 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 		var err error
 		out.Entry, err = s.Store.RemoteCache().Put(ctx, u.Token, e)
 		if err != nil {
-			return fmt.Errorf("cache publish: %w", err)
+			return storeFault(ctx, fmt.Errorf("cache publish: %w", err))
 		}
 		if err = s.PropagateRemotePropertyState(ctx, out.Entry); err != nil {
-			return err
+			return storeFault(ctx, err)
 		}
 		if e.ItemID == 0 {
 			return s.checkRawCacheBlob(ctx, actual.SHA256)
 		}
 		return nil
+	}
+	var published error
+	err = s.Store.Tx(ctx, func(ctx context.Context) error {
+		published = publish(ctx)
+		return published
 	})
 	if err != nil {
+		if published == nil {
+			// The transaction failed to begin or to commit: the store's own
+			// failure.
+			err = storeFault(ctx, err)
+		}
 		return CacheResult{}, fmt.Errorf("cache transaction: %w", err)
 	}
 	out.Info = info
@@ -206,7 +227,7 @@ func (s *Service) cacheItem(
 		var err error
 		d.Properties, e.Smart, err = s.initialRemoteProperties(ctx, u)
 		if err != nil {
-			return model.Item{}, err
+			return model.Item{}, storeFault(ctx, err)
 		}
 	}
 
@@ -220,13 +241,13 @@ func (s *Service) cacheItem(
 	}
 	it, err = s.Store.Items().Put(ctx, it)
 	if err != nil {
-		return model.Item{}, fmt.Errorf("cache origin: %w", err)
+		return model.Item{}, storeFault(ctx, fmt.Errorf("cache origin: %w", err))
 	}
 	e.ItemID = it.ID
 	if e.Smart == nil {
 		old, readErr := s.Store.RemoteCache().Read(ctx, u.Token.Key)
 		if readErr != nil && !errors.Is(readErr, kernel.ErrNotFound) {
-			return model.Item{}, fmt.Errorf("cache smart state: %w", readErr)
+			return model.Item{}, storeFault(ctx, fmt.Errorf("cache smart state: %w", readErr))
 		}
 		if readErr == nil && old.Token.Source == u.Token.Source && old.ItemID == it.ID &&
 			old.Blob.Checksums.SHA256 == e.Blob.Checksums.SHA256 {
@@ -242,13 +263,11 @@ func (s *Service) validateCachedBody(ctx context.Context, u CacheUpload, info bl
 	}
 	r, _, err := s.Blobs.Open(ctx, info.Digests.SHA256)
 	if err != nil {
-		return fmt.Errorf("cache validation body: %w", err)
+		err = fmt.Errorf("cache validation body: %w", err)
+		return MarkStorageFault(ctx, err, err)
 	}
 	defer r.Close()
-	if err = u.Validate(ctx, r, info.Size); err != nil {
-		return fmt.Errorf("cache validation: %w", err)
-	}
-	return nil
+	return checkCopy(ctx, u.Validate, r, info.Size)
 }
 
 // Match item publication's GC fence. A revived tombstone can mean collection
@@ -257,14 +276,14 @@ func (s *Service) validateCachedBody(ctx context.Context, u CacheUpload, info bl
 func (s *Service) checkRawCacheBlob(ctx context.Context, sha string) error {
 	ref, err := s.Store.Blobs().Get(ctx, sha)
 	if err != nil {
-		return fmt.Errorf("cache blob reference: %w", err)
+		return storeFault(ctx, fmt.Errorf("cache blob reference: %w", err))
 	}
 	if ref.Deleted.IsZero() {
 		return nil
 	}
 	exists, err := s.Blobs.Exists(ctx, sha)
 	if err != nil {
-		return fmt.Errorf("cache blob exists: %w", err)
+		return storeFault(ctx, fmt.Errorf("cache blob exists: %w", err))
 	}
 	if !exists {
 		return ErrCollected
@@ -575,7 +594,7 @@ func (s *Service) cacheTransient(
 	var out CacheResult
 	f, err := os.CreateTemp("", "artifactweave-remote-*")
 	if err != nil {
-		return out, fmt.Errorf("cache temporary body: %w", err)
+		return out, storeFault(ctx, fmt.Errorf("cache temporary body: %w", err))
 	}
 	body := transientCache{f}
 	keep := false
@@ -585,7 +604,7 @@ func (s *Service) cacheTransient(
 		}
 	}()
 	h := blob.NewHasher()
-	n, err := io.Copy(io.MultiWriter(f, h), d.Body)
+	n, err := spoolUpstream(ctx, io.MultiWriter(f, h), d.Body)
 	if err != nil {
 		return out, fmt.Errorf("cache transient copy: %w", err)
 	}
@@ -614,10 +633,10 @@ func (s *Service) cacheTransient(
 	}
 	if u.Validate != nil {
 		if _, err = f.Seek(0, io.SeekStart); err != nil {
-			return out, fmt.Errorf("cache validation rewind: %w", err)
+			return out, storeFault(ctx, fmt.Errorf("cache validation rewind: %w", err))
 		}
-		if err = u.Validate(ctx, f, n); err != nil {
-			return out, fmt.Errorf("cache validation: %w", err)
+		if err = checkCopy(ctx, u.Validate, f, n); err != nil {
+			return out, err
 		}
 	}
 	if u.CheckCurrent != nil {
@@ -626,7 +645,7 @@ func (s *Service) cacheTransient(
 		}
 	}
 	if _, err = f.Seek(0, io.SeekStart); err != nil {
-		return out, fmt.Errorf("cache transient rewind: %w", err)
+		return out, storeFault(ctx, fmt.Errorf("cache transient rewind: %w", err))
 	}
 	keep = true
 	out.Body = body

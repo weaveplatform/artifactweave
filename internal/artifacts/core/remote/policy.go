@@ -627,7 +627,20 @@ func isHex(c byte) bool {
 // anything else a 502 protocol failure. Format rules in the ecosystem
 // slices return it unwrapped, as the policy does, so that the source
 // service maps their failures as it maps the policy's own.
+//
+// A failure of the server's own storage while it keeps a remote file
+// (*item.StorageFault: a failed read of the copy under check, a failed
+// write of the copy, a failed call of the store that publishes it) passes
+// through as it is, a server fault, where the error it brought about maps
+// on its own to a 502 that serves no stale copy and that the
+// assumed-offline circuit does not count (storageFault). Elsewhere, as for
+// a read or write that timed out or ended short, that error maps as
+// before, so the stale copy and the circuit are as they were.
 func PolicyError(err error) error {
+	var fault *item.StorageFault
+	if errors.As(err, &fault) {
+		return storageFault(err, PolicyError(fault.Err))
+	}
 	var typed *source.HTTPError
 	if errors.As(err, &typed) {
 		return typed
@@ -665,5 +678,34 @@ func PolicyError(err error) error {
 		return &source.HTTPError{Status: 502, Kind: source.FailureKindIntegrity}
 	default:
 		return &source.HTTPError{Status: 502, Kind: source.FailureKindProtocol}
+	}
+}
+
+// storageFault is fault, a failure of the server's own storage, when
+// before, what the error it brought about maps to on its own, is a
+// security, integrity or protocol failure answering 502 Bad Gateway: one
+// that serves no stale copy (fallback) and that the assumed-offline
+// circuit does not count (RecordFailure). That 502 blamed the upstream for
+// a fault of the server's storage, which answers 500 "internal error"
+// instead [I]: no JFrog source says what 7.x answers when its own storage
+// fails, and a live capture cannot make it fail. Any other mapping is
+// kept, so a stale copy is served where it was.
+//
+// Leaving the fault out of the circuit matches 7.x, which assumes a remote
+// offline only for its HTTP client's failures, the upstream's unavailable
+// statuses and a failed info request (HttpRepo.doExecuteMethod,
+// RemoteRepoBase.interceptResponse and handleGenericException in
+// 7.161.26, the only callers of putOffline), never for the save into its
+// cache.
+func storageFault(fault, before error) error {
+	var failure *source.HTTPError
+	if !errors.As(before, &failure) || failure.Status != http.StatusBadGateway {
+		return before
+	}
+	switch failure.Kind {
+	case source.FailureKindSecurity, source.FailureKindIntegrity, source.FailureKindProtocol:
+		return fault
+	default:
+		return before
 	}
 }

@@ -108,6 +108,10 @@
 //     download URL templates.
 //   - remote_unit_test.go: the checks of an upstream config.json and index
 //     file.
+//   - remote_storage_test.go: a remote crate whose cached copy fails a read
+//     while it is checked answers 500 "internal error" and is not cached,
+//     while a crate that breaks the rules still answers 502
+//     (https://github.com/weaveplatform/artifactweave/issues/1269).
 //   - download_policy_test.go: the download policy on hosted and remote
 //     repositories.
 //

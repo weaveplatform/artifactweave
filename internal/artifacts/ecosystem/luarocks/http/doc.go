@@ -74,7 +74,11 @@
 //     not find resource" [I], after the same permission and download policy
 //     checks.
 //   - An upload whose stored content fails a read while it is checked
-//     answers 500, never the 400 of a bad rock.
+//     answers 500, never the 400 of a bad rock. So does a remote rock or
+//     manifest whose cached copy fails a read while it is checked, or that
+//     the server's storage fails to write or publish, never the 502 of an
+//     upstream's bad content [I]
+//     (https://github.com/weaveplatform/artifactweave/issues/1269).
 //   - The download policy (decision 0032) is checked after Read permission
 //     at the path a client asks for. A local or federated manifest is a
 //     stored document 7.x reads through the download path, so a blackout,
@@ -155,6 +159,11 @@
 //   - rock_read_test.go (external): a rock upload or item deploy whose
 //     stored content fails a read answers 500 and stores nothing, while bad
 //     rocks are still refused 400.
+//   - remote_storage_test.go (external): a remote rock, and a refreshed or
+//     re-admitted remote manifest, whose cached copy fails a read answers
+//     500 and caches nothing, and so does a rock whose copy, entry or
+//     transaction the storage fails to keep, or whose spool file cannot be
+//     made, while a bad upstream rock still answers 502.
 //
 // The @luarocks acceptance scenarios drive the luarocks client against
 // local, federated, remote and virtual repositories.

@@ -58,7 +58,10 @@
 //     *format.RejectionError, from Read and from CheckRead and CheckFolder
 //     alike, since artifactweave writes its message: a listing that checks
 //     each disclosed release can keep one whose file is refused, and a read
-//     answers the policy's 404 (#1237).
+//     answers the policy's 404 (#1237). A failure of the server's own
+//     storage (format.ErrStorageFault) leaves as it is too, in
+//     the store's words, so a router answers it as a server fault rather
+//     than as ErrUnavailable (#1269).
 //   - The package opens no store transaction and propagates none.
 //
 // # References
@@ -84,10 +87,11 @@
 //
 // # Testing
 //
-//   - source_test.go, source_boundary_test.go, root_test.go, smart_test.go
-//     and policy_test.go are an external test package (source_test) over
-//     fake backends: read intents and representations, refusals before
-//     lookup, result validation and safe errors, stream ownership and late
+//   - source_test.go, source_boundary_test.go, root_test.go, smart_test.go,
+//     policy_test.go and storage_fault_test.go are an external test
+//     package (source_test) over fake backends: read intents and
+//     representations, refusals before lookup, result validation and safe
+//     errors, a storage fault passed on as it is, stream ownership and late
 //     fences, root metadata grants, the Smart and Git LFS contracts, and the
 //     policy path, blackout-only reads, policy refusals from CheckRead and
 //     CheckPermission's permission-only check.

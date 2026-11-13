@@ -744,9 +744,12 @@ func (p *Policy) validateCachedMetadata(
 	e model.RemoteCacheEntry,
 	metadata source.MetadataResponse,
 ) error {
+	// A failed open or read here is the server's own storage failing on its
+	// copy, which PolicyError answers as a server fault where it answered
+	// 502, as it answers a failed read of a new copy under check.
 	body, _, err := p.Blobs.Open(ctx, e.Blob.Checksums.SHA256)
 	if err != nil {
-		return fmt.Errorf("cached metadata validation: %w", err)
+		return cachedCopyFault(ctx, err)
 	}
 	defer body.Close()
 	limit := p.metadataLimit(e.Kind)
@@ -755,7 +758,7 @@ func (p *Policy) validateCachedMetadata(
 	}
 	b, err := io.ReadAll(io.LimitReader(body, limit+1))
 	if err != nil {
-		return fmt.Errorf("cached metadata validation: %w", err)
+		return cachedCopyFault(ctx, err)
 	}
 	if int64(len(b)) > limit {
 		return source.ErrUnavailable
@@ -764,6 +767,13 @@ func (p *Policy) validateCachedMetadata(
 		return fmt.Errorf("cached metadata admission: %w", err)
 	}
 	return nil
+}
+
+// cachedCopyFault marks err, a failed open or read of the cached copy a 304
+// re-admits, as the item service marks a failed read of a copy it checks:
+// the server's own storage failed, not the upstream.
+func cachedCopyFault(ctx context.Context, err error) error {
+	return fmt.Errorf("cached metadata validation: %w", item.MarkStorageFault(ctx, err, err))
 }
 
 // cache keeps all adapter I/O outside the transaction and all final authority
