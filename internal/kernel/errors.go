@@ -14,4 +14,10 @@ var (
 	// ErrInvalid reports a record the store cannot hold as given, for
 	// example an item path that does not split into parent and name.
 	ErrInvalid = errors.New("store: invalid record")
+	// ErrStore marks a failure of the store itself, a statement the
+	// database failed to run, beside the driver's own error, so a caller
+	// can tell it from a verdict on the record (ErrNotFound, ErrConflict,
+	// ErrInvalid) and from a refusal by its own code. Its text is never
+	// shown: an error that carries it reads as the driver's.
+	ErrStore = errors.New("store: failure")
 )

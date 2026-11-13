@@ -59,6 +59,21 @@ func storeFault(ctx context.Context, err error) error {
 	return MarkStorageFault(ctx, err, err)
 }
 
+// hookFault is err, a format hook's failure while d's file is written, as
+// the hook returned it, but marked as a StorageFault when d is the remote
+// cache's file and a statement the store failed to run lies under it
+// (kernel.ErrStore): Hex's Deployed links the package index and LuaRocks'
+// syncs the rock's version, and a failed query there is the server's, not
+// the upstream's (https://github.com/weaveplatform/artifactweave/issues/1470).
+// A hook's refusal of the content carries no such mark and keeps its
+// error, which the remote policy answers 502 as before.
+func hookFault(ctx context.Context, d Deploy, err error) error {
+	if !d.Cached || !errors.Is(err, kernel.ErrStore) {
+		return err
+	}
+	return MarkStorageFault(ctx, err, err)
+}
+
 // uploadFault is err, Upload's failure to keep the upstream's body, marked
 // as a StorageFault where the blob store failed. A failed read of the body
 // (noted in body) is the upstream's failure, a connectivity 502 or a
