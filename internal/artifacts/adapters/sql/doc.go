@@ -34,7 +34,10 @@
 //   - Store, from New, with Repos, RemoteCache, Items, Trash, Packages,
 //     Blobs, Replicas, GitLFSLocks, BowerRegistrations, Builds,
 //     ArchivedItems, ColdBlobs and ColdReplicas, LayoutWatch, and the
-//     dialect store's Tx, AfterCommit and Close.
+//     dialect store's Tx, AfterCommit and Close. Items' DockerPages reads a
+//     registry repository's image layout a page at a time from the partial
+//     indexes items_docker_tags and items_docker_images (migration 0002,
+//     #1402).
 //   - Module: the name artifacts, the stream migrations.FS, the two sealed
 //     columns and the BeforeReseal and AfterMigrate hooks.
 //
@@ -113,7 +116,8 @@
 // sealed header values (pull request 656), layout fencing (pull request
 // 680), Git LFS locks (pull request 849) and Bower registrations (pull
 // request 912). Moved here in P9d, which added Store, New, LayoutWatch and
-// Module.
+// Module. The Docker page reader and its indexes page the registry's tags
+// lists and catalogs (#1402).
 //
 // # Testing
 //
@@ -159,6 +163,12 @@
 //   - archived_test.go: TestAccArchivedItemsClosedDatabase and
 //     TestAccArchivedItemsCorruptRows (every archived-item call fails on a
 //     closed pool and on rows corrupted behind the store's back).
+//   - docker_page_test.go: TestAccDockerPagesContract (the Docker page
+//     reader's contract, adapters/storetest.RunDockerPages, on SQLite in
+//     memory and in a file and on PostgreSQL), TestAccDockerPagesAtScale
+//     (on 5000 tags of one image and 5000 images, a late page of each is
+//     read through its index, with no sort, on SQLite and PostgreSQL) and
+//     TestAccDockerPagesClosedDatabase.
 //   - puppet_page_test.go: TestAccVersionNamesContract (the package store's
 //     VersionNames contract, adapters/storetest.RunVersionNames) and
 //     TestAccVersionNamesAtScale (a module of 5,000 versions beside another:

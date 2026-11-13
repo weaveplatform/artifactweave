@@ -1,6 +1,7 @@
 package dockerhttp
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -35,7 +36,26 @@ func (g *Registry) listTags(w http.ResponseWriter, r *http.Request, q Request) {
 	if imageBlackedOut(w, q) {
 		return
 	}
-	tags, found, err := layout.Tags(r.Context(), g.store.Items(), q.Repo.Key, q.Name)
+	pages := g.store.Items().DockerPages()
+	var first *layout.TagPages
+	open := func(last string, batch int) names {
+		src := layout.TagsAfter(pages, q.Repo.Key, q.Name, last, batch)
+		if first == nil {
+			first = src
+		}
+		return src
+	}
+	page, err := readPage(r, open)
+	if err != nil {
+		g.writeErr(w, r, err)
+		return
+	}
+	if first == nil {
+		// n=0 reads no page.
+		first = layout.TagsAfter(pages, q.Repo.Key, q.Name, "", 1)
+	}
+	// Whether the image exists does not depend on the page asked for.
+	found, err := first.Found(r.Context())
 	if err != nil {
 		g.writeErr(w, r, err)
 		return
@@ -44,8 +64,8 @@ func (g *Registry) listTags(w http.ResponseWriter, r *http.Request, q Request) {
 		Write(w, nameUnknown(q))
 		return
 	}
-	tags = paginate(w, r, tags)
-	writeJSON(w, map[string]any{"name": q.addressed(), "tags": tags})
+	name, _ := json.Marshal(q.addressed())
+	g.writePage(w, r, `{"name":`+string(name)+`,"tags":`, page)
 }
 
 // catalog serves _catalog: the images of one repository by name, or with
@@ -73,37 +93,78 @@ func (g *Registry) catalog(w http.ResponseWriter, r *http.Request, q Request) {
 			return
 		}
 	}
-	keys := make([]string, 0, len(repos))
-	patterns := make(map[string]repo.RepoPatterns, len(repos))
+	pages := g.store.Items().DockerPages()
+	var readable []repo.Config
 	for _, c := range repos {
 		if g.readsAnything(r, c) {
-			keys = append(keys, c.Key)
-			patterns[c.Key] = repo.PatternsOf(c)
+			readable = append(readable, c)
 		}
 	}
-	images, err := layout.Images(r.Context(), g.store.Items(), keys)
+	open := func(last string, batch int) names {
+		sources := make([]catalogSource, 0, len(readable))
+		for _, c := range readable {
+			// An image whose folder its repository's include and exclude
+			// patterns reject is left out, before the page is cut, as 7.x
+			// filters its catalog (RTFACT-26524, fixed). An image the
+			// patterns reject only some tags of stays, as its tags list
+			// keeps those tags (RTFACT-27234).
+			patterns := repo.PatternsOf(c)
+			accept := func(name string) bool { return ValidName(name) && patterns.Accepts(name, true) }
+			prefix := ""
+			if q.RepoKey == "" {
+				prefix = c.Key + "/"
+			}
+			sources = append(sources, catalogSource{
+				prefix: prefix,
+				images: layout.ImagesAfter(pages, c.Key, prefix, last, accept, batch),
+			})
+		}
+		return &catalogMerge{sources: sources}
+	}
+	page, err := readPage(r, open)
 	if err != nil {
 		g.writeErr(w, r, err)
 		return
 	}
-	names := []string{}
-	for _, im := range images {
-		// An image whose folder its repository's include and exclude
-		// patterns reject is left out, before the page is cut, as 7.x
-		// filters its catalog (RTFACT-26524, fixed). An image the patterns
-		// reject only some tags of stays, as its tags list keeps those tags
-		// (RTFACT-27234).
-		if !ValidName(im.Name) || !patterns[im.Repo].Accepts(im.Name, true) {
-			continue
+	g.writePage(w, r, `{"repositories":`, page)
+}
+
+// catalogSource is one repository's images, named as the catalog names
+// them, with the next one read ahead.
+type catalogSource struct {
+	prefix string
+	images *layout.ImagePages
+	head   string
+	ready  bool
+	done   bool
+}
+
+// catalogMerge merges the repositories' images, each source in Compare's
+// order, into one listing in that order: a repository's images are its
+// sorted page, and the merge reads one more from a source only when it has
+// listed the one before.
+type catalogMerge struct{ sources []catalogSource }
+
+func (m *catalogMerge) Next(ctx context.Context) (string, bool, error) {
+	best := -1
+	for n := range m.sources {
+		s := &m.sources[n]
+		if !s.ready && !s.done {
+			image, ok, err := s.images.Next(ctx)
+			if err != nil {
+				return "", false, err //nolint:wrapcheck // the layout names itself
+			}
+			s.head, s.ready, s.done = s.prefix+image, ok, !ok
 		}
-		if q.RepoKey == "" {
-			names = append(names, im.Repo+"/"+im.Name)
-		} else {
-			names = append(names, im.Name)
+		if s.ready && (best < 0 || layout.Compare(s.head, m.sources[best].head) < 0) {
+			best = n
 		}
 	}
-	slices.SortFunc(names, layout.Compare)
-	writeJSON(w, map[string]any{"repositories": paginate(w, r, names)})
+	if best < 0 {
+		return "", false, nil
+	}
+	m.sources[best].ready = false
+	return m.sources[best].head, true, nil
 }
 
 // served lists the repositories the registry-wide catalog covers: the
@@ -119,16 +180,14 @@ func (g *Registry) served(r *http.Request) ([]repo.Config, error) {
 	}), nil
 }
 
-// paginate returns the page of names, ordered as layout.Compare orders
-// them, that the request's n and last select: the names after last, at
-// most n of them. When more follow it sets the Link header to the next
+// paginateHeaders returns the page of names, ordered as layout.Compare
+// orders them, that the request's n and last select: the names after last,
+// at most n of them. When more follow it sets the Link header to the next
 // page, in the form the client addressed. n of zero gives an empty page
 // without a Link (end-8b). An n that is no count is ignored, as if absent:
-// the specification's error codes have none for it.
-func paginate(w http.ResponseWriter, r *http.Request, names []string) []string {
-	return paginateHeaders(w.Header(), r, names)
-}
-
+// the specification's error codes have none for it. A remote repository's
+// tags list pages its upstream's one listing with it; local listings read
+// their pages from the store (readPage), with the same answers.
 func paginateHeaders(header http.Header, r *http.Request, names []string) []string {
 	if names == nil {
 		// An empty list is [] in JSON, never null.
@@ -148,16 +207,15 @@ func paginateHeaders(header http.Header, r *http.Request, names []string) []stri
 	}
 	page := names[:n]
 	if n > 0 {
-		next := url.Values{"n": {strconv.Itoa(n)}, "last": {page[n-1]}}
-		header.Set("Link", "<"+r.URL.Path+"?"+next.Encode()+`>; rel="next"`)
+		header.Set("Link", nextLink(r, n, page[n-1]))
 	}
 	return page
 }
 
-func writeJSON(w http.ResponseWriter, body any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(body)
+// nextLink is the Link to the page of n names after last.
+func nextLink(r *http.Request, n int, last string) string {
+	next := url.Values{"n": {strconv.Itoa(n)}, "last": {last}}
+	return "<" + r.URL.Path + "?" + next.Encode() + `>; rel="next"`
 }
 
 // addressed is the image's name as the client addressed it: on the

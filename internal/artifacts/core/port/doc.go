@@ -35,6 +35,10 @@
 //     package's version names alone, in Versions' order, which the Puppet,
 //     Ansible and Chef lists count and order before they read their page's
 //     records (#1404).
+//   - DockerPageStore, the item store's reader of a registry repository's
+//     image layout a page at a time (ItemStore.DockerPages), with
+//     DockerFolderQuery, DockerImageQuery, DockerImageManifest and
+//     DockerFold.
 //   - BuildStore with NormaliseBuild; BowerRegistrationStore;
 //     GitLFSLockStore with GitLFSLockFilter; and ArchivedItemStore with
 //     ArchivedFilter.
@@ -103,6 +107,7 @@
 // property key checks (pull request 348), RemoteCacheStore (pull request
 // 646), GitLFSLockStore (pull request 849) and BowerRegistrationStore (pull
 // request 912). Moved here in P9d, which added ArchivedItemStore and Store.
+// DockerPageStore pages the registry's tags lists and catalogs (#1402).
 //
 // # Testing
 //

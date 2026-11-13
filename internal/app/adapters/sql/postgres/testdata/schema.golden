@@ -516,6 +516,8 @@ column items.remote_url text NOT NULL DEFAULT ''::text
 column items.props_modified_at bigint
 constraint items.items_pkey PRIMARY KEY (id)
 index items.items_created CREATE INDEX items_created ON items USING btree (created_at)
+index items.items_docker_images CREATE INDEX items_docker_images ON items USING btree (repo_key, cached, "left"(path, (length(path) - strpos(reverse(path), '/'::text))), path) WHERE ((type = 'file'::text) AND (name = ANY (ARRAY['manifest.json'::text, 'list.manifest.json'::text])))
+index items.items_docker_tags CREATE INDEX items_docker_tags ON items USING btree (repo_key, cached, lower(path), path) WHERE ((type = 'file'::text) AND (name = ANY (ARRAY['manifest.json'::text, 'list.manifest.json'::text])))
 index items.items_md5 CREATE INDEX items_md5 ON items USING btree (md5)
 index items.items_modified CREATE INDEX items_modified ON items USING btree (modified_at)
 index items.items_natural CREATE UNIQUE INDEX items_natural ON items USING btree (repo_key, cached, path, name)

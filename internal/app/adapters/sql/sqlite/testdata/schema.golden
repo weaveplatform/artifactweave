@@ -42,6 +42,8 @@ index group_members_user group_members CREATE INDEX group_members_user ON group_
 index groups_search_backfill user_groups CREATE INDEX groups_search_backfill ON user_groups(name)WHERE search_name IS NULL
 index item_properties_value item_properties CREATE INDEX item_properties_value ON item_properties(key,value)
 index items_created items CREATE INDEX items_created ON items(created_at)
+index items_docker_images items CREATE INDEX items_docker_images ON items(repo_key,cached,substr(path,1,length(rtrim(path,replace(path,'/','')))- 1),path)WHERE type = 'file' AND name IN('manifest.json','list.manifest.json')
+index items_docker_tags items CREATE INDEX items_docker_tags ON items(repo_key,cached,lower(path),path)WHERE type = 'file' AND name IN('manifest.json','list.manifest.json')
 index items_md5 items CREATE INDEX items_md5 ON items(md5)
 index items_modified items CREATE INDEX items_modified ON items(modified_at)
 index items_natural items CREATE UNIQUE INDEX items_natural ON items(repo_key,cached,path,name)

@@ -144,6 +144,8 @@ type ItemStore interface {
 	// query includes them. Every backend returns the same rows in the same
 	// order as aql.Select.
 	Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.Hit, error)
+	// DockerPages reads the image layout a page at a time (docker_page.go).
+	DockerPages() DockerPageStore
 
 	// Properties returns the item's properties (empty when it has none). This
 	// and the other property and statistics methods return kernel.ErrNotFound

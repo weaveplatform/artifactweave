@@ -112,7 +112,7 @@ func searchAtScale(t *testing.T, s *artsql.Store) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		plan := explain(t, s, q, args)
+		plan := explain(t, s, q, args...)
 		t.Logf("%s: %s of candidates:\n%s", engine, c.what, plan)
 		wantSeek(t, plan, "packages_name")
 	}
@@ -120,7 +120,7 @@ func searchAtScale(t *testing.T, s *artsql.Store) {
 	for i := range ids {
 		ids[i] = int64(count - 20 + i + 1)
 	}
-	plan := explain(t, s, artsql.SearchVersionsQuery(len(ids)), ids)
+	plan := explain(t, s, artsql.SearchVersionsQuery(len(ids)), ids...)
 	t.Logf("%s: the page's versions:\n%s", engine, plan)
 	// SQLite reads them in order through package_versions_order;
 	// PostgreSQL may read package_versions_version, already in package_id
@@ -133,39 +133,6 @@ func searchAtScale(t *testing.T, s *artsql.Store) {
 	if strings.Contains(plan, "TEMP B-TREE") {
 		t.Errorf("the page's versions are sorted whole")
 	}
-}
-
-// explain is the engine's plan of q: SQLite's EXPLAIN QUERY PLAN, and
-// PostgreSQL's EXPLAIN ANALYZE, which runs it.
-func explain(t *testing.T, s *artsql.Store, q string, args []any) string {
-	t.Helper()
-	prefix := "EXPLAIN QUERY PLAN "
-	if s.Dialect().Dollar {
-		prefix = "EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) "
-	}
-	rows, err := s.DB().QueryContext(t.Context(), s.Dialect().Rebind(prefix+q), args...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = rows.Close() }()
-	var plan strings.Builder
-	for rows.Next() {
-		var line string
-		if s.Dialect().Dollar {
-			err = rows.Scan(&line)
-		} else {
-			var id, parent, unused int
-			err = rows.Scan(&id, &parent, &unused, &line)
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		plan.WriteString(line + "\n")
-	}
-	if err := rows.Err(); err != nil {
-		t.Fatal(err)
-	}
-	return plan.String()
 }
 
 // wantSeek fails unless plan reads through index, and sorts nothing: the

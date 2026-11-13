@@ -364,10 +364,10 @@ func TestAccListingAndDeleteStoreFailures(t *testing.T) {
 		method, target string
 	}{
 		"tags": {func(w *blobWorld, o *Options) {
-			o.Store = itemsFault{Store: w.db, items: failingItems{w.db.Items()}}
+			o.Store = itemsFault{Store: w.db, items: pageFaults{w.db.Items(), new(0)}}
 		}, http.MethodGet, "/v2/docker-local/app/tags/list"},
 		"catalog": {func(w *blobWorld, o *Options) {
-			o.Store = itemsFault{Store: w.db, items: failingItems{w.db.Items()}}
+			o.Store = itemsFault{Store: w.db, items: pageFaults{w.db.Items(), new(0)}}
 		}, http.MethodGet, "/v2/docker-local/_catalog"},
 		"repositories": {func(w *blobWorld, o *Options) {
 			o.Store = faultyStore{Store: w.db, repos: faultyRepos{RepoStore: w.db.Repos(), list: true}}

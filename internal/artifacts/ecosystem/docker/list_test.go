@@ -91,6 +91,11 @@ func listings(t *testing.T, db item.Store) {
 	deploy("other", "untagged/"+layout.DigestFolder(other)+"/manifest.json", "other")
 	deploy("other", "plain/manifest.json", "m")
 	deploy("other", "top.json", "m")
+	// An image whose first folder is no manifest folder, and a folder
+	// whose only manifest folder is none.
+	deploy("docker-local", "mixed/-bad/manifest.json", "m")
+	deploy("docker-local", "mixed/v1/manifest.json", "m")
+	deploy("docker-local", "bad-only/-bad/manifest.json", "m")
 
 	tags, found, err := layout.Tags(ctx, db.Items(), "docker-local", "a_b.c")
 	if err != nil || !found {
@@ -124,27 +129,7 @@ func listings(t *testing.T, db item.Store) {
 		t.Errorf("absent: %v %v", folders, err)
 	}
 
-	images, err := layout.Images(ctx, db.Items(), []string{"docker-local", "other", "empty"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantImages := []layout.Image{
-		{Repo: "docker-local", Name: "a_b.c"},
-		{Repo: "docker-local", Name: "a_b.c/sub"},
-		{Repo: "docker-local", Name: "aXb.c"},
-		{Repo: "other", Name: "a_b.c"},
-		{Repo: "other", Name: "untagged"},
-	}
-	if diff := cmp.Diff(wantImages, images); diff != "" {
-		t.Error(diff)
-	}
-	if images, err := layout.Images(ctx, db.Items(), []string{"empty"}); err != nil ||
-		len(images) != 0 {
-		t.Errorf("empty: %v %v", images, err)
-	}
-	if images, err := layout.Images(ctx, db.Items(), nil); err != nil || images != nil {
-		t.Errorf("no repositories: %v %v", images, err)
-	}
+	pagedListings(t, db)
 }
 
 func TestUnitListingsFail(t *testing.T) {
@@ -156,9 +141,5 @@ func TestUnitListingsFail(t *testing.T) {
 	if _, err := layout.ManifestFolders(ctx, failingSearch{}, "r", "app", sum("x")); err == nil ||
 		!strings.Contains(err.Error(), "boom") {
 		t.Errorf("folders: %v", err)
-	}
-	if _, err := layout.Images(ctx, failingSearch{}, []string{"r"}); err == nil ||
-		!strings.Contains(err.Error(), "boom") {
-		t.Errorf("images: %v", err)
 	}
 }

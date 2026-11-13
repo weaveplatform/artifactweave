@@ -21,6 +21,9 @@
 // # Outputs
 //
 //   - Factory and Run.
+//   - RunDockerPages, the Docker page reader's contract
+//     (port.DockerPageStore): DockerPages, with ManifestFolders and
+//     ImageManifests.
 //   - RunVersionNames, the contract of PackageVersionNames: a package's
 //     version names in exactly Versions' order, following later writes and
 //     deletes, and a package's own (#1404). It is a subtest of its own,
@@ -80,7 +83,8 @@
 // property key cases (pull request 348), the remote cache cases (pull
 // request 646), the Git LFS lock cases (pull request 849) and the Bower
 // registration cases (pull request 912). Moved here in P9d, which added
-// Factory and Run.
+// Factory and Run. RunDockerPages came with the Docker page reader
+// (#1402).
 //
 // # Testing
 //
@@ -89,8 +93,9 @@
 // (SQLite in memory and in a file), and the metadata store's
 // TestUnitContract, TestAccContractFile, TestAccContractMemory and
 // TestAccContract (PostgreSQL) run it under the same subtest names. The
-// adapters run RunVersionNames in adapters/inmem's
-// TestUnitVersionNamesContract and adapters/sql's
-// TestAccVersionNamesContract (SQLite in memory and in a file, and
-// PostgreSQL).
+// adapters run RunDockerPages in adapters/inmem's
+// TestUnitDockerPagesContract and adapters/sql's TestAccDockerPagesContract,
+// and RunVersionNames in adapters/inmem's TestUnitVersionNamesContract and
+// adapters/sql's TestAccVersionNamesContract (each SQLite in memory and in
+// a file, and PostgreSQL).
 package storetest
