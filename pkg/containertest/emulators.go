@@ -65,6 +65,9 @@ func MinIO(t *testing.T) MinIOEndpoint {
 // removes it, for callers without a *testing.T such as acceptance steps;
 // check CheckLinux first. It returns once MinIO serves S3 requests.
 func RunMinIO(ctx context.Context) (MinIOEndpoint, func(), error) {
+	if err := requireImage(ctx, MinIOImage); err != nil {
+		return MinIOEndpoint{}, nil, fmt.Errorf("start minio: %w", err)
+	}
 	// The module waits only for /minio/health/live, which answers 200 as soon
 	// as MinIO serves HTTP; /minio/health/ready does the same. Until the
 	// object layer exists, S3 calls answer 503 XMinioServerNotInitialized,
@@ -107,6 +110,9 @@ func FakeGCS(t *testing.T) string {
 // FakeGCS does, and a function that removes it, for callers without a
 // *testing.T such as acceptance steps; check CheckLinux first.
 func RunFakeGCS(ctx context.Context) (string, func(), error) {
+	if err := requireImage(ctx, FakeGCSImage); err != nil {
+		return "", nil, fmt.Errorf("start fake-gcs-server: %w", err)
+	}
 	ctr, err := fakegcsserver.Run(ctx, FakeGCSImage)
 	stop := func() { _ = testcontainers.TerminateContainer(ctr) }
 	if err != nil {
@@ -152,6 +158,9 @@ func Azurite(t *testing.T) AzuriteEndpoint {
 // function that removes it, for callers without a *testing.T such as
 // acceptance steps; check CheckLinux first.
 func RunAzurite(ctx context.Context) (AzuriteEndpoint, func(), error) {
+	if err := requireImage(ctx, AzuriteImage); err != nil {
+		return AzuriteEndpoint{}, nil, fmt.Errorf("start azurite: %w", err)
+	}
 	ctr, err := azurite.Run(ctx, AzuriteImage,
 		azurite.WithEnabledServices(azurite.BlobService),
 		testcontainers.WithCmdArgs("--skipApiVersionCheck"),

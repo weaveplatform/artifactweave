@@ -524,6 +524,18 @@ The cross-cloud blob mirror scenario (`TestAccCrossCloud` in
 fake-gcs-server and Azurite side by side in the Linux unit job and skips on macOS and
 Windows; the emulator images are pinned in `pkg/containertest`.
 
+The emulator helpers in `pkg/containertest` (`MinIO`, `FakeGCS`, `Azurite` and their `Run`
+forms) pull their image before the testcontainers module starts it, and then check that the
+engine has it by its digest. One caller in a test process pulls a given image at a time;
+the others wait and then find it. testcontainers-go v0.45.0 pulls a missing image itself,
+but reads the engine's answer without decoding it. The engine answers a pull with 200 and
+reports a failure part-way, such as a registry error on a layer, inside that answer, so
+testcontainers lost the error and the container create failed with "No such image"
+([#1448](https://github.com/weaveplatform/artifactweave/issues/1448); upstream
+[testcontainers-go#3945](https://github.com/testcontainers/testcontainers-go/issues/3945)).
+A failed pull now fails with the registry's own error, and the next start pulls again. Each
+image still has one registry, so a registry that does not answer still fails the run.
+
 ## Package clients in acceptance
 
 P7's clients (#270) run in the `acceptance` job, and P7's exit checks (#284, #294, #295)
