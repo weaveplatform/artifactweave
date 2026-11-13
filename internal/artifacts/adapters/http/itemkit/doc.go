@@ -146,11 +146,12 @@
 // the lookup through a virtual repository. access_test.go tests AccessFor,
 // and Forced, ForceAuthentication's branches and the credentials it counts
 // as none over an in-memory store; redirect_test.go the signing-failure
-// throttle, the descriptor's minimum redirect size and the request copy
-// without the preconditions a download ignores; preconditions_test.go the
-// request the download reads, ServeContent, the checksum file's answers,
-// and that no ecosystem handler but Docker's calls http.ServeContent
-// directly. kittest.WantDownloadConditionals checks a package route's
+// throttle, the descriptor's minimum redirect size, the request copy
+// without the preconditions a download ignores, the request the download
+// reads, ServeContent, the checksum file's answers, and that no ecosystem
+// handler but Docker's calls http.ServeContent directly; they share one
+// file because tools/citestselection lists this package's test files by
+// name. kittest.WantDownloadConditionals checks a package route's
 // built documents from its own package's tests. The route suites under
 // test/server/artifacts and the router's guards in app reach the rest
 // through the router.
