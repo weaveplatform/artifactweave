@@ -33,6 +33,8 @@
 //
 //   - Store, the store Deps.Store holds, which Content returns and each
 //     Overlay is handed. It names no access or configuration-module store.
+//   - ServeContent: http.ServeContent for the indexes and metadata the
+//     package routes build, answered as the download answers a file.
 //   - Kit and its methods: GetItem (an item GET or HEAD), ServeFile,
 //     RedirectManifest, Items (the item service), Format, ItemCaller,
 //     ItemError, MayBeIdentical, Content, InternalError, Log, Reindex,
@@ -88,8 +90,15 @@
 //   - A file download, streamed, redirected or from a remote's stream,
 //     answers If-None-Match, If-Modified-Since and If-Range, and ignores
 //     If-Match and If-Unmodified-Since, which Artifactory's download never
-//     evaluates. A checksum sidecar, a folder listing and an archive entry
-//     keep their own answers.
+//     evaluates. So does every index or metadata document a package route
+//     builds, through ServeContent, and a HEAD of one answers 200 with its
+//     whole length whatever Range it sends. A checksum file, local, virtual
+//     or remote, answers as 7.x's download answers one: an If-None-Match
+//     naming its file's SHA-1, or an If-Modified-Since its file has not
+//     changed since, answers 304, If-Match and If-Unmodified-Since are
+//     never read, a HEAD answers 200 with the checksum's length and a GET
+//     applies Range. A folder listing and an archive entry keep their own
+//     answers.
 //
 // # References
 //
@@ -111,7 +120,13 @@
 //   - https://github.com/weaveplatform/artifactweave/issues/1075 and
 //     https://github.com/weaveplatform/artifactweave/issues/1090
 //   - https://github.com/weaveplatform/artifactweave/issues/1314 (the
-//     preconditions a download ignores).
+//     preconditions a download ignores), with
+//     https://github.com/weaveplatform/artifactweave/issues/1438 (the
+//     documents the package routes build),
+//     https://github.com/weaveplatform/artifactweave/issues/1436 (remote
+//     checksum files) and
+//     https://github.com/weaveplatform/artifactweave/issues/1362 (local
+//     checksum files).
 //   - https://github.com/weaveplatform/artifactweave/issues/1435 (Force
 //     Authentication on the item routes); JFrog's virtual repository
 //     settings, https://docs.jfrog.com/artifactory/docs/virtual-repositories,
@@ -132,6 +147,11 @@
 // and Forced, ForceAuthentication's branches and the credentials it counts
 // as none over an in-memory store; redirect_test.go the signing-failure
 // throttle, the descriptor's minimum redirect size and the request copy
-// without the preconditions a download ignores. The route suites under test/server/artifacts and the router's
-// guards in app reach the rest through the router.
+// without the preconditions a download ignores; preconditions_test.go the
+// request the download reads, ServeContent, the checksum file's answers,
+// and that no ecosystem handler but Docker's calls http.ServeContent
+// directly. kittest.WantDownloadConditionals checks a package route's
+// built documents from its own package's tests. The route suites under
+// test/server/artifacts and the router's guards in app reach the rest
+// through the router.
 package itemkit

@@ -125,6 +125,13 @@ GET and HEAD serve them from item metadata, choosing the value as Artifactory's
 serves the client's checksum (`original_*`), and answers 404 "Checksum not found for
 <path>" while the client has sent none. Under `server-generated-checksums`, for a file named
 `maven-metadata.xml` in any repository, and in a remote cache, it serves the computed one.
+A sidecar answers conditional requests as 7.x's download answers a checksum on every
+repository class (`DownloadServiceImpl.respond`, **[S]** 7.161.26): an `If-None-Match` that
+names its file's SHA-1, or an `If-Modified-Since` its file has not changed since, answers
+304; `If-Match` and `If-Unmodified-Since` are never read; a HEAD answers 200 with the
+checksum's length whatever `Range` it sends; a GET applies `Range`
+([#1436](https://github.com/weaveplatform/artifactweave/issues/1436),
+[#1362](https://github.com/weaveplatform/artifactweave/issues/1362)).
 PUT validates the client value against the
 artifact per the repository's `checksumPolicyType`: `client-checksums` rejects a mismatch
 and records the client value as `original_*`; `server-generated-checksums` records and
