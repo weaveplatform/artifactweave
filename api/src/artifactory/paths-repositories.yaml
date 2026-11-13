@@ -160,8 +160,8 @@ components:
             anonymous 200. Defaults to false.
           type: boolean
         forceP2Authentication:
-          description: Optional within this object. When true anonymous P2 requests receive 401. Stored only; P2 is not
-            served.
+          description: Optional within this object. Stored only; 7.x offers Force Authentication on P2 virtual
+            repositories, and a federated repository's flag changes no answer. Defaults to false.
           type: boolean
         handleReleases:
           description: Optional within this object. Whether release versions may be deployed to a Maven-family or npm
@@ -491,8 +491,8 @@ components:
             anonymous 200. Defaults to false.
           type: boolean
         forceP2Authentication:
-          description: Optional within this object. When true anonymous P2 requests receive 401. Stored only; P2 is not
-            served.
+          description: Optional within this object. Stored only; 7.x offers Force Authentication on P2 virtual
+            repositories, and a local repository's flag changes no answer. Defaults to false.
           type: boolean
         handleReleases:
           description: Optional within this object. Whether release versions may be deployed to a Maven-family or npm
@@ -1033,8 +1033,8 @@ components:
             anonymous 200. Defaults to false.
           type: boolean
         forceP2Authentication:
-          description: Optional within this object. When true anonymous P2 requests receive 401. Stored only; P2 is not
-            served.
+          description: Optional within this object. Stored only; 7.x offers Force Authentication on P2 virtual
+            repositories, and a remote repository's flag changes no answer. Defaults to false.
           type: boolean
         gitRegistryUrl:
           description: Optional within this object. Git index of the upstream Cargo registry. Defaults to
@@ -1490,6 +1490,13 @@ components:
         forceNugetAuthentication:
           description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an
             anonymous 200. Defaults to false.
+          type: boolean
+        forceP2Authentication:
+          description: Optional within this object. P2 repositories only. When true every anonymous request to the
+            repository's item paths, /artifactory/<key>/..., its members' files under <member key>/ included,
+            answers 401 "Unauthorized" with the Basic challenge before any member is listed or read, whatever the
+            anonymous user may read, so that an Eclipse client sends its credentials. A nested P2 virtual member's
+            own flag does not apply to reads through this repository. Off when absent.
           type: boolean
         hideUnauthorizedResources:
           description: Optional within this object. When true items in members the caller may not read are omitted

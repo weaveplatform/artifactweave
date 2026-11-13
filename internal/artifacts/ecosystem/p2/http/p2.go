@@ -37,7 +37,9 @@ type p2Items struct{ *itemkit.Kit }
 // virtual repository's p2.index and composite metadata over the members the
 // caller may traverse, and each member's files under <member key>/; a
 // remote's composite metadata and external children; and a remote site.zip!/
-// archive's entries. A folder, a path P2 does not class or a repository
+// archive's entries. An anonymous request to a virtual repository with
+// forceP2Authentication on answers 401 with the Basic challenge before any
+// of these (forced). A folder, a path P2 does not class or a repository
 // that is neither remote nor virtual answers 404; a query and matrix
 // parameters are taken as any file's GET takes them (#1350). Remote reads
 // still cross the common source policy and cache boundary. It reports
@@ -50,6 +52,14 @@ func TryP2Item(
 	s := p2Items{k}
 	if c.PackageType != repo.P2 {
 		return false
+	}
+	// Ahead of every other answer, as 7.x's filter runs before the request
+	// reaches the repository: a folder and a path P2 does not class are
+	// refused too, and no member is listed or read, from the store or an
+	// upstream.
+	if p.Anonymous && forced(r.Context(), c) {
+		httpkit.WriteErr(w, r, errForced)
+		return true
 	}
 	if req.IsFolder {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
@@ -249,7 +259,9 @@ func (s p2Items) serveP2Virtual(
 		// last segment, so the member matches and forwards them as its own
 		// GET would (#1350), as 7.x's virtual download passes the request's
 		// properties to each member it asks (processStandard, 7.161.26).
-		clone := r.Clone(r.Context())
+		// The clone is marked as the virtual's, so a nested P2 virtual
+		// member's own forceP2Authentication does not apply (forced).
+		clone := r.Clone(throughVirtual(r.Context()))
 		uri := *r.URL
 		uri.RawPath = "/artifactory/" + url.PathEscape(member.Key) + "/" +
 			p2EscapePath(name) + pkgroute.UpstreamMatrix(r.URL.EscapedPath())
