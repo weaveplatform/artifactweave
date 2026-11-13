@@ -37,8 +37,9 @@ P10 owns virtual-repository dependency-spec rewriting and
 `externalDependenciesRemoteRepo`, including Git shorthand dependencies. These are
 separate from the remote `dist.tarball` handling above. Local and federated repositories
 sign with ECDSA and serve `/-/npm/v1/keys` (#362, decision 0034). A remote relays its
-upstream's `dist.signatures` but not yet the upstream's keys, which is #1318, so
-`npm audit signatures` through a remote fails until then; virtual signature and key
+upstream's `dist.signatures` and answers `/-/npm/v1/keys` with the upstream's keys
+document (#1318, decision 0034, "Signatures"), so `npm audit signatures` verifies
+packages installed through a remote of a signing upstream; virtual signature and key
 merging is #1319, and P28 owns audit proxying. Audit requests do not receive a synthetic
 empty-success response. P21/#262 owns browser login;
 legacy authentication remains available.
