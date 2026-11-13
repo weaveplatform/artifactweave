@@ -147,7 +147,8 @@
 // router: the overlay order, the private-path default, the error mapping and
 // the lookup through a virtual repository. access_test.go tests AccessFor,
 // and Forced, ForceAuthentication's branches and the credentials it counts
-// as none over an in-memory store; redirect_test.go the signing-failure
+// as none over an in-memory store, and which paths a remote's -cache alias
+// reads through the remote source (aliasRemoteMetadata); redirect_test.go the signing-failure
 // throttle, the descriptor's minimum redirect size, the request copy
 // without the preconditions a download ignores, the request the download
 // reads, ServeContent, the checksum file's answers, and that no ecosystem

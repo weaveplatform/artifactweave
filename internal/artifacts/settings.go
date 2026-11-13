@@ -81,8 +81,8 @@ type Settings struct {
 	// collection passes; zero means the default.
 	GCInterval time.Duration
 	// Formats are the formats' settings: conda.shards_enabled,
-	// helm.relative_urls, npm.tag_latest_by_publish, npm.enforce_path and
-	// the four pypi keys. Formats.Helm.RelativeURLs is never nil, because
+	// debian.metadata_validation, helm.relative_urls,
+	// npm.tag_latest_by_publish, npm.enforce_path and the four pypi keys. Formats.Helm.RelativeURLs is never nil, because
 	// nil means the default, relative URLs, and would ignore
 	// relative_urls: false. Formats.TerraformBackend.Keys is not
 	// configuration: it is nil here, and app sets the keyring.

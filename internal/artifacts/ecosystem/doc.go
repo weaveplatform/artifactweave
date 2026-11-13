@@ -21,10 +21,11 @@
 //   - Settings: the server-wide options of the formats that take any, from
 //     the configuration (decision 0009) through app/config's Artifacts
 //     accessor, the Formats of the artifacts module's settings:
-//     conda.shards_enabled, helm.relative_urls, npm.tag_latest_by_publish and
-//     npm.enforce_path, and the four PyPI keys. The artifacts module adds
-//     the master key's keyring, with which the Terraform backend's format
-//     opens states; app does too for keys rotate, which builds no module.
+//     conda.shards_enabled, debian.metadata_validation, helm.relative_urls,
+//     npm.tag_latest_by_publish and npm.enforce_path, and the four PyPI
+//     keys. The artifacts module adds the master key's keyring, with which
+//     the Terraform backend's format opens states; app does too for keys
+//     rotate, which builds no module.
 //   - The slices: each format package's Serves, which says the package types
 //     it serves, and its Handler, which implements format.Handler.
 //

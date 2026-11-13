@@ -607,9 +607,9 @@ of its own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `archiveBrowsingEnabled` | `false` | |
 | `enableFileListsIndexing` | `false` | |
 | `optionalIndexCompressionFormats` | `[]` | Debian, implemented with [#1274](https://github.com/weaveplatform/artifactweave/issues/1274): the forms besides plain and gzip (`bz2`, `lzma`, `xz`) each Packages index is written in from the next index rebuild, and the Release lists ([D] [debian-repositories](https://docs.jfrog.com/artifactory/docs/debian-repositories.md), Optional Index Compression Formats). Other values add nothing **[I]**. |
-| `debianTrivialLayout` | | Debian, implemented in P9c ([#758](https://github.com/weaveplatform/artifactweave/issues/758)): the deprecated trivial layout takes no source packages, so a `.dsc` deploy answers 400, and no virtual repository may include the repository ([D] debian-repositories). |
+| `debianTrivialLayout` | `false` | Debian, implemented in P9c ([#758](https://github.com/weaveplatform/artifactweave/issues/758)): the deprecated trivial layout takes no source packages, so a `.dsc` deploy answers 400, and no virtual repository may include the repository ([D] debian-repositories). A Debian repository's read gives `false` when it was never set, as the provider's sample reads do ([#1372](https://github.com/weaveplatform/artifactweave/issues/1372)). |
 | `calculateYumMetadata`, `yumRootDepth` | | Accepted and persisted; RPM metadata behavior is planned in P29. |
-| `ddebSupported` | | Debian, implemented in P9c ([#758](https://github.com/weaveplatform/artifactweave/issues/758)): `.ddeb` debug packages are admitted and indexed only when it is true ("Enable indexing with debug symbols (.ddeb)", [D] debian-repositories). A key the clients send ("Keys known only from the Terraform provider"). |
+| `ddebSupported` | `false` | Debian, implemented in P9c ([#758](https://github.com/weaveplatform/artifactweave/issues/758)): `.ddeb` debug packages are admitted and indexed only when it is true ("Enable indexing with debug symbols (.ddeb)", [D] debian-repositories). A key the clients send ("Keys known only from the Terraform provider"). A Debian repository's read gives `false` when it was never set, as RTFACT-30304 and the provider's sample reads show ([#1372](https://github.com/weaveplatform/artifactweave/issues/1372)). |
 | `yumGroupFileNames`, `enableConanSupport`, `cargoAnonymousAccess`, `cargoInternalIndex` | | RPM, Conan and Cargo keys the clients send ("Keys known only from the Terraform provider"); accepted and persisted. |
 | `terraformType` | | `MODULE` or `PROVIDER`. Local and federated repositories. No default: the provider's two resources always send it, and a repository without it serves neither Terraform registry ([decision 0040](decisions/0040-terraform.md#terraformtype)). |
 | `encryptStates` | `true` | `terraformbackend`: seals state files under the master key. Replication between instances needs it `false` (7.77, [D] terraform-opentofu-and-terraform-backend-repositories); a change applies to later writes ([decision 0041](decisions/0041-terraform-backend.md)). 7.x's v1 read sends it for other local types too ([J] RTFACT-31100). |
@@ -659,6 +659,7 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 | `cargoAnonymousAccess`, `cargoInternalIndex` | | Cargo remotes, as on local repositories. |
 | `podsSpecsRepoUrl` | | CocoaPods remotes; `cocoaPods.cocoaPodsSpecsRepoUrl` in the YAML form. |
 | `hexPublicKey` | | Hex remotes: the upstream registry's public key. |
+| `ddebSupported`, `debianTrivialLayout` | `false` | Debian remotes ([#1372](https://github.com/weaveplatform/artifactweave/issues/1372)). JFrog's remote repositories page lists "Enable indexing with debug symbols (.ddeb)" among the additional settings of a Debian remote ([D] [remote-repositories](https://docs.jfrog.com/artifactory/docs/remote-repositories.md)), RTFACT-30304 shows `"ddebSupported" : false` in a Debian remote's configuration, and the provider's sample read of a Debian remote (`samples/repository_remote/debian.json`) gives both `false`. Accepted and persisted, and read as `false` when never set; the v2 read leaves `debianTrivialLayout` out. `ddebSupported` changes nothing a remote serves: it caches every `.ddeb` its upstream serves ([#1352](https://github.com/weaveplatform/artifactweave/issues/1352)) and builds no index of its own **[I]**. A virtual repository refuses a remote member whose `debianTrivialLayout` is true, as it does a local one. |
 | `disableUrlNormalization` | `false` | |
 | `customHttpHeaders` | `[]` | `[{"name","value","sensitive"}]`; generic remotes need 7.146. |
 | `externalDependenciesEnabled`, `externalDependenciesPatterns` | `false`, `[]` | Docker foreign layers; npm, Go and Bower external dependencies. |
@@ -695,6 +696,7 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 | `dockerApiVersion` | `V2` | |
 | `optionalIndexCompressionFormats` | | Debian, implemented with [#1274](https://github.com/weaveplatform/artifactweave/issues/1274): the forms besides plain and gzip (`bz2`, `lzma`, `xz`) the virtual repository composes each Packages index in, which its Release lists (RTFACT-24246, 7.15.3). Other values add nothing **[I]**. |
 | `debianTrivialLayout`, `debianDefaultArchitectures` | | Debian; accepted and stored only. A virtual repository has no trivial layout of its own, and refuses a member that uses it, as only repositories with the automatic layout may be members ([D] [debian-repositories](https://docs.jfrog.com/artifactory/docs/debian-repositories.md)). |
+| `ddebSupported` | `false` | Debian; accepted and stored only. With `debianTrivialLayout`, the v1 read gives it `false` when it was never set, as 7.161.26's `RepositoryConfigurationBase`, every class's configuration model, defaults both; no dump of a virtual repository's read was found **[I]** ([#1372](https://github.com/weaveplatform/artifactweave/issues/1372)). |
 | `p2Urls` | | P2 virtual repositories: the update sites aggregated; `p2.urls` in the YAML form. Each is `local://<key>[/<suffix>]`, 7.x's form for a local member and its path suffix (RTFACT-29915), or an http or https URL. The composite lists one child per site at the serving member's key and the rest of the URL, as 7.x serves `<repository key>/<sub-path>` (RTFACT-7631, RTFACT-29198); without `p2Urls` it lists each member at its key (#1257). A create, or an update that sends `p2Urls`, through the repositories API adds the P2 remote covering each URL, creating one keyed `<host>` or `<host>-<port>` when none does (RTFACT-30256), and the local repository a `local://` entry names; it never removes a member. A YAML apply stores them as given. |
 
 ## Federated fields
@@ -746,7 +748,7 @@ plan that sets one converges ([#396](https://github.com/weaveplatform/artifactwe
 - `cargoAnonymousAccess`, `yumGroupFileNames`, virtual `p2Urls` and remote
   `podsSpecsRepoUrl` (jfrog-client-go, [`artifactory/services`](https://github.com/jfrog/jfrog-client-go/tree/master/artifactory/services));
 - `cargoInternalIndex` on local and remote Cargo repositories, `ddebSupported` on local Debian
-  repositories, `enableConanSupport` on Conan repositories and `hexPublicKey` on remote Hex
+  repositories (7.x has it on remote ones too, [#1372](https://github.com/weaveplatform/artifactweave/issues/1372)), `enableConanSupport` on Conan repositories and `hexPublicKey` on remote Hex
   repositories (provider 12.11.14, the Cargo, Debian, Hex resources and `conan.go`). A
   comparison of every JSON key the provider's repository models and jfrog-client-go's
   services send with `pkg/repo.Config` finds no other.
@@ -846,7 +848,7 @@ virtualRepositories:
 | generic | | `propagateQueryParams`, `retrieveSha256FromServer` | |
 | cargo | `cargoAnonymousAccess`, `cargoInternalIndex` | `gitRegistryUrl`, `cargoAnonymousAccess`, `cargoInternalIndex` | |
 | rpm | `calculateYumMetadata`, `yumRootDepth`, `enableFileListsIndexing`, `yumGroupFileNames` | | |
-| debian | `debianTrivialLayout`, `optionalIndexCompressionFormats`, `ddebSupported` | | `debianDefaultArchitectures`, `optionalIndexCompressionFormats` |
+| debian | `debianTrivialLayout`, `optionalIndexCompressionFormats`, `ddebSupported` | `ddebSupported` (stored only) | `debianDefaultArchitectures`, `optionalIndexCompressionFormats`, `ddebSupported` (stored only) |
 | conan | `forceConanAuthentication`, `enableConanSupport` | `forceConanAuthentication`, `enableConanSupport` | |
 | p2 | | `forceP2Authentication`, stored only | `p2Urls`, `forceP2Authentication` |
 | cocoapods | | `podsSpecsRepoUrl` | |
@@ -871,6 +873,11 @@ for npm publishes, Done; [#481](https://github.com/weaveplatform/artifactweave/p
 the npm format), so its v2 read keeps `checksumPolicyType`, `handleReleases` and
 `handleSnapshots`; an npm remote or virtual repository's does not
 ([#457](https://github.com/weaveplatform/artifactweave/issues/457)).
+A Debian repository's v2 read keeps `ddebSupported` whatever its class, and
+`debianTrivialLayout` only for a local or federated repository, as 7.161.26's
+`RepositoryConfigurationBase` marks them `@IncludeTypeSpecific(packageType = Debian)` and
+`@IncludeTypeSpecific(packageType = Debian, repoType = {LOCAL, FEDERATED})`
+([#1372](https://github.com/weaveplatform/artifactweave/issues/1372)).
 P2's Force Authentication is a virtual repository setting. JFrog lists it among the P2
 virtual repository settings and not among the P2 remote ones ([D]
 [virtual-repositories](https://docs.jfrog.com/artifactory/docs/virtual-repositories#additional-settings-for-p2-virtual-repositories),

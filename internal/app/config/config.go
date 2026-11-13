@@ -107,6 +107,7 @@ type Config struct {
 	NuGet             NuGet            `yaml:"nuget"`
 	HuggingFace       HuggingFace      `yaml:"huggingface"`
 	Conda             Conda            `yaml:"conda"`
+	Debian            Debian           `yaml:"debian"`
 	PyPI              PyPI             `yaml:"pypi"`
 	Cran              Cran             `yaml:"cran"`
 	Remote            Remote           `yaml:"remote"`
@@ -366,6 +367,10 @@ func Default() Config {
 		Helm:  Helm{RelativeURLs: true},
 		NuGet: NuGet{SnapshotCleanupInterval: DefaultNuGetSnapshotCleanupInterval},
 		XZ:    XZ{DictionaryBudget: DefaultXZDictionaryBudget},
+
+		// 7.x validates Debian metadata unless debian.metadata.validation
+		// is set false (ConstantValues in 6.20 defaults it true).
+		Debian: Debian{MetadataValidation: true},
 	}
 }
 
@@ -480,6 +485,7 @@ var keys = append(append([]string{
 	"pypi.simple_json",
 	"pypi.core_metadata",
 	"conda.shards_enabled",
+	"debian.metadata_validation",
 	"huggingface.xet_enabled",
 	"remote.allowed_private_origins",
 	"xz.dictionary_budget",
@@ -581,6 +587,7 @@ func boolKeys(cfg *Config) map[string]*bool {
 		"pypi.simple_json":                                             &cfg.PyPI.SimpleJSON,
 		"huggingface.xet_enabled":                                      &cfg.HuggingFace.XetEnabled,
 		"conda.shards_enabled":                                         &cfg.Conda.ShardsEnabled,
+		"debian.metadata_validation":                                   &cfg.Debian.MetadataValidation,
 		"pypi.core_metadata":                                           &cfg.PyPI.CoreMetadata,
 	}
 }

@@ -62,9 +62,18 @@ federated repository without it refuses a `.ddeb` deploy with 400. It also
 asks its upstream for an installer's
 Packages index and for any `by-hash/SHA256` file, checked against the
 SHA-256 its name gives; a Packages or Sources index's by-hash copy is served
-to a caller who may read every package it lists, as the index is. A virtual
-repository merges authorized package records in member order and signs its
-own view, in plain and gzip forms and the forms its own
+to a caller who may read every package it lists, as the index is. Any other
+file under `dists/` that a local repository would derive, such as a
+component's Release in a `binary-<arch>` or `source` folder, a
+`Packages.diff/Index`, or the Release of a distribution named with a slash
+(`dists/buster/updates/Release`), is fetched from the upstream too and
+renewed per the Retrieval Cache Period (#1375). The remote's `-cache` alias
+serves a Release, an InRelease, an installer index, a Contents index's
+by-hash copy and those files once the remote has cached them, without
+asking the upstream, and answers 404 "Could not find resource" before
+(#1382), as it serves a Packages or Sources index and its by-hash copy.
+A virtual repository merges authorized package records in member order and
+signs its own view, in plain and gzip forms and the forms its own
 `optionalIndexCompressionFormats` names. It leaves out a remote member's
 index that does not decode or does not have the digest the member's Release
 gives it, as it would a missing one. Any other file under `dists/`, such
@@ -93,6 +102,25 @@ are complete. Use `deb-src` with the same repository URL and run
 local and remote repositories; the JFrog guide excludes virtual source
 repositories. The deprecated trivial layout does not support sources or
 virtual composition.
+
+## Metadata validation
+
+A local or federated repository checks each binary's control data before it
+indexes the package, as JFrog's "Use Debian Metadata Validation" describes:
+no field may have an empty value, and `Maintainer` and `Description` must be
+there. A package that fails is stored, marked with `deb.index.status` and
+left out of the index. 7.x turns the check off with its
+`debian.metadata.validation` system property; artifactweave's
+`debian.metadata_validation` key (`ARTIFACTWEAVE_DEBIAN_METADATA_VALIDATION`,
+on by default, see the
+[configuration reference](../operations/configuration-reference.md)) does the
+same (#1374). With it off, such a package is indexed and its empty fields
+are left out of its Packages stanza. A file that is not a readable package,
+or whose control data has no valid `Package`, `Version` or `Architecture`,
+is still stored, marked and left out, as no index can be read from it. The
+setting applies to deploys and index rebuilds after the server restarts with
+it; reindex a repository (`POST /artifactory/api/deb/reindex/<repo>`) to
+apply it to the packages the repository already holds.
 
 ## Snapshots
 

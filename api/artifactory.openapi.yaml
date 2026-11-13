@@ -20894,13 +20894,14 @@ components:
             - $ref: '#/components/schemas/ChecksumPolicyType'
           description: Optional within this object. How a client-supplied checksum that disagrees with the uploaded bytes is handled. client-checksums rejects, server-generated-checksums accepts and records both values.
         ddebSupported:
-          # JFrog's Debian guide: "Enable indexing with debug symbols (.ddeb)".
-          description: Optional within this object. When true a Debian repository accepts debug symbol packages (.ddeb), checks them and lists them in its Packages indexes as it does a .deb; when false or unset a .ddeb deploy answers 400.
+          # JFrog's Debian guide: "Enable indexing with debug symbols (.ddeb)". RTFACT-30304 and the
+          # Terraform provider's sample reads give false for a repository that never set it.
+          description: Optional within this object. When true a Debian repository accepts debug symbol packages (.ddeb), checks them and lists them in its Packages indexes as it does a .deb; when false or unset a .ddeb deploy answers 400. A Debian repository's configuration reads false when unset.
           type: boolean
         debianTrivialLayout:
           # JFrog's Debian guide: the trivial layout does not support source packages, and a
           # virtual repository includes only repositories with the automatic layout.
-          description: Optional within this object. When true the Debian repository uses the deprecated trivial layout, which takes no source packages, so a .dsc deploy answers 400, and which no virtual repository may include.
+          description: Optional within this object. When true the Debian repository uses the deprecated trivial layout, which takes no source packages, so a .dsc deploy answers 400, and which no virtual repository may include. A Debian repository's configuration reads false when unset.
           type: boolean
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server. Reads carry it, as an empty string when unset.
@@ -21740,13 +21741,14 @@ components:
               type: object
           type: object
         ddebSupported:
-          # JFrog's Debian guide: "Enable indexing with debug symbols (.ddeb)".
-          description: Optional within this object. When true a Debian repository accepts debug symbol packages (.ddeb), checks them and lists them in its Packages indexes as it does a .deb; when false or unset a .ddeb deploy answers 400.
+          # JFrog's Debian guide: "Enable indexing with debug symbols (.ddeb)". RTFACT-30304 and the
+          # Terraform provider's sample reads give false for a repository that never set it.
+          description: Optional within this object. When true a Debian repository accepts debug symbol packages (.ddeb), checks them and lists them in its Packages indexes as it does a .deb; when false or unset a .ddeb deploy answers 400. A Debian repository's configuration reads false when unset.
           type: boolean
         debianTrivialLayout:
           # JFrog's Debian guide: the trivial layout does not support source packages, and a
           # virtual repository includes only repositories with the automatic layout.
-          description: Optional within this object. When true the Debian repository uses the deprecated trivial layout, which takes no source packages, so a .dsc deploy answers 400, and which no virtual repository may include.
+          description: Optional within this object. When true the Debian repository uses the deprecated trivial layout, which takes no source packages, so a .dsc deploy answers 400, and which no virtual repository may include. A Debian repository's configuration reads false when unset.
           type: boolean
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server. Reads carry it, as an empty string when unset.
@@ -23357,6 +23359,17 @@ components:
               - value
             type: object
           type: array
+        ddebSupported:
+          # JFrog's Remote Repositories page, "Additional Settings for Debian Remote Repositories":
+          # "Enable indexing with debug symbols (.ddeb)". RTFACT-30304 reads it false on a Debian remote.
+          description: Optional within this object. Whether a Debian remote repository indexes debug symbol packages (.ddeb). Stored only. A remote caches and serves every .ddeb its upstream serves, whatever this says, and builds no index of its own. A Debian repository's configuration reads false when unset.
+          type: boolean
+        debianTrivialLayout:
+          # The Terraform provider's sample read of a Debian remote (samples/repository_remote/debian.json)
+          # gives "debianTrivialLayout": false; 7.161.26's RepositoryConfigurationBase marks it
+          # @IncludeTypeSpecific for Debian local and federated repositories only.
+          description: Optional within this object. When true no virtual repository may include the Debian remote repository. A Debian repository's configuration reads false when unset; the v2 read of a remote leaves it out.
+          type: boolean
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server. Reads carry it, as an empty string when unset.
           type: string
@@ -24759,13 +24772,20 @@ components:
         artifactoryRequestsCanRetrieveRemoteArtifacts:
           description: Optional within this object. When true requests that originate from a smart remote repository on another server may trigger remote fetches through this virtual repository. Defaults to false.
           type: boolean
+        ddebSupported:
+          # 7.161.26's RepositoryConfigurationBase, every class's configuration model, holds it with the
+          # default false and marks it @IncludeTypeSpecific for every Debian repository.
+          description: Optional within this object. Stored only. A virtual Debian repository indexes no package itself. A Debian repository's configuration reads false when unset.
+          type: boolean
         debianDefaultArchitectures:
           description: Optional within this object. Comma-separated architectures used when generating aggregated Debian metadata. Stored only.
           type: string
         debianTrivialLayout:
           # JFrog's Debian guide: a virtual repository includes only repositories with the
-          # automatic layout, so the trivial layout is not one a virtual repository has.
-          description: Optional within this object. Stored only. A virtual Debian repository has no trivial layout of its own; it refuses a member whose debianTrivialLayout is true.
+          # automatic layout, so the trivial layout is not one a virtual repository has. 7.161.26's
+          # RepositoryConfigurationBase marks it @IncludeTypeSpecific for Debian local and federated
+          # repositories only.
+          description: Optional within this object. Stored only. A virtual Debian repository has no trivial layout of its own; it refuses a member whose debianTrivialLayout is true. A Debian repository's configuration reads false when unset; the v2 read of a virtual repository leaves it out.
           type: boolean
         defaultDeploymentRepo:
           description: Optional within this object. Key of the member that receives uploads sent to the virtual repository. Must be one of repositories and must not be a remote.

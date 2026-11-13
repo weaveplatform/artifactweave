@@ -36,8 +36,10 @@
 //     (artifacts/adapters/http/itemkit), whose remote source request checks
 //     upstream metadata or a package before a remote caches it (the *Path
 //     predicates, ByHashPath, ValidateReleaseMetadata, ReadBinary,
-//     ReadSource) and caches an index as fetched (#1356), and whose item
-//     GET sends a remote's downloads through
+//     ReadSource), caches an index as fetched (#1356) and asks the upstream
+//     for any other file a local repository would derive as metadata
+//     (GeneratedPath, #1375), and whose item GET sends a remote's
+//     downloads, and the metadata its -cache alias holds (#1382), through
 //     the remote source (Serves); and the
 //     artifacts module's item delete (artifacts/adapters/http), which permits
 //     a whole snapshot folder's delete (WithSnapshotDelete).
@@ -56,16 +58,19 @@
 //     library only reads bzip2) write an index's optional forms. The generic
 //     deploy policy (artifacts/ecosystem/generic) is a check Admit
 //     applies.
-//   - Settings: none. A repository's primaryKeyPairRef (keyPair for a
-//     virtual repository) names its signing pair, ddebSupported admits
-//     .ddeb debug packages to a local or federated repository (a remote
-//     caches them whatever it says, #1352), debianTrivialLayout refuses
-//     source packages,
-//     and optionalIndexCompressionFormats names the forms besides plain
-//     and gzip (bz2, lzma, xz) each Packages index is written in.
+//   - Settings: the server's debian.metadata_validation, through the
+//     format registry as Handler's Settings (DisableMetadataValidation,
+//     #1374): 7.x's debian.metadata.validation, on by default. A
+//     repository's primaryKeyPairRef (keyPair for a virtual repository)
+//     names its signing pair, ddebSupported admits .ddeb debug packages to
+//     a local or federated repository (a remote caches them whatever it
+//     says, #1352), debianTrivialLayout refuses source packages, and
+//     optionalIndexCompressionFormats names the forms besides plain and
+//     gzip (bz2, lzma, xz) each Packages index is written in.
 //
 // # Outputs
 //
+//   - Settings, the server-wide options Handler carries.
 //   - Handler: the hooks that read a package before its transaction
 //     (Inspect), admit a package with valid coordinates and keep clients
 //     out of apt metadata and snapshots (Admit, Deleting), keep the
@@ -81,7 +86,8 @@
 //     SourceArchive and Sources, GzipIndex, IndexForm and IndexForms,
 //     ReleaseEntry and Release, SignedRelease and SignRelease,
 //     ValidBinaryPath and ValidSourcePath.
-//   - The upstream metadata rules: PackagesIndexPath, SourcesIndexPath,
+//   - The upstream metadata rules: GeneratedPath, PackagesIndexPath,
+//     SourcesIndexPath,
 //     InstallerPackagesIndexPath, ReleaseMetadataPath, ByHashPath,
 //     ByHashMetadataPath, ValidateReleaseMetadata,
 //     PackageIndexRef with ReleasePackageIndexes and ReleaseIndexRefs,
@@ -94,8 +100,11 @@
 // # Invariants
 //
 //   - A binary's identity comes from its control data, which must give a
-//     valid Package, Version and Architecture and a Maintainer and
-//     Description; its ar members must be debian-binary (2.x), then
+//     valid Package, Version and Architecture and, unless the server's
+//     debian.metadata_validation is off, a Maintainer and Description and
+//     no field with an empty value; with it off, an empty field is left out
+//     of the package's stanza. Its ar members must be debian-binary (2.x),
+//     then
 //     control.tar and data.tar, within fixed bounds (8 GiB archive, 16 MiB
 //     control member, 1 MiB control file, 4 GiB data).
 //   - A binary is listed only under the deb.distribution, deb.component
@@ -118,8 +127,10 @@
 //   - A local or federated repository's apt metadata under dists/ is
 //     derived, never uploaded, and never built for a remote from its
 //     partial cache: a remote caches the upstream's Release after the item
-//     kit's remote source request has checked it, and its indexes as
-//     fetched, as 7.x does until RTFACT-27303 is done (#1356).
+//     kit's remote source request has checked it, its indexes as fetched,
+//     as 7.x does until RTFACT-27303 is done (#1356), and any other file
+//     under dists/ that a local repository derives as the upstream's
+//     metadata (#1375).
 //   - Nothing under snapshots/ is written except by the server's own
 //     snapshot publication, or deleted except as a whole snapshot folder
 //     (409).
@@ -172,6 +183,10 @@
 //     snapshots and package coordinates, stale inspections, class-specific
 //     work, the source lifecycle, a malformed binary kept with its reason
 //     and unavailable content.
+//   - validation_test.go: a binary's metadata read with
+//     debian.metadata_validation off: empty fields left out of its stanza,
+//     no Maintainer or Description admitted, and the archive and its
+//     Package, Version and Architecture still checked (#1374).
 //   - work_test.go and source_work_test.go: Release and every
 //     architecture's index, signing through Env.Keys, and only complete
 //     source packages published.

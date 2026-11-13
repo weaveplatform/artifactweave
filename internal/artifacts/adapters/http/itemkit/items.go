@@ -447,7 +447,12 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 	if s.getRemoteFolder(w, r, c, cached, req, p, acc) {
 		return
 	}
-	if remoteDownloadType(c, cached) &&
+	alias, err := aliasRemoteMetadata(ctx, st, c, cached, req.Path)
+	if err != nil {
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "cached document", err))
+		return
+	}
+	if (remoteDownloadType(c, cached) || alias) &&
 		req.Path != "" &&
 		!req.IsFolder &&
 		s.RemoteSources != nil {

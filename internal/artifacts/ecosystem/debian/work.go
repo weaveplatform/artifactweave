@@ -26,7 +26,7 @@ type aptCoordinates struct{ distribution, component string }
 // Work rebuilds apt metadata from the committed item tree. It never builds a
 // remote repository's index from a partial cache: remote metadata is fetched
 // from the upstream with the source/cache policy instead.
-func (Handler) Work(ctx context.Context, env format.Env, work work.WorkItem) error {
+func (h Handler) Work(ctx context.Context, env format.Env, work work.WorkItem) error {
 	if work.Kind != KindIndex && work.Kind != KindReindexNoProps {
 		return nil
 	}
@@ -40,17 +40,17 @@ func (Handler) Work(ctx context.Context, env format.Env, work work.WorkItem) err
 		return nil
 	}
 	if work.Kind == KindReindexNoProps {
-		return reindex(ctx, env, c, false)
+		return reindex(ctx, env, c, false, h.validate())
 	}
-	return buildIndex(ctx, env, c)
+	return buildIndex(ctx, env, c, h.validate())
 }
 
-func buildIndex(ctx context.Context, env format.Env, c repo.Config) error {
+func buildIndex(ctx context.Context, env format.Env, c repo.Config, validate bool) error {
 	items, err := files(ctx, env.Store, c)
 	if err != nil {
 		return err
 	}
-	old, groups, err := collectAptGroups(ctx, env, items)
+	old, groups, err := collectAptGroups(ctx, env, items, validate)
 	if err != nil {
 		return err
 	}
@@ -236,7 +236,7 @@ func collectSourceGroups(
 }
 
 func collectAptGroups(
-	ctx context.Context, env format.Env, items []model.Item,
+	ctx context.Context, env format.Env, items []model.Item, validate bool,
 ) (map[string]bool, map[aptFolder][]IndexedBinary, error) {
 	old := map[string]bool{}
 	groups := map[aptFolder][]IndexedBinary{}
@@ -251,7 +251,7 @@ func collectAptGroups(
 		if !isBinary(p) {
 			continue
 		}
-		b, fault, err := packageFor(ctx, env, it)
+		b, fault, err := packageFor(ctx, env, it, validate)
 		if err != nil {
 			return nil, nil, err
 		}

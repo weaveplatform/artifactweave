@@ -25,10 +25,22 @@ import (
 // not hide it. Any by-hash file is checked against the SHA-256 its name
 // gives, a Release file is checked as metadata, and an index apt reads by
 // the name Packages or Sources, a Debian installer's included, is metadata
-// cached as fetched (debianIndexSourceRequest). Every other path, a
-// translation or a Contents index for one, passes through unchecked; a
-// path in none of these shapes that only resembles one answers not found
-// without asking the upstream, as it did before.
+// cached as fetched (debianIndexSourceRequest). Any other file a local
+// repository would derive (debian.GeneratedPath), such as a component's
+// Release in a binary-<arch> or source folder, a Packages.diff/Index and
+// its patches, or the Release of a distribution named with a slash
+// (dists/buster/updates/Release), is metadata too, fetched from the
+// upstream and renewed per the retrieval cache period (#1375). JFrog's
+// Debian guide says a remote's index files are "stored and renewed
+// according to the Retrieval Cache Period", and 6.20's
+// DebianNaming.isExpirable treats every file named Release, InRelease or
+// Release.gpg as one; a pdiff file's freshness is [I]. Asked as an
+// artifact, such a path is derived for every repository class (Classify),
+// so the remote policy read it from the cache alone and answered not found
+// without asking the upstream. Every other path, a translation or a
+// Contents index for one, passes through unchecked; a path in none of
+// these shapes that only resembles one answers not found without asking
+// the upstream, as it did before.
 //
 // A query refuses no Release, index or by-hash file (#1349). 7.x reads a
 // remote Debian file through its generic remote download, as the ?trace of
@@ -104,6 +116,8 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 	case strings.HasSuffix(p, ".deb") || strings.HasSuffix(p, ".ddeb") ||
 		strings.HasSuffix(p, ".dsc"):
 		return q, kernel.ErrNotFound
+	case debian.GeneratedPath(p):
+		q.Resource.Kind = source.ResourceKindMetadata
 	}
 	return q, nil
 }

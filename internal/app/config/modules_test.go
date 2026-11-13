@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/conda"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/helm"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/pypi"
@@ -79,6 +80,8 @@ func TestUnitModuleSettingsFromConfig(t *testing.T) {
 		GCInterval:                     7 * time.Minute,
 		Formats: ecosystem.Settings{
 			Conda: conda.Settings{ShardsEnabled: true},
+			// The file sets debian.metadata_validation to false.
+			Debian: debian.Settings{DisableMetadataValidation: true},
 			// relative_urls: false, which only a non-nil pointer carries.
 			Helm: helm.Settings{RelativeURLs: &relativeURLs},
 			NPM:  npm.Settings{TagLatestByPublish: true, EnforcePath: true},

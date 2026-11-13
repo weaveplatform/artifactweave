@@ -96,19 +96,19 @@ func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
 	env.Keys = pairs
 	keyed := c
 	keyed.PrimaryKeyPairRef = "missing-keypair"
-	if err := buildIndex(t.Context(), env, keyed); err == nil {
+	if err := buildIndex(t.Context(), env, keyed, true); err == nil {
 		t.Fatal("source Release published without its configured signing key")
 	}
 	pairs.Keypairs["rsa-key"] = accessapi.Keypair{Name: "rsa-key", Type: accessapi.KeypairRSA}
 	keyed.PrimaryKeyPairRef = "rsa-key"
-	if err := buildIndex(t.Context(), env, keyed); err == nil {
+	if err := buildIndex(t.Context(), env, keyed, true); err == nil {
 		t.Fatal("source Release published with a non-GPG key")
 	}
 	pairs.Keypairs["invalid-gpg"] = accessapi.Keypair{
 		Name: "invalid-gpg", Type: accessapi.KeypairGPG, PrivateKey: "not a key",
 	}
 	keyed.PrimaryKeyPairRef = "invalid-gpg"
-	if err := buildIndex(t.Context(), env, keyed); err == nil {
+	if err := buildIndex(t.Context(), env, keyed, true); err == nil {
 		t.Fatal("source Release published with invalid GPG key material")
 	}
 	key, err := terraformtest.NewKey()
@@ -119,7 +119,7 @@ func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
 		Name: "source-gpg", Type: accessapi.KeypairGPG, PrivateKey: key.Private,
 	}
 	keyed.PrimaryKeyPairRef = "source-gpg"
-	if err := buildIndex(t.Context(), env, keyed); err != nil {
+	if err := buildIndex(t.Context(), env, keyed, true); err != nil {
 		t.Fatalf("source Release signing: %v", err)
 	}
 	if len(generated["dists/stable/InRelease"]) == 0 ||

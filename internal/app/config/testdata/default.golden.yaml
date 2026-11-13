@@ -171,6 +171,8 @@ huggingface:
     xet_enabled: false
 conda:
     shards_enabled: false
+debian:
+    metadata_validation: true
 pypi:
     enforce_layout: false
     enforce_naming_normalization: false

@@ -104,6 +104,8 @@ helm:
   relative_urls: false
 nuget:
   snapshot_cleanup_interval: 3m
+debian:
+  metadata_validation: false
 api:
   enabled: false
   authentication_per_minute: 1000

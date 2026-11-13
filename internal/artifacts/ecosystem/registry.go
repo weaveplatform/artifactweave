@@ -54,6 +54,8 @@ type Settings struct {
 	// Conda is the conda format's: conda.shards_enabled, which adds CEP-16
 	// sharded repodata beside the classic indexes.
 	Conda conda.Settings
+	// Debian is the Debian format's: debian.metadata_validation.
+	Debian debian.Settings
 	// Helm is the classic Helm protocol's URL mode (decision 0039).
 	Helm helm.Settings
 	// NPM is the npm format's (decision 0034).
@@ -89,7 +91,7 @@ var handlers = []struct {
 	{cran.Serves, func(Settings) format.Handler { return cran.Handler{} }},
 	{agentpackages.Serves, func(Settings) format.Handler { return agentpackages.Handler{} }},
 	{agentplugins.Serves, func(Settings) format.Handler { return agentplugins.Handler{} }},
-	{debian.Serves, func(Settings) format.Handler { return debian.Handler{} }},
+	{debian.Serves, func(s Settings) format.Handler { return debian.Handler{Settings: s.Debian} }},
 	{gems.Serves, func(Settings) format.Handler { return gems.Handler{} }},
 	{gitlfs.Serves, func(Settings) format.Handler { return gitlfs.Handler{} }},
 	{docker.Serves, func(Settings) format.Handler { return docker.Handler{} }},

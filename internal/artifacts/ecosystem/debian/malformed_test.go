@@ -136,7 +136,7 @@ func TestUnitReadBinaryFaultIsNotMalformed(t *testing.T) {
 	sha := blobs.add(fixture(t, validControl))
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	_, fault, err := readBinary(ctx, blobs, sha)
+	_, fault, err := readBinary(ctx, blobs, sha, true)
 	var reject *format.RejectionError
 	if fault != "" || !errors.Is(err, context.Canceled) || errors.As(err, &reject) {
 		t.Fatalf("canceled read gave fault %q, error %v; want the cancellation alone", fault, err)

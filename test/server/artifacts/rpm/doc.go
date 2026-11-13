@@ -1,5 +1,6 @@
 // Package rpm runs the RPM routes of the assembled server: the signing of
-// virtual repository metadata, and the async values of the YUM reindex.
+// virtual repository metadata, a remote's repodata on its -cache alias,
+// and the async values of the YUM reindex.
 //
 // # Role
 //
@@ -20,6 +21,11 @@
 //
 // Assertions only:
 //   - rpm_test.go: virtual metadata is signed with the configured GPG key.
+//   - rpm_remote_cache_alias_test.go: a remote repository's cached
+//     repodata served by its -cache alias without asking the upstream
+//     (#1382), through the harness's remote world
+//     (harness.NewRemoteWorld) over the acceptance suite's upstream
+//     fixture (test/acceptance/testdata/rpm-upstream).
 //   - yum_reindex_async_test.go: Calculate YUM Repository Metadata with each
 //     async value, queued or run before it answers, or refused.
 //
@@ -34,8 +40,9 @@
 //     suites).
 //   - docs/testing/server-test-ownership.md: how CI selection gives the
 //     package an owner.
-//   - https://github.com/weaveplatform/artifactweave/issues/1068 and
-//     https://github.com/weaveplatform/artifactweave/issues/1082
+//   - https://github.com/weaveplatform/artifactweave/issues/1068,
+//     https://github.com/weaveplatform/artifactweave/issues/1082 and
+//     https://github.com/weaveplatform/artifactweave/issues/1382
 //
 // # Status
 //
