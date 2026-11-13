@@ -150,6 +150,17 @@ Artifactory uses two different tests:
   (`UploadServiceUtils.isMavenRepo`), and only then does a download of a `-SNAPSHOT` name
   resolve to a unique build (`LatestVersionResolver`).
 
+Force Authentication uses neither: 7.161.26's `OssForceAuthenticationFilter` tests the
+virtual repository's own type, so only a `maven` virtual repository's
+`forceMavenAuthentication` asks a client for credentials, and JFrog's virtual repository
+settings say the field "is relevant for Maven virtual repositories only" (**[D]**
+[virtual-repositories](https://docs.jfrog.com/artifactory/docs/virtual-repositories#additional-settings-for-mavengradleivysbt-virtual-repositories)).
+With it on, every request without credentials under `/artifactory/<key>/`, whatever its
+method or query, answers 401 "Unauthorized" with the Basic challenge before the request
+reaches the repository ([research 03](03-repository-configuration-model.md#per-ecosystem-summary)
+has the sources; [#1435](https://github.com/weaveplatform/artifactweave/issues/1435)). That a
+Gradle, Ivy or SBT virtual repository stores the flag with no effect is inferred (section 11).
+
 ### 1.4 Coordinates and version order
 
 - **[S]** In a version-container folder, the version of each child is the name of the folder
@@ -631,6 +642,14 @@ These go to the live-comparison list ([#216](https://github.com/weaveplatform/ar
     it holds unique builds.
 22. How 7.x reads a POM whose declaration names an encoding other than ISO-8859-1 or UTF-8,
     one it does not know, and one with non-UTF-8 bytes and no declaration (section 6).
+23. Whether 7.x's commercial filter (`MavenForceAuthenticationFilter`, not public) applies
+    `forceMavenAuthentication` to Gradle, Ivy and SBT virtual repositories. artifactweave
+    does not, as the open source filter tests the Maven type alone and
+    [RTFACT-29829](https://jfrog.atlassian.net/browse/RTFACT-29829), a request for it on Gradle,
+    was closed undone (1.3).
+24. Whether a forced Maven virtual repository read as a member of another virtual repository
+    asks for credentials. artifactweave does not, as the filter reads the key from the
+    request's path (1.3).
 
 ## Native client verification
 
