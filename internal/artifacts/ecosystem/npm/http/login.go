@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -74,13 +75,16 @@ type npmCredentialKey struct{}
 // KeepNPMCredential keeps, for the npm configuration operations alone, the
 // token a request authenticated with, which they write into .npmrc as it
 // came. Nothing else needs the raw token, so no other request carries it
-// further than the middleware.
+// further than the middleware. It reads Basic as the middleware does
+// (accessapi.BasicCredentials), not with Request.BasicAuth: a lower-case
+// "basic" value authenticates nothing in 7.x, so beside a key that did, it
+// must not be written into .npmrc in the key's place.
 func KeepNPMCredential(ctx context.Context, r *http.Request, p kernel.Principal) context.Context {
 	if p.TokenID == "" || !NPMOperation(r.URL.Path) {
 		return ctx
 	}
 	var c Credential
-	if user, password, ok := r.BasicAuth(); ok {
+	if user, password, ok := accessapi.BasicCredentials(r.Header.Get("Authorization")); ok {
 		c.User, c.Password = user, password
 	} else if scheme, raw, _ := strings.Cut(r.Header.Get("Authorization"), " "); strings.EqualFold(scheme, "Bearer") {
 		c.Token = strings.TrimSpace(raw)

@@ -197,16 +197,28 @@ func ownPasswordChange(r *http.Request, user string) bool {
 // on the NuGet routes alone, X-NuGet-ApiKey (nugetAPIKey). A credential
 // that does not verify, or a scheme nothing accepts, answers 401 rather
 // than quietly becoming anonymous.
+//
+// The exception is a Basic value 7.x reads no credential from, such as
+// "Basic Og==" or a lower-case "basic" (accessapi.IgnoredAuthorization).
+// It counts as no Authorization header at all: the request goes on to the
+// other headers and otherwise to anonymous, and no failed login is counted
+// against any name. 7.x's props filter reads X-JFrog-Art-Api whatever the
+// Authorization header says (AuthenticationFilterUtils.getTokenKeyValue,
+// 7.161.26), so a key sent beside such a value still authenticates.
 func credentials(
 	ctx context.Context,
 	a *authn.Authenticator,
 	r *http.Request,
 ) (p kernel.Principal, presented bool, err error) {
-	if user, password, ok := r.BasicAuth(); ok {
+	h := r.Header.Get("Authorization")
+	if accessapi.IgnoredAuthorization(h) {
+		h = ""
+	}
+	if user, password, ok := accessapi.BasicCredentials(h); ok {
 		p, err = basicCredentials(ctx, a, user, password)
 		return p, true, err
 	}
-	if h := r.Header.Get("Authorization"); h != "" {
+	if h != "" {
 		// Cargo sends the configured registry token as a bare Authorization
 		// value on sparse registry and web API requests.
 		if strings.HasPrefix(r.URL.Path, "/artifactory/api/cargo/") &&
@@ -236,7 +248,7 @@ func credentials(
 		p, err = a.Token(ctx, k, "")
 		return p, true, err //nolint:wrapcheck // apierror values, rendered by status
 	}
-	if user, secret, ok := nugetAPIKey(r); ok {
+	if user, secret, ok := nugetAPIKey(r, h); ok {
 		if user == "" || secret == "" {
 			return kernel.Principal{}, true, kernel.ErrBadCredentials
 		}
@@ -266,15 +278,15 @@ const nugetAPI = "/artifactory/api/nuget/"
 // nugetAPIKey returns the user and secret of the request's X-NuGet-ApiKey,
 // which 7.x reads as Basic credentials "<user>:<password or token>"
 // (decision 0038), reporting whether the request sends one this route
-// reads. Only the NuGet routes read it, and only without an Authorization
-// header: the NuGet client sends its key with a push or a delete and its
-// stored credentials only after a 401, so a stale key must not hide
-// credentials that would succeed. A value without a ":" has no secret, and
-// credentials answers it 401, as JFrog supports no key alone
-// (RTFACT-20340).
-func nugetAPIKey(r *http.Request) (string, string, bool) {
+// reads. Only the NuGet routes read it, and only without authorization,
+// the Authorization value credentials counts: the NuGet client sends its
+// key with a push or a delete and its stored credentials only after a 401,
+// so a stale key must not hide credentials that would succeed. A value
+// without a ":" has no secret, and credentials answers it 401, as JFrog
+// supports no key alone (RTFACT-20340).
+func nugetAPIKey(r *http.Request, authorization string) (string, string, bool) {
 	v := r.Header.Get("X-NuGet-ApiKey")
-	if v == "" || r.Header.Get("Authorization") != "" || !strings.HasPrefix(r.URL.Path, nugetAPI) {
+	if v == "" || authorization != "" || !strings.HasPrefix(r.URL.Path, nugetAPI) {
 		return "", "", false
 	}
 	user, secret, _ := strings.Cut(v, ":")
