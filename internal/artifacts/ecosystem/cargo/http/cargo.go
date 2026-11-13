@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
@@ -254,7 +255,7 @@ func (h handler) index(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "private, no-store")
-	http.ServeContent(w, r, name, model.Item{}.Updated, bytes.NewReader(out.Bytes()))
+	itemkit.ServeContent(w, r, name, model.Item{}.Updated, bytes.NewReader(out.Bytes()))
 }
 
 func (h handler) filterRemoteIndex(

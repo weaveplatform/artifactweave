@@ -534,7 +534,8 @@ func matchesMatrix(
 // recorded checksums (decision 0004); they are never stored as items. Which
 // checksum is served is item.ServedChecksum's: under client-checksums the
 // client's, so a file deployed without one has no SHA-1 file until the
-// client sends one.
+// client sends one. It answers conditional requests and ranges as a remote
+// repository's checksum file does (serveChecksum).
 func (s *Kit) getSidecar(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -560,16 +561,14 @@ func (s *Kit) getSidecar(
 	value := item.ServedChecksum(f.Repo, f.Item, alg)
 	if value == "" {
 		// Artifactory 6.20's message (DownloadServiceImpl.respondForChecksumRequest).
+		// 7.x evaluates the file's isNotModified before it looks the
+		// checksum up, so a matching conditional request would get 304 for
+		// a checksum it then cannot find; the 404 stays, as before [I].
 		httpkit.WriteErr(w, r, apierror.New(http.StatusNotFound,
 			"Checksum not found for "+f.Item.FullPath()))
 		return
 	}
-	w.Header().Set("Content-Type", checksumType(r, p))
-	w.Header().Set("Last-Modified", f.Item.Modified.UTC().Format(http.TimeFormat))
-	w.WriteHeader(http.StatusOK)
-	if r.Method != http.MethodHead {
-		_, _ = io.WriteString(w, value)
-	}
+	serveChecksum(w, r, p, value, f.Item.Actual.SHA1, f.Item.Modified)
 }
 
 // contentTypeProperty is the property whose first value, when not blank,
@@ -666,13 +665,7 @@ func (s *Kit) serveFile(
 	it := f.Item
 	// Before the redirect, so that a redirecting repository answers the
 	// conditional request as a streamed download does.
-	r = withoutUnevaluatedPreconditions(r)
-	if r.Method == http.MethodHead {
-		// A HEAD answers 200 with the file's whole length, never 206 or
-		// 416, for the reasons pkgroute.ServeStream gives (6.20's
-		// sendHeadResponse; RFC 9110 section 14.2) [I].
-		r = pkgroute.WithoutRange(r)
-	}
+	r = downloadRequest(r)
 	h := w.Header()
 	pkgroute.SetChecksums(h, it.Actual)
 	h.Set("X-Artifactory-Filename", it.Name)

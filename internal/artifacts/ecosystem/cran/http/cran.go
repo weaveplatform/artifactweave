@@ -200,7 +200,7 @@ func (s CranAPI) serveCranIndex(
 	}
 	w.Header().Set("Cache-Control", "private, no-store")
 	sw := &itemkit.StatusWriter{ResponseWriter: w}
-	http.ServeContent(sw, r, name, time.Time{}, bytes.NewReader(body))
+	itemkit.ServeContent(sw, r, name, time.Time{}, bytes.NewReader(body))
 	if sw.Complete(r) && used != nil {
 		_ = used(ctx)
 	}

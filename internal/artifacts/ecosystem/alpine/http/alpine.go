@@ -201,7 +201,7 @@ func (s alpineItems) serveAlpineIndex(
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Cache-Control", "private, no-store")
 	sw := &itemkit.StatusWriter{ResponseWriter: w}
-	http.ServeContent(sw, r, alpine.IndexName, time.Time{}, bytes.NewReader(body))
+	itemkit.ServeContent(sw, r, alpine.IndexName, time.Time{}, bytes.NewReader(body))
 	if sw.Complete(r) && used != nil {
 		_ = used(ctx)
 	}

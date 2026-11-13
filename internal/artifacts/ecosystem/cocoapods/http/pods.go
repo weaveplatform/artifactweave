@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
@@ -201,7 +202,7 @@ func serveBytes(w http.ResponseWriter, r *http.Request, media string, data []byt
 	sum := sha256.Sum256(data)
 	w.Header().Set("Content-Type", media)
 	w.Header().Set("ETag", `"`+hex.EncodeToString(sum[:])+`"`)
-	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
+	itemkit.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
 }
 
 func specFor(base, key string, a podfmt.Archive) ([]byte, error) {

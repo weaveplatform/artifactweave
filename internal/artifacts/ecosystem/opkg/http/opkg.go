@@ -202,7 +202,7 @@ func (s opkgItems) serveOpkgIndex(
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Cache-Control", "private, no-store")
 	sw := &itemkit.StatusWriter{ResponseWriter: w}
-	http.ServeContent(sw, r, path.Base(req.Path), time.Time{}, bytes.NewReader(body))
+	itemkit.ServeContent(sw, r, path.Base(req.Path), time.Time{}, bytes.NewReader(body))
 	if sw.Complete(r) && used != nil {
 		_ = used(ctx)
 	}
