@@ -47,6 +47,9 @@
 //
 // # Invariants
 //
+//   - OpenRuntime first sets the xz dictionary budget from
+//     xz.dictionary_budget, which every decode in the process shares, those
+//     of the work queue included (#1354).
 //   - OpenRuntime opens the store, which applies pending migrations, seeds
 //     the built-in principals and applies the bootstrap, then opens the
 //     token service, the authenticator, both blob tiers, the garbage
@@ -66,7 +69,9 @@
 //     the request ID, panic recovery, the access log, the base URL, the
 //     Smart Remote trace, the Docker API version header and registry
 //     challenge, content type normalisation, collection slashes, plus as
-//     space, the idempotent routes and the API recovery context; then, each
+//     space, the idempotent routes, the API recovery context and the xz
+//     request holder (xzRequests, so a request's xz readers are one holder
+//     of the dictionary budget); then, each
 //     only when configured, the ingress request limits, authentication, the
 //     API restrictions and the principal request limits; then the Helm
 //     partial reindex. The ingress limits count a request before anyone is

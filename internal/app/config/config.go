@@ -111,6 +111,7 @@ type Config struct {
 	Cran              Cran             `yaml:"cran"`
 	Remote            Remote           `yaml:"remote"`
 	API               apilimit.Options `yaml:"api"`
+	XZ                XZ               `yaml:"xz"`
 }
 
 // Remote supplies exact operator-approved private source origins.
@@ -364,6 +365,7 @@ func Default() Config {
 		Maven: Maven{SnapshotCleanupInterval: DefaultMavenSnapshotCleanupInterval},
 		Helm:  Helm{RelativeURLs: true},
 		NuGet: NuGet{SnapshotCleanupInterval: DefaultNuGetSnapshotCleanupInterval},
+		XZ:    XZ{DictionaryBudget: DefaultXZDictionaryBudget},
 	}
 }
 
@@ -480,6 +482,7 @@ var keys = append(append([]string{
 	"conda.shards_enabled",
 	"huggingface.xet_enabled",
 	"remote.allowed_private_origins",
+	"xz.dictionary_budget",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -592,6 +595,7 @@ func sections(cfg *Config) map[string]func(sub, key, value string) error {
 		"maven.":  func(sub, key, value string) error { return setMaven(&cfg.Maven, sub, key, value) },
 		"nuget.":  func(sub, key, value string) error { return setNuGet(&cfg.NuGet, sub, key, value) },
 		"remote.": func(sub, key, value string) error { return setRemote(&cfg.Remote, sub, key, value) },
+		"xz.":     func(sub, key, value string) error { return setXZ(&cfg.XZ, sub, key, value) },
 	}
 }
 

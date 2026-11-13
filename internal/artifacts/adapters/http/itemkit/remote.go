@@ -189,10 +189,10 @@ func P2SourceRequest(q source.Request) (source.Request, error) {
 	q.Resource.Variant = "p2-native-v1"
 	if kind == p2.KindIndex || kind == p2.KindMetadata {
 		q.Resource.Kind = source.ResourceKindMetadata
-		q.Resource.ValidateMetadata = func(_ context.Context, r io.ReadSeeker, size int64,
+		q.Resource.ValidateMetadata = func(ctx context.Context, r io.ReadSeeker, size int64,
 			_ source.MetadataResponse,
 		) error {
-			if err := p2.Validate(name, r, size); err != nil {
+			if err := p2.Validate(ctx, name, r, size); err != nil {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
 					Kind:   source.FailureKindIntegrity,
@@ -201,8 +201,8 @@ func P2SourceRequest(q source.Request) (source.Request, error) {
 			return nil
 		}
 	} else {
-		q.Resource.Validate = func(_ context.Context, r io.ReadSeeker, size int64) error {
-			if err := p2.Validate(name, r, size); err != nil {
+		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
+			if err := p2.Validate(ctx, name, r, size); err != nil {
 				return &source.HTTPError{
 					Status: http.StatusBadGateway,
 					Kind:   source.FailureKindIntegrity,

@@ -222,7 +222,7 @@ func (s p2Items) p2Read(r *http.Request, c repo.Config, cached bool,
 	} else {
 		q.Resource.Kind = source.ResourceKindArtifact
 		q.Resource.Variant = "p2-external-archive-v1"
-		q.Resource.Validate = func(_ context.Context, src io.ReadSeeker, size int64) error {
+		q.Resource.Validate = func(ctx context.Context, src io.ReadSeeker, size int64) error {
 			if size <= 0 || size > p2.MaxArtifact {
 				return source.ErrInvalidResult
 			}
@@ -230,7 +230,7 @@ func (s p2Items) p2Read(r *http.Request, c repo.Config, cached bool,
 			if err != nil || int64(len(body)) != size {
 				return source.ErrInvalidResult
 			}
-			entry, err := p2.ExtractArchive(body, archiveEntry)
+			entry, err := p2.ExtractArchive(ctx, body, archiveEntry)
 			if err != nil {
 				return fmt.Errorf("extract p2 archive entry: %w", err)
 			}
@@ -291,7 +291,7 @@ func (s p2Items) p2Read(r *http.Request, c repo.Config, cached bool,
 		return p2ReadResult{}, source.ErrInvalidResult
 	}
 	if archiveEntry != "" {
-		body, err = p2.ExtractArchive(body, archiveEntry)
+		body, err = p2.ExtractArchive(r.Context(), body, archiveEntry)
 		if err != nil {
 			return p2ReadResult{}, source.ErrInvalidResult
 		}
@@ -355,7 +355,7 @@ func (s p2Items) p2ArtifactChecksums(
 		if err != nil {
 			return kernel.Checksums{}, err
 		}
-		want, err := p2.ArtifactChecksums(candidate, metadata.body, resource)
+		want, err := p2.ArtifactChecksums(r.Context(), candidate, metadata.body, resource)
 		if err != nil {
 			return kernel.Checksums{}, source.ErrInvalidResult
 		}
@@ -451,16 +451,25 @@ func (s p2Items) p2ResolveExternal(r *http.Request, c repo.Config, cached bool,
 			if metadataBase == nil || metadataBase.Hostname() == "" {
 				metadataBase = base.ResolveReference(&url.URL{Path: filename})
 			}
-			_, err = p2.EditComposite(filename, parent.body, func(raw string) (string, error) {
-				u, err := p2ChildURL(c, metadataBase, raw)
-				if err != nil {
-					return "", err
-				}
-				if p2ChildDigest(parent.id, parentDir, u.String()) == token {
-					child = u
-				}
-				return p2ExternalPrefix + "/" + p2ChildDigest(parent.id, parentDir, u.String()), nil
-			})
+			_, err = p2.EditComposite(
+				r.Context(),
+				filename,
+				parent.body,
+				func(raw string) (string, error) {
+					u, err := p2ChildURL(c, metadataBase, raw)
+					if err != nil {
+						return "", err
+					}
+					if p2ChildDigest(parent.id, parentDir, u.String()) == token {
+						child = u
+					}
+					return p2ExternalPrefix + "/" + p2ChildDigest(
+						parent.id,
+						parentDir,
+						u.String(),
+					), nil
+				},
+			)
 			if err != nil {
 				return nil, source.ErrInvalidResult
 			}
@@ -549,7 +558,7 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 		if parentDir == name {
 			parentDir = ""
 		}
-		body, err = p2.EditComposite(filename, body, func(raw string) (string, error) {
+		body, err = p2.EditComposite(r.Context(), filename, body, func(raw string) (string, error) {
 			child, err := p2ChildURL(c, metadataBase, raw)
 			if err != nil {
 				return "", err

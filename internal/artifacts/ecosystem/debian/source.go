@@ -31,9 +31,10 @@ type SourceIndexRecord struct {
 }
 
 // DecodeSourcesIndex bounds and validates plain or gzip apt source indexes.
-func DecodeSourcesIndex(body []byte) ([]SourceIndexRecord, error) {
+// ctx ends a wait for the xz dictionary budget.
+func DecodeSourcesIndex(ctx context.Context, body []byte) ([]SourceIndexRecord, error) {
 	var err error
-	body, err = decodeIndexCompression(body)
+	body, err = decodeIndexCompression(ctx, body)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errInvalidSource, err)
 	}

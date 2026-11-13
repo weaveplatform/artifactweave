@@ -75,6 +75,7 @@ func TestUnitSourcesIndexRejectsCorruptArchiveBinding(t *testing.T) {
 		t.Fatal(err)
 	}
 	if rows, err := DecodeSourcesIndex(
+		t.Context(),
 		valid,
 	); err != nil || len(rows) != 1 ||
 		len(rows[0].Files) != 3 {
@@ -114,7 +115,7 @@ func TestUnitSourcesIndexRejectsCorruptArchiveBinding(t *testing.T) {
 		{"bad package", strings.Replace(string(valid), "Package: alpha", "Package: ../alpha", 1)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := DecodeSourcesIndex([]byte(tc.body)); err == nil {
+			if _, err := DecodeSourcesIndex(t.Context(), []byte(tc.body)); err == nil {
 				t.Fatal("unsafe Sources index accepted")
 			}
 		})
@@ -152,14 +153,14 @@ func TestUnitSourceIndexAndDescriptorRejectCrossFileChecksumConflicts(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rows, err := DecodeSourcesIndex(nil); err != nil || len(rows) != 0 {
+	if rows, err := DecodeSourcesIndex(t.Context(), nil); err != nil || len(rows) != 0 {
 		t.Fatalf("empty Sources index: %+v, %v", rows, err)
 	}
-	if _, err := DecodeSourcesIndex([]byte{0x1f, 0x8b, 0x00}); err == nil {
+	if _, err := DecodeSourcesIndex(t.Context(), []byte{0x1f, 0x8b, 0x00}); err == nil {
 		t.Fatal("corrupt gzip Sources index accepted")
 	}
 	tooManyRows := []byte(strings.Repeat("x\n\n", maxPackageRows+1))
-	if _, err := DecodeSourcesIndex(tooManyRows); err == nil {
+	if _, err := DecodeSourcesIndex(t.Context(), tooManyRows); err == nil {
 		t.Fatal("Sources index with excessive stanzas accepted")
 	}
 	// The first Files row must refer to the same bytes as its matching
@@ -169,16 +170,16 @@ func TestUnitSourceIndexAndDescriptorRejectCrossFileChecksumConflicts(t *testing
 		entry.Archives[0].Checksums.MD5, entry.Archives[0].Size, name),
 		fmt.Sprintf(" %s %d %s", entry.Archives[0].Checksums.MD5,
 			entry.Archives[0].Size+1, name), 1)
-	if _, err := DecodeSourcesIndex([]byte(badSize)); err == nil {
+	if _, err := DecodeSourcesIndex(t.Context(), []byte(badSize)); err == nil {
 		t.Fatal("Sources index with mismatched archive sizes accepted")
 	}
 	badName := strings.Replace(string(index), "Checksums-Sha256:\n ",
 		"Checksums-Sha256:\n "+strings.Repeat("a", 64)+" 1 extra.tar.gz\n ", 1)
-	if _, err := DecodeSourcesIndex([]byte(badName)); err == nil {
+	if _, err := DecodeSourcesIndex(t.Context(), []byte(badName)); err == nil {
 		t.Fatal("Sources index with unmatched archive accepted")
 	}
 	missingFiles := strings.Replace(string(index), "Files:\n", "Unverified-Files:\n", 1)
-	if _, err := DecodeSourcesIndex([]byte(missingFiles)); err == nil {
+	if _, err := DecodeSourcesIndex(t.Context(), []byte(missingFiles)); err == nil {
 		t.Fatal("Sources index without MD5 Files declarations accepted")
 	}
 	descriptor := strings.ReplaceAll(string(entry.Source.Control), "\r\n", "\n")

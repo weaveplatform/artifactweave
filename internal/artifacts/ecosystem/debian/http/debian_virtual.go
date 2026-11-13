@@ -227,7 +227,7 @@ func (s DebianAPI) addDebianMemberIndexes(
 		if !matches {
 			return fmt.Errorf("debian member %s: %w", member.Key, errDebianReleaseDigestMismatch)
 		}
-		rows, err := debian.DecodePackagesIndex(body)
+		rows, err := debian.DecodePackagesIndex(ctx, body)
 		if err != nil && member.Class == repo.Remote {
 			continue
 		}
@@ -399,7 +399,7 @@ func (s DebianAPI) serveVirtualDebianSources(
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "Debian virtual index", errDebianIndexTooLarge))
 		return true
 	}
-	paths, err := remoteDebianIndexPaths(req.Path, body, member)
+	paths, err := remoteDebianIndexPaths(ctx, req.Path, body, member)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "Debian virtual index", err))
 		return true

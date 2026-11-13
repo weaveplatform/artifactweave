@@ -195,3 +195,5 @@ api:
     max_keys: 16384
     budget_timeout: 500ms
     expensive_timeout: 2m0s
+xz:
+    dictionary_budget: 1GiB

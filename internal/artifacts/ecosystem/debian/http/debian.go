@@ -178,7 +178,7 @@ func (s DebianAPI) serveDebianIndex(
 		)
 		return
 	}
-	paths, err := remoteDebianIndexPaths(req.Path, body, c)
+	paths, err := remoteDebianIndexPaths(ctx, req.Path, body, c)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "Debian index", err))
 		return
@@ -247,19 +247,21 @@ func writeDebianIndex(
 // then refuses it, and any package GET is still checked on its own path. A
 // local or federated repository's index is the server's own, so one that
 // does not decode stays a fault.
-func remoteDebianIndexPaths(path string, body []byte, c repo.Config) ([]string, error) {
-	paths, err := debianIndexPaths(path, body)
+func remoteDebianIndexPaths(
+	ctx context.Context, path string, body []byte, c repo.Config,
+) ([]string, error) {
+	paths, err := debianIndexPaths(ctx, path, body)
 	if err != nil && c.Class == repo.Remote {
 		return nil, nil
 	}
 	return paths, err
 }
 
-func debianIndexPaths(path string, body []byte) ([]string, error) {
+func debianIndexPaths(ctx context.Context, path string, body []byte) ([]string, error) {
 	paths := []string{}
 	_, byHash := debian.ByHashMetadataPath(path)
 	if debian.PackagesIndexPath(path) || byHash && strings.Contains(path, "/binary-") {
-		rows, err := debian.DecodePackagesIndex(body)
+		rows, err := debian.DecodePackagesIndex(ctx, body)
 		for _, row := range rows {
 			paths = append(paths, row.Filename)
 		}
@@ -268,7 +270,7 @@ func debianIndexPaths(path string, body []byte) ([]string, error) {
 		}
 		return paths, nil
 	}
-	rows, err := debian.DecodeSourcesIndex(body)
+	rows, err := debian.DecodeSourcesIndex(ctx, body)
 	for _, row := range rows {
 		paths = append(paths, row.Files...)
 	}

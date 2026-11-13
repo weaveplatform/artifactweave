@@ -94,7 +94,7 @@ func TestUnitIndexFormsWritesTheOptionalCompressionFormats(t *testing.T) {
 				if got := decompressForm(t, form.Suffix, form.Body); !bytes.Equal(got, formsIndex) {
 					t.Errorf("%q decompresses to %q", form.Suffix, got)
 				}
-				rows, err := DecodePackagesIndex(form.Body)
+				rows, err := DecodePackagesIndex(t.Context(), form.Body)
 				if err != nil || len(rows) != 1 || rows[0].Name != "alpha" {
 					t.Errorf("%q decodes to %+v, %v", form.Suffix, rows, err)
 				}
@@ -109,7 +109,7 @@ func TestUnitIndexFormsWritesTheOptionalCompressionFormats(t *testing.T) {
 		if got := decompressForm(t, form.Suffix, form.Body); len(got) != 0 {
 			t.Errorf("empty index's %q form decompresses to %q", form.Suffix, got)
 		}
-		if rows, err := DecodePackagesIndex(form.Body); err != nil || len(rows) != 0 {
+		if rows, err := DecodePackagesIndex(t.Context(), form.Body); err != nil || len(rows) != 0 {
 			t.Errorf("empty index's %q form decodes to %+v, %v", form.Suffix, rows, err)
 		}
 	}
@@ -186,7 +186,7 @@ func TestUnitLzmaAloneHeaderTellsLzmaFromText(t *testing.T) {
 			t.Errorf("%s: %t, want %t", tc.name, got, tc.want)
 		}
 	}
-	if _, err := DecodePackagesIndex(lzmaHeader(0x5d, 1<<30, ^uint64(0))); err == nil {
+	if _, err := DecodePackagesIndex(t.Context(), lzmaHeader(0x5d, 1<<30, ^uint64(0))); err == nil {
 		t.Error("an LZMA header asking for a 1 GiB dictionary was decoded")
 	}
 }
@@ -229,17 +229,17 @@ func TestUnitIndexNamesAndInstallerIndex(t *testing.T) {
 		}
 	}
 	udeb := []byte(strings.Replace(string(formsIndex), "pool/alpha.deb", "pool/alpha.udeb", 1))
-	rows, err := DecodeInstallerPackagesIndex(udeb)
+	rows, err := DecodeInstallerPackagesIndex(t.Context(), udeb)
 	if err != nil || len(rows) != 1 || rows[0].Filename != "pool/alpha.udeb" {
 		t.Errorf("installer index: %+v, %v", rows, err)
 	}
-	if _, err := DecodeInstallerPackagesIndex(formsIndex); err == nil {
+	if _, err := DecodeInstallerPackagesIndex(t.Context(), formsIndex); err == nil {
 		t.Error("an installer index naming a .deb was accepted")
 	}
-	if _, err := DecodePackagesIndex(udeb); err == nil {
+	if _, err := DecodePackagesIndex(t.Context(), udeb); err == nil {
 		t.Error("a binary index naming a .udeb was accepted")
 	}
-	if _, err := DecodeInstallerPackagesIndex([]byte{0x1f, 0x8b, 0}); err == nil {
+	if _, err := DecodeInstallerPackagesIndex(t.Context(), []byte{0x1f, 0x8b, 0}); err == nil {
 		t.Error("a broken gzip installer index was accepted")
 	}
 }

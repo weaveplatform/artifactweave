@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -89,7 +90,9 @@ func Classify(name string) Kind {
 
 // Validate reads the complete representation before the source cache may
 // publish it. zip readers check both directory structure and entry CRCs.
-func Validate(name string, src io.ReadSeeker, size int64) error {
+// ctx ends a wait for the xz dictionary budget, which is then a refusal
+// too.
+func Validate(ctx context.Context, name string, src io.ReadSeeker, size int64) error {
 	kind := Classify(name)
 	limit := int64(MaxMetadata)
 	if kind == KindArtifact {
@@ -107,10 +110,11 @@ func Validate(name string, src io.ReadSeeker, size int64) error {
 	if strings.HasSuffix(name, ".xml.xz") {
 		// The p2 client's XZInputStream refuses a file whose index and
 		// footer are missing, so the whole file is read (#1331).
-		r, err := xzfile.NewReader(src, MaxMetadata+1)
+		r, err := xzfile.NewReader(ctx, src, MaxMetadata+1)
 		if err != nil {
 			return ErrInvalid
 		}
+		defer func() { _ = r.Close() }()
 		body, err := io.ReadAll(io.LimitReader(r, MaxMetadata+1))
 		if err != nil || len(body) > MaxMetadata {
 			return ErrInvalid
@@ -186,7 +190,7 @@ func validateJAR(name string, kind Kind, src io.ReadSeeker, size int64) error {
 
 // ExtractArchive serves Artifactory's `site.zip!/` P2 URL form. The complete
 // source archive is checked before its named update-site file is delivered.
-func ExtractArchive(site []byte, entry string) ([]byte, error) {
+func ExtractArchive(ctx context.Context, site []byte, entry string) ([]byte, error) {
 	if len(site) == 0 || len(site) > MaxArtifact || Classify(entry) == KindInvalid {
 		return nil, ErrInvalid
 	}
@@ -221,7 +225,7 @@ func ExtractArchive(site []byte, entry string) ([]byte, error) {
 	if err != nil || uint64(len(body)) != selected.UncompressedSize64 || r.Close() != nil {
 		return nil, ErrInvalid
 	}
-	if err := Validate(entry, bytes.NewReader(body), int64(len(body))); err != nil {
+	if err := Validate(ctx, entry, bytes.NewReader(body), int64(len(body))); err != nil {
 		return nil, err
 	}
 	return body, nil

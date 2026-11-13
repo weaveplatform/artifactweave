@@ -126,6 +126,9 @@
 //     footer, refused wherever it is read (#1331), and a block header that
 //     names a 1.5 GiB dictionary read within MaxMetadata, or one that names
 //     4 GiB refused (#1332).
+//   - xz_budget_test.go: that metadata, whole, cut and with a 1.5 GiB
+//     header, answers the same under the xz dictionary budget as without
+//     it, in Validate, ArtifactChecksums and EditComposite (#1354).
 //
 // testdata holds unmodified files of the published Eclipse GLSP 2.7.0 update
 // site (p2.index, the content and artifacts metadata as .jar and .xml.xz,

@@ -157,8 +157,8 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, found loc
 		Checksums:         kernel.Checksums{SHA256: info.FileHash},
 		NoCrossOriginAuth: true,
 		CheckURL:          func(_ context.Context, target *url.URL) error { return checkURL(c, target) },
-		Validate: func(_ context.Context, body io.ReadSeeker, size int64) error {
-			a, err := nixfmt.ReadArchive(body, size, info.Compression)
+		Validate: func(ctx context.Context, body io.ReadSeeker, size int64) error {
+			a, err := nixfmt.ReadArchive(ctx, body, size, info.Compression)
 			if err != nil || !a.Matches(info) {
 				return source.ErrInvalidResult
 			}

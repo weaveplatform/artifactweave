@@ -146,6 +146,8 @@
 //     and unrelated files kept out of the index, and the refusals.
 //   - xz_test.go: a .tar.xz source package whose xz stream lost its index
 //     and footer, refused at both package paths (#1331).
+//   - xz_budget_test.go: that package, whole and cut, answers the same
+//     under the xz dictionary budget as without it (#1354).
 //
 // testdata holds the unchanged CRAN assertthat 0.2.1 source archive and
 // Windows binary and its published PACKAGES entry, which the suites in

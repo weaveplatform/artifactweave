@@ -140,6 +140,8 @@
 //     are refused, and a NAR whose xz block header names a 4 GiB
 //     dictionary is refused without allocating it. platform/xzfile tests
 //     the container itself.
+//   - xz_budget_test.go: those NARs and tarballs, whole and cut, answer
+//     the same under the xz dictionary budget as without it (#1354).
 //   - contract_test.go: the format's lifecycle through the item service,
 //     and concurrent first publications of one store path.
 //   - channel_test.go: snapshot paths, channel tarballs and their faults,

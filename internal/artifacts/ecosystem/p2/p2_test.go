@@ -23,13 +23,14 @@ func TestUnitPublishedEclipseMetadata(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := Validate(name, bytes.NewReader(body), int64(len(body))); err != nil {
+		if err := Validate(t.Context(), name, bytes.NewReader(body), int64(len(body))); err != nil {
 			t.Errorf("published %s: %v", name, err)
 		}
 		if name == "content.jar" {
 			corrupt := bytes.Clone(body)
 			corrupt[len(corrupt)/2] ^= 0xff
 			if err := Validate(
+				t.Context(),
 				name,
 				bytes.NewReader(corrupt),
 				int64(len(corrupt)),
@@ -46,7 +47,12 @@ func TestUnitPublishedEclipseMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := Validate("plugins/"+plugin, bytes.NewReader(body), int64(len(body))); err != nil {
+	if err := Validate(
+		t.Context(),
+		"plugins/"+plugin,
+		bytes.NewReader(body),
+		int64(len(body)),
+	); err != nil {
 		t.Errorf("published Eclipse plugin: %v", err)
 	}
 }
@@ -56,13 +62,14 @@ func TestUnitPublishedP2ArtifactChecksum(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	checksums, err := ArtifactChecksums("artifacts.jar", body,
+	checksums, err := ArtifactChecksums(t.Context(), "artifacts.jar", body,
 		"plugins/org.eclipse.glsp.layout.source_2.7.0.jar")
 	if err != nil ||
 		checksums.SHA256 != "80c9be399f166cddc9934a42e27484e6427684bf8adf398fbfeb8224a189a728" {
 		t.Fatalf("published Eclipse checksum: %+v, %v", checksums, err)
 	}
 	if _, err := ArtifactChecksums(
+		t.Context(),
 		"artifacts.jar",
 		body,
 		"plugins/missing.jar",
@@ -96,10 +103,16 @@ func TestUnitP2MetadataEncodingsAndBounds(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := Validate(pair.entry, bytes.NewReader(xmlBody), int64(len(xmlBody))); err != nil {
+		if err := Validate(
+			t.Context(),
+			pair.entry,
+			bytes.NewReader(xmlBody),
+			int64(len(xmlBody)),
+		); err != nil {
 			t.Errorf("plain published %s: %v", pair.entry, err)
 		}
 		if err := Validate(
+			t.Context(),
 			pair.archive,
 			readSeekerOnly{bytes.NewReader(body)},
 			int64(len(body)),
@@ -120,6 +133,7 @@ func TestUnitP2MetadataEncodingsAndBounds(t *testing.T) {
 		{"p2.index", []byte("version=1\nmetadata.repository.factory.order=content.xml,!\n"), 65},
 	} {
 		if err := Validate(
+			t.Context(),
 			tc.name,
 			bytes.NewReader(tc.body),
 			tc.size,
@@ -130,7 +144,7 @@ func TestUnitP2MetadataEncodingsAndBounds(t *testing.T) {
 			t.Errorf("invalid %s accepted: %v", tc.name, err)
 		}
 	}
-	if err := Validate("binary/demo", bytes.NewReader([]byte("x")), 1); err != nil {
+	if err := Validate(t.Context(), "binary/demo", bytes.NewReader([]byte("x")), 1); err != nil {
 		t.Errorf("binary artifact rejected: %v", err)
 	}
 }
@@ -169,17 +183,31 @@ func TestUnitExtractsArchiveEntriesAndRejectsUntrustedPaths(t *testing.T) {
 		"p2.index": index,
 		"plugins/org.eclipse.glsp.layout.source_2.7.0.jar": plugin,
 	} {
-		got, err := ExtractArchive(archive.Bytes(), name)
+		got, err := ExtractArchive(t.Context(), archive.Bytes(), name)
 		if err != nil || !bytes.Equal(got, want) {
 			t.Errorf("archive %s: %v, size %d", name, err, len(got))
 		}
 	}
 	for _, name := range []string{"missing.jar", "../p2.index", "plugins/../p2.index"} {
-		if _, err := ExtractArchive(archive.Bytes(), name); !errors.Is(err, ErrInvalid) {
+		if _, err := ExtractArchive(
+			t.Context(),
+			archive.Bytes(),
+			name,
+		); !errors.Is(
+			err,
+			ErrInvalid,
+		) {
 			t.Errorf("unsafe archive entry %s accepted: %v", name, err)
 		}
 	}
-	if _, err := ExtractArchive([]byte("not a zip"), "p2.index"); !errors.Is(err, ErrInvalid) {
+	if _, err := ExtractArchive(
+		t.Context(),
+		[]byte("not a zip"),
+		"p2.index",
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
 		t.Errorf("corrupt archive accepted: %v", err)
 	}
 	var malicious bytes.Buffer
@@ -194,7 +222,14 @@ func TestUnitExtractsArchiveEntriesAndRejectsUntrustedPaths(t *testing.T) {
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ExtractArchive(malicious.Bytes(), "p2.index"); !errors.Is(err, ErrInvalid) {
+	if _, err := ExtractArchive(
+		t.Context(),
+		malicious.Bytes(),
+		"p2.index",
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
 		t.Errorf("traversal archive accepted: %v", err)
 	}
 }
@@ -215,6 +250,7 @@ func TestUnitRejectsUnsafeP2MetadataAndPaths(t *testing.T) {
 		{"content.xml", "<repository"},
 	} {
 		if err := Validate(
+			t.Context(),
 			tc.name,
 			bytes.NewReader([]byte(tc.body)),
 			int64(len(tc.body)),
@@ -227,6 +263,7 @@ func TestUnitRejectsUnsafeP2MetadataAndPaths(t *testing.T) {
 	}
 	validComposite := `<repository type="org.eclipse.equinox.internal.p2.metadata.repository.CompositeMetadataRepository"><children size="1"><child location="child"/></children></repository>`
 	if err := Validate(
+		t.Context(),
 		"compositeContent.xml",
 		bytes.NewReader([]byte(validComposite)),
 		int64(len(validComposite)),
@@ -283,14 +320,14 @@ func TestUnitExternalCompositeEditingBoundsAndEncodings(t *testing.T) {
 			}
 			body = packed.Bytes()
 		}
-		out, err := EditComposite(name, body, func(raw string) (string, error) {
+		out, err := EditComposite(t.Context(), name, body, func(raw string) (string, error) {
 			if raw != "https://child.example/site?token=opaque" {
 				t.Fatalf("raw child %q", raw)
 			}
 			return "__p2_ext/opaque", nil
 		})
 		if err != nil || bytes.Contains(out, []byte("child.example")) ||
-			Validate(name, bytes.NewReader(out), int64(len(out))) != nil {
+			Validate(t.Context(), name, bytes.NewReader(out), int64(len(out))) != nil {
 			t.Errorf("%s rewrite: %v", name, err)
 		}
 	}
@@ -302,6 +339,7 @@ func TestUnitExternalCompositeEditingBoundsAndEncodings(t *testing.T) {
 			`<repository type="org.eclipse.equinox.internal.p2.metadata.repository.CompositeMetadataRepository"><children size="1">` + raw + `</children></repository>`,
 		)
 		if _, err := EditComposite(
+			t.Context(),
 			"compositeContent.xml",
 			bad,
 			func(string) (string, error) { return "ok", nil },
@@ -312,10 +350,25 @@ func TestUnitExternalCompositeEditingBoundsAndEncodings(t *testing.T) {
 }
 
 func TestUnitP2ArchiveRejectsInvalidEntryAndSeekFailure(t *testing.T) {
-	if _, err := ExtractArchive([]byte("data"), "../p2.index"); !errors.Is(err, ErrInvalid) {
+	if _, err := ExtractArchive(
+		t.Context(),
+		[]byte("data"),
+		"../p2.index",
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
 		t.Errorf("unsafe archive entry accepted: %v", err)
 	}
-	if err := Validate("content.jar", failingSeeker{}, 1); !errors.Is(err, ErrInvalid) {
+	if err := Validate(
+		t.Context(),
+		"content.jar",
+		failingSeeker{},
+		1,
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
 		t.Errorf("unreadable metadata accepted: %v", err)
 	}
 	if _, err := (seekReaderAt{failingSeeker{}}).ReadAt(
@@ -338,6 +391,7 @@ func TestUnitP2IndexRejectsIncompleteAndMisleadingOrders(t *testing.T) {
 		"version=1\nmetadata.repository.factory.order\nartifact.repository.factory.order=artifacts.xml\n",
 	} {
 		if err := Validate(
+			t.Context(),
 			"p2.index",
 			bytes.NewReader([]byte(body)),
 			int64(len(body)),
@@ -349,6 +403,7 @@ func TestUnitP2IndexRejectsIncompleteAndMisleadingOrders(t *testing.T) {
 		}
 	}
 	if err := Validate(
+		t.Context(),
 		"p2.index",
 		bytes.NewReader([]byte("x")),
 		64<<10+1,
@@ -396,7 +451,14 @@ func TestUnitP2RejectsBrokenArchiveEntries(t *testing.T) {
 			if err := zw.Close(); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := ExtractArchive(archive.Bytes(), "p2.index"); !errors.Is(err, ErrInvalid) {
+			if _, err := ExtractArchive(
+				t.Context(),
+				archive.Bytes(),
+				"p2.index",
+			); !errors.Is(
+				err,
+				ErrInvalid,
+			) {
 				t.Fatalf("invalid archive entry accepted: %v", err)
 			}
 		})
@@ -405,7 +467,14 @@ func TestUnitP2RejectsBrokenArchiveEntries(t *testing.T) {
 	if err := zip.NewWriter(&empty).Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ExtractArchive(empty.Bytes(), "p2.index"); !errors.Is(err, ErrInvalid) {
+	if _, err := ExtractArchive(
+		t.Context(),
+		empty.Bytes(),
+		"p2.index",
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
 		t.Errorf("empty archive accepted: %v", err)
 	}
 	var missing bytes.Buffer
@@ -421,6 +490,7 @@ func TestUnitP2RejectsBrokenArchiveEntries(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := Validate(
+		t.Context(),
 		"content.jar",
 		bytes.NewReader(missing.Bytes()),
 		int64(missing.Len()),
@@ -434,6 +504,7 @@ func TestUnitP2RejectsBrokenArchiveEntries(t *testing.T) {
 
 func TestUnitP2RejectsReadFailures(t *testing.T) {
 	if err := Validate(
+		t.Context(),
 		"content.xml",
 		readErrorSeeker{bytes.NewReader([]byte("x"))},
 		1,
@@ -448,6 +519,7 @@ func TestUnitP2RejectsReadFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := Validate(
+		t.Context(),
 		"content.xml.xz",
 		bytes.NewReader(compressed[:len(compressed)/2]),
 		int64(len(compressed)/2),
@@ -491,7 +563,7 @@ func TestUnitP2ArchiveRejectsBadCRCAndUnknownCompression(t *testing.T) {
 		t.Fatal("stored update-site index not found in ZIP")
 	}
 	corrupt[position] ^= 1
-	if _, err := ExtractArchive(corrupt, "p2.index"); !errors.Is(err, ErrInvalid) {
+	if _, err := ExtractArchive(t.Context(), corrupt, "p2.index"); !errors.Is(err, ErrInvalid) {
 		t.Errorf("CRC-corrupted update site accepted: %v", err)
 	}
 	unknown := bytes.Clone(archive.Bytes())
@@ -502,7 +574,7 @@ func TestUnitP2ArchiveRejectsBadCRCAndUnknownCompression(t *testing.T) {
 	// Keep the payload intact while making the member's declared compressor unsupported.
 	binary.LittleEndian.PutUint16(unknown[8:10], 99)
 	binary.LittleEndian.PutUint16(unknown[central+10:central+12], 99)
-	if _, err := ExtractArchive(unknown, "p2.index"); !errors.Is(err, ErrInvalid) {
+	if _, err := ExtractArchive(t.Context(), unknown, "p2.index"); !errors.Is(err, ErrInvalid) {
 		t.Errorf("unsupported ZIP compressor delivered: %v", err)
 	}
 	zr, err := zip.NewReader(bytes.NewReader(unknown), int64(len(unknown)))
@@ -514,6 +586,7 @@ func TestUnitP2ArchiveRejectsBadCRCAndUnknownCompression(t *testing.T) {
 		t.Fatal("unknown-compressor fixture remained readable")
 	}
 	if err := Validate(
+		t.Context(),
 		"content.jar",
 		bytes.NewReader(unknown),
 		int64(len(unknown)),
@@ -526,6 +599,7 @@ func TestUnitP2ArchiveRejectsBadCRCAndUnknownCompression(t *testing.T) {
 	oversized := bytes.Clone(archive.Bytes())
 	binary.LittleEndian.PutUint32(oversized[central+24:central+28], uint32(MaxArtifact+1))
 	if err := Validate(
+		t.Context(),
 		"content.jar",
 		bytes.NewReader(oversized),
 		int64(len(oversized)),
@@ -562,7 +636,15 @@ func TestUnitP2JARRejectsInterruptedMemberRead(t *testing.T) {
 		failFrom:  int64(start),
 		failUntil: int64(start + len(payload)),
 	}
-	if err := Validate("content.jar", src, int64(archive.Len())); !errors.Is(err, ErrInvalid) {
+	if err := Validate(
+		t.Context(),
+		"content.jar",
+		src,
+		int64(archive.Len()),
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
 		t.Errorf("interrupted JAR member admitted: %v", err)
 	}
 	changed := &secondP2MemberReader{
@@ -573,6 +655,7 @@ func TestUnitP2JARRejectsInterruptedMemberRead(t *testing.T) {
 		failUntil: int64(start + len(payload)),
 	}
 	if err := Validate(
+		t.Context(),
 		"content.jar",
 		changed,
 		int64(archive.Len()),

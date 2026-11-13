@@ -3,6 +3,7 @@ package nix
 import (
 	"compress/bzip2"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -33,8 +34,14 @@ type Archive struct {
 // An xz file must be whole, every stream ending in its index and footer,
 // as Nix's decompressor requires (#1297), and its block headers may name
 // no dictionary above xzfile.MaxDict. Every refusal, a size outside 1 to
-// MaxArchiveBytes included, is ErrInvalid.
-func ReadArchive(input io.Reader, size int64, compression string) (Archive, error) {
+// MaxArchiveBytes included, is ErrInvalid. ctx ends a wait for the xz
+// dictionary budget, which is then a refusal too.
+func ReadArchive(
+	ctx context.Context,
+	input io.Reader,
+	size int64,
+	compression string,
+) (Archive, error) {
 	var out Archive
 	if size <= 0 || size > MaxArchiveBytes {
 		return out, ErrInvalid
@@ -47,10 +54,11 @@ func ReadArchive(input io.Reader, size int64, compression string) (Archive, erro
 	case "none":
 		reader = raw
 	case "xz":
-		r, err := xzfile.NewReader(raw, MaxNarBytes+1)
+		r, err := xzfile.NewReader(ctx, raw, MaxNarBytes+1)
 		if err != nil {
 			return out, ErrInvalid
 		}
+		defer func() { _ = r.Close() }()
 		reader = r
 	case "bzip2":
 		reader = bzip2.NewReader(raw)

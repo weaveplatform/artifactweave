@@ -119,7 +119,7 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 		Resource: source.Resource{
 			Kind: source.ResourceKindArtifact, Path: req.Path, Method: http.MethodGet,
 			ExternalURL: archiveURL, Variant: "p2-site-archive-v1",
-			Validate: func(_ context.Context, src io.ReadSeeker, size int64) error {
+			Validate: func(ctx context.Context, src io.ReadSeeker, size int64) error {
 				if size <= 0 || size > p2.MaxArtifact {
 					return &source.HTTPError{
 						Status: http.StatusBadGateway,
@@ -133,7 +133,7 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 						Kind:   source.FailureKindIntegrity,
 					}
 				}
-				if _, err := p2.ExtractArchive(body, req.Path); err != nil {
+				if _, err := p2.ExtractArchive(ctx, body, req.Path); err != nil {
 					return &source.HTTPError{
 						Status: http.StatusBadGateway,
 						Kind:   source.FailureKindIntegrity,
@@ -170,7 +170,7 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 		httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
 		return
 	}
-	body, err := p2.ExtractArchive(site, req.Path)
+	body, err := p2.ExtractArchive(r.Context(), site, req.Path)
 	if err != nil {
 		httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
 		return

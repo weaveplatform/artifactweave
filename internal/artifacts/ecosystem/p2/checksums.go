@@ -3,6 +3,7 @@ package p2
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/xml"
 	"errors"
 	"io"
@@ -17,15 +18,16 @@ import (
 // path. An absent declaration leaves the structural JAR validation in force.
 // Invalid declarations fail closed instead of silently disabling pinning.
 func ArtifactChecksums(
+	ctx context.Context,
 	metadataName string,
 	body []byte,
 	artifactPath string,
 ) (kernel.Checksums, error) {
 	if !strings.HasPrefix(path.Base(metadataName), "artifacts.") ||
-		Validate(metadataName, bytes.NewReader(body), int64(len(body))) != nil {
+		Validate(ctx, metadataName, bytes.NewReader(body), int64(len(body))) != nil {
 		return kernel.Checksums{}, ErrInvalid
 	}
-	xmlBody, err := metadataXML(metadataName, body)
+	xmlBody, err := metadataXML(ctx, metadataName, body)
 	if err != nil {
 		return kernel.Checksums{}, err
 	}
@@ -117,15 +119,16 @@ func validDigest(raw string, length int) bool {
 	return true
 }
 
-func metadataXML(name string, body []byte) ([]byte, error) {
+func metadataXML(ctx context.Context, name string, body []byte) ([]byte, error) {
 	switch {
 	case strings.HasSuffix(name, ".xml"):
 		return body, nil
 	case strings.HasSuffix(name, ".xml.xz"):
-		r, err := xzfile.NewReader(bytes.NewReader(body), MaxMetadata+1)
+		r, err := xzfile.NewReader(ctx, bytes.NewReader(body), MaxMetadata+1)
 		if err != nil {
 			return nil, ErrInvalid
 		}
+		defer func() { _ = r.Close() }()
 		out, err := io.ReadAll(io.LimitReader(r, MaxMetadata+1))
 		if err != nil || len(out) > MaxMetadata {
 			return nil, ErrInvalid
