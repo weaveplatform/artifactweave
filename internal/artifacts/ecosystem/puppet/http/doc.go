@@ -121,7 +121,13 @@
 //     that record's own release list, leaving out the releases it marks
 //     deleted, with the newest one's own record as its current release
 //     (#1370) [I]; its release list and search still answer from the
-//     pages.
+//     pages. A virtual repository whose members' pages list no release of
+//     the module the caller may read answers the record its first remote
+//     member, in member order, answers so, read under that member's
+//     authority after the virtual repository's Read, passing over a member
+//     that is blacked out, refuses the release pages' policy path, holds no
+//     record or lists no release the caller may read in both repositories
+//     (#1422) [I].
 //   - A remote builds each Forge query itself (module, limit, offset,
 //     sort_by and exclude_fields), never forwards a client's, module_groups
 //     included, never
@@ -198,8 +204,9 @@
 //     https://github.com/weaveplatform/artifactweave/issues/1327,
 //     https://github.com/weaveplatform/artifactweave/issues/1343,
 //     https://github.com/weaveplatform/artifactweave/issues/1344,
-//     https://github.com/weaveplatform/artifactweave/issues/1369 and
-//     https://github.com/weaveplatform/artifactweave/issues/1370
+//     https://github.com/weaveplatform/artifactweave/issues/1369,
+//     https://github.com/weaveplatform/artifactweave/issues/1370 and
+//     https://github.com/weaveplatform/artifactweave/issues/1422
 //
 // # Status
 //
@@ -241,6 +248,11 @@
 //     release pages leave out, from the upstream's module record and the
 //     newest release's own record, read permission, the failures, and a
 //     listed module that never reads the record's release list.
+//   - virtual_module_test.go: a virtual repository's module record for a
+//     module every member's pages leave out, from its first remote member
+//     that holds one, member order, read permission on the virtual
+//     repository and the member, the members passed over, the failures,
+//     and a listed module that keeps its merged record.
 //   - groups_test.go: module_groups on one module's release list and the
 //     module search answering as without it on every repository class, a
 //     remote's upstream queries without it, and the refusals it leaves

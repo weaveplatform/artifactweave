@@ -119,7 +119,23 @@ it marks deleted, with the newest release's own record, `v3/releases/<slug>`,
 as `current_release` (#1370) [I]. r10k reads this record for a module's current
 release before it installs it. The record is still read under the release
 pages' authority, and a record the upstream does not hold, or one listing no
-release the caller may read, still answers 404.
+release the caller may read, still answers 404. A virtual repository whose
+members' pages list no release of the module the caller may read answers
+`v3/modules/<m>` with the record its first remote member, in member order,
+answers so (#1422) [I]. JFrog's Puppet repositories page says a virtual
+repository aggregates its members and supports r10k, which reads this record
+before the release record and archive the virtual repository already answers
+for such a module (#1369); no source shows 7.x's answer. The virtual
+repository's Read on the module folder is checked first, then each member is
+checked as the merge of the release pages checks it: a member the caller may
+not read the module folder of, a blacked-out member, one whose patterns reject
+`.puppet/<m>/releases.json`, one whose upstream holds no record and one whose
+record lists no release the caller may read, in the virtual repository and in
+the member, are passed over (R5). Any other failure of the member fails the
+answer, as a remote's does. The record is the member's, module-wide fields
+included, rather than merged from releases as a listed module's is, and its
+links are relative, so they lead back to the virtual repository. A module some
+member lists keeps its merged record and never reads a module record.
 
 The same report shows that remote answering
 `v3/releases/puppetlabs-sqlserver-2.5.0`, a release of a Puppet Enterprise
