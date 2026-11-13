@@ -466,7 +466,7 @@ func TestAccPuppetRemoteReadsEveryForgePage(t *testing.T) {
 		excluded := slices.Sorted(maps.Keys(up.excluded))
 		up.mu.Unlock()
 		if !slices.Equal(excluded, []string{
-			"module: current_release releases",
+			"module: current_release",
 			"releases: reference tasks plans pdk validation_score malware_scan deleted_for",
 		}) {
 			t.Fatalf("exclude_fields asked: %q", excluded)

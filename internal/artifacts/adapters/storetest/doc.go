@@ -21,6 +21,10 @@
 // # Outputs
 //
 //   - Factory and Run.
+//   - RunVersionNames, the contract of PackageVersionNames: a package's
+//     version names in exactly Versions' order, following later writes and
+//     deletes, and a package's own (#1404). It is a subtest of its own,
+//     VersionNames, run beside Run rather than from it.
 //   - The subtests, one per concern, each on a store of its own: Blobs,
 //     ColdBlobs, BlobDeletion, ColdBlobDeletion, BlobTiersSeparate,
 //     Replicas, ReplicaTiersSeparate, Repos, Items, ItemCreate, ColonPaths,
@@ -84,5 +88,9 @@
 // adapters/inmem's TestUnitContract and in adapters/sql's TestAccContract
 // (SQLite in memory and in a file), and the metadata store's
 // TestUnitContract, TestAccContractFile, TestAccContractMemory and
-// TestAccContract (PostgreSQL) run it under the same subtest names.
+// TestAccContract (PostgreSQL) run it under the same subtest names. The
+// adapters run RunVersionNames in adapters/inmem's
+// TestUnitVersionNamesContract and adapters/sql's
+// TestAccVersionNamesContract (SQLite in memory and in a file, and
+// PostgreSQL).
 package storetest

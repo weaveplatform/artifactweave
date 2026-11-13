@@ -124,6 +124,9 @@ func (h handler) catalog(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
+	if h.answerHostedCatalog(w, r, query, start, limit) {
+		return
+	}
 	listed, checks, err := h.listed(r, query)
 	if err != nil {
 		h.k.Error(w, r, err)
@@ -237,6 +240,129 @@ func (h handler) listed(r *http.Request, query string) ([]entry, []release, erro
 		out = append(out, entry{name: name, description: m.Description, maintainer: m.Maintainer})
 	}
 	return out, checks, nil
+}
+
+// answerHostedCatalog answers the catalog of a local or federated
+// repository, when it is not a search, from hostedCatalog, and reports
+// whether it answered. The answer is the one catalog writes: such a
+// repository has no upstream to add to its page.
+func (h handler) answerHostedCatalog(
+	w http.ResponseWriter,
+	r *http.Request,
+	query string,
+	start, limit int,
+) bool {
+	c := pkgroute.RequestFrom(r).Repo.Class
+	if query != "" || c != repo.Local && c != repo.Federated {
+		return false
+	}
+	page, total, err := h.hostedCatalog(r, start, limit)
+	if err != nil {
+		h.k.Error(w, r, err)
+		return true
+	}
+	items := make([]map[string]any, 0, len(page))
+	for _, e := range page {
+		items = append(items, e.document(r))
+	}
+	writeJSON(w, r, 200, map[string]any{"total": total, "start": start, "items": items})
+	return true
+}
+
+// cookbook is a cookbook a hosted catalog lists: its package and the
+// highest version of it the caller may read.
+type cookbook struct {
+	id           int64
+	name, latest string
+}
+
+// hostedCatalog is the catalog listed gives a local or federated
+// repository, read a page at a time (#1404): the page at start of limit
+// cookbooks, and how many the catalog lists. A cookbook is listed when
+// hosted lists a version of it, which needs only the versions' names, so
+// every cookbook is counted from its names alone, within the bounds listed
+// keeps; a page's cookbook then reads only the highest of them, whose
+// description and maintainer the page lists, and checks it against its
+// archive as hosted does. A cookbook whose highest version was deleted
+// after the count is read whole (hosted), and one with no version left
+// leaves the page short. A search still reads every cookbook, whose
+// description and maintainer it searches.
+func (h handler) hostedCatalog(r *http.Request, start, limit int) ([]entry, int, error) {
+	names, err := h.names(r, false)
+	if err != nil {
+		return nil, 0, err
+	}
+	var listed []cookbook
+	for _, name := range names {
+		if !h.k.CanFolder(r, name, api.ActionRead) {
+			continue
+		}
+		c, ok, err := h.latest(r, name)
+		if err != nil {
+			return nil, 0, err
+		}
+		if ok {
+			listed = append(listed, c)
+		}
+	}
+	out := []entry{}
+	for _, c := range listed[min(start, len(listed)):min(start+limit, len(listed))] {
+		rel, ok, err := h.latestRelease(r, c)
+		if err != nil {
+			return nil, 0, err
+		}
+		if ok {
+			m := rel.meta.Manifest
+			out = append(
+				out,
+				entry{name: c.name, description: m.Description, maintainer: m.Maintainer},
+			)
+		}
+	}
+	return out, len(listed), nil
+}
+
+// latest returns cookbook name's highest version that hosted lists, from
+// the package index's version names alone; ok is false when it lists none.
+// An index of more versions than hosted reads fails as hosted fails.
+func (h handler) latest(r *http.Request, name string) (cookbook, bool, error) {
+	p, err := h.k.DB().Packages().Find(r.Context(), pkgroute.RequestFrom(r).Repo.Key, name)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return cookbook{}, false, nil
+	}
+	if err != nil {
+		return cookbook{}, false, fmt.Errorf("chef: find package: %w", err)
+	}
+	versions, err := h.k.DB().Packages().VersionNames(r.Context(), p.ID)
+	if err != nil {
+		return cookbook{}, false, fmt.Errorf("chef: package versions: %w", err)
+	}
+	if len(versions) > maxVersions {
+		return cookbook{}, false, apierror.New(503, "Chef releases exceed limit")
+	}
+	versions = slices.DeleteFunc(versions, func(v string) bool { return !h.listable(r, name, v) })
+	if len(versions) == 0 {
+		return cookbook{}, false, nil
+	}
+	return cookbook{id: p.ID, name: name, latest: slices.MinFunc(versions, newestFirst)}, true, nil
+}
+
+// latestRelease reads the release of c's highest version; ok is false when
+// the cookbook has no version left.
+func (h handler) latestRelease(r *http.Request, c cookbook) (release, bool, error) {
+	v, err := h.k.DB().Packages().Version(r.Context(), c.id, c.latest)
+	if errors.Is(err, kernel.ErrNotFound) {
+		found, err := h.hosted(r, c.name)
+		if err != nil || len(found) == 0 {
+			return release{}, false, err
+		}
+		return found[0], true, nil
+	}
+	if err != nil {
+		return release{}, false, fmt.Errorf("chef: package version: %w", err)
+	}
+	rel, err := h.stored(r, c.name, v)
+	return rel, err == nil, err
 }
 
 // matches reports whether an indexed cookbook answers query. 7.x looks

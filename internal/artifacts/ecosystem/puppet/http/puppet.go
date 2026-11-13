@@ -176,25 +176,49 @@ func (h handler) releases(w http.ResponseWriter, r *http.Request) {
 	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
 		return
 	}
-	releases, err := h.lookup(r, name, listing)
+	page, total, err := h.releasePage(r, name, offset, limit)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
-	if err = h.authority(r, releases); err != nil {
-		h.k.Error(w, r, err)
-		return
-	}
 	omit := excludedFields(query)
-	start, end := window(offset, limit, len(releases))
-	out := make([]trimmedRecord, 0, end-start)
-	for _, rel := range releases[start:end] {
+	out := make([]trimmedRecord, 0, len(page))
+	for _, rel := range page {
 		out = append(out, trimmedRecord{record(rel), omit})
 	}
 	writeJSON(w, r, http.StatusOK, struct {
 		Pagination listPage        `json:"pagination"`
 		Results    []trimmedRecord `json:"results"`
-	}{newListPage("/v3/releases", releaseFilter(query), limit, offset, len(releases)), out})
+	}{newListPage("/v3/releases", releaseFilter(query), limit, offset, total), out})
+}
+
+// releasePage returns the releases of module name on the page at offset of
+// limit of its release list, and how many the list holds. A local or
+// federated repository reads only its page's releases (hostedPage). A
+// remote or virtual repository still collects every release, as it must
+// to merge its upstream's pages or its members' lists, within maxVersions,
+// and checks the authority of each before it answers any.
+func (h handler) releasePage(
+	r *http.Request,
+	name string,
+	offset, limit int,
+) ([]release, int, error) {
+	switch pkgroute.RequestFrom(r).Repo.Class {
+	case repo.Local, repo.Federated:
+		if err := h.listingBlackout(r); err != nil {
+			return nil, 0, err
+		}
+		return h.hostedPage(r, name, offset, limit)
+	}
+	releases, err := h.lookup(r, name, listing)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err = h.authority(r, releases); err != nil {
+		return nil, 0, err
+	}
+	start, end := window(offset, limit, len(releases))
+	return releases[start:end], len(releases), nil
 }
 
 // releaseFilter returns the part of a one-module release list's links
@@ -307,18 +331,91 @@ func (h handler) release(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
-		rel, found, err := h.remoteRelease(r, name, version)
-		if err != nil {
-			h.k.Error(w, r, err)
-			return
-		}
-		if found {
-			writeJSON(w, r, 200, record(rel))
-			return
-		}
+	rel, found, err := h.upstreamRecord(r, name, version, listing)
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	if found {
+		writeJSON(w, r, 200, record(rel))
+		return
 	}
 	h.k.Error(w, r, apierror.New(404, "Puppet release not found"))
+}
+
+// upstreamRecord returns release version of module name from an upstream's
+// own record of it, v3/releases/<slug>, for a release the release pages
+// leave out, and false when no upstream holds it: a remote's upstream
+// (remoteRelease), or a virtual repository's remote members' upstreams, in
+// member order (virtualRecord). A hosted repository has no upstream.
+func (h handler) upstreamRecord(
+	r *http.Request,
+	name, version string,
+	u use,
+) (release, bool, error) {
+	switch pkgroute.RequestFrom(r).Repo.Class {
+	case repo.Remote:
+		return h.remoteRelease(r, name, version, u)
+	case repo.Virtual:
+		return h.virtualRecord(r, name, version, u)
+	default:
+		return release{}, false, nil
+	}
+}
+
+// virtualRecord asks a virtual repository's remote members, in member
+// order, for the upstream's record of a release every member's release
+// pages leave out, and returns the first that holds it, served through that
+// member (#1369). JFrog's Puppet repositories page says a virtual repository
+// aggregates its members for the Puppet client and r10k, and r10k reads
+// v3/releases/<slug> and then fetches the file_uri it names, so the virtual
+// repository answers both from the member that holds the record. That 7.x's
+// virtual repository asks its remote members so is [I]. A member is passed
+// over as the merge of the release pages passes it over (virtual): one the
+// caller may not read the module folder of, and one whose read answers 404,
+// as a blacked-out member's or one whose patterns reject the read does. To
+// serve the archive, a member whose own patterns reject the archive is
+// passed over too, as it is for a listed release (R5).
+func (h handler) virtualRecord(
+	r *http.Request,
+	name, version string,
+	u use,
+) (release, bool, error) {
+	path := puppetfmt.Path(name, version)
+	for _, key := range pkgroute.RequestFrom(r).Repo.Repositories {
+		member, err := h.k.DB().Repos().Get(r.Context(), key)
+		if errors.Is(err, kernel.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return release{}, false, fmt.Errorf("puppet: virtual member: %w", err)
+		}
+		if member.Class != repo.Remote ||
+			u == download && generic.CheckDownload(member, path, false) != nil {
+			continue
+		}
+		mr, err := h.k.MemberRequest(r, member)
+		if err != nil {
+			return release{}, false, err //nolint:wrapcheck // protocol class refusal
+		}
+		if !h.k.CanFolder(mr, name, api.ActionRead) {
+			continue
+		}
+		rel, found, err := h.remoteRelease(mr, name, version, u)
+		if err != nil {
+			var response *apierror.Error
+			if errors.Is(err, kernel.ErrNotFound) ||
+				errors.As(err, &response) && response.Status == http.StatusNotFound {
+				continue
+			}
+			return release{}, false, err
+		}
+		if found {
+			rel.member = mr
+			return rel, true, nil
+		}
+	}
+	return release{}, false, nil
 }
 
 func (h handler) module(w http.ResponseWriter, r *http.Request) {
@@ -333,6 +430,10 @@ func (h handler) module(w http.ResponseWriter, r *http.Request) {
 	releases, err := h.lookup(r, name, listing)
 	if err != nil {
 		h.k.Error(w, r, err)
+		return
+	}
+	if len(releases) == 0 && pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		h.unlistedModule(w, r, name)
 		return
 	}
 	if len(releases) == 0 {
@@ -367,9 +468,84 @@ func (h handler) moduleDetails(
 	u use,
 ) (moduleDetails, bool, error) {
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
-		return h.remoteModule(r, name, u)
+		read, found, err := h.remoteModule(r, name, u)
+		return read.details, found, err
 	}
 	return derivedModule(releases), true, nil
+}
+
+// unlistedModule answers v3/modules/<m> on a remote whose upstream's
+// release pages list no release of module name the caller may read, from
+// the upstream's own record of the module (#1370) [I]. RTFACT-19130
+// reports a 6.8.6 remote answering 404 for puppetlabs-sqlserver, a Puppet
+// Enterprise module the Forge's module record served, and names that 404
+// as the fault; the Forge's v3 API description says its module list holds
+// only the base group unless module_groups names others, "unless
+// requesting modules by their slugs". r10k reads this record for a
+// module's current release before it installs, so the record answers the
+// module. Its releases are the versions the record lists that the caller
+// may read (recordReleases), checked as a release page's are, and its
+// current release is the newest one's own record, v3/releases/<slug>
+// (remoteRelease); both are read under the release pages' authority, Read
+// on the module folder and the download policy at
+// .puppet/<m>/releases.json (DV-057). A record the upstream does not hold,
+// or that lists no release the caller may read, answers 404 as before; a
+// listed release whose own record the upstream does not hold is invalid
+// upstream metadata. The release list and the search still answer from the
+// release pages, as the Forge's own search leaves out a module of another
+// group (it found puppetlabs-sqlserver only with module_groups on
+// 2026-11-12).
+func (h handler) unlistedModule(w http.ResponseWriter, r *http.Request, name string) {
+	read, found, err := h.remoteModule(r, name, listing)
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	if !found {
+		h.k.Error(w, r, apierror.New(404, "Puppet module not found"))
+		return
+	}
+	versions, err := recordReleases(read.releases)
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	if read.checkPermission == nil {
+		h.k.Error(w, r, fmt.Errorf(
+			"puppet: missing authority: %w",
+			pkgroute.SourceError(source.ErrInvalidResult, false),
+		))
+		return
+	}
+	var releases []release
+	for _, v := range versions {
+		path := puppetfmt.Path(name, v)
+		if !h.k.Can(r, path, api.ActionRead) {
+			continue
+		}
+		if err = read.checkPermission(r.Context(), path); err != nil {
+			if errors.Is(err, source.ErrDenied) {
+				continue
+			}
+			h.k.Error(w, r, fmt.Errorf("puppet: authority: %w", pkgroute.SourceError(err, false)))
+			return
+		}
+		releases = append(releases, release{meta: puppetfmt.Metadata{Name: name, Version: v}})
+	}
+	if len(releases) == 0 {
+		h.k.Error(w, r, apierror.New(404, "Puppet module not found"))
+		return
+	}
+	current, found, err := h.remoteRelease(r, name, releases[0].meta.Version, listing)
+	if err == nil && !found {
+		err = invalidUpstream()
+	}
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	releases[0] = current
+	writeJSON(w, r, 200, newModuleRecord(releases, read.details))
 }
 
 // modules answers v3/modules: the whole-repository list when the query
@@ -485,27 +661,58 @@ func (h handler) archive(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
+	listed := false
 	for _, rel := range releases {
+		if rel.meta.Version != version {
+			continue
+		}
+		listed = true
 		// A version every member of a virtual repository refuses has no
 		// member left to serve it, and answers as one none holds (R5).
-		if rel.meta.Version == version && !rel.refused {
-			if err = h.authority(r, []release{rel}); err != nil {
-				h.k.Error(w, r, err)
-				return
-			}
-			if rel.remoteURL != "" {
-				h.remoteArchive(w, r, rel)
-				return
-			}
-			member := r
-			if rel.member != nil {
-				member = rel.member
-			}
-			h.k.ServeItem(w, member, path)
+		if !rel.refused {
+			h.serveArchive(w, r, rel, path)
+			return
+		}
+	}
+	// A release the pages leave out is served from the archive its
+	// upstream's record names, as v3/releases/<slug> answers that record
+	// (#1344): r10k reads the record and then fetches its file_uri, so a
+	// record whose archive answers 404 is one no client can install
+	// (#1369). The archive is checked against the record as a listed
+	// release's is against its page (remoteArchive). What 7.x answers here
+	// is [I]: RTFACT-19130 shows a remote answering the record of a release
+	// the Forge's lists leave out, not the archive request that follows.
+	if !listed {
+		rel, found, err := h.upstreamRecord(r, name, version, download)
+		if err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+		if found {
+			h.serveArchive(w, r, rel, path)
 			return
 		}
 	}
 	h.k.Error(w, r, apierror.New(404, "Puppet release not found"))
+}
+
+// serveArchive answers the archive at path of rel, once its authority
+// holds: from the upstream when rel is a remote's, and otherwise from the
+// stored item of the repository, or virtual member, that holds it.
+func (h handler) serveArchive(w http.ResponseWriter, r *http.Request, rel release, path string) {
+	if err := h.authority(r, []release{rel}); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	if rel.remoteURL != "" {
+		h.remoteArchive(w, r, rel)
+		return
+	}
+	member := r
+	if rel.member != nil {
+		member = rel.member
+	}
+	h.k.ServeItem(w, member, path)
 }
 
 func (h handler) authority(r *http.Request, releases []release) error {
@@ -561,13 +768,8 @@ func (h handler) lookup(r *http.Request, name string, u use) ([]release, error) 
 			}
 			return h.hosted(r, name)
 		}
-		// 7.x keeps a local repository's listings as documents
-		// (RTFACT-26143) at a path no source shows, so only the blackout
-		// refuses them, before anything is computed, naming the
-		// request's own path (R2a, R9); patterns never do. A member of a
-		// virtual repository is passed over instead (R5).
-		if err := h.k.CheckBlackedOut(r, q.Rest); err != nil {
-			return nil, fmt.Errorf("puppet: releases: %w", err)
+		if err := h.listingBlackout(r); err != nil {
+			return nil, err
 		}
 		return h.hosted(r, name)
 	case repo.Remote:
@@ -612,6 +814,83 @@ func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	}
 	sortReleases(out)
 	return out, nil
+}
+
+// listingBlackout refuses a local or federated repository's release list,
+// release or module record when the repository is blacked out. 7.x keeps a
+// local repository's listings as documents (RTFACT-26143) at a path no
+// source shows, so only the blackout refuses them, before anything is
+// computed, naming the request's own path (R2a, R9); patterns never do. A
+// member of a virtual repository is passed over instead (R5).
+func (h handler) listingBlackout(r *http.Request) error {
+	if err := h.k.CheckBlackedOut(r, pkgroute.RequestFrom(r).Rest); err != nil {
+		return fmt.Errorf("puppet: releases: %w", err)
+	}
+	return nil
+}
+
+// hostedPage returns the page at offset of limit of the release list hosted
+// gives module name, and how many releases that list holds, reading only
+// the page's releases (#1404). Read permission and the list's order need
+// only each version's name, so every version is counted and ordered by its
+// name alone; the page's releases are then read and checked against their
+// archives (stored), in the index's order, as hosted checks them, so that
+// a page holding two that fail answers the failure hosted would. A release
+// deleted between the count and the page leaves the page short, as the
+// whole-repository lists' pages are left.
+func (h handler) hostedPage(
+	r *http.Request,
+	name string,
+	offset, limit int,
+) ([]release, int, error) {
+	q := pkgroute.RequestFrom(r)
+	p, err := h.k.DB().Packages().Find(r.Context(), q.Repo.Key, name)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return nil, 0, nil
+	}
+	if err != nil {
+		return nil, 0, fmt.Errorf("puppet: find package: %w", err)
+	}
+	indexed, err := h.k.DB().Packages().VersionNames(r.Context(), p.ID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("puppet: package versions: %w", err)
+	}
+	if len(indexed) > maxVersions {
+		return nil, 0, apierror.New(503, "Puppet releases exceed limit")
+	}
+	// Read permission alone filters, as in hosted (R3).
+	indexed = slices.DeleteFunc(indexed, func(v string) bool {
+		return !h.k.Can(r, puppetfmt.Path(name, v), api.ActionRead)
+	})
+	listed := slices.SortedFunc(slices.Values(indexed), newestFirst)
+	start, end := window(offset, limit, len(listed))
+	onPage := make(map[string]bool, end-start)
+	for _, v := range listed[start:end] {
+		onPage[v] = true
+	}
+	found := make(map[string]release, end-start)
+	for _, version := range indexed {
+		if !onPage[version] {
+			continue
+		}
+		v, err := h.k.DB().Packages().Version(r.Context(), p.ID, version)
+		if errors.Is(err, kernel.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, 0, fmt.Errorf("puppet: package version: %w", err)
+		}
+		if found[version], err = h.stored(r, name, v); err != nil {
+			return nil, 0, err
+		}
+	}
+	out := make([]release, 0, len(found))
+	for _, v := range listed[start:end] {
+		if rel, ok := found[v]; ok {
+			out = append(out, rel)
+		}
+	}
+	return out, len(listed), nil
 }
 
 // stored returns the release of module name that the package index's

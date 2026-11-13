@@ -134,12 +134,19 @@ type metadataSource struct {
 	// moduleRevalidateError change a module record read's answer as
 	// metadataBase, readError, missingRevalidate, missingStream and
 	// revalidateError change a release page's.
-	moduleBase             string
-	moduleReadError        error
-	moduleNoRevalidate     bool
-	moduleNoStream         bool
-	moduleRevalidateError  error
-	metadataBase           string
+	moduleBase            string
+	moduleReadError       error
+	moduleNoRevalidate    bool
+	moduleNoStream        bool
+	moduleRevalidateError error
+	// moduleNoAuthority leaves a module record read without the source's
+	// check of a release it lists.
+	moduleNoAuthority bool
+	metadataBase      string
+	// pagesAtURL answers a release page from the address the remote asked
+	// for, as moduleRecord answers a module record, rather than from
+	// metadataBase, for remotes over more than one upstream.
+	pagesAtURL             bool
 	cachedItem             *artmodel.Item
 	skipMetadataValidation bool
 	redirect               *url.URL
@@ -218,7 +225,7 @@ func (s metadataSource) Read(
 			Revalidate: revalidate,
 		}, nil
 	}
-	if resource.Variant == "puppet-forge-v3-module-v1" {
+	if resource.Variant == "puppet-forge-v3-module-v2" {
 		return s.moduleRecord(r, resource)
 	}
 	if resource.Variant == "puppet-forge-v3-release-v1" {
@@ -255,6 +262,14 @@ func (s metadataSource) Read(
 	}
 	if s.metadataBase != "" {
 		result.Metadata.BaseURL = s.metadataBase
+	}
+	if s.pagesAtURL {
+		at, err := url.Parse(resource.ExternalURL)
+		if err != nil {
+			return source.Result{}, err
+		}
+		at.RawQuery = ""
+		result.Metadata.BaseURL = at.String()
 	}
 	if resource.ValidateMetadata != nil && !s.skipMetadataValidation {
 		if err := resource.ValidateMetadata(
@@ -305,7 +320,8 @@ func (s metadataSource) moduleRecord(
 		Stream: &source.Stream{
 			Body: io.NopCloser(strings.NewReader(body)), Status: 200, Size: int64(len(body)),
 		},
-		Metadata: source.MetadataResponse{BaseURL: at.String()},
+		Metadata:        source.MetadataResponse{BaseURL: at.String()},
+		CheckPermission: s.check,
 	}
 	if s.moduleBase != "" {
 		result.Metadata.BaseURL = s.moduleBase
@@ -315,6 +331,9 @@ func (s metadataSource) moduleRecord(
 	}
 	if s.moduleNoStream {
 		result.Stream = nil
+	}
+	if s.moduleNoAuthority {
+		result.CheckPermission = nil
 	}
 	if !s.skipMetadataValidation {
 		if err := resource.ValidateMetadata(
@@ -644,6 +663,7 @@ type faultStore struct {
 	pkgroute.Store
 	find     bool
 	versions bool
+	version  bool
 	items    bool
 	repos    bool
 	huge     bool
@@ -675,6 +695,29 @@ func (f faultPackages) Versions(ctx context.Context, id int64) ([]artmodel.Packa
 		return make([]artmodel.PackageVersion, 4097), nil
 	}
 	return f.PackageStore.Versions(ctx, id)
+}
+
+// VersionNames fails as Versions does: a list reads the names and a
+// record the versions.
+func (f faultPackages) VersionNames(ctx context.Context, id int64) ([]string, error) {
+	if f.f.versions {
+		return nil, context.Canceled
+	}
+	if f.f.huge {
+		return make([]string, 4097), nil
+	}
+	return f.PackageStore.VersionNames(ctx, id)
+}
+
+func (f faultPackages) Version(
+	ctx context.Context,
+	id int64,
+	version string,
+) (artmodel.PackageVersion, error) {
+	if f.f.version {
+		return artmodel.PackageVersion{}, context.Canceled
+	}
+	return f.PackageStore.Version(ctx, id, version)
 }
 
 type faultItems struct {
@@ -712,7 +755,7 @@ func TestAccStoreFailuresDoNotAdvertiseModules(t *testing.T) {
 		tune   func(*faultStore)
 		status int
 	}{
-		{"find", func(f *faultStore) { f.find = true }, 500}, {"versions", func(f *faultStore) { f.versions = true }, 500}, {"items", func(f *faultStore) { f.items = true }, 502}, {"oversized index", func(f *faultStore) { f.huge = true }, 503},
+		{"find", func(f *faultStore) { f.find = true }, 500}, {"versions", func(f *faultStore) { f.versions = true }, 500}, {"version", func(f *faultStore) { f.version = true }, 500}, {"items", func(f *faultStore) { f.items = true }, 502}, {"oversized index", func(f *faultStore) { f.huge = true }, 503},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var faults *faultStore

@@ -556,6 +556,7 @@ func TestAccVirtualPriorityAndPermissionFiltering(t *testing.T) {
 type faultStore struct {
 	pkgroute.Store
 	find, versions, items, repos, list, huge bool
+	version                                  bool
 }
 
 func (f *faultStore) Packages() port.PackageStore { return faultPackages{f.Store.Packages(), f} }
@@ -582,6 +583,29 @@ func (f faultPackages) Versions(ctx context.Context, id int64) ([]artmodel.Packa
 		return make([]artmodel.PackageVersion, 4097), nil
 	}
 	return f.PackageStore.Versions(ctx, id)
+}
+
+// VersionNames fails as Versions does: a catalog reads the names, and a
+// cookbook the versions.
+func (f faultPackages) VersionNames(ctx context.Context, id int64) ([]string, error) {
+	if f.f.versions {
+		return nil, context.Canceled
+	}
+	if f.f.huge {
+		return make([]string, 4097), nil
+	}
+	return f.PackageStore.VersionNames(ctx, id)
+}
+
+func (f faultPackages) Version(
+	ctx context.Context,
+	id int64,
+	version string,
+) (artmodel.PackageVersion, error) {
+	if f.f.version {
+		return artmodel.PackageVersion{}, context.Canceled
+	}
+	return f.PackageStore.Version(ctx, id, version)
 }
 
 func (f faultPackages) List(
@@ -636,6 +660,11 @@ func TestAccBrokenStoredIndexNeverAdvertisesCookbook(t *testing.T) {
 		{"items", func(f *faultStore) { f.items = true }, "/api/v1/cookbooks/widget", 502},
 		{"version limit", func(f *faultStore) { f.huge = true }, "/api/v1/cookbooks/widget", 503},
 		{"catalog", func(f *faultStore) { f.list = true }, "/api/v1/cookbooks", 500},
+		{"catalog find", func(f *faultStore) { f.find = true }, "/api/v1/cookbooks", 500},
+		{"catalog versions", func(f *faultStore) { f.versions = true }, "/api/v1/cookbooks", 500},
+		{"catalog version", func(f *faultStore) { f.version = true }, "/api/v1/cookbooks", 500},
+		{"catalog items", func(f *faultStore) { f.items = true }, "/api/v1/cookbooks", 502},
+		{"catalog version limit", func(f *faultStore) { f.huge = true }, "/api/v1/cookbooks", 503},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var faults *faultStore

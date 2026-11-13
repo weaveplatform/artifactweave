@@ -89,6 +89,16 @@
 //   - A hosted or virtual module lists at most 4,096 releases (503 beyond),
 //     and a remote accepts no more from its upstream. A whole-repository
 //     list reads at most 4,096 modules and 65,536 releases (503 beyond).
+//   - A local or federated repository's release lists, one module's and
+//     the whole-repository ones, count and order every release by its
+//     version alone and read only the releases of the page they answer,
+//     and the module list the releases of its page's modules (#1404). So
+//     only those are checked against their archives: a release whose index
+//     entry or archive no longer matches fails a page that holds it and no
+//     other, and one deleted after the count leaves the page short. A
+//     remote's or virtual repository's list still collects every release
+//     to merge its upstream's pages or its members' lists, within the
+//     bounds above.
 //   - The whole-repository lists are served by local and federated
 //     repositories. A virtual repository answers them 404 after the
 //     caller's read permission, as 7.x does (RTFACT-15072); a remote one
@@ -104,9 +114,14 @@
 //     value of another type as a hosted release would. A hosted or virtual
 //     module record takes its downloads, dates, owner and links from its
 //     releases [I]. A remote's relays those of the upstream's own record,
-//     v3/modules/<m>, asked without its current release and release list
-//     and read under the release pages' authority, and answers 404, and
-//     an empty search, when the upstream answers 404 for it (#1326) [I].
+//     v3/modules/<m>, asked without its current release and read under
+//     the release pages' authority, and answers 404, and an empty search,
+//     when the upstream answers 404 for it (#1326) [I]. A module whose
+//     release pages list no release the caller may read is answered from
+//     that record's own release list, leaving out the releases it marks
+//     deleted, with the newest one's own record as its current release
+//     (#1370) [I]; its release list and search still answer from the
+//     pages.
 //   - A remote builds each Forge query itself (module, limit, offset,
 //     sort_by and exclude_fields), never forwards a client's, module_groups
 //     included, never
@@ -134,8 +149,14 @@
 //     without the fields no record answers, and validated as a page's
 //     release is; the upstream's 404 for it, or a caller the source
 //     denies, answers "Puppet release not found" as before. A listed
-//     release never reads it, and the lists, the module record and the
-//     archive route still answer from the pages alone.
+//     release never reads it, and the lists and the search still answer
+//     from the pages alone. The archive route serves such a release's
+//     archive from the address the record names, read with the blackout
+//     alone as the pages are for an archive and checked against the
+//     record, and a virtual repository answers both the record and the
+//     archive from its first remote member, in member order, whose
+//     upstream's record holds the release, once every member's pages leave
+//     it out (#1369) [I].
 //   - A virtual repository resolves its members in order, leaving out a
 //     blacked-out member and, outside the search, a remote whose patterns
 //     reject its release pages. A version comes from the first member that holds it and whose
@@ -175,8 +196,10 @@
 //     https://github.com/weaveplatform/artifactweave/issues/1325,
 //     https://github.com/weaveplatform/artifactweave/issues/1326,
 //     https://github.com/weaveplatform/artifactweave/issues/1327,
-//     https://github.com/weaveplatform/artifactweave/issues/1343 and
-//     https://github.com/weaveplatform/artifactweave/issues/1344
+//     https://github.com/weaveplatform/artifactweave/issues/1343,
+//     https://github.com/weaveplatform/artifactweave/issues/1344,
+//     https://github.com/weaveplatform/artifactweave/issues/1369 and
+//     https://github.com/weaveplatform/artifactweave/issues/1370
 //
 // # Status
 //
@@ -195,6 +218,8 @@
 //     store failures.
 //   - paging_test.go: the one-module list's and the module search's pages,
 //     links, limits and refusals, and exclude_fields.
+//   - store_page_test.go: the local lists' pages read without reading the
+//     releases outside them, and the checks a page makes.
 //   - record_test.go: a hosted release's and module's exact records on
 //     every route that answers them, directly and through a virtual
 //     repository, and a remote's relayed fields and their defaults.
@@ -208,6 +233,14 @@
 //     leave out answered from the upstream's record, the query and
 //     authority of that read, the upstream's 404 and a denied caller, and
 //     the record's failures.
+//   - upstream_archive_test.go: the archive of a release only the
+//     upstream's record holds, through a remote and a virtual repository,
+//     the record read's authority, the archive checked against the record,
+//     member order and the members passed over, and the failures.
+//   - unlisted_module_test.go: a remote's module record for a module its
+//     release pages leave out, from the upstream's module record and the
+//     newest release's own record, read permission, the failures, and a
+//     listed module that never reads the record's release list.
 //   - groups_test.go: module_groups on one module's release list and the
 //     module search answering as without it on every repository class, a
 //     remote's upstream queries without it, and the refusals it leaves

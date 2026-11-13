@@ -570,8 +570,7 @@ func searchPage(total int, results ...string) string {
 
 // A Puppet remote's module record relays the module-wide fields of the
 // upstream's own record, v3/modules/<m>, asked without its current release
-// and release list, which the remote answers from its release pages
-// (#1326) [I]. When the upstream answers 404 for the record, the remote's
+// (#1370), and lists the releases its release pages give (#1326) [I]. When the upstream answers 404 for the record, the remote's
 // v3/modules/<m> answers 404 and its search finds nothing, while the
 // module's releases stay listed: RTFACT-19130 reports a 6.8.6 remote
 // answering 404 for a module the Forge served, a fault rather than an
@@ -637,7 +636,7 @@ func TestAccPuppetRemoteModuleRecordRelaysTheForge(t *testing.T) {
 			t.Fatal("the module record was not asked for")
 		}
 		for _, query := range up.moduleQueries {
-			if query != "exclude_fields=current_release+releases" {
+			if query != "exclude_fields=current_release" {
 				t.Fatalf("module record asked with %q", query)
 			}
 		}

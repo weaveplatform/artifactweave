@@ -22,13 +22,19 @@ import (
 // acme-widget in the base module group and acme-pe in pe_only, as
 // puppetlabs-sqlserver is (RTFACT-19130). Its release list holds only the
 // groups module_groups names, and only base when it names none, as its v3
-// API description says of the module list; that the release list does the
-// same is [I]. It serves either release's own record and archive, and
-// either module's record, whatever its group. It records every request's
-// path and query.
+// API description says of the module list. The public Forge's release list
+// did not filter so on 2026-11-12 (it listed puppetlabs-sqlserver's 37
+// releases without module_groups, and left out only its deleted one), so
+// this stands for an upstream whose release list leaves a module out. It
+// serves either release's own record and archive, and either module's
+// record, whatever its group, with the module's releases, as the public
+// Forge does whatever exclude_fields asks. It records every request's path
+// and query. files, when it holds a file, is served in place of that
+// archive.
 type groupedForge struct {
 	*httptest.Server
 	archives map[string][]byte
+	files    map[string][]byte
 	mu       sync.Mutex
 	asked    []string
 }
@@ -38,7 +44,7 @@ var forgeGroups = map[string]string{"acme-widget": "base", "acme-pe": "pe_only"}
 
 func newGroupedForge(t *testing.T) *groupedForge {
 	t.Helper()
-	f := &groupedForge{archives: map[string][]byte{}}
+	f := &groupedForge{archives: map[string][]byte{}, files: map[string][]byte{}}
 	for name := range forgeGroups {
 		f.archives[name+"-1.0.0"] = groupArchive(t, name, "1.0.0")
 	}
@@ -69,10 +75,22 @@ func newGroupedForge(t *testing.T) *groupedForge {
 			http.NotFound(w, r)
 			return
 		}
-		writeForgeJSON(w, map[string]any{"slug": name, "module_group": group})
+		slug := name + "-1.0.0"
+		writeForgeJSON(w, map[string]any{
+			"slug": name, "module_group": group,
+			"releases": []any{map[string]any{
+				"uri": "/v3/releases/" + slug, "slug": slug, "version": "1.0.0",
+				"supported": true, "created_at": "2019-03-26 11:15:38 -0700", "deleted_at": nil,
+				"file_uri": "/v3/files/" + slug + ".tar.gz", "file_size": len(f.archives[slug]),
+			}},
+		})
 	})
 	r.Get("/v3/files/{file}", func(w http.ResponseWriter, r *http.Request) {
-		data, ok := f.archives[strings.TrimSuffix(chi.URLParam(r, "file"), ".tar.gz")]
+		slug := strings.TrimSuffix(chi.URLParam(r, "file"), ".tar.gz")
+		data, ok := f.files[slug]
+		if !ok {
+			data, ok = f.archives[slug]
+		}
 		if !ok {
 			http.NotFound(w, r)
 			return

@@ -106,12 +106,20 @@ A hosted or virtual module takes its downloads (summed), dates (earliest and
 latest) and links (the current release's `project_page` and `issues_url`) from
 its releases [I]. A remote's module relays the downloads, dates, `supported`,
 `endorsement`, `module_group`, owner `gravatar_id` and links of its upstream's
-own record, `v3/modules/<m>`, asked with `exclude_fields=current_release
-releases`, and lists the releases its release pages give the caller. When the
+own record, `v3/modules/<m>`, asked with `exclude_fields=current_release`, and
+lists the releases its release pages give the caller. When the
 upstream answers 404 for that record, `v3/modules/<m>` answers 404 and the
 search finds nothing, while the release list still lists the module's releases
 (#1326) [I]. RTFACT-19130 reports a 6.8.6 remote answering 404 for a module the
-Forge served; that is the fault the report names, not an answer to keep.
+Forge served; that is the fault the report names, not an answer to keep. So
+when the release pages list no release of the module the caller may read, as
+the Forge's lists leave out a Puppet Enterprise module, the remote answers
+`v3/modules/<m>` from that record's own release list, leaving out the releases
+it marks deleted, with the newest release's own record, `v3/releases/<slug>`,
+as `current_release` (#1370) [I]. r10k reads this record for a module's current
+release before it installs it. The record is still read under the release
+pages' authority, and a record the upstream does not hold, or one listing no
+release the caller may read, still answers 404.
 
 The same report shows that remote answering
 `v3/releases/puppetlabs-sqlserver-2.5.0`, a release of a Puppet Enterprise
@@ -122,10 +130,15 @@ asked with the same `exclude_fields` as the pages (#1344) [I]. The record is
 read only after the pages lack the release, with their authority: Read on the
 module folder and the download policy at `.puppet/<m>/releases.json`. It is
 validated as a page's release is, and the upstream's 404 for it answers
-"Puppet release not found" as before. The release list, the search, the module
-record and the archive route still answer from the pages alone. Where 7.x
-caches the record, and whether its remote asks for it in this order, is [I]
-(#216).
+"Puppet release not found" as before. The archive route then serves such a
+release's archive from the address the record names, checked against the
+record as a listed release's archive is against its page, since r10k reads the
+record and then fetches its `file_uri` (#1369) [I]. A virtual repository
+answers both the release record and the archive from its first remote member,
+in member order, whose upstream's record holds the release, once every
+member's pages leave it out (#1369) [I]. The release list and the search still
+answer from the pages alone. Where 7.x caches the record, and whether its
+remote asks for it in this order, is [I] (#216).
 
 `GET .../v3/releases` and `GET .../v3/modules` with no query list every release
 and module a local or federated repository hosts that the caller may read, as
@@ -136,7 +149,12 @@ served as 100, as 7.x serves it, RTFACT-30529), from `offset`. Each answer
 carries the Forge's `pagination` object, `limit`, `offset`, `first`,
 `previous`, `current`, `next` and `total`, as JFrog's sample answer does;
 `puppet_forge`, which r10k and librarian-puppet use, reads it there. Modules
-are listed by name and releases by module name, newest first. A virtual
+are listed by name and releases by module name, newest first. These lists, and
+one module's release list on a local or federated repository, count and order
+their releases from the version names alone and read only the releases their
+page answers (#1404), so an index entry or archive that no longer matches fails
+only a page that holds it, and a release deleted between the count and the page
+leaves that page one short. A virtual
 repository answers both lists 404, as 7.x does
 ([RTFACT-15072](https://jfrog.atlassian.net/browse/RTFACT-15072)). A remote
 repository still answers them 400: JFrog support says a remote serves them, but
