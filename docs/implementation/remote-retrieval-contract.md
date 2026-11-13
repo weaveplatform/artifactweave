@@ -182,6 +182,7 @@ or authentication challenges as artifactweave credentials.
 | DNS/connect failure, broken body, invalid TLS, redirect violation | Transport error; only connectivity/timeouts trip assumed-offline, never security validation failures | 502; no security/integrity fallback |
 | Network/metadata deadline | Cancel request; discard incomplete candidate | 504; stale fallback only under R11 |
 | Unexpected 2xx, unsafe redirect or unsolicited 206 on full fetch | Not a full cacheable artifact; typed protocol error | 502 |
+| GET 200 or 304 whose stored or spooled copy fails to open or read while the format's check (`Validate`, `ValidateMetadata`, its inspection, or a 304's re-admission) reads it | The server's storage fault, not the upstream's: publish nothing, keep the prior entry, never trip assumed-offline ([#1269](https://github.com/weaveplatform/artifactweave/issues/1269)) | 500 "internal error" [I] where the check's refusal would answer a 502 with no fallback; a read that times out or ends short keeps its 504 or 502 and R11 fallback |
 
 For downstream HEAD, never publish an item from upstream HEAD alone. The transport sends one HEAD for an explicit HEAD request, and the caller closes
 the response without publishing incomplete content. `bypassHeadRequests` suppresses

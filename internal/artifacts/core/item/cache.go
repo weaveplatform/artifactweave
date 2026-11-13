@@ -132,7 +132,7 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 	actual := digestsOf(info)
 	var envInspection func(context.Context) (model.Item, error)
 	if u.Kind != model.RemoteMetadata || u.PublishMetadata {
-		env, err := s.inspected(ctx, d, actual, info.Size)
+		env, err := s.inspectedCopy(ctx, d, actual, info.Size)
 		if err != nil {
 			return out, err
 		}
@@ -242,13 +242,11 @@ func (s *Service) validateCachedBody(ctx context.Context, u CacheUpload, info bl
 	}
 	r, _, err := s.Blobs.Open(ctx, info.Digests.SHA256)
 	if err != nil {
-		return fmt.Errorf("cache validation body: %w", err)
+		err = fmt.Errorf("cache validation body: %w", err)
+		return MarkStorageFault(ctx, err, err)
 	}
 	defer r.Close()
-	if err = u.Validate(ctx, r, info.Size); err != nil {
-		return fmt.Errorf("cache validation: %w", err)
-	}
-	return nil
+	return checkCopy(ctx, u.Validate, r, info.Size)
 }
 
 // Match item publication's GC fence. A revived tombstone can mean collection
@@ -616,8 +614,8 @@ func (s *Service) cacheTransient(
 		if _, err = f.Seek(0, io.SeekStart); err != nil {
 			return out, fmt.Errorf("cache validation rewind: %w", err)
 		}
-		if err = u.Validate(ctx, f, n); err != nil {
-			return out, fmt.Errorf("cache validation: %w", err)
+		if err = checkCopy(ctx, u.Validate, f, n); err != nil {
+			return out, err
 		}
 	}
 	if u.CheckCurrent != nil {

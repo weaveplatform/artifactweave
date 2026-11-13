@@ -107,6 +107,11 @@
 //     protocol builds a virtual repository's merged document from the
 //     members MergeMembers returns, which leave out a member that is
 //     blacked out or would refuse the document's path.
+//   - SourceError answers a failed read of the server's own copy under
+//     check (format.ErrStorageFault) as the router's internal fault, 500
+//     "internal error", whatever the store's error wraps, never as the
+//     upstream's 502 or 504
+//     (https://github.com/weaveplatform/artifactweave/issues/1269).
 //
 // # References
 //
@@ -143,7 +148,8 @@
 // The package's own tests mount a test protocol over the in-memory store,
 // authorised by the access test kit: pkgroute_test.go, resolve_test.go,
 // folder_test.go, form_test.go, lifecycle_test.go, storeonce_test.go,
-// source_test.go, source_delivery_test.go, path_test.go,
+// source_test.go, source_storage_test.go, source_delivery_test.go,
+// path_test.go,
 // download_test.go, which covers the download policy at each helper, and
 // document_test.go, which covers CheckDocument and CheckBlackedOut, a
 // read's policy path and a remote member's refusal against a fake source

@@ -3,6 +3,7 @@ package format
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -446,3 +447,12 @@ func Rejectf(status int, format string, args ...any) *RejectionError {
 // or logged reads as the text the client is answered with. The HTTP layer
 // takes Status from the struct.
 func (r *RejectionError) Error() string { return r.Message }
+
+// ErrStorageFault marks a failed read of the server's own copy of a file
+// while a check reads it, such as a remote file the remote cache checks
+// with a format's Validate hook before it keeps or serves it. The fault is
+// the server's storage, not the content or the upstream that sent it, so
+// unlike a RejectionError or a hook's own refusal it answers as any other
+// server fault, 500 "internal error". The read's own error is wrapped with
+// it, for the log.
+var ErrStorageFault = errors.New("format: storage fault")

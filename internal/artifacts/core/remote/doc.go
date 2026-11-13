@@ -59,6 +59,13 @@
 //   - Cache aliases and explicit offline mode make no upstream call.
 //   - The sentinel texts, cache key terms and remote. log names stay
 //     byte-identical.
+//   - A failed open or read of the server's own copy while the cache
+//     checks it (item.StorageFault), the 304 re-admission's read of cached
+//     metadata included, is no upstream failure: PolicyError passes it on
+//     where its check's refusal would answer a 502 that serves no stale
+//     copy and that the assumed-offline circuit does not count, and
+//     otherwise maps that refusal as before
+//     (https://github.com/weaveplatform/artifactweave/issues/1269).
 //
 // # References
 //
@@ -87,7 +94,8 @@
 //     upstream (fakeupstream) and a pool from upstreamtest: policy_test.go
 //     holds the policy fixture, with policy_fault_test.go,
 //     policy_format_test.go, cache_maintenance_test.go,
-//     metadata_response_test.go and module_location_test.go; and
+//     metadata_response_test.go, module_location_test.go and
+//     storage_fault_test.go, a failed read of the cache's own copy; and
 //     discovery_test.go, discovery_contract_test.go, listing_test.go and
 //     listing_smart_test.go cover discovery and listings. helpers_test.go
 //     holds their small helpers, and export_test.go opens the policy's

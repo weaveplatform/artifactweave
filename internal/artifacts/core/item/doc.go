@@ -48,6 +48,11 @@
 //   - Errors the HTTP layer maps onto statuses: ErrChecksumMismatch,
 //     ErrBadChecksum, ErrNoBlob, ErrConflict, ErrCollected, ErrBadArchive,
 //     ErrOverwriteDenied with OverwriteDeniedError, and SidecarError.
+//   - StorageFault, with MarkStorageFault: a failed open or read of the
+//     server's own copy of a remote file while the cache checks it, with
+//     the format's Validate hook or its inspection. It is
+//     format.ErrStorageFault, a server fault, not the upstream's
+//     (https://github.com/weaveplatform/artifactweave/issues/1269).
 //
 // # Invariants
 //
@@ -94,9 +99,10 @@
 //     deploys, checksums and the format hooks around every write.
 //   - transfer*_test.go, archive_test.go and sidecar_test.go: copy and move,
 //     explode and checksum sidecars.
-//   - cache_test.go, cache_maintenance_test.go, smart_test.go and
-//     restore_test.go: the remote cache, its cleanup, smart remote
-//     properties, restore and zap. cache_restart_test.go's TestAcc tests run
+//   - cache_test.go, cache_check_test.go, cache_maintenance_test.go,
+//     smart_test.go and restore_test.go: the remote cache, a failed read
+//     of its copy under check, its cleanup, smart remote properties,
+//     restore and zap. cache_restart_test.go's TestAcc tests run
 //     the cleanup over SQLite across a restart and a concurrent download.
 //   - work_test.go: derived work and reindexes; fault_test.go,
 //     guard_test.go and the *_absent_test.go files: store failures, write
