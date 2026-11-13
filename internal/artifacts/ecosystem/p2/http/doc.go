@@ -39,25 +39,18 @@
 //   - TryP2Item: the overlay that serves a virtual repository's p2.index,
 //     composite metadata and member files, and a remote's composite
 //     metadata, external children and site archive entries, and answers
-//     404 for the paths P2 refuses, and 401 for every anonymous request to
-//     a virtual repository with forceP2Authentication on; a remote's own
-//     update-site files it leaves to the generic lookup.
+//     404 for the paths P2 refuses; a remote's own update-site files it
+//     leaves to the generic lookup.
 //
 // # Invariants
 //
-//   - An anonymous request to a P2 virtual repository with
-//     forceP2Authentication on answers 401 "Unauthorized" with the Basic
-//     challenge before any other answer and before any member is listed or
-//     read, whatever the anonymous user may read, as 7.x's
-//     force-authentication filter answers (OssForceAuthenticationFilter,
-//     7.161.26): the Eclipse client sends credentials only after a 401
-//     (RTFACT-29198). The flag is the one of the virtual repository the
-//     request names, which 7.x reads from the path, so a nested P2 virtual
-//     member read under <member key>/ is not asked [I]. A remote's stored
-//     flag changes no answer: JFrog offers Force Authentication on P2
-//     virtual repositories only, and 7.x's filter reads a virtual
-//     repository's alone. A signed-in caller, and every caller when the
-//     flag is off, get the answers below.
+//   - forceP2Authentication is not checked here. A request without
+//     credentials to a P2 virtual repository with the flag on never reaches
+//     the overlay: the item kit's ForceAuthentication answers it 401 before
+//     the router routes it, as 7.x's force-authentication filter does. A
+//     virtual repository's read of a member under <member key>/ goes to the
+//     kit's GetItem past that check, so a nested P2 virtual member's own
+//     flag does not apply [I].
 //   - External composite children are checked before they are served. A
 //     child location must be valid (p2.ValidChildLocation) and resolve,
 //     within p2.MaxChildURL bytes and without user information or a
@@ -176,10 +169,6 @@
 // stores (fixture_test.go, which keeps the names of the root fixtures the
 // tests used):
 //
-//   - force_test.go: forced authentication's 401 before any read of a
-//     virtual repository, and not for a remote, a signed-in caller or a
-//     nested virtual member read through a virtual repository whose flag
-//     is off.
 //   - p2_test.go: the kit's P2 source request on the published Eclipse
 //     GLSP files, the site.zip!/ suffix, and a virtual repository that
 //     fails closed when its member store fails and leaves out a

@@ -687,7 +687,7 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 | `virtualRetrievalCachePeriodSecs` | `7200` | Cache period for merged metadata; in YAML it is `virtualCacheConfig.virtualRetrievalCachePeriodSecs`. "The default is 7200 seconds" ([D] [virtual-repositories](https://docs.jfrog.com/artifactory/docs/virtual-repositories.md)). npm virtual repositories moved from 600 to 7200 in [SaaS 7.165.0](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71650-saas); the YAML sample still shows 600. |
 | `keyPair` | | Signing key for merged metadata. |
 | `pomRepositoryReferencesCleanupPolicy` | `discard_active_reference` | |
-| `forceMavenAuthentication`, `forceNugetAuthentication` | `false` | |
+| `forceMavenAuthentication`, `forceNugetAuthentication` | `false` | `forceMavenAuthentication` acts on a Maven virtual repository alone ([per-ecosystem summary](#per-ecosystem-summary)). |
 | `externalDependenciesEnabled`, `externalDependenciesPatterns`, `externalDependenciesRemoteRepo` | `false`, `[]`, `""` | npm, Go, Bower. |
 | `hideUnauthorizedResources` | `false` | |
 | `resolveDockerTagsByTimestamp` | `false` | |
@@ -837,7 +837,7 @@ virtualRepositories:
 | docker, oci, helmoci | `dockerApiVersion`, `maxUniqueTags`, `dockerTagRetention`, `blockPushingSchema1` | `enableTokenAuthentication`, `externalDependenciesEnabled`, `externalDependenciesPatterns`, `blockPushingSchema1`, `retrievalCachePeriodSecs` 21600, `dockerProjectId` | `resolveDockerTagsByTimestamp`, `dockerApiVersion` |
 | nimmodel | — | Default URL `https://api.ngc.nvidia.com` **[D]**, blank username and personal key password **[D]**, Bearer default **[I]**; remote only | — |
 | npm | `checksumPolicyType`, `handleReleases`, `handleSnapshots` (local and federated) | | `externalDependenciesEnabled`, `externalDependenciesPatterns`, `externalDependenciesRemoteRepo`, `virtualRetrievalCachePeriodSecs` |
-| maven, gradle, ivy, sbt | `handleReleases`, `handleSnapshots`, `snapshotVersionBehavior`, `checksumPolicyType`, `maxUniqueSnapshots`, `suppressPomConsistencyChecks` | same plus `remoteRepoChecksumPolicyType`, `fetchJarsEagerly`, `fetchSourcesEagerly`, `rejectInvalidJars`, `listRemoteFolderItems` | `pomRepositoryReferencesCleanupPolicy`, `keyPair`, `forceMavenAuthentication` |
+| maven, gradle, ivy, sbt | `handleReleases`, `handleSnapshots`, `snapshotVersionBehavior`, `checksumPolicyType`, `maxUniqueSnapshots`, `suppressPomConsistencyChecks` | same plus `remoteRepoChecksumPolicyType`, `fetchJarsEagerly`, `fetchSourcesEagerly`, `rejectInvalidJars`, `listRemoteFolderItems` | `pomRepositoryReferencesCleanupPolicy`, `keyPair`, `forceMavenAuthentication` (stored only on gradle, ivy and sbt) |
 | pypi | none: enforce layout, name normalisation, the JSON index and PEP 658 are global in 7.x ([research 28](28-pypi.md#12-repository-configuration-and-the-terraform-provider)) | `pyPIRegistryUrl`, `pyPIRepositorySuffix` | |
 | nuget | `forceNugetAuthentication`, `maxUniqueSnapshots` | `feedContextPath`, `downloadContextPath`, `v3FeedUrl`, `symbolServerUrl`, `forceNugetAuthentication` | `forceNugetAuthentication` |
 | go | | `vcsGitProvider`, `vcsGitDownloadUrl`, `missedRetrievalCachePeriodSecs` 600 | `externalDependenciesEnabled`, `externalDependenciesPatterns` |
@@ -882,6 +882,29 @@ both updated 2026-11-11), and 7.161.26's `OssForceAuthenticationFilter` reads
 key and its reads return it, but it changes no answer
 ([#1280](https://github.com/weaveplatform/artifactweave/issues/1280); the
 [P2 guide](../testing/p2.md#anonymous-access-and-force-authentication)).
+Maven's Force Authentication is the same switch on a Maven virtual repository. With it on,
+Artifactory "will request authentication parameters from the Maven client before trying to
+access this repository" ([D]
+[maven-repositories](https://docs.jfrog.com/artifactory/docs/maven-repositories#force-authentication-on-virtual-maven-repositories)),
+and the virtual repository settings for Maven, Gradle, Ivy and sbt say it "is relevant for
+Maven virtual repositories only" ([D]
+[virtual-repositories](https://docs.jfrog.com/artifactory/docs/virtual-repositories#additional-settings-for-mavengradleivysbt-virtual-repositories)).
+7.161.26's `OssForceAuthenticationFilter` applies both flags in one servlet filter, in the
+authentication chain, to every request under `/artifactory/<key>/` (not `api`, `ui` or
+`webapp`) that carries no credentials, whatever its method or query, when `<key>` names a
+virtual repository of type Maven with `forceMavenAuthentication` on or of type P2 with
+`forceP2Authentication` on. It answers 401 with `WWW-Authenticate: Basic realm="Artifactory
+Realm"` and `{"errors":[{"status":401,"message":"Unauthorized"}]}`, whether anonymous access
+is on or off; [J] [RTFACT-30189](https://jfrog.atlassian.net/browse/RTFACT-30189) shows that
+answer from 7.71.8. artifactweave applies it the same way, ahead of authentication and
+routing ([#1435](https://github.com/weaveplatform/artifactweave/issues/1435);
+`itemkit.ForceAuthentication`). Two points no source settles **[I]**: a Gradle, Ivy or SBT
+virtual repository stores `forceMavenAuthentication` with no effect, as the filter checks the
+Maven type alone and [J] [RTFACT-29829](https://jfrog.atlassian.net/browse/RTFACT-29829), a
+request for it on Gradle, was closed undone; and a forced virtual repository read through
+another virtual repository is not asked, as the filter reads the key from the request's path.
+The commercial build replaces the filter with `MavenForceAuthenticationFilter`, which is not
+public.
 
 ## Field sets of the reads
 

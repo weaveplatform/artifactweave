@@ -72,11 +72,14 @@
 //     space, the idempotent routes, the API recovery context and the xz
 //     request holder (xzRequests, so a request's xz readers are one holder
 //     of the dictionary budget); then, each
-//     only when configured, the ingress request limits, authentication, the
-//     API restrictions and the principal request limits; then the Helm
-//     partial reindex. The ingress limits count a request before anyone is
-//     authenticated and the principal limits charge the caller after
-//     (decision 0043).
+//     only when configured, the ingress request limits, the forced
+//     authentication of Maven and P2 virtual repositories
+//     (itemkit.ForceAuthentication), authentication, the API restrictions
+//     and the principal request limits; then the Helm partial reindex. The
+//     ingress limits count a request before anyone is authenticated and the
+//     principal limits charge the caller after (decision 0043). The forced
+//     authentication goes just before authentication, where 7.x's filter
+//     sits, so it answers the same whether anonymous access is on or off.
 //   - Hand-written routes are mounted before the generated strict servers,
 //     and the 501 stubs of hand-written operations last, so each
 //     hand-written route claims the pattern its spec derives instead of the
