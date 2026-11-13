@@ -23,7 +23,12 @@
 //   - MinIO, FakeGCS and Azurite, and RunMinIO, RunFakeGCS and RunAzurite
 //     for callers without a testing.T: one emulator container per caller,
 //     from an image pinned by digest, removed when the caller ends. MinIO
-//     is handed out only once it serves S3 requests, not merely HTTP.
+//     is handed out only once it serves S3 requests, not merely HTTP. Each
+//     image is pulled before its module starts, one pull per image at a
+//     time in the process. A pull that fails moves on to the image's second
+//     source, a registry serving the same digest (none yet for Azurite),
+//     and when every source fails the error names each registry's answer
+//     rather than the "No such image" testcontainers' own pull ends in.
 //
 // # References
 //
@@ -35,9 +40,14 @@
 //   - https://github.com/weaveplatform/artifactweave/issues/1307: MinIO
 //     answering CreateBucket with 503 XMinioServerNotInitialized after the
 //     module's liveness wait passed.
+//   - https://github.com/weaveplatform/artifactweave/issues/1448 and
+//     https://github.com/testcontainers/testcontainers-go/issues/3945: a
+//     pull whose failure the engine reports inside its 200 answer, which
+//     testcontainers-go does not decode.
 //
 // # Status
 //
 // Implemented P2 (the Linux engine gate), P2b (the emulators) and P7 (the
-// answer timeout). MinIO's readiness wait added by issue 1307.
+// answer timeout). MinIO's readiness wait added by issue 1307; the checked
+// image pull and the second sources by issue 1448.
 package containertest
