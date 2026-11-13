@@ -19,12 +19,13 @@ import (
 // on the persistent work queue, as format.KindReindex keyed by the
 // repository, or as format.KindReindexPath for Helm's partial reindex, and
 // answers 7.x's text once it is queued, since 7.x schedules them ("an
-// asynchronous reindexing of a local repository", KB 000005641). PyPI's
-// alone runs before it answers, unless asked not to. Until the format of an
-// operation's package type is a format.Reindexer the operation answers 501,
-// as the stub did, before anything else is checked. The reindex operations
-// of the other package types, which no format here serves, keep the
-// generated stub.
+// asynchronous reindexing of a local repository", KB 000005641). Conan's,
+// Conda's, CRAN's, opkg's and PyPI's, whose references call the calculation
+// synchronous by default, and Pub's run before they answer unless async is
+// true, and RubyGems' always does. Until the format of an operation's
+// package type is a format.Reindexer the operation answers 501, as the stub
+// did, before anything else is checked. The reindex operations of the other
+// package types, which no format here serves, keep the generated stub.
 
 // CalculateBowerIndex rebuilds the native Bower version index from manifests.
 func (s ArtifactoryAPI) CalculateBowerIndex(
@@ -36,13 +37,20 @@ func (s ArtifactoryAPI) CalculateBowerIndex(
 }
 
 // CalculateConanRepositoryMetadata rebuilds the index from completed
-// recipe/package revisions. Conan manifests are the commit markers.
+// recipe/package revisions, before it answers unless async is true: "The
+// calculation can be synchronous (the default) or asynchronous"
+// (calculateconanrepositorymetadata). Conan manifests are the commit
+// markers.
 func (s ArtifactoryAPI) CalculateConanRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateConanRepositoryMetadataRequestObject,
 ) (artgen.CalculateConanRepositoryMetadataResponseObject, error) {
-	msg, err := s.Reindex(ctx, repo.Conan, req.RepoKey, "", false)
-	return artgen.CalculateConanRepositoryMetadata200TextResponse(msg), err
+	async := req.Params.Async != nil && *req.Params.Async
+	msg, err := s.Reindex(ctx, repo.Conan, req.RepoKey, "", !async)
+	if err != nil {
+		return nil, err
+	}
+	return artgen.CalculateConanRepositoryMetadata200TextResponse(msg), nil
 }
 
 // CalculateCranRepositoryMetadata rebuilds the hosted PACKAGES indexes. The

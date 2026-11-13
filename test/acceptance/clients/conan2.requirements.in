@@ -1,0 +1,3 @@
+# Pins for conan2.requirements.txt. make deps-sync copies the pin from
+# CONAN2_VERSION in quality-gate.yml; run pip-lock.sh after a move.
+conan==2.34.0

@@ -610,7 +610,8 @@ of its own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `debianTrivialLayout` | | Debian, implemented in P9c ([#758](https://github.com/weaveplatform/artifactweave/issues/758)): the deprecated trivial layout takes no source packages, so a `.dsc` deploy answers 400, and no virtual repository may include the repository ([D] debian-repositories). |
 | `calculateYumMetadata`, `yumRootDepth` | | Accepted and persisted; RPM metadata behavior is planned in P29. |
 | `ddebSupported` | | Debian, implemented in P9c ([#758](https://github.com/weaveplatform/artifactweave/issues/758)): `.ddeb` debug packages are admitted and indexed only when it is true ("Enable indexing with debug symbols (.ddeb)", [D] debian-repositories). A key the clients send ("Keys known only from the Terraform provider"). |
-| `yumGroupFileNames`, `enableConanSupport`, `cargoAnonymousAccess`, `cargoInternalIndex` | | RPM, Conan and Cargo keys the clients send ("Keys known only from the Terraform provider"); accepted and persisted. |
+| `yumGroupFileNames`, `cargoAnonymousAccess`, `cargoInternalIndex` | | RPM and Cargo keys the clients send ("Keys known only from the Terraform provider"); accepted and persisted. |
+| `enableConanSupport` | | A legacy key the Conan provider resource sends. 7.x derives it from the package type, true for every Conan repository whatever was sent (`RepositoryConfigurationBase.setPackageTypeConfig`, 7.161.26), and its v1 read carries it ([J] RTFACT-16458, RTFACT-31100); its v2 serializer writes only the fields marked type-specific, which this flag is not, so the v2 read and the configurations list leave it out ([#1440](https://github.com/weaveplatform/artifactweave/issues/1440)). |
 | `terraformType` | | `MODULE` or `PROVIDER`. Local and federated repositories. No default: the provider's two resources always send it, and a repository without it serves neither Terraform registry ([decision 0040](decisions/0040-terraform.md#terraformtype)). |
 | `encryptStates` | `true` | `terraformbackend`: seals state files under the master key. Replication between instances needs it `false` (7.77, [D] terraform-opentofu-and-terraform-backend-repositories); a change applies to later writes ([decision 0041](decisions/0041-terraform-backend.md)). 7.x's v1 read sends it for other local types too ([J] RTFACT-31100). |
 | `forceNugetAuthentication`, `forceP2Authentication`, `forceConanAuthentication` | `false` | |
@@ -847,7 +848,7 @@ virtualRepositories:
 | cargo | `cargoAnonymousAccess`, `cargoInternalIndex` | `gitRegistryUrl`, `cargoAnonymousAccess`, `cargoInternalIndex` | |
 | rpm | `calculateYumMetadata`, `yumRootDepth`, `enableFileListsIndexing`, `yumGroupFileNames` | | |
 | debian | `debianTrivialLayout`, `optionalIndexCompressionFormats`, `ddebSupported` | | `debianDefaultArchitectures`, `optionalIndexCompressionFormats` |
-| conan | `forceConanAuthentication`, `enableConanSupport` | `forceConanAuthentication`, `enableConanSupport` | |
+| conan | `forceConanAuthentication`; `enableConanSupport` derived from the package type | `forceConanAuthentication`; `enableConanSupport` derived from the package type | |
 | p2 | | `forceP2Authentication`, stored only | `p2Urls`, `forceP2Authentication` |
 | cocoapods | | `podsSpecsRepoUrl` | |
 | hex | | `hexPublicKey` | |

@@ -13,15 +13,19 @@ URL = re.compile(r"https?://[^\s\"'\\]+")
 
 CLIENTS = "test/acceptance/clients/"
 
-# Every pip install of a Python client (#1439): a loop over PyPI and then TUNA's
-# mirror, each pass installing a whole hashed file. It builds no sdist, or
-# builds one only from hashed build requirements.
+# Every pip install of a Python client (#1439, #1455): a loop over PyPI and then
+# TUNA's mirror, each pass installing a whole hashed file. It builds no sdist, or
+# builds one only from hashed build requirements: a build constraint, or, with
+# --no-build-isolation, the ones an earlier hashed install put in the same venv.
 INDEXES = "https://pypi.org/simple https://pypi.tuna.tsinghua.edu.cn/simple"
 LOCKED_INSTALL = re.compile(
     r"for index in " + re.escape(INDEXES) + r"; do[\s\\]*"
     r"\S*pip\"? install --no-cache-dir (?:--root-user-action=ignore )?--require-hashes[\s\\]*"
-    r"(?:--only-binary=:all:|--build-constraint \S+)[\s\\]*"
+    r"(?:--only-binary=:all:|--build-constraint \S+|--no-build-isolation)[\s\\]*"
     r"--index-url \"\$index\" -r (\S+) && break")
+# A pip install that takes the build requirements of the venv it installs into,
+# and the hashed file it installs.
+NO_ISOLATION = re.compile(r"(\S*pip)\"? install [^\n]*--no-build-isolation[\s\\]*--index-url \S+ -r (\S+)")
 PIP = re.compile(r"\bpip\"? (?:install|download)\b")
 # One entry of a uv-written requirements file: the pin, then its hashes and
 # the comments naming what needs it.
@@ -222,6 +226,17 @@ class ReferenceTests(unittest.TestCase):
         sync.sync(self.root)
         self.assertEqual(["huggingface-hub==99.4.0", "hf-xet==99.5.0"],
                          re.findall(r"^[a-z].*$", self.read(CLIENTS + "huggingface.requirements.in"), re.MULTILINE))
+        self.assertEqual([], sync.sync(self.root, check=True))
+
+    def test_conan_lock_inputs_follow_the_workflow_pins(self):
+        # As the Hugging Face pins do (#1455).
+        self.set_pin("conan2", "99.6.0")
+        self.set_pin("conan1", "99.7.0")
+        sync.sync(self.root)
+        self.assertEqual(["conan==99.6.0"],
+                         re.findall(r"^[a-z].*$", self.read(CLIENTS + "conan2.requirements.in"), re.MULTILINE))
+        self.assertEqual(["conan==99.7.0"],
+                         re.findall(r"^[a-z].*$", self.read(CLIENTS + "conan1.requirements.in"), re.MULTILINE))
         self.assertEqual([], sync.sync(self.root, check=True))
 
     def test_python_client_pins_come_from_the_lock_inputs(self):
@@ -438,7 +453,8 @@ class PythonLockTests(unittest.TestCase):
 
     def test_every_lock_pins_its_inputs_and_hashes_every_entry(self):
         self.assertEqual([CLIENTS + name for name in [
-            "ansible.build-requirements.in", "ansible.requirements.in", "frogml/requirements.in", "huggingface.requirements.in",
+            "ansible.build-requirements.in", "ansible.requirements.in", "conan1.build-requirements.in",
+            "conan1.requirements.in", "conan2.requirements.in", "frogml/requirements.in", "huggingface.requirements.in",
             "poetry.requirements.in", "python.requirements.in"]],
             sorted(str(p.relative_to(sync.ROOT)) for p in (sync.ROOT / CLIENTS).rglob("*requirements.in")))
         self.assertEqual([], lock_problems(sync.ROOT))
@@ -465,6 +481,7 @@ class PythonLockTests(unittest.TestCase):
         workflow = (sync.ROOT / ".github/workflows/quality-gate.yml").read_text()
         step = re.search(r"\n      - name: Hugging Face Hub and Xet clients \(pinned\)\n.*?(?=\n      - name: )",
                          workflow, re.DOTALL)[0]
+        conan = re.search(r"\n      - name: Pinned Conan clients\n.*?(?=\n      - name: )", workflow, re.DOTALL)[0]
         sites = {
             CLIENTS + "python.Dockerfile": (
                 (sync.ROOT / CLIENTS / "python.Dockerfile").read_text(),
@@ -474,6 +491,8 @@ class PythonLockTests(unittest.TestCase):
             CLIENTS + "frogml/Dockerfile": (
                 (sync.ROOT / CLIENTS / "frogml/Dockerfile").read_text(), ["/tmp/frogml.requirements.txt"]),
             "the Hugging Face step": (step, [CLIENTS + "huggingface.requirements.txt"]),
+            "the Conan step": (conan, [CLIENTS + "conan2.requirements.txt", CLIENTS + "conan1.build-requirements.txt",
+                                       CLIENTS + "conan1.requirements.txt"]),
         }
         for site, (text, locks) in sites.items():
             with self.subTest(site=site):
@@ -482,6 +501,14 @@ class PythonLockTests(unittest.TestCase):
         # bash -e carries on past a for loop whose last command failed in an
         # && list, so the step has to stop on the loop's status itself.
         self.assertIn("\n          done || exit 1\n", step)
+        self.assertEqual(3, conan.count("\n          done || exit 1\n"))
+        # pip installs nothing for a build without isolation, so an unhashed
+        # setuptools could only come from a venv no hashed file filled first.
+        self.assertEqual([("\"$RUNNER_TEMP/conan1/bin/pip", CLIENTS + "conan1.requirements.txt")],
+                         NO_ISOLATION.findall(conan))
+        build = conan.index("-r " + CLIENTS + "conan1.build-requirements.txt")
+        self.assertLess(build, conan.index("-r " + CLIENTS + "conan1.requirements.txt"))
+        self.assertIn("\"$RUNNER_TEMP/conan1/bin/pip\" install", conan[conan.rindex("for index", 0, build):build])
 
 
 if __name__ == "__main__":

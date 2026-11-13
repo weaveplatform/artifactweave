@@ -4,14 +4,15 @@
 # in a .in file; pass --upgrade to move the dependencies to their newest
 # releases as well, which without it stay where the .txt file has them.
 #
-# The images and the Hugging Face workflow step install these files with
-# --require-hashes, first from PyPI and then from a second index, so the second
-# index can only serve the bytes PyPI holds (#1321, #1439). uv writes the hash
-# of every file PyPI holds for each pinned version, so one file serves the
-# amd64 runners and an arm64 laptop alike. Each file is resolved for Linux,
-# the only OS the clients run on, and for the Python that installs it: the
-# image's base for the images, and for the workflow step the runner's own
-# python3, which is 3.14 on ubuntu-26.04.
+# The images and the Hugging Face and Conan workflow steps install these files
+# with --require-hashes, first from PyPI and then from a second index, so the
+# second index can only serve the bytes PyPI holds (#1321, #1439, #1455). uv
+# writes the hash of every file PyPI holds for each pinned version, so one file
+# serves the amd64 runners and an arm64 laptop alike. Each file is resolved for
+# Linux, the only OS the clients run on, and for the Python that installs it:
+# the image's base for the images; the runner's own python3, which is 3.14 on
+# ubuntu-26.04, for the Hugging Face step; and setup-python's 3.12 for the
+# Conan step.
 set -eu
 cd "$(dirname "$0")"
 
@@ -39,3 +40,6 @@ lock ansible.requirements.in "$(python_of ansible.Dockerfile)" "$@"
 lock ansible.build-requirements.in "$(python_of ansible.Dockerfile)" "$@"
 lock frogml/requirements.in "$(python_of frogml/Dockerfile)" "$@"
 lock huggingface.requirements.in 3.14 "$@"
+lock conan2.requirements.in 3.12 "$@"
+lock conan1.requirements.in 3.12 "$@"
+lock conan1.build-requirements.in 3.12 "$@"
