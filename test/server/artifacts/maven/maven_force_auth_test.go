@@ -1,6 +1,7 @@
 package maven_test
 
 import (
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -115,7 +116,9 @@ const forcedJar = "/artifactory/mvn-forced/org/a/1.0/a-1.0.jar"
 // answers, as does the package API route over the forced repository. The
 // anonymous user's Basic credentials and a Bearer token that does not
 // verify count as none on the forced repository, as in 7.x's filter while
-// anonymous access is on.
+// anonymous access is on; the credentials that filter passes on to
+// authentication keep their answers
+// (TestAccMavenForceAuthenticationPassesOtherCredentialsOn).
 //
 // Only the flag of the Maven virtual repository a request names counts. The
 // forced repository read through an unforced one serves anonymous, as 7.x's
@@ -211,6 +214,55 @@ func TestAccMavenForceAuthenticationOnAVirtual(t *testing.T) {
 		rec := w.do(http.MethodGet, open, "", "", "Authorization", value)
 		wantAnswer(t, "unforced, "+value, rec, http.StatusUnauthorized, badCredentials)
 	}
+	// A Basic value that does not decode to a user name, as Commons Codec
+	// decodes it, counts as none too: the filter classes it as Basic and
+	// reads a blank user name (RequestUtils.getBasicAuthorization and
+	// getUsernameOrPasswordFromToken).
+	wantForced(t, http.MethodGet, forcedJar+" as Basic !!!",
+		w.do(http.MethodGet, forcedJar, "", "", "Authorization", "Basic !!!"))
+}
+
+// badCredentialsBody is the whole body of authentication's 401 for
+// credentials that do not verify.
+const badCredentialsBody = `{"errors":[{"message":"Bad credentials","status":401}]}` + "\n"
+
+// TestAccMavenForceAuthenticationPassesOtherCredentialsOn: with anonymous
+// access on, the credentials 7.x's force-authentication filter passes on to
+// authentication keep the answers they get without the flag: "Basic Og=="
+// and a lowercase "basic" of the anonymous user, which the filter does not
+// class as Basic (RequestUtils.getBasicAuthorization, 7.161.26); an
+// unpadded Basic value naming another user, which the filter decodes and
+// net/http does not; an empty Authorization header, which the filter counts
+// as present (AuthenticationFilterUtils.isAuthHeaderPresent); and an
+// X-Api-Key header (getApiKeyTokenKeyValue). Authentication answers the
+// first three 401 "Bad credentials", as on main, and serves the last two as
+// the anonymous user. The world is fresh, so no earlier failed login
+// suspends the anonymous user name (#1435).
+func TestAccMavenForceAuthenticationPassesOtherCredentialsOn(t *testing.T) {
+	w := forcedMavenWorld(t, true)
+	for _, tc := range []struct {
+		header, value string
+		code          int
+		body          string
+	}{
+		{"Authorization", "Basic Og==", http.StatusUnauthorized, badCredentialsBody},
+		{
+			"Authorization", "basic " + base64.StdEncoding.EncodeToString([]byte("anonymous:x")),
+			http.StatusUnauthorized, badCredentialsBody,
+		},
+		{
+			"Authorization", "Basic " + base64.RawStdEncoding.EncodeToString([]byte("admin:wrong")),
+			http.StatusUnauthorized, badCredentialsBody,
+		},
+		{"Authorization", "", http.StatusOK, "jar"},
+		{"X-Api-Key", "key", http.StatusOK, "jar"},
+	} {
+		rec := w.do(http.MethodGet, forcedJar, "", "", tc.header, tc.value)
+		if rec.Code != tc.code || rec.Body.String() != tc.body {
+			t.Errorf("%s %q: %d %q, want %d %q",
+				tc.header, tc.value, rec.Code, rec.Body, tc.code, tc.body)
+		}
+	}
 }
 
 // TestAccMavenForceAuthenticationWithAnonymousAccessOff: with anonymous
@@ -218,8 +270,9 @@ func TestAccMavenForceAuthenticationOnAVirtual(t *testing.T) {
 // repository gets the filter's 401 "Unauthorized", where every other path
 // keeps "Authentication is required", as 7.x's filter answers before its
 // anonymous fallback refuses the request (AccessFilter.doFilterInternal,
-// 7.161.26). Signed-in callers, and the anonymous user's Basic credentials,
-// which the authentication refuses, keep their answers (#1435).
+// 7.161.26). Signed-in callers, the anonymous user's Basic credentials,
+// which the authentication refuses, and an empty Authorization header keep
+// their answers (#1435).
 func TestAccMavenForceAuthenticationWithAnonymousAccessOff(t *testing.T) {
 	w := forcedMavenWorld(t, false)
 	for _, tc := range []struct{ method, path string }{
@@ -243,6 +296,13 @@ func TestAccMavenForceAuthenticationWithAnonymousAccessOff(t *testing.T) {
 	wantAnswer(t, "admin GET", w.do(http.MethodGet, forcedJar, "admin", ""), http.StatusOK, "jar")
 	// With anonymous access off, the anonymous user's Basic credentials are
 	// credentials like any other, which the authentication answers.
+	// An empty Authorization header is a credential to 7.x's filter
+	// (AuthenticationFilterUtils.isAuthHeaderPresent), which authentication
+	// answers as it answers no credentials.
+	rec := w.do(http.MethodGet, forcedJar, "", "", "Authorization", "")
+	if rec.Code != http.StatusUnauthorized || rec.Body.String() != required {
+		t.Errorf("an empty Authorization header: %d %q, want 401 %q", rec.Code, rec.Body, required)
+	}
 	anonymousBasic := basic("anonymous", "")["Authorization"]
 	wantAnswer(t, "the anonymous user's Basic credentials",
 		w.do(http.MethodGet, forcedJar, "", "", "Authorization", anonymousBasic),
