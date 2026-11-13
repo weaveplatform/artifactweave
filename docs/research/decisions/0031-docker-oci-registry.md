@@ -218,11 +218,13 @@ its status alone.
   `HEAD` since RTFACT-29977's fix (amended 2026-11-12, #1317, #1336). Neither capture shows
   `X-Artifactory-Docker-Registry` on a blob, so a blob does not send it. The item route on the
   same file keeps its `filename*` part, as 7.55.8 sent it on a Maven download. `If-None-Match`
-  takes that SHA-1 bare, quoted, weak or in a list, as on the item route. A local blob's
-  `HEAD` answers `If-None-Match` and `If-Modified-Since` with 304, as 6.20's download does,
-  and ignores `If-Match` and `If-Unmodified-Since`, which that download does not evaluate on
-  a `HEAD` **[I]**. A remote repository's blob, on its first fetch and from the cache,
-  carries the same `ETag`, checksums and file headers.
+  takes that SHA-1 bare, quoted, weak or in a list, as on the item route. A blob's `GET` and
+  `HEAD`, local or remote, answer `If-None-Match` and `If-Modified-Since` with 304, as 6.20's
+  download does, and ignore `If-Match` and `If-Unmodified-Since`, which that download does
+  not evaluate (6.20's `DownloadServiceImpl.isNotModified`;
+  [RTFACT-17259](https://jfrog.atlassian.net/browse/RTFACT-17259), deferred), so neither
+  answers 412 **[I]** (amended 2026-11-13, #1314, #1437). A remote repository's blob, on its
+  first fetch and from the cache, carries the same `ETag`, checksums and file headers.
 - **`Range`.** A blob `GET` answers `Range` with 200 and the whole blob, still with
   `Accept-Ranges: bytes`, and `If-Range` changes nothing: 7.71.4 answered a blob `GET` with
   `Range: bytes=0-250` so ([RTFACT-30157](https://jfrog.atlassian.net/browse/RTFACT-30157),
@@ -380,7 +382,14 @@ its status alone.
   ([RTFACT-23106](https://jfrog.atlassian.net/browse/RTFACT-23106)) and 7.33.12 a `HEAD`
   ([RTFACT-27199](https://jfrog.atlassian.net/browse/RTFACT-27199)), and conditional requests
   take it as a blob's do (amended 2026-11-12, #1317). A remote repository's manifest keeps
-  its digest as `ETag`, since no capture shows a remote one's **[I]**.
+  its digest as `ETag`, since no capture shows a remote one's **[I]**. A manifest, local,
+  redirected or remote, `GET` or `HEAD`, answers conditional requests as a blob does: 304 for
+  `If-None-Match` and `If-Modified-Since`, and `If-Match` and `If-Unmodified-Since` ignored,
+  never 412. 7.19.4 answered a local manifest `GET` with `If-Modified-Since` with 304, and
+  JFrog fixed a remote and a virtual one to do the same
+  ([RTFACT-26059](https://jfrog.atlassian.net/browse/RTFACT-26059)), as its file download
+  answers; no capture shows a manifest's answer to `If-Match` or `If-Unmodified-Since`
+  **[I]** (amended 2026-11-13, #1437).
   `X-Artifactory-Docker-Registry` names the repository that holds the manifest, by its
   stored key, which `jf docker push` and `pull` read (R23 6). A manifest also sends the
   headers of a file download, as 7.33.12 answered a local manifest `HEAD` (RTFACT-27199)

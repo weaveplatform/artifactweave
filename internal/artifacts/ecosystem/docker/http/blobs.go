@@ -51,9 +51,9 @@ func (g *Registry) registerBlobs() {
 // signed URL when the repository's download redirect says so (decision
 // 0029). A HEAD gets the headers the GET sends, ETag and X-Checksum-* among
 // them, as 7.x sends them since RTFACT-29977, and is never redirected. Both
-// answer with the whole blob whatever Range asks for (wholeRequest), and
-// name it as the Docker API does (setFileHeaders): the download keeps a
-// Content-Disposition already set.
+// answer with the whole blob whatever Range asks for, and ignore If-Match
+// and If-Unmodified-Since (pullRequest), and name it as the Docker API does
+// (setFileHeaders): the download keeps a Content-Disposition already set.
 func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
 	if err := q.Require(r, q.Name+"/", api.ActionRead); err != nil {
 		Write(w, err)
@@ -81,28 +81,7 @@ func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
 	}
 	w.Header().Set(contentDigestHeader, "sha256:"+hex)
 	setFileHeaders(w.Header(), it.Name)
-	r = wholeRequest(r)
-	if r.Method == http.MethodHead {
-		r = headRequest(r)
-	}
-	g.serveBlob(w, r, q.Repo, it)
-}
-
-// headRequest is r without the preconditions Artifactory's download leaves
-// unevaluated on a HEAD, so that a blob HEAD answers only If-None-Match and
-// If-Modified-Since with 304, as 6.20's download does
-// (DownloadServiceImpl.isNotModified), and otherwise 200 with the whole
-// length. The download evaluates neither If-Match nor If-Unmodified-Since
-// (RTFACT-17259; #1314 for the GET). Without this, a HEAD with a stale
-// If-Match would answer 412, where the HEAD answered 200 before it went
-// through the download. Range has already gone (wholeRequest).
-func headRequest(r *http.Request) *http.Request {
-	out := r.WithContext(r.Context())
-	out.Header = r.Header.Clone()
-	for _, k := range []string{"If-Match", "If-Unmodified-Since"} {
-		out.Header.Del(k)
-	}
-	return out
+	g.serveBlob(w, pullRequest(r), q.Repo, it)
 }
 
 // findBlob finds the copy of the blob hex that a pull of q's image serves:
