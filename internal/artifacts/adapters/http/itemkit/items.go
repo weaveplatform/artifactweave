@@ -674,10 +674,27 @@ func (s *Kit) serveFile(
 		h.Set("Content-Disposition", blob.Disposition(it.Name))
 	}
 	if it.Actual.SHA1 != "" {
-		// Quoted for ServeContent's comparisons; the client receives it
-		// bare, as 7.x sends it (bareETagWriter).
+		// Quoted for ServeContent's If-Range; the client receives it bare,
+		// as 7.x sends it (bareETagWriter).
 		h.Set("ETag", `"`+it.Actual.SHA1+`"`)
 		w = &bareETagWriter{ResponseWriter: w, sha1: it.Actual.SHA1}
+	}
+	// 7.x decides a download's 304 before it serves the file or redirects
+	// (DownloadServiceImpl.respond and isNotModified, 7.161.26), from one
+	// If-None-Match line at a time or else If-Modified-Since, which differs
+	// from http.ServeContent's reading of "*", of a list of tags on one
+	// line and of a second line (fileNotModified). So this decides, on the
+	// request as it was sent, and ServeContent and the redirect never see
+	// either header.
+	if fileNotModified(r, it.Actual, it.Modified) {
+		if !it.Modified.IsZero() {
+			h.Set("Last-Modified", it.Modified.UTC().Format(http.TimeFormat))
+		}
+		pkgroute.WriteNotModified(w)
+		return
+	}
+	r = withoutHeaders(r, "If-None-Match", "If-Modified-Since")
+	if it.Actual.SHA1 != "" {
 		r = quoteETag(r, it.Actual.SHA1)
 	}
 	if s.redirect(w, r, st, f, p) {
@@ -691,7 +708,9 @@ func (s *Kit) serveFile(
 		return
 	}
 	defer func() { _ = content.Close() }()
-	sw := &StatusWriter{ResponseWriter: w}
+	// A range that does not overlap answers 416 as 7.x's does: Content-Range
+	// alone, without the file's headers or http.Error's text.
+	sw := &StatusWriter{ResponseWriter: &pkgroute.RangeRefusalWriter{ResponseWriter: w}}
 	http.ServeContent(sw, r, it.Name, it.Modified, content)
 	if sw.Complete(r) {
 		s.recordCacheUse(ctx, f)

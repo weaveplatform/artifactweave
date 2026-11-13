@@ -4,7 +4,6 @@ import (
 	"io"
 	"net/http"
 	"path"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -173,53 +172,16 @@ func (w *checksumBodyWriter) Write(p []byte) (int, error) {
 
 // fileNotModified reports whether r's If-None-Match or If-Modified-Since
 // finds the file whose checksums are sums, and which last changed at
-// modified, unchanged, as 7.x's DownloadServiceImpl.isNotModified and
-// isNonMatch decide it (7.161.26). An If-None-Match decides alone: it
-// matches when one of its header lines, less a W/ prefix and its quotes,
-// is the file's SHA-1, so neither "*" nor a list of tags on one line
-// matches (ArtifactoryRequestBase.isNoneMatch and parseETagValue). A
-// request whose first X-Artifactory-If-None-Match-MD5 line is true, as
-// Commons Lang's BooleanUtils.toBoolean reads it, may name the MD5
-// instead (isSha1AndMd5NotMatch). Otherwise an If-Modified-Since matches
-// when the file has not changed since, to the second (isNewerThan).
+// modified, unchanged, as 7.x's DownloadServiceImpl.isNotModified decides
+// it for the file and for its checksum files alike
+// (pkgroute.FileNotModified): one If-None-Match line at a time, less a W/
+// prefix and its quotes, equal to the SHA-1, or to the MD5 when the
+// request asks with X-Artifactory-If-None-Match-MD5.
 func fileNotModified(r *http.Request, sums kernel.Checksums, modified time.Time) bool {
-	if tags := r.Header.Values("If-None-Match"); len(tags) > 0 {
-		md5 := ""
-		if flags := r.Header.Values("X-Artifactory-If-None-Match-MD5"); len(flags) > 0 &&
-			slices.Contains([]string{"true", "on", "yes", "y", "t"}, strings.ToLower(flags[0])) {
-			md5 = sums.MD5
-		}
-		for _, tag := range tags {
-			tag = strings.TrimSpace(tag)
-			if strings.HasPrefix(tag, "W/") {
-				tag = strings.ReplaceAll(tag, "W/", "")
-			}
-			tag = strings.ReplaceAll(tag, `"`, "")
-			if (sums.SHA1 != "" && tag == sums.SHA1) || (md5 != "" && tag == md5) {
-				return true
-			}
-		}
-		return false
-	}
-	since, err := http.ParseTime(r.Header.Get("If-Modified-Since"))
-	return err == nil && !modified.IsZero() && !modified.Truncate(time.Second).After(since)
+	return pkgroute.FileNotModified(r, []string{sums.SHA1}, sums.MD5, modified)
 }
 
-// withoutHeaders is r without the headers names, or r itself when it
-// carries none of them. The copy leaves the caller's request as it was
-// sent.
+// withoutHeaders is r without the headers names (pkgroute.WithoutHeaders).
 func withoutHeaders(r *http.Request, names ...string) *http.Request {
-	present := false
-	for _, k := range names {
-		present = present || len(r.Header.Values(k)) > 0
-	}
-	if !present {
-		return r
-	}
-	out := r.WithContext(r.Context())
-	out.Header = r.Header.Clone()
-	for _, k := range names {
-		out.Header.Del(k)
-	}
-	return out
+	return pkgroute.WithoutHeaders(r, names...)
 }

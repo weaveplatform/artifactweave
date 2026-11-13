@@ -266,6 +266,23 @@ func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error
 		h.Set("Content-Length", strconv.FormatInt(s.Size, 10))
 	}
 	SetChecksums(h, s.Checksums)
+	if s.Status == http.StatusOK && s.Checksums.SHA1 != "" {
+		// A stream with a SHA-1 is a file: the upstream's file, or a cached
+		// copy of it, which 7.x answers through its download as it answers
+		// a local file, so its conditional answer and its 416 are that
+		// download's (FileNotModified, RangeRefusalWriter). The ETag this
+		// response sends matches too: a client sends back the one it was
+		// given. A document a protocol builds per request carries no SHA-1
+		// and keeps http.ServeContent's answers, which no 7.x source shows
+		// for those routes [I].
+		tags := []string{s.Checksums.SHA1, ETagValue(s.ETag)}
+		if FileNotModified(r, tags, s.Checksums.MD5, s.Modified) {
+			WriteNotModified(w)
+			return nil
+		}
+		r = WithoutHeaders(r, "If-None-Match", "If-Modified-Since")
+		w = &RangeRefusalWriter{ResponseWriter: w}
+	}
 	// Validated temporary files and raw cached metadata are seekable. ServeContent
 	// evaluates downstream conditions and ranges against that complete response.
 	if seeker, ok := s.Body.(io.ReadSeeker); ok && s.Status == http.StatusOK {
