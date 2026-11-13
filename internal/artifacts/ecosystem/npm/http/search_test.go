@@ -196,9 +196,10 @@ func TestAccSearchHidesUnreadable(t *testing.T) {
 }
 
 // A store that fails, or a version document the index cannot decode, is
-// a fault: 500, and the cause goes to the access log.
+// a fault: 500, and the cause goes to the access log. The search reads the
+// packages and their versions in one call of the store, SearchNpm.
 func TestAccSearchFaults(t *testing.T) {
-	for _, failing := range []string{"list", "find", "versions"} {
+	for _, failing := range []string{"list", "versions"} {
 		f := newFixture(t, func(st pkgroute.Store) pkgroute.Store {
 			return listFailing{failingStore{Store: st, failing: failing}}
 		})
@@ -236,12 +237,15 @@ func TestAccSearchFaults(t *testing.T) {
 		http.StatusNotImplemented)
 }
 
-// listFailing is failingStore whose package listing fails too when it is
-// told to fail "list".
+// listFailing is failingStore whose search of the index fails too when it
+// is told to fail "list" or "versions", both of which it reads.
 type listFailing struct{ failingStore }
 
 func (s listFailing) Packages() port.PackageStore {
-	return listFailingPackages{PackageStore: s.failingStore.Packages(), fail: s.failing == "list"}
+	return listFailingPackages{
+		PackageStore: s.failingStore.Packages(),
+		fail:         s.failing == "list" || s.failing == "versions",
+	}
 }
 
 type listFailingPackages struct {
@@ -249,11 +253,11 @@ type listFailingPackages struct {
 	fail bool
 }
 
-func (p listFailingPackages) List(
-	ctx context.Context, key string, pg kernel.Page,
-) ([]model.Package, string, error) {
+func (p listFailingPackages) SearchNpm(
+	ctx context.Context, q port.NpmSearch, pg kernel.Page,
+) ([]port.SearchCandidate, string, error) {
 	if p.fail {
 		return nil, "", errBroken
 	}
-	return p.PackageStore.List(ctx, key, pg) //nolint:wrapcheck // a test's pass-through
+	return p.PackageStore.SearchNpm(ctx, q, pg) //nolint:wrapcheck // a test's pass-through
 }
