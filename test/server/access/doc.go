@@ -51,6 +51,9 @@
 //     subjects.
 //   - api_restrictions_test.go: restriction, recovery, validation and the
 //     project quota.
+//   - username_case_test.go: user names in any case on every route that
+//     takes one (#1432), and an unknown group or member in a user or legacy
+//     group request (#1433), on the in-memory, SQLite and PostgreSQL stores.
 //
 // # References
 //

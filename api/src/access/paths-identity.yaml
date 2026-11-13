@@ -2701,7 +2701,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Validation failed: missing username or email, password absent while internal_password_disabled
-            is false, a group that does not exist, or a password rejected by the password policy.'
+            is false, a group that does not exist ("Group ''<name>'' does not exist", on every store), or a password
+            rejected by the password policy.'
         '401':
           content:
             application/json:
@@ -2951,7 +2952,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: A group in the add list does not exist.
+          description: A group in the add list does not exist; the message is "Group '<name>' does not exist", on every
+            store.
         '401':
           content:
             application/json:

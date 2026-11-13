@@ -194,38 +194,23 @@ func only(grants map[string]accessapi.Actions, names []string) map[string]access
 	return out
 }
 
-// FoldUsers returns, sorted, the stored names of the users that names
-// match without regard to case, as the Access listing's user filter matches
-// them (getpermissions). The store keeps names as given, so a filter for
-// "dev" also matches a user "Dev" beside "dev". ErrNotFound names the first
-// that matches no user.
+// FoldUsers returns, sorted and without repeats, the stored names of the
+// users that names name in any case, as the Access listing's user filter
+// matches them (getpermissions). The stores hold only folded names
+// (model.FoldUsername), so each name's folded spelling is looked up
+// exactly. ErrNotFound names the first that matches no user, as the request
+// spelled it.
 func (s Service) FoldUsers(ctx context.Context, names []string) ([]string, error) {
-	if len(names) == 0 {
-		return nil, nil
-	}
-	matched := make([]bool, len(names))
 	var out []string
-	page := kernel.Page{Limit: listPage}
-	for {
-		us, next, err := s.Store.Users().List(ctx, page)
+	for _, n := range names {
+		u, err := s.Store.Users().Get(ctx, model.FoldUsername(n))
+		if errors.Is(err, kernel.ErrNotFound) {
+			return nil, fmt.Errorf("%w: User '%s' does not exist", ErrNotFound, n)
+		}
 		if err != nil {
-			return nil, fmt.Errorf("permission: list users: %w", err)
+			return nil, fmt.Errorf("permission: user %s: %w", n, err)
 		}
-		for _, u := range us {
-			for i, n := range names {
-				if strings.EqualFold(u.Name, n) {
-					matched[i] = true
-					out = append(out, u.Name)
-				}
-			}
-		}
-		if next == "" {
-			break
-		}
-		page.After = next
-	}
-	if i := slices.Index(matched, false); i >= 0 {
-		return nil, fmt.Errorf("%w: User '%s' does not exist", ErrNotFound, names[i])
+		out = append(out, u.Name)
 	}
 	slices.Sort(out)
 	return slices.Compact(out), nil
@@ -233,8 +218,9 @@ func (s Service) FoldUsers(ctx context.Context, names []string) ([]string, error
 
 // Granting returns the permissions granting any action to one of users or
 // one of groups, ordered by name, and the principals that matched. With
-// inherited, a user's groups count as well. ErrNotFound names the first
-// user or group that does not exist.
+// inherited, a user's groups count as well. A user name matches in any
+// case, and the principals carry its stored name; a group name matches
+// exactly. ErrNotFound names the first user or group that does not exist.
 func (s Service) Granting(
 	ctx context.Context,
 	users, groups []string,
@@ -253,7 +239,7 @@ func (s Service) Granting(
 		return nil
 	}
 	for _, name := range users {
-		u, err := s.Store.Users().Get(ctx, name)
+		u, err := s.Store.Users().Get(ctx, model.FoldUsername(name))
 		if errors.Is(err, kernel.ErrNotFound) {
 			return nil, Principals{}, fmt.Errorf("%w: User '%s' does not exist", ErrNotFound, name)
 		}
@@ -264,10 +250,10 @@ func (s Service) Granting(
 		if inherited {
 			gs = u.Groups
 		}
-		if err := collect(name, gs); err != nil {
+		if err := collect(u.Name, gs); err != nil {
 			return nil, Principals{}, err
 		}
-		pr.Users = append(pr.Users, name)
+		pr.Users = append(pr.Users, u.Name)
 		pr.Groups = append(pr.Groups, gs...)
 	}
 	for _, name := range groups {
@@ -281,6 +267,8 @@ func (s Service) Granting(
 		}
 		pr.Groups = append(pr.Groups, name)
 	}
+	slices.Sort(pr.Users)
+	pr.Users = slices.Compact(pr.Users)
 	slices.Sort(pr.Groups)
 	pr.Groups = slices.Compact(pr.Groups)
 	out := slices.Collect(maps.Values(byName))
@@ -288,11 +276,13 @@ func (s Service) Granting(
 	return out, pr, nil
 }
 
-// Create stores a new permission; ErrConflict when the name is taken.
+// Create stores a new permission; ErrConflict when the name is taken. Its
+// user grants are stored under folded names (model.Permission.FoldGrants).
 func (s Service) Create(ctx context.Context, p model.Permission) error {
 	if err := s.Validate(ctx, p); err != nil {
 		return err
 	}
+	p = p.FoldGrants()
 	return s.tx(ctx, func(ctx context.Context) error {
 		if _, err := s.Store.Permissions().Get(ctx, p.Name); err == nil {
 			return fmt.Errorf("%w: Permission '%s' already exists", ErrConflict, p.Name)
@@ -348,6 +338,10 @@ func CheckManagerEdit(
 	for _, rt := range sections {
 		was, inOld := old.Resources[rt]
 		now, inNew := p.Resources[rt]
+		// The stored grants are folded and so is m's own name, so p's must be
+		// too: otherwise a holder could spell its own entry BOB and pass it
+		// off as another user's.
+		now = now.FoldGrants()
 		if inOld != inNew || !sameTargets(was.Targets, now.Targets) {
 			return fmt.Errorf("%w: A user with Manage permission can only edit the actions",
 				ErrForbidden)
@@ -455,12 +449,15 @@ func (s Service) MergeResource(
 			return model.Permission{}, fmt.Errorf("%w: Permission '%s' has no %s resource",
 				ErrNotFound, name, rt)
 		}
+		// Folded first, so a patch's BOB replaces the stored bob as the
+		// same principal rather than joining it.
+		over := patch.FoldGrants()
 		merged = model.Resource{
 			Actions: model.Grants{
-				Users:  mergeMap(cur.Actions.Users, patch.Actions.Users),
-				Groups: mergeMap(cur.Actions.Groups, patch.Actions.Groups),
+				Users:  mergeMap(cur.Actions.Users, over.Actions.Users),
+				Groups: mergeMap(cur.Actions.Groups, over.Actions.Groups),
 			},
-			Targets: mergeMap(cur.Targets, patch.Targets),
+			Targets: mergeMap(cur.Targets, over.Targets),
 		}
 		p := old
 		p.Resources = maps.Clone(old.Resources)
@@ -538,6 +535,7 @@ func (s Service) write(
 		if err := s.Validate(ctx, p); err != nil {
 			return err
 		}
+		p = p.FoldGrants()
 		now := s.now()
 		p.Updated = now
 		if exists {
@@ -552,7 +550,10 @@ func (s Service) write(
 
 // Validate checks a permission against the rules every API shares: a valid
 // name, known resource types, targets that exist and are not virtual,
-// patterns within length, and principals that exist.
+// patterns within length, and principals that exist. A user grant's name
+// matches its user in any case; an unknown one is named as the document
+// spells it. The writes fold the user grants after Validate, for that
+// message.
 func (s Service) Validate(ctx context.Context, p model.Permission) error {
 	if err := ValidName(p.Name); err != nil {
 		return err
@@ -574,9 +575,11 @@ func (s Service) Validate(ctx context.Context, p model.Permission) error {
 		}
 	}
 	for _, u := range slices.Sorted(maps.Keys(users)) {
-		if _, err := s.Store.Users().Get(ctx, u); errors.Is(err, kernel.ErrNotFound) {
+		_, err := s.Store.Users().Get(ctx, model.FoldUsername(u))
+		switch {
+		case errors.Is(err, kernel.ErrNotFound):
 			return invalidf("User '%s' does not exist", u)
-		} else if err != nil {
+		case err != nil:
 			return fmt.Errorf("permission: user %s: %w", u, err)
 		}
 	}

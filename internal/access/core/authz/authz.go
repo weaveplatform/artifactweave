@@ -56,7 +56,9 @@ type Decider struct {
 	scope  *kernel.Scope
 	// user and groups are the identities the subject's grants are read
 	// for, after a token scope narrowed them: user is empty when the scope
-	// does not act as the user, and groups are those it acts through.
+	// does not act as the user, and groups are those it acts through. user
+	// and self are folded (model.FoldUsername), as the user keys of every
+	// stored grant are, so a transient user's mixed-case name matches them.
 	user   string
 	groups []string
 	// self and member are who the subject is, whatever a token scope
@@ -80,7 +82,7 @@ func New(ctx context.Context, src Sources, s accessapi.Subject) (*Decider, error
 		hasAppliedPermissions: sc.hasAppliedPermissions,
 		scope:                 s.Scope,
 		rules:                 map[accessapi.ResourceType][]rule{},
-		self:                  s.Name,
+		self:                  model.FoldUsername(s.Name),
 		member:                slices.Clone(s.Groups),
 	}
 	if sc.hasArtifactFilter {
@@ -96,7 +98,7 @@ func New(ctx context.Context, src Sources, s accessapi.Subject) (*Decider, error
 	d.groups = groups
 	user := ""
 	if sc.canUseUserGrants {
-		user = s.Name
+		user = model.FoldUsername(s.Name)
 	}
 	viaGroup, err := groupAdmin(ctx, src.Groups, groups)
 	if err != nil {

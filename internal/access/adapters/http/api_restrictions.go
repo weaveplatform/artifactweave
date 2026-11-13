@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
@@ -95,27 +96,34 @@ func (s *Server) CheckAPIRestriction(
 	}
 }
 
+// restrictionCaller checks an administrator manages user's restriction, and
+// returns the administrator and the user's stored name. A restriction is
+// stored under that name and the authenticator reads it under the folded
+// name (authn.CheckAPIRestriction), so the path may spell the user in any
+// case.
 func (s SecurityAPI) restrictionCaller(
 	ctx context.Context,
 	user string,
-) (kernel.Principal, error) {
+) (kernel.Principal, string, error) {
 	p, err := kernel.RequireAdmin(ctx)
 	if err != nil {
-		return p, fmt.Errorf("API restriction administrator: %w", err)
+		return p, "", fmt.Errorf("API restriction administrator: %w", err)
 	}
 	if s.deps.Store == nil {
-		return p, apierror.New(
+		return p, "", apierror.New(
 			http.StatusServiceUnavailable,
 			"API restriction storage is unavailable",
 		)
 	}
+	user = model.FoldUsername(user)
 	if user == "anonymous" || user == "" {
-		return p, httpkit.BadRequestf("A managed user name is required")
+		return p, "", httpkit.BadRequestf("A managed user name is required")
 	}
-	if _, err := s.deps.Store.Users().Get(ctx, user); err != nil {
-		return p, restrictionStoreError(err)
+	u, err := s.deps.Store.Users().Get(ctx, user)
+	if err != nil {
+		return p, "", restrictionStoreError(err)
 	}
-	return p, nil
+	return p, u.Name, nil
 }
 
 func restrictionStoreError(err error) error {
@@ -157,12 +165,13 @@ func (s SecurityAPI) GetAPIRestriction(
 	ctx context.Context,
 	req artgen.GetAPIRestrictionRequestObject,
 ) (artgen.GetAPIRestrictionResponseObject, error) {
-	if _, err := s.restrictionCaller(ctx, req.UserName); err != nil {
+	_, user, err := s.restrictionCaller(ctx, req.UserName)
+	if err != nil {
 		return nil, err
 	}
-	r, err := s.deps.Store.APIRestrictions().Get(ctx, req.UserName)
+	r, err := s.deps.Store.APIRestrictions().Get(ctx, user)
 	if errors.Is(err, kernel.ErrNotFound) {
-		r, err = port.APIRestriction{User: req.UserName}, nil
+		r, err = port.APIRestriction{User: user}, nil
 	}
 	if err != nil {
 		return nil, restrictionStoreError(err)
@@ -177,7 +186,7 @@ func (s SecurityAPI) SetAPIRestriction(
 	ctx context.Context,
 	req artgen.SetAPIRestrictionRequestObject,
 ) (artgen.SetAPIRestrictionResponseObject, error) {
-	p, err := s.restrictionCaller(ctx, req.UserName)
+	p, user, err := s.restrictionCaller(ctx, req.UserName)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +200,7 @@ func (s SecurityAPI) SetAPIRestriction(
 		)
 	}
 	r, err := s.deps.Store.APIRestrictions().Put(ctx, port.APIRestriction{
-		User: req.UserName, Actor: p.Name,
+		User: user, Actor: p.Name,
 		Reason: strings.TrimSpace(req.Body.Reason), Until: req.Body.Until, Changed: now,
 	})
 	if err != nil {
@@ -207,12 +216,12 @@ func (s SecurityAPI) ClearAPIRestriction(
 	ctx context.Context,
 	req artgen.ClearAPIRestrictionRequestObject,
 ) (artgen.ClearAPIRestrictionResponseObject, error) {
-	p, err := s.restrictionCaller(ctx, req.UserName)
+	p, user, err := s.restrictionCaller(ctx, req.UserName)
 	if err != nil {
 		return nil, err
 	}
 	_, err = s.deps.Store.APIRestrictions().Put(ctx, port.APIRestriction{
-		User: req.UserName, Actor: p.Name,
+		User: user, Actor: p.Name,
 		Reason: "Restriction cleared", Changed: time.Now().UTC(),
 	})
 	if err != nil {
@@ -238,7 +247,8 @@ func (s SecurityAPI) GetAPIRestrictionAudit(
 			"API restriction storage is unavailable",
 		)
 	}
-	user := httpkit.Deref(req.Params.User)
+	// Folded, as restrictions are stored: the filter names a user.
+	user := model.FoldUsername(httpkit.Deref(req.Params.User))
 	limit := 100
 	if req.Params.Limit != nil {
 		limit = *req.Params.Limit

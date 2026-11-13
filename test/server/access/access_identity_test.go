@@ -893,12 +893,12 @@ func TestAccGroupNamesMatchExactly(t *testing.T) {
 			http.StatusOK,
 			`{"permissions":[{"name":"ops-perm","uri":"https://reg.example/access/api/v2/permissions/ops-perm"}]}`,
 		},
-		// The 400's message is the in-memory store's own error text; the SQL
-		// stores word it differently.
+		// The identity service words the 400, the same on every store
+		// (#1433).
 		{
 			http.MethodPatch, "/access/api/v2/users/user/groups", `{"add":["OPS"]}`,
 			http.StatusBadRequest,
-			`{"errors":[{"code":"BAD_REQUEST","message":"group OPS: store: not found"}]}`,
+			`{"errors":[{"code":"BAD_REQUEST","message":"Group 'OPS' does not exist"}]}`,
 		},
 		{
 			http.MethodPatch, v2Groups + "/OPS/members", `{"add":["user"]}`, http.StatusNotFound,

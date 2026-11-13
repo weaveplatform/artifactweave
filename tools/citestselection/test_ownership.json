@@ -176,7 +176,8 @@
       "roles_test.go",
       "security_test.go",
       "token_auth_test.go",
-      "tokens_test.go"
+      "tokens_test.go",
+      "username_case_test.go"
     ],
     "test/server/artifacts": [
       "aql_actions_test.go",

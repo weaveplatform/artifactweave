@@ -20,14 +20,14 @@ import (
 
 // CreateGroup creates g with members, as PutGroup does for a new name, and
 // answers ErrExists when the name is taken instead of replacing the group.
-// An unknown member is kernel.ErrNotFound, which Access v2 documents as 404;
-// the legacy PutGroup answers it 400.
+// Member names are folded. An unknown member is kernel.ErrNotFound, which
+// Access v2 documents as 404; the legacy PutGroup answers it 400.
 func (s *Service) CreateGroup(ctx context.Context, g model.Group, members []string) error {
 	if err := validName("group", g.Name); err != nil {
 		return err
 	}
 	next := g
-	next.Realm, next.Members = model.RealmInternal, sortedUnique(members)
+	next.Realm, next.Members = model.RealmInternal, sortedUnique(model.FoldUsernames(members))
 	err := s.Store.Groups().Create(ctx, next)
 	if errors.Is(err, kernel.ErrConflict) {
 		return fmt.Errorf("%w: group %q", ErrExists, g.Name)
@@ -43,8 +43,8 @@ func (s *Service) CreateGroup(ctx context.Context, g model.Group, members []stri
 // fills the defaults) and members replaces the membership even when empty.
 // What the request cannot carry survives: the realm and realm attributes,
 // which the page says a replacement keeps, and the platform auditor flag,
-// which no group request sets. An unknown member is kernel.ErrNotFound,
-// which Access v2 documents as 404.
+// which no group request sets. Member names are folded. An unknown member
+// is kernel.ErrNotFound, which Access v2 documents as 404.
 func (s *Service) ReplaceGroup(ctx context.Context, g model.Group, members []string) (bool, error) {
 	if err := validName("group", g.Name); err != nil {
 		return false, err
@@ -54,7 +54,7 @@ func (s *Service) ReplaceGroup(ctx context.Context, g model.Group, members []str
 		groups := s.Store.Groups()
 		old, err := groups.Get(ctx, g.Name)
 		next := g
-		next.Members = sortedUnique(members)
+		next.Members = sortedUnique(model.FoldUsernames(members))
 		switch {
 		case errors.Is(err, kernel.ErrNotFound):
 			created = true
@@ -72,7 +72,7 @@ func (s *Service) ReplaceGroup(ctx context.Context, g model.Group, members []str
 
 // UpdateUserGroups applies add, then remove, to the user's memberships and
 // returns the resulting groups. A name in both lists ends up removed; an
-// unknown group in add is ErrInvalid.
+// unknown group in add is ErrInvalid, worded by requireGroups.
 func (s *Service) UpdateUserGroups(
 	ctx context.Context,
 	name string,
@@ -80,15 +80,18 @@ func (s *Service) UpdateUserGroups(
 ) ([]string, error) {
 	var groups []string
 	err := s.tx(ctx, func(ctx context.Context) error {
-		u, err := s.Store.Users().Get(ctx, name)
+		u, err := s.Store.Users().Get(ctx, model.FoldUsername(name))
 		if err != nil {
 			return err //nolint:wrapcheck // ErrNotFound is the handler's 404
 		}
 		next := sortedUnique(append(slices.Clone(u.Groups), add...))
 		next = slices.DeleteFunc(next, func(g string) bool { return slices.Contains(remove, g) })
-		u.Groups = next
-		if err := groupsError(s.Store.Users().Update(ctx, u)); err != nil {
+		if err := s.requireGroups(ctx, next); err != nil {
 			return err
+		}
+		u.Groups = next
+		if err := s.Store.Users().Update(ctx, u); err != nil {
+			return err //nolint:wrapcheck // a store error
 		}
 		groups = next
 		return nil
@@ -97,13 +100,14 @@ func (s *Service) UpdateUserGroups(
 }
 
 // UpdateGroupMembers applies add, then remove, to the group's members and
-// returns the resulting member list. Unknown users in add are
-// kernel.ErrNotFound, which Access v2 answers 404.
+// returns the resulting member list. Both lists' names are folded. Unknown
+// users in add are kernel.ErrNotFound, which Access v2 answers 404.
 func (s *Service) UpdateGroupMembers(
 	ctx context.Context,
 	name string,
 	add, remove []string,
 ) ([]string, error) {
+	add, remove = model.FoldUsernames(add), model.FoldUsernames(remove)
 	var members []string
 	err := s.tx(ctx, func(ctx context.Context) error {
 		if _, err := s.Store.Groups().Get(ctx, name); err != nil {
@@ -137,7 +141,7 @@ func (s *Service) SetPassword(ctx context.Context, name, password string) error 
 		return invalidf("password is required")
 	}
 	return s.tx(ctx, func(ctx context.Context) error {
-		u, err := s.Store.Users().Get(ctx, name)
+		u, err := s.Store.Users().Get(ctx, model.FoldUsername(name))
 		if err != nil {
 			return err //nolint:wrapcheck // ErrNotFound is the handler's 404
 		}

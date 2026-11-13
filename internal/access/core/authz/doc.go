@@ -88,6 +88,8 @@
 //     TestUnitGrantable, TestUnitSelf and TestUnitManagesResources.
 //   - api_test.go: TestUnitAsAPIAndFromAPI (the access/api view answers as
 //     the evaluator does, and a nil or foreign Decider converts to nothing).
+//   - username_test.go: TestUnitUsernameFolds (a subject named in another
+//     case holds the grants of its folded name, #1432).
 //
 // The tests build the permission world on the access module's in-memory
 // adapter.
