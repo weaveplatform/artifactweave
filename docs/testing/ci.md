@@ -533,8 +533,21 @@ reports a failure part-way, such as a registry error on a layer, inside that ans
 testcontainers lost the error and the container create failed with "No such image"
 ([#1448](https://github.com/weaveplatform/artifactweave/issues/1448); upstream
 [testcontainers-go#3945](https://github.com/testcontainers/testcontainers-go/issues/3945)).
-A failed pull now fails with the registry's own error, and the next start pulls again. Each
-image still has one registry, so a registry that does not answer still fails the run.
+A failed pull now moves on to the image's second source, a registry that serves the same
+digest, as #1321 asks of every CI download:
+
+| Emulator | First source | Second source |
+|---|---|---|
+| MinIO | `cgr.dev/chainguard/minio` | `docker.io/chainguard/minio`, Chainguard's copy |
+| fake-gcs-server | `fsouza/fake-gcs-server` (Docker Hub) | `mirror.gcr.io/fsouza/fake-gcs-server`, Google's cache of Docker Hub |
+| Azurite | `mcr.microsoft.com/azure-storage/azurite` | none yet |
+
+A pull by digest is checked against that digest, so both sources give the same bytes. When
+every source fails, the start fails with each registry's error, and the next start tries
+again. Azurite has no public copy anywhere, so a run that needs it still fails when MCR does
+not answer. On a digest bump, check that each second source serves the new digest, for
+example with `docker buildx imagetools inspect`: mirror.gcr.io holds only the images it has
+cached.
 
 ## Package clients in acceptance
 

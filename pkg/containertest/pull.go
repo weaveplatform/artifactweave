@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -38,8 +39,8 @@ func imageLock(image string) *sync.Mutex {
 	return l
 }
 
-// requireImage makes image present on the engine testcontainers uses,
-// before an emulator module creates a container from it.
+// requireImage makes one of an emulator's sources present on the engine
+// testcontainers uses, and returns it for the module to start.
 //
 // testcontainers-go pulls a missing image itself, but reads the response to
 // its end without decoding it (attemptToPullImage in docker.go, v0.45.0).
@@ -48,15 +49,16 @@ func imageLock(image string) *sync.Mutex {
 // reports that error inside the stream. testcontainers drops it and creates
 // the container, which fails with "No such image" and hides the registry's
 // answer (#1448, upstream testcontainers/testcontainers-go#3945). Pulling
-// here and decoding the stream reports the registry's own error; the
-// module's pull is then skipped, because its inspect finds the image.
-func requireImage(ctx context.Context, image string) error {
+// here and decoding the stream reports the registry's own error, and lets a
+// failed pull move on to the next source; the module's pull is then
+// skipped, because its inspect finds the image.
+func requireImage(ctx context.Context, sources ...string) (string, error) {
 	cli, err := testcontainers.NewDockerClientWithOpts(ctx)
 	if err != nil {
-		return fmt.Errorf("docker client: %w", err)
+		return "", fmt.Errorf("docker client: %w", err)
 	}
 	defer func() { _ = cli.Close() }()
-	return ensureImage(ctx, cli, image, registryAuth(ctx, image))
+	return ensureImage(ctx, cli, func(ref string) string { return registryAuth(ctx, ref) }, sources)
 }
 
 // registryAuth returns the X-Registry-Auth value testcontainers' own pull
@@ -75,33 +77,51 @@ func registryAuth(ctx context.Context, image string) string {
 	return base64.URLEncoding.EncodeToString(b)
 }
 
-// ensureImage pulls image unless the engine has it, then checks the engine
-// has it. One caller at a time pulls a given image in this process; the
-// others wait and then find it. A failed pull is not remembered, so the
-// next caller pulls again, as testcontainers' own pull did.
-func ensureImage(ctx context.Context, api imageAPI, image, auth string) error {
-	lock := imageLock(image)
+// ensureImage returns the first of sources the engine has, or else pulls
+// them in order and returns the first that arrives. Every source carries
+// the same digest, so any of them is the same image. One caller at a time
+// does this for a given emulator in this process; the others wait and then
+// find the image. A failed pull is not remembered, so the next caller
+// tries again, as testcontainers' own pull did.
+func ensureImage(
+	ctx context.Context, api imageAPI, auth func(ref string) string, sources []string,
+) (string, error) {
+	lock := imageLock(sources[0])
 	lock.Lock()
 	defer lock.Unlock()
-	// Every emulator image is pinned by digest, so finding the reference
-	// finds those exact bytes. Any inspect error, not only "not found",
-	// leads to the pull, whose error then names the engine's problem.
-	if _, err := api.ImageInspect(ctx, image); err == nil {
-		return nil
+	// Any inspect error, not only "not found", leads to the pulls, whose
+	// errors then name the engine's problem.
+	for _, ref := range sources {
+		if _, err := api.ImageInspect(ctx, ref); err == nil {
+			return ref, nil
+		}
 	}
-	pull, err := api.ImagePull(ctx, image, client.ImagePullOptions{RegistryAuth: auth})
+	errs := make([]error, 0, len(sources))
+	for _, ref := range sources {
+		err := pull(ctx, api, ref, auth(ref))
+		if err == nil {
+			return ref, nil
+		}
+		errs = append(errs, err)
+	}
+	return "", errors.Join(errs...)
+}
+
+// pull pulls ref and checks the engine then has it.
+func pull(ctx context.Context, api imageAPI, ref, auth string) error {
+	resp, err := api.ImagePull(ctx, ref, client.ImagePullOptions{RegistryAuth: auth})
 	if err != nil {
-		return fmt.Errorf("pull %s: %w", image, err)
+		return fmt.Errorf("pull %s: %w", ref, err)
 	}
 	// Wait decodes the stream and returns the first error it reports.
-	if err := pull.Wait(ctx); err != nil {
-		return fmt.Errorf("pull %s: %w", image, err)
+	if err := resp.Wait(ctx); err != nil {
+		return fmt.Errorf("pull %s: %w", ref, err)
 	}
 	// A stream that ends without an error has not yet proved the image is
 	// there; if it is not, say so here rather than at container create.
-	if _, err := api.ImageInspect(ctx, image); err != nil {
+	if _, err := api.ImageInspect(ctx, ref); err != nil {
 		return fmt.Errorf("pull %s ended without an error, but the engine does not have it: %w",
-			image, err)
+			ref, err)
 	}
 	return nil
 }

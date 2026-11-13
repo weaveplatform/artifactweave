@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -14,68 +15,99 @@ import (
 	"github.com/moby/moby/client"
 )
 
-// testImage is a digest reference like the emulator constants.
-const testImage = "registry.test/emulator@sha256:" +
-	"0000000000000000000000000000000000000000000000000000000000000001"
+// testDigest stands for an emulator's pinned digest; primary and mirror
+// serve it as an emulator's first and second source do.
+const (
+	testDigest = "sha256:0000000000000000000000000000000000000000000000000000000000000001"
+	primary    = "primary.test/emulator"
+	mirror     = "mirror.test/emulator"
+)
 
 // pullProgress is the start of every pull stream: the engine has answered
 // 200 before it fetches anything.
 const pullProgress = `{"status":"Pulling from emulator","id":"sha256"}` + "\n" +
 	`{"status":"Pulling fs layer","progressDetail":{},"id":"0123456789ab"}` + "\n"
 
-// fakeEngine models the two Docker Engine API routes ensureImage calls:
-// image inspect, which finds the image only once a pull has stored it, and
-// image create (a pull), which answers 200 and streams pullBody.
-type fakeEngine struct {
-	// pullStatus, when not 0, refuses the pull with that status before any
+const (
+	pulledBody = pullProgress + `{"status":"Status: Downloaded newer image"}` + "\n"
+	badGateway = pullProgress +
+		`{"errorDetail":{"code":502,"message":"received unexpected HTTP status: 502 Bad Gateway"},` +
+		`"error":"received unexpected HTTP status: 502 Bad Gateway"}` + "\n"
+	cutOff = pullProgress +
+		`{"errorDetail":{"message":"unexpected EOF"},"error":"unexpected EOF"}` + "\n"
+)
+
+// fakeRepo is how the fake engine answers a pull from one repository.
+type fakeRepo struct {
+	// status, when not 0, refuses the pull with that status before any
 	// stream, as the engine does for a reference it cannot resolve.
-	pullStatus int
-	pullBody   string
+	status int
+	body   string
 	// stores says whether a pull that answered 200 leaves the image there.
 	stores bool
+}
+
+// fakeEngine models the two Docker Engine API routes ensureImage calls:
+// image inspect, which finds an image once it is held, and image create (a
+// pull), which answers as its repository's fakeRepo says.
+type fakeEngine struct {
+	repos map[string]fakeRepo
 	// hold, when set, delays each pull's answer until it is closed.
 	hold chan struct{}
 
-	mu      sync.Mutex
-	present bool
-	pulls   int
-	auth    []string
+	mu   sync.Mutex
+	held map[string]bool
+	// pulls lists each pull's repository and X-Registry-Auth, in order.
+	pulls []string
+}
+
+// repository is ref without its digest.
+func repository(ref string) string {
+	name, _, _ := strings.Cut(ref, "@")
+	return name
 }
 
 func (e *fakeEngine) start(t *testing.T) imageAPI {
 	t.Helper()
+	if e.held == nil {
+		e.held = map[string]bool{}
+	}
 	r := chi.NewRouter()
 	r.Get("/{version}/images/*", func(w http.ResponseWriter, r *http.Request) {
+		ref := strings.TrimSuffix(chi.URLParam(r, "*"), "/json")
 		e.mu.Lock()
-		present := e.present
+		held := e.held[repository(ref)]
 		e.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		if !present {
+		if !held {
 			w.WriteHeader(http.StatusNotFound)
-			_, _ = fmt.Fprintf(w, `{"message":"No such image: %s"}`,
-				strings.TrimSuffix(chi.URLParam(r, "*"), "/json"))
+			_, _ = fmt.Fprintf(w, `{"message":"No such image: %s"}`, ref)
 			return
 		}
 		_, _ = w.Write([]byte(`{"Id":"sha256:1"}`))
 	})
 	r.Post("/{version}/images/create", func(w http.ResponseWriter, r *http.Request) {
+		repo := r.URL.Query().Get("fromImage")
 		e.mu.Lock()
-		e.pulls++
-		e.auth = append(e.auth, r.Header.Get("X-Registry-Auth"))
+		e.pulls = append(e.pulls, repo+" "+r.Header.Get("X-Registry-Auth"))
 		e.mu.Unlock()
 		if e.hold != nil {
 			<-e.hold
 		}
+		answer, ok := e.repos[repo]
+		if !ok {
+			answer = fakeRepo{status: http.StatusNotFound}
+		}
 		w.Header().Set("Content-Type", "application/json")
-		if e.pullStatus != 0 {
-			w.WriteHeader(e.pullStatus)
+		if answer.status != 0 {
+			w.WriteHeader(answer.status)
 			_, _ = w.Write([]byte(`{"message":"pull refused"}`))
 			return
 		}
-		_, _ = w.Write([]byte(e.pullBody))
-		if e.stores {
+		_, _ = w.Write([]byte(answer.body))
+		if answer.stores {
 			e.mu.Lock()
-			e.present = true
+			e.held[repo] = true
 			e.mu.Unlock()
 		}
 	})
@@ -92,81 +124,142 @@ func (e *fakeEngine) start(t *testing.T) imageAPI {
 	return cli
 }
 
-func (e *fakeEngine) counts() (int, []string) {
+func (e *fakeEngine) pulled() []string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return e.pulls, append([]string(nil), e.auth...)
+	return slices.Clone(e.pulls)
 }
 
-// TestUnitEnsureImage covers each answer a pull can give. The stream cases
-// are #1448: testcontainers-go drains the stream without decoding it, so it
-// took them for a finished pull and the container create then failed with
-// "No such image".
+// authFor stands for registryAuth: each source gets its own registry's
+// credentials.
+func authFor(ref string) string {
+	host, _, _ := strings.Cut(ref, "/")
+	return "cred-" + host
+}
+
+// TestUnitEnsureImage covers each answer a pull can give, from one source
+// and from two. The stream cases are #1448: testcontainers-go drains the
+// stream without decoding it, so it took them for a finished pull and the
+// container create then failed with "No such image".
 func TestUnitEnsureImage(t *testing.T) {
+	one := []string{primary + "@" + testDigest}
+	two := []string{primary + "@" + testDigest, mirror + "@" + testDigest}
 	cases := []struct {
 		name    string
+		sources []string
 		engine  *fakeEngine
-		pulls   int
-		wantErr string
+		// want is the source returned; pulls lists each pull's repository
+		// and credentials; wantErr lists parts the error must contain.
+		want    string
+		pulls   []string
+		wantErr []string
 	}{
 		{
-			name:   "present already",
-			engine: &fakeEngine{present: true},
+			name:    "present already",
+			sources: one,
+			engine:  &fakeEngine{held: map[string]bool{primary: true}},
+			want:    one[0],
 		},
 		{
-			name: "pulled",
+			name:    "pulled",
+			sources: one,
 			engine: &fakeEngine{
-				pullBody: pullProgress + `{"status":"Status: Downloaded newer image"}` + "\n",
-				stores:   true,
+				repos: map[string]fakeRepo{primary: {body: pulledBody, stores: true}},
 			},
-			pulls: 1,
+			want:  one[0],
+			pulls: []string{primary + " cred-primary.test"},
 		},
 		{
-			name: "registry error inside the stream",
-			engine: &fakeEngine{pullBody: pullProgress +
-				`{"errorDetail":{"code":502,"message":"received unexpected HTTP status: 502 Bad Gateway"},` +
-				`"error":"received unexpected HTTP status: 502 Bad Gateway"}` + "\n"},
-			pulls:   1,
-			wantErr: "pull " + testImage + ": received unexpected HTTP status: 502 Bad Gateway",
+			name:    "registry error inside the stream",
+			sources: one,
+			engine:  &fakeEngine{repos: map[string]fakeRepo{primary: {body: badGateway}}},
+			pulls:   []string{primary + " cred-primary.test"},
+			wantErr: []string{
+				"pull " + one[0] + ": received unexpected HTTP status: 502 Bad Gateway",
+			},
 		},
 		{
-			name: "error inside the stream without a code",
-			engine: &fakeEngine{pullBody: pullProgress +
-				`{"errorDetail":{"message":"unexpected EOF"},"error":"unexpected EOF"}` + "\n"},
-			pulls:   1,
-			wantErr: "pull " + testImage + ": unexpected EOF",
+			name:    "error inside the stream without a code",
+			sources: one,
+			engine:  &fakeEngine{repos: map[string]fakeRepo{primary: {body: cutOff}}},
+			pulls:   []string{primary + " cred-primary.test"},
+			wantErr: []string{"pull " + one[0] + ": unexpected EOF"},
 		},
 		{
 			name:    "stream ends cleanly without the image",
-			engine:  &fakeEngine{pullBody: pullProgress},
-			pulls:   1,
-			wantErr: "pull " + testImage + " ended without an error, but the engine does not have it",
+			sources: one,
+			engine:  &fakeEngine{repos: map[string]fakeRepo{primary: {body: pullProgress}}},
+			pulls:   []string{primary + " cred-primary.test"},
+			wantErr: []string{
+				"pull " + one[0] + " ended without an error, but the engine does not have it",
+			},
 		},
 		{
 			name:    "pull refused",
-			engine:  &fakeEngine{pullStatus: http.StatusInternalServerError},
-			pulls:   1,
-			wantErr: "pull " + testImage + ": ",
+			sources: one,
+			engine: &fakeEngine{repos: map[string]fakeRepo{
+				primary: {status: http.StatusInternalServerError},
+			}},
+			pulls:   []string{primary + " cred-primary.test"},
+			wantErr: []string{"pull " + one[0] + ": "},
+		},
+		{
+			name:    "first source pulled, second not asked",
+			sources: two,
+			engine: &fakeEngine{repos: map[string]fakeRepo{
+				primary: {body: pulledBody, stores: true},
+				mirror:  {body: pulledBody, stores: true},
+			}},
+			want:  two[0],
+			pulls: []string{primary + " cred-primary.test"},
+		},
+		{
+			name:    "first source fails inside its stream, second pulled",
+			sources: two,
+			engine: &fakeEngine{repos: map[string]fakeRepo{
+				primary: {body: badGateway},
+				mirror:  {body: pulledBody, stores: true},
+			}},
+			want:  two[1],
+			pulls: []string{primary + " cred-primary.test", mirror + " cred-mirror.test"},
+		},
+		{
+			name:    "second source held already",
+			sources: two,
+			engine:  &fakeEngine{held: map[string]bool{mirror: true}},
+			want:    two[1],
+		},
+		{
+			name:    "every source fails",
+			sources: two,
+			engine: &fakeEngine{repos: map[string]fakeRepo{
+				primary: {body: badGateway},
+				mirror:  {body: cutOff},
+			}},
+			pulls: []string{primary + " cred-primary.test", mirror + " cred-mirror.test"},
+			wantErr: []string{
+				"pull " + two[0] + ": received unexpected HTTP status: 502 Bad Gateway",
+				"pull " + two[1] + ": unexpected EOF",
+			},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			api := tc.engine.start(t)
-			err := ensureImage(context.Background(), api, testImage, "credentials")
-			switch {
-			case tc.wantErr == "" && err != nil:
+			got, err := ensureImage(context.Background(), api, authFor, tc.sources)
+			if len(tc.wantErr) == 0 && err != nil {
 				t.Fatalf("error %v, want none", err)
-			case tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)):
-				t.Fatalf("error %v, want one containing %q", err, tc.wantErr)
 			}
-			pulls, auth := tc.engine.counts()
-			if pulls != tc.pulls {
-				t.Fatalf("%d pulls, want %d", pulls, tc.pulls)
-			}
-			for _, a := range auth {
-				if a != "credentials" {
-					t.Fatalf("pull sent X-Registry-Auth %q, want the caller's", a)
+			for _, part := range tc.wantErr {
+				if err == nil || !strings.Contains(err.Error(), part) {
+					t.Fatalf("error %v, want one containing %q", err, part)
 				}
+			}
+			if got != tc.want {
+				t.Fatalf("source %q, want %q", got, tc.want)
+			}
+			if pulls := tc.engine.pulled(); !slices.Equal(pulls, tc.pulls) {
+				t.Fatalf("pulls %q, want %q", pulls, tc.pulls)
 			}
 		})
 	}
@@ -178,11 +271,11 @@ func TestUnitEnsureImage(t *testing.T) {
 // the image, so the engine sees one pull.
 func TestUnitEnsureImageOnePullAtATime(t *testing.T) {
 	engine := &fakeEngine{
-		pullBody: pullProgress + `{"status":"Status: Downloaded newer image"}` + "\n",
-		stores:   true,
-		hold:     make(chan struct{}),
+		repos: map[string]fakeRepo{primary: {body: pulledBody, stores: true}},
+		hold:  make(chan struct{}),
 	}
 	api := engine.start(t)
+	sources := []string{primary + "@" + testDigest}
 	const callers = 8
 	var started, done sync.WaitGroup
 	errs := make(chan error, callers)
@@ -192,7 +285,8 @@ func TestUnitEnsureImageOnePullAtATime(t *testing.T) {
 		go func() {
 			defer done.Done()
 			started.Done()
-			errs <- ensureImage(context.Background(), api, testImage, "")
+			_, err := ensureImage(context.Background(), api, authFor, sources)
+			errs <- err
 		}()
 	}
 	started.Wait()
@@ -207,7 +301,28 @@ func TestUnitEnsureImageOnePullAtATime(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if pulls, _ := engine.counts(); pulls != 1 {
-		t.Fatalf("%d pulls, want 1", pulls)
+	if pulls := engine.pulled(); len(pulls) != 1 {
+		t.Fatalf("pulls %q, want 1", pulls)
+	}
+}
+
+// TestUnitEmulatorSourcesShareADigest: every source of an emulator names
+// the pinned digest, so a second source gives the same bytes, and the first
+// source is the exported image.
+func TestUnitEmulatorSourcesShareADigest(t *testing.T) {
+	for image, sources := range map[string][]string{
+		MinIOImage:   minioSources,
+		FakeGCSImage: fakeGCSSources,
+		AzuriteImage: azuriteSources,
+	} {
+		if sources[0] != image {
+			t.Fatalf("first source %q, want %q", sources[0], image)
+		}
+		_, digest, _ := strings.Cut(image, "@")
+		for _, ref := range sources {
+			if _, d, _ := strings.Cut(ref, "@"); d != digest {
+				t.Fatalf("source %q does not carry %s's digest %s", ref, image, digest)
+			}
+		}
 	}
 }

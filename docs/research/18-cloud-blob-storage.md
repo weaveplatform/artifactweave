@@ -104,6 +104,7 @@ about $0.003 at $0.005 per 1,000.
 - **There is no official emulator** (GCS-SDK/doc.go:70).
 - **fake-gcs-server v1.56.1:**
   - Runs in process or as a container: image `fsouza/fake-gcs-server:1.56.1@sha256:797ce226d62f947c009dc40246b30cfb456b8473d8241407f9d6f2c04e4d69ef` through testcontainers `modules/fakegcsserver` v0.44.0 (no default image; `StorageURL()` lacks the trailing slash).
+  - Second source: `mirror.gcr.io/fsouza/fake-gcs-server`, Google's cache of Docker Hub, serves the same digest; `pkg/containertest` pulls from it when Docker Hub fails (#1448).
   - Supports media, multipart and resumable inserts with `ifGenerationMatch`, compose with the 32-source limit, range reads, listing and rewrite.
 - **What fake-gcs-server gets wrong:**
   - Compose **ignores destination and source preconditions and `deleteSourceObjects`**.
@@ -246,6 +247,7 @@ A declared digest avoids the copy entirely: stage on the final name and commit w
 ### 2.6 Emulator
 
 - **Image:** Azurite v3.37.0, `mcr.microsoft.com/azure-storage/azurite@sha256:830430c1da1a2d537e08f3e6764dd1f5ae00cf0346bcaf625b968ec3f0971fd5` (amd64 and arm64).
+  - No second source: Docker Hub, mirror.gcr.io and ghcr.io hold no copy (checked 2026-11-13), so a run fails when MCR does not answer (#1448).
 - **API version check:** its baseline API version is 2026-06-06, older than the SDK's.
   - **[probe]** Every request is refused with `400 InvalidHeaderValue` unless Azurite runs with `--skipApiVersionCheck` (AZT/src/blob/utils/constants.ts:5).
 - **testcontainers module:** `modules/azure/azurite` v0.44.0. It has no default image, `WithEnabledServices(BlobService)`, and `BlobServiceURL` without the account name; it has no connection-string helper.
@@ -466,7 +468,7 @@ From `TestAccRealS3Probes` (`pkg/blob/s3/real_test.go`) in run 38892387927, agai
 | 7: default checksum | `FULL_OBJECT` CRC32; no CRC64NVME | Informational: the contract computes its own SHA-256 |
 | 8: a URL presigned for GET, used for HEAD | HEAD answers 403, GET answers 200 | Confirms the inference in research [19](19-cdn-and-download-redirect.md) section 2 for S3: HEAD and conditional requests on a redirecting repository are answered locally and never redirected, as decision [0029](decisions/0029-cdn-delivery-and-download-redirect.md) requires |
 
-**[probe]** MinIO, the image `pkg/containertest` pins (2026-10-16), refuses `If-None-Match: *` onto an existing key with 412 on PutObject and CompleteMultipartUpload, but ignores it on CopyObject and overwrites the destination. Content keys make that harmless: the copy writes the same bytes.
+**[probe]** MinIO, the image `pkg/containertest` pins (2026-10-16; Chainguard's copy on Docker Hub, `docker.io/chainguard/minio`, serves the same digest and is its second source), refuses `If-None-Match: *` onto an existing key with 412 on PutObject and CompleteMultipartUpload, but ignores it on CopyObject and overwrites the destination. Content keys make that harmless: the copy writes the same bytes.
 
 ## Sources
 

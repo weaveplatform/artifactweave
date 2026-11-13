@@ -25,9 +25,10 @@
 //     from an image pinned by digest, removed when the caller ends. MinIO
 //     is handed out only once it serves S3 requests, not merely HTTP. Each
 //     image is pulled before its module starts, one pull per image at a
-//     time in the process, and a pull that fails reports the registry's
-//     error rather than the "No such image" testcontainers' own pull ends
-//     in.
+//     time in the process. A pull that fails moves on to the image's second
+//     source, a registry serving the same digest (none yet for Azurite),
+//     and when every source fails the error names each registry's answer
+//     rather than the "No such image" testcontainers' own pull ends in.
 //
 // # References
 //
@@ -48,5 +49,5 @@
 //
 // Implemented P2 (the Linux engine gate), P2b (the emulators) and P7 (the
 // answer timeout). MinIO's readiness wait added by issue 1307; the checked
-// image pull by issue 1448.
+// image pull and the second sources by issue 1448.
 package containertest
