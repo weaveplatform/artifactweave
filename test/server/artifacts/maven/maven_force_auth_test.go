@@ -234,10 +234,11 @@ const badCredentialsBody = `{"errors":[{"message":"Bad credentials","status":401
 // unpadded Basic value naming another user, which the filter decodes and
 // net/http does not; an empty Authorization header, which the filter counts
 // as present (AuthenticationFilterUtils.isAuthHeaderPresent); and an
-// X-Api-Key header (getApiKeyTokenKeyValue). Authentication answers the
-// first three 401 "Bad credentials", as on main, and serves the last two as
-// the anonymous user. The world is fresh, so no earlier failed login
-// suspends the anonymous user name (#1435).
+// X-Api-Key header (getApiKeyTokenKeyValue). Authentication reads no
+// credential from the first two either, as 7.x's chain does, and serves
+// them as the anonymous user (#1451), as it does the last two; it answers
+// the unpadded value 401 "Bad credentials". The world is fresh, so no
+// earlier failed login suspends the anonymous user name (#1435).
 func TestAccMavenForceAuthenticationPassesOtherCredentialsOn(t *testing.T) {
 	w := forcedMavenWorld(t, true)
 	for _, tc := range []struct {
@@ -245,10 +246,10 @@ func TestAccMavenForceAuthenticationPassesOtherCredentialsOn(t *testing.T) {
 		code          int
 		body          string
 	}{
-		{"Authorization", "Basic Og==", http.StatusUnauthorized, badCredentialsBody},
+		{"Authorization", "Basic Og==", http.StatusOK, "jar"},
 		{
 			"Authorization", "basic " + base64.StdEncoding.EncodeToString([]byte("anonymous:x")),
-			http.StatusUnauthorized, badCredentialsBody,
+			http.StatusOK, "jar",
 		},
 		{
 			"Authorization", "Basic " + base64.RawStdEncoding.EncodeToString([]byte("admin:wrong")),

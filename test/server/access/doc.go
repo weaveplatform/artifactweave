@@ -54,6 +54,11 @@
 //   - username_case_test.go: user names in any case on every route that
 //     takes one (#1432), and an unknown group or member in a user or legacy
 //     group request (#1433), on the in-memory, SQLite and PostgreSQL stores.
+//   - ignored_basic_test.go: the Basic values 7.x reads no credential from,
+//     served as a request without credentials and counted as no failed
+//     login, and the credentials handed back beside them (#1451).
+//   - builtin_user_delete_test.go: the legacy refusal to delete a built-in
+//     user, worded without the identity service's sentinels (#1449).
 //
 // # References
 //
