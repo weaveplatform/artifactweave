@@ -123,6 +123,10 @@
 //     leaves out an image its repository's patterns reject (RTFACT-26524),
 //     and a mount from another repository that would refuse the blob opens
 //     a session.
+//   - A blob or manifest pull, local or remote, GET or HEAD, answers
+//     If-None-Match and If-Modified-Since with 304, and ignores If-Match,
+//     If-Unmodified-Since, Range and If-Range (pullRequest), as 7.x's
+//     download does: it never answers 412 or 206 (#1337, #1437).
 //   - A remote repository's failure to fetch, its upstream's 401, 403, 429
 //     or 5xx or an upstream that is unreachable, unusable or slow, answers
 //     its status and message in Artifactory's envelope, under no registry
