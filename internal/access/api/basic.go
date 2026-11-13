@@ -23,8 +23,8 @@ const emptyBasic = "Og=="
 // "Og==" since 3.4.0: "Artifactory should ignore it and continue as
 // anonymous" (RTFACT-6765). Net/http's Request.BasicAuth matches the scheme
 // in any case, which is why callers that must agree with 7.x read Basic
-// through BasicCredentials instead. Any other scheme is left to whoever
-// reads it.
+// through BasicCredentials instead. Bearer is read by BearerToken, and
+// the authentication counts any other scheme as no credential either.
 func IgnoredAuthorization(value string) bool {
 	scheme := value
 	if i := strings.IndexAny(value, " \t"); i >= 0 {
@@ -34,7 +34,7 @@ func IgnoredAuthorization(value string) bool {
 		return false
 	}
 	rest, exact := strings.CutPrefix(value, basicPrefix)
-	return !exact || strings.TrimSpace(rest) == "" || rest == emptyBasic
+	return !exact || Blank(rest) || rest == emptyBasic
 }
 
 // BasicCredentials returns the user name and secret of an Authorization

@@ -75,19 +75,25 @@ type npmCredentialKey struct{}
 // KeepNPMCredential keeps, for the npm configuration operations alone, the
 // token a request authenticated with, which they write into .npmrc as it
 // came. Nothing else needs the raw token, so no other request carries it
-// further than the middleware. It reads Basic as the middleware does
-// (accessapi.BasicCredentials), not with Request.BasicAuth: a lower-case
-// "basic" value authenticates nothing in 7.x, so beside a key that did, it
-// must not be written into .npmrc in the key's place.
+// further than the middleware. It reads Basic and Bearer as the middleware
+// does (accessapi.BasicCredentials, accessapi.BearerToken), not with
+// Request.BasicAuth: a lower-case "basic" value, a blank "Bearer" or
+// another scheme authenticates nothing in 7.x, so beside a key that did,
+// it must not be written into .npmrc in the key's place. Nor must Basic
+// credentials naming another user, such as the anonymous name the
+// middleware declines while anonymous access is off; an empty name is the
+// token's subject (authn.Authenticator.Token).
 func KeepNPMCredential(ctx context.Context, r *http.Request, p kernel.Principal) context.Context {
 	if p.TokenID == "" || !NPMOperation(r.URL.Path) {
 		return ctx
 	}
 	var c Credential
-	if user, password, ok := accessapi.BasicCredentials(r.Header.Get("Authorization")); ok {
+	h := r.Header.Get("Authorization")
+	if user, password, ok := accessapi.BasicCredentials(h); ok &&
+		(user == "" || accessapi.SameUsername(user, p.Name)) {
 		c.User, c.Password = user, password
-	} else if scheme, raw, _ := strings.Cut(r.Header.Get("Authorization"), " "); strings.EqualFold(scheme, "Bearer") {
-		c.Token = strings.TrimSpace(raw)
+	} else if token, ok := accessapi.BearerToken(h); ok {
+		c.Token = token
 	} else {
 		c.Token = r.Header.Get("X-JFrog-Art-Api")
 	}

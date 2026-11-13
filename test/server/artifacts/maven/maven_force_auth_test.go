@@ -271,9 +271,11 @@ func TestAccMavenForceAuthenticationPassesOtherCredentialsOn(t *testing.T) {
 // repository gets the filter's 401 "Unauthorized", where every other path
 // keeps "Authentication is required", as 7.x's filter answers before its
 // anonymous fallback refuses the request (AccessFilter.doFilterInternal,
-// 7.161.26). Signed-in callers, the anonymous user's Basic credentials,
-// which the authentication refuses, and an empty Authorization header keep
-// their answers (#1435).
+// 7.161.26). Signed-in callers keep their answers (#1435). The anonymous
+// user's Basic credentials and an empty Authorization header pass the
+// filter, and the authentication answers them as no credentials: 7.x's
+// Basic filter declines the anonymous user name while anonymous access is
+// off (ArtifactoryBasicAuthenticationFilter.acceptFilter, #1451).
 func TestAccMavenForceAuthenticationWithAnonymousAccessOff(t *testing.T) {
 	w := forcedMavenWorld(t, false)
 	for _, tc := range []struct{ method, path string }{
@@ -296,7 +298,8 @@ func TestAccMavenForceAuthenticationWithAnonymousAccessOff(t *testing.T) {
 	}
 	wantAnswer(t, "admin GET", w.do(http.MethodGet, forcedJar, "admin", ""), http.StatusOK, "jar")
 	// With anonymous access off, the anonymous user's Basic credentials are
-	// credentials like any other, which the authentication answers.
+	// credentials like any other to the filter, which the authentication
+	// declines and answers as no credentials (#1451).
 	// An empty Authorization header is a credential to 7.x's filter
 	// (AuthenticationFilterUtils.isAuthHeaderPresent), which authentication
 	// answers as it answers no credentials.
@@ -307,5 +310,5 @@ func TestAccMavenForceAuthenticationWithAnonymousAccessOff(t *testing.T) {
 	anonymousBasic := basic("anonymous", "")["Authorization"]
 	wantAnswer(t, "the anonymous user's Basic credentials",
 		w.do(http.MethodGet, forcedJar, "", "", "Authorization", anonymousBasic),
-		http.StatusUnauthorized, `"message":"Bad credentials"`)
+		http.StatusUnauthorized, `"message":"Authentication is required"`)
 }

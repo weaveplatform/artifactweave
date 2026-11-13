@@ -58,9 +58,11 @@
 //     switch, and rechecking a verified credential against current state
 //     (Current, CurrentRegistry and RestoreDownload).
 //   - Decider: the permission questions about one request's subject.
-//   - Basic credentials as 7.x reads them: BasicCredentials decodes an
-//     Authorization value, and IgnoredAuthorization reports the Basic
-//     values that carry no credential at all.
+//   - Basic and Bearer credentials as 7.x reads them: BasicCredentials
+//     decodes an Authorization value, IgnoredAuthorization reports the
+//     Basic values that carry no credential at all, BearerToken reads the
+//     token of a Bearer value as the props filter and RequestUtils read
+//     it, and Blank is Java's isBlank, which 7.x applies to those values.
 //   - Authorizer: evaluating a principal's permissions once for a request
 //     (Authorize), for a principal the request did not authorise (For), and
 //     for a subject no request authenticated (Decide). SubjectOf is the
@@ -177,7 +179,8 @@
 //     WithPrincipal; a nil or typed-nil decider hides an outer one.
 //     access/core/authn's TestUnitDeciderSharedWithAccessAPI checks that its
 //     accessors share the context key.
-//   - TestUnitBasicCredentials: which Authorization values 7.x reads as
-//     Basic credentials, which it reads no credential from, and the user
-//     and secret it decodes.
+//   - TestUnitBasicCredentials, TestUnitBearerToken, TestUnitBlank: which
+//     Authorization values 7.x reads as Basic or Bearer credentials, which
+//     it reads no credential from, blank as Java's isBlank tells it, and
+//     the user, secret or token it reads.
 package api

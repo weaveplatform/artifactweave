@@ -28,8 +28,11 @@ reference token), `X-JFrog-Art-Api` (reference tokens only), and anonymous when
 alone, `X-NuGet-ApiKey: <user>:<password or token>` is read as Basic credentials when the
 request has no `Authorization` header (decision [0038](0038-nuget.md),
 [#532](https://github.com/weaveplatform/artifactweave/issues/532)). Basic is the scheme spelled
-exactly `Basic `: `Basic Og==`, a blank `Basic` and the scheme in another case carry no
-credential, as in 7.x, so they count as no `Authorization` header and no failed login
+exactly `Basic `, and Bearer is `bearer ` in any case followed by a token, or `Bearer ` exactly
+in a value of nine characters or more: `Basic Og==`, a blank `Basic`, the Basic scheme in
+another case, `Bearer` without a token, any other scheme and a blank `X-JFrog-Art-Api` carry
+no credential, as in 7.x, and neither do Basic credentials naming `anonymous` while anonymous
+access is off. They count as no `Authorization` header and no failed login
 ([research 05](../05-platform-identity-and-security-apis.md#authentication-accepted-on-every-endpoint),
 item 8; [#1451](https://github.com/weaveplatform/artifactweave/issues/1451)). Basic auth can be
 disabled platform-wide through the Access configuration endpoint. A password does not create
