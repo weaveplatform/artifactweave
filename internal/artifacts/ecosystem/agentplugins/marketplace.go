@@ -3,7 +3,6 @@ package agentplugins
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"slices"
 
@@ -20,33 +19,27 @@ var indexes = map[string]string{
 	"vscode-marketplace.json": "vscode",
 }
 
-// ErrMarketplace is what Marketplace returns, wrapped with the name, for a
-// name that is not a marketplace file.
-var ErrMarketplace = errors.New("agentplugins: unknown agent plugin marketplace")
-
 // IsMarketplace reports whether name is one of the marketplace files a local
-// Agent Plugins repository renders at its root: marketplace.json, which
-// lists every plugin; claude-marketplace.json and codex-marketplace.json,
-// which list the plugins carrying that harness's manifest;
+// Agent Plugins repository keeps at its root: marketplace.json, which lists
+// every plugin; claude-marketplace.json and codex-marketplace.json, which
+// list the plugins carrying that harness's manifest;
 // cursor-marketplace.json, which lists those with a Cursor manifest or a
 // conforming root plugin.json; and vscode-marketplace.json, which lists
 // those with a conforming root plugin.json only (the Agent Plugins
 // Repositories docs' "Marketplace Files and Indexing" table, 7.173.8).
 func IsMarketplace(name string) bool { _, ok := indexes[name]; return ok }
 
-// Marketplace selects each package's latest readable version. Rendering for
-// each caller avoids exposing ZIPs hidden by path-scoped Read permissions.
-func Marketplace(
-	ctx context.Context,
-	st format.Store,
-	repoKey, name string,
-	can func(string) bool,
-) ([]byte, error) {
-	harness, ok := indexes[name]
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrMarketplace, name)
+// marketplaces returns the content of every marketplace file of the
+// repository, by name. Each file lists, for each plugin, the newest version
+// of a layout it names. The files are stored, so they list every plugin
+// whoever reads them: 7.x keeps them at the repository root as files of
+// their own, which any caller who may read that path downloads as they
+// are.
+func marketplaces(ctx context.Context, st format.Store, repoKey string) (map[string][]byte, error) {
+	lists := make(map[string][]map[string]any, len(indexes))
+	for name := range indexes {
+		lists[name] = make([]map[string]any, 0)
 	}
-	plugins := make([]map[string]any, 0)
 	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
 		pkgs, next, err := st.Packages().List(ctx, repoKey, page)
@@ -54,30 +47,8 @@ func Marketplace(
 			return nil, fmt.Errorf("agentplugins: list packages: %w", err)
 		}
 		for _, p := range pkgs {
-			versions, err := st.Packages().Versions(ctx, p.ID)
-			if err != nil {
-				return nil, fmt.Errorf("agentplugins: versions of %s: %w", p.Name, err)
-			}
-			model.SortVersions(model.ComparatorFor(p.Type), versions)
-			for _, v := range slices.Backward(versions) {
-				var meta Metadata
-				if err := json.Unmarshal(v.Metadata, &meta); err != nil {
-					return nil, fmt.Errorf(
-						"agentplugins: metadata of %s %s: %w",
-						p.Name,
-						v.Version,
-						err,
-					)
-				}
-				if !can(meta.Path) || !meta.listedIn(harness) {
-					continue
-				}
-				entry, err := marketplaceEntry(meta, harness)
-				if err != nil {
-					return nil, err
-				}
-				plugins = append(plugins, entry)
-				break
+			if err := listPlugin(ctx, st, p, lists); err != nil {
+				return nil, err
 			}
 		}
 		if next == "" {
@@ -85,17 +56,57 @@ func Marketplace(
 		}
 		page.After = next
 	}
-	out, err := json.Marshal(
-		map[string]any{
+	out := make(map[string][]byte, len(lists))
+	for name, plugins := range lists {
+		data, err := json.Marshal(map[string]any{
 			"name":    repoKey,
 			"owner":   map[string]string{"name": repoKey},
 			"plugins": plugins,
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("agentplugins: marshal marketplace: %w", err)
+		})
+		if err != nil {
+			return nil, fmt.Errorf("agentplugins: marshal %s: %w", name, err)
+		}
+		out[name] = data
 	}
 	return out, nil
+}
+
+// listPlugin appends to each file's list the entry of package p's newest
+// version that the file lists, reading the versions from the newest down
+// until every file has its entry.
+func listPlugin(
+	ctx context.Context,
+	st format.Store,
+	p model.Package,
+	lists map[string][]map[string]any,
+) error {
+	versions, err := st.Packages().Versions(ctx, p.ID)
+	if err != nil {
+		return fmt.Errorf("agentplugins: versions of %s: %w", p.Name, err)
+	}
+	model.SortVersions(model.ComparatorFor(p.Type), versions)
+	done := make(map[string]bool, len(indexes))
+	for _, v := range slices.Backward(versions) {
+		var meta Metadata
+		if err := json.Unmarshal(v.Metadata, &meta); err != nil {
+			return fmt.Errorf("agentplugins: metadata of %s %s: %w", p.Name, v.Version, err)
+		}
+		for name, harness := range indexes {
+			if done[name] || !meta.listedIn(harness) {
+				continue
+			}
+			entry, err := marketplaceEntry(meta, harness)
+			if err != nil {
+				return err
+			}
+			lists[name] = append(lists[name], entry)
+			done[name] = true
+		}
+		if len(done) == len(indexes) {
+			break
+		}
+	}
+	return nil
 }
 
 // listedIn reports whether the marketplace file of harness lists this

@@ -197,9 +197,19 @@ func TestUnitStandardBundleIsAdmittedAndIndexed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	env := format.Env{Store: st, Inspection: &inspection{sha: sha, meta: std}}
+	var queued []string
+	env := format.Env{
+		Store: st, Inspection: &inspection{sha: sha, meta: std},
+		Enqueue: func(_ context.Context, kind, key string, _ []byte) error {
+			queued = append(queued, kind+" "+key)
+			return nil
+		},
+	}
 	if err := h.Deployed(ctx, env, c, it); err != nil {
 		t.Fatalf("Deployed: %v", err)
+	}
+	if want := []string{KindMarketplace + " plugins"}; !slices.Equal(queued, want) {
+		t.Errorf("Deployed queued %v, want %v", queued, want)
 	}
 	props, err := st.Items().Properties(ctx, it.ID)
 	if err != nil {
@@ -228,24 +238,18 @@ func TestUnitStandardBundleIsAdmittedAndIndexed(t *testing.T) {
 	}
 }
 
-// listedVersions renders file of repository plugins for a caller who may
-// read everything, and returns its plugins as name@version.
+// listedVersions builds file of repository plugins and returns its plugins
+// as name@version.
 func listedVersions(t *testing.T, st *inmem.Store, file string) []string {
 	t.Helper()
 	var doc struct {
 		Plugins []struct{ Name, Version string } `json:"plugins"`
 	}
-	b, err := Marketplace(
-		context.Background(),
-		st,
-		"plugins",
-		file,
-		func(string) bool { return true },
-	)
+	files, err := marketplaces(context.Background(), st, "plugins")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := json.Unmarshal(b, &doc); err != nil {
+	if err := json.Unmarshal(files[file], &doc); err != nil {
 		t.Fatal(err)
 	}
 	out := []string{}
@@ -308,14 +312,14 @@ func TestUnitStandardMarketplaceEntries(t *testing.T) {
 
 	entries := func(file string) map[string]map[string]any {
 		t.Helper()
-		b, err := Marketplace(ctx, st, "plugins", file, func(string) bool { return true })
+		files, err := marketplaces(ctx, st, "plugins")
 		if err != nil {
 			t.Fatal(err)
 		}
 		var doc struct {
 			Plugins []map[string]any `json:"plugins"`
 		}
-		if err := json.Unmarshal(b, &doc); err != nil {
+		if err := json.Unmarshal(files[file], &doc); err != nil {
 			t.Fatal(err)
 		}
 		out := map[string]map[string]any{}

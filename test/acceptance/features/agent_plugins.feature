@@ -1,5 +1,5 @@
 @jf @agentplugins
-Feature: JFrog CLI publishes Agent Plugins into permission-filtered marketplaces
+Feature: JFrog CLI publishes Agent Plugins into the stored marketplace files
   The pinned CLI packages harness manifests and uploads a canonical ZIP. The
   repository indexes the path-derived identity for the unified and harness
   marketplaces; installing into client homes is covered by #691.

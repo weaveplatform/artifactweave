@@ -7,7 +7,10 @@ package agentpluginshttp
 // the item kit's GET and HEAD at the item paths, with
 // TryAgentMarketplaceItem as the kit's only overlay, then
 // RegisterAgentMarketplaceRoutes. The caller is in the context as the
-// router's authentication leaves it, with a fake decider.
+// router's authentication leaves it, with a fake decider. The kit has a
+// work queue with the formats' handlers, which no worker runs: a download
+// of a marketplace file runs the work it owes, as it does on a server
+// whose workers have not reached it yet.
 
 import (
 	"bytes"
@@ -35,6 +38,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
 
 // The keys of the Agent Plugins repositories the tests store, beside
@@ -74,16 +78,23 @@ type itemWorld struct {
 }
 
 // newItemWorld returns a kittest world and the routes over an item kit
-// built from it as the router builds its own. tune adjusts the kit's
-// dependencies first. The authorizer is a fake whose evaluation allows
-// nothing, so a caller holds only what the decider in its request grants.
+// built from it as the router builds its own, with a work queue over the
+// world's store. tune adjusts the kit's dependencies first; the queue's
+// handlers then run over the kit's store, so a faulty one fails the work
+// too. The authorizer is a fake whose evaluation allows nothing, so a
+// caller holds only what the decider in its request grants.
 func newItemWorld(t *testing.T, tune ...func(*itemkit.Deps)) *itemWorld {
 	t.Helper()
 	k := kittest.New(t, inmem.New())
 	logs := &bytes.Buffer{}
+	q, err := work.New(k.Store, work.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	d := itemkit.Deps{
 		Store:  k.Store,
 		Blobs:  k.Blobs,
+		Work:   q,
 		Access: accessapi.API{Authorizer: &accessapitest.Authorizer{}},
 		Logger: slog.New(slog.NewJSONHandler(logs, nil)),
 	}
@@ -94,6 +105,11 @@ func newItemWorld(t *testing.T, tune ...func(*itemkit.Deps)) *itemWorld {
 	// repository, and the router lists it first.
 	d.Overlays = []itemkit.Overlay{TryAgentMarketplaceItem}
 	kit := itemkit.New(d)
+	if d.Store != nil && d.Work != nil {
+		if err := kit.Items(d.Store).RegisterWork(d.Work); err != nil {
+			t.Fatal(err)
+		}
+	}
 	r := chi.NewRouter()
 	for _, p := range httpkit.ChiPatterns("/artifactory/{repoKey}/{filePath}") {
 		r.Get(p, kit.GetItem)
@@ -160,8 +176,8 @@ func (w *itemWorld) put(key string, cached bool, path, body string) {
 var indexed = time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
 
 // plugin indexes version of the plugin name in plugins-local, with the
-// manifests of harnesses, as the format's Deployed hook indexes a bundle
-// stored at the version's canonical path.
+// manifests of harnesses, and queues the marketplace work, as the format's
+// Deployed hook does for a bundle stored at the version's canonical path.
 func (w *itemWorld) plugin(name, version string, harnesses ...string) {
 	w.t.Helper()
 	ctx := w.t.Context()
@@ -183,6 +199,21 @@ func (w *itemWorld) plugin(name, version string, harnesses ...string) {
 	}); err != nil {
 		w.t.Fatal(err)
 	}
+	if err := w.world.Store.WorkQueue().Enqueue(
+		ctx, agentplugins.KindMarketplace, pluginsLocal, nil, indexed,
+	); err != nil {
+		w.t.Fatal(err)
+	}
+}
+
+// stored returns the item stored at the root of plugins-local under name.
+func (w *itemWorld) stored(name string) model.Item {
+	w.t.Helper()
+	it, err := w.world.Store.Items().Get(w.t.Context(), pluginsLocal, false, name)
+	if err != nil {
+		w.t.Fatalf("%s is not stored: %v", name, err)
+	}
+	return it
 }
 
 // wantError fails the test unless rec answered status with the Artifactory
@@ -250,6 +281,31 @@ type failingRepoGet struct{ port.RepoStore }
 
 func (failingRepoGet) Get(context.Context, string) (repo.Config, error) {
 	return repo.Config{}, errFault
+}
+
+// itemReadFails is a store whose item lookups at the repository root fail
+// once ok of them have answered, so the lookup a download makes after the
+// format's own can fail alone.
+type itemReadFails struct {
+	itemkit.Store
+	ok *int
+}
+
+func (s itemReadFails) Items() port.ItemStore { return &failingItemGet{s.Store.Items(), s.ok} }
+
+type failingItemGet struct {
+	port.ItemStore
+	ok *int
+}
+
+func (s *failingItemGet) Get(
+	ctx context.Context, key string, cached bool, p string,
+) (model.Item, error) {
+	if *s.ok == 0 {
+		return model.Item{}, errFault
+	}
+	*s.ok--
+	return s.ItemStore.Get(ctx, key, cached, p)
 }
 
 // packageListingFails is a store whose package listings fail.

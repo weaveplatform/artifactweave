@@ -1,6 +1,7 @@
 package agentpluginshttp
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -8,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/agentplugins"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -46,7 +48,7 @@ func (s AgentPluginItems) getAgentMarketplace(w http.ResponseWriter, r *http.Req
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	s.serveAgentMarketplace(w, r, st, c, name, p, acc)
+	s.serveAgentMarketplace(w, r, st, c, name, p, acc, false)
 }
 
 // AgentPluginItems serves the agent plugin marketplace documents over the
@@ -55,9 +57,11 @@ type AgentPluginItems struct{ *itemkit.Kit }
 
 // TryAgentMarketplaceItem is the item kit's overlay for the agent plugin
 // marketplace documents. In a local agent plugins repository, a request for
-// a marketplace name without properties is answered here, with the plugins
-// the caller may read. It answers false, leaving the request to the
-// overlays after it and the generic lookup, for anything else.
+// a marketplace name without properties is answered here, as the API path
+// answers it. It answers false, leaving the request to the overlays after
+// it and the generic lookup, for anything else. The generic lookup would
+// serve the stored file too; the overlay keeps both paths on one function,
+// so they cannot answer apart.
 func TryAgentMarketplaceItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
@@ -66,43 +70,56 @@ func TryAgentMarketplaceItem(
 		req.IsFolder || len(req.Props) != 0 || !agentplugins.IsMarketplace(req.Path) {
 		return false
 	}
-	AgentPluginItems{k}.serveAgentMarketplace(w, r, st, c, req.Path, p, acc)
+	AgentPluginItems{k}.serveAgentMarketplace(w, r, st, c, req.Path, p, acc, true)
 	return true
 }
 
+// serveAgentMarketplace serves the marketplace file name stored at the root
+// of c. 7.x stores the files there and serves them as it serves any file,
+// so the caller needs Read on the file's own path, and everyone who has it
+// reads the same bytes: the same size and checksums an AQL search or the
+// storage API reports to them, which JFrog CLI checks a download against.
+// itemRoute types the file as the item routes do (ServeItemFile), and the
+// API path as the native APIs do (ServeFile).
 func (s AgentPluginItems) serveAgentMarketplace(
 	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
-	name string, p kernel.Principal, acc itemkit.Access,
+	name string, p kernel.Principal, acc itemkit.Access, itemRoute bool,
 ) {
-	// The read permission first, so a caller who may not read the
-	// repository learns nothing of how it is set (DV-057); then the
+	ctx := r.Context()
+	// The read permission first, so a caller who may not read the file
+	// learns nothing of how the repository is set (DV-057); then the
 	// policy at the file's own path, where 7.x stores it.
-	if !acc.Folder(c, "", api.ActionRead) {
+	if !acc.File(c, name, api.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
 	if err := generic.CheckDownload(c, name, false); err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "download check", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "download check", err))
 		return
 	}
-	// 7.x rebuilds the marketplace on upload, listing each plugin's latest
-	// version, and serves the stored file, so patterns rejecting that
-	// version's ZIP leave it listed and refuse only the ZIP's download.
-	// The caller's read permission still picks the version, as rendering
-	// per reader does.
-	data, err := agentplugins.Marketplace(r.Context(), st, c.Key, name, func(path string) bool {
-		return acc.File(c, path, api.ActionRead)
-	})
-	if err != nil {
-		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "agent plugin marketplace", err))
+	// The format stores the files from the work queue; resolving the path
+	// runs the work a completed write left owed, or queues it for a
+	// repository whose files were never stored, so the file read next is
+	// current.
+	if _, err := s.Items(st).Resolve(ctx, c, format.Download{Path: name}); err != nil {
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "agent plugin marketplace", err))
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "private, no-store")
-	w.WriteHeader(http.StatusOK)
-	if r.Method != http.MethodHead {
-		// json.Marshal HTML-escapes manifest strings; the media type is JSON.
-		//nolint:gosec // encoded JSON cannot inject into the HTML response surface
-		_, _ = w.Write(data)
+	it, err := st.Items().Get(ctx, c.Key, false, name)
+	switch {
+	case errors.Is(err, kernel.ErrNotFound) || err == nil && it.Folder:
+		// Without a work queue that runs here nothing has stored the file
+		// yet; a folder at the name holds no marketplace.
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+		return
+	case err != nil:
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "agent plugin marketplace", err))
+		return
 	}
+	f := itemkit.Found{Repo: c, Item: it}
+	if itemRoute {
+		s.ServeItemFile(w, r, st, f, p)
+		return
+	}
+	s.ServeFile(w, r, st, f, p)
 }

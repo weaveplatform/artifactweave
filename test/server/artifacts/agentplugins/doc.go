@@ -1,5 +1,5 @@
 // Package agentplugins runs the Agent Plugins routes of the assembled server:
-// the marketplace files that track the repository tree, and their
+// the stored marketplace files that track the repository tree, and their
 // permissions.
 //
 // # Role
@@ -11,17 +11,23 @@
 //
 // # Inputs
 //
-//   - The world of test/server/support/agentcommon.
+//   - The world of test/server/support/agentcommon, with the runtime's work
+//     queue and item service (world_test.go), whose marketplace work a test
+//     runs as a server's workers would once an upload has answered.
 //
 // # Outputs
 //
 //   - TestAccAgentPluginMarketplacesTrackTreeAndPermissions: the marketplace
 //     files follow the plugins as they are deployed, copied and deleted, and
-//     each principal reads only what it may.
+//     only a principal who may read a file's path reads it.
 //   - TestAccAgentPluginStandardLayoutIsServed: a bundle with an Agent
 //     Plugins Standard root plugin.json is admitted, typed and listed in the
 //     VS Code, Cursor and unified files, also after a reindex, while a root
 //     plugin.json that does not conform keeps its earlier answers.
+//   - TestAccAgentPluginMarketplaceFilesAreStoredFiles: JFrog CLI's AQL
+//     search, the storage API and the folder listings show each marketplace
+//     file, with the size and checksums of the bytes its download serves,
+//     to every caller who may read its path, and to no other (issue 1292).
 //
 // # References
 //

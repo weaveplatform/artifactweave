@@ -12,8 +12,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
-	agentpluginsfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/agentplugins"
 	"github.com/weaveplatform/artifactweave/test/server/support/agentcommon"
 )
 
@@ -42,8 +40,13 @@ func pluginZIP(t *testing.T, harness string) string {
 	return b.String()
 }
 
+// TestAccAgentPluginMarketplacesTrackTreeAndPermissions: the stored
+// marketplace files follow the plugins as they are deployed, overwritten,
+// deleted, restored, copied and reindexed. A caller needs Read on a file's
+// own path at the repository root, as on any stored file, so one whose
+// grant covers a single plugin's folder reads none of them.
 func TestAccAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
-	w := agentcommon.NewWorld(t)
+	w := newQueuedWorld(t)
 	ctx := context.Background()
 	setTrashcan(t, w.DB, true)
 	c := repo.Config{Key: "plugins-local", Class: repo.Local, PackageType: repo.AgentPlugins}
@@ -99,8 +102,8 @@ func TestAccAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 	if got := entry(read(api, "admin")); got["version"] != "1.10.0" || got["name"] != "reader" {
 		t.Fatalf("latest %+v", got)
 	}
-	if got := entry(read(api, "deployer")); got["version"] != "1.9.0" {
-		t.Fatalf("permission filter %+v", got)
+	for _, path := range []string{api, "/artifactory/plugins-local/marketplace.json"} {
+		wantStatus(t, w.Do(http.MethodGet, path, "deployer", ""), http.StatusForbidden)
 	}
 	if hits := hitsOf(t, w.Do(http.MethodGet,
 		"/artifactory/api/search/artifact?name=reader-1.10.0.zip",
@@ -125,11 +128,7 @@ func TestAccAgentPluginMarketplacesTrackTreeAndPermissions(t *testing.T) {
 	if err := w.DB.Packages().Delete(ctx, indexed.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := (agentpluginsfmt.Handler{}).Reindex(
-		ctx,
-		format.Env{Store: w.DB, Blobs: w.Blobs},
-		c,
-	); err != nil {
+	if err := w.Items.Reindex(ctx, c); err != nil {
 		t.Fatal(err)
 	}
 	if got := entry(read(api, "admin")); got["version"] != "1.10.0" {

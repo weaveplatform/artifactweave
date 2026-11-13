@@ -258,7 +258,8 @@ The `@agentplugins_clients` scenarios in the required native acceptance
 partition run the [pinned JFrog CLI](ci-native-client-inventory.md) against the local server. They isolate the
 CLI's home directory and cover Cursor v1 install/v2 update, byte-identical
 ZIP downloads, path-over-manifest identity, Claude marketplace and ZIP reads,
-denied credentials and token expiry. Install sets
+denied credentials and token expiry, and installs without `--version`, which
+wait until the storage API shows the stored marketplace files. Install sets
 `JFROG_AGENT_PLUGINS_DISABLE_QUIET_FAILURE=true` because signed Evidence
 verification belongs to P23; this does not mark Evidence support complete.
 

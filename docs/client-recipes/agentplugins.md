@@ -65,13 +65,18 @@ env HOME="$AW_PLUGIN_HOME" jf agent plugins install hello-standard --harness vsc
 env HOME="$AW_PLUGIN_HOME" jf agent plugins install hello-standard --harness cursor --repo "$AW_REPO" --version 1.0.0
 ```
 
+Without --version the CLI installs the newest version listed in the harness's marketplace file at the repository root (marketplace.json for --harness vscode). The registry stores those files shortly after a publish answers, as Artifactory does, so an install right after a publish can fail until the file lists the plugin: retry it, or wait until GET /artifactory/api/storage/$AW_REPO/cursor-marketplace.json answers 200.
+
+```sh
+env HOME="$AW_PLUGIN_HOME" jf agent plugins install hello-standard --harness cursor --repo "$AW_REPO"
+```
+
 ## Limits
 
 Classes outside **local** are not registered for this format. Commands above apply only to each operation's listed classes. Federated evidence is for one node; it does not establish cross-vendor replication.
 
 - Claude marketplace JSON and ZIP authorization are tested, but this recipe claims the actual Cursor adapter install performed by JFrog CLI, not a Claude desktop install.
 - vscode-marketplace.json is served and tested as JSON, but no pinned client reads it: JFrog CLI installs --harness vscode from marketplace.json, and VS Code has no native connection to an HTTP marketplace of ZIP sources.
-- Pass --version to jf agent plugins install. Without it the CLI looks the marketplace file up with an AQL search, which does not find the marketplace files the registry renders for each reader.
 - Remote, virtual and federated classes are unsupported.
 
 ## Verification sources
@@ -80,4 +85,5 @@ These are the pinned client definitions and executable evidence from which this 
 
 - Client pin: [.github/actions/jfrog-cli/action.yml](../../.github/actions/jfrog-cli/action.yml).
 - Evidence: [test/acceptance/features/agent_plugins_clients.feature](../../test/acceptance/features/agent_plugins_clients.feature).
+- Evidence: [test/acceptance/features/agent_plugins_marketplace.feature](../../test/acceptance/features/agent_plugins_marketplace.feature).
 - Evidence: [test/acceptance/features/tokens.feature](../../test/acceptance/features/tokens.feature).
