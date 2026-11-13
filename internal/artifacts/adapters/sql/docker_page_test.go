@@ -111,35 +111,8 @@ func dockerPagesAtScale(t *testing.T, s *artsql.Store) {
 // no sort: a sort would read every manifest of the image or repository.
 func dockerPlan(t *testing.T, s *artsql.Store, what, index, query string, args []any) {
 	t.Helper()
-	ctx := t.Context()
-	explain := "EXPLAIN QUERY PLAN "
-	if s.Dialect().Dollar {
-		explain = "EXPLAIN (ANALYZE, BUFFERS, COSTS OFF, TIMING OFF, SUMMARY OFF) "
-	}
-	rows, err := s.DB().QueryContext(ctx, s.Dialect().Rebind(explain+query), args...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = rows.Close() }()
-	var plan strings.Builder
-	for rows.Next() {
-		var line string
-		if s.Dialect().Dollar {
-			err = rows.Scan(&line)
-		} else {
-			var id, parent, unused int
-			err = rows.Scan(&id, &parent, &unused, &line)
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		plan.WriteString(line + "\n")
-	}
-	if err := rows.Err(); err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("%s: late %s page plan:\n%s", s.Dialect().Name, what, plan.String())
-	text := plan.String()
+	text := explain(t, s, query, args...)
+	t.Logf("%s: late %s page plan:\n%s", s.Dialect().Name, what, text)
 	if !strings.Contains(text, index) || strings.Contains(text, "TEMP B-TREE") ||
 		strings.Contains(text, "Sort") {
 		t.Fatalf("the late %s page does not seek %s in order:\n%s", what, index, text)

@@ -127,36 +127,3 @@ func versionNamesAtScale(t *testing.T, s *artsql.Store) {
 		t.Fatal("a page row's record was not sought on package_versions_version")
 	}
 }
-
-// explain returns the engine's plan for q with args, which on PostgreSQL
-// is run, so the plan shows the rows each step read.
-func explain(t *testing.T, s *artsql.Store, q string, args ...any) string {
-	t.Helper()
-	prefix := "EXPLAIN QUERY PLAN "
-	if s.Dialect().Dollar {
-		prefix = "EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) "
-	}
-	rows, err := s.DB().QueryContext(t.Context(), s.Dialect().Rebind(prefix+q), args...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = rows.Close() }()
-	var plan strings.Builder
-	for rows.Next() {
-		var line string
-		if s.Dialect().Dollar {
-			err = rows.Scan(&line)
-		} else {
-			var id, parent, unused int
-			err = rows.Scan(&id, &parent, &unused, &line)
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		plan.WriteString(line + "\n")
-	}
-	if err := rows.Err(); err != nil {
-		t.Fatal(err)
-	}
-	return plan.String()
-}
