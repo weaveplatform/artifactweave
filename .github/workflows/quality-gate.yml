@@ -630,8 +630,6 @@ jobs:
         env:
           HF_HUB_VERSION: '2.4.0'
           HF_XET_VERSION: '1.8.0'
-          https_proxy: http://127.0.0.1:9
-          no_proxy: pypi.tuna.tsinghua.edu.cn
         run: |
           python3 -m venv "$RUNNER_TEMP/huggingface-hub"
           for index in https://pypi.org/simple https://pypi.tuna.tsinghua.edu.cn/simple; do
