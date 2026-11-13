@@ -899,7 +899,10 @@ is on or off; [J] [RTFACT-30189](https://jfrog.atlassian.net/browse/RTFACT-30189
 answer from 7.71.8. While anonymous access is on, the filter counts the anonymous user's
 Basic credentials, Basic credentials with a blank user name, and a Bearer token that does not
 verify or whose subject is anonymous as no credentials (`checkIfAuthenticationShouldBeIgnored`);
-any other credential, verified or not, is left to authentication. artifactweave applies it the
+any other credential, verified or not, is left to authentication. So are the values it does not
+class as Basic or Bearer (`RequestUtils.getBasicAuthorization` matches `Basic ` exactly and drops
+`Og==`), an empty `Authorization` header, which `isAuthHeaderPresent` counts as present, and the
+API key headers and `RT_IDN_TOKEN` cookie (`getTokenKeyValue`). artifactweave applies it the
 same way, ahead of authentication and routing
 ([#1435](https://github.com/weaveplatform/artifactweave/issues/1435);
 `itemkit.ForceAuthentication`). Two points no source settles **[I]**: a Gradle, Ivy or SBT

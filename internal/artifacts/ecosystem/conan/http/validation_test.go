@@ -39,6 +39,7 @@ func TestUnitConanCredentialExchangeBoundary(t *testing.T) {
 		{"token principal with password", "GET", "authenticate", "alice", "alice", "password", false, 501},
 		{"credential check", "GET", "check_credentials", "alice", "", "", false, 200},
 		{"token echo", "GET", "authenticate", "alice", "alice", "eyJ.conan.token", false, 200},
+		{"basic user in another case", "GET", "authenticate", "alice", "ALICE", "eyJ.conan.token", false, 200},
 		{"method check", "POST", "authenticate", "alice", "alice", "password", true, 405},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

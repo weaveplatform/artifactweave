@@ -1,28 +1,19 @@
 package model
 
 import (
-	"strings"
-
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 )
 
 // FoldUsername is the spelling a user name is stored and matched in: lower
-// case. Access compares user names without regard to case and stores them
-// in lower case: JFrog's SCIM page says "User names are case-insensitive",
-// Get Permissions matches "Usernames ... case-insensitively, group names
-// exactly", and RTFACT-29660 (7.55.13) says that a user created "with
-// capitalization" is stored lower-case. Group names keep their case
-// (#1309).
+// case, the access api's rule (api.FoldUsername), which gives its sources.
 //
 // Every entry point folds a user name it is given before it reads or writes
 // a store, and the stores compare names exactly, so they hold only
-// lower-case names and any spelling of a name finds its user. strings.ToLower
-// rather than strings.EqualFold, so that matching is equality of the
-// spelling the stores hold.
-func FoldUsername(name string) string { return strings.ToLower(name) }
+// lower-case names and any spelling of a name finds its user.
+func FoldUsername(name string) string { return api.FoldUsername(name) }
 
 // SameUsername reports whether a and b name the same user.
-func SameUsername(a, b string) bool { return FoldUsername(a) == FoldUsername(b) }
+func SameUsername(a, b string) bool { return api.SameUsername(a, b) }
 
 // FoldUsernames returns names folded, in order; nil stays nil.
 func FoldUsernames(names []string) []string {
