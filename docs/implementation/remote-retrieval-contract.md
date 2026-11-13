@@ -420,7 +420,7 @@ absent from this baseline must enter P20's ledger with an implementation owner.
 |---|---|
 | [#615](https://github.com/weaveplatform/artifactweave/issues/615), [#637](https://github.com/weaveplatform/artifactweave/issues/637), [#638](https://github.com/weaveplatform/artifactweave/issues/638), [#639](https://github.com/weaveplatform/artifactweave/issues/639) | Deterministic status/body/time/auth faults; provider apply/empty-plan/destroy separately from content; optional real-upstream monitoring; final native/client, security and CI sign-off. Fakes are not vendor observations. |
 | [#623](https://github.com/weaveplatform/artifactweave/issues/623)/#624 Docker/OCI/Helm OCI | Challenge tokens, immutable digests, mutable tags, foreign layers, exact manifest bytes; source auth failure cannot become `MANIFEST_UNKNOWN`. |
-| [#625](https://github.com/weaveplatform/artifactweave/issues/625) Maven/Gradle/Ivy/SBT; [#626](https://github.com/weaveplatform/artifactweave/issues/626) npm | Preserve full upstream version metadata; validate snapshots/POM/JARs and packument/tarball integrity. Eager companions are bounded; npm audit and local signing [#362](https://github.com/weaveplatform/artifactweave/issues/362) remain P28. |
+| [#625](https://github.com/weaveplatform/artifactweave/issues/625) Maven/Gradle/Ivy/SBT; [#626](https://github.com/weaveplatform/artifactweave/issues/626) npm | Preserve full upstream version metadata; validate snapshots/POM/JARs and packument/tarball integrity. Eager companions are bounded. npm local signing is [#362](https://github.com/weaveplatform/artifactweave/issues/362); an npm remote relays its upstream's keys document ([#1318](https://github.com/weaveplatform/artifactweave/issues/1318)); npm audit proxying remains P28. |
 | [#627](https://github.com/weaveplatform/artifactweave/issues/627) PyPI; [#628](https://github.com/weaveplatform/artifactweave/issues/628)/#629 NuGet | Correct HTML/JSON and v2/v3 variants, upstream signature/core-metadata integrity, no invented local-only view of remote versions; names, pages and rewritten downloads stay consistent. |
 | [#630](https://github.com/weaveplatform/artifactweave/issues/630) Helm; [#631](https://github.com/weaveplatform/artifactweave/issues/631)/#632 Terraform | Preserve index/discovery lists, chart provenance, module ZIP/provider checksum/signature bytes; validate external origins. Terraform backend is a different local-only repository contract. |
 | [#633](https://github.com/weaveplatform/artifactweave/issues/633) Go; P10 | P9 tests GOPROXY `.info/.mod/.zip`, list/latest source without enabling unsupported direct remote routes. P10 composes ordered sources and proves native Go; P28 sumdb/VCS and P33 VCS transport remain assigned. |
@@ -515,8 +515,17 @@ and upstream signatures survive reindex. Native npm 11/12 cold install and offli
 `ci` scenarios cover both scoped and unscoped packages. Local publication is unchanged,
 remote package mutation APIs answer 405, and audit never returns invented success.
 
-P10 retains virtual external dependency-spec rewriting and destination-repository
-selection; P28 retains audit and local signing/key discovery; P21 retains browser login.
+The remote's `/-/npm/v1/keys` is the upstream's own keys document, fetched through this
+policy and relayed byte for byte (#1318): cached at `.npm/keys.json`, where read
+permission and then the remote's download policy are checked, under the remote's
+credentials, retrieval cache period and offline mode. An upstream 404 answers the 404 of
+a registry without keys, and a source failure answers its source error, so
+`npm audit signatures` through a remote of a signing upstream verifies what it relays
+(decision 0034, "Signatures"; the answers no source names are [I]).
+
+P10 retains virtual external dependency-spec rewriting, destination-repository
+selection and virtual signature and key merging (#1319); P28 retains audit proxying;
+P21 retains browser login.
 Remote `dist.tarball` URL allow-pattern handling, filtering and error shapes remain
 labelled [I] for P19/#216 live comparison.
 

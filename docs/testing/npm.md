@@ -37,6 +37,22 @@ secondary until the queued reindex finishes, so the keys document lists both
 meanwhile. Deleting a pair queues nothing: run
 `POST /artifactory/api/npm/<repo>/reindex` to remove its signatures.
 
+## Through a remote repository
+
+An npm remote repository relays its upstream's `dist.signatures` and answers
+`/-/npm/v1/keys` with the upstream's own keys document, so `npm audit signatures`
+verifies packages installed through a remote of a signing upstream, such as
+registry.npmjs.org (#1318, decision 0034, "Signatures"). The remote fetches the document
+through the [remote retrieval contract](../implementation/remote-retrieval-contract.md)
+and caches it at `.npm/keys.json`, so a caller needs read permission there, and an
+include pattern must name that path, as on a local repository. An upstream without the
+document answers 404, and npm then has no keys to verify the relayed signatures with.
+
+The [remote scenario](../../test/acceptance/features/npm_remote_signatures.feature)
+installs a scoped and an unscoped package through a remote of the fake upstream, which
+signs each version with a key it lists, and runs `npm audit signatures` with both
+pinned clients.
+
 ## The Sigstore dependency
 
 Before it asks the registry, `npm audit signatures` initialises npm's Sigstore TUF
@@ -64,8 +80,9 @@ ARTIFACTWEAVE_REQUIRE_DOCKER=1 ARTIFACTWEAVE_ACCEPT_TAGS=@npm \
   go test ./test/acceptance -run '^TestAccFeatures$' -count=1
 ```
 
-The npm clients reach the binary over the host network, so the scenario runs on a
-Linux Docker host. It audits a repository with no pair (npm finds no keys), then
+`@npm` runs the remote scenario too. The npm clients reach the binary over the host
+network, so the scenarios run on a Linux Docker host. The local scenario audits a
+repository with no pair (npm finds no keys), then
 after a PEM pair is named, then after a rotation to a pair given as gpg's armored
 export, and last with one version's signature replaced in the store by another
 package's, which npm reports as an invalid registry signature.

@@ -29,6 +29,10 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
+	if slices.Equal(p.Segments, keysPath) {
+		h.remoteKeys(w, r)
+		return
+	}
 	name, rest, ok := splitName(p.Segments)
 	switch {
 	case !ok:

@@ -335,8 +335,8 @@ func TestAccKeysDocumentFaults(t *testing.T) {
 	if len(f.faults) != 1 || !errors.Is(f.faults[0], broken) {
 		t.Fatalf("faults %v", f.faults)
 	}
-	// A remote repository relays its upstream's signatures and answers its
-	// own keys path as before, whatever pairs it names.
+	// A remote repository relays its upstream's signatures and keys
+	// (remote_keys.go): the pairs it names change nothing.
 	c, err := f.db.Repos().Get(context.Background(), "npm-remote")
 	if err != nil {
 		t.Fatal(err)
