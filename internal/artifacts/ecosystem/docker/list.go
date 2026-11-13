@@ -16,11 +16,14 @@ import (
 // their bytes, so that the order is total and a page continued after last
 // neither repeats nor skips a name (decision 0031).
 func Compare(a, b string) int {
-	if c := strings.Compare(strings.ToLower(a), strings.ToLower(b)); c != 0 {
+	if c := strings.Compare(Fold(a), Fold(b)); c != 0 {
 		return c
 	}
 	return strings.Compare(a, b)
 }
+
+// Fold is the case folding Compare orders by first.
+func Fold(s string) string { return strings.ToLower(s) }
 
 // digestFolder reports whether folder is the name of a digest folder,
 // where a manifest pushed by digest lives. A sha256__<hex> folder is a tag.
@@ -118,49 +121,4 @@ func ManifestFolders(
 	}
 	slices.SortFunc(folders, Compare)
 	return folders, nil
-}
-
-// Image is an image in a repository.
-type Image struct {
-	Repo string
-	Name string
-}
-
-// Images returns the images of the repositories keys, each a folder
-// holding at least one manifest in a tag or digest folder of its own
-// (decision 0031), ordered by repository and then as tags are ordered.
-// Whether a name is valid is the caller's to judge.
-func Images(ctx context.Context, items port.ItemStore, keys []string) ([]Image, error) {
-	if len(keys) == 0 {
-		return nil, nil
-	}
-	refs := make([]aql.RepoRef, 0, len(keys))
-	for _, k := range keys {
-		refs = append(refs, aql.RepoRef{Key: k})
-	}
-	hits, err := items.Search(ctx, manifestFiles(aql.RepoSet{Refs: refs}), aql.Options{})
-	if err != nil {
-		return nil, fmt.Errorf("docker: images: %w", err)
-	}
-	seen := map[Image]bool{}
-	var out []Image
-	for _, h := range hits {
-		i := strings.LastIndex(h.Item.Path, "/")
-		if i < 0 {
-			// A manifest in a top-level folder has no image above it.
-			continue
-		}
-		im := Image{Repo: h.Item.RepoKey, Name: h.Item.Path[:i]}
-		if _, isFolder := manifestFolder(h.Item.Path[i+1:]); isFolder && !seen[im] {
-			seen[im] = true
-			out = append(out, im)
-		}
-	}
-	slices.SortFunc(out, func(a, b Image) int {
-		if c := strings.Compare(a.Repo, b.Repo); c != 0 {
-			return c
-		}
-		return Compare(a.Name, b.Name)
-	})
-	return out, nil
 }

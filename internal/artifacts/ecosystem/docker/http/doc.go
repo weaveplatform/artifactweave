@@ -41,8 +41,10 @@
 //     keep upload sessions and store blobs, mounts, manifests and deletes
 //     through the item service; Lookup reads only repositories, from any
 //     format.Store; the format package (artifacts/ecosystem/docker, imported
-//     as layout), which names paths, parses manifests and finds blobs,
-//     manifests, tags, images and referrers; the access module's API
+//     as layout), which names paths, parses manifests, finds blobs,
+//     manifests and referrers, and reads tags lists' and catalogs' pages
+//     from the item store's page reader (TagPages, ImagePages; #1402); the
+//     access module's API
 //     (access/api), whose decider each request carries, whose Tokens sign
 //     registry tokens (TokenIssuer) and whose Identity reads a user's email;
 //     the registry's remote source service (Options.Sources), through which
@@ -101,6 +103,14 @@
 //     Artifactory envelope.
 //   - Codes, statuses and messages stay byte-identical: docker, crane,
 //     oras, cosign, helm and the JFrog CLI read them.
+//   - A local repository's tags list and a catalog read from the store only
+//     the page they answer and the name after it, which decides the Link
+//     (#1402), and answer, Link included, byte for byte the page cut from
+//     the whole sorted list. A page longer than listBuffer is counted, then
+//     read again as it streams, up to the name its Link names, so a write
+//     in between adds or drops only the written name; a store failure
+//     before the first byte answers 500, and one after it ends the
+//     connection with the body unclosed (decision 0043).
 //   - A read the download policy refuses, a local or a remote repository's,
 //     answers 404 with the policy's message in Artifactory's envelope,
 //     under no registry code, as the Docker client showed 7.x's answer
@@ -147,6 +157,9 @@
 //     https://docs.jfrog.com/artifactory/docs/additional-docker-information.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Dependency rules".
+//   - Decision 0043: docs/research/decisions/0043-api-reliability.md,
+//     "Streaming complete lists" (a listing's store failure after its first
+//     byte), and issue 1402 (the paged tags lists and catalogs).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 229 (ecosystem/docker; http/ holds /v2), line 404 (the root's
 //     docker_rest.go, now rest.go) and line 1022 (the mapping row).
@@ -186,7 +199,12 @@
 //     digest, refusals, body limits, permissions and store failures;
 //     indexes and the referrers API.
 //   - tags_test.go: tags lists and pagination, catalogs, deletes, their
-//     permissions and failures, and the catalog grant.
+//     permissions and failures, and the catalog grant; list_page_test.go:
+//     every page of a listing longer than the buffer, and of the
+//     registry-wide catalog's merge, byte for byte as the collected list
+//     answered it; the rows a page with n reads from the store; a long
+//     page that loses no tag to writes while it streams; and a store
+//     failure before and after the first byte.
 //   - token_test.go: the token endpoint, its grants, lifetime and parent
 //     binding, the challenge and the auth endpoints, on the access test kit
 //     (access/accesstest).

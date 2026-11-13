@@ -20,7 +20,9 @@
 //
 // # Outputs
 //
-//   - Factory and Run.
+//   - Factory and Run, and RunDockerPages, the Docker page reader's
+//     contract (port.DockerPageStore): DockerPages, with ManifestFolders
+//     and ImageManifests.
 //   - The subtests, one per concern, each on a store of its own: Blobs,
 //     ColdBlobs, BlobDeletion, ColdBlobDeletion, BlobTiersSeparate,
 //     Replicas, ReplicaTiersSeparate, Repos, Items, ItemCreate, ColonPaths,
@@ -76,7 +78,8 @@
 // property key cases (pull request 348), the remote cache cases (pull
 // request 646), the Git LFS lock cases (pull request 849) and the Bower
 // registration cases (pull request 912). Moved here in P9d, which added
-// Factory and Run.
+// Factory and Run. RunDockerPages came with the Docker page reader
+// (#1402).
 //
 // # Testing
 //
@@ -85,4 +88,7 @@
 // (SQLite in memory and in a file), and the metadata store's
 // TestUnitContract, TestAccContractFile, TestAccContractMemory and
 // TestAccContract (PostgreSQL) run it under the same subtest names.
+// RunDockerPages runs in adapters/inmem's TestUnitDockerPagesContract and
+// adapters/sql's TestAccDockerPagesContract (SQLite in memory and in a
+// file, and PostgreSQL).
 package storetest

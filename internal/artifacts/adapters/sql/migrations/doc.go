@@ -16,7 +16,8 @@
 //
 //   - FS: a directory per dialect, sqlite and postgres, named like the dialect,
 //     of NNNN_name.sql files with "-- +up" and "-- +down" sections. The stream
-//     starts at 0001_baseline.sql.
+//     starts at 0001_baseline.sql; 0002_docker_page.sql adds the two partial
+//     indexes the registry's tags lists and catalogs page by (#1402).
 //
 // # Invariants
 //
@@ -55,7 +56,8 @@
 //
 // # Status
 //
-// Implemented P9d: the baseline (issue 994).
+// Implemented P9d: the baseline (issue 994). 0002: the Docker page indexes
+// (issue 1402).
 //
 // # Testing
 //

@@ -39,7 +39,9 @@
 //     Handler reads stored manifests and chart configs and keeps the
 //     package index (artifacts/core/pkgindex); the item store's AQL search
 //     (port.ItemStore, artifacts/core/aql), through which the lookups find
-//     blobs, manifests, tags, images and referrers; and core remote: the
+//     blobs, manifests, tags and referrers; the item store's page reader
+//     (port.DockerPageStore), from which TagPages and ImagePages read a tags
+//     list's and a catalog's pages (#1402); and core remote: the
 //     shared policy (remote.Policy), through which RegistryContent checks,
 //     reads and caches child manifests and configs and opens what the cache
 //     holds, and the registry port (remote.Registries), through which it
@@ -61,9 +63,12 @@
 //   - Lookups over the item store: FindBlob and FindBlobs (every copy of a
 //     blob in the image, from which a pull picks one the repository's
 //     patterns accept), FindManifest, FolderManifest, ManifestFolders,
-//     Tags, Images, Manifests, Retained, ImageManifests and FindReferrers,
-//     with Compare, the specification's order of tags and names, and
+//     Tags, Manifests, Retained, ImageManifests and FindReferrers, with
+//     Compare and Fold, the specification's order of tags and names, and
 //     PushTime, a tag's place among its image's tags.
+//   - Pages over the item store's page reader: TagPages (TagsAfter), an
+//     image's tags in Compare's order, with Found; and ImagePages
+//     (ImagesAfter), a repository's images; each reads a batch at a time.
 //   - Handler: the hooks that index images and tags, classify a tag's
 //     manifest as metadata, admit writes under the generic deploy policy,
 //     settle the index after deletes and reindex a repository; and Chart,
@@ -152,7 +157,9 @@
 //
 //   - layout_test.go, list_test.go and manifest_test.go: paths, blob,
 //     manifest, tag, image and catalog lookups against stored items,
-//     manifest parsing and refusals, properties and image configs.
+//     manifest parsing and refusals, properties and image configs;
+//     list_page_test.go: TagPages and ImagePages against the same items, in
+//     every batch size, and their store failures.
 //   - handler_test.go and index_fault_test.go: classification, generic
 //     admission, and store failures while indexing; push times.
 //   - chart_test.go: a Helm chart's metadata on its tag, and configs or

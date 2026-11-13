@@ -32,6 +32,10 @@
 //   - RepoStore with RepoFilter; ItemStore with Download, DeleteResult and
 //     RepoUsage; BlobIndex with the sentinel ErrDeleting; ReplicaIndex;
 //     TrashStore; and PackageStore.
+//   - DockerPageStore, the item store's reader of a registry repository's
+//     image layout a page at a time (ItemStore.DockerPages), with
+//     DockerFolderQuery, DockerImageQuery, DockerImageManifest and
+//     DockerFold.
 //   - BuildStore with NormaliseBuild; BowerRegistrationStore;
 //     GitLFSLockStore with GitLFSLockFilter; and ArchivedItemStore with
 //     ArchivedFilter.
@@ -100,6 +104,7 @@
 // property key checks (pull request 348), RemoteCacheStore (pull request
 // 646), GitLFSLockStore (pull request 849) and BowerRegistrationStore (pull
 // request 912). Moved here in P9d, which added ArchivedItemStore and Store.
+// DockerPageStore pages the registry's tags lists and catalogs (#1402).
 //
 // # Testing
 //

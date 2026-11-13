@@ -95,5 +95,8 @@
 // inmem_test.go: TestUnitContract runs the artifacts contract
 // (adapters/storetest.Run) on a Store over a fresh memtx.Store. The
 // metadata store's in-memory TestUnitContract runs the same cases through
-// its own store, with RemoteLayoutFences beside them.
+// its own store, with RemoteLayoutFences beside them. docker_page_test.go:
+// TestUnitDockerPagesContract runs the Docker page reader's contract
+// (adapters/storetest.RunDockerPages), whose order the in-memory reader
+// gives as the SQL adapter's indexes do.
 package inmem
