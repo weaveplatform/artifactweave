@@ -59,12 +59,11 @@ func (Handler) Inspect(
 }
 
 // Admit refuses a write, other than a checksum deploy or a remote's cached
-// content, to a marketplace file name (409), since those files are rendered
-// for each reader and never stored, and a .zip that is not at a canonical
-// bundle path or whose bundle Inspect found invalid or with neither a
-// harness manifest nor a conforming root plugin.json (409). It then applies
-// the generic blackout and include and exclude checks, keeping their
-// refusals as they are.
+// content, to a marketplace file name (409), since the format alone writes
+// those files (Work), and a .zip that is not at a canonical bundle path or
+// whose bundle Inspect found invalid or with neither a harness manifest nor
+// a conforming root plugin.json (409). It then applies the generic blackout
+// and include and exclude checks, keeping their refusals as they are.
 func (Handler) Admit(
 	_ context.Context,
 	env format.Env,
@@ -93,15 +92,21 @@ func (Handler) Admit(
 }
 
 // Deployed indexes a stored bundle at a canonical path of the repository's
-// own tree; folders, cached items and other files change nothing. It sets
-// the agentplugins.* properties, dropping agentplugins.sha1 when the item
-// has no SHA-1, creates the plugin's package when it is new, and links the
-// version to the bundle, with its Metadata, named and versioned by the path,
-// as the version's metadata. A bundle with neither a harness manifest nor a
-// conforming root plugin.json fails with ErrArchive.
+// own tree, and queues the marketplace work. It sets the agentplugins.*
+// properties, dropping agentplugins.sha1 when the item has no SHA-1,
+// creates the plugin's package when it is new, and links the version to the
+// bundle, with its Metadata, named and versioned by the path, as the
+// version's metadata. A bundle with neither a harness manifest nor a
+// conforming root plugin.json fails with ErrArchive. A file stored at a
+// marketplace name, which only a restore from the trash can bring back,
+// queues the work too, so the file is rebuilt over what was restored;
+// folders, cached items and other files change nothing.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
-	if it.Folder || it.Cached || !strings.HasSuffix(it.FullPath(), ".zip") {
+	if it.Folder || it.Cached {
 		return nil
+	}
+	if IsMarketplace(it.FullPath()) {
+		return queue(ctx, env, c)
 	}
 	name, version, ok := ParsePath(it.FullPath())
 	if !ok {
@@ -122,12 +127,27 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it m
 	if err := setProperties(ctx, env.Store, it, meta); err != nil {
 		return err
 	}
-	return index(ctx, env.Store, c, it, meta)
+	if err := index(ctx, env.Store, c, it, meta); err != nil {
+		return err
+	}
+	return queue(ctx, env, c)
 }
 
-// Deleting does nothing: the item service drops a removed bundle's version
-// link with it.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, model.Item) error { return nil }
+// Deleting queues the marketplace work when a bundle at a canonical path
+// or a marketplace file of the repository's own tree is about to be
+// deleted, so the files stop listing a version once its bundle is gone and
+// a deleted file is stored again. The item service drops a removed
+// bundle's version link with it. Folders, cached items and other files
+// change nothing.
+func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
+	if it.Folder || it.Cached {
+		return nil
+	}
+	if _, _, ok := ParsePath(it.FullPath()); ok || IsMarketplace(it.FullPath()) {
+		return queue(ctx, env, c)
+	}
+	return nil
+}
 
 // Deleted does nothing: a version is one bundle, so the item service's
 // pruning of versions left without files is all a delete needs.
@@ -202,9 +222,9 @@ func index(
 
 // Reindex rebuilds repository c's package index from the bundles at
 // canonical paths of its own tree, setting each bundle's properties as
-// Deployed does, and fails with ErrArchive on the first bundle that cannot
-// be read or has neither a harness manifest nor a conforming root
-// plugin.json.
+// Deployed does, then queues the marketplace work. It fails with ErrArchive
+// on the first bundle that cannot be read or has neither a harness
+// manifest nor a conforming root plugin.json.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	var all []pkgindex.Indexed
 	byName := map[string]int{}
@@ -256,7 +276,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	if err := pkgindex.Reconcile(ctx, env.Store, c, all); err != nil {
 		return err //nolint:wrapcheck // pkgindex wraps error
 	}
-	return nil
+	return queue(ctx, env, c)
 }
 
 var (

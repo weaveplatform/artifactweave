@@ -142,13 +142,11 @@ Feature: JFrog CLI installs and updates Agent Plugins from a local repository
     Self-managed 7.173.8 indexes a root plugin.json of the Agent Plugins
     Standard 1.0.0 into vscode-marketplace.json, cursor-marketplace.json and
     marketplace.json, and the pinned CLI installs it for VS Code and Cursor.
-    The installs pass --version: without it the CLI looks the marketplace
-    file up with an AQL search, which finds stored files only, and the
-    registry renders its marketplace files for each reader instead. VS Code
-    cannot run headless, and neither it nor Cursor reads a ZIP source from
-    an HTTP marketplace, so the scenario checks what VS Code reads instead:
-    the root plugin.json, with its agent-plugins.org $schema, in the folder
-    it discovers plugins from.
+    The installs pass --version, which agent_plugins_marketplace.feature
+    leaves out. VS Code cannot run headless, and neither it nor Cursor
+    reads a ZIP source from an HTTP marketplace, so the scenario checks what
+    VS Code reads instead: the root plugin.json, with its agent-plugins.org
+    $schema, in the folder it discovers plugins from.
     Given the registry is running
     And the JFrog CLI is available
     And the JFrog CLI runs with "JFROG_AGENT_PLUGINS_DISABLE_QUIET_FAILURE" set to "true"

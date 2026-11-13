@@ -10,9 +10,6 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
-	agentpluginsfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/agentplugins"
-	"github.com/weaveplatform/artifactweave/test/server/support/agentcommon"
 )
 
 // zipOf is a plugin bundle of the files, path to content.
@@ -46,7 +43,7 @@ const standardManifest = `{"$schema":"https://agent-plugins.org/schemas/1.0.0/pl
 // root plugin.json does not conform answers as before: refused on its own,
 // and listed by its harness manifests alone beside one.
 func TestAccAgentPluginStandardLayoutIsServed(t *testing.T) {
-	w := agentcommon.NewWorld(t)
+	w := newQueuedWorld(t)
 	ctx := context.Background()
 	c := repo.Config{Key: "plugins-std", Class: repo.Local, PackageType: repo.AgentPlugins}
 	if err := w.DB.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
@@ -168,11 +165,7 @@ func TestAccAgentPluginStandardLayoutIsServed(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := (agentpluginsfmt.Handler{}).Reindex(
-		ctx,
-		format.Env{Store: w.DB, Blobs: w.Blobs},
-		c,
-	); err != nil {
+	if err := w.Items.Reindex(ctx, c); err != nil {
 		t.Fatal(err)
 	}
 	check("after a reindex")

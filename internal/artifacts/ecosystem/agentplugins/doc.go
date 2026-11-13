@@ -1,11 +1,13 @@
 // Package agentplugins validates and indexes local Agent Plugin ZIP bundles
-// and renders their marketplace files. A plugin version is one bundle,
+// and stores their marketplace files. A plugin version is one bundle,
 // stored at <name>/<version>/<name>-<version>.zip, that carries at least one
 // harness manifest (.claude-plugin/plugin.json, .cursor-plugin/plugin.json
 // or .codex-plugin/plugin.json) or a root plugin.json of the Agent Plugins
 // Standard 1.0.0; the path, not the manifest, names the plugin and its
-// version. The marketplace files list each plugin's newest version the
-// reader may read, and are rendered for every request rather than stored.
+// version. The marketplace files list each plugin's newest version and are
+// stored at the repository root as queued work rebuilds them (decision
+// 0033), so AQL, the storage API and the folder listings show them as they
+// show any other file.
 //
 // # Role
 //
@@ -13,22 +15,25 @@
 // manifest index and marketplace files of the Agent Plugins slice. Its
 // Handler plugs into the item service through the format hooks (decision
 // 0032). Its http subpackage, agentpluginshttp
-// (artifacts/ecosystem/agentplugins/http), serves the marketplace files
-// with Marketplace.
+// (artifacts/ecosystem/agentplugins/http), serves the stored marketplace
+// files.
 //
 // # Inputs
 //
 //   - Driving: the format registry (artifacts/ecosystem), which hands the
-//     item service's hooks for agentplugins repositories to Handler, and the
-//     work queue, which runs every format's reindex through it; and
-//     agentpluginshttp, which serves the marketplace files at
+//     item service's hooks for agentplugins repositories to Handler; the
+//     work queue, which runs every format's reindex and the
+//     agentplugins.marketplace work through it; the item service's
+//     downloads, which ask Handler which work a marketplace file owes
+//     (Owed) and seed it for a repository that has none yet (Resolve); and
+//     agentpluginshttp, which serves the stored files at
 //     /artifactory/api/agentplugins/{repoKey}/{marketplace} and, through
-//     the item routes, at the repository root (IsMarketplace,
-//     Marketplace).
+//     the item routes, at the repository root (IsMarketplace).
 //   - Driven: the format hooks' environment (format.Env): its blobs hold the
-//     bundles, and its store holds the items, their properties and the
-//     package index (artifacts/core/pkgindex), which Marketplace lists. The
-//     generic blackout and include and exclude checks
+//     bundles, its store holds the items, their properties and the package
+//     index (artifacts/core/pkgindex), which the marketplace work lists, and
+//     its Derive stores each marketplace file and its Enqueue queues the
+//     work. The generic blackout and include and exclude checks
 //     (artifacts/ecosystem/generic) run after the format's own.
 //   - Settings: none.
 //
@@ -37,10 +42,19 @@
 //   - Handler: the hooks that read a bundle once before its transaction
 //     (Inspect), admit only a bundle with a harness manifest or a conforming
 //     root plugin.json at a canonical path and keep uploads off the
-//     marketplace names (Admit), index a
-//     version and set its properties once its bundle is stored (Deployed)
-//     and rebuild the index from the stored bundles (Reindex). Deletes need
-//     no hook: the item service prunes a version whose bundle is gone.
+//     marketplace names (Admit), index a version, set its properties and
+//     queue the marketplace work once its bundle is stored (Deployed),
+//     queue it again when a bundle or a marketplace file is deleted
+//     (Deleting) and rebuild the index from the stored bundles (Reindex).
+//     The item service prunes a version whose bundle is gone.
+//   - The agentplugins.marketplace work (KindMarketplace), keyed by the
+//     repository (Work): it stores claude-marketplace.json,
+//     codex-marketplace.json, cursor-marketplace.json, marketplace.json and
+//     vscode-marketplace.json at the repository root, created by _system_,
+//     and leaves a file whose content has not changed as it is. Owed makes
+//     a marketplace file's download wait for that work, Resolve queues it
+//     for a repository that holds no file and no work yet, and Classify
+//     classes the files as derived, so replication skips them.
 //   - The package index: a package per plugin name, with a version per
 //     stored bundle, whose metadata is the bundle's Metadata as JSON: its
 //     harnesses and their manifests, its conforming root plugin.json, its
@@ -49,9 +63,8 @@
 //     harnesses, and generic, vscode and cursor for the standard layout),
 //     agentplugins.sha256 and agentplugins.sha1 item properties on each
 //     bundle.
-//   - Marketplace: the JSON of one marketplace file for one reader.
 //   - The path and bundle rules: ValidName, ValidVersion, Path, ParsePath,
-//     ReadArchive, Metadata, StandardSchema, ErrArchive, ErrMarketplace and
+//     ReadArchive, Metadata, StandardSchema, ErrArchive, IsMarketplace and
 //     the bundle bounds.
 //
 // # Invariants
@@ -70,19 +83,25 @@
 //   - vscode-marketplace.json lists the standard layout only, and
 //     cursor-marketplace.json adds it to the Cursor manifests; an entry
 //     takes its fields from the harness's own manifest first.
-//   - A marketplace file is rendered for each reader and lists, for each
-//     plugin, the newest version that reader may read, so a narrower read
-//     grant never discloses a hidden bundle. A version whose ZIP the
-//     repository's patterns reject stays listed, as 7.x's stored file lists
-//     each plugin's latest version, and only the ZIP's download refuses.
-//     The unified file advertises ZIP sources, and Claude's file URL
-//     sources.
+//   - A marketplace file is one stored file per repository that lists, for
+//     each plugin, its newest version, as 7.x keeps the files at the
+//     repository root (issue 1292). Every caller who may read the file's
+//     own path reads the same bytes; the permission check is the file's,
+//     as for any other file, so a grant that leaves the root out shows no
+//     marketplace file. A version whose ZIP the repository's patterns
+//     reject stays listed, and only the ZIP's download refuses. The unified
+//     file advertises ZIP sources, and Claude's file URL sources.
+//   - All five files are kept, empty or not, so each answers once the
+//     repository holds a plugin or a download has asked for it. A folder
+//     at a file's name is left in place and that file is not stored.
 //   - The property names are stored, so they stay byte-identical.
 //
 // # References
 //
 //   - Decision 0032: docs/research/decisions/0032-package-format-handlers.md
-//     (the format hooks).
+//     (the format hooks); decision 0033:
+//     docs/research/decisions/0033-persistent-work-queue.md (the queued
+//     marketplace work).
 //   - docs/research/33-package-formats.md, "Agent Plugins" (the contract,
 //     the marketplace files and the 7.173.8 version boundary), and
 //     docs/testing/phase9b-signoff.md (the qualification ledger).
@@ -100,13 +119,16 @@
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
 //   - https://github.com/weaveplatform/artifactweave/issues/690,
 //     https://github.com/weaveplatform/artifactweave/issues/691,
-//     https://github.com/weaveplatform/artifactweave/issues/1046 and
-//     https://github.com/weaveplatform/artifactweave/issues/1255
+//     https://github.com/weaveplatform/artifactweave/issues/1046,
+//     https://github.com/weaveplatform/artifactweave/issues/1255 and
+//     https://github.com/weaveplatform/artifactweave/issues/1292
 //
 // # Status
 //
 // Implemented P9b (newly identified Artifactory formats). Moved here in P9d.
 // The Agent Plugins Standard and vscode-marketplace.json added by issue 1255.
+// The marketplace files stored rather than rendered for each reader by issue
+// 1292.
 //
 // # Testing
 //
@@ -117,6 +139,9 @@
 //     and the files and fields each layout is listed with.
 //   - handler_test.go: invalid bundles and repository policies at
 //     admission, a missing blob, and a reindex fault.
-//   - marketplace_test.go: the newest readable version and permission
-//     filtering.
+//   - marketplace_test.go: each plugin's newest version in each file, and
+//     the store faults the files fail on.
+//   - work_test.go: the stored files, an unchanged file left as it is, a
+//     folder at a file's name, the repositories that owe no work, store
+//     faults, Owed, Resolve, Classify and the hooks that queue the work.
 package agentplugins

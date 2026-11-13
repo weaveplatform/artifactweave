@@ -1,10 +1,13 @@
 package agentpluginshttp
 
 import (
+	"crypto/sha1" //nolint:gosec // the X-Checksum-Sha1 header names a SHA-1
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -13,12 +16,15 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit/kittest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // listed fails the test unless rec is a marketplace file of plugins-local,
-// served as JSON that no shared cache may keep, and returns its plugins as
-// name@version, in order.
+// served as the stored JSON file it is: with its length and the SHA-1 of
+// the bytes it carries, which JFrog CLI checks against what an AQL search
+// reported, and with no header that keeps it to one reader. It returns
+// the plugins as name@version, in order.
 func listed(t *testing.T, rec *httptest.ResponseRecorder) []string {
 	t.Helper()
 	if rec.Code != http.StatusOK {
@@ -27,10 +33,15 @@ func listed(t *testing.T, rec *httptest.ResponseRecorder) []string {
 	if got := rec.Header().Get("Content-Type"); got != "application/json" {
 		t.Errorf("Content-Type %q, want application/json", got)
 	}
-	// A marketplace file is rendered for its caller, so a shared cache that
-	// kept one would hand it to callers who may not read what it lists.
-	if got := rec.Header().Get("Cache-Control"); got != "private, no-store" {
-		t.Errorf("Cache-Control %q, want private, no-store", got)
+	sum := sha1.Sum(rec.Body.Bytes()) //nolint:gosec // the header's algorithm
+	if got := rec.Header().Get("X-Checksum-Sha1"); got != hex.EncodeToString(sum[:]) {
+		t.Errorf("X-Checksum-Sha1 %q, want the SHA-1 of the body served", got)
+	}
+	if got := rec.Header().Get("Content-Length"); got != strconv.Itoa(rec.Body.Len()) {
+		t.Errorf("Content-Length %q, want %d", got, rec.Body.Len())
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "" {
+		t.Errorf("Cache-Control %q, want none: every reader gets the same file", got)
 	}
 	var doc struct {
 		Name  string `json:"name"`
@@ -56,14 +67,31 @@ func listed(t *testing.T, rec *httptest.ResponseRecorder) []string {
 	return out
 }
 
-// TestAccAgentPluginsMarketplaceListsWhatTheCallerMayRead: a marketplace
-// file is rendered for each request, the same at its API path and at the
-// repository root. It lists each plugin's latest version that the caller
-// may read, of the harness the file names. A version whose ZIP the
-// repository's patterns reject stays listed, as 7.x's stored marketplace
-// lists each plugin's latest version, rather than giving way to an older
-// one; only the ZIP's download refuses.
-func TestAccAgentPluginsMarketplaceListsWhatTheCallerMayRead(t *testing.T) {
+// readerOf is a caller who may read the paths read allows, and every
+// folder, so that listings show the way down.
+func readerOf(name string, read func(p string) bool) *caller {
+	return &caller{kernel.Principal{Name: name}, &accessapitest.Decider{
+		AllowsFolderFunc: func(
+			accessapi.ResourceType, accessapi.Repo, string, accessapi.Actions,
+		) bool {
+			return true
+		},
+		AllowsFunc: func(
+			_ accessapi.ResourceType, _ accessapi.Repo, p string, _ accessapi.Actions,
+		) bool {
+			return read(p)
+		},
+	}}
+}
+
+// TestAccAgentPluginsMarketplaceServesTheStoredFile: 7.x keeps each
+// marketplace file at the repository root as a file of its own, so both
+// paths serve the stored file, and every caller who may read it reads the
+// same bytes. It lists each plugin's latest version of the harness the
+// file names, including versions whose ZIP the caller may not read, and a
+// version whose ZIP the repository's patterns reject; only the ZIP's
+// download refuses.
+func TestAccAgentPluginsMarketplaceServesTheStoredFile(t *testing.T) {
 	w := newItemWorld(t)
 	local := pluginsRepo(pluginsLocal, repo.Local)
 	local.ExcludesPattern = new("secret/**,alpha/2.0.0/**")
@@ -73,44 +101,52 @@ func TestAccAgentPluginsMarketplaceListsWhatTheCallerMayRead(t *testing.T) {
 	w.plugin("beta", "1.0.0", "cursor")
 	w.plugin("hidden", "1.0.0", "claude")
 	w.plugin("secret", "1.0.0", "claude")
-	// reader may read the repository and every bundle in it but alpha's
-	// newest and hidden's.
-	reader := &caller{kernel.Principal{Name: "reader"}, &accessapitest.Decider{
-		AllowsFolderFunc: func(
-			accessapi.ResourceType, accessapi.Repo, string, accessapi.Actions,
-		) bool {
-			return true
-		},
-		AllowsFunc: func(
-			_ accessapi.ResourceType, _ accessapi.Repo, p string, _ accessapi.Actions,
-		) bool {
-			return !strings.HasPrefix(p, "alpha/2.0.0/") && !strings.HasPrefix(p, "hidden/")
-		},
-	}}
+	// reader may read every file but alpha's newest bundle and hidden's.
+	reader := readerOf("reader", func(p string) bool {
+		return !strings.HasPrefix(p, "alpha/2.0.0/") && !strings.HasPrefix(p, "hidden/")
+	})
+	every := []string{"alpha@2.0.0", "beta@1.0.0", "hidden@1.0.0", "secret@1.0.0"}
 	for _, tc := range []struct {
 		file string
-		as   *caller
 		want []string
 	}{
-		{
-			"marketplace.json", admin,
-			[]string{"alpha@2.0.0", "beta@1.0.0", "hidden@1.0.0", "secret@1.0.0"},
-		},
-		{"claude-marketplace.json", admin, []string{"alpha@2.0.0", "hidden@1.0.0", "secret@1.0.0"}},
-		{"cursor-marketplace.json", admin, []string{"beta@1.0.0"}},
-		{"codex-marketplace.json", admin, []string{}},
-		{"marketplace.json", reader, []string{"alpha@1.0.0", "beta@1.0.0", "secret@1.0.0"}},
-		{"claude-marketplace.json", reader, []string{"alpha@1.0.0", "secret@1.0.0"}},
+		{"marketplace.json", every},
+		{"claude-marketplace.json", []string{"alpha@2.0.0", "hidden@1.0.0", "secret@1.0.0"}},
+		{"cursor-marketplace.json", []string{"beta@1.0.0"}},
+		{"codex-marketplace.json", []string{}},
+		{"vscode-marketplace.json", []string{}},
 	} {
-		for _, target := range []string{
-			apiPath(pluginsLocal, tc.file), itemPath(pluginsLocal, tc.file),
-		} {
-			t.Run(tc.as.p.Name+" "+target, func(t *testing.T) {
-				got := listed(t, w.do(http.MethodGet, target, tc.as))
-				if !slices.Equal(got, tc.want) {
-					t.Errorf("lists %v, want %v", got, tc.want)
-				}
-			})
+		var bodies []string
+		for _, as := range []*caller{admin, reader} {
+			for _, target := range []string{
+				apiPath(pluginsLocal, tc.file), itemPath(pluginsLocal, tc.file),
+			} {
+				t.Run(as.p.Name+" "+target, func(t *testing.T) {
+					rec := w.do(http.MethodGet, target, as)
+					if got := listed(t, rec); !slices.Equal(got, tc.want) {
+						t.Errorf("lists %v, want %v", got, tc.want)
+					}
+					bodies = append(bodies, rec.Body.String())
+				})
+			}
+		}
+		if len(bodies) != 4 {
+			t.Fatalf("%s served %d times, want 4", tc.file, len(bodies))
+		}
+		stored := w.stored(tc.file)
+		if stored.CreatedBy != "_system_" || stored.Size != int64(len(bodies[0])) {
+			t.Errorf("%s stored by %q with %d bytes, want the system's %d",
+				tc.file, stored.CreatedBy, stored.Size, len(bodies[0]))
+		}
+		for _, b := range bodies[1:] {
+			if b != bodies[0] {
+				t.Errorf(
+					"%s served %s and %s, want one file for every reader",
+					tc.file,
+					b,
+					bodies[0],
+				)
+			}
 		}
 	}
 	wantError(t, w.do(http.MethodGet, itemPath(pluginsLocal, "alpha/2.0.0/alpha-2.0.0.zip"), admin),
@@ -118,9 +154,31 @@ func TestAccAgentPluginsMarketplaceListsWhatTheCallerMayRead(t *testing.T) {
 			"'plugins-local:alpha/2.0.0/alpha-2.0.0.zip' due to its include/exclude pattern settings.")
 }
 
+// TestAccAgentPluginsMarketplaceFollowsTheIndex: a download owes the work a
+// change to the plugins left queued, so the file served next lists the
+// change.
+func TestAccAgentPluginsMarketplaceFollowsTheIndex(t *testing.T) {
+	w := newItemWorld(t)
+	w.repos(pluginsRepo(pluginsLocal, repo.Local))
+	target := itemPath(pluginsLocal, "marketplace.json")
+	if got := listed(t, w.do(http.MethodGet, target, admin)); len(got) != 0 {
+		t.Fatalf("an empty repository lists %v", got)
+	}
+	w.plugin("alpha", "1.0.0", "claude")
+	if got := listed(
+		t,
+		w.do(http.MethodGet, target, admin),
+	); !slices.Equal(
+		got,
+		[]string{"alpha@1.0.0"},
+	) {
+		t.Errorf("after a plugin lists %v, want alpha@1.0.0", got)
+	}
+}
+
 // TestAccAgentPluginsMarketplaceHeadAnswersTheHeadersAlone: HEAD shares the
-// GET handler at both paths, so it answers the file's status and headers
-// and writes no body.
+// GET handler at both paths, so it answers the stored file's status and
+// headers and writes no body.
 func TestAccAgentPluginsMarketplaceHeadAnswersTheHeadersAlone(t *testing.T) {
 	w := newItemWorld(t)
 	w.repos(pluginsRepo(pluginsLocal, repo.Local))
@@ -130,11 +188,17 @@ func TestAccAgentPluginsMarketplaceHeadAnswersTheHeadersAlone(t *testing.T) {
 	} {
 		t.Run(target, func(t *testing.T) {
 			rec := w.do(http.MethodHead, target, admin)
+			stored := w.stored("marketplace.json")
 			if rec.Code != http.StatusOK || rec.Body.Len() != 0 ||
 				rec.Header().Get("Content-Type") != "application/json" ||
-				rec.Header().Get("Cache-Control") != "private, no-store" {
-				t.Errorf("answered %d %v with %d bytes, want 200 and the JSON headers alone",
-					rec.Code, rec.Header(), rec.Body.Len())
+				rec.Header().Get("Content-Length") != strconv.FormatInt(stored.Size, 10) ||
+				rec.Header().Get("X-Checksum-Sha1") != stored.Actual.SHA1 {
+				t.Errorf(
+					"answered %d %v with %d bytes, want 200 and the stored file's headers alone",
+					rec.Code,
+					rec.Header(),
+					rec.Body.Len(),
+				)
 			}
 		})
 	}
@@ -174,16 +238,15 @@ func TestAccAgentPluginsMarketplaceAPIServesOnlyALocalRepositorysFiles(t *testin
 }
 
 // TestAccAgentPluginsMarketplaceOverlayLeavesOtherRequestsToTheLookup: at
-// the item path the overlay renders a marketplace file only for a request
+// the item path the overlay serves a marketplace file only for a request
 // without properties for a marketplace name at the root of a local Agent
-// Plugins repository, even where a file is stored under that name. Every
-// other request reaches the generic lookup, which serves the file stored
-// at the path where the overlay would have rendered one.
+// Plugins repository, and serves what is stored there. Every other request
+// reaches the generic lookup, which serves the file stored at its path.
 func TestAccAgentPluginsMarketplaceOverlayLeavesOtherRequestsToTheLookup(t *testing.T) {
 	w := newItemWorld(t)
 	w.repos(pluginsRepo(pluginsLocal, repo.Local), pluginsRepo(pluginsRemote, repo.Remote))
 	// The format refuses uploads at the marketplace names; these are stored
-	// past it, so that what the generic lookup serves tells it apart.
+	// past it, so that what each request is served tells the paths apart.
 	w.put(kittest.LocalKey, false, "marketplace.json", `{"stored":"generic"}`)
 	w.put(pluginsLocal, false, "marketplace.json", `{"stored":"root"}`)
 	w.put(pluginsLocal, false, "vscode-marketplace.json", `{"stored":"vscode"}`)
@@ -193,6 +256,11 @@ func TestAccAgentPluginsMarketplaceOverlayLeavesOtherRequestsToTheLookup(t *test
 	for _, tc := range []struct {
 		name, target, stored string
 	}{
+		{"marketplace file", itemPath(pluginsLocal, "marketplace.json"), `{"stored":"root"}`},
+		{
+			"VS Code marketplace file", itemPath(pluginsLocal, "vscode-marketplace.json"),
+			`{"stored":"vscode"}`,
+		},
 		{
 			"generic repository", itemPath(kittest.LocalKey, "marketplace.json"),
 			`{"stored":"generic"}`,
@@ -224,14 +292,6 @@ func TestAccAgentPluginsMarketplaceOverlayLeavesOtherRequestsToTheLookup(t *test
 			}
 		})
 	}
-	for _, file := range []string{"marketplace.json", "vscode-marketplace.json"} {
-		t.Run(file, func(t *testing.T) {
-			got := listed(t, w.do(http.MethodGet, itemPath(pluginsLocal, file), admin))
-			if len(got) != 0 {
-				t.Errorf("lists %v, want no plugins", got)
-			}
-		})
-	}
 }
 
 // TestUnitAgentPluginsOverlayDeclinesACacheAlias: only a remote repository
@@ -256,12 +316,14 @@ func TestUnitAgentPluginsOverlayDeclinesACacheAlias(t *testing.T) {
 	}
 }
 
-// TestAccAgentPluginsMarketplaceRefusesBeforeRendering: a marketplace file
+// TestAccAgentPluginsMarketplaceRefusesBeforeReading: a marketplace file
 // is refused, at both paths, in a blacked-out repository and where the
-// repository's patterns exclude it, before it is rendered. A caller who may
-// not read the repository is refused first, and the anonymous user
-// challenged, so neither learns how the repository is set (DV-057).
-func TestAccAgentPluginsMarketplaceRefusesBeforeRendering(t *testing.T) {
+// repository's patterns exclude it, before it is read. A caller who may
+// not read the file is refused first, and the anonymous user challenged,
+// so neither learns how the repository is set (DV-057): that includes a
+// caller who may read plugins in the repository but not the root, as Read
+// on a stored file's own path is what 7.x asks.
+func TestAccAgentPluginsMarketplaceRefusesBeforeReading(t *testing.T) {
 	w := newItemWorld(t)
 	dark := pluginsRepo("plugins-dark", repo.Local)
 	dark.BlackedOut = new(true)
@@ -269,6 +331,10 @@ func TestAccAgentPluginsMarketplaceRefusesBeforeRendering(t *testing.T) {
 	closed.ExcludesPattern = new("*.json")
 	w.repos(pluginsRepo(pluginsLocal, repo.Local), dark, closed)
 	w.plugin("alpha", "1.0.0", "claude")
+	alphaOnly := readerOf(
+		"alpha-reader",
+		func(p string) bool { return strings.HasPrefix(p, "alpha/") },
+	)
 	const (
 		blackedOut = "The repository 'plugins-dark' is blacked out and cannot serve artifact " +
 			"'plugins-dark:marketplace.json'."
@@ -301,6 +367,10 @@ func TestAccAgentPluginsMarketplaceRefusesBeforeRendering(t *testing.T) {
 			http.StatusForbidden, "Forbidden",
 		},
 		{
+			"caller who may read a plugin but not the file", pluginsLocal, alphaOnly,
+			http.StatusForbidden, "Forbidden",
+		},
+		{
 			"anonymous user who may not read the repository", pluginsLocal, anonymous,
 			http.StatusUnauthorized, "Authentication is required",
 		},
@@ -315,17 +385,75 @@ func TestAccAgentPluginsMarketplaceRefusesBeforeRendering(t *testing.T) {
 	}
 }
 
+// TestAccAgentPluginsMarketplaceNotStored: a marketplace file that nothing
+// has stored, where no work queue runs the work a download owes, answers
+// as a missing item at both paths.
+func TestAccAgentPluginsMarketplaceNotStored(t *testing.T) {
+	w := newItemWorld(t, func(d *itemkit.Deps) { d.Work = nil })
+	w.repos(pluginsRepo(pluginsLocal, repo.Local))
+	for _, target := range []string{
+		apiPath(pluginsLocal, "marketplace.json"), itemPath(pluginsLocal, "marketplace.json"),
+	} {
+		wantError(t, w.do(http.MethodGet, target, admin),
+			http.StatusNotFound, "Could not find resource")
+	}
+}
+
+// TestAccAgentPluginsMarketplaceFolderAnswersAsAFolder: the format stores
+// no file over a folder that stands at a marketplace name, so the item
+// route answers that folder as the generic lookup answers any folder, with
+// its HTML index, and the API path, which lists no folder, answers it as a
+// missing file.
+func TestAccAgentPluginsMarketplaceFolderAnswersAsAFolder(t *testing.T) {
+	w := newItemWorld(t)
+	w.repos(pluginsRepo(pluginsLocal, repo.Local))
+	w.plugin("alpha", "1.0.0", "claude")
+	if _, err := w.world.Store.Items().Put(t.Context(), model.Item{
+		RepoKey: pluginsLocal, Name: "marketplace.json", Folder: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const index = "<!DOCTYPE html>\n" +
+		"<html><head><title>Index of " + pluginsLocal + "/marketplace.json</title></head><body>\n" +
+		"<h1>Index of " + pluginsLocal + "/marketplace.json</h1>\n" +
+		"<pre></pre></body></html>\n"
+	for method, body := range map[string]string{http.MethodGet: index, http.MethodHead: ""} {
+		rec := w.do(method, itemPath(pluginsLocal, "marketplace.json"), admin)
+		if rec.Code != http.StatusOK || rec.Body.String() != body ||
+			rec.Header().Get("Content-Type") != "text/html; charset=utf-8" {
+			t.Errorf("%s answered %d %v %q, want 200 and the folder's index",
+				method, rec.Code, rec.Header(), rec.Body)
+		}
+	}
+	wantError(t, w.do(http.MethodGet, apiPath(pluginsLocal, "marketplace.json"), admin),
+		http.StatusNotFound, "Could not find resource")
+	// The other files are stored as ever.
+	if rec := w.do(
+		http.MethodGet,
+		itemPath(pluginsLocal, "claude-marketplace.json"),
+		admin,
+	); rec.Code != http.StatusOK ||
+		!strings.Contains(rec.Body.String(), `"alpha"`) {
+		t.Errorf(
+			"claude-marketplace.json answered %d %s, want 200 listing alpha",
+			rec.Code,
+			rec.Body,
+		)
+	}
+}
+
 // TestAccAgentPluginsMarketplaceFailsClosed: a server without a store
 // answers the API path as an unimplemented operation, a request that
 // carries no caller is challenged, and a caller whose permissions cannot
-// be evaluated, a repository that cannot be looked up and a marketplace
-// whose plugins cannot be listed answer 500, naming nothing internal and
-// logging the step that failed.
+// be evaluated, a repository that cannot be looked up, marketplace work
+// that fails and a stored file that cannot be read answer 500, naming
+// nothing internal and logging the step that failed.
 func TestAccAgentPluginsMarketplaceFailsClosed(t *testing.T) {
 	marketplace := apiPath(pluginsLocal, "marketplace.json")
 	for _, tc := range []struct {
 		name    string
 		tune    func(*itemkit.Deps)
+		stored  bool
 		target  string
 		as      *caller
 		status  int
@@ -371,6 +499,14 @@ func TestAccAgentPluginsMarketplaceFailsClosed(t *testing.T) {
 			status: http.StatusInternalServerError, message: "internal error",
 			logged: "agent plugin marketplace",
 		},
+		{
+			// The format's own lookup answers; the read after it fails.
+			name:   "stored file cannot be read",
+			tune:   func(d *itemkit.Deps) { d.Store = itemReadFails{d.Store, new(1)} },
+			stored: true, target: marketplace, as: admin,
+			status: http.StatusInternalServerError, message: "internal error",
+			logged: "agent plugin marketplace",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var tune []func(*itemkit.Deps)
@@ -379,7 +515,11 @@ func TestAccAgentPluginsMarketplaceFailsClosed(t *testing.T) {
 			}
 			w := newItemWorld(t, tune...)
 			w.repos(pluginsRepo(pluginsLocal, repo.Local))
-			w.plugin("alpha", "1.0.0", "claude")
+			if tc.stored {
+				w.put(pluginsLocal, false, "marketplace.json", "{}")
+			} else {
+				w.plugin("alpha", "1.0.0", "claude")
+			}
 			wantError(t, w.do(http.MethodGet, tc.target, tc.as), tc.status, tc.message)
 			if tc.logged != "" {
 				w.wantLogged(t, tc.logged)

@@ -230,13 +230,43 @@ than core package indexing. See the [Plugins guide] and [JFrog CLI plugins].
 `<name>/<version>/<name>-<version>.zip` path after bounded archive, manifest,
 CRC and path checks. The package index records path identity and manifest
 fields; it rebuilds on reindex and follows item lifecycle changes. The
-marketplace responses are rendered at the root artifact URL and the
-`/api/agentplugins/{repo}/{file}` URL for the current reader, selecting the
-latest readable SemVer version. The unified index advertises ZIP sources;
-Claude's harness index advertises URL sources. Rendering per reader is an
-artifactweave design choice **[I]**: shared stored JSON could disclose a
-plugin ZIP hidden by a narrower Read grant. It needs target-instance
-comparison under [#216].
+unified index advertises ZIP sources; Claude's harness index advertises URL
+sources. #690 rendered the marketplace files for each reader, listing the
+latest version that reader could read; [#1292] replaced that with stored
+files, below.
+
+**Stored marketplace files in [#1292].** The [Plugins guide] says
+Artifactory "rebuilds marketplace JSON at the repository root" and
+"maintains the following marketplace index files at the repository root",
+and [JFrog CLI plugins] says an install without `--version` "Requires
+`<HARNESS>-marketplace.json` in the repository root (or `marketplace.json`
+for `vscode`)". The CLI downloads `<repo>/<file>` with no checksum or size
+([JFrog CLI marketplace source]), so jfrog-client-go finds the file with an
+AQL search first and checks the downloaded bytes against the SHA-1 that AQL
+reports ([jfrog-client-go download]). JFrog CLI's own tests against
+Artifactory install without `--version` "through the generated
+marketplace", and wait for it because "Artifactory builds the per-harness
+marketplace index asynchronously after a publish" ([JFrog CLI Agent
+Plugins tests]). So the registry stores the five files at the repository
+root, created by `_system_`, from queued work that runs after an upload,
+a delete or a reindex has answered (decision 0033), and AQL, the storage
+API and the folder listings show them as any other file. Each file lists
+each plugin's newest version; a download needs Read on the file's own path,
+as for any file, and every reader gets the same bytes. A download of a
+file first runs the rebuild a completed write left owed, so it never lags
+the write. The following answers are **[I]**, pending [#216] capture:
+- Every caller who may read a file's root path reads the stored bytes,
+  which list plugins that caller may not read; a grant that leaves the
+  root path out shows no marketplace file in AQL, the storage API, the
+  listings or a download.
+- All five files are stored, even when one lists no plugin, so an empty
+  repository's file still answers 200 with an empty list once it is
+  stored; 7.x may write only the files a plugin is listed in.
+- The files carry no property, keep their created date when rewritten,
+  are left as they are when their content has not changed, and are not
+  stored over a folder at their name: the item route answers that folder
+  as any folder, and the `/api/agentplugins/` path answers 404. A client
+  delete of a file queues the rebuild, which stores it again.
 
 **Agent Plugins Standard in [#1255].** A bundle is also indexed by a root
 `plugin.json` that conforms to the [Agent Plugins Standard] 1.0.0: it
@@ -275,10 +305,8 @@ plugin's root `plugin.json` and selects its Agent Plugins adapter by the
 `agent-plugins.org` `$schema` ([VS Code agent plugin parser]). The native
 scenario publishes a standard plugin with the pinned CLI, installs it for
 VS Code and Cursor, and checks the JSON that each file serves and the root
-`plugin.json` in the folder VS Code discovers plugins from. The installs
-pass `--version`: without it the CLI looks the marketplace file up with an
-AQL search, which does not find the files the registry renders for each
-reader.
+`plugin.json` in the folder VS Code discovers plugins from. A second
+scenario installs without `--version`, through the stored files.
 
 **Native client proof in #691.** JFrog CLI 2.126.0 publishes a Cursor plugin,
 installs v1 to an isolated client home and updates it to v2 from the marketplace.
@@ -369,7 +397,7 @@ general virtual work must preserve LuaRocks virtual behavior from [#686].
 | P9B-2 | Native LuaRocks `upload` with rockspec then source rock, `manifest`/`manifest-5.x` reads, missing/denied/overwrite cases, virtual local+remote selection, warm/expired/offline cache and reindex. Capture all upload method/path/body/result shapes. |
 | P9B-3 | NIM 1.3+ Docker run against paired NIM/Docker remotes: capture NGC methods, model mappings, authentication challenge, file bytes, metadata properties, failure/negative-cache responses and permission revocation. |
 | P9B-4 | Skills multipart publish, discovery, list/detail/versions/search, fingerprint resolve, download/file, delete/reindex and scan-status with no Xray entitlement; compare anonymous and revoked-token responses. |
-| P9B-5 | Agent Plugins harness ZIP publish/index/Claude and CLI install/update, multiple versions/layout changes, malformed manifest, narrow Read and revoke. Probe the Agent Plugins Standard on 7.173.x: which root `plugin.json` conforms, `agentplugins.type` for each layout and both, the entry fields of `vscode-marketplace.json` and `cursor-marketplace.json`, and the manifest each file uses for a bundle with both layouts. |
+| P9B-5 | Agent Plugins harness ZIP publish/index/Claude and CLI install/update, multiple versions/layout changes, malformed manifest, narrow Read and revoke. Probe the Agent Plugins Standard on 7.173.x: which root `plugin.json` conforms, `agentplugins.type` for each layout and both, the entry fields of `vscode-marketplace.json` and `cursor-marketplace.json`, and the manifest each file uses for a bundle with both layouts. Capture which marketplace files a publish stores and when, their properties, `createdBy` and dates, what AQL, the storage API and a download show a reader whose grant leaves out some plugins or the root path, and a client delete of a file (#1292). |
 | P9B-6 | APM ZIP publish/versions/download/search/install through local and federated, exact/range versions, bad path/ZIP, overwrite, anonymous/denied access, restore/reindex and replication prohibition. |
 
 [LuaRocks guide]: https://docs.jfrog.com/artifactory/docs/luarocks-repositories
@@ -386,6 +414,8 @@ general virtual work must preserve LuaRocks virtual behavior from [#686].
 [JFrog CLI marketplace source]: https://github.com/jfrog/jfrog-cli-artifactory/blob/30c80a7deec4/agent/plugins/common/marketplace.go
 [VS Code plugin marketplaces]: https://github.com/microsoft/vscode/blob/fcdfa8f173bf/src/vs/workbench/contrib/chat/common/plugins/pluginMarketplaceService.ts
 [VS Code agent plugin parser]: https://github.com/microsoft/vscode/blob/fcdfa8f173bf/src/vs/platform/agentPlugins/common/agentPluginParser.ts
+[jfrog-client-go download]: https://github.com/jfrog/jfrog-client-go/blob/45c51cfca4f7/artifactory/services/download.go
+[JFrog CLI Agent Plugins tests]: https://github.com/jfrog/jfrog-cli/blob/e0df8a58ef9c/agent_plugins_test.go
 [release index]: https://docs.jfrog.com/releases/docs/artifactory-release-notes
 [release dates]: https://docs.jfrog.com/releases/docs/artifactory-end-of-life
 [JFrog CLI plugins]: https://docs.jfrog.com/artifactory/docs/jf-agent-plugins
@@ -401,6 +431,7 @@ general virtual work must preserve LuaRocks virtual behavior from [#686].
 [#691]: https://github.com/weaveplatform/artifactweave/issues/691
 [#693]: https://github.com/weaveplatform/artifactweave/issues/693
 [#1255]: https://github.com/weaveplatform/artifactweave/issues/1255
+[#1292]: https://github.com/weaveplatform/artifactweave/issues/1292
 [P13]: ../implementation/plan.md#p13-peer-trust-and-federated-repositories
 [P23]: ../implementation/plan.md#p23-evidence-and-provenance
 [P26]: ../implementation/plan.md#p26-security-scanning-and-intelligence

@@ -1,8 +1,8 @@
 // Package agentpluginshttp serves the agent plugin marketplace files of a
 // local Agent Plugins repository over the item kit: at
 // /artifactory/api/agentplugins/{repoKey}/{marketplace}, and at the
-// repository root through the item routes. Each file is rendered for the
-// request, from the plugins the caller may read.
+// repository root through the item routes. Each is the file the format's
+// queued work stores at the repository root, served as any stored file is.
 //
 // # Role
 //
@@ -21,12 +21,13 @@
 //     and calls AgentPluginItems' RegisterAgentMarketplaceRoutes right
 //     after the item routes.
 //   - Driven: the item kit (artifacts/adapters/http/itemkit), whose store
-//     (itemkit.Store) the overlay is handed and the marketplace's files are
-//     read from, and which resolves the repository and the caller's access
-//     and writes errors; the generic download policy
+//     (itemkit.Store) the overlay is handed and the stored files are read
+//     from, whose item service (Items) runs the marketplace work a download
+//     owes, and which resolves the repository and the caller's access,
+//     serves the file and writes errors; the generic download policy
 //     (artifacts/ecosystem/generic); and the format package
-//     (artifacts/ecosystem/agentplugins), whose IsMarketplace and
-//     Marketplace name and render the files.
+//     (artifacts/ecosystem/agentplugins), whose IsMarketplace names the
+//     files.
 //
 // # Outputs
 //
@@ -35,20 +36,25 @@
 //     /artifactory/api/agentplugins/{repoKey}/{marketplace}.
 //   - TryAgentMarketplaceItem: the overlay that serves a marketplace file at
 //     a local Agent Plugins repository's root, and leaves every other
-//     request to the overlays after it and the generic lookup.
+//     request, a folder standing at a marketplace name included, to the
+//     overlays after it and the generic lookup.
 //
 // # Invariants
 //
-//   - A marketplace needs Read on the repository itself, checked before
-//     the download policy at the file's own name, so a caller who may not
-//     read the repository learns nothing of how it is set (DV-057): then a
-//     blacked-out repository, or patterns rejecting the name, answer 404
-//     with the item routes' message. It lists each plugin's latest version
-//     that the caller may read. Patterns rejecting that version's ZIP leave
-//     it listed, as 7.x's stored marketplace lists each plugin's latest
-//     version, and refuse only the ZIP's download.
-//   - The files are JSON, private and never stored by a shared cache
-//     (Cache-Control: private, no-store); HEAD answers the headers alone.
+//   - A marketplace file needs Read on its own path at the repository
+//     root, checked before the download policy at that path, so a caller
+//     who may not read it learns nothing of how the repository is set
+//     (DV-057): then a blacked-out repository, or patterns rejecting the
+//     name, answer 404 with the item routes' message. Every caller who may
+//     read it reads the same stored bytes, with the checksums, dates and
+//     size that AQL and the storage API report, which JFrog CLI checks its
+//     download against (issue 1292). Patterns rejecting a listed version's
+//     ZIP leave it listed, and refuse only the ZIP's download.
+//   - A download first runs the marketplace work a completed write left
+//     owed, so it never reads a file that lags the write; a file nothing
+//     has stored answers 404. A folder at a marketplace name answers as
+//     any folder does at the item route, and 404 at the API path, which
+//     lists no folder. HEAD answers the headers alone.
 //   - Only a local Agent Plugins repository has marketplace files; any
 //     other repository, or a cached one, answers 404 at the API path.
 //   - Statuses and error and log text stay byte-identical.
@@ -71,26 +77,32 @@
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
 //   - https://github.com/weaveplatform/artifactweave/issues/690,
 //     https://github.com/weaveplatform/artifactweave/issues/1086,
-//     https://github.com/weaveplatform/artifactweave/issues/1090 and
-//     https://github.com/weaveplatform/artifactweave/issues/1255
+//     https://github.com/weaveplatform/artifactweave/issues/1090,
+//     https://github.com/weaveplatform/artifactweave/issues/1255 and
+//     https://github.com/weaveplatform/artifactweave/issues/1292
 //
 // # Status
 //
 // Implemented P9b (newly identified Artifactory formats), as the server
 // root's agentplugins.go. P9d moved it here (WEB-17). Issue 1255 added
-// vscode-marketplace.json, which self-managed 7.173.8 renders.
+// vscode-marketplace.json, which self-managed 7.173.8 renders. Issue 1292
+// serves the stored files in place of a file rendered for each caller.
 //
 // # Testing
 //
 // agentplugins_test.go serves the marketplace files over a kittest world
-// (fixture_test.go) through a chi router that mounts the item kit's GET
-// and HEAD, with TryAgentMarketplaceItem as the only overlay, and
-// RegisterAgentMarketplaceRoutes, with fake deciders: what each caller may
-// read at both paths, HEAD, the requests left to the generic lookup, the
-// refusals, and the failures of the store, the caller and the rendering.
+// (fixture_test.go) with the runtime's work queue, through a chi router
+// that mounts the item kit's GET and HEAD, with TryAgentMarketplaceItem as
+// the only overlay, and RegisterAgentMarketplaceRoutes, with fake deciders:
+// the stored file each reader gets at both paths, the file following the
+// index, HEAD, the requests left to the generic lookup, the refusals, a
+// file not stored, a folder at a marketplace name, and the failures of the
+// store, the caller and the work.
 // The route suite test/server/artifacts/agentplugins drives the marketplace
-// files through the router, the format's marketplace_test.go covers the
-// rendering and its permission filter, and the @agentplugins acceptance
-// scenarios (test/acceptance/features/agent_plugins.feature and
-// agent_plugins_clients.feature) read them as clients do.
+// files through the router, AQL and the storage API, the format's
+// marketplace_test.go and work_test.go cover the files' content and their
+// storing, and the @agentplugins acceptance scenarios
+// (test/acceptance/features/agent_plugins.feature,
+// agent_plugins_clients.feature and agent_plugins_marketplace.feature) read
+// them as clients do.
 package agentpluginshttp

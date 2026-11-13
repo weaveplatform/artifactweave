@@ -17,7 +17,8 @@ import (
 
 // standardPlugin indexes version of the plugin name in plugins-local as
 // a bundle with a conforming root plugin.json and the manifests of
-// harnesses, as the format's Deployed hook indexes one.
+// harnesses, and queues the marketplace work, as the format's Deployed
+// hook does for one.
 func (w *itemWorld) standardPlugin(name, version string, harnesses ...string) {
 	w.t.Helper()
 	ctx := w.t.Context()
@@ -45,13 +46,19 @@ func (w *itemWorld) standardPlugin(name, version string, harnesses ...string) {
 	}); err != nil {
 		w.t.Fatal(err)
 	}
+	if err := w.world.Store.WorkQueue().Enqueue(
+		ctx, agentplugins.KindMarketplace, pluginsLocal, nil, indexed,
+	); err != nil {
+		w.t.Fatal(err)
+	}
 }
 
 // TestAccAgentPluginsVSCodeMarketplaceListsTheStandardLayout: self-managed
-// 7.173.8 renders vscode-marketplace.json, at both paths, listing the
-// plugins whose newest version the caller may read has a conforming root
-// plugin.json, and adds those plugins to cursor-marketplace.json. The
-// harness files and the unified file list what they listed before.
+// 7.173.8 stores vscode-marketplace.json, served at both paths, listing the
+// plugins whose newest version has a conforming root plugin.json, and adds
+// those plugins to cursor-marketplace.json. The harness files and the
+// unified file list what they listed before. A caller who may not read
+// some of the ZIPs reads the same stored files.
 func TestAccAgentPluginsVSCodeMarketplaceListsTheStandardLayout(t *testing.T) {
 	w := newItemWorld(t)
 	w.repos(pluginsRepo(pluginsLocal, repo.Local))
@@ -88,8 +95,11 @@ func TestAccAgentPluginsVSCodeMarketplaceListsTheStandardLayout(t *testing.T) {
 		},
 		{"claude-marketplace.json", admin, []string{"alpha@1.0.0", "beta@1.0.0"}},
 		{"codex-marketplace.json", admin, []string{}},
-		{"vscode-marketplace.json", reader, []string{"beta@1.0.0"}},
-		{"cursor-marketplace.json", reader, []string{"beta@1.0.0", "gamma@1.0.0"}},
+		{"vscode-marketplace.json", reader, []string{"alpha@2.0.0", "beta@1.0.0", "hidden@1.0.0"}},
+		{
+			"cursor-marketplace.json", reader,
+			[]string{"alpha@2.0.0", "beta@1.0.0", "gamma@1.0.0", "hidden@1.0.0"},
+		},
 	} {
 		for _, target := range []string{
 			apiPath(pluginsLocal, tc.file), itemPath(pluginsLocal, tc.file),
@@ -110,8 +120,12 @@ func TestAccAgentPluginsVSCodeMarketplaceListsTheStandardLayout(t *testing.T) {
 			rec := w.do(http.MethodHead, target, admin)
 			if rec.Code != http.StatusOK || rec.Body.Len() != 0 ||
 				rec.Header().Get("Content-Type") != "application/json" {
-				t.Errorf("answered %d %v with %d bytes, want 200 and the JSON headers alone",
-					rec.Code, rec.Header(), rec.Body.Len())
+				t.Errorf(
+					"answered %d %v with %d bytes, want 200 and the stored file's headers alone",
+					rec.Code,
+					rec.Header(),
+					rec.Body.Len(),
+				)
 			}
 		})
 	}
