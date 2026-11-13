@@ -615,9 +615,10 @@ func checksumType(r *http.Request, name string) string {
 // ServeFile streams a file's content, typed by its path, with the headers
 // the JFrog CLI reads (Content-Length, Accept-Ranges and the X-Checksum
 // headers); ranges on a GET and conditional requests are
-// http.ServeContent's. A Content-Disposition already in w's headers is
-// kept, so a protocol can send its own form. The native APIs and the
-// Docker registry serve their files with it.
+// http.ServeContent's, less the two Artifactory's download never evaluates
+// (withoutUnevaluatedPreconditions). A Content-Disposition already in w's
+// headers is kept, so a protocol can send its own form. The native APIs
+// and the Docker registry serve their files with it.
 func (s *Kit) ServeFile(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -663,6 +664,9 @@ func (s *Kit) serveFile(
 ) {
 	ctx := r.Context()
 	it := f.Item
+	// Before the redirect, so that a redirecting repository answers the
+	// conditional request as a streamed download does.
+	r = withoutUnevaluatedPreconditions(r)
 	if r.Method == http.MethodHead {
 		// A HEAD answers 200 with the file's whole length, never 206 or
 		// 416, for the reasons pkgroute.ServeStream gives (6.20's

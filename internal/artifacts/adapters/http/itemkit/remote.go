@@ -328,6 +328,12 @@ func (s *Kit) ServeRemoteStream(
 		result.Stream.ETag = ""
 		result.Stream.Checksums = kernel.Checksums{}
 		result.Stream.ContentRange = ""
+	} else {
+		// A remote file served from the upstream's stream answers If-Match
+		// and If-Unmodified-Since as its cached copy does: 6.20 answers a
+		// remote download through the same isNotModified. A checksum keeps
+		// its own answers.
+		r = withoutUnevaluatedPreconditions(r)
 	}
 	sw := &StatusWriter{ResponseWriter: w}
 	if err := pkgroute.ServeStream(sw, r, result.Stream); err != nil {

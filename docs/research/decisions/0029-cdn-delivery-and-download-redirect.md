@@ -95,8 +95,10 @@ checksum check after a redirect (research 19 section 2).
 **Policy.** One function, `internal/artifacts/adapters/http/itemkit/redirect.go`, decides for every caller, in this
 order:
 
-1. A conditional request whose validators decide the answer (304 or 412) is answered
-   locally from the item's metadata.
+1. A conditional request whose validators decide the answer (304, or 412 for a registry
+   manifest) is answered locally from the item's metadata. A file download ignores
+   `If-Match` and `If-Unmodified-Since`, as Artifactory's does, so it is answered as the
+   plain request would be ([#1314](https://github.com/weaveplatform/artifactweave/issues/1314)).
 2. A repository with neither `downloadRedirect` nor `cdnRedirect` streams.
 3. A file smaller than the minimum size streams. The minimum is the descriptor's
    `downloadRedirectConfig.fileMinimumSize`, in MB of 1,048,576 bytes, once a descriptor has
