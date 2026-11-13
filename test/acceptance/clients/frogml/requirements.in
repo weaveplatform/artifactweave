@@ -1,0 +1,2 @@
+# Pins for requirements.txt, moved by hand; run ../pip-lock.sh after a move.
+frogml==3.0.0

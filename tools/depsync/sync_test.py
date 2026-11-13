@@ -11,6 +11,55 @@ import sync
 # quote or backslash that ends it.
 URL = re.compile(r"https?://[^\s\"'\\]+")
 
+CLIENTS = "test/acceptance/clients/"
+
+# Every pip install of a Python client (#1439): a loop over PyPI and then TUNA's
+# mirror, each pass installing a whole hashed file. It builds no sdist, or
+# builds one only from hashed build requirements.
+INDEXES = "https://pypi.org/simple https://pypi.tuna.tsinghua.edu.cn/simple"
+LOCKED_INSTALL = re.compile(
+    r"for index in " + re.escape(INDEXES) + r"; do[\s\\]*"
+    r"\S*pip\"? install --no-cache-dir (?:--root-user-action=ignore )?--require-hashes[\s\\]*"
+    r"(?:--only-binary=:all:|--build-constraint \S+)[\s\\]*"
+    r"--index-url \"\$index\" -r (\S+) && break")
+PIP = re.compile(r"\bpip\"? (?:install|download)\b")
+# One entry of a uv-written requirements file: the pin, then its hashes and
+# the comments naming what needs it.
+ENTRY = re.compile(r"([A-Za-z0-9][A-Za-z0-9._-]*)==(\S+) \\\n")
+HASH = re.compile(r"--hash=sha256:[0-9a-f]{64}")
+
+
+def normalize(name):
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def lock_problems(root):
+    """Names each .txt file under the client images that lags its .in file
+    or holds an entry without a SHA-256."""
+    problems = []
+    for source in sorted((root / CLIENTS).rglob("*requirements.in")):
+        lock = source.with_suffix(".txt")
+        label = str(lock.relative_to(root))
+        if not lock.exists():
+            problems.append(label + ": missing; run pip-lock.sh")
+            continue
+        locked = {}
+        for entry in re.split(r"\n(?=[^\s#])", lock.read_text()):
+            if entry.startswith("#") or not entry.strip():
+                continue
+            match = ENTRY.match(entry)
+            if not match:
+                problems.append(label + ": cannot read the entry " + entry.splitlines()[0])
+                continue
+            locked[normalize(match[1])] = match[2]
+            if not HASH.search(entry):
+                problems.append(label + ": " + match[1] + " has no SHA-256")
+        for name, version in re.findall(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==(\S+)$", source.read_text(), re.MULTILINE):
+            if locked.get(normalize(name)) != version:
+                problems.append(label + ": " + source.name + " pins " + name + "==" + version + " but the file has "
+                                + str(locked.get(normalize(name))) + "; run pip-lock.sh")
+    return problems
+
 
 class ReferenceTests(unittest.TestCase):
     def setUp(self):
@@ -164,6 +213,35 @@ class ReferenceTests(unittest.TestCase):
         content = self.read("docs/testing/ci-native-client-inventory.md")
         self.assertIn("huggingface-hub/99.4.0/#files", content)
         self.assertIn("Hub 2.3 then passed", content)
+
+    def test_hugging_face_lock_input_follows_the_workflow_pins(self):
+        # The workflow's version variables stay the canonical pins (#1439);
+        # pip-lock.sh resolves the hashed file from the .in file they write.
+        self.set_pin("hf-hub", "99.4.0")
+        self.set_pin("hf-xet", "99.5.0")
+        sync.sync(self.root)
+        self.assertEqual(["huggingface-hub==99.4.0", "hf-xet==99.5.0"],
+                         re.findall(r"^[a-z].*$", self.read(CLIENTS + "huggingface.requirements.in"), re.MULTILINE))
+        self.assertEqual([], sync.sync(self.root, check=True))
+
+    def test_python_client_pins_come_from_the_lock_inputs(self):
+        # #1439 moved these pins from the pip command lines to the .in files
+        # pip-lock.sh reads; the image headers and inventories follow them.
+        for name, value in {"pip": "99.1", "twine": "99.2.0", "uv": "99.3.0", "poetry": "99.4.0",
+                            "ansible": "99.5.0", "frogml": "99.6.0"}.items():
+            self.set_pin(name, value)
+        sync.sync(self.root)
+        self.assertTrue(self.read(CLIENTS + "python.Dockerfile").startswith(
+            "# Client pins: Python " + self.values["python.version"] + "; pip 99.1; Twine 99.2.0; uv 99.3.0; Poetry 99.4.0.\n"))
+        ansible = self.read(CLIENTS + "ansible.Dockerfile")
+        self.assertTrue(ansible.startswith("# Client pins: ansible-core 99.5.0 on Python "))
+        self.assertIn("grep -F '99.5.0'", ansible)
+        self.assertTrue(self.read(CLIENTS + "frogml/Dockerfile").startswith("# Client pins: FrogML 99.6.0; Python "))
+        images = self.read("docs/testing/ci-client-images.md")
+        self.assertIn("pip 99.1, Twine 99.2.0, uv 99.3.0, Poetry 99.4.0 and their dependencies", images)
+        self.assertIn("ansible-core 99.5.0 and its dependencies", images)
+        self.assertIn("FrogML 99.6.0 and its dependencies", images)
+        self.assertEqual([], sync.sync(self.root, check=True))
 
     def test_ruby_client_pins_update_downloads_installation_and_recipe_independently(self):
         self.set_pin("rubygems", "99.1.0")
@@ -349,6 +427,61 @@ class ReferenceTests(unittest.TestCase):
         (self.root / "link").symlink_to(self.root / "go.mod")
         with self.assertRaises(ValueError):
             sync.safe_path(self.root, "link")
+
+
+class PythonLockTests(unittest.TestCase):
+    """The second source of #1439. pip trusts TUNA's mirror only as far as the
+    hashes in each .txt file reach, and make deps-sync reads the .in pins, so a
+    .txt file behind its .in file would install the old release while every
+    inventory names the new one, and an install outside the loop would take
+    PyPI as its only source."""
+
+    def test_every_lock_pins_its_inputs_and_hashes_every_entry(self):
+        self.assertEqual([CLIENTS + name for name in [
+            "ansible.build-requirements.in", "ansible.requirements.in", "frogml/requirements.in", "huggingface.requirements.in",
+            "poetry.requirements.in", "python.requirements.in"]],
+            sorted(str(p.relative_to(sync.ROOT)) for p in (sync.ROOT / CLIENTS).rglob("*requirements.in")))
+        self.assertEqual([], lock_problems(sync.ROOT))
+
+    def test_a_lagging_or_unhashed_lock_is_named(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name in ["python.requirements.in", "python.requirements.txt"]:
+                (root / CLIENTS).mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(sync.ROOT / CLIENTS / name, root / CLIENTS / name)
+            source = root / CLIENTS / "python.requirements.in"
+            source.write_text(re.sub(r"(?m)^twine==\S+$", "twine==99.0.0", source.read_text()))
+            lock = root / CLIENTS / "python.requirements.txt"
+            lock.write_text(re.sub(r"(?m)^(uv==\S+ \\\n)(?:    --hash=\S+(?: \\)?\n)+", r"\1", lock.read_text()))
+            problems = lock_problems(root)
+            self.assertEqual(2, len(problems), problems)
+            self.assertIn(CLIENTS + "python.requirements.txt: uv has no SHA-256", problems)
+            self.assertTrue(any(p.startswith(CLIENTS + "python.requirements.txt: python.requirements.in pins "
+                                             "twine==99.0.0 but the file has ") for p in problems), problems)
+            (root / CLIENTS / "python.requirements.txt").unlink()
+            self.assertEqual([CLIENTS + "python.requirements.txt: missing; run pip-lock.sh"], lock_problems(root))
+
+    def test_every_python_install_takes_a_hashed_file_from_pypi_then_its_mirror(self):
+        workflow = (sync.ROOT / ".github/workflows/quality-gate.yml").read_text()
+        step = re.search(r"\n      - name: Hugging Face Hub and Xet clients \(pinned\)\n.*?(?=\n      - name: )",
+                         workflow, re.DOTALL)[0]
+        sites = {
+            CLIENTS + "python.Dockerfile": (
+                (sync.ROOT / CLIENTS / "python.Dockerfile").read_text(),
+                ["/tmp/python.requirements.txt", "/tmp/poetry.requirements.txt"]),
+            CLIENTS + "ansible.Dockerfile": (
+                (sync.ROOT / CLIENTS / "ansible.Dockerfile").read_text(), ["/tmp/ansible.requirements.txt"]),
+            CLIENTS + "frogml/Dockerfile": (
+                (sync.ROOT / CLIENTS / "frogml/Dockerfile").read_text(), ["/tmp/frogml.requirements.txt"]),
+            "the Hugging Face step": (step, [CLIENTS + "huggingface.requirements.txt"]),
+        }
+        for site, (text, locks) in sites.items():
+            with self.subTest(site=site):
+                self.assertEqual(locks, LOCKED_INSTALL.findall(text))
+                self.assertEqual(len(locks), len(PIP.findall(text)), "a pip install outside the two-index loop")
+        # bash -e carries on past a for loop whose last command failed in an
+        # && list, so the step has to stop on the loop's status itself.
+        self.assertIn("\n          done || exit 1\n", step)
 
 
 if __name__ == "__main__":
