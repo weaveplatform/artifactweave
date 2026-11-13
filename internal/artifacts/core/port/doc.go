@@ -31,7 +31,10 @@
 //
 //   - RepoStore with RepoFilter; ItemStore with Download, DeleteResult and
 //     RepoUsage; BlobIndex with the sentinel ErrDeleting; ReplicaIndex;
-//     TrashStore; and PackageStore.
+//     TrashStore; and PackageStore, which embeds PackageVersionNames: a
+//     package's version names alone, in Versions' order, which the Puppet,
+//     Ansible and Chef lists count and order before they read their page's
+//     records (#1404).
 //   - BuildStore with NormaliseBuild; BowerRegistrationStore;
 //     GitLFSLockStore with GitLFSLockFilter; and ArchivedItemStore with
 //     ArchivedFilter.

@@ -95,5 +95,7 @@
 // inmem_test.go: TestUnitContract runs the artifacts contract
 // (adapters/storetest.Run) on a Store over a fresh memtx.Store. The
 // metadata store's in-memory TestUnitContract runs the same cases through
-// its own store, with RemoteLayoutFences beside them.
+// its own store, with RemoteLayoutFences beside them. puppet_page_test.go:
+// TestUnitVersionNamesContract runs adapters/storetest.RunVersionNames, the
+// contract of the package store's VersionNames (#1404).
 package inmem

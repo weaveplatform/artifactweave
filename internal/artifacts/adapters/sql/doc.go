@@ -159,6 +159,13 @@
 //   - archived_test.go: TestAccArchivedItemsClosedDatabase and
 //     TestAccArchivedItemsCorruptRows (every archived-item call fails on a
 //     closed pool and on rows corrupted behind the store's back).
+//   - puppet_page_test.go: TestAccVersionNamesContract (the package store's
+//     VersionNames contract, adapters/storetest.RunVersionNames) and
+//     TestAccVersionNamesAtScale (a module of 5,000 versions beside another:
+//     its names come from package_versions_order in its own order, with no
+//     sort, and a late page row is one seek on package_versions_version,
+//     whose query plans it logs), each on SQLite in memory and in a file and
+//     on PostgreSQL (#1404).
 //
 // They open SQLite over the artifacts registration alone (store_test.go),
 // which migrates the stream and runs the header backfill as the metadata
