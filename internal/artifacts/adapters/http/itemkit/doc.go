@@ -67,6 +67,11 @@
 //     failure; once the entry's 200 is sent, a failure is only logged. An
 //     entry the archive lacks, or one of a file that is no archive or a
 //     corrupt one, answers 404.
+//   - A file download, streamed, redirected or from a remote's stream,
+//     answers If-None-Match, If-Modified-Since and If-Range, and ignores
+//     If-Match and If-Unmodified-Since, which Artifactory's download never
+//     evaluates. A checksum sidecar, a folder listing and an archive entry
+//     keep their own answers.
 //
 // # References
 //
@@ -87,6 +92,8 @@
 //     lines 238 to 246 (artifacts/adapters/http).
 //   - https://github.com/weaveplatform/artifactweave/issues/1075 and
 //     https://github.com/weaveplatform/artifactweave/issues/1090
+//   - https://github.com/weaveplatform/artifactweave/issues/1314 (the
+//     preconditions a download ignores).
 //
 // # Status
 //
@@ -98,8 +105,9 @@
 //
 // kit_test.go tests the kit over the in-memory world of kittest, without a
 // router: the overlay order, the private-path default, the error mapping and
-// the lookup through a virtual repository. access_test.go tests AccessFor, and
-// redirect_test.go the signing-failure throttle and the descriptor's minimum
-// redirect size. The route suites under test/server/artifacts and the router's
+// the lookup through a virtual repository. access_test.go tests AccessFor,
+// redirect_test.go the signing-failure throttle, the descriptor's minimum
+// redirect size and the request copy without the preconditions a download
+// ignores. The route suites under test/server/artifacts and the router's
 // guards in app reach the rest through the router.
 package itemkit

@@ -74,7 +74,8 @@ func TestAccRedirectAnswersConditionalRequestsLocally(t *testing.T) {
 	}{
 		{"matching If-None-Match", []string{"If-None-Match", etag}, http.StatusNotModified},
 		{"If-Modified-Since after the change", []string{"If-Modified-Since", future}, http.StatusNotModified},
-		{"failing If-Match", []string{"If-Match", `"other"`}, http.StatusPreconditionFailed},
+		// Artifactory's download never evaluates If-Match (#1314).
+		{"ignored If-Match", []string{"If-Match", `"other"`}, http.StatusFound},
 		{"stale If-None-Match", []string{"If-None-Match", `"other"`}, http.StatusFound},
 	} {
 		rec := w.do("GET", p, "admin", "", c.header...)
@@ -89,9 +90,9 @@ func TestAccRedirectAnswersConditionalRequestsLocally(t *testing.T) {
 			t.Fatalf("%s: 304 headers %v", c.name, rec.Header())
 		}
 	}
-	// Only the redirected GET counts.
-	if n := w.downloads("r.bin"); n != 1 {
-		t.Fatalf("%d downloads counted, want 1", n)
+	// Only the redirected GETs count.
+	if n := w.downloads("r.bin"); n != 2 {
+		t.Fatalf("%d downloads counted, want 2", n)
 	}
 }
 

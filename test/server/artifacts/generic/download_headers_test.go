@@ -116,7 +116,8 @@ func TestAccBoxDownloadsAsAVagrantBox(t *testing.T) {
 // RTFACT-29977, RTFACT-27264), on the item route and on a protocol route.
 // If-None-Match naming it bare or quoted answers 304, and If-Range with it
 // the range asked for. What answered otherwise before still does: another
-// tag, a plain or unsatisfiable range, If-Match and If-Modified-Since.
+// tag, a plain or unsatisfiable range and If-Modified-Since. If-Match is
+// ignored, bare or quoted (#1314).
 func TestAccFileDownloadSendsTheBareSHA1AsETag(t *testing.T) {
 	w, data, sha := downloadWorld(t)
 	quoted := `"` + sha + `"`
@@ -161,7 +162,7 @@ func TestAccFileDownloadSendsTheBareSHA1AsETag(t *testing.T) {
 				answer{http.StatusRequestedRangeNotSatisfiable, "invalid range: failed to overlap\n", "bytes */" + size, false},
 			},
 			{"If-Match quoted", http.MethodGet, []string{"If-Match", quoted}, whole},
-			{"If-Match bare", http.MethodGet, []string{"If-Match", sha}, answer{http.StatusPreconditionFailed, "", "", true}},
+			{"If-Match bare", http.MethodGet, []string{"If-Match", sha}, whole},
 			{"If-Modified-Since", http.MethodGet, []string{"If-Modified-Since", future}, notModified},
 		} {
 			rec := w.Do(c.method, path, "reader", "", c.headers...)

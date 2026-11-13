@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -69,6 +71,38 @@ func TestUnitMinRedirectSizeReadsTheDescriptor(t *testing.T) {
 				tc.want,
 				tc.logged,
 			)
+		}
+	}
+}
+
+// withoutUnevaluatedPreconditions drops If-Match and If-Unmodified-Since,
+// every value of each, from a copy, keeps the conditional headers the
+// download evaluates, and leaves the request it was given as it was sent.
+// A request without either is returned as it is.
+func TestUnitWithoutUnevaluatedPreconditions(t *testing.T) {
+	plain := httptest.NewRequest(http.MethodGet, "/artifactory/libs-local/a.bin", nil)
+	plain.Header.Set("If-None-Match", `"x"`)
+	if got := withoutUnevaluatedPreconditions(plain); got != plain {
+		t.Fatal("a request without If-Match or If-Unmodified-Since was copied")
+	}
+	for _, name := range unevaluatedPreconditions {
+		r := httptest.NewRequest(http.MethodGet, "/artifactory/libs-local/a.bin", nil)
+		r.Header.Add(name, "a")
+		r.Header.Add(name, "b")
+		for _, kept := range []string{"If-None-Match", "If-Modified-Since", "If-Range", "Range"} {
+			r.Header.Set(kept, kept)
+		}
+		got := withoutUnevaluatedPreconditions(r)
+		if got == r || len(got.Header.Values(name)) != 0 {
+			t.Fatalf("%s: %v", name, got.Header)
+		}
+		for _, kept := range []string{"If-None-Match", "If-Modified-Since", "If-Range", "Range"} {
+			if got.Header.Get(kept) != kept {
+				t.Fatalf("%s: %s dropped: %v", name, kept, got.Header)
+			}
+		}
+		if len(r.Header.Values(name)) != 2 {
+			t.Fatalf("%s: the caller's request changed: %v", name, r.Header)
 		}
 	}
 }
