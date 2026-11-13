@@ -95,7 +95,9 @@ func TestUnitServeContentAnswersAsTheDownload(t *testing.T) {
 		{"If-Unmodified-Since before", "", modified, []string{"If-Unmodified-Since", before}, whole, head},
 		{"Range", "", time.Time{}, []string{"Range", "bytes=2-5"}, part, head},
 		{
-			"Range past the end", "", time.Time{}, []string{"Range", "bytes=1000-2000"},
+			"Range past the end", "",
+			time.Time{},
+			[]string{"Range", "bytes=1000-2000"},
 			contentAnswer{http.StatusRequestedRangeNotSatisfiable, "invalid range: failed to overlap\n", "bytes */15"},
 			head,
 		},
@@ -105,10 +107,18 @@ func TestUnitServeContentAnswersAsTheDownload(t *testing.T) {
 		{"If-Modified-Since after", "", modified, []string{"If-Modified-Since", after}, notModified, notModified},
 		{"If-Modified-Since, no time", "", time.Time{}, []string{"If-Modified-Since", after}, whole, head},
 	} {
-		if got := serveContentAnswer(http.MethodGet, c.etag, c.modified, c.headers...); got != c.get {
+		if got := serveContentAnswer(
+			http.MethodGet,
+			c.etag,
+			c.modified,
+			c.headers...); got != c.get {
 			t.Errorf("GET %s: %+v, want %+v", c.label, got, c.get)
 		}
-		if got := serveContentAnswer(http.MethodHead, c.etag, c.modified, c.headers...); got != c.head {
+		if got := serveContentAnswer(
+			http.MethodHead,
+			c.etag,
+			c.modified,
+			c.headers...); got != c.head {
 			t.Errorf("HEAD %s: %+v, want %+v", c.label, got, c.head)
 		}
 	}
@@ -143,11 +153,13 @@ func TestUnitFileNotModified(t *testing.T) {
 		{"no SHA-1", "", modified, [][2]string{{"If-None-Match", `""`}}, false},
 		{
 			"If-None-Match decides alone", sha, modified,
-			[][2]string{{"If-None-Match", `"other"`}, {"If-Modified-Since", after}}, false,
+			[][2]string{{"If-None-Match", `"other"`}, {"If-Modified-Since", after}},
+			false,
 		},
 		{
 			"If-None-Match over an earlier If-Modified-Since", sha, modified,
-			[][2]string{{"If-None-Match", sha}, {"If-Modified-Since", before}}, true,
+			[][2]string{{"If-None-Match", sha}, {"If-Modified-Since", before}},
+			true,
 		},
 		{"If-Modified-Since after", sha, modified, [][2]string{{"If-Modified-Since", after}}, true},
 		{"If-Modified-Since the same second", sha, modified, [][2]string{{"If-Modified-Since", same}}, true},
@@ -211,12 +223,26 @@ func TestUnitServeChecksum(t *testing.T) {
 			}
 		}
 	}
-	if rec := serve(http.MethodGet, sha, modified, "Range", "bytes=2-5"); rec.Code != http.StatusPartialContent ||
-		rec.Body.String() != sha[2:6] || rec.Header().Get("Content-Range") != "bytes 2-5/40" {
+	if rec := serve(
+		http.MethodGet,
+		sha,
+		modified,
+		"Range",
+		"bytes=2-5",
+	); rec.Code != http.StatusPartialContent ||
+		rec.Body.String() != sha[2:6] ||
+		rec.Header().Get("Content-Range") != "bytes 2-5/40" {
 		t.Errorf("GET Range: %d %v %q", rec.Code, rec.Header(), rec.Body)
 	}
-	if rec := serve(http.MethodHead, sha, modified, "Range", "bytes=2-5"); rec.Code != http.StatusOK ||
-		rec.Header().Get("Content-Range") != "" || rec.Header().Get("Content-Length") != "40" {
+	if rec := serve(
+		http.MethodHead,
+		sha,
+		modified,
+		"Range",
+		"bytes=2-5",
+	); rec.Code != http.StatusOK ||
+		rec.Header().Get("Content-Range") != "" ||
+		rec.Header().Get("Content-Length") != "40" {
 		t.Errorf("HEAD Range: %d %v", rec.Code, rec.Header())
 	}
 }

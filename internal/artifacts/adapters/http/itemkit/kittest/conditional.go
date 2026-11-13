@@ -37,8 +37,17 @@ func WantDownloadConditionals(t *testing.T, label string, send Send, head bool) 
 		{"If-Match other", []string{"If-Match", `"other"`}},
 		{"If-Unmodified-Since an hour ago", []string{"If-Unmodified-Since", before}},
 	} {
-		if rec := send(http.MethodGet, c.headers...); rec.Code != http.StatusOK || !sameDocument(rec.Body.String(), body) {
-			t.Errorf("%s: GET %s: %d %q, want 200 with the document", label, c.label, rec.Code, rec.Body)
+		if rec := send(
+			http.MethodGet,
+			c.headers...); rec.Code != http.StatusOK ||
+			!sameDocument(rec.Body.String(), body) {
+			t.Errorf(
+				"%s: GET %s: %d %q, want 200 with the document",
+				label,
+				c.label,
+				rec.Code,
+				rec.Body,
+			)
 		}
 		if head {
 			wantWholeHead(t, label+": HEAD "+c.label, send(http.MethodHead, c.headers...), size)
@@ -54,7 +63,12 @@ func WantDownloadConditionals(t *testing.T, label string, send Send, head bool) 
 			ranges = append(ranges, []string{"Range", "bytes=2-5", "If-Range", etag})
 		}
 		for _, h := range ranges {
-			wantWholeHead(t, label+": HEAD "+strings.Join(h, " "), send(http.MethodHead, h...), size)
+			wantWholeHead(
+				t,
+				label+": HEAD "+strings.Join(h, " "),
+				send(http.MethodHead, h...),
+				size,
+			)
 		}
 	}
 	part := send(http.MethodGet, "Range", "bytes=2-5")

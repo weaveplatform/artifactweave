@@ -136,5 +136,11 @@ func (h handler) localBinary(w http.ResponseWriter, r *http.Request, name, versi
 	}
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Cache-Control", "private, no-store")
-	itemkit.ServeContent(w, r, name+"-"+version+".tar.gz", time.Time{}, bytes.NewReader(out.Bytes()))
+	itemkit.ServeContent(
+		w,
+		r,
+		name+"-"+version+".tar.gz",
+		time.Time{},
+		bytes.NewReader(out.Bytes()),
+	)
 }

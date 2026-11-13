@@ -45,7 +45,9 @@ func TestAccP2MetadataAnswersConditionalsAsTheDownload(t *testing.T) {
 			case q.Repo.Key == "p2-external" && q.Resource.Path == "compositeContent.xml":
 				body := []byte(p2ExternalComposite)
 				return source.Result{
-					Metadata: source.MetadataResponse{BaseURL: "https://root.example/site/compositeContent.xml"},
+					Metadata: source.MetadataResponse{
+						BaseURL: "https://root.example/site/compositeContent.xml",
+					},
 					Stream: &source.Stream{
 						Body: io.NopCloser(bytes.NewReader(body)), Status: http.StatusOK,
 						Representation: source.Representation{Size: int64(len(body))},
@@ -58,7 +60,12 @@ func TestAccP2MetadataAnswersConditionalsAsTheDownload(t *testing.T) {
 	w := newItemWorld(t, false, func(c *Config) {
 		c.RemoteSources = &source.Service{Resolve: sourceIdentity, HTTP: backend, Cache: backend}
 	})
-	if res := w.do(http.MethodPut, "/artifactory/libs-local/site.zip", "admin", archive.String()); res.Code != http.StatusCreated {
+	if res := w.do(
+		http.MethodPut,
+		"/artifactory/libs-local/site.zip",
+		"admin",
+		archive.String(),
+	); res.Code != http.StatusCreated {
 		t.Fatalf("seed archive: %d %s", res.Code, res.Body)
 	}
 	cached = w.item("libs-local", false, "site.zip")

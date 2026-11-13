@@ -19,7 +19,13 @@ func TestUnitSwiftManifestAnswersConditionalsAsTheDownload(t *testing.T) {
 	f := newFixture(t, repo.Local)
 	body, contentType := form(t, archive(t, "Widget/"))
 	url := base + "acme/Widget/1.0.0"
-	if rec := f.do(http.MethodPut, url, body, contentType, "admin"); rec.Code != http.StatusCreated {
+	if rec := f.do(
+		http.MethodPut,
+		url,
+		body,
+		contentType,
+		"admin",
+	); rec.Code != http.StatusCreated {
 		t.Fatalf("publish: %d %s", rec.Code, rec.Body)
 	}
 	path := url + "/Package.swift"

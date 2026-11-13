@@ -63,12 +63,14 @@ func checksumConditionals(sum, sha string, modified time.Time) []conditional {
 		},
 		// A GET's range; a HEAD's whole length.
 		{
-			"Range", []string{"Range", "bytes=2-5"},
+			"Range",
+			[]string{"Range", "bytes=2-5"},
 			condAnswer{http.StatusPartialContent, sum[2:6], "bytes 2-5/" + strconv.Itoa(len(sum))},
 			head,
 		},
 		{
-			"Range past the end", []string{"Range", "bytes=1000-2000"},
+			"Range past the end",
+			[]string{"Range", "bytes=1000-2000"},
 			condAnswer{
 				http.StatusRequestedRangeNotSatisfiable, "invalid range: failed to overlap\n",
 				"bytes */" + strconv.Itoa(len(sum)),
@@ -98,7 +100,8 @@ func wantChecksumAnswers(
 		wantCondAnswer(t, "GET "+label+" "+c.label, send(http.MethodGet, c.headers...), c.get, "")
 		rec := send(http.MethodHead, c.headers...)
 		wantCondAnswer(t, "HEAD "+label+" "+c.label, rec, c.head, "")
-		if rec.Code == http.StatusOK && rec.Header().Get("Content-Length") != strconv.Itoa(len(sum)) {
+		if rec.Code == http.StatusOK &&
+			rec.Header().Get("Content-Length") != strconv.Itoa(len(sum)) {
 			t.Errorf("HEAD %s %s: Content-Length %q, want %d", label, c.label,
 				rec.Header().Get("Content-Length"), len(sum))
 		}
@@ -122,8 +125,12 @@ func TestAccChecksumFileAnswersConditionalsAsTheDownload(t *testing.T) {
 	const data = "a file whose checksums are asked for on a condition"
 	sha, sum256 := fileSums(data)
 	// libs-local keeps client checksums, so the deploy sends both.
-	harness.WantStatus(t, w.Do(http.MethodPut, "/artifactory/libs-local/dir/sums.bin", "admin", data,
-		"X-Checksum-Sha1", sha, "X-Checksum-Sha256", sum256), http.StatusCreated)
+	harness.WantStatus(
+		t,
+		w.Do(http.MethodPut, "/artifactory/libs-local/dir/sums.bin", "admin", data,
+			"X-Checksum-Sha1", sha, "X-Checksum-Sha256", sum256),
+		http.StatusCreated,
+	)
 	for _, key := range []string{"libs-local", "virt"} {
 		for ext, sum := range map[string]string{"sha1": sha, "sha256": sum256} {
 			path := "/artifactory/" + key + "/dir/sums.bin." + ext
@@ -157,10 +164,16 @@ func TestAccRemoteChecksumFileAnswersConditionalsAsTheDownload(t *testing.T) {
 	modified := time.Unix(1700000000, 0).UTC()
 	sums := http.Header{"X-Checksum-Sha1": {sha}, "X-Checksum-Sha256": {sum256}}
 	for _, name := range []string{"/dir/sums.bin", "/org/a/1.0/a-1.0.jar"} {
-		w.Upstream.Set(name, fakeupstream.Resource{Body: []byte(data), Header: sums, Modified: modified})
+		w.Upstream.Set(
+			name,
+			fakeupstream.Resource{Body: []byte(data), Header: sums, Modified: modified},
+		)
 	}
-	harness.WantStatus(t, w.Request(http.MethodGet, "/artifactory/remote/dir/sums.bin", "admin", ""),
-		http.StatusOK)
+	harness.WantStatus(
+		t,
+		w.Request(http.MethodGet, "/artifactory/remote/dir/sums.bin", "admin", ""),
+		http.StatusOK,
+	)
 	for _, path := range []string{
 		"/artifactory/remote/dir/sums.bin",
 		"/artifactory/maven-store-true/org/a/1.0/a-1.0.jar",
@@ -209,8 +222,18 @@ func TestAccColdRemoteChecksumAnswersConditionalsAsTheDownload(t *testing.T) {
 			if method == http.MethodHead {
 				want = c.head
 			}
-			wantCondAnswer(t, method+" "+c.label,
-				w.Request(method, "/artifactory/remote/cold.bin.sha256", "reader", "", c.headers...), want, "")
+			wantCondAnswer(
+				t,
+				method+" "+c.label,
+				w.Request(
+					method,
+					"/artifactory/remote/cold.bin.sha256",
+					"reader",
+					"",
+					c.headers...),
+				want,
+				"",
+			)
 		}
 	}
 }
