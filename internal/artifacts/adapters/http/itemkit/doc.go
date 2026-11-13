@@ -36,13 +36,15 @@
 //   - Kit and its methods: GetItem (an item GET or HEAD), ServeFile,
 //     RedirectManifest, Items (the item service), Format, ItemCaller,
 //     ItemError, MayBeIdentical, Content, InternalError, Log, Reindex,
-//     ReindexAs, OperationRepo, Enqueue, Queue, Await, ServeRemoteStream and
-//     RemoteDeliveryAllowed.
+//     ReindexAs, OperationRepo, Enqueue, Queue, Await, ServeRemoteStream,
+//     RemoteDeliveryAllowed, and ForceAuthentication, the router's
+//     middleware that challenges a request without credentials to a
+//     repository Forced reports.
 //   - Item values and helpers: ItemRequest, ParseItemPath,
 //     ParseEscapedItemPath, Found, Download, Lookup, StatusWriter,
 //     ResolveRepo, DeployTarget, ItemCreated, ItemNotFound,
 //     OverwriteRefusal, ChecksumsJSON, DownloadURI, SplitRepoPath,
-//     NotFoundRepo and View.
+//     NotFoundRepo, View and Forced.
 //   - Access, Target and AccessFor: the questions handlers ask the
 //     request's permission decider.
 //   - The per-format remote source requests (AlpineSourceRequest and the
@@ -51,6 +53,20 @@
 //
 // # Invariants
 //
+//   - ForceAuthentication answers 401 "Unauthorized" with the Basic
+//     challenge to every request without credentials under
+//     /artifactory/<key>/ (not api, ui or webapp), whatever its method or
+//     query, when <key> names a Maven virtual repository with
+//     forceMavenAuthentication on or a P2 virtual repository with
+//     forceP2Authentication on, before the router routes it and whether
+//     anonymous access is on or off, as 7.x's force-authentication filter
+//     does (OssForceAuthenticationFilter, 7.161.26). While anonymous access
+//     is on, the anonymous user's Basic credentials, a blank Basic user name
+//     and a Bearer token that does not verify or whose subject is anonymous
+//     count as none, as in that filter; any other credential, verified or
+//     not, is left to authentication. Only the repository the path names
+//     counts, so a format that reads a member through GetItem never asks the
+//     member's flag.
 //   - GetItem tries Deps.Overlays in order and stops at the first that
 //     answers. A format's route takes precedence over the generic lookup and
 //     over every overlay after it, so the composition lists them in one
@@ -94,6 +110,11 @@
 //     https://github.com/weaveplatform/artifactweave/issues/1090
 //   - https://github.com/weaveplatform/artifactweave/issues/1314 (the
 //     preconditions a download ignores).
+//   - https://github.com/weaveplatform/artifactweave/issues/1435 (Force
+//     Authentication on the item routes); JFrog's virtual repository
+//     settings, https://docs.jfrog.com/artifactory/docs/virtual-repositories,
+//     and maven-repositories, "Force Authentication on Virtual Maven
+//     Repositories".
 //
 // # Status
 //
@@ -106,8 +127,9 @@
 // kit_test.go tests the kit over the in-memory world of kittest, without a
 // router: the overlay order, the private-path default, the error mapping and
 // the lookup through a virtual repository. access_test.go tests AccessFor,
-// redirect_test.go the signing-failure throttle, the descriptor's minimum
-// redirect size and the request copy without the preconditions a download
-// ignores. The route suites under test/server/artifacts and the router's
+// and Forced, ForceAuthentication's branches and the credentials it counts
+// as none over an in-memory store; redirect_test.go the signing-failure
+// throttle, the descriptor's minimum redirect size and the request copy
+// without the preconditions a download ignores. The route suites under test/server/artifacts and the router's
 // guards in app reach the rest through the router.
 package itemkit

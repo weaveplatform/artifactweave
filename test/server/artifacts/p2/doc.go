@@ -48,6 +48,10 @@
 //     signed-in caller and when it is off; a nested virtual member read
 //     through a virtual repository whose own flag is off; and a remote's
 //     flag, which changes nothing (#1280).
+//   - p2_force_auth_methods_test.go: the same 401 for an anonymous ?trace,
+//     PUT, DELETE and a method the item routes do not serve, and for a
+//     request without credentials while anonymous access is off; the
+//     answers it leaves to a signed-in caller and when it is off (#1435).
 //
 // # References
 //
