@@ -1268,6 +1268,8 @@ func securityMatrix() []matrixRow {
 		row("DELETE "+secGroups+"/{groupName}", secGroups+"/g-{p}", "", administrators, 200),
 		at("GET /artifactory/api/security/lockedUsers", "", administrators, 200),
 		at("POST /artifactory/api/security/unlockAllUsers", "", administrators, 200),
+		at("POST "+sysEncrypt, "", administrators, 200),
+		at("POST "+sysDecrypt, "", administrators, 200),
 		at("POST /artifactory/api/security/unlockUsers", `["v-{p}"]`, administrators, 200),
 		row(
 			"POST /artifactory/api/security/unlockUsers/{userName}",
