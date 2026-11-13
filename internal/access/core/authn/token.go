@@ -137,13 +137,21 @@ func (a *Authenticator) lookupTokenUser(
 	user string,
 ) (model.User, error) {
 	sub, err := model.ParseSubject(t.Subject)
-	if err != nil || sub.Kind != "users" || (user != "" && user != sub.Name) {
+	// A Basic user name names the subject in any case: RTFACT-10141 made
+	// 7.17.2 accept an API key or encrypted password with the user name in
+	// upper case, as a password always was. RTFACT-23454 reports an access
+	// token refused the same way ("Token principal mismatch"); that is taken
+	// as the same bug, not followed.
+	if err != nil || sub.Kind != "users" || (user != "" && !model.SameUsername(user, sub.Name)) {
 		return model.User{}, kernel.ErrBadCredentials
 	}
+	// A synthetic or transient user keeps the subject's spelling, so a
+	// token issued before user names were folded acts under the name it
+	// always had, and a credential reference kept for it still matches.
 	if t.Identity == kernel.IdentitySynthetic {
 		return model.User{Name: sub.Name}, nil
 	}
-	u, err := a.users.Get(ctx, sub.Name)
+	u, err := a.users.Get(ctx, model.FoldUsername(sub.Name))
 	if errors.Is(err, kernel.ErrNotFound) && t.Identity == kernel.IdentityTransient {
 		return a.transientUser(ctx, sub.Name)
 	}

@@ -18,7 +18,8 @@ import (
 
 // ErrInvalid reports a request the caller must change: a missing or
 // mismatched field, an unknown group or member, or a change to a protected
-// principal. Handlers answer it 400.
+// principal. Handlers answer it 400 with the message after the sentinel,
+// which the service words itself so that it is the same on every store.
 var ErrInvalid = errors.New("identity: invalid")
 
 // ErrProtected marks the ErrInvalid errors that refuse a change to a
@@ -105,8 +106,10 @@ type UserPatch struct {
 // PutUser creates u, or replaces every field an existing user's document
 // carries, and reports whether it created it. password is the clear-text
 // password, required unless u.InternalPasswordDisabled. A new user also
-// joins every auto-join group.
+// joins every auto-join group. u.Name is folded (model.FoldUsername), so the
+// legacy PUT of Dan creates or replaces dan.
 func (s *Service) PutUser(ctx context.Context, u model.User, password string) (bool, error) {
+	u.Name = model.FoldUsername(u.Name)
 	if err := validName("user", u.Name); err != nil {
 		return false, err
 	}
@@ -147,17 +150,22 @@ func (s *Service) PutUser(ctx context.Context, u model.User, password string) (b
 		if err := s.setPassword(ctx, &next, password, now, true); err != nil {
 			return err
 		}
-		if created {
-			return groupsError(s.Store.Users().Create(ctx, next))
+		if err := s.requireGroups(ctx, next.Groups); err != nil {
+			return err
 		}
-		return groupsError(s.Store.Users().Update(ctx, next))
+		if created {
+			return s.Store.Users().Create(ctx, next) //nolint:wrapcheck // a store error
+		}
+		return s.Store.Users().Update(ctx, next) //nolint:wrapcheck // a store error
 	})
 	return created, err
 }
 
 // CreateUser creates u with password, as PutUser does for a new name, and
 // answers ErrExists when the name is taken instead of replacing the user.
+// u.Name is folded, so Bob beside bob is taken.
 func (s *Service) CreateUser(ctx context.Context, u model.User, password string) error {
+	u.Name = model.FoldUsername(u.Name)
 	if err := validName("user", u.Name); err != nil {
 		return err
 	}
@@ -176,11 +184,14 @@ func (s *Service) CreateUser(ctx context.Context, u model.User, password string)
 		if err := s.setPassword(ctx, &next, password, now, false); err != nil {
 			return err
 		}
+		if err := s.requireGroups(ctx, next.Groups); err != nil {
+			return err
+		}
 		err = s.Store.Users().Create(ctx, next)
 		if errors.Is(err, kernel.ErrConflict) {
 			return fmt.Errorf("%w: user %q", ErrExists, u.Name)
 		}
-		return groupsError(err)
+		return err //nolint:wrapcheck // a store error
 	})
 }
 
@@ -202,7 +213,7 @@ func (s *Service) newUser(ctx context.Context, u model.User, now time.Time) (mod
 // the membership.
 func (s *Service) PatchUser(ctx context.Context, name string, p UserPatch) error {
 	return s.tx(ctx, func(ctx context.Context) error {
-		old, err := s.Store.Users().Get(ctx, name)
+		old, err := s.Store.Users().Get(ctx, model.FoldUsername(name))
 		if err != nil {
 			return err //nolint:wrapcheck // ErrNotFound is the handler's 404
 		}
@@ -238,7 +249,12 @@ func (s *Service) PatchUser(ctx context.Context, name string, p UserPatch) error
 				return err
 			}
 		}
-		return groupsError(s.Store.Users().Update(ctx, next))
+		if p.Groups != nil {
+			if err := s.requireGroups(ctx, next.Groups); err != nil {
+				return err
+			}
+		}
+		return s.Store.Users().Update(ctx, next) //nolint:wrapcheck // a store error
 	})
 }
 
@@ -308,8 +324,10 @@ func (s *Service) admins(ctx context.Context) ([]string, error) {
 }
 
 // DeleteUser removes a user, its group memberships and its tokens. The
-// seeded admin and anonymous users and the last administrator stay.
+// seeded admin and anonymous users and the last administrator stay, in
+// whatever case the request spells them.
 func (s *Service) DeleteUser(ctx context.Context, name string) error {
+	name = model.FoldUsername(name)
 	if name == authn.AdminUser || name == kernel.AnonymousUser {
 		return fmt.Errorf(
 			"%w: %w: the built-in user %q cannot be deleted",
@@ -334,9 +352,11 @@ func (s *Service) DeleteUser(ctx context.Context, name string) error {
 }
 
 // revokeTokens deletes the user's tokens. Their subject is
-// jfac@<service id>/users/<name> (decision 0005).
+// jfac@<service id>/users/<name> (decision 0005). The subject's name is
+// matched without case: a token an administrator minted for a name before
+// the user existed, or one from an OIDC mapping, keeps the spelling it was
+// issued with, and it acts as this user all the same.
 func (s *Service) revokeTokens(ctx context.Context, name string) error {
-	suffix := "/users/" + name
 	var page kernel.Page
 	for {
 		tokens, next, err := s.Store.Tokens().List(ctx, port.TokenFilter{}, page)
@@ -344,7 +364,8 @@ func (s *Service) revokeTokens(ctx context.Context, name string) error {
 			return err //nolint:wrapcheck // a store error
 		}
 		for _, t := range tokens {
-			if strings.HasSuffix(t.Subject, suffix) {
+			if sub, err := model.ParseSubject(t.Subject); err == nil && sub.Kind == "users" &&
+				model.SameUsername(sub.Name, name) {
 				if err := s.Store.Tokens().Delete(ctx, t.ID); err != nil &&
 					!errors.Is(err, kernel.ErrNotFound) {
 					return err //nolint:wrapcheck // a store error
@@ -361,7 +382,8 @@ func (s *Service) revokeTokens(ctx context.Context, name string) error {
 // revokeEncryptedPasswords deletes the named users' encrypted passwords
 // (model.TokenPurposeEncryptedPassword tokens); the next request for one
 // issues a new value. Each user holds at most one, so the list is one entry
-// per user who ever asked, not every token.
+// per user who ever asked, not every token. names are stored, so folded,
+// names.
 func (s *Service) revokeEncryptedPasswords(ctx context.Context, names ...string) error {
 	var page kernel.Page
 	for {
@@ -373,7 +395,8 @@ func (s *Service) revokeEncryptedPasswords(ctx context.Context, names ...string)
 		}
 		for _, t := range tokens {
 			sub, err := model.ParseSubject(t.Subject)
-			if err != nil || sub.Kind != "users" || !slices.Contains(names, sub.Name) {
+			if err != nil || sub.Kind != "users" ||
+				!slices.Contains(names, model.FoldUsername(sub.Name)) {
 				continue
 			}
 			if err := s.Store.Tokens().Delete(ctx, t.ID); err != nil &&
@@ -388,9 +411,10 @@ func (s *Service) revokeEncryptedPasswords(ctx context.Context, names ...string)
 	}
 }
 
-// User returns one user.
+// User returns one user, found by name in any case and named as stored.
 func (s *Service) User(ctx context.Context, name string) (model.User, error) {
-	return s.Store.Users().Get(ctx, name) //nolint:wrapcheck // ErrNotFound is the handler's 404
+	//nolint:wrapcheck // ErrNotFound is the handler's 404
+	return s.Store.Users().Get(ctx, model.FoldUsername(name))
 }
 
 // Users returns every user, ordered by name.
@@ -418,7 +442,8 @@ type GroupPatch struct {
 
 // PutGroup creates g, or replaces every field of an existing group, and
 // reports whether it created it. members, when not nil, replaces the
-// membership; otherwise an existing group keeps its members.
+// membership; otherwise an existing group keeps its members. Member names
+// are folded; the group's name keeps its case.
 func (s *Service) PutGroup(ctx context.Context, g model.Group, members *[]string) (bool, error) {
 	if err := validName("group", g.Name); err != nil {
 		return false, err
@@ -436,7 +461,10 @@ func (s *Service) PutGroup(ctx context.Context, g model.Group, members *[]string
 		next.Realm, next.Members = model.RealmInternal, nil
 		switch {
 		case members != nil:
-			next.Members = sortedUnique(*members)
+			if err := s.requireUsers(ctx, *members); err != nil {
+				return err
+			}
+			next.Members = sortedUnique(model.FoldUsernames(*members))
 		case !created:
 			next.Members = old.Members
 		}
@@ -444,9 +472,9 @@ func (s *Service) PutGroup(ctx context.Context, g model.Group, members *[]string
 			next.ExternalID = old.ExternalID
 			next.Roles.ResourcesManager, next.Roles.ManageWebhook = old.Roles.ResourcesManager, old.Roles.ManageWebhook
 			next.Roles.PlatformAuditor, next.Roles.PolicyViewer = old.Roles.PlatformAuditor, old.Roles.PolicyViewer
-			return membersError(s.Store.Groups().Update(ctx, next))
+			return s.Store.Groups().Update(ctx, next) //nolint:wrapcheck // a store error
 		}
-		return membersError(s.Store.Groups().Create(ctx, next))
+		return s.Store.Groups().Create(ctx, next) //nolint:wrapcheck // a store error
 	})
 	return created, err
 }
@@ -470,9 +498,12 @@ func (s *Service) PatchGroup(ctx context.Context, name string, p GroupPatch) err
 		set(&g.Roles.ResourcesManager, p.ResourcesManager)
 		set(&g.Roles.ManageWebhook, p.ManageWebhook)
 		if p.Members != nil {
-			g.Members = sortedUnique(*p.Members)
+			if err := s.requireUsers(ctx, *p.Members); err != nil {
+				return err
+			}
+			g.Members = sortedUnique(model.FoldUsernames(*p.Members))
 		}
-		return membersError(s.Store.Groups().Update(ctx, g))
+		return s.Store.Groups().Update(ctx, g) //nolint:wrapcheck // a store error
 	})
 }
 
@@ -529,14 +560,14 @@ func (s *Service) Groups(ctx context.Context) ([]model.Group, error) {
 
 // ExpirePasswords forces each named user to set a new password before the
 // next login, revokes their encrypted passwords, and returns the names that
-// matched no user.
+// matched no user, as the request spelled them.
 func (s *Service) ExpirePasswords(ctx context.Context, names []string) ([]string, error) {
 	var unknown []string
 	err := s.tx(ctx, func(ctx context.Context) error {
 		unknown = nil
 		var expired []string
 		for _, n := range sortedUnique(names) {
-			u, err := s.Store.Users().Get(ctx, n)
+			u, err := s.Store.Users().Get(ctx, model.FoldUsername(n))
 			if errors.Is(err, kernel.ErrNotFound) {
 				unknown = append(unknown, n)
 				continue
@@ -548,7 +579,7 @@ func (s *Service) ExpirePasswords(ctx context.Context, names []string) ([]string
 			if err := s.Store.Users().Update(ctx, u); err != nil {
 				return err //nolint:wrapcheck // a store error
 			}
-			expired = append(expired, n)
+			expired = append(expired, u.Name)
 		}
 		if len(expired) == 0 {
 			return nil
@@ -563,7 +594,7 @@ func (s *Service) ExpirePasswords(ctx context.Context, names []string) ([]string
 // once.
 func (s *Service) UnexpirePassword(ctx context.Context, name string) error {
 	return s.tx(ctx, func(ctx context.Context) error {
-		u, err := s.Store.Users().Get(ctx, name)
+		u, err := s.Store.Users().Get(ctx, model.FoldUsername(name))
 		if err != nil {
 			return err //nolint:wrapcheck // ErrNotFound is the handler's 404
 		}
@@ -586,6 +617,7 @@ func (s *Service) ChangePassword(
 	ctx context.Context,
 	name, oldPassword, newPassword, confirm string,
 ) error {
+	name = model.FoldUsername(name)
 	u, err := s.Store.Users().Get(ctx, name)
 	if err != nil {
 		return err //nolint:wrapcheck // ErrNotFound is the handler's 404
@@ -649,13 +681,17 @@ func (s *Service) Locked(ctx context.Context) ([]string, error) {
 	return s.Store.Users().Locked(ctx) //nolint:wrapcheck // a store error
 }
 
-// Unlock unlocks the named users; unknown names are ignored. An empty list
-// is refused, so a client bug cannot read as "unlock nobody".
+// Unlock unlocks the named users, in whatever case they are spelled;
+// unknown names are ignored. RTFACT-29660 reports that 7.55.13's
+// unlockUsers ignores TEST_user for the user test_user, a bug against
+// Access's own rule, so this does not follow it. An empty list is refused,
+// so a client bug cannot read as "unlock nobody".
 func (s *Service) Unlock(ctx context.Context, names []string) error {
 	if len(names) == 0 {
 		return invalidf("name at least one user to unlock")
 	}
-	return s.Store.Users().Unlock(ctx, names...) //nolint:wrapcheck // a store error
+	//nolint:wrapcheck // a store error
+	return s.Store.Users().Unlock(ctx, model.FoldUsernames(names)...)
 }
 
 // UnlockAll unlocks every locked user.
@@ -812,22 +848,39 @@ func sortedUnique(names []string) []string {
 	return slices.Compact(out)
 }
 
-// groupsError turns the store's "no such group" into the 400 the API
-// documents for unknown groups.
-func groupsError(err error) error {
-	if errors.Is(err, kernel.ErrNotFound) {
-		return invalidf("%v", err)
+// requireGroups refuses the first of groups, in name order, that is no
+// group, with the 400 the user routes answer for it. The stores word their
+// own "not found" differently (#1433), so the service checks inside the
+// write's transaction rather than passing a store's text to the client. The
+// words are those the permission routes use for an unknown group; JFrog
+// documents only the 400 ("Bad Request - Invalid input").
+func (s *Service) requireGroups(ctx context.Context, groups []string) error {
+	for _, g := range sortedUnique(groups) {
+		_, err := s.Store.Groups().Get(ctx, g)
+		switch {
+		case errors.Is(err, kernel.ErrNotFound):
+			return invalidf("Group '%s' does not exist", g)
+		case err != nil:
+			return err //nolint:wrapcheck // a store error
+		}
 	}
-	return err
+	return nil
 }
 
-// membersError turns the store's "no such user" into a 400 for unknown
-// members.
-func membersError(err error) error {
-	if errors.Is(err, kernel.ErrNotFound) {
-		return invalidf("%v", err)
+// requireUsers is requireGroups for a legacy group's members. It finds a
+// member by its folded name and names one it does not find as the request
+// spells it, as the permission routes name an unknown user.
+func (s *Service) requireUsers(ctx context.Context, users []string) error {
+	for _, u := range sortedUnique(users) {
+		_, err := s.Store.Users().Get(ctx, model.FoldUsername(u))
+		switch {
+		case errors.Is(err, kernel.ErrNotFound):
+			return invalidf("User '%s' does not exist", u)
+		case err != nil:
+			return err //nolint:wrapcheck // a store error
+		}
 	}
-	return err
+	return nil
 }
 
 // all collects every page of a list.

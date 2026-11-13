@@ -72,7 +72,7 @@ func (s AccessService) identityFor(ctx context.Context, self string) (*identity.
 	if err != nil {
 		return nil, err
 	}
-	if self != "" && p.Name == self {
+	if self != "" && model.SameUsername(p.Name, self) {
 		return svc, nil
 	}
 	d, _ := accessapi.DeciderFrom(ctx)
@@ -201,8 +201,9 @@ func (s AccessService) CreateUser(
 	if b == nil {
 		return nil, httpkit.BadRequestf("a body with the user is required")
 	}
-	// The spec stores usernames lower-case, as Artifactory does.
-	name := strings.ToLower(b.Username)
+	// The spec stores usernames lower-case, as Artifactory does; the
+	// identity service folds the same way.
+	name := model.FoldUsername(b.Username)
 	if name == "" || len(name) > maxUsernameLength {
 		return nil, httpkit.BadRequestf("username must be 1 to %d characters", maxUsernameLength)
 	}
@@ -364,7 +365,7 @@ func (s AccessService) ChangeUserPassword(
 	// An administrator sets anyone's password; any user sets their own, even
 	// with an expired password (the middleware lets that one request through),
 	// but not through a narrowed token (narrowedToken).
-	if !p.Admin && (p.Name != name || narrowedToken(p)) {
+	if !p.Admin && (!model.SameUsername(p.Name, name) || narrowedToken(p)) {
 		return nil, kernel.ErrForbidden
 	}
 	if req.Body == nil || req.Body.Password == nil || *req.Body.Password == "" {

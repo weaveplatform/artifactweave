@@ -554,8 +554,8 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (Issued, err
 
 // RefreshCheck is what a refresh must match beyond a valid refresh token.
 type RefreshCheck struct {
-	// Username, when set, must be the refreshed token's user, or the refresh
-	// fails with ErrRefreshOtherUser.
+	// Username, when set, must be the refreshed token's user, in any case,
+	// or the refresh fails with ErrRefreshOtherUser.
 	Username string
 	// TokenID, when set, must be the refreshed token's id, or the refresh
 	// fails as an invalid refresh token: the caller presented that token as
@@ -585,7 +585,7 @@ func (s *Service) RefreshAs(
 		if err != nil {
 			return fmt.Errorf("%w: %w", authn.ErrInvalidToken, err)
 		}
-		if c.Username != "" && sub.Name != c.Username {
+		if c.Username != "" && !model.SameUsername(sub.Name, c.Username) {
 			return ErrRefreshOtherUser
 		}
 		if c.TokenID != "" && old.ID != c.TokenID {
