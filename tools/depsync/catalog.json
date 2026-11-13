@@ -265,8 +265,8 @@
       "pattern": "^FROM \\S*:([0-9]+(?:\\.[0-9]+)*)(?:[-@])"
     },
     "ansible": {
-      "path": "test/acceptance/clients/ansible.Dockerfile",
-      "pattern": "ansible-core==([0-9.]+)"
+      "path": "test/acceptance/clients/ansible.requirements.in",
+      "pattern": "^ansible-core==([0-9.]+)$"
     },
     "bower": {
       "path": "test/acceptance/clients/bower.Dockerfile",
@@ -301,8 +301,8 @@
       "pattern": "https://getcomposer.org/download/(2\\.[0-9.]+)/composer.phar"
     },
     "frogml": {
-      "path": "test/acceptance/clients/frogml/Dockerfile",
-      "pattern": "frogml==([0-9.]+)"
+      "path": "test/acceptance/clients/frogml/requirements.in",
+      "pattern": "^frogml==([0-9.]+)$"
     },
     "git-lfs": {
       "path": "test/acceptance/clients/git-lfs.Dockerfile",
@@ -365,20 +365,20 @@
       "pattern": "gem install --no-document puppet -v ([0-9.]+)"
     },
     "pip": {
-      "path": "test/acceptance/clients/python.Dockerfile",
-      "pattern": "pip==([0-9.]+)"
+      "path": "test/acceptance/clients/python.requirements.in",
+      "pattern": "^pip==([0-9.]+)$"
     },
     "twine": {
-      "path": "test/acceptance/clients/python.Dockerfile",
-      "pattern": "twine==([0-9.]+)"
+      "path": "test/acceptance/clients/python.requirements.in",
+      "pattern": "^twine==([0-9.]+)$"
     },
     "uv": {
-      "path": "test/acceptance/clients/python.Dockerfile",
-      "pattern": "uv==([0-9.]+)"
+      "path": "test/acceptance/clients/python.requirements.in",
+      "pattern": "^uv==([0-9.]+)$"
     },
     "poetry": {
-      "path": "test/acceptance/clients/python.Dockerfile",
-      "pattern": "poetry==([0-9.]+)"
+      "path": "test/acceptance/clients/poetry.requirements.in",
+      "pattern": "^poetry==([0-9.]+)$"
     },
     "sbt": {
       "path": "test/acceptance/clients/sbt.Dockerfile",
@@ -741,12 +741,6 @@
       "count": 2
     },
     {
-      "path": "test/acceptance/clients/frogml/Dockerfile",
-      "pattern": "(frogml-)[0-9]+(?:\\.[0-9]+)*(-py3-none-any\\.whl)",
-      "replacement": "\\g<1>{{frogml}}\\g<2>",
-      "count": 3
-    },
-    {
       "path": "test/acceptance/clients/luarocks.Dockerfile",
       "pattern": "(lua-)[0-9]+(?:\\.[0-9]+)*",
       "replacement": "\\g<1>{{lua}}",
@@ -841,6 +835,16 @@
       "path": "test/acceptance/sbt_steps_test.go",
       "pattern": "(sbt.version=)[0-9]+(?:\\.[0-9]+)*",
       "replacement": "\\g<1>{{sbt}}"
+    },
+    {
+      "path": "test/acceptance/clients/huggingface.requirements.in",
+      "pattern": "^huggingface-hub==[0-9]+(?:\\.[0-9]+)*$",
+      "replacement": "huggingface-hub=={{hf-hub}}"
+    },
+    {
+      "path": "test/acceptance/clients/huggingface.requirements.in",
+      "pattern": "^hf-xet==[0-9]+(?:\\.[0-9]+)*$",
+      "replacement": "hf-xet=={{hf-xet}}"
     },
     {
       "path": "test/server/artifacts/huggingface/huggingface_xet_native_test.go",

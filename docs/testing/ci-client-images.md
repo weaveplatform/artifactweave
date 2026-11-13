@@ -48,7 +48,7 @@ original tested versions.
 ## Download sources
 
 The images not listed below take their client from the base image or from the
-package manager they run (apk, APT, pip, gem, npm or mix). The images below also
+package manager they run (apk, APT, gem, npm or mix). The images below also
 download a file while they build. Each file is pinned to the digest its upstream
 publishes: a SHA-256, or the SHA-512 that Maven Central and Eclipse publish for
 Ivy and Eclipse. Where a second host serves the same bytes, the build falls back
@@ -62,9 +62,24 @@ so a second source never changes what runs. When every source is down, the build
 fails. A pin names the first URL only; `make deps-sync` moves the second URL with
 it.
 
+The Python images, listed below too, install their clients and every
+dependency with pip from a hashed requirements file
+([#1439](https://github.com/weaveplatform/artifactweave/issues/1439)).
+[`pip-lock.sh`](../../test/acceptance/clients/pip-lock.sh) writes each `.txt`
+file from the pins in its `.in` file, with PyPI's SHA-256 for every file of each
+pinned release. pip installs the whole file with `--require-hashes`, from PyPI
+and then from the second index, so the second index can serve only PyPI's bytes.
+It builds no sdist (`--only-binary=:all:`), except PyYAML in the Ansible image,
+whose build requirements are hashed in a file of their own
+(`--build-constraint`). To move a pin, edit the `.in` file and run
+`pip-lock.sh`; the `tools/depsync` tests fail while a `.txt` file lags its `.in`
+file. The CI-installed Hugging Face clients work the same way.
+
 | Dockerfile | Download | First source | Second source |
 |---|---|---|---|
+| [`ansible.Dockerfile`](../../test/acceptance/clients/ansible.Dockerfile) | ansible-core 2.22.0 and its dependencies, from [`ansible.requirements.txt`](../../test/acceptance/clients/ansible.requirements.txt) | `pypi.org/simple` | [TUNA's mirror of PyPI](https://pypi.tuna.tsinghua.edu.cn/simple/), Tsinghua University's copy of the whole of PyPI, which keeps PyPI's file paths and digests |
 | [`composer.Dockerfile`](../../test/acceptance/clients/composer.Dockerfile) | Composer 2.11.1 and 1.10.28 phars | `getcomposer.org/download/` | The `composer.phar` asset of Composer's GitHub releases [2.11.1](https://github.com/composer/composer/releases/tag/2.11.1) and [1.10.28](https://github.com/composer/composer/releases/tag/1.10.28) |
+| [`frogml/Dockerfile`](../../test/acceptance/clients/frogml/Dockerfile) | FrogML 3.0.0 and its dependencies, from [`frogml/requirements.txt`](../../test/acceptance/clients/frogml/requirements.txt) | `pypi.org/simple` | TUNA's mirror of PyPI |
 | [`git-lfs.Dockerfile`](../../test/acceptance/clients/git-lfs.Dockerfile) | Git LFS 3.8.1 tarball | GitHub release `git-lfs/git-lfs` | None. No other host serves it; packagecloud holds `.deb` and `.rpm` packages, which are other bytes |
 | [`jetbrains.Dockerfile`](../../test/acceptance/clients/jetbrains.Dockerfile) | IntelliJ IDEA 2026.2.4 tarballs | `download.jetbrains.com` | None. `cache-redirector.jetbrains.com` only redirects to it, and `download-cdn.jetbrains.com` refuses a request without the signed query it adds |
 | [`luarocks.Dockerfile`](../../test/acceptance/clients/luarocks.Dockerfile) | Lua 5.5.1 tarball | `www.lua.org/ftp/` | [`www.tecgraf.puc-rio.br/lua/ftp/`](https://www.tecgraf.puc-rio.br/lua/ftp/), the PUC-Rio mirror that [lua.org's mirrors page](https://www.lua.org/mirrors.html) names |
@@ -73,6 +88,7 @@ it.
 | [`maven.Dockerfile`](../../test/acceptance/clients/maven.Dockerfile) | Gradle 9.8.2 distribution | `services.gradle.org/distributions/` | [GitHub release `gradle/gradle-distributions` v9.8.2](https://github.com/gradle/gradle-distributions/releases/tag/v9.8.2), where `services.gradle.org` redirects. It covers the redirector being down, not GitHub |
 | [`opkg.Dockerfile`](../../test/acceptance/clients/opkg.Dockerfile) | opkg 0.10.0 tarball | `downloads.yoctoproject.org/releases/opkg/` | [`mirrors.kernel.org/yocto/opkg/`](https://mirrors.kernel.org/yocto/opkg/opkg-0.10.0.tar.gz), kernel.org's copy of the Yocto releases |
 | [`p2.Dockerfile`](../../test/acceptance/clients/p2.Dockerfile) | Eclipse Platform 4.41 archives | `archive.eclipse.org` | [`ftp2.osuosl.org/pub/eclipse/`](https://ftp2.osuosl.org/pub/eclipse/eclipse/downloads/), OSU Open Source Lab, on Eclipse's mirror list. It holds only the releases `download.eclipse.org` still holds |
+| [`python.Dockerfile`](../../test/acceptance/clients/python.Dockerfile) | pip 26.3, Twine 7.0.0, uv 0.13.7, Poetry 2.5.1 and their dependencies, from [`python.requirements.txt`](../../test/acceptance/clients/python.requirements.txt) and [`poetry.requirements.txt`](../../test/acceptance/clients/poetry.requirements.txt) | `pypi.org/simple` | TUNA's mirror of PyPI |
 | [`sbt.Dockerfile`](../../test/acceptance/clients/sbt.Dockerfile) | sbt 2.0.12 tgz | GitHub release `sbt/sbt` | None. SDKMAN redirects to the same release, and Maven Central holds no launcher tgz |
 | [`vagrant.Dockerfile`](../../test/acceptance/clients/vagrant.Dockerfile) | Vagrant 2.4.9 `.deb` | `releases.hashicorp.com/vagrant/` | [HashiCorp's apt repository](https://apt.releases.hashicorp.com/pool/amd64/main/vagrant_2.4.9-1_amd64.deb) |
 | [`vscode.Dockerfile`](../../test/acceptance/clients/vscode.Dockerfile) | VS Code archive | `vscode.download.prss.microsoft.com` | None. `update.code.visualstudio.com` redirects to the same host |

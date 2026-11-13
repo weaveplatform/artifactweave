@@ -1,0 +1,5 @@
+# The build requirements in PyYAML 6.0.3's pyproject.toml. It has no wheel for
+# Python 3.15, so pip builds it from its sdist, and pip-lock.sh hashes these
+# into ansible.build-requirements.txt for the build to use.
+setuptools
+cython>=3.0

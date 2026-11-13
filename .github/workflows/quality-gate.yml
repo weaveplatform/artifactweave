@@ -618,6 +618,13 @@ jobs:
         with:
           clients: ${{ needs.impact.outputs.profile == 'full' && 'crane,oras,cosign,helm,terraform' || needs.impact.outputs.clients }}
 
+      # The two clients and their dependencies come from the hashed file
+      # that test/acceptance/clients/pip-lock.sh writes, first from PyPI and
+      # then from TUNA's mirror of PyPI, as the Python client images do, so
+      # one PyPI fault does not fail the job and the mirror can serve only
+      # PyPI's bytes (#1321, #1439; python.Dockerfile says why TUNA). The
+      # file holds the SHA-256 of every wheel of each pinned release. bash -e
+      # does not stop on a loop whose last pip failed, hence the exit.
       - name: Hugging Face Hub and Xet clients (pinned)
         if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.owner == 'huggingface'
         env:
@@ -625,19 +632,10 @@ jobs:
           HF_XET_VERSION: '1.8.0'
         run: |
           python3 -m venv "$RUNNER_TEMP/huggingface-hub"
-          mkdir -p "$RUNNER_TEMP/huggingface-wheels"
-          "$RUNNER_TEMP/huggingface-hub/bin/pip" download --no-deps --only-binary=:all: \
-            -d "$RUNNER_TEMP/huggingface-wheels" "huggingface_hub==$HF_HUB_VERSION" "hf_xet==$HF_XET_VERSION"
-          printf '%s  %s\n' \
-            '42ecfd93ede47bdd333daebbf66a32d7bfe2e18752754fe4d2d4f98a0179d801' \
-            "$RUNNER_TEMP/huggingface-wheels/huggingface_hub-$HF_HUB_VERSION-py3-none-any.whl" \
-            | sha256sum -c -
-          printf '%s  %s\n' \
-            '29dab7c904cd1914a0439c6e1306c12c7497c8bd32290fbe563ebf51ca4b6d6d' \
-            "$RUNNER_TEMP/huggingface-wheels/hf_xet-$HF_XET_VERSION-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" \
-            | sha256sum -c -
-          "$RUNNER_TEMP/huggingface-hub/bin/pip" install --no-cache-dir \
-            "$RUNNER_TEMP/huggingface-wheels/"*.whl
+          for index in https://pypi.org/simple https://pypi.tuna.tsinghua.edu.cn/simple; do
+            "$RUNNER_TEMP/huggingface-hub/bin/pip" install --no-cache-dir --require-hashes --only-binary=:all: \
+              --index-url "$index" -r test/acceptance/clients/huggingface.requirements.txt && break
+          done || exit 1
           "$RUNNER_TEMP/huggingface-hub/bin/python" -c \
             'import importlib.metadata,os,huggingface_hub,hf_xet; assert huggingface_hub.__version__ == os.environ["HF_HUB_VERSION"]; assert importlib.metadata.version("hf-xet") == os.environ["HF_XET_VERSION"]; print("huggingface_hub", huggingface_hub.__version__, "hf_xet", importlib.metadata.version("hf-xet"))'
           echo "ARTIFACTWEAVE_HF_BIN=$RUNNER_TEMP/huggingface-hub/bin/hf" >> "$GITHUB_ENV"

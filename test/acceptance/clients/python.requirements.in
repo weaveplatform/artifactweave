@@ -1,0 +1,4 @@
+# Pins for python.requirements.txt, moved by hand; run pip-lock.sh after a move.
+pip==26.3
+twine==7.0.0
+uv==0.13.7

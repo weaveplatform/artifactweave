@@ -1,0 +1,4 @@
+# Pins for huggingface.requirements.txt. make deps-sync copies them from
+# HF_HUB_VERSION and HF_XET_VERSION in quality-gate.yml; run pip-lock.sh after a move.
+huggingface-hub==2.4.0
+hf-xet==1.8.0
