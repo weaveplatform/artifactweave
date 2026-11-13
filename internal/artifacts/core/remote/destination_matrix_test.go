@@ -11,9 +11,11 @@ import (
 // and escaped throughout, so the %5C, %00, %0D and %0A that 7.x sends for a
 // backslash, NUL, CR or LF in a value pass (HttpRepo.encodeIfNeeded, then
 // URIUtil.encodeQuery, 7.161.26). It is refused when it carries a byte a
-// path segment may not carry, a stray "%", or a decoded "." or ".." piece
-// between "/", "\" or NUL, which an upstream that decodes before it
-// resolves would read as a step.
+// path segment may not carry, a stray "%", or a decoded piece between "/",
+// "\" or NUL that is "." or "..", or starts with one of them followed by
+// ";", "?" or "#": an upstream that decodes before it resolves would read
+// the first as a step, and one that also strips path parameters or splits
+// off the query or fragment would read the second as one.
 func TestUnitCheckedMatrix(t *testing.T) {
 	for _, matrix := range []string{
 		";x=1",
@@ -26,6 +28,10 @@ func TestUnitCheckedMatrix(t *testing.T) {
 		";x=a..%5C..b",
 		";x=..%00",
 		";x=a%2Fb%3Fc%23d%20e",
+		";x=..;y=..%3F;z=..%23",
+		";x=a%2F..b;y=1",
+		";x=a%2F.x%3Fq",
+		";x=a%2F...%23f",
 		";x%2B=1;y;z=",
 		";x=%e2%82%ac",
 	} {
@@ -54,6 +60,14 @@ func TestUnitCheckedMatrix(t *testing.T) {
 		";x=a%5C.%5Cb",
 		";x=%00..",
 		";x=a%00.",
+		";x=1%2F..;y=1",
+		";x=1%2F.;y=1",
+		";x=1%2F..%3Bq",
+		";x=1%2F..%3Fq",
+		";x=1%2F.%3Fq",
+		";x=1%2F..%23f",
+		";x=1%5C..;y=1",
+		";x=1%00..%3Fq",
 	} {
 		if err := remote.CheckedMatrix(matrix); !errors.Is(err, remote.ErrSecurity) {
 			t.Errorf("CheckedMatrix(%q) = %v, want ErrSecurity", matrix, err)

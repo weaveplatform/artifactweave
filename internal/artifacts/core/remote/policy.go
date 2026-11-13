@@ -571,10 +571,11 @@ func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 // Two forms are left off whole, and the upstream is asked for the bare
 // path: a string that does not start with ";", which appended as it is
 // would join the last segment and name another file; and one CheckedMatrix
-// refuses, whose decoded form holds a "." or ".." piece. 7.x sends such a
-// value with its "/" and dots as they are, so the upstream resolves
-// another file; escaped, it would still be a step for an upstream that
-// decodes before it resolves, and the transport would refuse it.
+// refuses, whose decoded form holds a piece that reads as a dot segment,
+// alone or before a ";", "?" or "#". 7.x sends such a value with its "/"
+// and dots as they are, so the upstream resolves another file; escaped, it
+// would still be a step for an upstream that decodes before it resolves,
+// and the transport would refuse it.
 func upstreamMatrix(params string) string {
 	if !strings.HasPrefix(params, ";") {
 		return ""

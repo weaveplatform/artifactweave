@@ -285,10 +285,11 @@ The following are artifactweave limits and decisions, not claimed vendor default
   (#1420); the transport accepts those escapes only in the matrix string the request
   appended (`CheckedRequestURL`), and still refuses them, escaped or not, in the
   repository URL and the item path (`CheckedURL`). A string whose decoded form holds a
-  `.` or `..` piece between `/`, `\` or NUL is left off whole and the bare path asked
-  for: Artifactory sends its `/` and dots unescaped, so the upstream resolves another
-  file, and escaped it would still be a step for an upstream that decodes before it
-  resolves.
+  piece between `/`, `\` or NUL that reads as a dot segment, `.` or `..` alone or before a
+  `;`, `?` or `#`, is left off whole and the bare path asked for: Artifactory sends its
+  `/`, `;` and dots unescaped, so the upstream resolves another file, and escaped it
+  would still be a dot segment for an upstream that decodes before it resolves, strips
+  path parameters or splits off the query.
 - At most 10 redirects. Re-evaluate destination policy at every hop, DNS resolution and
   token realm. Explicit private upstream authorities may be configured; metadata may not
   grant itself loopback/link-local/metadata-service or arbitrary internal access. Default

@@ -78,7 +78,10 @@ func rawLineUpstream(t *testing.T) (string, func() []string) {
 // "/", "\" or NUL is still left off: 7.x sends its "/" and dots as they
 // are, so the upstream resolves another file, a fault not followed, and
 // escaped it would be a step for an upstream that decodes before it
-// resolves.
+// resolves. So is one whose piece starts with a dot segment followed by
+// ";", "?" or "#", which such an upstream would read as a dot segment once
+// it strips path parameters or splits off the query or fragment; main sent
+// those.
 func TestAccGenericRemoteSendsEscapedMatrixParametersUpstream(t *testing.T) {
 	w := newRemoteWorld(t)
 	upstream, take := rawLineUpstream(t)
@@ -96,6 +99,11 @@ func TestAccGenericRemoteSendsEscapedMatrixParametersUpstream(t *testing.T) {
 		{";x=a%5C..%5Cb", ""},
 		{";x=a%00..", ""},
 		{";x=a%5C.", ""},
+		{";x=1%2F..;y=1", ""},
+		{";x=1%2F..%3Fq", ""},
+		{";x=1%2F..%23f", ""},
+		{";x=1%2F.;y=1", ""},
+		{";x=1%2F..b;y=1", ";x=1%2F..b;y=1"},
 	} {
 		path := fmt.Sprintf("/e%d/file.bin", i)
 		for _, method := range []string{http.MethodHead, http.MethodGet} {

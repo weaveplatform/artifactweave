@@ -57,8 +57,8 @@ Matrix parameters on a remote file's GET or HEAD
 Artifactory appends them to the remote request URL, and the file is cached at its bare
 path. A `/`, `?`, `#` or space in a key or value reaches the upstream as `%2F`, `%3F`,
 `%23` or `%20`, and a backslash, NUL or line break as `%5C`, `%00`, `%0D` or `%0A`, as
-Artifactory sends it. A string whose decoded form holds a `.` or `..` segment is left
-off and the bare path asked for. A copy the cache already holds is matched against the
+Artifactory sends it. A string whose decoded form holds a `.` or `..` segment, alone or
+before a `;`, `?` or `#`, is left off and the bare path asked for. A copy the cache already holds is matched against the
 parameters first, without asking the upstream: a mandatory key (`;key+=value`) the copy
 does not carry, or a key it carries with another value, answers 404. The upstream's
 own answer is served as it comes, whether the repository stores it or streams it, and a

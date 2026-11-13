@@ -16,9 +16,10 @@ body. An explicit caller HEAD remains HEAD and cannot publish a complete artifac
 Paths are escaped relative paths. Encoded package slashes and spaces retain their
 spelling. Dot segments, including escaped traversal, absolute paths and userinfo are
 rejected. A request's matrix string (`Request.Matrix`) is checked by its own rule: it
-may carry `%5C`, `%00`, `%0D` and `%0A`, as Artifactory sends them, but no decoded dot
-piece between `/`, `\` or NUL; the path before it is checked as any path. Repeated
-separators are normalized unless `disableUrlNormalization` is set.
+may carry `%5C`, `%00`, `%0D` and `%0A`, as Artifactory sends them, but no decoded piece
+between `/`, `\` or NUL that reads as a dot segment, alone or before a `;`, `?` or `#`;
+the path before it is checked as any path. Repeated separators are normalized unless
+`disableUrlNormalization` is set.
 Raw query order and escapes are preserved: source query, configured `queryParams`, then
 client query when `propagateQueryParams` is enabled. Adapters must not treat metadata
 download URLs as ordinary relative paths or append these queries to signed URLs.

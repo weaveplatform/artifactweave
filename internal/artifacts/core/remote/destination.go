@@ -100,7 +100,8 @@ func CheckedRequestURL(raw, matrix string) (*url.URL, error) {
 // CheckedMatrix refuses with ErrSecurity a matrix string, as it follows an
 // upstream path, that is not ";"-led and escaped throughout (RFC 3986
 // segment bytes and %XX escapes, nothing else), or whose decoded form holds
-// a "." or ".." piece between "/", "\" or NUL.
+// a piece between "/", "\" or NUL that reads as a dot segment: "." or "..",
+// alone or before a ";", "?" or "#".
 //
 // 7.x sends a remote request's matrix parameters as HttpRepo.encodeIfNeeded
 // leaves them (7.161.26): ArtifactoryRequestBase.processMatrixParams
@@ -124,7 +125,11 @@ func CheckedRequestURL(raw, matrix string) (*url.URL, error) {
 // whose decoded form holds a dot piece is refused, and TransportRequest
 // leaves it off. Pieces are cut at "\" too, which some upstreams read as a
 // separator, and at NUL, which a C upstream reads as the end of the path or
-// drops, so that neither escape can be decoded into a step.
+// drops, so that neither escape can be decoded into a step. A piece is read
+// up to its first ";", "?" or "#" as well: an upstream that decodes first
+// and then strips each segment's path parameters, or splits off the query
+// or fragment, would read "..;k=v" or "..?q" as a dot segment. 7.x sends
+// such a value with its "/" and ";" as they are, the same fault.
 func CheckedMatrix(matrix string) error {
 	if !strings.HasPrefix(matrix, ";") {
 		return ErrSecurity
@@ -146,7 +151,11 @@ func CheckedMatrix(matrix string) error {
 		if i < len(decoded) && decoded[i] != '/' && decoded[i] != '\\' && decoded[i] != 0 {
 			continue
 		}
-		if piece := string(decoded[start:i]); piece == "." || piece == ".." {
+		piece := string(decoded[start:i])
+		if end := strings.IndexAny(piece, ";?#"); end >= 0 {
+			piece = piece[:end]
+		}
+		if piece == "." || piece == ".." {
 			return ErrSecurity
 		}
 		start = i + 1

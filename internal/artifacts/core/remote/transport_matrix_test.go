@@ -22,9 +22,9 @@ import (
 // stray "%" becomes %25. A backslash, NUL, CR or LF travels as %5C, %00,
 // %0D or %0A, as 7.x's encodeIfNeeded sends it (#1420). A string that does
 // not start with ";" would join the file name, and one whose decoded form
-// holds a "." or ".." piece between "/", "\" or NUL would be a step for an
-// upstream that decodes before it resolves (CheckedMatrix): both are left
-// off and the bare path is asked for. Request.Matrix names what was
+// holds a piece between "/", "\" or NUL that reads as a dot segment would
+// be a step for an upstream that decodes before it resolves
+// (CheckedMatrix): both are left off and the bare path is asked for. Request.Matrix names what was
 // appended, so that the transport checks it by that rule.
 func TestUnitTransportRequestAppendsMatrixParameters(t *testing.T) {
 	for _, tc := range []struct {
@@ -151,6 +151,18 @@ func TestUnitTransportRequestAppendsMatrixParameters(t *testing.T) {
 			name:     "a dot segment after a NUL",
 			resource: source.Resource{Path: "a/file.bin", Method: http.MethodGet},
 			matrix:   ";x=1%00..",
+			wantPath: "a/file.bin",
+		},
+		{
+			name:     "a dot segment before a parameter",
+			resource: source.Resource{Path: "a/file.bin", Method: http.MethodGet},
+			matrix:   ";x=1%2F..;y=1",
+			wantPath: "a/file.bin",
+		},
+		{
+			name:     "a dot segment before a query",
+			resource: source.Resource{Path: "a/file.bin", Method: http.MethodGet},
+			matrix:   ";x=1%2F..%3Fq",
 			wantPath: "a/file.bin",
 		},
 		{
