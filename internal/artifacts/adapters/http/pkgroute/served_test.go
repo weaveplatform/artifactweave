@@ -40,7 +40,10 @@ func TestUnitReadServed(t *testing.T) {
 	if _, err = pkgroute.ReadServed(done, failedRead{}, 4, otherwise); !errors.Is(err, otherwise) {
 		t.Fatalf("ended request: %v", err)
 	}
-	if err = pkgroute.ServedReadFault(done, io.ErrUnexpectedEOF); err != io.ErrUnexpectedEOF { //nolint:errorlint // the error itself
+	if err = pkgroute.ServedReadFault(
+		done,
+		io.ErrUnexpectedEOF,
+	); err != io.ErrUnexpectedEOF { //nolint:errorlint // the error itself
 		t.Fatalf("ended request's fault: %v", err)
 	}
 }

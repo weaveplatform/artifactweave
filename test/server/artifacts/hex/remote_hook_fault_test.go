@@ -68,8 +68,11 @@ func TestAccRemoteHexTarballAnswersAStoreFailureUnderItsHookAsAServerFault(t *te
 		rec.Body.String() != `{"errors":[{"message":"internal error","status":500}]}`+"\n" {
 		t.Fatalf("refused statement: %d %s", rec.Code, rec.Body)
 	}
-	if _, err = w.Runtime.Store.Items().Get(ctx, "remote", true, "tarballs/decimal-2.0.0.tar"); !errors.Is(
-		err, kernel.ErrNotFound) {
+	if _, err = w.Runtime.Store.Items().
+		Get(ctx, "remote", true, "tarballs/decimal-2.0.0.tar"); !errors.Is(
+		err,
+		kernel.ErrNotFound,
+	) {
 		t.Fatalf("the tarball was cached: %v", err)
 	}
 	state, err := w.Runtime.Store.RemoteCache().State(ctx, "remote")

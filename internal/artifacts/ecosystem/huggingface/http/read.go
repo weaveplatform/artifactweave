@@ -409,7 +409,10 @@ func (h handler) resultBytes(ctx context.Context, result source.Result) ([]byte,
 		defer result.Stream.Body.Close()
 		b, err := io.ReadAll(io.LimitReader(result.Stream.Body, maxInfo+1))
 		if err != nil {
-			return nil, fmt.Errorf("huggingface: read upstream metadata: %w", pkgroute.ServedReadFault(ctx, err))
+			return nil, fmt.Errorf(
+				"huggingface: read upstream metadata: %w",
+				pkgroute.ServedReadFault(ctx, err),
+			)
 		}
 		return b, nil
 	}
@@ -423,7 +426,10 @@ func (h handler) resultBytes(ctx context.Context, result source.Result) ([]byte,
 	defer rc.Close()
 	b, err := io.ReadAll(io.LimitReader(rc, maxInfo+1))
 	if err != nil {
-		return nil, fmt.Errorf("huggingface: read cached metadata: %w", pkgroute.ServedReadFault(ctx, err))
+		return nil, fmt.Errorf(
+			"huggingface: read cached metadata: %w",
+			pkgroute.ServedReadFault(ctx, err),
+		)
 	}
 	return b, nil
 }

@@ -131,8 +131,17 @@ func TestAccAPIKeyHeaders(t *testing.T) {
 			rec := do(t, h, http.MethodGet, license, tc.headers, "")
 			if rec.Code != tc.status || tc.body != "" && rec.Body.String() != tc.body ||
 				rec.Header().Get("WWW-Authenticate") != tc.auth {
-				t.Errorf("%s (anonymous access %v): %d %q %q, want %d %q %q", tc.name, anonymous,
-					rec.Code, rec.Body, rec.Header().Get("WWW-Authenticate"), tc.status, tc.body, tc.auth)
+				t.Errorf(
+					"%s (anonymous access %v): %d %q %q, want %d %q %q",
+					tc.name,
+					anonymous,
+					rec.Code,
+					rec.Body,
+					rec.Header().Get("WWW-Authenticate"),
+					tc.status,
+					tc.body,
+					tc.auth,
+				)
 			}
 		}
 	}
@@ -163,15 +172,36 @@ func TestAccAPIKeyBesideAWrongPasswordCountsNothing(t *testing.T) {
 	for _, header := range []string{"X-JFrog-Art-Api", "X-Api-Key"} {
 		headers := basic("user", "wrong")
 		headers[header] = issued.ReferenceToken
-		if rec := do(t, h, http.MethodGet, secAPIKey, headers, ""); rec.Code != http.StatusNotFound {
+		if rec := do(
+			t,
+			h,
+			http.MethodGet,
+			secAPIKey,
+			headers,
+			"",
+		); rec.Code != http.StatusNotFound {
 			t.Fatalf("%s beside a wrong password: %d %s", header, rec.Code, rec.Body)
 		}
 	}
-	rec := do(t, h, http.MethodGet, "/artifactory/api/security/lockedUsers", basic("admin", "pw"), "")
+	rec := do(
+		t,
+		h,
+		http.MethodGet,
+		"/artifactory/api/security/lockedUsers",
+		basic("admin", "pw"),
+		"",
+	)
 	if rec.Code != http.StatusOK || rec.Body.String() != "[]" && rec.Body.String() != "[]\n" {
 		t.Fatalf("locked users: %d %s", rec.Code, rec.Body)
 	}
-	if rec := do(t, h, http.MethodGet, secAPIKey, basic("user", "pw"), ""); rec.Code != http.StatusNotFound {
+	if rec := do(
+		t,
+		h,
+		http.MethodGet,
+		secAPIKey,
+		basic("user", "pw"),
+		"",
+	); rec.Code != http.StatusNotFound {
 		t.Fatalf("user's password after the key: %d %s", rec.Code, rec.Body)
 	}
 }

@@ -26,10 +26,16 @@ func TestAccPypiRemoteFileMIMERefusal(t *testing.T) {
 	w.Update()
 	// A zip source archive, whose type, application/zip, the label does not
 	// match; a wheel's, application/octet-stream, matches any label.
-	data := zipBytes(t, map[string]string{"demo-1.0/PKG-INFO": "Metadata-Version: 2.1\nName: demo\nVersion: 1.0\n"})
+	data := zipBytes(
+		t,
+		map[string]string{"demo-1.0/PKG-INFO": "Metadata-Version: 2.1\nName: demo\nVersion: 1.0\n"},
+	)
 	sum := sha256.Sum256(data)
 	const name = "demo-1.0.zip"
-	w.Upstream.Set("/files/"+name, fakeupstream.Resource{Body: data, Header: http.Header{"Content-Type": {"text/html"}}})
+	w.Upstream.Set(
+		"/files/"+name,
+		fakeupstream.Resource{Body: data, Header: http.Header{"Content-Type": {"text/html"}}},
+	)
 	doc, _ := json.Marshal(map[string]any{
 		"meta": map[string]string{"api-version": "1.1"}, "name": "demo",
 		"files": []map[string]any{{
@@ -46,7 +52,12 @@ func TestAccPypiRemoteFileMIMERefusal(t *testing.T) {
 		`: Mismatching mime types found in request: [application/zip] and response: text/html, ` +
 		`and this repo blocks text/html on mismatch; Path: 'remote:demo/1.0/` + name + `'","status":409}]}` + "\n"
 	for _, pass := range []string{"first", "again"} {
-		rec := w.Request(http.MethodGet, "/artifactory/api/pypi/remote/demo/1.0/"+name, "reader", "")
+		rec := w.Request(
+			http.MethodGet,
+			"/artifactory/api/pypi/remote/demo/1.0/"+name,
+			"reader",
+			"",
+		)
 		if rec.Code != http.StatusConflict || rec.Body.String() != want {
 			t.Errorf("%s: %d %q", pass, rec.Code, rec.Body)
 		}

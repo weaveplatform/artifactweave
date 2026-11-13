@@ -49,7 +49,9 @@ func TestAccCondaRemoteIndexAnswersAFailedReadOfTheServedCopyAsAServerFault(t *t
 					Actual: kernel.Checksums{SHA256: cached},
 				}}, nil
 			}
-			return source.Result{Stream: &source.Stream{Body: timedOutRead{}, Status: http.StatusOK}}, nil
+			return source.Result{
+				Stream: &source.Stream{Body: timedOutRead{}, Status: http.StatusOK},
+			}, nil
 		},
 	)}
 	var logs bytes.Buffer
@@ -60,8 +62,11 @@ func TestAccCondaRemoteIndexAnswersAFailedReadOfTheServedCopyAsAServerFault(t *t
 		c.Blobs = blobs
 		c.Logger = slog.New(slog.NewTextHandler(&logs, nil))
 	})
-	wantStatus(t, w.do(http.MethodPut, "/artifactory/other-local/conda-cached-index", "admin", string(index)),
-		http.StatusCreated)
+	wantStatus(
+		t,
+		w.do(http.MethodPut, "/artifactory/other-local/conda-cached-index", "admin", string(index)),
+		http.StatusCreated,
+	)
 	remote := *repo.Defaults(&repo.Config{
 		Key: "conda-remote", Class: repo.Remote, PackageType: repo.Conda, URL: "https://up.example",
 	})
@@ -71,7 +76,12 @@ func TestAccCondaRemoteIndexAnswersAFailedReadOfTheServedCopyAsAServerFault(t *t
 	blobs.Cut(cached, 0)
 	for _, served = range []string{"stream", "item"} {
 		logs.Reset()
-		got := w.do(http.MethodGet, "/artifactory/api/conda/conda-remote/noarch/repodata.json", "admin", "")
+		got := w.do(
+			http.MethodGet,
+			"/artifactory/api/conda/conda-remote/noarch/repodata.json",
+			"admin",
+			"",
+		)
 		if got.Code != http.StatusInternalServerError ||
 			got.Body.String() != `{"errors":[{"message":"internal error","status":500}]}`+"\n" {
 			t.Errorf("%s: %d %q", served, got.Code, got.Body)

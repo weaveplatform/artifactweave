@@ -18,7 +18,8 @@ func TestUnitWrapMarksTheStoresOwnFailures(t *testing.T) {
 	d := dialect.Dialect{Name: "fake"}
 	s := dialect.New(faultDB(t, faults{exec: true}), d, nil)
 	_, err := s.Exec(t.Context(), "touch", "UPDATE items SET name = name")
-	if want := "fake: touch: fault"; !errors.Is(err, kernel.ErrStore) || !errors.Is(err, errFault) ||
+	if want := "fake: touch: fault"; !errors.Is(err, kernel.ErrStore) ||
+		!errors.Is(err, errFault) ||
 		err.Error() != want {
 		t.Errorf("Exec = %v; want %s marked kernel.ErrStore", err, want)
 	}

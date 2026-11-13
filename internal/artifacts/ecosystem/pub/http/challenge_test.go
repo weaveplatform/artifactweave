@@ -19,7 +19,13 @@ import (
 func TestUnitPubRefusalsCarryTheChallenge(t *testing.T) {
 	f := newFixture(t, repo.Local)
 	body, contentType := upload(t, archive(t, "widget_pub", "1.2.3"))
-	if rec := f.do(http.MethodPost, base+"/api/packages/versions/new", "admin", contentType, body); rec.Code != http.StatusNoContent {
+	if rec := f.do(
+		http.MethodPost,
+		base+"/api/packages/versions/new",
+		"admin",
+		contentType,
+		body,
+	); rec.Code != http.StatusNoContent {
 		t.Fatalf("publish: %d %s", rec.Code, rec.Body)
 	}
 	for _, c := range []struct {

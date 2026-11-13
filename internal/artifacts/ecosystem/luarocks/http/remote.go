@@ -79,7 +79,12 @@ func (h handler) upstreamManifest(
 		return source.Result{}, remoteManifest{}, remoteFailure()
 	}
 	defer result.Stream.Body.Close()
-	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, remoteManifestLimit, remoteFailure())
+	data, err := pkgroute.ReadServed(
+		r.Context(),
+		result.Stream.Body,
+		remoteManifestLimit,
+		remoteFailure(),
+	)
 	if err != nil {
 		return source.Result{}, remoteManifest{}, err
 	}

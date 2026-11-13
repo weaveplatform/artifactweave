@@ -309,7 +309,12 @@ func (h handler) gitRefsForPointer(
 		return nil, source.Result{}, remoteInvalid()
 	}
 	defer result.Stream.Body.Close()
-	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, maxGitRefsBytes, remoteInvalid())
+	data, err := pkgroute.ReadServed(
+		r.Context(),
+		result.Stream.Body,
+		maxGitRefsBytes,
+		remoteInvalid(),
+	)
 	if err != nil {
 		return nil, source.Result{}, err
 	}
@@ -529,7 +534,12 @@ func (h handler) gitPackageNames(r *http.Request, query string) ([]string, error
 		return nil, remoteInvalid()
 	}
 	defer result.Stream.Body.Close()
-	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, maxGitCatalogBytes, remoteInvalid())
+	data, err := pkgroute.ReadServed(
+		r.Context(),
+		result.Stream.Body,
+		maxGitCatalogBytes,
+		remoteInvalid(),
+	)
 	if err != nil {
 		return nil, err
 	}

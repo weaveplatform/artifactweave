@@ -334,7 +334,12 @@ func (h handler) virtualSourceArchive(
 			h.k.Error(w, r, pkgroute.SourceError(source.ErrInvalidResult, false))
 			return
 		}
-		data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, maxCDNMetadata, source.ErrInvalidResult)
+		data, err := pkgroute.ReadServed(
+			r.Context(),
+			result.Stream.Body,
+			maxCDNMetadata,
+			source.ErrInvalidResult,
+		)
 		_ = result.Stream.Body.Close()
 		if err == nil && len(data) > maxCDNMetadata {
 			err = source.ErrInvalidResult

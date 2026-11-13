@@ -47,8 +47,10 @@ func TestUnitRemoteInfoAnswersAFailedReadOfTheServedCopyAsAServerFault(t *testin
 	}
 	stored, err := f.items.Deploy(t.Context(), item.Deploy{
 		Target: item.Target{Repo: c, Cached: true, Path: "models--acme--demo/api/main.json"},
-		Body:   bytes.NewBufferString(fmt.Sprintf(`{"id":"acme/demo","sha":"%s","siblings":[]}`, sha)),
-		By:     "source",
+		Body: bytes.NewBufferString(
+			fmt.Sprintf(`{"id":"acme/demo","sha":"%s","siblings":[]}`, sha),
+		),
+		By: "source",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -60,9 +62,11 @@ func TestUnitRemoteInfoAnswersAFailedReadOfTheServedCopyAsAServerFault(t *testin
 		"stream": {Stream: &source.Stream{Body: timedOutRead{}, Status: http.StatusOK}},
 		"item":   {Item: &stored},
 	} {
-		sources.HTTP = sourceBackendFunc(func(context.Context, source.Request, source.Permit) (source.Result, error) {
-			return result, nil
-		})
+		sources.HTTP = sourceBackendFunc(
+			func(context.Context, source.Request, source.Permit) (source.Result, error) {
+				return result, nil
+			},
+		)
 		r := f.request(http.MethodGet, "api/models/acme/demo/revision/main", "", nil)
 		b := readResponse(t, r)
 		if r.StatusCode != http.StatusInternalServerError ||

@@ -120,7 +120,9 @@ func TestAccProtocolMiddlewareEnvelopes(t *testing.T) {
 			`{"error":{"code":"UNAUTHORIZED","message":"Bad credentials"}}`,
 		},
 		{
-			http.MethodGet, pub, map[string]string{"Authorization": "Bearer not-a-token"}, 401,
+			http.MethodGet, pub,
+			map[string]string{"Authorization": "Bearer not-a-token"},
+			401,
 			pubType, pubRealm("Bad credentials"),
 			`{"error":{"code":"UNAUTHORIZED","message":"Bad credentials"}}`,
 		},

@@ -66,8 +66,18 @@ func TestUnitServeStreamIgnoresIfMatchAndIfUnmodifiedSince(t *testing.T) {
 					}
 					if err != nil || w.Code != http.StatusOK || w.Body.String() != body ||
 						w.Header().Get("Content-Length") != "10" {
-						t.Errorf("%s %s: %s (seekable %v, file %v): %d %q %v %v", method, header[0], header[1],
-							seekable, file, w.Code, w.Body, w.Header(), err)
+						t.Errorf(
+							"%s %s: %s (seekable %v, file %v): %d %q %v %v",
+							method,
+							header[0],
+							header[1],
+							seekable,
+							file,
+							w.Code,
+							w.Body,
+							w.Header(),
+							err,
+						)
 					}
 					if r.Header.Get(header[0]) != header[1] {
 						t.Fatalf("request changed: %v", r.Header)
@@ -130,7 +140,13 @@ func TestUnitServeStreamAnswersAFileAsTheDownload(t *testing.T) {
 					w.Header().Get("X-Checksum-Sha1") != streamSHA1 ||
 					w.Header().Get("Content-Type") != "" || w.Header().Get("Content-Length") != "" ||
 					w.Header().Get("Last-Modified") != "") {
-					t.Errorf("%s %s (seekable %v): 304 headers %v", method, tc.name, seekable, w.Header())
+					t.Errorf(
+						"%s %s (seekable %v): 304 headers %v",
+						method,
+						tc.name,
+						seekable,
+						w.Header(),
+					)
 				}
 			}
 		}
@@ -185,7 +201,8 @@ func TestUnitFileNotModified(t *testing.T) {
 			{"If-None-Match", streamMD5}, {"X-Artifactory-If-None-Match-MD5", "false"},
 		}, streamMD5, false},
 		{"only the first flag counts", [][2]string{
-			{"If-None-Match", streamMD5}, {"X-Artifactory-If-None-Match-MD5", "no"},
+			{"If-None-Match", streamMD5},
+			{"X-Artifactory-If-None-Match-MD5", "no"},
 			{"X-Artifactory-If-None-Match-MD5", "true"},
 		}, streamMD5, false},
 		{"since the same second", [][2]string{
@@ -200,11 +217,21 @@ func TestUnitFileNotModified(t *testing.T) {
 		for _, h := range tc.headers {
 			r.Header.Add(h[0], h[1])
 		}
-		if got := pkgroute.FileNotModified(r, []string{streamSHA1, ""}, tc.md5, modified); got != tc.want {
+		if got := pkgroute.FileNotModified(
+			r,
+			[]string{streamSHA1, ""},
+			tc.md5,
+			modified,
+		); got != tc.want {
 			t.Errorf("%s: %v, want %v", tc.name, got, tc.want)
 		}
 	}
-	if pkgroute.FileNotModified(httptest.NewRequest(http.MethodGet, "/", nil), nil, "", time.Time{}) {
+	if pkgroute.FileNotModified(
+		httptest.NewRequest(http.MethodGet, "/", nil),
+		nil,
+		"",
+		time.Time{},
+	) {
 		t.Error("no validators matched")
 	}
 }
@@ -218,13 +245,19 @@ func TestUnitRangeRefusalWriterCopies(t *testing.T) {
 	if w.Unwrap() != rec {
 		t.Fatal("Unwrap is not the wrapped writer")
 	}
-	if n, err := w.ReadFrom(strings.NewReader("body")); n != 4 || err != nil || rec.Body.String() != "body" {
+	if n, err := w.ReadFrom(
+		strings.NewReader("body"),
+	); n != 4 || err != nil ||
+		rec.Body.String() != "body" {
 		t.Fatalf("copied %d %v %q", n, err, rec.Body)
 	}
 	rec = httptest.NewRecorder()
 	w = &pkgroute.RangeRefusalWriter{ResponseWriter: rec}
 	w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
-	if n, err := w.ReadFrom(strings.NewReader("body")); n != 4 || err != nil || rec.Body.Len() != 0 {
+	if n, err := w.ReadFrom(
+		strings.NewReader("body"),
+	); n != 4 || err != nil ||
+		rec.Body.Len() != 0 {
 		t.Fatalf("416 copied %d %v %q", n, err, rec.Body)
 	}
 }

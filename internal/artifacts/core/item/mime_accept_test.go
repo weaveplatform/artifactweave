@@ -157,7 +157,12 @@ func TestUnitMIMERequestsTheURLsType(t *testing.T) {
 		}
 	}
 	c := repo.Config{Key: "r", Class: repo.Remote}
-	if err := RefuseLabel(c, "http://up.example/packages/Acme/1.0.0", "text/html", nil); err != nil {
+	if err := RefuseLabel(
+		c,
+		"http://up.example/packages/Acme/1.0.0",
+		"text/html",
+		nil,
+	); err != nil {
 		t.Fatalf("HEAD of a URL with no type: %v", err)
 	}
 }

@@ -26,7 +26,12 @@ func TestAccRemoteManifestAnswersAFailedReadOfTheServedCopyAsAServerFault(t *tes
 		o.Fault = func(_ *http.Request, err error) { faults = append(faults, err) }
 	})
 	f.seed()
-	wantBody(t, f.do(http.MethodGet, remoteBase+"manifest", nil, "", "admin"), []string{`"1.0-1"`}, nil)
+	wantBody(
+		t,
+		f.do(http.MethodGet, remoteBase+"manifest", nil, "", "admin"),
+		[]string{`"1.0-1"`},
+		nil,
+	)
 	failed := 0
 	for spare := 0; ; spare++ {
 		blobs.Cut(cachedSHA(t, f, "manifest"), spare)

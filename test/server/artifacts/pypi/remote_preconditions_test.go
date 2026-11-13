@@ -38,10 +38,19 @@ func TestAccPypiRemoteFileIgnoresIfMatchAndIfUnmodifiedSince(t *testing.T) {
 				label   string
 				headers func(sha string) []string
 			}{
-				{"If-Match other", func(string) []string { return []string{"If-Match", `"other"`} }},
+				{
+					"If-Match other",
+					func(string) []string { return []string{"If-Match", `"other"`} },
+				},
 				{"If-Match bare", func(sha string) []string { return []string{"If-Match", sha} }},
-				{"If-Match quoted", func(sha string) []string { return []string{"If-Match", `"` + sha + `"`} }},
-				{"If-Unmodified-Since before", func(string) []string { return []string{"If-Unmodified-Since", before} }},
+				{
+					"If-Match quoted",
+					func(sha string) []string { return []string{"If-Match", `"` + sha + `"`} },
+				},
+				{
+					"If-Unmodified-Since before",
+					func(string) []string { return []string{"If-Unmodified-Since", before} },
+				},
 			}
 			version := func(i int, method string) string {
 				return "1." + strconv.Itoa(i) + map[string]string{"GET": "0", "HEAD": "1"}[method]
@@ -69,10 +78,15 @@ func TestAccPypiRemoteFileIgnoresIfMatchAndIfUnmodifiedSince(t *testing.T) {
 				"meta": map[string]string{"api-version": "1.1"}, "name": "demo", "files": files,
 			})
 			w.Upstream.Set("/simple/demo/", fakeupstream.Resource{
-				Body: doc, Header: http.Header{"Content-Type": {"application/vnd.pypi.simple.v1+json"}},
+				Body:   doc,
+				Header: http.Header{"Content-Type": {"application/vnd.pypi.simple.v1+json"}},
 			})
-			harness.WantStatus(t, w.Request(http.MethodGet, "/artifactory/api/pypi/remote/simple/demo/",
-				"reader", "", "Accept", "application/vnd.pypi.simple.v1+json"), http.StatusOK)
+			harness.WantStatus(
+				t,
+				w.Request(http.MethodGet, "/artifactory/api/pypi/remote/simple/demo/",
+					"reader", "", "Accept", "application/vnd.pypi.simple.v1+json"),
+				http.StatusOK,
+			)
 			for i, c := range cases {
 				for _, method := range []string{http.MethodGet, http.MethodHead} {
 					v := version(i, method)
@@ -84,11 +98,23 @@ func TestAccPypiRemoteFileIgnoresIfMatchAndIfUnmodifiedSince(t *testing.T) {
 					}
 					target := "/artifactory/api/pypi/remote/demo/" + v + "/demo-" + v + "-py3-none-any.whl"
 					for _, pass := range []string{"first download", "again"} {
-						rec := w.Request(method, target, "reader", "", c.headers(hex.EncodeToString(sum[:]))...)
+						rec := w.Request(
+							method,
+							target,
+							"reader",
+							"",
+							c.headers(hex.EncodeToString(sum[:]))...)
 						if rec.Code != http.StatusOK || rec.Body.String() != want ||
 							rec.Header().Get("Content-Length") != strconv.Itoa(len(data)) {
-							t.Errorf("%s %s %s: %d %q, want 200 and %d bytes", pass, method, c.label,
-								rec.Code, rec.Header().Get("Content-Length"), len(data))
+							t.Errorf(
+								"%s %s %s: %d %q, want 200 and %d bytes",
+								pass,
+								method,
+								c.label,
+								rec.Code,
+								rec.Header().Get("Content-Length"),
+								len(data),
+							)
 						}
 					}
 				}

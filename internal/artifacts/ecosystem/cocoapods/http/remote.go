@@ -345,7 +345,12 @@ func (h handler) remoteSpec(
 	name, version, publicKey string,
 ) {
 	defer result.Stream.Body.Close()
-	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, maxCDNMetadata, source.ErrInvalidResult)
+	data, err := pkgroute.ReadServed(
+		r.Context(),
+		result.Stream.Body,
+		maxCDNMetadata,
+		source.ErrInvalidResult,
+	)
 	if err == nil && len(data) > maxCDNMetadata {
 		err = source.ErrInvalidResult
 	}
@@ -416,7 +421,12 @@ func (h handler) remoteIndexRows(
 	p string,
 ) ([]string, error) {
 	defer result.Stream.Body.Close()
-	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, maxCDNMetadata, source.ErrInvalidResult)
+	data, err := pkgroute.ReadServed(
+		r.Context(),
+		result.Stream.Body,
+		maxCDNMetadata,
+		source.ErrInvalidResult,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +499,12 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, name, ver
 		h.k.Error(w, r, pkgroute.SourceError(source.ErrInvalidResult, false))
 		return
 	}
-	data, err := pkgroute.ReadServed(r.Context(), specResult.Stream.Body, maxCDNMetadata, source.ErrInvalidResult)
+	data, err := pkgroute.ReadServed(
+		r.Context(),
+		specResult.Stream.Body,
+		maxCDNMetadata,
+		source.ErrInvalidResult,
+	)
 	_ = specResult.Stream.Body.Close()
 	if err == nil && len(data) > maxCDNMetadata {
 		err = source.ErrInvalidResult

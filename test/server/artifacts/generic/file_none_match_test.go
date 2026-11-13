@@ -42,7 +42,11 @@ func noneMatchCases(sha, md5 string) []noneMatchCase {
 
 // sendLines serves a request carrying lines, each its own header line, as
 // user with the password every harness principal has.
-func sendLines(h http.Handler, method, target, user string, lines [][2]string) *httptest.ResponseRecorder {
+func sendLines(
+	h http.Handler,
+	method, target, user string,
+	lines [][2]string,
+) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(method, target, nil)
 	r.SetBasicAuth(user, "pw")
 	for _, l := range lines {
@@ -107,7 +111,13 @@ func wantNoneMatch(
 		}
 	}
 	rec = sendLines(h, http.MethodHead, target, user, [][2]string{{"Range", "bytes=1000-2000"}})
-	wantCondAnswer(t, "HEAD "+target+" past the end", rec, condAnswer{http.StatusOK, "", ""}, file.sha1)
+	wantCondAnswer(
+		t,
+		"HEAD "+target+" past the end",
+		rec,
+		condAnswer{http.StatusOK, "", ""},
+		file.sha1,
+	)
 }
 
 // TestAccFileDownloadAnswersIfNoneMatchAsTheDownload: a file on a local, a
@@ -121,12 +131,34 @@ func TestAccFileDownloadAnswersIfNoneMatchAsTheDownload(t *testing.T) {
 	// The repositories keep client checksums, so the deploy sends them for
 	// the checksum files to answer.
 	for _, key := range []string{"libs-local", "redirect-local"} {
-		harness.WantStatus(t, w.Do(http.MethodPut, "/artifactory/"+key+"/dir/match.bin", "admin", data,
-			"X-Checksum-Sha1", file.sha1, "X-Checksum-Sha256", file.sha256), http.StatusCreated)
+		harness.WantStatus(
+			t,
+			w.Do(http.MethodPut, "/artifactory/"+key+"/dir/match.bin", "admin", data,
+				"X-Checksum-Sha1", file.sha1, "X-Checksum-Sha256", file.sha256),
+			http.StatusCreated,
+		)
 	}
-	wantNoneMatch(t, w.H, "/artifactory/libs-local/dir/match.bin", "reader", data, file, false, true)
+	wantNoneMatch(
+		t,
+		w.H,
+		"/artifactory/libs-local/dir/match.bin",
+		"reader",
+		data,
+		file,
+		false,
+		true,
+	)
 	wantNoneMatch(t, w.H, "/artifactory/virt/dir/match.bin", "reader", data, file, false, true)
-	wantNoneMatch(t, w.H, "/artifactory/redirect-local/dir/match.bin", "reader", data, file, true, true)
+	wantNoneMatch(
+		t,
+		w.H,
+		"/artifactory/redirect-local/dir/match.bin",
+		"reader",
+		data,
+		file,
+		true,
+		true,
+	)
 }
 
 // TestAccRemoteFileDownloadAnswersIfNoneMatchAsTheDownload: a remote file
@@ -155,10 +187,15 @@ func TestAccRemoteFileDownloadAnswersIfNoneMatchAsTheDownload(t *testing.T) {
 					Header: http.Header{
 						"X-Checksum-Sha1": {file.sha1}, "X-Checksum-Sha256": {file.sha256},
 						"X-Checksum-Md5": {file.md5},
-					}})
+					},
+				})
 				target := "/artifactory/remote" + name
 				if pass == "again" {
-					harness.WantStatus(t, w.Request(http.MethodGet, target, "reader", ""), http.StatusOK)
+					harness.WantStatus(
+						t,
+						w.Request(http.MethodGet, target, "reader", ""),
+						http.StatusOK,
+					)
 				}
 				wantNoneMatch(t, w.H, target, "reader", data, file, false, store && pass == "again")
 			}

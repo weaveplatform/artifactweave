@@ -25,7 +25,12 @@ type failingHooks struct {
 	err error
 }
 
-func (h failingHooks) Admit(ctx context.Context, env format.Env, c repo.Config, w format.Write) (format.Write, error) {
+func (h failingHooks) Admit(
+	ctx context.Context,
+	env format.Env,
+	c repo.Config,
+	w format.Write,
+) (format.Write, error) {
 	if h.at == "admit" {
 		return w, h.err
 	}
@@ -39,7 +44,13 @@ func (h failingHooks) Deployed(context.Context, format.Env, repo.Config, model.I
 	return nil
 }
 
-func (h failingHooks) Annotated(context.Context, format.Env, repo.Config, model.Item, format.Annotation) error {
+func (h failingHooks) Annotated(
+	context.Context,
+	format.Env,
+	repo.Config,
+	model.Item,
+	format.Annotation,
+) error {
 	if h.at == "annotated" {
 		return h.err
 	}

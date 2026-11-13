@@ -40,7 +40,8 @@ func TestAccNPMAuthLinesHandBackTheAPIKey(t *testing.T) {
 		"a key beside Bearer":            with(bearerAuth(issued.AccessToken), "X-JFrog-Art-Api", ref),
 	} {
 		rec := do(t, w.h, "GET", "/artifactory/api/npm/auth", headers, "")
-		if want := "_authToken = " + ref + "\n"; rec.Code != http.StatusOK || rec.Body.String() != want {
+		if want := "_authToken = " + ref + "\n"; rec.Code != http.StatusOK ||
+			rec.Body.String() != want {
 			t.Errorf("%s: %d %q, want 200 %q", name, rec.Code, rec.Body, want)
 		}
 		rec = do(t, w.h, "GET", "/artifactory/api/npm/npm-local/auth/acme", headers, "")

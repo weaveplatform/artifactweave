@@ -799,7 +799,12 @@ func (h handler) remoteJSON(
 		return source.Result{}, source.ErrInvalidResult
 	}
 	defer result.Stream.Body.Close()
-	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, maxPageBytes, source.ErrInvalidResult)
+	data, err := pkgroute.ReadServed(
+		r.Context(),
+		result.Stream.Body,
+		maxPageBytes,
+		source.ErrInvalidResult,
+	)
 	if err != nil {
 		return source.Result{}, err
 	}

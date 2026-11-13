@@ -267,7 +267,11 @@ func credentials(
 // apiKeyCredentials verifies an API key: a reference token alone, since
 // API keys are retired and 7.x refuses an access token sent as one
 // (AccessTokenAuthenticationProviderV2.assertNotTokenWithApiKeyHeader).
-func apiKeyCredentials(ctx context.Context, a *authn.Authenticator, key string) (kernel.Principal, error) {
+func apiKeyCredentials(
+	ctx context.Context,
+	a *authn.Authenticator,
+	key string,
+) (kernel.Principal, error) {
 	if !accessapi.IsReferenceToken(key) {
 		return kernel.Principal{}, kernel.ErrBadCredentials
 	}
@@ -284,7 +288,8 @@ func apiKeyCredentials(ctx context.Context, a *authn.Authenticator, key string) 
 // keeps its status, as the entry point keeps a 403's.
 func refusedAPIKey(r *http.Request, err error) error {
 	var e *apierror.Error
-	if !errors.As(err, &e) || e.Status != http.StatusUnauthorized || !accessapi.APIKeySent(r.Header) {
+	if !errors.As(err, &e) || e.Status != http.StatusUnauthorized ||
+		!accessapi.APIKeySent(r.Header) {
 		return err
 	}
 	return challengedForbidden(e.Message)
@@ -305,7 +310,8 @@ func refusedAPIKey(r *http.Request, err error) error {
 func refusedNuGetPassword(r *http.Request, secret string, err error) error {
 	if !errors.Is(err, kernel.ErrBadCredentials) || accessapi.LooksLikeToken(secret) ||
 		!strings.Contains(strings.ToLower(r.UserAgent()), "nuget") ||
-		accessapi.Blank(r.Header.Get("Authorization")) && accessapi.Blank(r.Header.Get("X-NuGet-ApiKey")) {
+		accessapi.Blank(r.Header.Get("Authorization")) &&
+			accessapi.Blank(r.Header.Get("X-NuGet-ApiKey")) {
 		return err
 	}
 	return challengedForbidden(kernel.ErrBadCredentials.Message)

@@ -102,7 +102,8 @@ func TestAccMetadataReadFailuresPreventArchiveFetch(t *testing.T) {
 				return metadataResult(body), nil
 			})
 			response := f.get(tc.repo, tc.resource)
-			if response.Code != http.StatusInternalServerError || !body.closed.Load() || calls != 1 {
+			if response.Code != http.StatusInternalServerError || !body.closed.Load() ||
+				calls != 1 {
 				t.Fatalf(
 					"response = %d %s; closed = %t, calls = %d",
 					response.Code,

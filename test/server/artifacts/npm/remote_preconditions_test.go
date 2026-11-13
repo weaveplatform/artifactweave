@@ -38,16 +38,27 @@ func TestAccNPMRemoteTarballIgnoresIfMatchAndIfUnmodifiedSince(t *testing.T) {
 				label   string
 				headers func(sha string) []string
 			}{
-				{"If-Match other", func(string) []string { return []string{"If-Match", `"other"`} }},
+				{
+					"If-Match other",
+					func(string) []string { return []string{"If-Match", `"other"`} },
+				},
 				{"If-Match bare", func(sha string) []string { return []string{"If-Match", sha} }},
-				{"If-Match quoted", func(sha string) []string { return []string{"If-Match", `"` + sha + `"`} }},
-				{"If-Unmodified-Since before", func(string) []string { return []string{"If-Unmodified-Since", before} }},
+				{
+					"If-Match quoted",
+					func(sha string) []string { return []string{"If-Match", `"` + sha + `"`} },
+				},
+				{
+					"If-Unmodified-Since before",
+					func(string) []string { return []string{"If-Unmodified-Since", before} },
+				},
 			}
 			versions := map[string]any{}
 			tarballs := map[string][]byte{}
 			for i := range cases {
 				for _, method := range []string{http.MethodGet, http.MethodHead} {
-					version := "1." + strconv.Itoa(i) + "." + map[string]string{"GET": "0", "HEAD": "1"}[method]
+					version := "1." + strconv.Itoa(
+						i,
+					) + "." + map[string]string{"GET": "0", "HEAD": "1"}[method]
 					data := support.NPMTarballOf("pkg", version)
 					sum := sha1.Sum(data) //nolint:gosec // npm's dist.shasum
 					file := "/pkg/-/pkg-" + version + ".tgz"
@@ -62,14 +73,18 @@ func TestAccNPMRemoteTarballIgnoresIfMatchAndIfUnmodifiedSince(t *testing.T) {
 				}
 			}
 			doc, _ := json.Marshal(map[string]any{
-				"name": "pkg", "versions": versions, "dist-tags": map[string]string{"latest": "1.0.0"},
+				"name":      "pkg",
+				"versions":  versions,
+				"dist-tags": map[string]string{"latest": "1.0.0"},
 			})
 			w.Upstream.Set("/pkg", fakeupstream.Resource{
 				Body: doc, Header: http.Header{"Content-Type": {"application/json"}},
 			})
 			for i, c := range cases {
 				for _, method := range []string{http.MethodGet, http.MethodHead} {
-					version := "1." + strconv.Itoa(i) + "." + map[string]string{"GET": "0", "HEAD": "1"}[method]
+					version := "1." + strconv.Itoa(
+						i,
+					) + "." + map[string]string{"GET": "0", "HEAD": "1"}[method]
 					data := tarballs[version]
 					sum := sha1.Sum(data) //nolint:gosec // the file's SHA-1
 					want := ""
@@ -77,12 +92,23 @@ func TestAccNPMRemoteTarballIgnoresIfMatchAndIfUnmodifiedSince(t *testing.T) {
 						want = string(data)
 					}
 					for _, pass := range []string{"first download", "again"} {
-						rec := w.Request(method, "/artifactory/api/npm/remote/pkg/-/pkg-"+version+".tgz",
-							"reader", "", c.headers(hex.EncodeToString(sum[:]))...)
+						rec := w.Request(
+							method,
+							"/artifactory/api/npm/remote/pkg/-/pkg-"+version+".tgz",
+							"reader",
+							"",
+							c.headers(hex.EncodeToString(sum[:]))...)
 						if rec.Code != http.StatusOK || rec.Body.String() != want ||
 							rec.Header().Get("Content-Length") != strconv.Itoa(len(data)) {
-							t.Errorf("%s %s %s: %d %q, want 200 and %d bytes", pass, method, c.label,
-								rec.Code, rec.Header().Get("Content-Length"), len(data))
+							t.Errorf(
+								"%s %s %s: %d %q, want 200 and %d bytes",
+								pass,
+								method,
+								c.label,
+								rec.Code,
+								rec.Header().Get("Content-Length"),
+								len(data),
+							)
 						}
 					}
 				}

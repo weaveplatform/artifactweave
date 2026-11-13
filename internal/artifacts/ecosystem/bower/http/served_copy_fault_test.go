@@ -88,7 +88,10 @@ func TestAccBowerRemoteAnswersAFailedReadOfTheServedCopyAsAServerFault(t *testin
 		f, blobs := servedCopyFaults(t, true)
 		base := "/artifactory/api/bower/bower-remote/"
 		pointer := `{"name":"hello","url":"` + f.up.URL + `/git/team/hello.git"}`
-		f.up.Set("/registry/packages/search/hello", fakeupstream.Resource{Body: []byte("[" + pointer + "]")})
+		f.up.Set(
+			"/registry/packages/search/hello",
+			fakeupstream.Resource{Body: []byte("[" + pointer + "]")},
+		)
 		f.up.Set("/registry/packages/hello", fakeupstream.Resource{Body: []byte(pointer)})
 		f.up.Set("/git/team/hello.git/info/refs", fakeupstream.Resource{Body: []byte(
 			gitPkt("# service=git-upload-pack\n") + "0000" +

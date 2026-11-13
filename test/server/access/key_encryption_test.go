@@ -35,9 +35,21 @@ func TestAccKeyEncryption(t *testing.T) {
 				if rec.Code != tc.status || rec.Body.String() != tc.body ||
 					rec.Header().Get("Content-Type") != tc.contentType ||
 					rec.Header().Get("WWW-Authenticate") != tc.auth {
-					t.Errorf("%s as %s (anonymous access %v): %d %q %q %q, want %d %q %q %q",
-						path, tc.who, anonymous, rec.Code, rec.Header().Get("Content-Type"), rec.Body,
-						rec.Header().Get("WWW-Authenticate"), tc.status, tc.contentType, tc.body, tc.auth)
+					t.Errorf(
+						"%s as %s (anonymous access %v): %d %q %q %q, want %d %q %q %q",
+						path,
+						tc.who,
+						anonymous,
+						rec.Code,
+						rec.Header().Get("Content-Type"),
+						rec.Body,
+						rec.Header().
+							Get("WWW-Authenticate"),
+						tc.status,
+						tc.contentType,
+						tc.body,
+						tc.auth,
+					)
 				}
 			}
 		}

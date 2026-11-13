@@ -64,7 +64,10 @@ func TestAccRemoteBazelAnswersAFailedReadOfTheServedCopyAsAServerFault(t *testin
 		"integrity":    "sha256-" + base64.StdEncoding.EncodeToString(digest[:]),
 		"strip_prefix": "hello-1.0.0",
 	})
-	up.Set("/registry/modules/hello/metadata.json", fakeupstream.Resource{Body: []byte(`{"versions":["1.0.0"]}`)})
+	up.Set(
+		"/registry/modules/hello/metadata.json",
+		fakeupstream.Resource{Body: []byte(`{"versions":["1.0.0"]}`)},
+	)
 	up.Set("/registry/modules/hello/1.0.0/MODULE.bazel",
 		fakeupstream.Resource{Body: []byte("module(name = \"hello\", version = \"1.0.0\")\n")})
 	up.Set("/registry/modules/hello/1.0.0/source.json", fakeupstream.Resource{Body: sourceDoc})

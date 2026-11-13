@@ -17,7 +17,10 @@ import (
 
 // errStatement is a statement the database failed to run, as the SQL
 // store's Wrap passes it up: the driver's error marked kernel.ErrStore.
-var errStatement = fmt.Errorf("sqlite: ensure package: %w", errors.Join(kernel.ErrStore, errDropped))
+var errStatement = fmt.Errorf(
+	"sqlite: ensure package: %w",
+	errors.Join(kernel.ErrStore, errDropped),
+)
 
 // indexFaults is the item service's store whose package index fails
 // with err while it is set.
@@ -58,7 +61,12 @@ func TestAccRemoteRockAnswersAStoreFailureUnderItsHookAsAServerFault(t *testing.
 	})
 	f.seed()
 	f.up.Set("/rocks/"+path, fakeupstream.Resource{Body: rock(t, "visible", "1.0-1")})
-	wantBody(t, f.do(http.MethodGet, remoteBase+"manifest", nil, "", "admin"), []string{`"1.0-1"`}, nil)
+	wantBody(
+		t,
+		f.do(http.MethodGet, remoteBase+"manifest", nil, "", "admin"),
+		[]string{`"1.0-1"`},
+		nil,
+	)
 	fail = errStatement
 	wantError(t, f.do(http.MethodGet, remoteBase+path, nil, "", "admin"),
 		http.StatusInternalServerError, "internal error")
