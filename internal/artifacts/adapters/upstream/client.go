@@ -213,7 +213,10 @@ func (c *Client) Do(ctx context.Context, r remote.Request) (*http.Response, erro
 		}
 		u, err = remote.CheckedURL(r.ExternalURL)
 	} else {
-		u, err = requestURL(c.config, c.base, r.Path, r.Query)
+		u, err = requestURL(c.config, c.base, r.Path, r.Matrix, r.Query)
+		if err == nil && r.Matrix != "" && strings.HasSuffix(r.Path, r.Matrix) {
+			ctx = withMatrix(ctx, r.Matrix)
+		}
 	}
 	if err != nil {
 		return nil, err

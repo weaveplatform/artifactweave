@@ -280,9 +280,15 @@ The following are artifactweave limits and decisions, not claimed vendor default
   bare path, and a cached copy is matched against them before the upstream is asked.
   Every byte a path segment may not carry is percent-encoded, so `/`, `?`, `#` and a space
   in a key or value travel as `%2F`, `%3F`, `%23` and `%20` rather than moving the request
-  elsewhere; an escape already made is kept and a stray `%` becomes `%25`. A string that
-  decodes to a backslash, NUL, line break or dot segment is left off whole and the bare
-  path asked for, since the transport refuses those in any outgoing URL (`CheckedURL`).
+  elsewhere; an escape already made is kept and a stray `%` becomes `%25`. A backslash,
+  NUL, CR or LF travels as `%5C`, `%00`, `%0D` or `%0A`, the bytes Artifactory sends
+  (#1420); the transport accepts those escapes only in the matrix string the request
+  appended (`CheckedRequestURL`), and still refuses them, escaped or not, in the
+  repository URL and the item path (`CheckedURL`). A string whose decoded form holds a
+  `.` or `..` piece between `/`, `\` or NUL is left off whole and the bare path asked
+  for: Artifactory sends its `/` and dots unescaped, so the upstream resolves another
+  file, and escaped it would still be a step for an upstream that decodes before it
+  resolves.
 - At most 10 redirects. Re-evaluate destination policy at every hop, DNS resolution and
   token realm. Explicit private upstream authorities may be configured; metadata may not
   grant itself loopback/link-local/metadata-service or arbitrary internal access. Default

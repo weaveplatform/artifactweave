@@ -20,8 +20,7 @@ type destinationPolicy struct {
 }
 
 func (p *destinationPolicy) addresses(ctx context.Context, u *url.URL) ([]string, error) {
-	if _, err := remote.CheckedURL(u.String()); err != nil {
-		//nolint:wrapcheck // preserves upstream error identity
+	if err := checkedURL(ctx, u); err != nil {
 		return nil, err
 	}
 	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")

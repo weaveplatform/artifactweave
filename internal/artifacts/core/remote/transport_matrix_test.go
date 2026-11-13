@@ -2,6 +2,7 @@ package remote_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -18,10 +19,13 @@ import (
 // query. A byte a path segment may not carry, such as one that would end
 // the path or start a query or a fragment, is percent-encoded, so a value
 // never moves the request elsewhere; an escape already made is kept and a
-// stray "%" becomes %25. A string that does not start with ";" would join
-// the file name, and one that decodes to a backslash, NUL, line break or
-// dot segment is refused by the transport (CheckedURL): both are left off
-// and the bare path is asked for, as before.
+// stray "%" becomes %25. A backslash, NUL, CR or LF travels as %5C, %00,
+// %0D or %0A, as 7.x's encodeIfNeeded sends it (#1420). A string that does
+// not start with ";" would join the file name, and one whose decoded form
+// holds a "." or ".." piece between "/", "\" or NUL would be a step for an
+// upstream that decodes before it resolves (CheckedMatrix): both are left
+// off and the bare path is asked for. Request.Matrix names what was
+// appended, so that the transport checks it by that rule.
 func TestUnitTransportRequestAppendsMatrixParameters(t *testing.T) {
 	for _, tc := range []struct {
 		name                string
@@ -105,30 +109,54 @@ func TestUnitTransportRequestAppendsMatrixParameters(t *testing.T) {
 			name:     "a backslash",
 			resource: source.Resource{Path: "a/file.bin", Method: http.MethodGet},
 			matrix:   `;x=1\y`,
-			wantPath: "a/file.bin",
+			wantPath: "a/file.bin;x=1%5Cy",
 		},
 		{
 			name:     "a line break",
 			resource: source.Resource{Path: "a/file.bin", Method: http.MethodGet},
 			matrix:   ";x=1\r\nHost: evil",
-			wantPath: "a/file.bin",
+			wantPath: "a/file.bin;x=1%0D%0AHost:%20evil",
 		},
 		{
 			name:     "an escaped line break",
 			resource: source.Resource{Path: "a/file.bin", Method: http.MethodGet},
 			matrix:   ";x=1%0D%0A",
-			wantPath: "a/file.bin",
+			wantPath: "a/file.bin;x=1%0D%0A",
 		},
 		{
 			name:     "an escaped backslash",
 			resource: source.Resource{Path: "a/file.bin", Method: http.MethodGet},
 			matrix:   ";x=1%5Cy",
-			wantPath: "a/file.bin",
+			wantPath: "a/file.bin;x=1%5Cy",
 		},
 		{
 			name:     "a NUL",
 			resource: source.Resource{Path: "a/file.bin", Method: http.MethodGet},
 			matrix:   ";x=1%00",
+			wantPath: "a/file.bin;x=1%00",
+		},
+		{
+			name:     "dots that are not a segment",
+			resource: source.Resource{Path: "a/file.bin", Method: http.MethodGet},
+			matrix:   ";x=..;y=a..%5C..b;z=..%00",
+			wantPath: "a/file.bin;x=..;y=a..%5C..b;z=..%00",
+		},
+		{
+			name:     "a dot segment between backslashes",
+			resource: source.Resource{Path: "a/file.bin", Method: http.MethodGet},
+			matrix:   ";x=1%5C..%5Csecret",
+			wantPath: "a/file.bin",
+		},
+		{
+			name:     "a dot segment after a NUL",
+			resource: source.Resource{Path: "a/file.bin", Method: http.MethodGet},
+			matrix:   ";x=1%00..",
+			wantPath: "a/file.bin",
+		},
+		{
+			name:     "a single dot after a backslash",
+			resource: source.Resource{Path: "a/file.bin", Method: http.MethodGet},
+			matrix:   ";x=1%5C.",
 			wantPath: "a/file.bin",
 		},
 		{
@@ -173,6 +201,15 @@ func TestUnitTransportRequestAppendsMatrixParameters(t *testing.T) {
 				source.Request{Resource: tc.resource, MatrixParams: tc.matrix},
 				model.RemoteCacheEntry{},
 			)
+			wantMatrix := strings.TrimPrefix(tc.wantPath, tc.resource.Path)
+			if tc.resource.UpstreamPath != "" {
+				wantMatrix = strings.TrimPrefix(tc.wantPath, tc.resource.UpstreamPath)
+			} else if tc.resource.EscapedPath != "" {
+				wantMatrix = strings.TrimPrefix(tc.wantPath, tc.resource.EscapedPath)
+			}
+			if r.Matrix != wantMatrix {
+				t.Errorf("TransportRequest Matrix = %q, want %q", r.Matrix, wantMatrix)
+			}
 			if r.Path != tc.wantPath || r.Query != tc.wantQuery ||
 				r.ExternalURL != tc.wantExternal || r.Method != tc.resource.Method {
 				t.Errorf("TransportRequest = path %q, query %q, external %q, method %q; "+

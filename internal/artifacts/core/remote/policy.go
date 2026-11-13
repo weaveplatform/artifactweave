@@ -509,6 +509,8 @@ func (p *Policy) used(token model.RemoteCacheToken) func(context.Context) error 
 // (HEAD) append buildRequestMatrixParams to the remote request URL. They
 // are not part of the cache key, so the copy they fetch is cached at its
 // bare path. An external URL names its own resource and takes none.
+// Request.Matrix names them, so that the transport checks them by their
+// own rule (CheckedMatrix) and the path before them as any path.
 func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 	path := q.Resource.EscapedPath
 	if path == "" {
@@ -517,11 +519,12 @@ func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 	if q.Resource.UpstreamPath != "" {
 		path = q.Resource.UpstreamPath
 	}
-	query := q.Resource.Query
+	query, matrix := q.Resource.Query, ""
 	if q.Resource.ExternalURL != "" {
 		path, query = "", ""
 	} else {
-		path += upstreamMatrix(q.MatrixParams)
+		matrix = upstreamMatrix(q.MatrixParams)
+		path += matrix
 	}
 	headers := make(http.Header)
 	if q.Resource.Accept != "" {
@@ -544,6 +547,7 @@ func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 		Method:              q.Resource.Method,
 		Body:                append([]byte(nil), q.Resource.PostBody...),
 		Path:                path,
+		Matrix:              matrix,
 		Query:               query,
 		ExternalURL:         q.Resource.ExternalURL,
 		CheckURL:            q.Resource.CheckURL,
@@ -560,17 +564,17 @@ func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 // reaches the upstream as %2F, %3F, %23 or %20 rather than ending the path
 // or starting a query or a fragment. A "%" that starts a valid escape is
 // kept, since the item route hands over its parameters already escaped
-// (pkgroute.UpstreamMatrix); a stray one becomes %25.
+// (pkgroute.UpstreamMatrix); a stray one becomes %25. A backslash, NUL, CR
+// or LF travels as %5C, %00, %0D or %0A, the bytes 7.x sends for it
+// (CheckedMatrix gives the 7.161.26 source).
 //
 // Two forms are left off whole, and the upstream is asked for the bare
-// path, as it was before parameters were passed on: a string that does
-// not start with ";", which appended as it is would join the last segment
-// and name another file; and one that decodes to a backslash, a NUL, a
-// line break or a "." or ".." segment. CheckedURL refuses every outgoing
-// URL whose decoded path holds one, so that an upstream that decodes
-// before it resolves the path never reads it as a separator, a header or a
-// step out of the repository URL; appended, they would turn the answer
-// into a 502.
+// path: a string that does not start with ";", which appended as it is
+// would join the last segment and name another file; and one CheckedMatrix
+// refuses, whose decoded form holds a "." or ".." piece. 7.x sends such a
+// value with its "/" and dots as they are, so the upstream resolves
+// another file; escaped, it would still be a step for an upstream that
+// decodes before it resolves, and the transport would refuse it.
 func upstreamMatrix(params string) string {
 	if !strings.HasPrefix(params, ";") {
 		return ""
@@ -592,14 +596,8 @@ func upstreamMatrix(params string) string {
 		}
 	}
 	out := b.String()
-	decoded, err := url.PathUnescape(out)
-	if err != nil || strings.ContainsAny(decoded, "\\\x00\r\n") {
+	if CheckedMatrix(out) != nil {
 		return ""
-	}
-	for _, segment := range strings.Split(decoded, "/") {
-		if segment == "." || segment == ".." {
-			return ""
-		}
 	}
 	return out
 }

@@ -150,6 +150,7 @@ func TestUnitURLPreservation(t *testing.T) {
 			},
 			base,
 			tc.path,
+			"",
 			tc.query,
 		)
 		if err != nil || u.String() != tc.expected {
@@ -157,7 +158,7 @@ func TestUnitURLPreservation(t *testing.T) {
 		}
 	}
 	for _, path := range []string{"../x", "%2e%2e/x", "a%2f..%2fx", "/x", "//host", "a?x", "a#x", "a\\x", "%00", "%xx"} {
-		if _, err := requestURL(repo.Config{}, base, path, ""); !errors.Is(err, remote.ErrURL) {
+		if _, err := requestURL(repo.Config{}, base, path, "", ""); !errors.Is(err, remote.ErrURL) {
 			t.Fatal(path, err)
 		}
 	}
@@ -183,7 +184,7 @@ func TestUnitP2MetadataFileBaseURLNormalizesOnlyP2(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		u, err := requestURL(repo.Config{PackageType: tc.format}, base, "p2.index", "")
+		u, err := requestURL(repo.Config{PackageType: tc.format}, base, "p2.index", "", "")
 		if err != nil || u.String() != tc.expected {
 			t.Errorf("%s %s: URL=%v, error=%v, want %s", tc.format, tc.base, u, err, tc.expected)
 		}
@@ -197,6 +198,7 @@ func TestUnitP2MetadataFileBaseURLNormalizesOnlyP2(t *testing.T) {
 		base,
 		"p2.index",
 		"",
+		"",
 	); !errors.Is(
 		err,
 		remote.ErrURL,
@@ -207,7 +209,7 @@ func TestUnitP2MetadataFileBaseURLNormalizesOnlyP2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	u, err := requestURL(repo.Config{PackageType: repo.P2}, signed, "p2.index", "")
+	u, err := requestURL(repo.Config{PackageType: repo.P2}, signed, "p2.index", "", "")
 	if err != nil || u.String() != "https://eclipse.example/site/p2.index?signature=a%2Fb" {
 		t.Errorf("P2 metadata URL lost its signed query: %v, %v", u, err)
 	}

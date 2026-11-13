@@ -219,10 +219,11 @@ func TestAccGenericRemoteServesTheUpstreamsAnswerUnmatched(t *testing.T) {
 // percent-encoded after the path, so it never ends the path or starts a
 // query or a fragment there, and a mandatory key keeps its "+" as %2B, as
 // 7.x's HttpRepo escapes the plus sign in the remote request URL
-// (HttpUtils.escapePlusSymbol, 7.161.26). A value that decodes to a
-// backslash, a line break or a dot segment, which the transport refuses in
-// any outgoing URL (remote.CheckedURL), is left off and the bare path asked
-// for, as before. Before, the parameters never reached the upstream.
+// (HttpUtils.escapePlusSymbol, 7.161.26). A backslash or line break travels
+// as %5C, %0D or %0A, as 7.x's encodeIfNeeded sends it (#1420). A value
+// whose decoded form holds a dot segment is left off and the bare path asked
+// for (remote.CheckedMatrix). Before, the parameters never reached the
+// upstream.
 func TestAccGenericRemoteEscapesMatrixParametersUpstream(t *testing.T) {
 	w := newRemoteWorld(t)
 	var mu sync.Mutex
@@ -239,8 +240,8 @@ func TestAccGenericRemoteEscapesMatrixParametersUpstream(t *testing.T) {
 	for i, tc := range []struct{ params, want string }{
 		{";x=a%2Fb%3Fc%23d%20e", ";x=a%2Fb%3Fc%23d%20e"},
 		{";x=c%2Bd;y%3F+=1", ";x=c%2Bd;y%3F%2B=1"},
-		{";x=a%5Cb", ""},
-		{";x=1%0D%0AHost:%20evil", ""},
+		{";x=a%5Cb", ";x=a%5Cb"},
+		{";x=1%0D%0AHost:%20evil", ";x=1%0D%0AHost:%20evil"},
 		{";x=1%2F..%2F..%2Fsecret", ""},
 	} {
 		path := fmt.Sprintf("/m%d/file.bin", i)
