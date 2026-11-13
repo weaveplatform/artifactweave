@@ -84,7 +84,7 @@ func (g *Registry) serveRemote(w http.ResponseWriter, r *http.Request, q Request
 	}
 	digest := "sha256:" + stream.Checksums.SHA256
 	w.Header().Set(contentDigestHeader, digest)
-	out, req := w, wholeRequest(r)
+	out, req := w, pullRequest(r)
 	if q.Kind == KindBlob {
 		stream.MediaType = "application/octet-stream"
 		// A remote blob is named as a local one is, and carries no

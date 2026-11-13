@@ -40,6 +40,11 @@
 //     (registry_download_headers_test.go): the file headers of a local and a
 //     remote manifest and blob, and the whole content a GET or HEAD with
 //     Range gets through the Docker API (issues 1336, 1337 and 1338).
+//   - TestAcc results for conditional pulls
+//     (registry_preconditions_test.go): a local manifest, plain and
+//     redirected, and a remote blob and manifest, first fetched and again,
+//     ignore If-Match and If-Unmodified-Since and answer If-None-Match and
+//     If-Modified-Since as before (#1437).
 //   - TestAcc results for refusals (registry_refusal_test.go): 7.x's 403
 //     UNAUTHORIZED for a pull, a blob read, a tags list, a push and a
 //     delete the caller's permissions refuse, by password, registry token
