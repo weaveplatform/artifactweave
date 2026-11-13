@@ -27,14 +27,10 @@ const KindMarketplace = "agentplugins.marketplace"
 func derives(c repo.Config, cached bool) bool { return !cached && c.Class == repo.Local }
 
 // queue asks for the marketplace work of c. Only a local repository holds
-// Agent Plugins, so the hooks that call it need not check c's class.
+// Agent Plugins, so the hooks that call it need not check c's class. The
+// queue's own errors name the work, so they are returned as they are.
 func queue(ctx context.Context, env format.Env, c repo.Config) error {
-	return env.Enqueue(
-		ctx,
-		KindMarketplace,
-		c.Key,
-		nil,
-	) //nolint:wrapcheck // the queue names itself
+	return env.Enqueue(ctx, KindMarketplace, c.Key, nil) //nolint:wrapcheck
 }
 
 // WorkKinds names the format's one work kind, KindMarketplace.

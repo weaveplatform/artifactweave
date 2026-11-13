@@ -106,13 +106,9 @@ func TestAccAgentPluginMarketplaceFilesAreStoredFiles(t *testing.T) {
 				get := w.Do(http.MethodGet, "/artifactory/"+key+"/"+name, as, "")
 				wantStatus(t, get, http.StatusOK)
 				body := get.Body.Bytes()
-				sha1Sum, md5Sum, sha256Sum := sha1.Sum(
-					body,
-				), md5.Sum(
-					body,
-				), sha256.Sum256(
-					body,
-				) //nolint:gosec // the fields' algorithms
+				sha1Sum := sha1.Sum(body) //nolint:gosec // AQL's actual_sha1 names a SHA-1
+				md5Sum := md5.Sum(body)   //nolint:gosec // AQL's actual_md5 names an MD5
+				sha256Sum := sha256.Sum256(body)
 				if hit.Repo != key || hit.Path != "." || hit.Name != name || hit.Type != "file" ||
 					hit.Size != int64(len(body)) ||
 					hit.ActualSHA1 != hex.EncodeToString(sha1Sum[:]) ||
