@@ -39,11 +39,25 @@
 //   - TryP2Item: the overlay that serves a virtual repository's p2.index,
 //     composite metadata and member files, and a remote's composite
 //     metadata, external children and site archive entries, and answers
-//     404 for the paths P2 refuses; a remote's own update-site files it
-//     leaves to the generic lookup.
+//     404 for the paths P2 refuses, and 401 for every anonymous request to
+//     a virtual repository with forceP2Authentication on; a remote's own
+//     update-site files it leaves to the generic lookup.
 //
 // # Invariants
 //
+//   - An anonymous request to a P2 virtual repository with
+//     forceP2Authentication on answers 401 "Unauthorized" with the Basic
+//     challenge before any other answer and before any member is listed or
+//     read, whatever the anonymous user may read, as 7.x's
+//     force-authentication filter answers (OssForceAuthenticationFilter,
+//     7.161.26): the Eclipse client sends credentials only after a 401
+//     (RTFACT-29198). The flag is the one of the virtual repository the
+//     request names, which 7.x reads from the path, so a nested P2 virtual
+//     member read under <member key>/ is not asked [I]. A remote's stored
+//     flag changes no answer: JFrog offers Force Authentication on P2
+//     virtual repositories only, and 7.x's filter reads a virtual
+//     repository's alone. A signed-in caller, and every caller when the
+//     flag is off, get the answers below.
 //   - External composite children are checked before they are served. A
 //     child location must be valid (p2.ValidChildLocation) and resolve,
 //     within p2.MaxChildURL bytes and without user information or a
@@ -122,7 +136,12 @@
 //   - docs/testing/p2.md (remote and virtual repositories, composite
 //     children and their origins, and the bounds).
 //   - JFrog P2 repositories:
-//     https://docs.jfrog.com/artifactory/docs/p2-repositories.
+//     https://docs.jfrog.com/artifactory/docs/p2-repositories, and its
+//     section "Allow Anonymous Access for P2" for forceP2Authentication,
+//     which JFrog's virtual repository settings list for P2
+//     (https://docs.jfrog.com/artifactory/docs/virtual-repositories) and
+//     its remote repository settings do not
+//     (https://docs.jfrog.com/artifactory/docs/remote-repositories).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Dependency rules".
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
@@ -132,7 +151,8 @@
 //     and #p9d-modular-monolith-migration, epic WEB
 //     (https://github.com/weaveplatform/artifactweave/issues/944).
 //   - RTFACT-7631 and RTFACT-29198, whose P2 virtual requests name the
-//     member's key and the update site's sub-path:
+//     member's key and the update site's sub-path, and whose anonymous
+//     requests forceP2Authentication answers with a 401:
 //     https://jfrog.atlassian.net/browse/RTFACT-7631 and
 //     https://jfrog.atlassian.net/browse/RTFACT-29198; RTFACT-29915, the
 //     local://<key>/<suffix> form of a p2Urls entry:
@@ -140,8 +160,9 @@
 //   - https://github.com/weaveplatform/artifactweave/issues/773,
 //     https://github.com/weaveplatform/artifactweave/issues/1084,
 //     https://github.com/weaveplatform/artifactweave/issues/1090,
-//     https://github.com/weaveplatform/artifactweave/issues/1247 and
-//     https://github.com/weaveplatform/artifactweave/issues/1257
+//     https://github.com/weaveplatform/artifactweave/issues/1247,
+//     https://github.com/weaveplatform/artifactweave/issues/1257 and
+//     https://github.com/weaveplatform/artifactweave/issues/1280
 //
 // # Status
 //
@@ -155,6 +176,10 @@
 // stores (fixture_test.go, which keeps the names of the root fixtures the
 // tests used):
 //
+//   - force_test.go: forced authentication's 401 before any read of a
+//     virtual repository, and not for a remote, a signed-in caller or a
+//     nested virtual member read through a virtual repository whose flag
+//     is off.
 //   - p2_test.go: the kit's P2 source request on the published Eclipse
 //     GLSP files, the site.zip!/ suffix, and a virtual repository that
 //     fails closed when its member store fails and leaves out a

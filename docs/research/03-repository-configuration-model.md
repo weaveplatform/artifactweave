@@ -848,7 +848,7 @@ virtualRepositories:
 | rpm | `calculateYumMetadata`, `yumRootDepth`, `enableFileListsIndexing`, `yumGroupFileNames` | | |
 | debian | `debianTrivialLayout`, `optionalIndexCompressionFormats`, `ddebSupported` | | `debianDefaultArchitectures`, `optionalIndexCompressionFormats` |
 | conan | `forceConanAuthentication`, `enableConanSupport` | `forceConanAuthentication`, `enableConanSupport` | |
-| p2 | | `forceP2Authentication` | `p2Urls` |
+| p2 | | `forceP2Authentication`, stored only | `p2Urls`, `forceP2Authentication` |
 | cocoapods | | `podsSpecsRepoUrl` | |
 | hex | | `hexPublicKey` | |
 | bower, composer | | `bowerRegistryUrl`, `composerRegistryUrl` | |
@@ -871,6 +871,17 @@ for npm publishes, Done; [#481](https://github.com/weaveplatform/artifactweave/p
 the npm format), so its v2 read keeps `checksumPolicyType`, `handleReleases` and
 `handleSnapshots`; an npm remote or virtual repository's does not
 ([#457](https://github.com/weaveplatform/artifactweave/issues/457)).
+P2's Force Authentication is a virtual repository setting. JFrog lists it among the P2
+virtual repository settings and not among the P2 remote ones ([D]
+[virtual-repositories](https://docs.jfrog.com/artifactory/docs/virtual-repositories#additional-settings-for-p2-virtual-repositories),
+[D]
+[remote-repositories](https://docs.jfrog.com/artifactory/docs/remote-repositories#additional-settings-for-p2-remote-repositories),
+both updated 2026-11-11), and 7.161.26's `OssForceAuthenticationFilter` reads
+`forceP2Authentication` from a virtual repository only, for the problem [J]
+[RTFACT-29198](https://jfrog.atlassian.net/browse/RTFACT-29198) reports. A remote stores the
+key and its reads return it, but it changes no answer
+([#1280](https://github.com/weaveplatform/artifactweave/issues/1280); the
+[P2 guide](../testing/p2.md#anonymous-access-and-force-authentication)).
 
 ## Field sets of the reads
 

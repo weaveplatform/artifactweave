@@ -42,6 +42,12 @@
 //   - p2_xz_test.go: a remote's upstream content.xml.xz or
 //     artifacts.xml.xz that lost its xz index and footer, refused through
 //     the remote and through a virtual over it (#1331).
+//   - p2_force_auth_test.go: forceP2Authentication's 401 with the Basic
+//     challenge for every anonymous read of a virtual repository that sets
+//     it, before a member's upstream is asked; the answers it leaves to a
+//     signed-in caller and when it is off; a nested virtual member read
+//     through a virtual repository whose own flag is off; and a remote's
+//     flag, which changes nothing (#1280).
 //
 // # References
 //
@@ -57,7 +63,8 @@
 //     package an owner.
 //   - https://github.com/weaveplatform/artifactweave/issues/1068,
 //     https://github.com/weaveplatform/artifactweave/issues/1084,
-//     https://github.com/weaveplatform/artifactweave/issues/1257 and
+//     https://github.com/weaveplatform/artifactweave/issues/1257,
+//     https://github.com/weaveplatform/artifactweave/issues/1280 and
 //     https://github.com/weaveplatform/artifactweave/issues/1331
 //
 // # Status
