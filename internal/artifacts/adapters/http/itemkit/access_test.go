@@ -240,16 +240,23 @@ func TestUnitForceAuthenticationChallengesBeforeRouting(t *testing.T) {
 	}
 }
 
-// TestUnitForceAuthenticationCountsAnonymousCredentialsAsNone: while
-// anonymous access is on, Basic credentials whose user name is blank or
-// anonymous or that do not decode, and a Bearer token that is blank, does
-// not verify or verifies as the anonymous user, count as none on a forced
-// repository, as in 7.x's filter (OssForceAuthenticationFilter.
-// checkIfAuthenticationShouldBeIgnored, 7.161.26). Another user's Basic
-// credentials, a token of another user or whose check fails for another
-// reason, another scheme, a reference token, and every credential while
-// anonymous access is off pass the request on. An anonymous access setting
-// that cannot be read answers 500 to a credential it decides.
+// TestUnitForceAuthenticationCountsAnonymousCredentialsAsNone: on a forced
+// repository the middleware tells credentials apart as 7.x's filter does
+// (OssForceAuthenticationFilter.acceptFilter and
+// checkIfAuthenticationShouldBeIgnored, 7.161.26). While anonymous access
+// is on, Basic credentials whose user name, decoded as Commons Codec
+// decodes it, is blank or anonymous, and a Bearer token that does not
+// verify or verifies as the anonymous user, count as none. The filter's
+// other credentials pass the request on to authentication: another user's
+// Basic credentials, an unpadded value naming one included; "Basic Og==",
+// a blank Basic or Bearer value, a lowercase "basic" and an empty
+// Authorization header, which the filter does not class as Basic or
+// Bearer; a token of another user or whose check fails for another reason;
+// a non-blank X-JFrog-Art-Api, an X-Api-Key header and a non-blank
+// RT_IDN_TOKEN cookie. A blank X-JFrog-Art-Api, a blank RT_IDN_TOKEN and
+// another cookie are none. While anonymous access is off every credential
+// passes on. An anonymous access setting that cannot be read answers 500 to
+// a credential it decides.
 func TestUnitForceAuthenticationCountsAnonymousCredentialsAsNone(t *testing.T) {
 	on := true
 	db := inmem.New()
@@ -280,74 +287,93 @@ func TestUnitForceAuthenticationCountsAnonymousCredentialsAsNone(t *testing.T) {
 		Access: accessapi.API{Authenticator: auth},
 	})
 	const target = "/artifactory/mvn-forced/a.jar"
-	serve := func(name, value string) (*httptest.ResponseRecorder, bool) {
+	// serve sends headers, name and value pairs, where the name Cookie
+	// adds a cookie of the form name=value.
+	serve := func(headers ...string) (*httptest.ResponseRecorder, bool) {
 		reached := false
 		h := kit.ForceAuthentication(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			reached = true
 			w.WriteHeader(http.StatusTeapot)
 		}))
 		r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
-		if name != "" {
-			r.Header.Set(name, value)
+		for i := 0; i+1 < len(headers); i += 2 {
+			r.Header.Add(headers[i], headers[i+1])
 		}
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, r)
 		return rec, reached
 	}
-	b64 := base64.StdEncoding.EncodeToString
+	b64 := func(s string) string { return base64.StdEncoding.EncodeToString([]byte(s)) }
+	raw := func(s string) string { return base64.RawStdEncoding.EncodeToString([]byte(s)) }
+	urlSafe := func(s string) string { return base64.URLEncoding.EncodeToString([]byte(s)) }
 	const forcedBody = `{"errors":[{"message":"Unauthorized","status":401}]}` + "\n"
-	none := []string{
-		"Basic " + b64([]byte("anonymous:")),
-		"Basic " + b64([]byte("Anonymous:secret")),
-		"Basic " + b64([]byte(":secret")),
-		"Basic " + b64([]byte(" :secret")),
-		"Basic " + b64([]byte("nocolon")),
-		"Basic Og==",
-		"Basic !!!",
-		"basic " + b64([]byte("anonymous:x")),
-		"Bearer not-a-token",
-		"bearer not-a-token",
-		"Bearer anonymous-token",
-		"Bearer ",
+	none := [][]string{
+		{"Authorization", "Basic " + b64("anonymous:")},
+		{"Authorization", "Basic " + b64("Anonymous:secret")},
+		{"Authorization", "Basic " + raw("anonymous:x")},
+		{"Authorization", "Basic " + raw("anonymous:xy") + "Q"},
+		{"Authorization", "Basic " + urlSafe("anonymous:xx\xfb\xff\xff")},
+		{"Authorization", "Basic " + b64(":secret")},
+		{"Authorization", "Basic " + b64(" \u2028\x1c:secret")},
+		{"Authorization", "Basic " + b64("nocolon")},
+		{"Authorization", "Basic !!!"},
+		{"Authorization", "Bearer not-a-token"},
+		{"Authorization", "bearer not-a-token"},
+		{"Authorization", "Bearer anonymous-token"},
 	}
-	for _, value := range none {
-		rec, reached := serve("Authorization", value)
-		if reached || rec.Code != http.StatusUnauthorized || rec.Body.String() != forcedBody {
-			t.Errorf("anonymous access on, %q: reached %v, %d %q; want the forced 401",
-				value, reached, rec.Code, rec.Body)
-		}
-	}
-	for _, h := range [][2]string{
-		{"Authorization", "Basic " + b64([]byte("admin:wrong"))},
+	passed := [][]string{
+		{"Authorization", "Basic " + b64("admin:wrong")},
+		{"Authorization", "Basic " + raw("admin:wrong")},
+		{"Authorization", "Basic " + b64("\u00a0:secret")},
+		{"Authorization", "Basic Og=="},
+		{"Authorization", "Basic  "},
+		{"Authorization", "basic " + b64("anonymous:x")},
+		{"Authorization", "Bearer  "},
+		{"Authorization", ""},
 		{"Authorization", "Bearer user-token"},
 		{"Authorization", "Bearer restricted-token"},
 		{"Authorization", "Bearer unreadable-token"},
 		{"Authorization", "Token user-token"},
 		{"X-JFrog-Art-Api", "cmVmdGtu"},
-	} {
-		if rec, reached := serve(h[0], h[1]); !reached {
-			t.Errorf("anonymous access on, %s %q: %d %q; want it passed on",
-				h[0], h[1], rec.Code, rec.Body)
+		{"X-JFrog-Art-Api", "", "X-Api-Key", ""},
+		{"Cookie", "RT_IDN_TOKEN=idn"},
+	}
+	noCredentials := [][]string{
+		nil,
+		{"X-JFrog-Art-Api", " "},
+		{"Cookie", "RT_IDN_TOKEN="},
+		{"Cookie", "session=s"},
+	}
+	wantForced := func(what string, headers []string) {
+		t.Helper()
+		rec, reached := serve(headers...)
+		if reached || rec.Code != http.StatusUnauthorized || rec.Body.String() != forcedBody {
+			t.Errorf("%s, %q: reached %v, %d %q; want the forced 401",
+				what, headers, reached, rec.Code, rec.Body)
 		}
+	}
+	wantPassed := func(what string, headers []string) {
+		t.Helper()
+		if rec, reached := serve(headers...); !reached {
+			t.Errorf("%s, %q: %d %q; want it passed on", what, headers, rec.Code, rec.Body)
+		}
+	}
+	for _, h := range append(none, noCredentials...) {
+		wantForced("anonymous access on", h)
+	}
+	for _, h := range passed {
+		wantPassed("anonymous access on", h)
 	}
 	anonymous = false
-	for _, value := range none {
-		if rec, reached := serve("Authorization", value); !reached {
-			t.Errorf("anonymous access off, %q: %d %q; want it passed on",
-				value, rec.Code, rec.Body)
-		}
+	for _, h := range append(none, passed...) {
+		wantPassed("anonymous access off", h)
 	}
-	if rec, reached := serve("", ""); reached || rec.Code != http.StatusUnauthorized {
-		t.Errorf("anonymous access off, no credentials: reached %v, %d; want the forced 401",
-			reached, rec.Code)
+	for _, h := range noCredentials {
+		wantForced("anonymous access off", h)
 	}
 	anonymous, setting = true, errBoom
-	rec, reached := serve("Authorization", none[0])
-	if reached || rec.Code != http.StatusInternalServerError {
+	if rec, reached := serve(none[0]...); reached || rec.Code != http.StatusInternalServerError {
 		t.Errorf("unreadable setting: reached %v, %d %q; want 500", reached, rec.Code, rec.Body)
 	}
-	if rec, reached := serve("", ""); reached || rec.Code != http.StatusUnauthorized {
-		t.Errorf("unreadable setting, no credentials: reached %v, %d; want the forced 401",
-			reached, rec.Code)
-	}
+	wantForced("unreadable setting", nil)
 }
