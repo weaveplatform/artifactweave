@@ -20920,7 +20920,7 @@ components:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableConanSupport:
-          description: Optional within this object. Conan support flag of a conan repository. Stored only; Conan is not served.
+          description: Optional within this object. Stored only and returned as it was sent; it changes no answer.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
@@ -20938,7 +20938,7 @@ components:
           description: Optional within this object. Comma-separated Ant-style patterns; matching paths are rejected on deploy and hidden on read. Defaults to the empty string, which excludes nothing.
           type: string
         forceConanAuthentication:
-          description: Optional within this object. When true anonymous Conan requests receive 401. Stored only; Conan is not served.
+          description: Optional within this object. Conan repositories only. When true every anonymous request to the repository's Conan API, /artifactory/api/conan/<key>/..., answers 401 "Authentication is required" with the Basic challenge before it is served, whatever the anonymous user may read, so that a Conan client sends its credentials. The item paths, /artifactory/<key>/..., are not affected. Defaults to false.
           type: boolean
         forceMetadataNameVersion:
           description: Optional within this object. Helm repositories only. When true a chart archive (a file ending `.tgz` or `.tar.gz`) that is deployed, copied or moved here is refused with 403 unless its Chart.yaml can be read and names a chart and a version, the version is SemVer 2.0.0, and the file is named `<name>-<version>` with its extension. Set only when the repository is created; an update that changes it answers 400. Defaults to false.
@@ -21763,7 +21763,7 @@ components:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableConanSupport:
-          description: Optional within this object. Conan support flag of a conan repository. Stored only; Conan is not served.
+          description: Optional within this object. Stored only and returned as it was sent; it changes no answer.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
@@ -21781,7 +21781,7 @@ components:
           description: Optional within this object. Comma-separated Ant-style patterns; matching paths are rejected on deploy and hidden on read. Defaults to the empty string, which excludes nothing.
           type: string
         forceConanAuthentication:
-          description: Optional within this object. When true anonymous Conan requests receive 401. Stored only; Conan is not served.
+          description: Optional within this object. Conan repositories only. When true every anonymous request to the repository's Conan API, /artifactory/api/conan/<key>/..., answers 401 "Authentication is required" with the Basic challenge before it is served, whatever the anonymous user may read, so that a Conan client sends its credentials. The item paths, /artifactory/<key>/..., are not affected. Defaults to false.
           type: boolean
         forceMetadataNameVersion:
           description: Optional within this object. Helm repositories only. When true a chart archive (a file ending `.tgz` or `.tar.gz`) that is deployed, copied or moved here is refused with 403 unless its Chart.yaml can be read and names a chart and a version, the version is SemVer 2.0.0, and the file is named `<name>-<version>` with its extension. Set only when the repository is created; an update that changes it answers 400. Defaults to false.
@@ -23409,7 +23409,7 @@ components:
           description: Optional within this object. When true a Maven sources JAR is fetched together with the main artifact. Defaults to false.
           type: boolean
         forceConanAuthentication:
-          description: Optional within this object. When true anonymous Conan requests receive 401. Stored only; Conan is not served.
+          description: Optional within this object. Conan repositories only. When true every anonymous request to the repository's Conan API, /artifactory/api/conan/<key>/..., answers 401 "Authentication is required" with the Basic challenge before it is served, whatever the anonymous user may read, so that a Conan client sends its credentials. The item paths, /artifactory/<key>/..., are not affected. Defaults to false.
           type: boolean
         forceNugetAuthentication:
           description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an anonymous 200. Defaults to false.

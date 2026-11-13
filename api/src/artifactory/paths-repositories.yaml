@@ -115,8 +115,7 @@ components:
             repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableConanSupport:
-          description: Optional within this object. Conan support flag of a conan repository. Stored only; Conan is not
-            served.
+          description: Optional within this object. Stored only and returned as it was sent; it changes no answer.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a
@@ -139,8 +138,11 @@ components:
             on deploy and hidden on read. Defaults to the empty string, which excludes nothing.
           type: string
         forceConanAuthentication:
-          description: Optional within this object. When true anonymous Conan requests receive 401. Stored only; Conan
-            is not served.
+          description: Optional within this object. Conan repositories only. When true every anonymous request to
+            the repository's Conan API, /artifactory/api/conan/<key>/..., answers 401 "Authentication is required"
+            with the Basic challenge before it is served, whatever the anonymous user may read, so that a Conan
+            client sends its credentials. The item paths, /artifactory/<key>/..., are not affected. Defaults to
+            false.
           type: boolean
         forceMetadataNameVersion:
           description: Optional within this object. Helm repositories only. When true a chart archive (a file
@@ -443,8 +445,7 @@ components:
             repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableConanSupport:
-          description: Optional within this object. Conan support flag of a conan repository. Stored only; Conan is not
-            served.
+          description: Optional within this object. Stored only and returned as it was sent; it changes no answer.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a
@@ -470,8 +471,11 @@ components:
             on deploy and hidden on read. Defaults to the empty string, which excludes nothing.
           type: string
         forceConanAuthentication:
-          description: Optional within this object. When true anonymous Conan requests receive 401. Stored only; Conan
-            is not served.
+          description: Optional within this object. Conan repositories only. When true every anonymous request to
+            the repository's Conan API, /artifactory/api/conan/<key>/..., answers 401 "Authentication is required"
+            with the Basic challenge before it is served, whatever the anonymous user may read, so that a Conan
+            client sends its credentials. The item paths, /artifactory/<key>/..., are not affected. Defaults to
+            false.
           type: boolean
         forceMetadataNameVersion:
           description: Optional within this object. Helm repositories only. When true a chart archive (a file
@@ -1025,8 +1029,11 @@ components:
             artifact. Defaults to false.
           type: boolean
         forceConanAuthentication:
-          description: Optional within this object. When true anonymous Conan requests receive 401. Stored only; Conan
-            is not served.
+          description: Optional within this object. Conan repositories only. When true every anonymous request to
+            the repository's Conan API, /artifactory/api/conan/<key>/..., answers 401 "Authentication is required"
+            with the Basic challenge before it is served, whatever the anonymous user may read, so that a Conan
+            client sends its credentials. The item paths, /artifactory/<key>/..., are not affected. Defaults to
+            false.
           type: boolean
         forceNugetAuthentication:
           description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an
