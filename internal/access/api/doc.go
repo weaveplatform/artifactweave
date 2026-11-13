@@ -58,6 +58,9 @@
 //     switch, and rechecking a verified credential against current state
 //     (Current, CurrentRegistry and RestoreDownload).
 //   - Decider: the permission questions about one request's subject.
+//   - Basic credentials as 7.x reads them: BasicCredentials decodes an
+//     Authorization value, and IgnoredAuthorization reports the Basic
+//     values that carry no credential at all.
 //   - Authorizer: evaluating a principal's permissions once for a request
 //     (Authorize), for a principal the request did not authorise (For), and
 //     for a subject no request authenticated (Decide). SubjectOf is the
@@ -174,4 +177,7 @@
 //     WithPrincipal; a nil or typed-nil decider hides an outer one.
 //     access/core/authn's TestUnitDeciderSharedWithAccessAPI checks that its
 //     accessors share the context key.
+//   - TestUnitBasicCredentials: which Authorization values 7.x reads as
+//     Basic credentials, which it reads no credential from, and the user
+//     and secret it decodes.
 package api

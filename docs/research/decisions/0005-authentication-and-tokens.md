@@ -27,7 +27,11 @@ reference token), `X-JFrog-Art-Api` (reference tokens only), and anonymous when
 `anonAccessEnabled` is on and the anonymous principal has permission. On the NuGet routes
 alone, `X-NuGet-ApiKey: <user>:<password or token>` is read as Basic credentials when the
 request has no `Authorization` header (decision [0038](0038-nuget.md),
-[#532](https://github.com/weaveplatform/artifactweave/issues/532)). Basic auth can be
+[#532](https://github.com/weaveplatform/artifactweave/issues/532)). Basic is the scheme spelled
+exactly `Basic `: `Basic Og==`, a blank `Basic` and the scheme in another case carry no
+credential, as in 7.x, so they count as no `Authorization` header and no failed login
+([research 05](../05-platform-identity-and-security-apis.md#authentication-accepted-on-every-endpoint),
+item 8; [#1451](https://github.com/weaveplatform/artifactweave/issues/1451)). Basic auth can be
 disabled platform-wide through the Access configuration endpoint. A password does not create
 tokens through the Access token API unless `token.allow_basic_auth` is on (**Token API**
 below).
@@ -446,7 +450,8 @@ decodes them; string spellings such as `"true"` and `"60"` are accepted on write
 - **One record, two APIs.** `/access/api/v2/users` and `/groups` manage the same records
   as the legacy security API. Creation is create-only: a taken name answers `409`, not a
   replacement. Deleting a built-in user answers `403` in v2, but `400` in the legacy API
-  as before.
+  as before, each with the message alone, `the built-in user "admin" cannot be deleted`
+  (#1449).
 - **The basic authentication switch** refuses a password in `Basic` with `401` when it is
   off. An access or reference token sent as the Basic password still works, as does
   `Bearer`. When the switch cannot be read, the password is checked as usual; the policy

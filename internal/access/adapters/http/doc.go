@@ -43,7 +43,8 @@
 //   - Authenticate decides in the order its comment lists (decision 0005):
 //     self-authenticated routes and skips, then credentials, which answer
 //     401 at once when they do not verify, then anonymous access, and only
-//     then the public routes.
+//     then the public routes. A Basic value 7.x reads no credential from,
+//     such as "Basic Og==", counts as no credential at all.
 //   - Every principal it lets through is authorised once, and handlers ask
 //     that decider (decision 0006).
 //   - A key pair delete clears the repositories' references to the pair and

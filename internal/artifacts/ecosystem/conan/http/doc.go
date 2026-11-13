@@ -77,7 +77,9 @@
 //     a token login gets its own token back. The login's Basic user name
 //     must name the authenticated user in any case
 //     (accessapi.SameUsername, #1432), since the Conan client sends it as
-//     typed.
+//     typed. The login reads Basic as the authentication does
+//     (accessapi.BasicCredentials, #1451), so a value 7.x reads no
+//     credential from is never exchanged.
 //   - Statuses and error texts stay byte-identical.
 //
 // # References
