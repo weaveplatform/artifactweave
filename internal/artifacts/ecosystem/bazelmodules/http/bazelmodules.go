@@ -405,7 +405,7 @@ func (h handler) remoteBytes(
 	defer result.Stream.Body.Close()
 	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, metadataLimit, invalid())
 	if err != nil {
-		return nil, result, err
+		return nil, result, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
 	}
 	if len(data) > metadataLimit || validate(data) != nil {
 		return nil, result, invalid()

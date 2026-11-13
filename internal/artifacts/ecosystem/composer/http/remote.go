@@ -47,7 +47,7 @@ func readMetadata(ctx context.Context, result source.Result) ([]byte, error) {
 	defer result.Stream.Body.Close()
 	data, err := pkgroute.ReadServed(ctx, result.Stream.Body, remoteMetadataLimit, remoteInvalid())
 	if err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
 	}
 	if len(data) > remoteMetadataLimit {
 		return nil, remoteInvalid()

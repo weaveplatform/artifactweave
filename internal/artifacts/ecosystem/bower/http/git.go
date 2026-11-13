@@ -168,7 +168,7 @@ func (h handler) gitPackage(r *http.Request, name string) (gitPointer, error) {
 	defer result.Stream.Body.Close()
 	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, maxRefsBytes, remoteInvalid())
 	if err != nil {
-		return gitPointer{}, err
+		return gitPointer{}, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
 	}
 	if result.Revalidate != nil {
 		if err := result.Revalidate(r.Context()); err != nil {
@@ -316,7 +316,7 @@ func (h handler) gitRefsForPointer(
 		remoteInvalid(),
 	)
 	if err != nil {
-		return nil, source.Result{}, err
+		return nil, source.Result{}, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
 	}
 	refs, err := parseGitRefs(data)
 	return refs, result, err
@@ -541,7 +541,7 @@ func (h handler) gitPackageNames(r *http.Request, query string) ([]string, error
 		remoteInvalid(),
 	)
 	if err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
 	}
 	names, err := parseGitCatalog(c, data)
 	if err != nil {

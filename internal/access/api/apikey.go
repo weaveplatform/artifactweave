@@ -6,8 +6,8 @@ import "net/http"
 // X-Api-Key, its older name (ApiKeyManager.API_KEY_HEADER and
 // OLD_API_KEY_HEADER, 7.161.26).
 const (
-	apiKeyHeader    = "X-JFrog-Art-Api"
-	oldAPIKeyHeader = "X-Api-Key"
+	apiKeyHeader    = "X-JFrog-Art-Api" //nolint:gosec // a header's name, not a credential
+	oldAPIKeyHeader = "X-Api-Key"       //nolint:gosec // a header's name, not a credential
 )
 
 // APIKey returns the API key a request sends as 7.x reads it, reporting

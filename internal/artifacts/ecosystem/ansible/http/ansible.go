@@ -806,7 +806,7 @@ func (h handler) remoteJSON(
 		source.ErrInvalidResult,
 	)
 	if err != nil {
-		return source.Result{}, err
+		return source.Result{}, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
 	}
 	if len(data) > maxPageBytes {
 		return source.Result{}, source.ErrInvalidResult

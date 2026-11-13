@@ -129,7 +129,7 @@ func (h handler) remoteRefs(r *http.Request, name string) ([]remoteRef, source.R
 	defer result.Stream.Body.Close()
 	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, maxRefsBytes, remoteInvalid())
 	if err != nil {
-		return nil, source.Result{}, err
+		return nil, source.Result{}, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
 	}
 	vs, err := parseRefs(data)
 	if err != nil {
@@ -195,7 +195,7 @@ func (h handler) remotePackageNames(r *http.Request, query string) ([]string, er
 	defer result.Stream.Body.Close()
 	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, maxRefsBytes, remoteInvalid())
 	if err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
 	}
 	return parsePackages(data)
 }

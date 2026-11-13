@@ -86,7 +86,7 @@ func (h handler) upstreamManifest(
 		remoteFailure(),
 	)
 	if err != nil {
-		return source.Result{}, remoteManifest{}, err
+		return source.Result{}, remoteManifest{}, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
 	}
 	if len(data) > remoteManifestLimit {
 		return source.Result{}, remoteManifest{}, remoteFailure()

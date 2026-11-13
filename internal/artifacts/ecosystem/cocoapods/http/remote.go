@@ -428,7 +428,7 @@ func (h handler) remoteIndexRows(
 		source.ErrInvalidResult,
 	)
 	if err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
 	}
 	if len(data) > maxCDNMetadata {
 		return nil, source.ErrInvalidResult
