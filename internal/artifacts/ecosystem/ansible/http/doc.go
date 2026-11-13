@@ -55,6 +55,14 @@
 //     from 1 to 100, 100 by default (400).
 //   - A local version comes from the package index, and its stored archive
 //     must still have the SHA-256 the index records.
+//   - A local or federated repository's version list counts and orders
+//     every version by its name and reads only the versions of the page it
+//     answers (#1404). So only those are checked against their archives: a
+//     version whose index entry or archive no longer matches fails a page
+//     that holds it and no other, and one deleted, or whose archive went,
+//     after the count leaves the page short. A remote's or virtual
+//     repository's list still collects every version to merge its
+//     upstream's pages or its members' lists.
 //   - A publish needs a local or federated repository (405), the write
 //     grant on the collections folder and on the archive's path, a file of
 //     at most 128 MiB whose SHA-256 the form's sha256 field names (400) and
@@ -146,6 +154,9 @@
 //     virtual repository's ordered readable members, and pagination and
 //     path permissions.
 //   - helpers_test.go: the upstream Galaxy base and the pagination bounds.
+//   - store_page_test.go (external): the local version list's pages read
+//     without reading the versions outside them, the checks a page makes,
+//     and its store failures.
 //
 // The @ansible acceptance scenarios drive ansible-galaxy against local,
 // federated, virtual and remote repositories, offline and with bad

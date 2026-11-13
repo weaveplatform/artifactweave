@@ -203,9 +203,13 @@ func (h handler) v2Feed(w http.ResponseWriter, r *http.Request, endpoint string,
 	entries := make([]atomEntry, 0, v2PageSize)
 	total, picked := 0, 0
 	take := min(q.top, v2PageSize)
+	packages := scan{terms: q.match.terms}
+	if endpoint == "FindPackagesById()" {
+		packages = scan{prefix: q.id, exact: true}
+	}
 	err = h.eachPackage(
 		r,
-		func(name string) bool { return endpoint != "FindPackagesById()" || name == q.id },
+		packages,
 		q.filter,
 		func(p pkg) error {
 			if !q.match.matches(p.newest().meta) {

@@ -20,9 +20,14 @@
 //
 // # Outputs
 //
-//   - Factory and Run, and RunDockerPages, the Docker page reader's
-//     contract (port.DockerPageStore): DockerPages, with ManifestFolders
-//     and ImageManifests.
+//   - Factory and Run.
+//   - RunDockerPages, the Docker page reader's contract
+//     (port.DockerPageStore): DockerPages, with ManifestFolders and
+//     ImageManifests.
+//   - RunVersionNames, the contract of PackageVersionNames: a package's
+//     version names in exactly Versions' order, following later writes and
+//     deletes, and a package's own (#1404). It is a subtest of its own,
+//     VersionNames, run beside Run rather than from it.
 //   - The subtests, one per concern, each on a store of its own: Blobs,
 //     ColdBlobs, BlobDeletion, ColdBlobDeletion, BlobTiersSeparate,
 //     Replicas, ReplicaTiersSeparate, Repos, Items, ItemCreate, ColonPaths,
@@ -87,8 +92,10 @@
 // adapters/inmem's TestUnitContract and in adapters/sql's TestAccContract
 // (SQLite in memory and in a file), and the metadata store's
 // TestUnitContract, TestAccContractFile, TestAccContractMemory and
-// TestAccContract (PostgreSQL) run it under the same subtest names.
-// RunDockerPages runs in adapters/inmem's TestUnitDockerPagesContract and
-// adapters/sql's TestAccDockerPagesContract (SQLite in memory and in a
-// file, and PostgreSQL).
+// TestAccContract (PostgreSQL) run it under the same subtest names. The
+// adapters run RunDockerPages in adapters/inmem's
+// TestUnitDockerPagesContract and adapters/sql's TestAccDockerPagesContract,
+// and RunVersionNames in adapters/inmem's TestUnitVersionNamesContract and
+// adapters/sql's TestAccVersionNamesContract (each SQLite in memory and in
+// a file, and PostgreSQL).
 package storetest

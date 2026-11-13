@@ -9,6 +9,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	nugetfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
@@ -22,7 +23,7 @@ const (
 	maxTake = 1000
 )
 
-// listPage is how many packages one read of the index lists.
+// listPage is how many packages one read of the index returns.
 var listPage = 500
 
 // filter is which versions a feed request may see beyond what its caller
@@ -102,28 +103,49 @@ func pageOf(q url.Values) page {
 	return p
 }
 
+// scan is which of the request's repository's packages eachPackage
+// visits, in the index's order: byte order of the name, the id
+// lower-cased.
+type scan struct {
+	// prefix keeps the names that start with it, which the store reads
+	// alone (port.NuGetSearch).
+	prefix string
+	// exact keeps the name prefix alone: the first name read, as no other
+	// name that starts with it sorts before it, and the scan stops at the
+	// next.
+	exact bool
+	// terms are the request's search terms, from which the store passes
+	// over packages no version of which can match; whether one does is
+	// the caller's to decide.
+	terms []string
+}
+
 // eachPackage calls each with every package of the request's repository
-// whose name keep accepts, in the index's order, the id lower-cased, with
-// the versions the caller may read and f shows. A package left with none
-// is skipped.
+// that s visits, in the index's order, with the versions the caller may
+// read and f shows. A package left with none is skipped. The index is
+// read a page of candidates at a time, each with its versions; the
+// caller's permissions and f are applied here, as the access module
+// decides them per path in Go, so whatever counts what each is given
+// (totalHits, a feed's offsets) counts here too.
 func (h handler) eachPackage(
 	r *http.Request,
-	keep func(name string) bool,
+	s scan,
 	f filter,
 	each func(p pkg) error,
 ) error {
 	key := pkgroute.RequestFrom(r).Repo.Key
+	q := port.NuGetSearch{RepoKey: key, Terms: s.terms, Prefix: s.prefix}
 	at := kernel.Page{Limit: listPage}
 	for {
-		found, next, err := h.k.DB().Packages().List(r.Context(), key, at)
+		found, next, err := h.k.DB().Packages().SearchNuGet(r.Context(), q, at)
 		if err != nil {
 			return fmt.Errorf("nuget: packages of %s: %w", key, err)
 		}
-		for _, fp := range found {
-			if !keep(fp.Name) {
-				continue
+		for _, c := range found {
+			if s.exact && c.Package.Name != s.prefix {
+				return nil
 			}
-			p, ok, err := h.versionsOf(r, fp)
+			p, ok, err := h.visible(r, c.Package, c.Versions)
 			if err != nil {
 				return err
 			}
@@ -211,7 +233,7 @@ func (h handler) search(w http.ResponseWriter, r *http.Request) {
 	}
 	u := urlsOf(r, hv)
 	answer := searchAnswer{Data: []searchResult{}}
-	err := h.eachPackage(r, func(string) bool { return true }, f, func(p pkg) error {
+	err := h.eachPackage(r, scan{terms: q.terms}, f, func(p pkg) error {
 		if !q.matches(p.newest().meta) {
 			return nil
 		}
@@ -331,7 +353,7 @@ func (h handler) autocomplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	prefix := strings.ToLower(params.Get("q"))
-	err := h.eachPackage(r, func(name string) bool { return strings.HasPrefix(name, prefix) }, f,
+	err := h.eachPackage(r, scan{prefix: prefix}, f,
 		func(p pkg) error {
 			add(p.newest().meta.ID)
 			return nil

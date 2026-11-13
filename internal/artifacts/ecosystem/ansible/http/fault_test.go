@@ -63,6 +63,30 @@ func (s failingPackages) Versions(ctx context.Context, id int64) ([]model.Packag
 	return v, err
 }
 
+// VersionNames and Version fail as Versions does: a version list reads the
+// names, and then its page's versions one at a time.
+func (s failingPackages) VersionNames(ctx context.Context, id int64) ([]string, error) {
+	if s.stage == "versions" {
+		return nil, errStore
+	}
+	return s.PackageStore.VersionNames(ctx, id)
+}
+
+func (s failingPackages) Version(
+	ctx context.Context,
+	id int64,
+	version string,
+) (model.PackageVersion, error) {
+	if s.stage == "version" {
+		return model.PackageVersion{}, errStore
+	}
+	v, err := s.PackageStore.Version(ctx, id, version)
+	if s.stage == "metadata" {
+		v.Metadata = []byte("{")
+	}
+	return v, err
+}
+
 type failingItems struct {
 	port.ItemStore
 	stage string

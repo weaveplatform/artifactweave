@@ -169,6 +169,13 @@
 //     (on 5000 tags of one image and 5000 images, a late page of each is
 //     read through its index, with no sort, on SQLite and PostgreSQL) and
 //     TestAccDockerPagesClosedDatabase.
+//   - puppet_page_test.go: TestAccVersionNamesContract (the package store's
+//     VersionNames contract, adapters/storetest.RunVersionNames) and
+//     TestAccVersionNamesAtScale (a module of 5,000 versions beside another:
+//     its names come from package_versions_order in its own order, with no
+//     sort, and a late page row is one seek on package_versions_version,
+//     whose query plans it logs), each on SQLite in memory and in a file and
+//     on PostgreSQL (#1404).
 //
 // They open SQLite over the artifacts registration alone (store_test.go),
 // which migrates the stream and runs the header backfill as the metadata

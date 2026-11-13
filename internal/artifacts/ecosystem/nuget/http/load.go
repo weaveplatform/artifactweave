@@ -102,6 +102,16 @@ func (h handler) versionsOf(r *http.Request, found model.Package) (pkg, bool, er
 	if err != nil {
 		return pkg{}, false, fmt.Errorf("nuget: versions of %s: %w", found.Name, err)
 	}
+	return h.visible(r, found, all)
+}
+
+// visible is versionsOf for a package the index returned with all its
+// versions, as a search's candidates come.
+func (h handler) visible(
+	r *http.Request,
+	found model.Package,
+	all []model.PackageVersion,
+) (pkg, bool, error) {
 	p := pkg{name: found.Name}
 	for _, pv := range all {
 		m, err := nugetfmt.DecodeMetadata(pv.Metadata)

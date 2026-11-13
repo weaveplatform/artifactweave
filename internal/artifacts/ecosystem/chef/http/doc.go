@@ -59,6 +59,14 @@
 //   - A version is listed, and latest resolved, only among the versions the
 //     caller may read. A hosted version whose stored index entry or archive
 //     does not match fails with 502 rather than being advertised.
+//   - A local or federated repository's catalog counts its cookbooks from
+//     their versions' names and reads only the highest version of each
+//     cookbook on the page it answers, whose description and maintainer
+//     the page lists (#1404). So only that version is checked against its
+//     archive, and a cookbook with no version left after the count leaves
+//     the page short. A search, and a remote's or virtual repository's
+//     catalog, still read every cookbook they list, within the bounds
+//     below.
 //   - The download policy (#1251), after read permission: a blacked-out
 //     repository refuses the cookbook and version records before they are
 //     built, with the blackout's 404 naming the request's path, while its
@@ -152,4 +160,6 @@
 //     catalog bounds, version order and empty dependency objects.
 //   - remote_paging_test.go: the upstream catalog and search pages a remote
 //     accepts and refuses.
+//   - store_page_test.go: a local catalog's pages read without reading the
+//     cookbooks outside them, and the checks a page makes.
 package chefhttp

@@ -46,6 +46,12 @@
 //     remote's release that its upstream's release list leaves out,
 //     answered from the upstream's record after the caller's permission
 //     and the remote's policy.
+//   - puppet_upstream_record_test.go: the archive of a release only the
+//     Forge's record holds, through a remote, refused when it does not
+//     match the record, and the record and archive through a virtual
+//     repository over the remote, a local member's release winning; and
+//     a remote's module record for a module the Forge's release list
+//     leaves out, answered from the Forge's module record.
 //
 // # References
 //
@@ -60,8 +66,10 @@
 //   - docs/testing/server-test-ownership.md: how CI selection gives the
 //     package an owner.
 //   - https://github.com/weaveplatform/artifactweave/issues/1096,
-//     https://github.com/weaveplatform/artifactweave/issues/1343 and
-//     https://github.com/weaveplatform/artifactweave/issues/1344
+//     https://github.com/weaveplatform/artifactweave/issues/1343,
+//     https://github.com/weaveplatform/artifactweave/issues/1344,
+//     https://github.com/weaveplatform/artifactweave/issues/1369 and
+//     https://github.com/weaveplatform/artifactweave/issues/1370
 //
 // # Status
 //

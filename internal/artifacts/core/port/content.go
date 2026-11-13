@@ -298,6 +298,14 @@ type PackageStore interface {
 	Find(ctx context.Context, repoKey, name string) (model.Package, error)
 	// List returns a repository's packages ordered by name.
 	List(ctx context.Context, repoKey string, p kernel.Page) ([]model.Package, string, error)
+	// SearchNpm returns, ordered by name, an npm search's candidates (npm_search.go).
+	SearchNpm(ctx context.Context, q NpmSearch, p kernel.Page) ([]SearchCandidate, string, error)
+	// SearchNuGet returns, ordered by name, a NuGet search's candidates (nuget_search.go).
+	SearchNuGet(
+		ctx context.Context,
+		q NuGetSearch,
+		p kernel.Page,
+	) ([]SearchCandidate, string, error)
 	// Delete removes the package with its versions and file links.
 	Delete(ctx context.Context, id int64) error
 
@@ -324,4 +332,6 @@ type PackageStore interface {
 	VersionOf(ctx context.Context, itemID int64) (model.PackageVersion, error)
 	// RecordVersionDownload sets the version's LastDownloaded.
 	RecordVersionDownload(ctx context.Context, versionID int64, at time.Time) error
+
+	PackageVersionNames
 }

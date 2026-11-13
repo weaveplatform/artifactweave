@@ -14,6 +14,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -200,7 +201,21 @@ func (h handler) readable(r *http.Request, name string) (pkg, bool, error) {
 	if err != nil {
 		return pkg{}, false, fmt.Errorf("npm: versions of %s: %w", name, err)
 	}
-	p := pkg{repoKey: key, name: name, created: found.Created, rules: h.format}
+	return h.visible(r, found, all)
+}
+
+// visible is readable for a package the index already returned with all
+// its versions, as a search's candidates come.
+func (h handler) visible(
+	r *http.Request,
+	found model.Package,
+	all []model.PackageVersion,
+) (pkg, bool, error) {
+	name := found.Name
+	p := pkg{
+		repoKey: pkgroute.RequestFrom(r).Repo.Key, name: name, created: found.Created,
+		rules: h.format,
+	}
 	for _, v := range all {
 		if !h.k.Can(r, npmfmt.CanonicalPath(name, v.Version), api.ActionRead) {
 			continue

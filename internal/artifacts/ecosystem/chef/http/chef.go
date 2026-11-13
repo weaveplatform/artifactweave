@@ -465,31 +465,51 @@ func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 	}
 	out := make([]release, 0, len(versions))
 	for _, v := range versions {
-		path := cheffmt.Path(name, v.Version)
-		// Read permission decides what is listed: a version whose archive
-		// the patterns reject stays listed, and only its download is
-		// refused (R3; RTFACT-20145 shows an excluded cookbook still
-		// found by search). A blacked-out repository lists nothing, which
-		// is what its catalog and search answer (R2b); its records and
-		// downloads refuse before they look (resolution, archivePolicy).
-		if !h.k.Can(r, path, api.ActionRead) || generic.CheckBlackedOut(q.Repo, path) != nil {
+		if !h.listable(r, name, v.Version) {
 			continue
 		}
-		var meta cheffmt.Metadata
-		if json.Unmarshal(v.Metadata, &meta) != nil || meta.Name != name ||
-			meta.Version != v.Version || meta.Path != path {
-			return nil, apierror.New(http.StatusBadGateway, "invalid stored Chef package index")
+		rel, err := h.stored(r, name, v)
+		if err != nil {
+			return nil, err
 		}
-		item, err := h.k.DB().Items().Get(
-			r.Context(), q.Repo.Key, pkgindex.Stored(q.Repo).Cached, path,
-		)
-		if err != nil || item.Folder || meta.SHA256 == "" || meta.SHA256 != item.Actual.SHA256 {
-			return nil, apierror.New(http.StatusBadGateway, "invalid stored Chef archive")
-		}
-		out = append(out, release{meta: meta, item: item})
+		out = append(out, rel)
 	}
 	sortReleases(out)
 	return out, nil
+}
+
+// listable reports whether hosted lists version of cookbook name. Read
+// permission decides what is listed: a version whose archive the patterns
+// reject stays listed, and only its download is refused (R3; RTFACT-20145
+// shows an excluded cookbook still found by search). A blacked-out
+// repository lists nothing, which is what its catalog and search answer
+// (R2b); its records and downloads refuse before they look (resolution,
+// archivePolicy).
+func (h handler) listable(r *http.Request, name, version string) bool {
+	path := cheffmt.Path(name, version)
+	return h.k.Can(r, path, api.ActionRead) &&
+		generic.CheckBlackedOut(pkgroute.RequestFrom(r).Repo, path) == nil
+}
+
+// stored returns the release of cookbook name that the package index's
+// version v records, once the index entry and the stored archive agree; a
+// release whose entry or archive does not match fails with 502 rather than
+// being listed.
+func (h handler) stored(r *http.Request, name string, v model.PackageVersion) (release, error) {
+	q := pkgroute.RequestFrom(r)
+	path := cheffmt.Path(name, v.Version)
+	var meta cheffmt.Metadata
+	if json.Unmarshal(v.Metadata, &meta) != nil || meta.Name != name ||
+		meta.Version != v.Version || meta.Path != path {
+		return release{}, apierror.New(http.StatusBadGateway, "invalid stored Chef package index")
+	}
+	item, err := h.k.DB().Items().Get(
+		r.Context(), q.Repo.Key, pkgindex.Stored(q.Repo).Cached, path,
+	)
+	if err != nil || item.Folder || meta.SHA256 == "" || meta.SHA256 != item.Actual.SHA256 {
+		return release{}, apierror.New(http.StatusBadGateway, "invalid stored Chef archive")
+	}
+	return release{meta: meta, item: item}, nil
 }
 
 // virtual merges the versions of name that find returns for each member
@@ -558,13 +578,19 @@ func (h handler) virtual(
 }
 
 func sortReleases(out []release) {
-	slices.SortFunc(out, func(a, b release) int {
-		cmp := semver.Compare("v"+a.meta.Version, "v"+b.meta.Version)
-		if cmp != 0 {
-			return -cmp
-		}
-		return strings.Compare(a.meta.Version, b.meta.Version)
-	})
+	slices.SortFunc(
+		out,
+		func(a, b release) int { return newestFirst(a.meta.Version, b.meta.Version) },
+	)
+}
+
+// newestFirst orders Chef versions from the highest semantic version down,
+// the order a cookbook's versions are listed in.
+func newestFirst(a, b string) int {
+	if cmp := semver.Compare("v"+a, "v"+b); cmp != 0 {
+		return -cmp
+	}
+	return strings.Compare(a, b)
 }
 
 func writeJSON(w http.ResponseWriter, r *http.Request, status int, doc any) {

@@ -98,5 +98,7 @@
 // its own store, with RemoteLayoutFences beside them. docker_page_test.go:
 // TestUnitDockerPagesContract runs the Docker page reader's contract
 // (adapters/storetest.RunDockerPages), whose order the in-memory reader
-// gives as the SQL adapter's indexes do.
+// gives as the SQL adapter's indexes do. puppet_page_test.go:
+// TestUnitVersionNamesContract runs adapters/storetest.RunVersionNames, the
+// contract of the package store's VersionNames (#1404).
 package inmem
