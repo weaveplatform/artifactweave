@@ -46,6 +46,10 @@
 //     download policy, directly and through a virtual repository.
 //   - conan_client_remote_test.go: each client generation downloads through
 //     a Conan remote from an upstream that the same client uploaded to.
+//   - username_case_test.go: the v1 and v2 login of a user named in another
+//     case gets that user's token, a token sent back as the password is
+//     echoed under any spelling of its user, and another user's name is
+//     refused.
 //
 // # References
 //
@@ -60,8 +64,9 @@
 //   - docs/testing/server-test-ownership.md: how CI selection gives the
 //     package an owner.
 //   - Decision 0007: docs/research/decisions/0007-remote-repositories.md.
-//   - https://github.com/weaveplatform/artifactweave/issues/1068 and
-//     https://github.com/weaveplatform/artifactweave/issues/1096
+//   - https://github.com/weaveplatform/artifactweave/issues/1068,
+//     https://github.com/weaveplatform/artifactweave/issues/1096 and
+//     https://github.com/weaveplatform/artifactweave/issues/1432
 //
 // # Status
 //
