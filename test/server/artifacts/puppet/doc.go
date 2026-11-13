@@ -52,6 +52,12 @@
 //     repository over the remote, a local member's release winning; and
 //     a remote's module record for a module the Forge's release list
 //     leaves out, answered from the Forge's module record.
+//   - puppet_virtual_module_test.go: that module record through a virtual
+//     repository over the remote, with the current release's archive its
+//     file_uri leads to, a listed module's merged record kept, Read on the
+//     virtual repository checked first, and a blacked-out member, or one
+//     whose patterns reject the release pages' policy path, passed over
+//     for the next remote member.
 //
 // # References
 //
@@ -68,8 +74,9 @@
 //   - https://github.com/weaveplatform/artifactweave/issues/1096,
 //     https://github.com/weaveplatform/artifactweave/issues/1343,
 //     https://github.com/weaveplatform/artifactweave/issues/1344,
-//     https://github.com/weaveplatform/artifactweave/issues/1369 and
-//     https://github.com/weaveplatform/artifactweave/issues/1370
+//     https://github.com/weaveplatform/artifactweave/issues/1369,
+//     https://github.com/weaveplatform/artifactweave/issues/1370 and
+//     https://github.com/weaveplatform/artifactweave/issues/1422
 //
 // # Status
 //
