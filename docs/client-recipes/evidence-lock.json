@@ -7,7 +7,7 @@
   "deploy/check.sh": "e657b14afb5a2f3a0b0a20007274a3c5dabc899ff643f4f57ce22e2d27f43a57",
   "docs/research/39-vcs-legacy.md": "3e79e20a799adce720a38edeb3be24bfa277cc951a6261665ca4d5b57d90943e",
   "go.mod": "bbf1e22cc915e1237e5fb83cb152b248f4566b51e44eae38e2359731fa936ff9",
-  "internal/access/adapters/http/authn_middleware.go": "9ce2bdd32a698bf70f82a484003c314c4d5671982189ea5ba6a9ccc72db7bc57",
+  "internal/access/adapters/http/authn_middleware.go": "fa7512dfc27db56ad4a19488b28c28b3e5b7b79c4a0a634b56c6cc2028dbdb81",
   "internal/access/core/authn/token.go": "06d8a40169fa84b51b0cabf85d2566118eb2f99d97ea7ff8e09ef1920b3e09b6",
   "internal/access/core/authn/token_test.go": "f938bc246161c84e57e91880fe75d7edfa84e1652ab48e61fa8afa04a7ad6cb2",
   "internal/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go": "6e940745e65c5dc7394166d3ab8e479b537037bb03abade401b4e4f4f6f92979",

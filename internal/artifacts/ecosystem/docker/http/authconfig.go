@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
@@ -88,9 +89,12 @@ func registryURL(r *http.Request) string {
 }
 
 // presented is the secret of the request's credential: a Basic password,
-// a Bearer token or an X-JFrog-Art-Api reference token.
+// a Bearer token or an X-JFrog-Art-Api reference token. Basic is read as
+// the authentication reads it (accessapi.BasicCredentials): a lower-case
+// "basic" value authenticates nothing, so beside a key that did, its
+// secret is not the one to hand back.
 func presented(r *http.Request) string {
-	if _, password, ok := r.BasicAuth(); ok {
+	if _, password, ok := accessapi.BasicCredentials(r.Header.Get("Authorization")); ok {
 		return password
 	}
 	if scheme, raw, ok := strings.Cut(r.Header.Get("Authorization"), " "); ok &&

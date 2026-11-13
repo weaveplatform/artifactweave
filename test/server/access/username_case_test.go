@@ -401,7 +401,7 @@ func TestAccUsernamesFoldCase(t *testing.T) {
 			{
 				admin, http.MethodDelete, secUsers + "/ADMIN", "", http.StatusBadRequest,
 				legacyError(http.StatusBadRequest,
-					`identity: protected: the built-in user \"admin\" cannot be deleted`),
+					`the built-in user \"admin\" cannot be deleted`),
 			},
 
 			{

@@ -26,8 +26,12 @@ func (h handler) authenticate(w http.ResponseWriter, r *http.Request) {
 	// matched it: without regard to case (accessapi.FoldUsername). The Conan
 	// client sends the name as the user typed it (conan/internal/rest/
 	// rest_client_v2.py, authenticate: HTTPBasicAuth(user, password)), so
-	// BOB logs in as bob here as on every other route.
-	name, secret, ok := r.BasicAuth()
+	// BOB logs in as bob here as on every other route. The credential is
+	// read as the authentication reads it (accessapi.BasicCredentials), not
+	// with Request.BasicAuth: a lower-case "basic" value or "Basic Og=="
+	// authenticates nothing in 7.x, so beside a key that did, it is no
+	// credential to exchange.
+	name, secret, ok := accessapi.BasicCredentials(r.Header.Get("Authorization"))
 	if !ok || !accessapi.SameUsername(name, p.Name) || secret == "" {
 		h.error(w, r, kernel.ErrUnauthenticated)
 		return
