@@ -50,6 +50,10 @@
 //     target names.
 //   - Token shapes: IsReferenceToken and LooksLikeToken tell a token from a
 //     password; ErrNotRevocable refuses to revoke a short-lived token.
+//   - The user name rule: FoldUsername is the lower-case spelling a user
+//     name is stored and matched in, and SameUsername compares two names
+//     by it, so a module that checks a name a client sent against the
+//     request's principal matches it as the authenticator did.
 //   - Authenticator: verifying a password or a token, the anonymous access
 //     switch, and rechecking a verified credential against current state
 //     (Current, CurrentRegistry and RestoreDownload).
@@ -134,7 +138,8 @@
 //   - Decision 0013: docs/research/decisions/0013-projects-and-environments.md.
 //   - Decision 0017: docs/research/decisions/0017-sealed-columns-and-master-key.md.
 //   - Research 05: docs/research/05-platform-identity-and-security-apis.md,
-//     "Permissions v2", "Access tokens v1" and "Reference tokens".
+//     "Permissions v2", "Access tokens v1" and "Reference tokens", and its
+//     note on user name case (#1432).
 //   - Plan: docs/implementation/plan.md#p9d-modular-monolith-migration, epic
 //     ACC (https://github.com/weaveplatform/artifactweave/issues/940), and
 //     #p4-identity-and-authorization.
@@ -147,7 +152,8 @@
 // the contracts Authenticator, Authorizer, Decider, Tokens, Keys, Identity,
 // Restrictions, Projects, Grants and AnonymousAccess, the Settings value, the
 // API aggregate, and the context accessors WithCaller, WithDecider and
-// DeciderFrom. The target layout's hooks.go, with the token gate (P17), and
+// DeciderFrom. Added by #1432: FoldUsername and SameUsername, the user name
+// rule that access/core/model applies. The target layout's hooks.go, with the token gate (P17), and
 // events.go, with the access events (P11), are not created yet.
 //
 // # Testing
@@ -158,6 +164,8 @@
 //   - TestUnitIsReferenceToken, TestUnitLooksLikeToken: the reference-token
 //     form and how a Basic password is told apart from a token.
 //   - TestUnitUserInfoEnabled: which account statuses may act.
+//   - TestUnitFoldUsername: user names fold to lower case and match in any
+//     case, as 7.x matches them.
 //   - TestUnitSubjectOf: the subject of a password, a token, a token with
 //     an empty scope, a groups-scoped token and the anonymous principal, as
 //     the evaluator has always started from it.
