@@ -48,7 +48,8 @@
 //     to the package API, to a read through another virtual repository and
 //     to Gradle, Ivy and SBT virtual repositories; while anonymous access is
 //     on, the same 401 for the anonymous user's Basic credentials and a
-//     Bearer token that does not verify (#1435).
+//     Bearer token that does not verify, and the answers it leaves to the
+//     credentials 7.x's filter passes on to authentication (#1435).
 //
 // # References
 //

@@ -223,9 +223,11 @@ earlier versions and OSS 6.20 `SecurityServiceImpl` does on create and update **
 artifactweave folds every user name it is given, on both APIs: `POST /access/api/v2/users` and
 the legacy `PUT /api/security/users/Dan` store `dan`; `BOB` names `bob` in every user path,
 including a legacy body's `name`, in Basic logins (a password, an encrypted password or an
-access token, with the lock count and suspension shared), in group `members` and `userNames`,
-in permission grants and the `users/{userName}` permission view, in unlocks, password expiry
-and changes, in the API restrictions, and in the user a token is minted for or refreshed by.
+access token, with the lock count and suspension shared) and the Basic name of Conan's
+`users/authenticate` exchange, which the Conan client sends as typed, in group `members` and
+`userNames`, in permission grants and the `users/{userName}` permission view, in unlocks,
+password expiry and changes, in the API restrictions, and in the user a token is minted for or
+refreshed by.
 The built-in `admin` and `anonymous` stay protected in any case. JFrog bugs that split by case
 are not followed: RTFACT-29660 (`unlockUsers` with `TEST_user` does nothing, and failed logins
 counted apart), RTFACT-23893 (`"userNames":["TESTUSER"]` adds nobody), RTFACT-10141 (an API key

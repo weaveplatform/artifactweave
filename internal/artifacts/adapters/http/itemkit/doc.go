@@ -64,7 +64,9 @@
 //     is on, the anonymous user's Basic credentials, a blank Basic user name
 //     and a Bearer token that does not verify or whose subject is anonymous
 //     count as none, as in that filter; any other credential, verified or
-//     not, is left to authentication. Only the repository the path names
+//     not, is left to authentication, and so are the values the filter does
+//     not class as Basic or Bearer: "Basic Og==", a lowercase "basic" and an
+//     empty Authorization header. Only the repository the path names
 //     counts, so a format that reads a member through GetItem never asks the
 //     member's flag.
 //   - GetItem tries Deps.Overlays in order and stops at the first that

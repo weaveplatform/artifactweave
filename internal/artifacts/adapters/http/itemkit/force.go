@@ -1,11 +1,13 @@
 package itemkit
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
+	"unicode"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -112,46 +114,137 @@ func (s *Kit) ForceAuthentication(next http.Handler) http.Handler {
 type credential int
 
 const (
-	// noCredential: no Authorization header and no X-JFrog-Art-Api.
+	// noCredential: none of the credentials 7.x's filter looks for.
 	noCredential credential = iota
 	// anonymousBasic: Basic credentials whose user name is blank or
-	// anonymous, or that do not decode to a user name and a secret.
+	// anonymous.
 	anonymousBasic
 	// bearer: a Bearer token, whose subject only verifying it tells.
 	bearer
-	// namedCredential: any other credential, valid or not: Basic with
-	// another user name, another scheme, or X-JFrog-Art-Api.
+	// namedCredential: any other credential, valid or not.
 	namedCredential
 )
 
-// presented classes the credential r carries in the forms the
-// authentication middleware reads on an item path (decision 0005): the
-// Authorization header, Basic or Bearer, ahead of an X-JFrog-Art-Api
-// reference token. NuGet's X-NuGet-ApiKey counts only under
-// /artifactory/api/nuget/, which pathRepoKey never reports. 7.x's filter
-// tests a credential's presence (AuthenticationFilterUtils.
-// isRequestContainsAuthentication), so a named user's wrong password gets
-// the authentication's 401, not this one.
+// presented classes the credential r carries as 7.x's filter does
+// (OssForceAuthenticationFilter.acceptFilter and
+// checkIfAuthenticationShouldBeIgnored, 7.161.26). A request carries one
+// when it has an Authorization header, whatever its value, empty included
+// (AuthenticationFilterUtils.isAuthHeaderPresent); a non-blank
+// X-JFrog-Art-Api, or else an X-Api-Key header (getApiKeyTokenKeyValue); or
+// a non-blank RT_IDN_TOKEN cookie (getTokenKeyValueFromCookies). The SSO
+// header, a UI session and a client certificate, which the filter also
+// counts, are credentials artifactweave does not read. The filter then
+// tells apart two forms of Authorization only, each spelled as
+// RequestUtils spells it: "Basic " exactly, followed by a non-blank value
+// other than "Og==" (getBasicAuthorization), whose user name it decodes
+// (basicUser); and "bearer " in any case followed by a non-blank token
+// (getBearerAuthenticationValue). Every other value, such as "Basic Og==",
+// a lowercase "basic" or an empty header, is a credential the filter
+// passes on, so the authentication answers it as it would without the
+// flag. NuGet's X-NuGet-ApiKey counts only under /artifactory/api/nuget/,
+// which pathRepoKey never reports.
 func presented(r *http.Request) credential {
-	h := r.Header.Get("Authorization")
-	if h == "" {
-		if r.Header.Get("X-JFrog-Art-Api") != "" {
+	if _, ok := r.Header["Authorization"]; !ok {
+		if otherCredential(r) {
 			return namedCredential
 		}
 		return noCredential
 	}
-	scheme, _, _ := strings.Cut(h, " ")
-	switch {
-	case strings.EqualFold(scheme, "Bearer"):
-		return bearer
-	case !strings.EqualFold(scheme, "Basic"):
+	h := r.Header.Get("Authorization")
+	if rest, ok := strings.CutPrefix(h, "Basic "); ok && !blank(rest) && rest != "Og==" {
+		if user := basicUser(rest); blank(user) || strings.ToLower(user) == kernel.AnonymousUser {
+			return anonymousBasic
+		}
 		return namedCredential
 	}
-	user, _, ok := r.BasicAuth()
-	if !ok || strings.TrimSpace(user) == "" || strings.EqualFold(user, kernel.AnonymousUser) {
-		return anonymousBasic
+	if bearerToken(h) != "" {
+		return bearer
 	}
 	return namedCredential
+}
+
+// otherCredential reports whether r carries one of the credentials 7.x's
+// filter counts besides the Authorization header: an API key header, as
+// AuthenticationFilterUtils.getApiKeyTokenKeyValue reads them, or the
+// RT_IDN_TOKEN cookie with a non-blank value.
+func otherCredential(r *http.Request) bool {
+	if !blank(r.Header.Get("X-JFrog-Art-Api")) {
+		return true
+	}
+	if _, ok := r.Header["X-Api-Key"]; ok {
+		return true
+	}
+	for _, c := range r.Cookies() {
+		if c.Name == "RT_IDN_TOKEN" && !blank(c.Value) {
+			return true
+		}
+	}
+	return false
+}
+
+// bearerToken returns the token of an Authorization value h that 7.x's
+// RequestUtils.getBearerAuthenticationValue reads as Bearer: "bearer " in
+// any case and then a non-blank token, which it hands to verification as
+// it is. Any other value returns "".
+func bearerToken(h string) string {
+	const prefix = "bearer "
+	if len(h) <= len(prefix) || strings.ToLower(h[:len(prefix)]) != prefix ||
+		blank(h[len(prefix):]) {
+		return ""
+	}
+	return h[len(prefix):]
+}
+
+// basicUser returns the user name in the value of a Basic credential as
+// 7.x's RequestUtils.getUsernameOrPasswordFromToken reads it: decoded as
+// Apache Commons Codec's Base64.decodeBase64 does, which skips characters
+// outside both base64 alphabets, stops at the first '=' and drops the bits
+// left over, then cut at the first ':'. A value without ':' has a blank user
+// name.
+func basicUser(value string) string {
+	value, _, _ = strings.Cut(value, "=")
+	clean := make([]byte, 0, len(value))
+	for i := range len(value) {
+		switch c := value[i]; {
+		case c == '-':
+			clean = append(clean, '+')
+		case c == '_':
+			clean = append(clean, '/')
+		case 'A' <= c && c <= 'Z', 'a' <= c && c <= 'z', '0' <= c && c <= '9', c == '+', c == '/':
+			clean = append(clean, c)
+		}
+	}
+	if len(clean)%4 == 1 {
+		clean = clean[:len(clean)-1]
+	}
+	// clean holds characters of the alphabet alone, in a length that
+	// decodes, so Decode has no error to report.
+	decoded := make([]byte, base64.RawStdEncoding.DecodedLen(len(clean)))
+	n, _ := base64.RawStdEncoding.Decode(decoded, clean)
+	user, _, ok := strings.Cut(string(decoded[:n]), ":")
+	if !ok {
+		return ""
+	}
+	return user
+}
+
+// blank reports whether s is empty or holds only whitespace as Java's
+// Character.isWhitespace defines it, the test of Commons Lang's
+// StringUtils.isBlank, which 7.x's filter uses: the space separators but
+// the no-break spaces, the line and paragraph separators, and the ASCII
+// controls tab to carriage return and file to unit separator.
+func blank(s string) bool {
+	for _, r := range s {
+		switch {
+		case r == '\u00a0', r == '\u2007', r == '\u202f':
+			return false
+		case '\t' <= r && r <= '\r', '\u001c' <= r && r <= '\u001f':
+		case unicode.In(r, unicode.Zs, unicode.Zl, unicode.Zp):
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // withoutCredentials reports whether a request whose credential is cred
@@ -163,10 +256,7 @@ func presented(r *http.Request) credential {
 // verifyBearerAuthPresent, 7.161.26). A Bearer token whose check fails for
 // another reason, such as a store error or a restricted user, is left to
 // the authentication to answer. While anonymous access is off, any
-// credential counts, and the authentication answers it. 7.x's filter does
-// not class an empty Basic credential, "Basic Og==", as Basic
-// (RequestUtils.getBasicAuthorization), so it passes that one on; it
-// counts as none here, as the flag means it to.
+// credential counts, and the authentication answers it.
 func (s *Kit) withoutCredentials(r *http.Request, cred credential) (bool, error) {
 	auth := s.Access.Authenticator
 	if cred == noCredential || auth == nil {
@@ -183,11 +273,7 @@ func (s *Kit) withoutCredentials(r *http.Request, cred credential) (bool, error)
 	if cred == anonymousBasic {
 		return true, nil
 	}
-	_, raw, _ := strings.Cut(r.Header.Get("Authorization"), " ")
-	if raw = strings.TrimSpace(raw); raw == "" {
-		return true, nil
-	}
-	p, err := auth.Token(ctx, raw, "")
+	p, err := auth.Token(ctx, bearerToken(r.Header.Get("Authorization")), "")
 	if err != nil {
 		return errors.Is(err, kernel.ErrBadCredentials), nil
 	}
