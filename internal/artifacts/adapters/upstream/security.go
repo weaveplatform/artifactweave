@@ -52,8 +52,7 @@ func (s *sourceSecurity) prepare(req *http.Request) error {
 		req.Header.Del(h.Name)
 	}
 	transportHeaders(req.Header)
-	if _, err := remote.CheckedURL(req.URL.String()); err != nil {
-		//nolint:wrapcheck // preserves upstream error identity
+	if err := checkedURL(req.Context(), req.URL); err != nil {
 		return err
 	}
 	if s.base.Scheme == "https" && req.URL.Scheme != "https" {

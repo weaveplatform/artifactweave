@@ -11,11 +11,21 @@ import (
 
 // requestURL treats Path as an escaped relative path. It never parses a path as
 // an authority, and preserves raw query order and escaping for signed URLs.
-func requestURL(c repo.Config, base *url.URL, escapedPath, query string) (*url.URL, error) {
-	if strings.HasPrefix(escapedPath, "/") || strings.ContainsAny(escapedPath, "?#\\\r\n") {
+// When escapedPath ends with matrix, the request's matrix string
+// (remote.Request.Matrix), the path before it is checked as any path and
+// matrix by remote.CheckedMatrix, which takes the escaped backslash, NUL
+// and line breaks 7.x sends in a matrix value; otherwise the whole path is.
+func requestURL(c repo.Config, base *url.URL, escapedPath, matrix, query string) (*url.URL, error) {
+	itemPath, ok := strings.CutSuffix(escapedPath, matrix)
+	if matrix == "" || !ok {
+		itemPath = escapedPath
+	} else if remote.CheckedMatrix(matrix) != nil {
 		return nil, remote.ErrURL
 	}
-	decoded, err := url.PathUnescape(escapedPath)
+	if strings.HasPrefix(itemPath, "/") || strings.ContainsAny(itemPath, "?#\\\r\n") {
+		return nil, remote.ErrURL
+	}
+	decoded, err := url.PathUnescape(itemPath)
 	if err != nil || strings.ContainsAny(decoded, "\\\x00\r\n") {
 		return nil, remote.ErrURL
 	}

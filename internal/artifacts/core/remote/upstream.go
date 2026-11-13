@@ -55,9 +55,15 @@ type Request struct {
 	GitLFSActionHeaders http.Header
 	Method              string
 	Path                string
-	Query               string
-	Header              http.Header
-	Metadata            bool
+	// Matrix is the matrix string TransportRequest appended to Path, which
+	// still ends with it. The transport checks Path without it as it checks
+	// any path, and it by CheckedMatrix, so that the escapes 7.x sends in a
+	// matrix value pass while the same bytes in the item path are refused.
+	// A Path that no longer ends with Matrix is checked whole.
+	Matrix   string
+	Query    string
+	Header   http.Header
+	Metadata bool
 	// Body is admitted only for closed format-owned metadata POST contracts.
 	Body []byte
 }
