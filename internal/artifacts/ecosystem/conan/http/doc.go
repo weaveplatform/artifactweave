@@ -74,7 +74,10 @@
 //     own patterns refuse a file with "No repository found to serve the
 //     request".
 //   - A password login gets a revocable token that lasts at most an hour;
-//     a token login gets its own token back.
+//     a token login gets its own token back. The login's Basic user name
+//     must name the authenticated user in any case
+//     (accessapi.SameUsername, #1432), since the Conan client sends it as
+//     typed.
 //   - Statuses and error texts stay byte-identical.
 //
 // # References
@@ -99,8 +102,12 @@
 //     and #p9d-modular-monolith-migration, epic ECO
 //     (https://github.com/weaveplatform/artifactweave/issues/943).
 //   - https://github.com/weaveplatform/artifactweave/issues/770,
-//     https://github.com/weaveplatform/artifactweave/issues/1038 and
-//     https://github.com/weaveplatform/artifactweave/issues/1089
+//     https://github.com/weaveplatform/artifactweave/issues/1038,
+//     https://github.com/weaveplatform/artifactweave/issues/1089 and
+//     https://github.com/weaveplatform/artifactweave/issues/1432
+//   - The Conan client's login: conan-io/conan, conan/internal/rest/
+//     rest_client_v2.py, authenticate, which sends HTTPBasicAuth(user,
+//     password) with the name as typed.
 //
 // # Status
 //
@@ -109,12 +116,14 @@
 //
 // # Testing
 //
-//   - validation_test.go: the credential exchange's boundaries, manifest
+//   - validation_test.go: the credential exchange's boundaries (a Basic
+//     user name in another case among them), manifest
 //     parsing, permission errors, remote metadata checks and archive
 //     safety.
 //
 // The routes are also tested end to end from test/server/artifacts/conan:
 // conan_test.go; conan_client_test.go and conan_client_remote_test.go with
-// the pinned Conan 2 and Conan 1 clients, which make conan-accept runs; and
-// conan_remote_test.go.
+// the pinned Conan 2 and Conan 1 clients, which make conan-accept runs;
+// conan_remote_test.go; and username_case_test.go, the login under any
+// spelling of the user name.
 package conanhttp

@@ -16,7 +16,9 @@ import (
 // repository, whatever the method or query (OssForceAuthenticationFilter,
 // 7.161.26). With anonymous access off, a request without credentials gets
 // the same answer. Signed-in callers, and anonymous on the same virtual
-// repository with the flag off, keep their answers (#1435).
+// repository with the flag off, keep their answers. An empty Authorization
+// header, which the filter counts as a credential and passes on, gets what
+// authentication gives a request without credentials (#1435).
 func TestAccP2ForceAuthenticationOnEveryMethod(t *testing.T) {
 	on := true
 	for _, anonymous := range []bool{true, false} {
@@ -53,6 +55,22 @@ func TestAccP2ForceAuthenticationOnEveryMethod(t *testing.T) {
 			{http.MethodPost, "/artifactory/p2-forced-virtual/p2.index"},
 		} {
 			wantForced(t, tc.method+" "+tc.path, w.do(tc.method, tc.path, "", "x"))
+		}
+		// An empty Authorization header is a credential to 7.x's filter
+		// (AuthenticationFilterUtils.isAuthHeaderPresent), so it passes the
+		// request on, and authentication answers it as it answers no
+		// credentials: anonymous reads the index while anonymous access is
+		// on (AccessFilter.useAnonymousIfPossible), and "Authentication is
+		// required" answers while it is off.
+		const indexPath = "/artifactory/p2-forced-virtual/p2.index"
+		empty := w.do(http.MethodGet, indexPath, "", "", "Authorization", "")
+		wantCode, wantBody := http.StatusOK, "version"
+		if !anonymous {
+			wantCode, wantBody = http.StatusUnauthorized, `"message":"Authentication is required"`
+		}
+		if empty.Code != wantCode || !strings.Contains(empty.Body.String(), wantBody) {
+			t.Errorf("an empty Authorization header, anonymous access %v: %d %q, want %d with %q",
+				anonymous, empty.Code, empty.Body, wantCode, wantBody)
 		}
 		if !anonymous {
 			continue
