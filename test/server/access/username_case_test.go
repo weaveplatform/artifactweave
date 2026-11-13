@@ -256,6 +256,11 @@ func TestAccUsernamesFoldCase(t *testing.T) {
 				`{"add":["DAN"],"remove":["BOB"]}`, http.StatusOK, `{"members":["dan"]}`,
 			},
 			{
+				admin, http.MethodPut, v2Groups + "/team", `{"members":["BOB","Dan"]}`,
+				http.StatusOK, strings.Replace(v2GroupDoc("team"), `"members":[]`,
+					`"members":["bob","dan"]`, 1),
+			},
+			{
 				admin, http.MethodPatch, v2Users + "/BOB/groups",
 				`{"add":["team"],"remove":["crew"]}`, http.StatusOK,
 				`{"groups":["readers","team"]}`,
@@ -269,6 +274,26 @@ func TestAccUsernamesFoldCase(t *testing.T) {
 			},
 			{admin, http.MethodGet, permV2 + "/bob-perm", "", http.StatusOK, bobPerm},
 			{admin, http.MethodGet, permV2 + "/users/BOB", "", http.StatusOK, "[" + bobPerm + "]"},
+			{
+				admin,
+				http.MethodPut,
+				permV1 + "/bob-v1",
+				`{"name":"bob-v1","repositories":["ANY LOCAL"],"principals":{"users":{"BOB":["r"]}}}`,
+				http.StatusOK,
+				`{"info":"Successfully created permission target 'bob-v1'"}`,
+			},
+			{
+				admin, http.MethodGet, permV1 + "/bob-v1", "", http.StatusOK,
+				`{"includesPattern":"**","name":"bob-v1","principals":{"users":{"bob":["r"]}},` +
+					`"repositories":["ANY LOCAL"]}`,
+			},
+			// A patch's Bob replaces the stored bob rather than joining it.
+			{
+				admin, http.MethodPatch, permAcc + "/bob-v1/artifact",
+				`{"actions":{"users":{"Bob":["READ","WRITE"]}}}`, http.StatusOK,
+				`{"actions":{"users":{"bob":["READ","WRITE"]}},` +
+					`"targets":{"ANY LOCAL":{"exclude_patterns":[],"include_patterns":["**"]}}}`,
+			},
 
 			// BOB logs in as bob, with a password, and changes its own
 			// password through either API.
