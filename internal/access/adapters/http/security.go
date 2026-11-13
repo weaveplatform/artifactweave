@@ -142,12 +142,13 @@ func (s SecurityAPI) GetUserDetails(
 }
 
 // userBody returns the user document a write carries, in either media type.
+// The body's name may spell the path's in another case: both name one user.
 func userBody(name string, bodies ...*artgen.UserConfiguration) (*artgen.UserConfiguration, error) {
 	for _, b := range bodies {
 		if b == nil {
 			continue
 		}
-		if b.Name != nil && *b.Name != name {
+		if b.Name != nil && !model.SameUsername(*b.Name, name) {
 			return nil, httpkit.BadRequestf("the user name in the body must match the path")
 		}
 		return b, nil
@@ -645,7 +646,7 @@ func (s SecurityAPI) ChangePassword(
 		return nil, httpkit.BadRequestf("userName is required")
 	}
 	b := req.Body
-	self := p.Name == b.UserName && !narrowedToken(p)
+	self := model.SameUsername(p.Name, b.UserName) && !narrowedToken(p)
 	if !self && (!p.Admin || p.PasswordExpired) {
 		return nil, kernel.ErrForbidden
 	}

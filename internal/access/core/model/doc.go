@@ -20,7 +20,7 @@
 //     permissions, as kernel/wire declares them: the legacy security API's
 //     (permission targets v1 and v2) and Access's.
 //   - For the checks and parsers, a project key, an environment name, a role
-//     action or a token subject.
+//     action, a token subject or a user name.
 //
 // # Outputs
 //
@@ -43,6 +43,9 @@
 //     ErrInvalidSubject, the token defaults and
 //     TokenPurposeEncryptedPassword.
 //   - TrustedKey and SigningKey.
+//   - FoldUsername, SameUsername and FoldUsernames, the user name rule, and
+//     FoldUserGrants with Resource.FoldGrants and Permission.FoldGrants, its
+//     application to a permission's user grants.
 //   - UserLockPolicy, PasswordExpirationPolicy, PasswordPolicy with
 //     DefaultPasswordPolicy, and AccessLockSettings with
 //     DefaultAccessLockSettings.
@@ -56,6 +59,10 @@
 //     token's secret, a signing key's private key and passphrase) are tagged
 //     json:"-", so no document column can hold one; the stores keep the
 //     sealed ones in sealed columns (decision 0017).
+//   - A user name is stored and matched folded to lower case (FoldUsername),
+//     as Access treats user names: "User names are case-insensitive" (JFrog's
+//     SCIM page), and RTFACT-29660 (7.55.13) stores a user created "with
+//     capitalization" in lower case. A group name keeps its case (#1309).
 //   - The string constants (statuses, role types, principal types, the
 //     built-in roles and environments) are stored and on the wire, so their
 //     values never change.
@@ -92,7 +99,8 @@
 // their wire conversions (pull request 3). P4 added the global roles and
 // environments (pull request 93) and the encrypted-password token purpose
 // (pull request 108), and AccessLockSettings came with the Access user lock
-// policy endpoints (pull request 242). Moved here in P9d.
+// policy endpoints (pull request 242). Moved here in P9d. The user name rule
+// came with #1432.
 //
 // # Testing
 //
@@ -108,6 +116,7 @@
 //     and ParseSubject), TestUnitProject (ValidateProjectKey and
 //     ProjectRepoKey) and TestUnitSigningKeyJSON (a signing key's secrets
 //     stay out of its JSON).
+//   - username_test.go: TestUnitFoldUsername and TestUnitFoldGrants.
 //
 // The module's contract suite, internal/access/adapters/storetest.Run, stores
 // and reads these values in its identity, token, key and project subtests;

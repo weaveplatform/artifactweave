@@ -100,6 +100,8 @@
 //     TestUnitRegistryTokenParentUnreadable.
 //   - fault_test.go: TestUnitStoreFailures, TestUnitBadStoredKeys and
 //     TestUnitRecordMismatches.
+//   - username_test.go: TestUnitRefreshAsFoldsUsername (a refresh's user
+//     matches the token's in any case, #1432).
 //   - accessapi_test.go: compiles only while Request and RegistryRequest
 //     convert to and from their access/api counterparts.
 //

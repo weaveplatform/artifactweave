@@ -55,7 +55,7 @@ func (a *Authenticator) Current(
 	if !p.Password {
 		return kernel.Principal{}, kernel.ErrBadCredentials
 	}
-	u, err := a.users.Get(ctx, p.Name)
+	u, err := a.users.Get(ctx, model.FoldUsername(p.Name))
 	if err != nil {
 		return kernel.Principal{}, fmt.Errorf("auth: current user: %w", err)
 	}

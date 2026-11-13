@@ -4,17 +4,19 @@ import (
 	"context"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 )
 
 var _ accessapi.Identity = identity{}
 
 // identity reads user accounts and the auto-join groups. Errors are the
 // store's, unwrapped, so errors.Is(err, kernel.ErrNotFound) and each caller's
-// own wrap still apply.
+// own wrap still apply. A user is found by name in any case and named as
+// stored (model.FoldUsername).
 type identity struct{ st Store }
 
 func (b identity) User(ctx context.Context, name string) (accessapi.UserInfo, error) {
-	u, err := b.st.Users().Get(ctx, name)
+	u, err := b.st.Users().Get(ctx, model.FoldUsername(name))
 	if err != nil {
 		return accessapi.UserInfo{}, err //nolint:wrapcheck // the store's errors are the contract's
 	}

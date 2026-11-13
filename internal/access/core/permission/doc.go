@@ -71,6 +71,8 @@
 //     TestUnitMergeAndDeleteResource, TestUnitGrantingAndList,
 //     TestUnitValidResourceType, TestUnitDefaultClock, TestUnitNarrow and
 //     TestUnitFoldUsers.
+//   - username_test.go: TestUnitUserGrantsFold and
+//     TestUnitManagerOwnEntryFolds (user grants in any case, #1432).
 //   - fault_test.go: TestUnitStoreFailures.
 //
 // The tests run on the metadata store's in-memory store, with a stand-in

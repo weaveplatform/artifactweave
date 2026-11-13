@@ -115,10 +115,17 @@ func NewAuthenticator(
 // marked PasswordExpired.
 // While the name is temporarily suspended after failed logins, every
 // password answers ErrLoginSuspended (suspension.go).
+//
+// The name is folded (model.FoldUsername) before anything else, so BOB logs
+// in as bob, and a failed login as BOB counts toward bob's lock and
+// suspension. RTFACT-29660 reports 7.55.13 counting TEST_user and test_user
+// apart, against its own rule that user names are case-insensitive; that
+// is not followed.
 func (a *Authenticator) Basic(
 	ctx context.Context,
 	name, password string,
 ) (kernel.Principal, error) {
+	name = model.FoldUsername(name)
 	// A switch that cannot be read does not stop the check here: a correct
 	// password then fails in accept, which needs the same settings, and a
 	// wrong one still answers as a wrong password.
