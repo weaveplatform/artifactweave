@@ -192,13 +192,13 @@ func ownPasswordChange(r *http.Request, user string) bool {
 
 // credentials verifies whatever credential the request presents, reporting
 // presented false when there is none. Every form decision 0005 accepts:
-// an API key header with a reference token (API keys are retired); Basic
-// with a password, or with an access or reference token as the password
-// (the user name must be the token's subject); Bearer with either token;
-// and on the NuGet routes alone, X-NuGet-ApiKey (nugetAPIKey). A credential
-// that does not verify answers 401 rather than quietly becoming anonymous,
-// and so does a Basic value 7.x reads but cannot decode, but for the 403s
-// of refusedAPIKey and refusedNuGetPassword.
+// an API key header with a reference token (API keys are retired);
+// Basic with a password, or with an access or reference token as the
+// password (the user name must be the token's subject); Bearer with either
+// token; and on the NuGet routes alone, X-NuGet-ApiKey (nugetAPIKey). A
+// credential that does not verify answers 401 rather than quietly becoming
+// anonymous, and so does a Basic value 7.x reads but cannot decode, but for
+// the 403s of refusedAPIKey and refusedNuGetPassword.
 //
 // An API key is read first, and alone (accessapi.APIKey): 7.161.26's props
 // filter, which reads X-JFrog-Art-Api unless it is blank and otherwise
