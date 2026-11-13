@@ -1,6 +1,7 @@
 // Package xzfile reads whole .xz files, as liblzma and xz -t read them,
 // with a dictionary no larger than its block header names or the caller
-// reads, and none above 1.5 GiB, as XZ for Java reads them.
+// reads, and none above 1.5 GiB, as XZ for Java reads them, within a
+// memory budget that the dictionaries of all decodes share.
 //
 // # Role
 //
@@ -13,19 +14,26 @@
 // parses the container itself, because that package's Reader ends without
 // an error where a block header or the index must start, and allocates
 // whatever dictionary a block header names. It imports the standard
-// library and that lzma package, and no module.
+// library and that lzma package, and no module. The app sets the budget
+// from xz.dictionary_budget, and marks each HTTP request with
+// WithRequest.
 //
 // # Inputs
 //
+//   - The caller's context, which ends a wait for the budget, and may
+//     carry the request WithRequest marks.
 //   - The file, as an io.Reader read once from its first byte.
 //   - The limit: the most bytes the caller reads from the content, or 0
 //     for none.
+//   - The budget, SetBudget: the most bytes of dictionary the process's
+//     decodes hold at once, or 0 for none. DefaultBudget is 1 GiB.
 //
 // # Outputs
 //
-//   - An io.Reader of the content of every stream in the file, in order.
-//     Its Read returns io.EOF only once the input ended after a stream's
-//     footer and its stream padding.
+//   - An io.ReadCloser of the content of every stream in the file, in
+//     order. Its Read returns io.EOF only once the input ended after a
+//     stream's footer and its stream padding. Close gives back the
+//     dictionary it holds.
 //   - A refusal: io.ErrUnexpectedEOF for an input that ends anywhere but
 //     between streams, and otherwise an error whose text is the one
 //     ulikunitz/xz's Reader gives the same fault, such as "xz: checksum
@@ -56,6 +64,24 @@
 //     Data that refers further back than its header names is refused, as
 //     both refuse it. ulikunitz/xz read it within an 8 MiB dictionary, and
 //     within 64 MiB for Nix and Terraform.
+//   - A block takes its dictionary from the budget before the dictionary
+//     is allocated, and gives it back when the block's data ends, when
+//     Read fails or returns io.EOF, and on Close; a reader dropped
+//     unclosed gives it back once the garbage collector finds it. The
+//     budget counts the dictionary only, not the 32 KiB input buffer.
+//   - A decode that does not fit waits, in order of arrival, and is never
+//     refused: XZ for Java decodes with no memory limit (Apache Commons
+//     Compress passes -1), so a refusal would change an answer (#1354).
+//     One that fits goes ahead whatever its context says, as it did
+//     without a budget; a wait its context ends fails Read with the
+//     context's error and takes nothing.
+//   - A dictionary larger than the whole budget decodes alone: it goes in
+//     once nothing else holds the budget, and those behind it wait.
+//   - The readers of one request (WithRequest) are one holder. One that
+//     already holds part of the budget passes the decodes queued ahead of
+//     it, and goes in while it alone holds the budget, so a request that
+//     reads a second xz file while its first is open cannot wait on
+//     itself. Readers of no request are each a holder of their own.
 //   - For a fault ulikunitz/xz's Reader refused, the refusal reads as it
 //     did there, in the same order of checks, so Debian's 400 for a package
 //     (which names the fault) is unchanged. Where that Reader decoded a file
@@ -82,17 +108,21 @@
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Dependency rules": the platform imports no module.
 //   - https://github.com/weaveplatform/artifactweave/issues/1297,
-//     https://github.com/weaveplatform/artifactweave/issues/1331 and
-//     https://github.com/weaveplatform/artifactweave/issues/1332
+//     https://github.com/weaveplatform/artifactweave/issues/1331,
+//     https://github.com/weaveplatform/artifactweave/issues/1332 and
+//     https://github.com/weaveplatform/artifactweave/issues/1354
+//   - A dictionary that grows as it fills, so a short file takes less
+//     than its header names: https://github.com/weaveplatform/artifactweave/issues/1413
 //
 // # Status
 //
 // Implemented after P9d: the reader Nix's whole-stream fix added in P9c
 // (#1297), moved here so Debian, CRAN, p2 and Terraform read xz with it too
-// (#1331), and its dictionary bounded as XZ for Java bounds it (#1332). A
-// format whose limit is large, such as Nix's 2 GiB, can still allocate up
-// to 1.5 GiB for a header of a few bytes; no memory budget is shared
-// between decodes yet.
+// (#1331), its dictionary bounded as XZ for Java bounds it (#1332), and
+// the dictionaries of all decodes held within a shared budget (#1354). A
+// format whose limit is large, such as Nix's 2 GiB, still allocates up to
+// 1.5 GiB for a header of a few bytes, within the budget; #1413 would
+// allocate it as it fills.
 //
 // # Testing
 //
@@ -112,9 +142,23 @@
 //     TestUnitDataBeyondTheDictionary (data that refers past the
 //     dictionary, or past what its header names, is refused, and read
 //     whole with one that reaches).
+//   - budget_test.go: TestUnitTheBudgetBoundsConcurrentDecodes (sixteen
+//     decodes at once of a file whose header names 1.5 GiB hold no more
+//     than the budget, by runtime.MemStats, and all of theirs without
+//     it), TestUnitADecodeThatDoesNotFitWaits,
+//     TestUnitADictionaryLargerThanTheBudgetDecodesAlone,
+//     TestUnitACancelledWaitTakesNothing, TestUnitOneRequestReadsTwoStreams
+//     (no deadlock with WithRequest, and the wait without it),
+//     TestUnitTheDictionaryIsGivenBack (block end, io.EOF, an error, Close
+//     and the garbage collector), TestUnitTurningTheBudgetOffLetsWaitersIn
+//     and TestUnitSameAnswersWithTheBudgetOnAndOff (every early end and
+//     changed byte of the fixture).
 //   - Each format's tests read a fixture cut by its index and footer:
 //     ecosystem/nix (xz_test.go), ecosystem/debian (xz_test.go),
 //     ecosystem/cran (xz_test.go), ecosystem/p2 (xz_test.go) and
 //     ecosystem/terraform/http (remote_archive_xz_test.go), and the server
 //     suites under test/server/artifacts send them through the routes.
+//     Each format's xz_budget_test.go reads its xz fixtures with a budget
+//     smaller than their dictionaries and with none, and gets the same
+//     answers.
 package xzfile

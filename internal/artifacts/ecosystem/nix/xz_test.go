@@ -15,6 +15,7 @@ func TestUnitNARsNeedTheirWholeXZStream(t *testing.T) {
 	info, archive, _ := fixture(t)
 	cut := archive[:len(archive)-xzTail(t, archive)]
 	if _, err := ReadArchive(
+		t.Context(),
 		bytes.NewReader(cut),
 		int64(len(cut)),
 		"xz",
@@ -25,6 +26,7 @@ func TestUnitNARsNeedTheirWholeXZStream(t *testing.T) {
 		t.Fatalf("cut NAR: %v", err)
 	}
 	if a, err := ReadArchive(
+		t.Context(),
 		bytes.NewReader(archive),
 		int64(len(archive)),
 		"xz",
@@ -36,11 +38,11 @@ func TestUnitNARsNeedTheirWholeXZStream(t *testing.T) {
 
 func TestUnitChannelsNeedTheirWholeXZStream(t *testing.T) {
 	tarball := compressXZ(t, channelTar(t, 0))
-	if err := ReadChannel(bytes.NewReader(tarball), int64(len(tarball))); err != nil {
+	if err := ReadChannel(t.Context(), bytes.NewReader(tarball), int64(len(tarball))); err != nil {
 		t.Fatal(err)
 	}
 	cutTarball := tarball[:len(tarball)-xzTail(t, tarball)]
-	if err := ReadChannel(
+	if err := ReadChannel(t.Context(),
 		bytes.NewReader(cutTarball),
 		int64(len(cutTarball)),
 	); !errors.Is(
@@ -102,14 +104,19 @@ func TestUnitXZDictionaryIsBounded(t *testing.T) {
 	nar := regular("hello\n")
 	// Property 20 names 2 MiB: the same file under it is a valid NAR.
 	small := storedXZ(nar, 20)
-	if a, err := ReadArchive(bytes.NewReader(small), int64(len(small)), "xz"); err != nil ||
+	if a, err := ReadArchive(
+		t.Context(),
+		bytes.NewReader(small),
+		int64(len(small)),
+		"xz",
+	); err != nil ||
 		a.NarSize != int64(len(nar)) {
 		t.Fatalf("NAR under a 2 MiB dictionary: %+v %v", a, err)
 	}
 	archive := storedXZ(nar, 40)
 	var before, after runtime.MemStats
 	runtime.ReadMemStats(&before)
-	_, err := ReadArchive(bytes.NewReader(archive), int64(len(archive)), "xz")
+	_, err := ReadArchive(t.Context(), bytes.NewReader(archive), int64(len(archive)), "xz")
 	runtime.ReadMemStats(&after)
 	if !errors.Is(err, ErrInvalid) {
 		t.Fatalf("NAR under a 4 GiB dictionary: %v, want ErrInvalid", err)

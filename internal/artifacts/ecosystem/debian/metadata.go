@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/bzip2"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -265,10 +266,11 @@ func ReleaseIndexRefs(distribution string, body []byte) ([]PackageIndexRef, erro
 
 // DecodePackagesIndex accepts the plain index and each compression an index
 // name may carry. The bound applies after decompression, so a small
-// compressed bomb cannot enter the remote cache or a virtual index.
-func DecodePackagesIndex(body []byte) ([]PackageRecord, error) {
+// compressed bomb cannot enter the remote cache or a virtual index. ctx
+// ends a wait for the xz dictionary budget.
+func DecodePackagesIndex(ctx context.Context, body []byte) ([]PackageRecord, error) {
 	var err error
-	body, err = decodeIndexCompression(body)
+	body, err = decodeIndexCompression(ctx, body)
 	if err != nil {
 		return nil, err
 	}
@@ -278,9 +280,9 @@ func DecodePackagesIndex(body []byte) ([]PackageRecord, error) {
 // DecodeInstallerPackagesIndex checks an installer's Packages index
 // (InstallerPackagesIndexPath) as DecodePackagesIndex checks a binary-<arch>
 // one, except that its rows name .udeb files, the installer's packages.
-func DecodeInstallerPackagesIndex(body []byte) ([]PackageRecord, error) {
+func DecodeInstallerPackagesIndex(ctx context.Context, body []byte) ([]PackageRecord, error) {
 	var err error
-	body, err = decodeIndexCompression(body)
+	body, err = decodeIndexCompression(ctx, body)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +291,7 @@ func DecodeInstallerPackagesIndex(body []byte) ([]PackageRecord, error) {
 	})
 }
 
-func decodeIndexCompression(body []byte) ([]byte, error) {
+func decodeIndexCompression(ctx context.Context, body []byte) ([]byte, error) {
 	var reader io.Reader
 	var closeReader func()
 	switch {
@@ -302,11 +304,11 @@ func decodeIndexCompression(body []byte) ([]byte, error) {
 	case bytes.HasPrefix(body, []byte{0xfd, '7', 'z', 'X', 'Z', 0x00}):
 		// liblzma, which apt decodes an index with, refuses an xz file whose
 		// index and footer are missing, so the whole file is read (#1331).
-		z, err := xzfile.NewReader(bytes.NewReader(body), maxPackagesIndex+1)
+		z, err := xzfile.NewReader(ctx, bytes.NewReader(body), maxPackagesIndex+1)
 		if err != nil {
 			return nil, fmt.Errorf("%w: xz index: %w", errInvalidBinary, err)
 		}
-		reader = z
+		reader, closeReader = z, func() { _ = z.Close() }
 	case bytes.HasPrefix(body, []byte("BZh")):
 		reader = bzip2.NewReader(bytes.NewReader(body))
 	case bytes.HasPrefix(body, []byte{0x28, 0xb5, 0x2f, 0xfd}):

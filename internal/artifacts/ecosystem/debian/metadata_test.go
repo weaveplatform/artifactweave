@@ -46,7 +46,7 @@ func TestUnitParsePackagesIndexBindsRealPackage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	decoded, err := DecodePackagesIndex(compressed)
+	decoded, err := DecodePackagesIndex(t.Context(), compressed)
 	if err != nil || len(decoded) != 1 || decoded[0].SHA256 != rows[0].SHA256 {
 		t.Fatalf("gzip Packages index: %+v, %v", decoded, err)
 	}
@@ -91,7 +91,7 @@ func TestUnitCompressedAptIndexes(t *testing.T) {
 		if !PackagesIndexPath(p) {
 			t.Fatalf("rejected apt index path %s", p)
 		}
-		rows, err := DecodePackagesIndex(compressed.Bytes())
+		rows, err := DecodePackagesIndex(t.Context(), compressed.Bytes())
 		if err != nil || len(rows) != 1 || rows[0].Name != "alpha" {
 			t.Fatalf("%s index decode: %+v %v", ext, rows, err)
 		}

@@ -28,6 +28,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
+	"github.com/weaveplatform/artifactweave/internal/platform/xzfile"
 )
 
 // repairEvery is how often a mirror's repair loop runs a pass; a variable
@@ -111,6 +112,9 @@ func OpenRuntime(
 	opts RuntimeOptions,
 ) (*Runtime, error) {
 	opts = opts.withDefaults()
+	// The budget is the process's: every decode shares it, those of the
+	// work queue's workers included, so it is set before they start.
+	xzfile.SetBudget(int64(cfg.XZ.DictionaryBudget))
 	settings := cfg.Artifacts()
 	keys, err := Keyring(cfg)
 	if err != nil {

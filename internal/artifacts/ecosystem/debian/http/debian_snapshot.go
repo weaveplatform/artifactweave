@@ -336,7 +336,7 @@ func (s DebianAPI) debianSnapshotFiles(
 			return nil, errDebianReleaseDigestMismatch
 		}
 		if debian.PackagesIndexPath(ref.Path) || debian.SourcesIndexPath(ref.Path) {
-			paths, err := debianIndexPaths(ref.Path, body)
+			paths, err := debianIndexPaths(ctx, ref.Path, body)
 			if err != nil && c.Class == repo.Remote {
 				// A remote caches an index it cannot decode as fetched
 				// (#1356), but a snapshot copies only indexes whose
@@ -514,7 +514,7 @@ func (s DebianAPI) checkDebianSnapshotIndex(
 	if err != nil {
 		return err
 	}
-	paths, err := debianIndexPaths(rel, body)
+	paths, err := debianIndexPaths(ctx, rel, body)
 	if err != nil {
 		return err
 	}

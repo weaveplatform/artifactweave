@@ -49,14 +49,14 @@ func TestUnitXZMetadataNeedsItsWholeStream(t *testing.T) {
 		read func(name string, body []byte) error
 	}{
 		{"artifacts.xml.xz", p2TestXZ(t, artifacts), func(name string, body []byte) error {
-			return Validate(name, bytes.NewReader(body), int64(len(body)))
+			return Validate(t.Context(), name, bytes.NewReader(body), int64(len(body)))
 		}},
 		{"artifacts.xml.xz", p2TestXZ(t, artifacts), func(name string, body []byte) error {
-			_, err := ArtifactChecksums(name, body, "plugins/plugin_1.0.0.jar")
+			_, err := ArtifactChecksums(t.Context(), name, body, "plugins/plugin_1.0.0.jar")
 			return err
 		}},
 		{"compositeContent.xml.xz", p2TestXZ(t, composite), func(name string, body []byte) error {
-			_, err := EditComposite(name, body, keep)
+			_, err := EditComposite(t.Context(), name, body, keep)
 			return err
 		}},
 	} {
@@ -69,6 +69,7 @@ func TestUnitXZMetadataNeedsItsWholeStream(t *testing.T) {
 	}
 	// metadataXML reads a file Validate admitted; it refuses a cut one too.
 	if _, err := metadataXML(
+		t.Context(),
 		"artifacts.xml.xz",
 		xzCut(t, p2TestXZ(t, artifacts)),
 	); !errors.Is(
@@ -122,7 +123,7 @@ func TestUnitXZMetadataDictionaryIsBoundedByMaxMetadata(t *testing.T) {
 		body := storedXZ(artifactsXML, c.prop)
 		var before, after runtime.MemStats
 		runtime.ReadMemStats(&before)
-		err := Validate("artifacts.xml.xz", bytes.NewReader(body), int64(len(body)))
+		err := Validate(t.Context(), "artifacts.xml.xz", bytes.NewReader(body), int64(len(body)))
 		runtime.ReadMemStats(&after)
 		if c.ok && err != nil || !c.ok && !errors.Is(err, ErrInvalid) {
 			t.Fatalf("property %d: %v", c.prop, err)

@@ -148,10 +148,11 @@ func readTar(ctx context.Context, raw io.Reader, p, name string) (map[string]str
 		// R reads a .tar.xz through liblzma, which refuses a file whose
 		// index and footer are missing, so the drain below reads the whole
 		// file (#1331).
-		xr, err := xzfile.NewReader(raw, maxUnpacked+1)
+		xr, err := xzfile.NewReader(ctx, raw, maxUnpacked+1)
 		if err != nil {
 			return nil, ErrPackage
 		}
+		defer func() { _ = xr.Close() }()
 		stream = xr
 	default:
 		return nil, ErrPackage

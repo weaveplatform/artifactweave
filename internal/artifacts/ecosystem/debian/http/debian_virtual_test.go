@@ -132,7 +132,7 @@ func TestAccDebianVirtualKeepsPackagesThePatternsReject(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("virtual Packages answered %d %s, want 200", rec.Code, rec.Body)
 	}
-	rows, err := debian.DecodePackagesIndex(rec.Body.Bytes())
+	rows, err := debian.DecodePackagesIndex(t.Context(), rec.Body.Bytes())
 	if err != nil {
 		t.Fatalf("virtual Packages does not decode: %v", err)
 	}

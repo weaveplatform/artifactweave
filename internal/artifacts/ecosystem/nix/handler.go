@@ -91,7 +91,7 @@ func (Handler) Inspect(
 		// The status and message are inferred: the JFrog documentation
 		// enforces the xz tarball without saying how it answers one that
 		// is not (#216).
-		if err := ReadChannel(rc, bi.Size); err != nil {
+		if err := ReadChannel(ctx, rc, bi.Size); err != nil {
 			return nil, format.Rejectf(400, "invalid Nix channel archive")
 		}
 	default:
@@ -102,7 +102,7 @@ func (Handler) Inspect(
 		if !ok {
 			return nil, format.Rejectf(400, "invalid Nix archive path")
 		}
-		a, err := ReadArchive(rc, bi.Size, compression)
+		a, err := ReadArchive(ctx, rc, bi.Size, compression)
 		if err != nil {
 			return nil, format.Rejectf(400, "invalid Nix archive")
 		}
@@ -269,7 +269,7 @@ func ReferencedArchive(
 		return model.Item{}, fmt.Errorf("nix: archive blob: %w", err)
 	}
 	defer rc.Close()
-	a, err := ReadArchive(rc, bi.Size, info.Compression)
+	a, err := ReadArchive(ctx, rc, bi.Size, info.Compression)
 	if err != nil || !a.Matches(info) {
 		return model.Item{}, ErrInvalid
 	}

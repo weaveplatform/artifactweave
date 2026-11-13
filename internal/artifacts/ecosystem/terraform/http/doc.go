@@ -114,6 +114,9 @@
 //   - remote_test.go, remote_links_test.go, remote_source_test.go and
 //     remote_archive_test.go: remote modules, their sources, links and
 //     archives.
+//   - xz_budget_test.go: a remote .tar.xz and .xz module, whole and cut,
+//     answers the same under the xz dictionary budget as without it
+//     (#1354).
 //   - remote_provider_test.go, remote_provider_policy_test.go,
 //     remote_provider_rotation_test.go and remote_provider_source_test.go:
 //     remote providers, the mirror, redirects and credentials.

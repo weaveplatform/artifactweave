@@ -134,10 +134,11 @@ func validateSelectedArchive(
 		// The whole file is read, as liblzma reads it, so a module whose
 		// index and footer are missing is refused (#1331). The inflation
 		// budget bounds what is read, and so the dictionary (#1332).
-		xr, err := xzfile.NewReader(stream, inflated+1)
+		xr, err := xzfile.NewReader(ctx, stream, inflated+1)
 		if err != nil {
 			return remoteModuleError()
 		}
+		defer func() { _ = xr.Close() }()
 		stream = xr
 	case strings.HasSuffix(name, ".tar"):
 	default:

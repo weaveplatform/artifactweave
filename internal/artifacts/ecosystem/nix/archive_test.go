@@ -56,7 +56,7 @@ func regular(body string) []byte {
 
 func TestUnitRealNixArchiveAndCompression(t *testing.T) {
 	info, compressed, nar := fixture(t)
-	a, err := ReadArchive(bytes.NewReader(compressed), int64(len(compressed)), "xz")
+	a, err := ReadArchive(t.Context(), bytes.NewReader(compressed), int64(len(compressed)), "xz")
 	if err != nil || !a.Matches(info) {
 		t.Fatalf("native NAR invalid: %#v %v", a, err)
 	}
@@ -75,24 +75,39 @@ func TestUnitRealNixArchiveAndCompression(t *testing.T) {
 				data = w.EncodeAll(nar, nil)
 				w.Close()
 			}
-			got, err := ReadArchive(bytes.NewReader(data), int64(len(data)), compression)
+			got, err := ReadArchive(
+				t.Context(),
+				bytes.NewReader(data),
+				int64(len(data)),
+				compression,
+			)
 			if err != nil || got.NarHash != a.NarHash || got.NarSize != a.NarSize {
 				t.Fatalf("NAR integrity: %#v %v", got, err)
 			}
 		})
 	}
 	for _, compression := range []string{"none", "xz", "bzip2", "gzip", "zstd", "unsupported"} {
-		if _, err := ReadArchive(strings.NewReader("bad"), 3, compression); err == nil {
+		if _, err := ReadArchive(
+			t.Context(),
+			strings.NewReader("bad"),
+			3,
+			compression,
+		); err == nil {
 			t.Errorf("bad %s accepted", compression)
 		}
 	}
 	for _, size := range []int64{0, -1, MaxArchiveBytes + 1} {
-		if _, err := ReadArchive(bytes.NewReader(nar), size, "none"); err == nil {
+		if _, err := ReadArchive(t.Context(), bytes.NewReader(nar), size, "none"); err == nil {
 			t.Errorf("size %d", size)
 		}
 	}
 	for _, data := range [][]byte{nar[:len(nar)-1], append(bytes.Clone(nar), 1), append(bytes.Clone(nar), make([]byte, 8)...)} {
-		if _, err := ReadArchive(bytes.NewReader(data), int64(len(data)), "none"); err == nil {
+		if _, err := ReadArchive(
+			t.Context(),
+			bytes.NewReader(data),
+			int64(len(data)),
+			"none",
+		); err == nil {
 			t.Fatal("truncated or trailing NAR accepted")
 		}
 	}
@@ -142,6 +157,7 @@ func TestUnitNARGrammarRejectsMalformedAndUnsafeNodes(t *testing.T) {
 				token(&b, s)
 			}
 			if _, err := ReadArchive(
+				t.Context(),
 				bytes.NewReader(b.Bytes()),
 				int64(b.Len()),
 				"none",
@@ -155,19 +171,34 @@ func TestUnitNARGrammarRejectsMalformedAndUnsafeNodes(t *testing.T) {
 		for _, s := range tokens {
 			token(&b, s)
 		}
-		if _, err := ReadArchive(bytes.NewReader(b.Bytes()), int64(b.Len()), "none"); err != nil {
+		if _, err := ReadArchive(
+			t.Context(),
+			bytes.NewReader(b.Bytes()),
+			int64(b.Len()),
+			"none",
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
 	good := regular("fixture")
 	bad := bytes.Clone(good)
 	bad[21] = 1
-	if _, err := ReadArchive(bytes.NewReader(bad), int64(len(bad)), "none"); err == nil {
+	if _, err := ReadArchive(
+		t.Context(),
+		bytes.NewReader(bad),
+		int64(len(bad)),
+		"none",
+	); err == nil {
 		t.Fatal("nonzero padding accepted")
 	}
 	bad = bytes.Clone(good)
 	binary.LittleEndian.PutUint64(bad[:8], 5000)
-	if _, err := ReadArchive(bytes.NewReader(bad), int64(len(bad)), "none"); err == nil {
+	if _, err := ReadArchive(
+		t.Context(),
+		bytes.NewReader(bad),
+		int64(len(bad)),
+		"none",
+	); err == nil {
 		t.Fatal("oversized token accepted")
 	}
 }
@@ -180,7 +211,12 @@ func TestUnitNARStructuralResourceLimits(t *testing.T) {
 	token(&b, "regular")
 	token(&b, "contents")
 	_ = binary.Write(&b, binary.LittleEndian, uint64(MaxNarBytes+1))
-	if _, err := ReadArchive(bytes.NewReader(b.Bytes()), int64(b.Len()), "none"); err == nil {
+	if _, err := ReadArchive(
+		t.Context(),
+		bytes.NewReader(b.Bytes()),
+		int64(b.Len()),
+		"none",
+	); err == nil {
 		t.Fatal("oversized content")
 	}
 	for _, tokens := range [][]string{{"nix-archive-1", "(", "type"}, {"nix-archive-1", "(", "type", "regular"}, {"nix-archive-1", "(", "type", "symlink", "wrong"}, {"nix-archive-1", "(", "type", "directory"}} {
@@ -188,7 +224,12 @@ func TestUnitNARStructuralResourceLimits(t *testing.T) {
 		for _, s := range tokens {
 			token(&b, s)
 		}
-		if _, err := ReadArchive(bytes.NewReader(b.Bytes()), int64(b.Len()), "none"); err == nil {
+		if _, err := ReadArchive(
+			t.Context(),
+			bytes.NewReader(b.Bytes()),
+			int64(b.Len()),
+			"none",
+		); err == nil {
 			t.Fatal("truncated grammar")
 		}
 	}
@@ -199,7 +240,12 @@ func TestUnitNARStructuralResourceLimits(t *testing.T) {
 			token(&b, s)
 		}
 	}
-	if _, err := ReadArchive(bytes.NewReader(b.Bytes()), int64(b.Len()), "none"); err == nil {
+	if _, err := ReadArchive(
+		t.Context(),
+		bytes.NewReader(b.Bytes()),
+		int64(b.Len()),
+		"none",
+	); err == nil {
 		t.Fatal("unbounded recursion")
 	}
 }

@@ -38,8 +38,8 @@
 //     cran, huggingface, maven, nuget, remote, gc, conda, helm and pypi
 //     sections) and Configuration (docker.subdomain_match). The platform's
 //     keys (listen, base_url, data_dir, compat, database, blob, cold_blob,
-//     the master keys, bootstrap, log, work and api) stay fields that app
-//     reads directly.
+//     the master keys, bootstrap, log, work, api and xz) stay fields that
+//     app reads directly.
 //
 // # Invariants
 //

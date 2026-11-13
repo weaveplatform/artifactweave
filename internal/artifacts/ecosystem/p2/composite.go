@@ -3,6 +3,7 @@ package p2
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/xml"
 	"errors"
 	"io"
@@ -19,9 +20,11 @@ import (
 // No original location reaches a client if one replacement fails.
 //
 //nolint:gocyclo // The format's XML, JAR, and XZ encodings share one fail-closed rewrite path.
-func EditComposite(name string, body []byte, replace func(string) (string, error)) ([]byte, error) {
+func EditComposite(
+	ctx context.Context, name string, body []byte, replace func(string) (string, error),
+) ([]byte, error) {
 	if !strings.HasPrefix(path.Base(name), "composite") ||
-		Validate(name, bytes.NewReader(body), int64(len(body))) != nil {
+		Validate(ctx, name, bytes.NewReader(body), int64(len(body))) != nil {
 		return nil, ErrInvalid
 	}
 	entry := path.Base(name)
@@ -30,10 +33,11 @@ func EditComposite(name string, body []byte, replace func(string) (string, error
 	case strings.HasSuffix(name, ".xml"):
 		xmlBody = body
 	case strings.HasSuffix(name, ".xml.xz"):
-		r, err := xzfile.NewReader(bytes.NewReader(body), MaxMetadata+1)
+		r, err := xzfile.NewReader(ctx, bytes.NewReader(body), MaxMetadata+1)
 		if err != nil {
 			return nil, ErrInvalid
 		}
+		defer func() { _ = r.Close() }()
 		xmlBody, err = io.ReadAll(io.LimitReader(r, MaxMetadata+1))
 		if err != nil || len(xmlBody) > MaxMetadata {
 			return nil, ErrInvalid
@@ -152,7 +156,7 @@ func EditComposite(name string, body []byte, replace func(string) (string, error
 		}
 	}
 	if writer.Close() != nil || packed.Len() > MaxMetadata ||
-		Validate(name, bytes.NewReader(packed.Bytes()), int64(packed.Len())) != nil {
+		Validate(ctx, name, bytes.NewReader(packed.Bytes()), int64(packed.Len())) != nil {
 		return nil, ErrInvalid
 	}
 	return packed.Bytes(), nil

@@ -2,6 +2,7 @@ package nix
 
 import (
 	"archive/tar"
+	"context"
 	"errors"
 	"io"
 	"regexp"
@@ -87,16 +88,18 @@ func IsChannelPath(path string) bool {
 // else, is refused. The tarball must have an entry,
 // stay within MaxChannelBytes expanded, and size must be 1 to
 // MaxArchiveBytes; its block headers may name no dictionary above
-// xzfile.MaxDict. Every refusal is ErrInvalid.
-func ReadChannel(input io.Reader, size int64) error {
+// xzfile.MaxDict. Every refusal is ErrInvalid. ctx ends a wait for the xz
+// dictionary budget, which is then a refusal too.
+func ReadChannel(ctx context.Context, input io.Reader, size int64) error {
 	if size <= 0 || size > MaxArchiveBytes {
 		return ErrInvalid
 	}
 	compressed := &io.LimitedReader{R: input, N: size + 1}
-	r, err := xzfile.NewReader(compressed, MaxChannelBytes+1)
+	r, err := xzfile.NewReader(ctx, compressed, MaxChannelBytes+1)
 	if err != nil {
 		return ErrInvalid
 	}
+	defer func() { _ = r.Close() }()
 	expanded := &io.LimitedReader{R: r, N: MaxChannelBytes + 1}
 	archive := tar.NewReader(expanded)
 	entries := 0

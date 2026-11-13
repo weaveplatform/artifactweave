@@ -485,6 +485,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		accesshttp.PlusAsSpace,
 		artifactshttp.IdempotencyRoutes,
 		accesshttp.APIRecoveryContext,
+		xzRequests,
 	)
 	limits := newLimitOptions(cfg.RequestLimits)
 	limiter := requestLimiter{cfg: cfg}
