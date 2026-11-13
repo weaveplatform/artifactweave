@@ -7397,6 +7397,12 @@ type GetRepositoriesByTypeAndProjectParams struct {
 
 	// Project Optional query parameter. Project key; only repositories assigned to that project are listed.
 	Project *string `form:"project,omitempty" json:"project,omitempty"`
+
+	// Limit Optional query parameter. Page size, from 1 to 1000. With it the answer holds at most limit repositories from offset on, and carries X-Total-Count, X-Result-Offset and X-Result-Limit. Without it the whole filtered list is returned and those headers are not sent. A value outside 1 to 1000 answers 400.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Optional query parameter. Zero-based index into the filtered list of the first repository to return; 0 when omitted. It needs limit, and a negative value answers 400. An offset past the end gives an empty page.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
 // GetRepositoriesByTypeAndProjectParamsType defines parameters for GetRepositoriesByTypeAndProject.
@@ -10720,7 +10726,7 @@ type ClientInterface interface {
 
 	// CalculateNuGetRepositoryMetadata performs a POST /api/nuget/{repoKey}/reindex (the `CalculateNuGetRepositoryMetadata` operationId) request.
 	//
-	// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing remote repositories, remote caches and virtual repositories is not implemented and answers 501.
+	// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository, or from the verified cached packages of a remote repository, named by its key or its cache's. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing virtual repositories is not implemented and answers 501.
 	CalculateNuGetRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateOpkgRepositoryMetadata performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
@@ -10891,7 +10897,7 @@ type ClientInterface interface {
 
 	// GetRepositoriesByTypeAndProject List repositories
 	//
-	// Returns minimal details for every repository the caller may see, optionally filtered by class, package type and project. Admins, and tokens scoped artifact:*:r or system:info:r, see every repository; other callers see the repositories they can read. The type value is lower case here but upper case in the response. Remote caches are never listed.
+	// Returns minimal details for every repository the caller may see, optionally filtered by class, package type and project. Admins, and tokens scoped artifact:*:r or system:info:r, see every repository; other callers see the repositories they can read. The type value is lower case here but upper case in the response. Remote caches are never listed. The list is ordered by key. limit and offset page it; without limit the whole list comes back with no paging headers.
 	//
 	// Corresponds with GET /api/repositories (the `GetRepositoriesByTypeAndProject` operationId).
 	GetRepositoriesByTypeAndProject(ctx context.Context, params *GetRepositoriesByTypeAndProjectParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -15725,7 +15731,7 @@ func (c *Client) CalculateNpmRepositoryMetadata(ctx context.Context, repoKey str
 
 // CalculateNuGetRepositoryMetadata performs a POST /api/nuget/{repoKey}/reindex (the `CalculateNuGetRepositoryMetadata` operationId) request.
 //
-// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing remote repositories, remote caches and virtual repositories is not implemented and answers 501.
+// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository, or from the verified cached packages of a remote repository, named by its key or its cache's. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing virtual repositories is not implemented and answers 501.
 func (c *Client) CalculateNuGetRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateNuGetRepositoryMetadataRequest(c.Server, repoKey)
 	if err != nil {
@@ -16186,7 +16192,7 @@ func (c *Client) SetRepositoryReplicationConfiguration(ctx context.Context, repo
 
 // GetRepositoriesByTypeAndProject List repositories
 //
-// Returns minimal details for every repository the caller may see, optionally filtered by class, package type and project. Admins, and tokens scoped artifact:*:r or system:info:r, see every repository; other callers see the repositories they can read. The type value is lower case here but upper case in the response. Remote caches are never listed.
+// Returns minimal details for every repository the caller may see, optionally filtered by class, package type and project. Admins, and tokens scoped artifact:*:r or system:info:r, see every repository; other callers see the repositories they can read. The type value is lower case here but upper case in the response. Remote caches are never listed. The list is ordered by key. limit and offset page it; without limit the whole list comes back with no paging headers.
 //
 // Corresponds with GET /api/repositories (the `GetRepositoriesByTypeAndProject` operationId).
 func (c *Client) GetRepositoriesByTypeAndProject(ctx context.Context, params *GetRepositoriesByTypeAndProjectParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -28050,6 +28056,30 @@ func NewGetRepositoriesByTypeAndProjectRequest(server string, params *GetReposit
 
 		}
 
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -38030,7 +38060,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateNuGetRepositoryMetadataWithResponse performs a POST /api/nuget/{repoKey}/reindex (the `CalculateNuGetRepositoryMetadata` operationId) request.
 	//
-	// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing remote repositories, remote caches and virtual repositories is not implemented and answers 501.
+	// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository, or from the verified cached packages of a remote repository, named by its key or its cache's. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing virtual repositories is not implemented and answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateNuGetRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateNuGetRepositoryMetadataResponse, error)
@@ -38247,7 +38277,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetRepositoriesByTypeAndProjectWithResponse List repositories
 	//
-	// Returns minimal details for every repository the caller may see, optionally filtered by class, package type and project. Admins, and tokens scoped artifact:*:r or system:info:r, see every repository; other callers see the repositories they can read. The type value is lower case here but upper case in the response. Remote caches are never listed.
+	// Returns minimal details for every repository the caller may see, optionally filtered by class, package type and project. Admins, and tokens scoped artifact:*:r or system:info:r, see every repository; other callers see the repositories they can read. The type value is lower case here but upper case in the response. Remote caches are never listed. The list is ordered by key. limit and offset page it; without limit the whole list comes back with no paging headers.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -50534,6 +50564,13 @@ func (r SetRepositoryReplicationConfigurationResponse) ContentType() string {
 	return ""
 }
 
+// GetRepositoriesByTypeAndProjectResponse200Headers the declared response headers of an HTTP 200 response for GetRepositoriesByTypeAndProject
+type GetRepositoriesByTypeAndProjectResponse200Headers struct {
+	XResultLimit  *int
+	XResultOffset *int
+	XTotalCount   *int
+}
+
 type GetRepositoriesByTypeAndProjectResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -50571,12 +50608,16 @@ type GetRepositoriesByTypeAndProjectResponse struct {
 		// Url Required within this object. Absolute URL of the repository root on this server, built from the resolved base URL.
 		Url string `json:"url"`
 	}
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetRepositoriesByTypeAndProjectResponse200Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -50617,6 +50658,11 @@ func (r GetRepositoriesByTypeAndProjectResponse) GetApplicationvndOrgJfrogArtifa
 	Url string `json:"url"`
 } {
 	return r.ApplicationvndOrgJfrogArtifactoryRepositoriesRepositoryDetailsListJSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetRepositoriesByTypeAndProjectResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -65115,7 +65161,7 @@ func (c *ClientWithResponses) CalculateNpmRepositoryMetadataWithResponse(ctx con
 
 // CalculateNuGetRepositoryMetadataWithResponse performs a POST /api/nuget/{repoKey}/reindex (the `CalculateNuGetRepositoryMetadata` operationId) request.
 //
-// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing remote repositories, remote caches and virtual repositories is not implemented and answers 501.
+// Queues a rebuild of package metadata from the packages in a local or federated NuGet repository, or from the verified cached packages of a remote repository, named by its key or its cache's. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing virtual repositories is not implemented and answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateNuGetRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateNuGetRepositoryMetadataResponse, error) {
@@ -65506,7 +65552,7 @@ func (c *ClientWithResponses) SetRepositoryReplicationConfigurationWithResponse(
 
 // GetRepositoriesByTypeAndProjectWithResponse List repositories
 //
-// Returns minimal details for every repository the caller may see, optionally filtered by class, package type and project. Admins, and tokens scoped artifact:*:r or system:info:r, see every repository; other callers see the repositories they can read. The type value is lower case here but upper case in the response. Remote caches are never listed.
+// Returns minimal details for every repository the caller may see, optionally filtered by class, package type and project. Admins, and tokens scoped artifact:*:r or system:info:r, see every repository; other callers see the repositories they can read. The type value is lower case here but upper case in the response. Remote caches are never listed. The list is ordered by key. limit and offset page it; without limit the whole list comes back with no paging headers.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -77103,6 +77149,13 @@ func ParseGetRepositoriesByTypeAndProjectResponse(rsp *http.Response) (*GetRepos
 		}
 		response.ApplicationvndOrgJfrogArtifactoryRepositoriesRepositoryDetailsListJSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -77124,6 +77177,33 @@ func ParseGetRepositoriesByTypeAndProjectResponse(rsp *http.Response) (*GetRepos
 		}
 		response.JSON500 = &dest
 
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetRepositoriesByTypeAndProjectResponse200Headers
+		if values := rsp.Header.Values("X-Result-Limit"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Result-Limit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XResultLimit = &value
+		}
+		if values := rsp.Header.Values("X-Result-Offset"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Result-Offset", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XResultOffset = &value
+		}
+		if values := rsp.Header.Values("X-Total-Count"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Total-Count", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XTotalCount = &value
+		}
+		response.Headers200 = &headers
 	}
 
 	return response, nil

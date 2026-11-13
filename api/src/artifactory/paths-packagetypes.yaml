@@ -1,6 +1,6 @@
-# Package-type specific operations (P1). In-scope ecosystems (Docker, npm, Maven, PyPI,
-# NuGet, Helm, Terraform, Go) are described in full; the others carry x-tier: stub and
-# answer 501. Facts come from the oracle (docs/research/01), prose is ours.
+# Package-type specific operations (P1). The operations artifactweave serves are described
+# in full; those it does not serve yet carry x-tier: stub and answer 501. Facts come from
+# the oracle (docs/research/01), prose is ours.
 paths:
   /api/alpine/{repoKey}/reindex:
     post:
@@ -243,7 +243,7 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateconanrepositorymetadata.md
-      x-tier: stub
+      x-tier: implemented
   /api/conda/{repoKey}/reindex:
     post:
       description: Rebuilds the channel indexes of a local or federated Conda repository from its stored package
@@ -298,7 +298,7 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecondarepositorymetadata.md
-      x-tier: stub
+      x-tier: implemented
   /api/cran/reindex/{repoKey}:
     post:
       description: Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives.
@@ -353,7 +353,7 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecranrepositorymetadata.md
-      x-tier: stub
+      x-tier: implemented
   /api/cran/{repoKey}/move-archives:
     get:
       description: >-
@@ -634,7 +634,7 @@ paths:
       tags:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createdebiansnapshot.md
-      x-tier: stub
+      x-tier: implemented
   /api/docker/{repoKey}/v2/delete:
     delete:
       description: Deletes a tag of a Docker, OCI or Helm OCI image, including a multi-architecture tag. The
@@ -1262,9 +1262,10 @@ paths:
   /api/nuget/{repoKey}/reindex:
     post:
       description: Queues a rebuild of package metadata from the packages in a local or federated NuGet
-        repository. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once
+        repository, or from the verified cached packages of a remote repository, named by its key or its
+        cache's. Requires Manage on the repository. Returns 200 with a plain-text acknowledgement once
         queued, without waiting for the rebuild. A different package type is rejected with 400. Reindexing
-        remote repositories, remote caches and virtual repositories is not implemented and answers 501.
+        virtual repositories is not implemented and answers 501.
       operationId: calculateNuGetRepositoryMetadata
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package

@@ -510,7 +510,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 		s.listFolder(w, r, st, c, f, acc)
 		return
 	}
-	s.ServeFile(w, r, st, f, p)
+	s.ServeItemFile(w, r, st, f, p)
 }
 
 // matchesMatrix applies download matrix parameters (model.Matrix.Matches).
@@ -564,7 +564,7 @@ func (s *Kit) getSidecar(
 			"Checksum not found for "+f.Item.FullPath()))
 		return
 	}
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Type", checksumType(r, p))
 	w.Header().Set("Last-Modified", f.Item.Modified.UTC().Format(http.TimeFormat))
 	w.WriteHeader(http.StatusOK)
 	if r.Method != http.MethodHead {
@@ -572,16 +572,94 @@ func (s *Kit) getSidecar(
 	}
 }
 
-// ServeFile streams a file's content with the headers the JFrog CLI reads
-// (Content-Length, Accept-Ranges and the X-Checksum headers); ranges on a
-// GET and conditional requests are http.ServeContent's. A Content-Disposition
-// already in w's headers is kept, so a protocol can send its own form.
+// contentTypeProperty is the property whose first value, when not blank,
+// is the Content-Type a file downloads with (7.x's CONTENT_TYPE_PROP_KEY,
+// RTFACT-4653).
+const contentTypeProperty = "artifactory.content-type"
+
+// fileContentType is the Content-Type a file downloads with on the item
+// route, GET and HEAD: its contentTypeProperty value, as 7.x's
+// DbStoringRepoMixin.setMimeType puts it on the resource its download
+// answers from, otherwise the type recorded from its path. 7.x's storage
+// info, deploy answer, archive entries and signed URLs type a file by its
+// path alone, and so do this server's.
+func fileContentType(ctx context.Context, st Store, it model.Item) (string, error) {
+	props, err := st.Items().Properties(ctx, it.ID)
+	if errors.Is(err, kernel.ErrNotFound) {
+		// A file served without an item of its own, such as a remote
+		// file a format route describes from its cache, has no properties.
+		return it.MimeType, nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("properties of %s: %w", it.FullPath(), err)
+	}
+	if values := props[contentTypeProperty]; len(values) > 0 && strings.TrimSpace(values[0]) != "" {
+		return values[0], nil
+	}
+	return it.MimeType, nil
+}
+
+// checksumType is the Content-Type of the checksum file at name: the MIME
+// table's type of its path on a GET, which 7.x's sendBodyResponseForChecksum
+// sends, application/x-checksum for .sha1, .sha256 and .md5 and the
+// table's default for .sha512, which 7.x has no row for; and
+// application/x-checksum on a HEAD, ChecksumResource's type, for all four
+// [I for .sha512, which 7.x does not generate].
+func checksumType(r *http.Request, name string) string {
+	if r.Method == http.MethodHead {
+		return "application/x-checksum"
+	}
+	return item.MimeType(name)
+}
+
+// ServeFile streams a file's content, typed by its path, with the headers
+// the JFrog CLI reads (Content-Length, Accept-Ranges and the X-Checksum
+// headers); ranges on a GET and conditional requests are
+// http.ServeContent's. A Content-Disposition already in w's headers is
+// kept, so a protocol can send its own form. The native APIs and the
+// Docker registry serve their files with it.
 func (s *Kit) ServeFile(
 	w http.ResponseWriter,
 	r *http.Request,
 	st Store,
 	f Found,
 	p kernel.Principal,
+) {
+	s.serveFile(w, r, st, f, p, f.Item.MimeType)
+}
+
+// ServeItemFile is ServeFile for a download on the item route,
+// /artifactory/<repo>/<path>, for every package type and repository
+// class: the file is typed by its artifactory.content-type property when
+// that is set (fileContentType). 7.x answers that route through
+// RepoFilter and DownloadServiceImpl.process, which take the type from the
+// resource the repository's getInfo returns, typed by the property in
+// DbStoringRepoMixin.setMimeType for a local or cache repository of any
+// package type, and send it on a GET and a HEAD (RequestResponseHelper).
+// The native APIs and the Docker registry keep ServeFile's type: their
+// 7.x code is not in the OSS sources, and JFrog's docs do not name them.
+func (s *Kit) ServeItemFile(
+	w http.ResponseWriter,
+	r *http.Request,
+	st Store,
+	f Found,
+	p kernel.Principal,
+) {
+	contentType, err := fileContentType(r.Context(), st, f.Item)
+	if err != nil {
+		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "item properties", err))
+		return
+	}
+	s.serveFile(w, r, st, f, p, contentType)
+}
+
+func (s *Kit) serveFile(
+	w http.ResponseWriter,
+	r *http.Request,
+	st Store,
+	f Found,
+	p kernel.Principal,
+	contentType string,
 ) {
 	ctx := r.Context()
 	it := f.Item
@@ -594,7 +672,7 @@ func (s *Kit) ServeFile(
 	h := w.Header()
 	pkgroute.SetChecksums(h, it.Actual)
 	h.Set("X-Artifactory-Filename", it.Name)
-	h.Set("Content-Type", it.MimeType)
+	h.Set("Content-Type", contentType)
 	if h.Get("Content-Disposition") == "" {
 		h.Set("Content-Disposition", blob.Disposition(it.Name))
 	}

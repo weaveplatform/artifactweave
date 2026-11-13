@@ -21,7 +21,7 @@ var reindexMatrixPart = matrixPart{
 			deb       = "/artifactory/api/deb/reindex/"
 		)
 		manages := func(key string) rule { return holds(key, "", api.ActionManage) }
-		return []matrixRow{
+		rows := []matrixRow{
 			row(reindexPyPI, pypi+"reindex-pypi/reindex", "", manages("reindex-pypi"), 200),
 			row(reindexPyPI, pypi+"reindex-pypi/reindex?async=true", "",
 				manages("reindex-pypi"), 200),
@@ -33,6 +33,10 @@ var reindexMatrixPart = matrixPart{
 			row(reindexYum, yum+"reindex-rpm", "", manages("reindex-rpm"), 200),
 			row(reindexDebian, deb+"reindex-debian", "", manages("reindex-debian"), 200),
 		}
+		for _, r := range formatReindexes {
+			rows = append(rows, row(r.route, r.path(r.key()), "", manages(r.key()), 200))
+		}
+		return rows
 	},
 	seed: func(t *testing.T, f *matrixFixture) {
 		t.Helper()

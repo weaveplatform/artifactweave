@@ -95,9 +95,12 @@ func TestAccOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
 					}
 				})
 			}
+			// A query is kept for the source boundary, which passes it on
+			// only under Propagate Query Params (#1350).
 			q.Resource.Query = "download=1"
-			if _, err := itemkit.OpkgSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
-				t.Errorf("metadata query accepted: %v", err)
+			if got, err := itemkit.OpkgSourceRequest(q); err != nil ||
+				got.Resource.Query != "download=1" || got.Resource.ValidateMetadata == nil {
+				t.Errorf("metadata query: %+v, %v; want it kept", got.Resource, err)
 			}
 		})
 	}
@@ -121,8 +124,9 @@ func TestAccOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
 		t.Fatal("corrupt IPK accepted")
 	}
 	q.Resource.Query = "download=1"
-	if _, err := itemkit.OpkgSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
-		t.Errorf("package query accepted: %v", err)
+	if got, err := itemkit.OpkgSourceRequest(q); err != nil ||
+		got.Resource.Query != "download=1" || got.Resource.Validate == nil {
+		t.Errorf("package query: %+v, %v; want it kept", got.Resource, err)
 	}
 	if _, err := itemkit.OpkgSourceRequest(
 		source.Request{Resource: source.Resource{Path: "../wrong.ipk"}},
@@ -249,7 +253,7 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 		{"/artifactory/opkg-empty/feed/Packages.gz", "admin", http.StatusOK},
 		{"/artifactory/opkg-empty/feed/Release", "admin", http.StatusOK},
 		{"/artifactory/opkg-empty/feed/Packages.sig", "admin", http.StatusNotFound},
-		{"/artifactory/opkg-empty/feed/Packages?download=1", "admin", http.StatusNotFound},
+		{"/artifactory/opkg-empty/feed/Packages?download=1", "admin", http.StatusOK},
 		{"/artifactory/opkg-empty/feed/Packages", "user", http.StatusForbidden},
 		{"/artifactory/opkg-empty/feed/alpha_1.0_all.ipk", "admin", http.StatusNotFound},
 		{"/artifactory/opkg-empty/feed/alpha_1.0_all.ipk?download=1", "admin", http.StatusNotFound},
@@ -731,23 +735,24 @@ func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 	if packageReads != 1 {
 		t.Fatalf("package read count %d, want 1", packageReads)
 	}
+	// A query is served as the path alone is (#1350).
 	if res := w.do(
 		http.MethodGet,
 		url+"?download=1",
 		"admin",
 		"",
-	); res.Code != http.StatusNotFound {
-		t.Errorf("package query was accepted: %d", res.Code)
+	); res.Code != http.StatusOK || !bytes.Equal(res.Body.Bytes(), ipk) || used != 2 {
+		t.Errorf("package query: status=%d used=%d, want 200 and the IPK", res.Code, used)
 	}
 	if res := w.do(http.MethodGet, url, "user", ""); res.Code != http.StatusForbidden {
 		t.Errorf("unreadable remote IPK was exposed: %d", res.Code)
 	}
 	mode = "outage"
-	if res := w.do(http.MethodGet, url, "admin", ""); res.Code == http.StatusOK || used != 1 {
+	if res := w.do(http.MethodGet, url, "admin", ""); res.Code == http.StatusOK || used != 2 {
 		t.Errorf("upstream outage published success: status=%d used=%d", res.Code, used)
 	}
 	mode = "revoked"
-	if res := w.do(http.MethodGet, url, "admin", ""); res.Code == http.StatusOK || used != 1 {
+	if res := w.do(http.MethodGet, url, "admin", ""); res.Code == http.StatusOK || used != 2 {
 		t.Errorf("revoked upstream authority published success: status=%d used=%d", res.Code, used)
 	}
 	mode = "cached"
@@ -759,12 +764,12 @@ func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 		Size:    want.Size,
 		Actual:  kernel.Checksums{SHA256: strings.Repeat("0", 64)},
 	}
-	if res := w.do(http.MethodGet, url, "admin", ""); res.Code == http.StatusOK || used != 1 {
+	if res := w.do(http.MethodGet, url, "admin", ""); res.Code == http.StatusOK || used != 2 {
 		t.Errorf("wrong cached SHA published success: status=%d used=%d", res.Code, used)
 	}
 	cached.Actual.SHA256 = want.SHA256
 	cached.Size--
-	if res := w.do(http.MethodGet, url, "admin", ""); res.Code == http.StatusOK || used != 1 {
+	if res := w.do(http.MethodGet, url, "admin", ""); res.Code == http.StatusOK || used != 2 {
 		t.Errorf("wrong cached size published success: status=%d used=%d", res.Code, used)
 	}
 	p := kernel.Principal{Name: "admin", Admin: true}

@@ -554,11 +554,19 @@ func TestUnitCRANIndexVariantsAndVirtualPackageRoutes(t *testing.T) {
 	wantStatus(t, w.do(http.MethodGet,
 		"/artifactory/libs-local/src/contrib/PACKAGES", "admin", ""),
 		http.StatusNotFound)
+	// A query, and a matrix parameter the composed index may lack, are taken
+	// as any file's GET takes them (#1350); a mandatory key it lacks is not
+	// found.
 	for _, path := range []string{
-		"/artifactory/cran-index-view/src/contrib/PACKAGES.rds",
 		"/artifactory/cran-index-view/src/contrib/PACKAGES?unexpected=1",
 		"/artifactory/cran-index-view/src/contrib/PACKAGES;tag=x",
 		"/artifactory/cran-index-view/src/contrib/assertthat_0.2.1.tar.gz?unexpected=1",
+	} {
+		wantStatus(t, w.do(http.MethodGet, path, "admin", ""), http.StatusOK)
+	}
+	for _, path := range []string{
+		"/artifactory/cran-index-view/src/contrib/PACKAGES.rds",
+		"/artifactory/cran-index-view/src/contrib/PACKAGES;tag+=x",
 		"/artifactory/cran-index-view/src/contrib/absent_1.0.tar.gz",
 	} {
 		got := w.do(http.MethodGet, path, "admin", "")

@@ -106,13 +106,16 @@ func TestUnitCRANSourceClassifiesCompressedIndexAndWindowsBinary(t *testing.T) {
 			}
 		})
 	}
+	// A query is kept for the source boundary, which passes it on only
+	// under Propagate Query Params (#1350).
 	for _, path := range []string{
 		"src/contrib/PACKAGES.gz", "bin/windows/contrib/4.5/assertthat_0.2.1.zip",
 	} {
-		if _, err := itemkit.CranSourceRequest(source.Request{Resource: source.Resource{
+		q, err := itemkit.CranSourceRequest(source.Request{Resource: source.Resource{
 			Path: path, Query: "bypass=1", Method: http.MethodGet,
-		}}); !errors.Is(err, source.ErrInvalidRequest) {
-			t.Fatalf("query on CRAN path %q admitted: %v", path, err)
+		}})
+		if err != nil || q.Resource.Query != "bypass=1" || q.Resource.Variant == "" {
+			t.Fatalf("query on CRAN path %q: %+v, %v; want it kept", path, q.Resource, err)
 		}
 	}
 }

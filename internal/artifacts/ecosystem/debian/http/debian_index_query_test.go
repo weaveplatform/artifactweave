@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // The bytes a remote member's upstream and a local member serve for the
@@ -43,17 +43,23 @@ func (w *itemWorld) withProperties(it model.Item, props model.Properties) {
 // repository's package or Sources index from a local member, and a remote
 // member's cached package answer 500 when a matrix parameter asks for the
 // file's properties and they cannot be read, rather than serving a file the
-// parameters may not match. Without a matrix parameter nothing reads them,
-// so the same requests serve the file.
+// parameters may not match. Without a matrix parameter nothing reads an
+// index's properties, so an index is served; a package's download reads
+// them for its artifactory.content-type (#1380), as 7.x's getInfo reads
+// the properties of every file it downloads, so it answers 500 too.
 func TestUnitDebianIndexMatrixFailsClosed(t *testing.T) {
 	index := packagesIndex("alpha 1.0 " + debAlpha)
 	for _, tc := range []struct {
 		name, key, path string
+		plain           int // the answer without a matrix parameter
 	}{
-		{"local index", "deb-local", debPackages},
-		{"virtual package from a local member", "deb-virtual", debAlpha},
-		{"virtual Sources from a local member", "deb-virtual", debSources},
-		{"virtual package cached by a remote member", "deb-cached", debAlpha},
+		{"local index", "deb-local", debPackages, http.StatusOK},
+		{"virtual package from a local member", "deb-virtual", debAlpha, http.StatusInternalServerError},
+		{"virtual Sources from a local member", "deb-virtual", debSources, http.StatusOK},
+		{
+			"virtual package cached by a remote member", "deb-cached", debAlpha,
+			http.StatusInternalServerError,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var w *overlayWorld
@@ -77,8 +83,13 @@ func TestUnitDebianIndexMatrixFailsClosed(t *testing.T) {
 			w.put("deb-local", debAlpha, false, localDeb)
 			w.put("deb-local", debSources, false, sourcesIndex("1.0-1"))
 			w.put("deb-remote", debAlpha, true, remoteDeb)
-			if rec := w.get(tc.key, tc.path, "admin"); rec.Code != http.StatusOK {
-				t.Fatalf("without a matrix parameter answered %d %s, want 200", rec.Code, rec.Body)
+			if rec := w.get(tc.key, tc.path, "admin"); rec.Code != tc.plain {
+				t.Fatalf(
+					"without a matrix parameter answered %d %s, want %d",
+					rec.Code,
+					rec.Body,
+					tc.plain,
+				)
 			}
 			wantError(t, w.get(tc.key, tc.path+";x=1", "admin"),
 				http.StatusInternalServerError, "internal error")
@@ -89,38 +100,58 @@ func TestUnitDebianIndexMatrixFailsClosed(t *testing.T) {
 // TestAccDebianVirtualPassesOverAMemberTheMatrixDoesNotMatch: a virtual
 // repository asks its members in order for a package, and a member whose
 // file the matrix parameters do not match is passed over for the next, as
-// one that lacks the file is [I]. A remote member's stream carries no
-// properties, so only a mandatory key passes over it; its cached file is
-// matched by the properties it carries.
+// one that lacks the file is [I]. A remote member matches only the copy its
+// cache held before the request, without asking its upstream (7.x's
+// RemoteRepoBase.internalGetInfo, 7.161.26). Without one it asks the
+// upstream with the parameters and serves its answer, a stream or the copy
+// it stores, unmatched, as 7.x's downloadAndSave does (#1351, #1371).
 func TestAccDebianVirtualPassesOverAMemberTheMatrixDoesNotMatch(t *testing.T) {
 	for _, tc := range []struct {
 		name, matrix string
-		cached       model.Properties // nil streams the package, not cached
+		stored       bool             // the upstream's answer is stored, not streamed
+		cached       model.Properties // non-nil: a copy cached before the request
 		want         []byte
+		asked        string // the matrix parameters the upstream got; "" not asked
 	}{
-		{"stream, a key it may lack", ";x=1", nil, remoteDeb},
-		{"stream, a mandatory key", ";x+=1", nil, localDeb},
-		{"stream, a mandatory key no member carries", ";x+=2", nil, nil},
-		{"cached file without the key", ";x=1", model.Properties{}, remoteDeb},
-		{"cached file without a mandatory key", ";x+=1", model.Properties{}, localDeb},
-		{"cached file with another value", ";x=1", model.Properties{"x": {"2"}}, localDeb},
-		{"cached file with the value", ";x+=2", model.Properties{"x": {"2"}}, remoteDeb},
+		{"stream, a key it may lack", ";x=1", false, nil, remoteDeb, ";x=1"},
+		{"stream, a mandatory key", ";x+=1", false, nil, remoteDeb, ";x%2B=1"},
+		{"stream, a mandatory key no member carries", ";x+=2", false, nil, remoteDeb, ";x%2B=2"},
+		{"stored on fetch, a mandatory key", ";x+=2", true, nil, remoteDeb, ";x%2B=2"},
+		{"cached copy without the key", ";x=1", false, model.Properties{}, remoteDeb, ";x=1"},
+		{"cached copy without a mandatory key", ";x+=1", false, model.Properties{}, localDeb, ""},
+		{"cached copy with another value", ";x=1", false, model.Properties{"x": {"2"}}, localDeb, ""},
+		{
+			"cached copy with the value", ";x+=2", false,
+			model.Properties{"x": {"2"}},
+			remoteDeb,
+			";x%2B=2",
+		},
+		{
+			"cached copy, a mandatory key no member carries", ";y+=1", false,
+			model.Properties{},
+			nil, "",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var w *overlayWorld
-			read := streamed(remoteDeb, nil)
-			if tc.cached != nil {
-				read = func() (source.Result, error) {
-					it := w.put("deb-remote", debAlpha, true, remoteDeb)
-					if len(tc.cached) != 0 {
-						w.withProperties(it, tc.cached)
+			var cached model.Item
+			asked := ""
+			w = newOverlayWorld(t, withSources(
+				func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+					if q.Resource.Path != debAlpha {
+						return source.Result{}, kernel.ErrNotFound
 					}
-					return source.Result{Item: &it}, nil
-				}
-			}
-			w = newOverlayWorld(t, withSources(upstream(
-				map[string]func() (source.Result, error){debAlpha: read},
-			)))
+					asked = q.MatrixParams
+					switch {
+					case tc.cached != nil:
+						return source.Result{Item: &cached}, nil
+					case tc.stored:
+						it := w.put("deb-remote", debAlpha, true, remoteDeb)
+						return source.Result{Item: &it}, nil
+					}
+					return streamed(remoteDeb, nil)()
+				},
+			))
 			w.debRepos(
 				repo.Config{Key: "deb-remote", Class: repo.Remote},
 				repo.Config{Key: "deb-local", Class: repo.Local},
@@ -129,9 +160,18 @@ func TestAccDebianVirtualPassesOverAMemberTheMatrixDoesNotMatch(t *testing.T) {
 					Repositories: []string{"deb-remote", "deb-local"},
 				},
 			)
+			if tc.cached != nil {
+				cached = w.put("deb-remote", debAlpha, true, remoteDeb)
+				if len(tc.cached) != 0 {
+					w.withProperties(cached, tc.cached)
+				}
+			}
 			w.withProperties(w.put("deb-local", debAlpha, false, localDeb),
 				model.Properties{"x": {"1"}})
 			rec := w.get("deb-virtual", debAlpha+tc.matrix, "admin")
+			if asked != tc.asked {
+				t.Errorf("upstream asked with %q, want %q", asked, tc.asked)
+			}
 			if tc.want == nil {
 				wantError(t, rec, http.StatusNotFound, "Could not find resource")
 				return
@@ -145,25 +185,35 @@ func TestAccDebianVirtualPassesOverAMemberTheMatrixDoesNotMatch(t *testing.T) {
 
 // TestAccDebianVirtualSourcesWithAQueryOrMatrixParameters: a virtual
 // repository's Sources index comes from the first member that serves it.
-// A remote member serves its index for a query as it does without one
-// (#1349), so it still answers first. It refuses a matrix parameter, so the
-// virtual passes over it without asking its upstream, and a local member's
-// index is matched by the properties it carries.
+// A remote member serves its index for a query (#1349) and for matrix
+// parameters (#1371) as it does without them, asking its upstream with
+// them, so it still answers first. A copy its cache holds is matched
+// first, and a member whose copy does not match is passed over without
+// asking its upstream, for a local member's index matched by the
+// properties it carries.
 func TestAccDebianVirtualSourcesWithAQueryOrMatrixParameters(t *testing.T) {
 	for _, tc := range []struct {
 		name, suffix string
+		cached       bool // the remote member's cache holds a copy without properties
 		want         []byte
+		query        string // what the upstream got; "-" not asked
+		matrix       string
 	}{
-		{"no parameter", "", sourcesIndex("2.0-1")},
-		{"query", "?skipUpdateStats=true", sourcesIndex("2.0-1")},
-		{"matrix parameter it matches", ";x=1", sourcesIndex("1.0-1")},
-		{"matrix parameter it does not match", ";x=2", nil},
+		{"no parameter", "", false, sourcesIndex("2.0-1"), "", ""},
+		{"query", "?skipUpdateStats=true&a=1", false, sourcesIndex("2.0-1"), "a=1", ""},
+		{"matrix parameter", ";x=1", false, sourcesIndex("2.0-1"), "", ";x=1"},
+		{"mandatory matrix parameter", ";x+=2", false, sourcesIndex("2.0-1"), "", ";x%2B=2"},
+		{
+			"cached copy, a mandatory key the local index carries", ";x+=1", true,
+			sourcesIndex("1.0-1"), "-", "-",
+		},
+		{"cached copy, a mandatory key no member carries", ";x+=2", true, nil, "-", "-"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			asked := false
+			query, matrix := "-", "-"
 			w := newOverlayWorld(t, withSources(
-				func(context.Context, source.Request, source.Permit) (source.Result, error) {
-					asked = true
+				func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+					query, matrix = q.Resource.Query, q.MatrixParams
 					return streamed(sourcesIndex("2.0-1"), nil)()
 				},
 			))
@@ -175,12 +225,15 @@ func TestAccDebianVirtualSourcesWithAQueryOrMatrixParameters(t *testing.T) {
 					Repositories: []string{"deb-remote", "deb-local"},
 				},
 			)
+			if tc.cached {
+				w.put("deb-remote", debSources, true, sourcesIndex("2.0-1"))
+			}
 			w.withProperties(w.put("deb-local", debSources, false, sourcesIndex("1.0-1")),
 				model.Properties{"x": {"1"}})
 			rec := w.get("deb-virtual", debSources+tc.suffix, "admin")
-			remote := !strings.HasPrefix(tc.suffix, ";")
-			if asked != remote {
-				t.Errorf("upstream asked %v, want %v", asked, remote)
+			if query != tc.query || matrix != tc.matrix {
+				t.Errorf("upstream asked with query %q, matrix %q; want %q, %q",
+					query, matrix, tc.query, tc.matrix)
 			}
 			if tc.want == nil {
 				wantError(t, rec, http.StatusNotFound, "Could not find resource")

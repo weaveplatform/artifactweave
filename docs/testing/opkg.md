@@ -54,6 +54,16 @@ file, and a member left out of the feed because its patterns reject only the
 feed still serves its IPKs. Direct index reads require Read permission on
 every listed package; the download policy does not filter them.
 
+A GET of a feed file or an IPK takes the query parameters Artifactory documents for any
+file, such as `skipUpdateStats`, and matrix parameters, matched against the
+file's properties as on any other GET, once the caller's read permission is
+settled (#1350). A virtual repository's composed index carries no properties,
+so only a mandatory key (`;key+=value`) refuses it, and a virtual package GET
+passes over a member whose file does not match for the next member that lists
+the package. A remote repository passes the matrix parameters to its upstream
+after the path, and the query only when its Propagate Query Params is set; a
+copy its cache already holds is matched first.
+
 ## Evidence
 
 [`@opkg` acceptance](../../test/acceptance/features/opkg.feature) uses

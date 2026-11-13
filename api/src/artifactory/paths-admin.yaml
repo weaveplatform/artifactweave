@@ -936,9 +936,9 @@ paths:
       x-tier: stub
   /api/v1/service_trust/pairing/{usecase}:
     delete:
-      description: Removes the trust relationship with one peer for the use case and deletes its stored keys. Federations
-        that use the peer stop syncing with it. With `force=true` the local trust is removed even when the peer
-        cannot be told. Administrators only.
+      description: Not implemented; answers 501. It would remove the trust relationship with one peer for the use
+        case and delete its stored keys, so federations that use the peer stop syncing with it. With `force=true`
+        the local trust would be removed even when the peer cannot be told. Administrators only.
       operationId: unregisterPairingToken
       parameters:
       - description: 'Required path parameter. The trust use case: `federated-repo/*` for two-way federated repository
@@ -1004,12 +1004,14 @@ paths:
       - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/unregisterpairingtoken.md
+      x-tier: stub
     post:
-      description: Creates a one-time pairing token for establishing trust with another instance of this server
-        (decision 0021). The token is a signed JWT whose subject is the administrator who requested it; it can be
-        redeemed once and expires 300 seconds after creation. An administrator hands it to the peer, which redeems it
-        with the exchange operation; the two instances then hold each other's keys and authenticate every sync call in
-        both directions. The peer must be another instance of this server. Administrators only.
+      description: 'Not implemented; answers 501. It would create a one-time pairing token for establishing trust
+        with another instance of this server (decision 0021). The token would be a signed JWT whose subject is the
+        administrator who requested it; it could be redeemed once and would expire 300 seconds after creation. An
+        administrator would hand it to the peer, which redeems it with the exchange operation; the two instances
+        would then hold each other''s keys and authenticate every sync call in both directions. The peer must be
+        another instance of this server. Administrators only.'
       operationId: generatePairingToken
       parameters:
       - description: 'Required path parameter. The trust use case: `federated-repo/*` for two-way federated repository
@@ -1054,10 +1056,11 @@ paths:
       - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md
+      x-tier: stub
     put:
-      description: Redeems a pairing token generated on the peer, completing trust between the two instances for
-        the use case. Run it on the instance that did not generate the token, with the same use case. Administrators
-        only.
+      description: Not implemented; answers 501. It would redeem a pairing token generated on the peer, completing
+        trust between the two instances for the use case. It would run on the instance that did not generate the
+        token, with the same use case. Administrators only.
       operationId: exchangePairingToken
       parameters:
       - description: 'Required path parameter. The trust use case: `federated-repo/*` for two-way federated repository
@@ -1119,3 +1122,4 @@ paths:
       - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/exchangepairingtoken.md
+      x-tier: stub

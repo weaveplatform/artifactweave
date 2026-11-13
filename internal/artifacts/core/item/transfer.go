@@ -669,10 +669,12 @@ func (s *Service) land(
 	if err := s.ensureFolders(ctx, t.To, path.Dir(st.dst), t.By, now); err != nil {
 		return model.Item{}, err
 	}
+	// 7.x types a file by its path each time it is asked
+	// (FileResource.getMimeType), so a copy is typed by its new name.
 	it := model.Item{
 		RepoKey: t.To.Repo.Key, Name: st.dst,
 		Size: st.src.Size, Actual: st.src.Actual, Original: st.src.Original,
-		MimeType: st.src.MimeType,
+		MimeType: MimeType(st.dst),
 		Created:  st.src.Created, CreatedBy: st.src.CreatedBy,
 		Modified: st.src.Modified, ModifiedBy: st.src.ModifiedBy,
 		Updated: st.src.Updated,

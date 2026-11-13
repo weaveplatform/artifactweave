@@ -69,7 +69,18 @@
 //     shared cache.
 //   - A server built without a remote source service answers a remote
 //     index or package read 500, a fault of its own, not the upstream's.
-//   - A request with matrix parameters or a query string answers 404.
+//   - An index and a virtual package take a query and matrix parameters as
+//     any other file's GET does, once read permission and the download
+//     policy are settled (#1350): a query, such as skipUpdateStats
+//     (RTFACT-25636), changes nothing, and matrix parameters are matched
+//     against the file's properties (JFrog's guide, Using Properties in
+//     Deployment and Resolution). A virtual repository's composed index
+//     carries none [I], so only a mandatory key refuses it, and a virtual
+//     package's GET passes over a member whose file does not match to the
+//     next member that lists it [I]. A remote's index, and a remote
+//     member's package, match the copy its cache holds before the upstream
+//     is asked, and pass the query, under Propagate Query Params, and the
+//     matrix parameters to the upstream (#1371).
 //   - Statuses and error and log text stay byte-identical.
 //
 // # References
