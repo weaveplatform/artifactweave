@@ -13,7 +13,8 @@
 # hashes. The FrogML wheel's SHA-256 is in the file with its dependencies'.
 FROM python:3.13.18-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
 COPY requirements.txt /tmp/frogml.requirements.txt
-RUN for index in https://pypi.org/simple https://pypi.tuna.tsinghua.edu.cn/simple; do \
+RUN export https_proxy=http://127.0.0.1:9 no_proxy=pypi.tuna.tsinghua.edu.cn \
+ && for index in https://pypi.org/simple https://pypi.tuna.tsinghua.edu.cn/simple; do \
       pip install --no-cache-dir --require-hashes --only-binary=:all: \
         --index-url "$index" -r /tmp/frogml.requirements.txt && break; \
     done \
