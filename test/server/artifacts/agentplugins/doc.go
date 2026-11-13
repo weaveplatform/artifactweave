@@ -28,6 +28,9 @@
 //     search, the storage API and the folder listings show each marketplace
 //     file, with the size and checksums of the bytes its download serves,
 //     to every caller who may read its path, and to no other (issue 1292).
+//   - TestAccAgentPluginMarketplaceFolderIsServedAsAFolder: a folder at a
+//     marketplace name answers as any folder at the item route and 404 at
+//     the API path, and the other files are still stored.
 //
 // # References
 //

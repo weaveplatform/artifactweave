@@ -59,15 +59,22 @@ type AgentPluginItems struct{ *itemkit.Kit }
 // marketplace documents. In a local agent plugins repository, a request for
 // a marketplace name without properties is answered here, as the API path
 // answers it. It answers false, leaving the request to the overlays after
-// it and the generic lookup, for anything else. The generic lookup would
-// serve the stored file too; the overlay keeps both paths on one function,
-// so they cannot answer apart.
+// it and the generic lookup, for anything else, and for a folder that
+// stands at a marketplace name: the format stores no file there, so the
+// generic lookup answers the folder as it answers any folder. The generic
+// lookup would serve the stored file too; the overlay keeps both paths on
+// one function, so they cannot answer apart.
 func TryAgentMarketplaceItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	if c.PackageType != repo.AgentPlugins || c.Class != repo.Local || cached ||
 		req.IsFolder || len(req.Props) != 0 || !agentplugins.IsMarketplace(req.Path) {
+		return false
+	}
+	// A store fault is left to serveAgentMarketplace, which answers it
+	// once the caller's permission has been checked.
+	if it, err := st.Items().Get(r.Context(), c.Key, false, req.Path); err == nil && it.Folder {
 		return false
 	}
 	AgentPluginItems{k}.serveAgentMarketplace(w, r, st, c, req.Path, p, acc, true)
@@ -109,7 +116,9 @@ func (s AgentPluginItems) serveAgentMarketplace(
 	switch {
 	case errors.Is(err, kernel.ErrNotFound) || err == nil && it.Folder:
 		// Without a work queue that runs here nothing has stored the file
-		// yet; a folder at the name holds no marketplace.
+		// yet. A folder at the name holds no marketplace file; the item
+		// route leaves a folder to the generic lookup, and the API path,
+		// which lists no folder, answers it as a missing file.
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	case err != nil:

@@ -36,7 +36,8 @@
 //     /artifactory/api/agentplugins/{repoKey}/{marketplace}.
 //   - TryAgentMarketplaceItem: the overlay that serves a marketplace file at
 //     a local Agent Plugins repository's root, and leaves every other
-//     request to the overlays after it and the generic lookup.
+//     request, a folder standing at a marketplace name included, to the
+//     overlays after it and the generic lookup.
 //
 // # Invariants
 //
@@ -51,8 +52,9 @@
 //     ZIP leave it listed, and refuse only the ZIP's download.
 //   - A download first runs the marketplace work a completed write left
 //     owed, so it never reads a file that lags the write; a file nothing
-//     has stored, or a folder at its name, answers 404. HEAD answers the
-//     headers alone.
+//     has stored answers 404. A folder at a marketplace name answers as
+//     any folder does at the item route, and 404 at the API path, which
+//     lists no folder. HEAD answers the headers alone.
 //   - Only a local Agent Plugins repository has marketplace files; any
 //     other repository, or a cached one, answers 404 at the API path.
 //   - Statuses and error and log text stay byte-identical.
@@ -94,7 +96,8 @@
 // the only overlay, and RegisterAgentMarketplaceRoutes, with fake deciders:
 // the stored file each reader gets at both paths, the file following the
 // index, HEAD, the requests left to the generic lookup, the refusals, a
-// file not stored, and the failures of the store, the caller and the work.
+// file not stored, a folder at a marketplace name, and the failures of the
+// store, the caller and the work.
 // The route suite test/server/artifacts/agentplugins drives the marketplace
 // files through the router, AQL and the storage API, the format's
 // marketplace_test.go and work_test.go cover the files' content and their

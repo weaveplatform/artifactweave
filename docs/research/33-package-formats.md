@@ -264,8 +264,9 @@ the write. The following answers are **[I]**, pending [#216] capture:
   stored; 7.x may write only the files a plugin is listed in.
 - The files carry no property, keep their created date when rewritten,
   are left as they are when their content has not changed, and are not
-  stored over a folder at their name. A client delete of a file queues the
-  rebuild, which stores it again.
+  stored over a folder at their name: the item route answers that folder
+  as any folder, and the `/api/agentplugins/` path answers 404. A client
+  delete of a file queues the rebuild, which stores it again.
 
 **Agent Plugins Standard in [#1255].** A bundle is also indexed by a root
 `plugin.json` that conforms to the [Agent Plugins Standard] 1.0.0: it

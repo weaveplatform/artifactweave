@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 )
 
 // marketplaceNames are the files a local Agent Plugins repository keeps at
@@ -188,6 +189,66 @@ func TestAccAgentPluginMarketplaceFilesAreStoredFiles(t *testing.T) {
 	root := w.storage(t, "user", key+"/", http.StatusOK)
 	if got, _ := json.Marshal(root["children"]); string(got) != `[{"folder":true,"uri":"/alpha"}]` {
 		t.Errorf("user's root lists %s, want alpha alone", got)
+	}
+}
+
+// TestAccAgentPluginMarketplaceFolderIsServedAsAFolder: through the
+// router, a folder that stands at a marketplace name is answered at the
+// item route as any folder is, with its HTML index, while the API path
+// answers it as a missing file. The work stores no file over it and keeps
+// storing the other files.
+func TestAccAgentPluginMarketplaceFolderIsServedAsAFolder(t *testing.T) {
+	w := newQueuedWorld(t)
+	ctx := t.Context()
+	const key = "plugins-local"
+	c := repo.Config{Key: key, Class: repo.Local, PackageType: repo.AgentPlugins}
+	if err := w.DB.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.DB.Items().Put(ctx, artmodel.Item{
+		RepoKey: key, Name: "cursor-marketplace.json", Folder: true, CreatedBy: "admin",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	wantStatus(t, w.Do(http.MethodPut, "/artifactory/"+key+"/alpha/1.0.0/alpha-1.0.0.zip",
+		"admin", pluginZIP(t, "cursor")), http.StatusCreated)
+	w.settle(key)
+
+	get := w.Do(http.MethodGet, "/artifactory/"+key+"/cursor-marketplace.json", "admin", "")
+	wantStatus(t, get, http.StatusOK)
+	if ct := get.Header().Get("Content-Type"); ct != "text/html; charset=utf-8" ||
+		!strings.HasPrefix(get.Body.String(), "<!DOCTYPE html>") ||
+		!strings.Contains(get.Body.String(), "<h1>Index of "+key+"/cursor-marketplace.json</h1>") {
+		t.Errorf("item route answered %q %s, want the folder's index", ct, get.Body)
+	}
+	head := w.Do(http.MethodHead, "/artifactory/"+key+"/cursor-marketplace.json", "admin", "")
+	if head.Code != http.StatusOK || head.Body.Len() != 0 {
+		t.Errorf("HEAD answered %d %s, want 200 and no body", head.Code, head.Body)
+	}
+	api := w.Do(
+		http.MethodGet,
+		"/artifactory/api/agentplugins/"+key+"/cursor-marketplace.json",
+		"admin",
+		"",
+	)
+	wantStatus(t, api, http.StatusNotFound)
+	if got := api.Body.String(); !strings.Contains(got, `"Could not find resource"`) {
+		t.Errorf("API path answered %s, want the missing item", got)
+	}
+	info := w.storage(t, "admin", key+"/cursor-marketplace.json", http.StatusOK)
+	if _, ok := info["children"]; !ok {
+		t.Errorf("storage API answered %v, want the folder", info)
+	}
+	if body := w.Do(
+		http.MethodGet,
+		"/artifactory/"+key+"/marketplace.json",
+		"admin",
+		"",
+	).Body.String(); !strings.Contains(
+		body,
+		`"alpha"`,
+	) {
+		t.Errorf("marketplace.json is %s, want the stored file listing alpha", body)
 	}
 }
 

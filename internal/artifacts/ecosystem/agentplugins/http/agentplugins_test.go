@@ -385,39 +385,60 @@ func TestAccAgentPluginsMarketplaceRefusesBeforeReading(t *testing.T) {
 	}
 }
 
-// TestAccAgentPluginsMarketplaceNotStored: a marketplace file that is not
-// stored answers as a missing item, at both paths: where no work queue
-// runs the work a download owes, and where a folder stands at its name.
+// TestAccAgentPluginsMarketplaceNotStored: a marketplace file that nothing
+// has stored, where no work queue runs the work a download owes, answers
+// as a missing item at both paths.
 func TestAccAgentPluginsMarketplaceNotStored(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		tune func(*itemkit.Deps)
-		seed func(w *itemWorld)
-	}{
-		{"no work queue", func(d *itemkit.Deps) { d.Work = nil }, func(*itemWorld) {}},
-		{"a folder at the name", nil, func(w *itemWorld) {
-			if _, err := w.world.Store.Items().Put(w.t.Context(), model.Item{
-				RepoKey: pluginsLocal, Name: "marketplace.json", Folder: true,
-			}); err != nil {
-				w.t.Fatal(err)
-			}
-		}},
+	w := newItemWorld(t, func(d *itemkit.Deps) { d.Work = nil })
+	w.repos(pluginsRepo(pluginsLocal, repo.Local))
+	for _, target := range []string{
+		apiPath(pluginsLocal, "marketplace.json"), itemPath(pluginsLocal, "marketplace.json"),
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var tune []func(*itemkit.Deps)
-			if tc.tune != nil {
-				tune = append(tune, tc.tune)
-			}
-			w := newItemWorld(t, tune...)
-			w.repos(pluginsRepo(pluginsLocal, repo.Local))
-			tc.seed(w)
-			for _, target := range []string{
-				apiPath(pluginsLocal, "marketplace.json"), itemPath(pluginsLocal, "marketplace.json"),
-			} {
-				wantError(t, w.do(http.MethodGet, target, admin),
-					http.StatusNotFound, "Could not find resource")
-			}
-		})
+		wantError(t, w.do(http.MethodGet, target, admin),
+			http.StatusNotFound, "Could not find resource")
+	}
+}
+
+// TestAccAgentPluginsMarketplaceFolderAnswersAsAFolder: the format stores
+// no file over a folder that stands at a marketplace name, so the item
+// route answers that folder as the generic lookup answers any folder, with
+// its HTML index, and the API path, which lists no folder, answers it as a
+// missing file.
+func TestAccAgentPluginsMarketplaceFolderAnswersAsAFolder(t *testing.T) {
+	w := newItemWorld(t)
+	w.repos(pluginsRepo(pluginsLocal, repo.Local))
+	w.plugin("alpha", "1.0.0", "claude")
+	if _, err := w.world.Store.Items().Put(t.Context(), model.Item{
+		RepoKey: pluginsLocal, Name: "marketplace.json", Folder: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const index = "<!DOCTYPE html>\n" +
+		"<html><head><title>Index of " + pluginsLocal + "/marketplace.json</title></head><body>\n" +
+		"<h1>Index of " + pluginsLocal + "/marketplace.json</h1>\n" +
+		"<pre></pre></body></html>\n"
+	for method, body := range map[string]string{http.MethodGet: index, http.MethodHead: ""} {
+		rec := w.do(method, itemPath(pluginsLocal, "marketplace.json"), admin)
+		if rec.Code != http.StatusOK || rec.Body.String() != body ||
+			rec.Header().Get("Content-Type") != "text/html; charset=utf-8" {
+			t.Errorf("%s answered %d %v %q, want 200 and the folder's index",
+				method, rec.Code, rec.Header(), rec.Body)
+		}
+	}
+	wantError(t, w.do(http.MethodGet, apiPath(pluginsLocal, "marketplace.json"), admin),
+		http.StatusNotFound, "Could not find resource")
+	// The other files are stored as ever.
+	if rec := w.do(
+		http.MethodGet,
+		itemPath(pluginsLocal, "claude-marketplace.json"),
+		admin,
+	); rec.Code != http.StatusOK ||
+		!strings.Contains(rec.Body.String(), `"alpha"`) {
+		t.Errorf(
+			"claude-marketplace.json answered %d %s, want 200 listing alpha",
+			rec.Code,
+			rec.Body,
+		)
 	}
 }
 
