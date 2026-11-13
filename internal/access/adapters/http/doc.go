@@ -46,8 +46,9 @@
 //     then the public routes. An API key (X-JFrog-Art-Api, or X-Api-Key
 //     after a blank one) is read first and alone, whatever the
 //     Authorization header says, as 7.x's props filter reads it. A refused
-//     key that is not blank answers 403 with the Basic challenge, as 7.x's
-//     entry point answers it. An Authorization value 7.x reads no credential from,
+//     key that is not blank answers 403, as does a NuGet client's refused
+//     password, both with the Basic challenge, as 7.x's entry point
+//     answers them. An Authorization value 7.x reads no credential from,
 //     such as "Basic Og==", "Bearer" without a token or another scheme,
 //     counts as no credential at all, as do a blank X-JFrog-Art-Api and
 //     Basic credentials naming the anonymous user while anonymous access

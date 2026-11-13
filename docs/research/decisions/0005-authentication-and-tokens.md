@@ -33,7 +33,9 @@ every request that sends a key, reads it. A key that does not verify answers 403
 credentials" with the Basic challenge while either header is not blank, as 7.x's entry point
 answers it so that a client stops asking for credentials; an `X-Api-Key` sent empty is read
 as a key and refused 401 **[I]**
-([#1464](https://github.com/weaveplatform/artifactweave/issues/1464)).
+([#1464](https://github.com/weaveplatform/artifactweave/issues/1464)). A NuGet client, a
+`User-Agent` naming NuGet in any case, whose password does not verify gets 403 too (decision
+[0038](0038-nuget.md), [#1465](https://github.com/weaveplatform/artifactweave/issues/1465)).
 On the NuGet routes
 alone, `X-NuGet-ApiKey: <user>:<password or token>` is read as Basic credentials when the
 request has no `Authorization` header (decision [0038](0038-nuget.md),

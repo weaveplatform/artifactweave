@@ -82,8 +82,8 @@ type AuthnOptions struct {
 //     (pkgroute.Protocol.SkipsAuthentication).
 //  3. Credentials that do not verify answer 401 at once, even on a public
 //     route, as Artifactory does: a client with a wrong password learns it
-//     on its first call. A refused API key (refusedAPIKey) answers 403
-//     instead.
+//     on its first call. A refused API key (refusedAPIKey) and a NuGet
+//     client's refused password (refusedNuGetPassword) answer 403 instead.
 //     An expired password may still change itself (ownPasswordChange), and
 //     a registry token is good for the registry alone (decision 0005).
 //  4. The exception is an expired Bearer access token on refreshRoute
@@ -197,8 +197,8 @@ func ownPasswordChange(r *http.Request, user string) bool {
 // (the user name must be the token's subject); Bearer with either token;
 // and on the NuGet routes alone, X-NuGet-ApiKey (nugetAPIKey). A credential
 // that does not verify answers 401 rather than quietly becoming anonymous,
-// and so does a Basic value 7.x reads but cannot decode, but for the 403
-// of refusedAPIKey.
+// and so does a Basic value 7.x reads but cannot decode, but for the 403s
+// of refusedAPIKey and refusedNuGetPassword.
 //
 // An API key is read first, and alone (accessapi.APIKey): 7.161.26's props
 // filter, which reads X-JFrog-Art-Api unless it is blank and otherwise
@@ -241,7 +241,7 @@ func credentials(
 		}
 		if !declined {
 			p, err = basicCredentials(ctx, a, user, password)
-			return p, true, err
+			return p, true, refusedNuGetPassword(r, password, err)
 		}
 		h = ""
 	case h != "":
@@ -259,7 +259,7 @@ func credentials(
 			return kernel.Principal{}, true, kernel.ErrBadCredentials
 		}
 		p, err = basicCredentials(ctx, a, user, secret)
-		return p, true, err
+		return p, true, refusedNuGetPassword(r, secret, err)
 	}
 	return kernel.Principal{}, false, nil
 }
@@ -288,6 +288,27 @@ func refusedAPIKey(r *http.Request, err error) error {
 		return err
 	}
 	return challengedForbidden(e.Message)
+}
+
+// refusedNuGetPassword is err, a password's refusal, as 7.x's entry point
+// answers a NuGet client: 403 "Bad credentials" with the Basic challenge,
+// rather than 401, when the client's User-Agent names NuGet in any case
+// and it sent an Authorization or X-NuGet-ApiKey value that is not blank,
+// so that the client stops asking for credentials, which it "keeps asking
+// for ... indefinitely on 401 responses"
+// (ArtifactoryBasicAuthenticationEntryPoint.isAlreadyAuthedNuGetRequest,
+// 7.161.26). The rule is 7.x's for a BadCredentialsException, which its
+// providers throw for a password that does not verify
+// (AccessAuthProviderUtils), on any route; a token that does not verify
+// throws another exception and keeps its 401, and so does a key without a
+// password, which decision 0038 answers 401 (RTDEV-37982).
+func refusedNuGetPassword(r *http.Request, secret string, err error) error {
+	if !errors.Is(err, kernel.ErrBadCredentials) || accessapi.LooksLikeToken(secret) ||
+		!strings.Contains(strings.ToLower(r.UserAgent()), "nuget") ||
+		accessapi.Blank(r.Header.Get("Authorization")) && accessapi.Blank(r.Header.Get("X-NuGet-ApiKey")) {
+		return err
+	}
+	return challengedForbidden(kernel.ErrBadCredentials.Message)
 }
 
 // challengedForbidden is a 403 with message that carries the challenge,

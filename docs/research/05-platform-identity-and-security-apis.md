@@ -495,7 +495,12 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
    challenge the entry point adds to every answer that is not for the UI. Its message is the
    provider's, which is not open source; artifactweave answers "Bad credentials" **[I]**, and
    an `X-Api-Key` sent empty, read as a key but not one that turns the refusal into 403,
-   401 **[I]** ([#1464](https://github.com/weaveplatform/artifactweave/issues/1464)).
+   401 **[I]** ([#1464](https://github.com/weaveplatform/artifactweave/issues/1464)). The
+   same entry point answers 403 "if bad credentials error" to a client whose `User-Agent`
+   contains `nuget` in any case and that sent an `Authorization` or `X-NuGet-ApiKey` value
+   that is not blank (`isAlreadyAuthedNuGetRequest`), which artifactweave follows on every
+   route (decision [0038](decisions/0038-nuget.md),
+   [#1465](https://github.com/weaveplatform/artifactweave/issues/1465)).
    From 7.111.4 an administrator blocks existing API keys with a platform setting that is
    off by default ([7.111.4 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)); artifactweave never holds API keys, so none exist to
    block.
