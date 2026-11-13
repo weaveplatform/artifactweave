@@ -86,12 +86,18 @@ func (s accessState) identityErr(ctx context.Context, op, notFound string, err e
 	case err == nil:
 		return nil
 	case errors.Is(err, identity.ErrInvalid):
-		// The message is what follows the sentinel, whatever wraps it.
+		// The message is what follows the sentinels, whatever wraps them.
+		// A refused change to a built-in user carries ErrProtected right
+		// after ErrInvalid, for Access v2's 403; it is no more part of the
+		// message than ErrInvalid is.
 		msg := err.Error()
 		if _, after, ok := strings.Cut(msg, identity.ErrInvalid.Error()+": "); ok {
 			msg = after
 		}
-		return httpkit.BadRequestf("%s", msg)
+		return httpkit.BadRequestf(
+			"%s",
+			strings.TrimPrefix(msg, identity.ErrProtected.Error()+": "),
+		)
 	case errors.Is(err, kernel.ErrNotFound) && notFound != "":
 		return apierror.New(http.StatusNotFound, notFound)
 	default:
