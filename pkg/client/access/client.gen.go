@@ -762,7 +762,7 @@ type GroupCreateRequest struct {
 	// Members Optional within this object. Initial member usernames; each must exist. Mutually exclusive with import_from_ldap_group_setting.
 	Members *[]string `json:"members,omitempty"`
 
-	// Name Required within this object. The group name; unique, case-insensitive. A create or replace by name (PUT) may send it empty or leave it out and takes the name in the path; any other value must equal the name in the path.
+	// Name Required within this object. The group name; unique and case-sensitive, so ops and Ops are two groups. A create or replace by name (PUT) may send it empty or leave it out and takes the name in the path; any other value must equal the name in the path, case included.
 	Name string `json:"name"`
 
 	// PolicyManager Optional within this object. Stored and echoed; no effect.
