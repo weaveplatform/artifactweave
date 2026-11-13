@@ -431,9 +431,9 @@ func TestUnitServeChecksum(t *testing.T) {
 const directServeContent = "http.ServeContent("
 
 // directServeContentAllowed are the ecosystem directories whose handlers
-// may still call http.ServeContent themselves: the registry answers its
-// manifests' and blobs' preconditions by the Docker API's rules, which
-// #1437 settles.
+// may still call http.ServeContent themselves: the registry drops the
+// headers 7.x's Docker API does not act on before it serves a manifest or
+// a blob (pullRequest, #1437).
 var directServeContentAllowed = []string{"internal/artifacts/ecosystem/docker/"}
 
 // No package type's handler serves content through http.ServeContent
