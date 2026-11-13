@@ -2,6 +2,7 @@ package xzfile
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
@@ -157,10 +158,11 @@ func build(t *testing.T, check byte, sizes bool, data ...[]byte) parts {
 }
 
 func read(limit int64, data []byte) ([]byte, error) {
-	r, err := NewReader(bytes.NewReader(data), limit)
+	r, err := NewReader(context.Background(), bytes.NewReader(data), limit)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = r.Close() }()
 	return io.ReadAll(r)
 }
 
@@ -231,9 +233,16 @@ func TestUnitDecodesWholeFiles(t *testing.T) {
 		if err = w.Close(); err != nil {
 			t.Fatal(err)
 		}
-		if got, err := NewReader(bytes.NewReader(b.Bytes()), int64(len(want))); err != nil {
+		if got, err := NewReader(
+			t.Context(),
+			bytes.NewReader(b.Bytes()),
+			int64(len(want)),
+		); err != nil {
 			t.Fatalf("ulikunitz/xz writer %+v: %v", config, err)
-		} else if all, err := io.ReadAll(got); err != nil || !bytes.Equal(all, want) {
+		} else if all, err := io.ReadAll(
+			got,
+		); err != nil ||
+			!bytes.Equal(all, want) {
 			t.Fatalf("ulikunitz/xz writer %+v: %v", config, err)
 		}
 	}

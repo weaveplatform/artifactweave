@@ -3,6 +3,7 @@ package xzfile
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"hash/crc64"
 	"io"
 	"math"
+	"runtime"
 
 	"github.com/ulikunitz/xz/lzma"
 )
@@ -77,6 +79,8 @@ var (
 	errFooterCRC       = errors.New("xz: footer checksum error")
 	errFooterFlags     = errors.New("xz: footer flags incorrect")
 	errFooterSize      = errors.New("xz: index size in footer wrong")
+	// errClosed is what Read returns after Close; no caller reads then.
+	errClosed = errors.New("xz: reader closed")
 )
 
 // reader decodes an xz file as liblzma's stream decoder does with
@@ -96,6 +100,12 @@ var (
 // dictionary, which that Reader takes from the block header (#1332).
 type reader struct {
 	in *bufio.Reader
+	// ctx ends a wait for the dictionary budget. It is kept because Read
+	// takes no context, and a block's dictionary is taken where the block
+	// starts, inside Read.
+	ctx context.Context
+	// acct is the part of the dictionary budget the current block holds.
+	acct *account
 	// limit is the most bytes the caller reads, or 0 for no limit.
 	limit int64
 	// flags is the current stream's check type, and records the index
@@ -117,12 +127,47 @@ type record struct{ unpadded, uncompressed int64 }
 // bytes the caller reads from it, or 0 for no limit: a match cannot reach
 // further back than the content decoded, so a block is decoded with a
 // dictionary no larger than limit and reads everything the caller does.
-func NewReader(in io.Reader, limit int64) (io.Reader, error) {
-	x := &reader{in: bufio.NewReaderSize(in, 32<<10), limit: limit}
+//
+// Each block takes its dictionary from the process's budget (SetBudget)
+// before it is allocated, waiting while it does not fit, and gives it back
+// when the block ends, when Read fails or returns io.EOF, and on Close. A
+// wait that ctx ends fails Read with ctx's error. The caller closes the
+// reader; one dropped unclosed gives its dictionary back only once the
+// garbage collector finds it unreachable.
+func NewReader(ctx context.Context, in io.Reader, limit int64) (io.ReadCloser, error) {
+	x := &reader{
+		in:    bufio.NewReaderSize(in, 32<<10),
+		ctx:   ctx,
+		acct:  newAccount(ctx),
+		limit: limit,
+	}
 	if err := x.stream(true); err != nil {
 		return nil, err
 	}
+	runtime.AddCleanup(x, (*account).release, x.acct)
 	return x, nil
+}
+
+// Close gives back the dictionary the reader holds and drops its decoder.
+// It never fails, and may be called more than once.
+func (x *reader) Close() error {
+	if x.err == nil {
+		x.err = errClosed
+	}
+	x.block = nil
+	x.acct.release()
+	return nil
+}
+
+// stop ends the reader with err, unless err is nil. Nothing reads a block
+// after an error, so its dictionary goes back to the budget at once,
+// whether or not the caller closes the reader.
+func (x *reader) stop(err error) {
+	if err == nil {
+		return
+	}
+	x.err, x.block = err, nil
+	x.acct.release()
 }
 
 // dictSize returns the dictionary for a block whose header names dict: dict,
@@ -138,7 +183,7 @@ func dictSize(dict, limit int64) int {
 func (x *reader) Read(p []byte) (int, error) {
 	for x.err == nil {
 		if x.block == nil {
-			x.err = x.next()
+			x.stop(x.next())
 			continue
 		}
 		n, err := x.block.Read(p)
@@ -146,7 +191,7 @@ func (x *reader) Read(p []byte) (int, error) {
 			err = x.endBlock()
 		}
 		if err != nil {
-			x.err = err
+			x.stop(err)
 			return n, err
 		}
 		if n > 0 || len(p) == 0 {
@@ -315,8 +360,14 @@ func (x *reader) startBlock(size byte) error {
 	// Allocating what the header names, as ulikunitz/xz did, let a file of
 	// a few bytes take 4 GiB (#1332). The caller never reads past limit,
 	// so a dictionary of limit refuses nothing the header's would read.
+	// The budget is taken first, so a decode that waits has allocated
+	// nothing yet (#1354).
+	dictCap := dictSize(dict, x.limit)
+	if err := x.acct.take(x.ctx, int64(dictCap)); err != nil {
+		return err
+	}
 	b.read = &count{r: x.in}
-	b.data, err = lzma.Reader2Config{DictCap: dictSize(dict, x.limit)}.NewReader2(b.read)
+	b.data, err = lzma.Reader2Config{DictCap: dictCap}.NewReader2(b.read)
 	if err != nil {
 		return err //nolint:wrapcheck // the decoder's own text, as ulikunitz/xz gives it
 	}
@@ -385,6 +436,8 @@ func (b *block) Read(p []byte) (int, error) {
 func (x *reader) endBlock() error {
 	b := x.block
 	x.block = nil
+	// The LZMA2 data has ended, so nothing reads the dictionary again.
+	x.acct.release()
 	if b.n < b.uncompressed || b.read.n < b.compressed {
 		return io.ErrUnexpectedEOF
 	}

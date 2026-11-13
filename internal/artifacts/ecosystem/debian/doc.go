@@ -187,6 +187,8 @@
 //     Packages, installer Packages or Sources index, whose xz stream lost
 //     its index and footer, refused by ReadBinary and the index decoders
 //     (#1331).
+//   - xz_budget_test.go: those packages and indexes, whole and cut, answer
+//     the same under the xz dictionary budget as without it (#1354).
 //
 // testdata holds the contract packages, the dpkg-source fixture alpha_1.0-1
 // and generate-source.sh, which builds it; the protocol's tests

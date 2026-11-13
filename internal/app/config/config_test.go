@@ -169,6 +169,7 @@ func TestUnitFileCoversEveryKey(t *testing.T) {
 		AQLTimeout:   AQLTimeout{Query: 10 * time.Minute, Streamed: time.Hour},
 		Maven:        Maven{SnapshotCleanupInterval: 2 * time.Minute},
 		NuGet:        NuGet{SnapshotCleanupInterval: 3 * time.Minute},
+		XZ:           XZ{DictionaryBudget: 512 << 20},
 	}
 	if diff := cmp.Diff(want, cfg); diff != "" {
 		t.Fatal(diff)
@@ -188,7 +189,7 @@ func TestUnitEnvCoversEveryKey(t *testing.T) {
 			env[envName(k)] = "45s"
 		case strings.HasPrefix(k, "api.") && k != "api.enabled":
 			env[envName(k)] = "3"
-		case strings.HasSuffix(k, "_size"):
+		case strings.HasSuffix(k, "_size"), k == "xz.dictionary_budget":
 			env[envName(k)] = "8MiB"
 		case strings.HasSuffix(k, ".concurrency"), strings.HasSuffix(k, ".redundancy"),
 			strings.HasSuffix(k, ".write_quorum"), strings.HasPrefix(k, "search.aql."),
@@ -221,6 +222,7 @@ func TestUnitEnvCoversEveryKey(t *testing.T) {
 		cfg.Search.UserQueryLimit != 3 || !cfg.Search.LimitAnonymousUsersOnly ||
 		cfg.Work.Workers != 3 || cfg.Work.MaxAttempts != 3 || cfg.Work.Lease != 45*time.Second ||
 		cfg.NPM.MaxPublishSize != 8<<20 || cfg.NPM.LoginTokenExpiry != 45*time.Second ||
+		cfg.XZ.DictionaryBudget != 8<<20 ||
 		!cfg.NPM.TagLatestByPublish || !cfg.Token.AllowBasicAuth ||
 		!cfg.Deploy.EnforceIdenticalChecksumDeploy ||
 		!cfg.PyPI.EnforceLayout || !cfg.PyPI.EnforceNamingNormalization ||

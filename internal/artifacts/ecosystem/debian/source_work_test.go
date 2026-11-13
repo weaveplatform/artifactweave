@@ -78,7 +78,7 @@ func TestUnitWorkPublishesOnlyCompleteSourcePackages(t *testing.T) {
 		!strings.Contains(string(plain), "Directory: pool/main/a/alpha\n") {
 		t.Fatalf("incomplete deb-src publication: %v", keys(generated))
 	}
-	if rows, err := DecodeSourcesIndex(compressed); err != nil || len(rows) != 1 ||
+	if rows, err := DecodeSourcesIndex(t.Context(), compressed); err != nil || len(rows) != 1 ||
 		len(rows[0].Files) != 3 {
 		t.Fatalf("generated source index: %+v, %v", rows, err)
 	}

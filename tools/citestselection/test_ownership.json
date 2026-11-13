@@ -133,7 +133,8 @@
       "stub_test.go",
       "tokens_fixture_test.go",
       "tokens_status_test.go",
-      "vcs_tables_test.go"
+      "vcs_tables_test.go",
+      "xz_test.go"
     ],
     "internal/artifacts/adapters/http": [
       "aql_related_test.go",

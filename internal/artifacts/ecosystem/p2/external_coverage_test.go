@@ -50,7 +50,7 @@ func TestUnitP2ArtifactChecksumsAcrossPublishedEncodings(t *testing.T) {
 				{"features/feature_2.0.0.jar", sha256, ""},
 				{"binary/archive_3.0.0", "", sha512},
 			} {
-				got, err := ArtifactChecksums(tc.name, tc.body, want.path)
+				got, err := ArtifactChecksums(t.Context(), tc.name, tc.body, want.path)
 				if err != nil || got.SHA256 != want.sha256 || got.SHA512 != want.sha512 {
 					t.Fatalf("%s: %+v, %v", want.path, got, err)
 				}
@@ -62,6 +62,7 @@ func TestUnitP2ArtifactChecksumsAcrossPublishedEncodings(t *testing.T) {
 		"artifacts.xml": bytes.Replace(metadata, []byte(sha256), []byte("not-a-digest"), 1),
 	} {
 		if _, err := ArtifactChecksums(
+			t.Context(),
 			name,
 			body,
 			"plugins/plugin_1.0.0.jar",
@@ -75,12 +76,12 @@ func TestUnitP2ArtifactChecksumsAcrossPublishedEncodings(t *testing.T) {
 	duplicate := bytes.Replace(metadata,
 		[]byte(`</artifacts>`),
 		[]byte(`<artifact classifier="osgi.bundle" id="plugin" version="1.0.0"/></artifacts>`), 1)
-	if _, err := ArtifactChecksums("artifacts.xml", duplicate,
+	if _, err := ArtifactChecksums(t.Context(), "artifacts.xml", duplicate,
 		"plugins/plugin_1.0.0.jar"); !errors.Is(err, ErrInvalid) {
 		t.Errorf("duplicate artifact checksum accepted: %v", err)
 	}
 	invalidHex := bytes.Replace(metadata, []byte(sha256), []byte(strings.Repeat("z", 64)), 1)
-	if _, err := ArtifactChecksums("artifacts.xml", invalidHex,
+	if _, err := ArtifactChecksums(t.Context(), "artifacts.xml", invalidHex,
 		"plugins/plugin_1.0.0.jar"); !errors.Is(err, ErrInvalid) {
 		t.Errorf("non-hex published checksum accepted: %v", err)
 	}
@@ -96,7 +97,7 @@ func TestUnitP2MetadataExtractionRejectsMissingArchiveEntry(t *testing.T) {
 		{"artifacts.xml.xz", []byte("not xz")},
 		{"artifacts.other", []byte("unsupported")},
 	} {
-		if _, err := metadataXML(tc.name, tc.body); !errors.Is(err, ErrInvalid) {
+		if _, err := metadataXML(t.Context(), tc.name, tc.body); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%s metadata extraction accepted: %v", tc.name, err)
 		}
 	}
@@ -111,6 +112,7 @@ func TestUnitP2CompositeRewritePreservesArchiveSidecarAndFailsClosed(t *testing.
 	const sidecar = "published sidecar bytes"
 	archive := p2TestJAR(t, "compositeContent.xml", metadata, []byte(sidecar))
 	changed, err := EditComposite(
+		t.Context(),
 		"compositeContent.jar",
 		archive,
 		func(raw string) (string, error) {
@@ -144,6 +146,7 @@ func TestUnitP2CompositeRewritePreservesArchiveSidecarAndFailsClosed(t *testing.
 		}
 	}
 	if output, err := EditComposite(
+		t.Context(),
 		"compositeContent.jar",
 		archive,
 		func(raw string) (string, error) {
@@ -157,6 +160,7 @@ func TestUnitP2CompositeRewritePreservesArchiveSidecarAndFailsClosed(t *testing.
 		t.Fatalf("denied child exposed partial metadata: %q, %v", output, err)
 	}
 	if output, err := EditComposite(
+		t.Context(),
 		"compositeContent.xml",
 		metadata,
 		func(string) (string, error) { return strings.Repeat("x", MaxMetadata), nil },
@@ -171,12 +175,12 @@ func TestUnitP2CompositeRewritePreservesArchiveSidecarAndFailsClosed(t *testing.
 			`<repository type="org.eclipse.equinox.internal.p2.metadata.repository.CompositeMetadataRepository"><children size="1">` +
 				malformed + `</children></repository>`,
 		)
-		if output, err := EditComposite("compositeContent.xml", body,
+		if output, err := EditComposite(t.Context(), "compositeContent.xml", body,
 			func(string) (string, error) { return "safe", nil }); err == nil || len(output) != 0 {
 			t.Fatalf("malformed child exposed metadata: %q, %v", output, err)
 		}
 	}
-	if _, err := EditComposite("content.xml", metadata,
+	if _, err := EditComposite(t.Context(), "content.xml", metadata,
 		func(string) (string, error) { return "safe", nil }); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("non-composite metadata rewritten: %v", err)
 	}
@@ -188,6 +192,7 @@ func TestUnitP2IndexAndArchiveIntegrityEdges(t *testing.T) {
 			"artifact.repository.factory.order=artifacts.xml,!\n",
 	)
 	if err := Validate(
+		t.Context(),
 		"p2.index",
 		bytes.NewReader(validIndex),
 		int64(len(validIndex)),
@@ -205,6 +210,7 @@ func TestUnitP2IndexAndArchiveIntegrityEdges(t *testing.T) {
 			"artifact.repository.factory.order=artifacts.jar\n"),
 	} {
 		if err := Validate(
+			t.Context(),
 			"p2.index",
 			bytes.NewReader(body),
 			int64(len(body)),
@@ -217,6 +223,7 @@ func TestUnitP2IndexAndArchiveIntegrityEdges(t *testing.T) {
 	}
 	missingMetadata := p2TestJAR(t, "other.xml", []byte("unrelated"), nil)
 	if err := Validate(
+		t.Context(),
 		"content.jar",
 		bytes.NewReader(missingMetadata),
 		int64(len(missingMetadata)),
@@ -227,7 +234,14 @@ func TestUnitP2IndexAndArchiveIntegrityEdges(t *testing.T) {
 		t.Fatalf("JAR without declared metadata accepted: %v", err)
 	}
 	invalidEntry := p2TestJAR(t, "content.xml", []byte("<not-a-repository/>"), nil)
-	if _, err := ExtractArchive(invalidEntry, "content.xml"); !errors.Is(err, ErrInvalid) {
+	if _, err := ExtractArchive(
+		t.Context(),
+		invalidEntry,
+		"content.xml",
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
 		t.Fatalf("invalid archive metadata delivered: %v", err)
 	}
 	var directory bytes.Buffer
@@ -240,7 +254,14 @@ func TestUnitP2IndexAndArchiveIntegrityEdges(t *testing.T) {
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ExtractArchive(directory.Bytes(), "content.jar"); !errors.Is(err, ErrInvalid) {
+	if _, err := ExtractArchive(
+		t.Context(),
+		directory.Bytes(),
+		"content.jar",
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
 		t.Fatalf("directory delivered as metadata: %v", err)
 	}
 	oversized := p2TestJAR(
@@ -257,6 +278,7 @@ func TestUnitP2IndexAndArchiveIntegrityEdges(t *testing.T) {
 	}
 	binary.LittleEndian.PutUint32(oversized[central+24:], MaxMetadata+1)
 	if err := Validate(
+		t.Context(),
 		"content.jar",
 		bytes.NewReader(oversized),
 		int64(len(oversized)),
@@ -275,7 +297,7 @@ func (p2ReadErrorSeeker) Seek(int64, int) (int64, error) { return 0, nil }
 
 func TestUnitP2MetadataReadErrorsFailClosed(t *testing.T) {
 	for _, name := range []string{"content.xml", "p2.index"} {
-		if err := Validate(name, p2ReadErrorSeeker{}, 1); !errors.Is(err, ErrInvalid) {
+		if err := Validate(t.Context(), name, p2ReadErrorSeeker{}, 1); !errors.Is(err, ErrInvalid) {
 			t.Fatalf("%s read error accepted: %v", name, err)
 		}
 	}
@@ -309,7 +331,7 @@ func TestUnitP2ArchiveDeclaredAndAggregateExpansionLimits(t *testing.T) {
 		t.Fatal("test archive has no central directory")
 	}
 	binary.LittleEndian.PutUint32(declared[central+24:], MaxArtifact+1)
-	if _, err := ExtractArchive(declared, "p2.index"); !errors.Is(err, ErrInvalid) {
+	if _, err := ExtractArchive(t.Context(), declared, "p2.index"); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("declared archive expansion escaped limit: %v", err)
 	}
 	var aggregate bytes.Buffer
@@ -327,6 +349,7 @@ func TestUnitP2ArchiveDeclaredAndAggregateExpansionLimits(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := Validate(
+		t.Context(),
 		"content.jar",
 		bytes.NewReader(aggregate.Bytes()),
 		int64(aggregate.Len()),
@@ -368,7 +391,7 @@ func TestUnitP2MetadataArchiveRejectsCorruptMemberBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	corrupt[offset] ^= 0xff
-	if _, err := metadataXML("artifacts.jar", corrupt); !errors.Is(err, ErrInvalid) {
+	if _, err := metadataXML(t.Context(), "artifacts.jar", corrupt); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("corrupt metadata JAR member admitted: %v", err)
 	}
 }
@@ -402,7 +425,7 @@ func TestUnitP2ArchiveRejectsCorruptEntryAndUnknownCompression(t *testing.T) {
 		t.Fatal(err)
 	}
 	corrupt[offset] ^= 0xff
-	if _, err := ExtractArchive(corrupt, "p2.index"); !errors.Is(err, ErrInvalid) {
+	if _, err := ExtractArchive(t.Context(), corrupt, "p2.index"); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("corrupt archive entry delivered: %v", err)
 	}
 	unsupported := writeStored(
@@ -415,10 +438,18 @@ func TestUnitP2ArchiveRejectsCorruptEntryAndUnknownCompression(t *testing.T) {
 	}
 	binary.LittleEndian.PutUint16(unsupported[8:], 99)
 	binary.LittleEndian.PutUint16(unsupported[central+10:], 99)
-	if _, err := metadataXML("artifacts.jar", unsupported); !errors.Is(err, ErrInvalid) {
+	if _, err := metadataXML(
+		t.Context(),
+		"artifacts.jar",
+		unsupported,
+	); !errors.Is(
+		err,
+		ErrInvalid,
+	) {
 		t.Fatalf("unsupported metadata compression admitted: %v", err)
 	}
 	if err := Validate(
+		t.Context(),
 		"artifacts.jar",
 		bytes.NewReader(unsupported),
 		int64(len(unsupported)),

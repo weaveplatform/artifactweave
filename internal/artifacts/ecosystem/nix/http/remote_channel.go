@@ -137,8 +137,8 @@ func (h handler) remoteSnapshot(r *http.Request, s nixfmt.Snapshot) (source.Resu
 			}
 			return source.ErrInvalidResult
 		},
-		Validate: func(_ context.Context, body io.ReadSeeker, size int64) error {
-			if nixfmt.ReadChannel(body, size) != nil {
+		Validate: func(ctx context.Context, body io.ReadSeeker, size int64) error {
+			if nixfmt.ReadChannel(ctx, body, size) != nil {
 				return source.ErrInvalidResult
 			}
 			return nil

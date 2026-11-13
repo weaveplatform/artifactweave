@@ -100,7 +100,7 @@ func TestUnitReadChannel(t *testing.T) {
 	good := compressXZ(t, channelTar(t, 0))
 	padded := compressXZ(t, channelTar(t, 9216))
 	for name, data := range map[string][]byte{"tight": good, "padded": padded} {
-		if err := ReadChannel(bytes.NewReader(data), int64(len(data))); err != nil {
+		if err := ReadChannel(t.Context(), bytes.NewReader(data), int64(len(data))); err != nil {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
@@ -131,7 +131,14 @@ func TestUnitReadChannel(t *testing.T) {
 		if size == -1 {
 			size = int64(len(tc.data))
 		}
-		if err := ReadChannel(bytes.NewReader(tc.data), size); !errors.Is(err, ErrInvalid) {
+		if err := ReadChannel(
+			t.Context(),
+			bytes.NewReader(tc.data),
+			size,
+		); !errors.Is(
+			err,
+			ErrInvalid,
+		) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}

@@ -64,15 +64,15 @@ func TestUnitIndexesNeedTheirWholeXZStream(t *testing.T) {
 		err    error
 	}{
 		"Packages": {[]byte(packages), func(b []byte) error {
-			_, err := DecodePackagesIndex(b)
+			_, err := DecodePackagesIndex(t.Context(), b)
 			return err
 		}, errInvalidBinary},
 		"installer Packages": {[]byte(strings.Replace(packages, ".deb", ".udeb", 1)), func(b []byte) error {
-			_, err := DecodeInstallerPackagesIndex(b)
+			_, err := DecodeInstallerPackagesIndex(t.Context(), b)
 			return err
 		}, errInvalidBinary},
 		"Sources": {sources, func(b []byte) error {
-			_, err := DecodeSourcesIndex(b)
+			_, err := DecodeSourcesIndex(t.Context(), b)
 			return err
 		}, errInvalidSource},
 	} {

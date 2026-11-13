@@ -135,7 +135,7 @@ func readARMember(body io.ReaderAt, offset, size int64) (arMember, int64, error)
 	return arMember{name: name, offset: start, size: count}, next, nil
 }
 
-func unpackMember(body io.ReaderAt, m arMember) (io.Reader, func(), error) {
+func unpackMember(ctx context.Context, body io.ReaderAt, m arMember) (io.Reader, func(), error) {
 	r := io.NewSectionReader(body, m.offset, m.size)
 	switch {
 	case strings.HasSuffix(m.name, ".gz"):
@@ -153,11 +153,11 @@ func unpackMember(body io.ReaderAt, m arMember) (io.Reader, func(), error) {
 		if strings.HasPrefix(m.name, "data.tar") {
 			limit = maxDataTar
 		}
-		z, err := xzfile.NewReader(r, limit+1)
+		z, err := xzfile.NewReader(ctx, r, limit+1)
 		if err != nil {
 			return nil, nil, fmt.Errorf("%w: xz member: %w", errInvalidBinary, err)
 		}
-		return z, func() {}, nil
+		return z, func() { _ = z.Close() }, nil
 	case strings.HasSuffix(m.name, ".zst"):
 		limit := uint64(maxControlTar)
 		if strings.HasPrefix(m.name, "data.tar") {
@@ -176,7 +176,7 @@ func unpackMember(body io.ReaderAt, m arMember) (io.Reader, func(), error) {
 }
 
 func readControl(ctx context.Context, body io.ReaderAt, m arMember) ([]byte, error) {
-	r, closeReader, err := unpackMember(body, m)
+	r, closeReader, err := unpackMember(ctx, body, m)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func readControl(ctx context.Context, body io.ReaderAt, m arMember) ([]byte, err
 }
 
 func validateData(ctx context.Context, body io.ReaderAt, m arMember) error {
-	r, closeReader, err := unpackMember(body, m)
+	r, closeReader, err := unpackMember(ctx, body, m)
 	if err != nil {
 		return err
 	}

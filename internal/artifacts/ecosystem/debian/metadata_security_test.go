@@ -127,7 +127,7 @@ func TestUnitPackagesIndexRejectsAmbiguousCoordinates(t *testing.T) {
 		{0xfd, '7', 'z', 'X', 'Z', 0x00, 0x00},
 		{0x28, 0xb5, 0x2f, 0xfd, 0x00},
 	} {
-		if _, err := DecodePackagesIndex(body); err == nil {
+		if _, err := DecodePackagesIndex(t.Context(), body); err == nil {
 			t.Fatalf("corrupt compressed Packages index accepted: %x", body)
 		}
 	}

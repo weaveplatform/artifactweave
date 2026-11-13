@@ -221,7 +221,7 @@ func (w *itemWorld) publish(key string, index []byte) {
 // in order, failing the test when it does not decode.
 func filenames(t *testing.T, body []byte) []string {
 	t.Helper()
-	rows, err := debian.DecodePackagesIndex(body)
+	rows, err := debian.DecodePackagesIndex(t.Context(), body)
 	if err != nil {
 		t.Fatalf("served Packages index does not decode: %v", err)
 	}
