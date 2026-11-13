@@ -195,53 +195,57 @@ func ownPasswordChange(r *http.Request, user string) bool {
 // password (the user name must be the token's subject); Bearer with either
 // token; X-JFrog-Art-Api with a reference token (API keys are retired); and
 // on the NuGet routes alone, X-NuGet-ApiKey (nugetAPIKey). A credential
-// that does not verify, or a scheme nothing accepts, answers 401 rather
-// than quietly becoming anonymous.
+// that does not verify answers 401 rather than quietly becoming anonymous,
+// and so does a Basic value 7.x reads but cannot decode.
 //
-// The exception is a Basic value 7.x reads no credential from, such as
-// "Basic Og==" or a lower-case "basic" (accessapi.IgnoredAuthorization).
-// It counts as no Authorization header at all: the request goes on to the
-// other headers and otherwise to anonymous, and no failed login is counted
-// against any name. 7.x's props filter reads X-JFrog-Art-Api whatever the
-// Authorization header says (AuthenticationFilterUtils.getTokenKeyValue,
-// 7.161.26), so a key sent beside such a value still authenticates.
+// An Authorization value 7.x reads no credential from counts as no
+// Authorization header at all: the request goes on to the other headers
+// and otherwise to anonymous, and no failed login is counted against any
+// name. 7.161.26's open source chain reads Basic only as "Basic " followed
+// by a value neither blank nor "Og==" (accessapi.IgnoredAuthorization),
+// Bearer only as the props filter and RequestUtils read it
+// (accessapi.BearerToken), and no other scheme. Its Basic filter also
+// declines the anonymous user name while anonymous access is off
+// (ArtifactoryBasicAuthenticationFilter.acceptFilter). Cargo's and
+// RubyGems' bare tokens are read on their own paths. The props filter
+// reads X-JFrog-Art-Api whatever the Authorization header says, unless it
+// is blank (AuthenticationFilterUtils.getTokenKeyValue), so a key sent
+// beside such a value still authenticates, and a blank key is no
+// credential either.
 func credentials(
 	ctx context.Context,
 	a *authn.Authenticator,
 	r *http.Request,
 ) (p kernel.Principal, presented bool, err error) {
 	h := r.Header.Get("Authorization")
-	if accessapi.IgnoredAuthorization(h) {
+	switch {
+	case accessapi.IgnoredAuthorization(h):
 		h = ""
-	}
-	if user, password, ok := accessapi.BasicCredentials(h); ok {
-		p, err = basicCredentials(ctx, a, user, password)
-		return p, true, err
-	}
-	if h != "" {
-		// Cargo sends the configured registry token as a bare Authorization
-		// value on sparse registry and web API requests.
-		if strings.HasPrefix(r.URL.Path, "/artifactory/api/cargo/") &&
-			!strings.ContainsAny(h, " \t") {
-			p, err = a.Token(ctx, h, "")
-			if err != nil {
-				return p, true, fmt.Errorf("cargo authorization: %w", err)
-			}
-			return p, true, nil
-		}
-		if strings.HasPrefix(r.URL.Path, "/artifactory/api/gems/") && !strings.Contains(h, " ") &&
-			accessapi.LooksLikeToken(h) {
-			p, err = a.Token(ctx, h, "")
-			return p, true, err //nolint:wrapcheck // Authentication errors are rendered by status.
-		}
-		scheme, raw, _ := strings.Cut(h, " ")
-		if !strings.EqualFold(scheme, "Bearer") || raw == "" {
+	case strings.HasPrefix(h, "Basic "):
+		user, password, ok := accessapi.BasicCredentials(h)
+		if !ok {
 			return kernel.Principal{}, true, kernel.ErrBadCredentials
 		}
-		p, err = a.Token(ctx, strings.TrimSpace(raw), "")
-		return p, true, err //nolint:wrapcheck // apierror values, rendered by status
+		declined, err := declinedBasic(ctx, a, user)
+		if err != nil {
+			return kernel.Principal{}, true, err
+		}
+		if !declined {
+			p, err = basicCredentials(ctx, a, user, password)
+			return p, true, err
+		}
+		h = ""
+	case h != "":
+		if p, ok, err := packageToken(ctx, a, r, h); ok {
+			return p, true, err
+		}
+		if token, ok := accessapi.BearerToken(h); ok {
+			p, err = a.Token(ctx, token, "")
+			return p, true, err //nolint:wrapcheck // apierror values, rendered by status
+		}
+		h = ""
 	}
-	if k := r.Header.Get("X-JFrog-Art-Api"); k != "" {
+	if k := r.Header.Get("X-JFrog-Art-Api"); !accessapi.Blank(k) {
 		if !accessapi.IsReferenceToken(k) {
 			return kernel.Principal{}, true, kernel.ErrBadCredentials
 		}
@@ -254,6 +258,52 @@ func credentials(
 		}
 		p, err = basicCredentials(ctx, a, user, secret)
 		return p, true, err
+	}
+	return kernel.Principal{}, false, nil
+}
+
+// declinedBasic reports whether 7.x's Basic filter declines Basic
+// credentials naming user, which then count as none: the anonymous user
+// name, in any case, while anonymous access is off. 7.161.26's
+// ArtifactoryBasicAuthenticationFilter.acceptFilter accepts only when
+// "securityService.isAnonAccessEnabled() || !UserInfo.isAnonymous(username)",
+// and UserInfo.isAnonymous matches the name lower-cased. The filter also
+// declines a password that fails the password policy, but only while
+// Access's security.authentication.verify-password-policy is on, which the
+// supported Access configurations page documents as off by default and
+// artifactweave has no setting for.
+func declinedBasic(ctx context.Context, a *authn.Authenticator, user string) (bool, error) {
+	if !accessapi.SameUsername(user, kernel.AnonymousUser) {
+		return false, nil
+	}
+	on, err := a.AnonymousAllowed(ctx)
+	if err != nil {
+		return false, fmt.Errorf("basic authorization: %w", err)
+	}
+	return !on, nil
+}
+
+// packageToken verifies the bare token a package client sends as the whole
+// Authorization value on its own paths, reporting whether h is one.
+// Cargo sends the configured registry token so on sparse registry and web
+// API requests, and RubyGems sends its API key so.
+func packageToken(
+	ctx context.Context,
+	a *authn.Authenticator,
+	r *http.Request,
+	h string,
+) (kernel.Principal, bool, error) {
+	switch {
+	case strings.HasPrefix(r.URL.Path, "/artifactory/api/cargo/") && !strings.ContainsAny(h, " \t"):
+		p, err := a.Token(ctx, h, "")
+		if err != nil {
+			return p, true, fmt.Errorf("cargo authorization: %w", err)
+		}
+		return p, true, nil
+	case strings.HasPrefix(r.URL.Path, "/artifactory/api/gems/") && !strings.Contains(h, " ") &&
+		accessapi.LooksLikeToken(h):
+		p, err := a.Token(ctx, h, "")
+		return p, true, err //nolint:wrapcheck // Authentication errors are rendered by status.
 	}
 	return kernel.Principal{}, false, nil
 }
@@ -309,11 +359,11 @@ func expiredRefresh(
 	if !errors.Is(err, kernel.ErrBadCredentials) || r.Method+" "+r.URL.Path != refreshRoute {
 		return authn.Refresher{}, false
 	}
-	scheme, raw, _ := strings.Cut(r.Header.Get("Authorization"), " ")
-	if !strings.EqualFold(scheme, "Bearer") {
+	token, ok := accessapi.BearerToken(r.Header.Get("Authorization"))
+	if !ok {
 		return authn.Refresher{}, false
 	}
-	return a.ExpiredToken(ctx, strings.TrimSpace(raw))
+	return a.ExpiredToken(ctx, token)
 }
 
 // authorize evaluates p's permissions for the request, returning p and its

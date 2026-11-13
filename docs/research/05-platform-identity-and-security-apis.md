@@ -556,27 +556,42 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
      `utils/config/tokenrefresh.go`, `createTokensForConfig`), and `jf rt atc` with a password
      works where `jf atc` refuses it (jfrog-cli issue
      [2547](https://github.com/jfrog/jfrog-cli/issues/2547)).
-8. **Basic values that carry no credential.** 7.x reads Basic credentials only from an
-   `Authorization` value that starts with exactly `Basic ` and goes on with a value neither
+8. **Authorization values that carry no credential.** 7.x reads Basic credentials only from
+   an `Authorization` value that starts with exactly `Basic ` and goes on with a value neither
    blank nor `Og==`, the encoding of an empty user name and password
    (`RequestUtils.getBasicAuthorization`, 7.161.26 open source;
-   `ArtifactoryBasicAuthenticationFilter.acceptFilter` accepts a request only then). No other
-   filter of the open source chain reads a Basic value, so `AccessFilter.useAnonymousIfPossible`
-   serves `Basic Og==`, a blank `Basic`, and the scheme in another case (`basic`, `BASIC`) or
-   followed by a tab as a request without credentials: anonymous while anonymous access is on,
-   401 "Authentication is required" while it is off, and a ping either way
-   (`AnonymousPingInterceptor`). JFrog settled it for `Og==` in 3.4.0: "Artifactory should
-   ignore it and continue as anonymous", which "is a must when using Docker as anonymous
-   without ~/.dockercfg file" (**[J]** [RTFACT-6765](https://jfrog.atlassian.net/browse/RTFACT-6765)).
-   artifactweave does the same on every route and counts no failed login for these values
-   ([#1451](https://github.com/weaveplatform/artifactweave/issues/1451)). A credential in
-   another header still counts: the props filter reads `X-JFrog-Art-Api` whatever
-   `Authorization` says (`AuthenticationFilterUtils.getTokenKeyValue`), and the NuGet routes
-   read `X-NuGet-ApiKey` when no `Authorization` value counts **[I]**. The Basic filter stands
-   aside on `/api/docker/`, `/api/oci/`, `/api/nuget/` and `/api/vagrant/`
+   `ArtifactoryBasicAuthenticationFilter.acceptFilter` accepts a request only then). It reads
+   a Bearer token in two places: the props filter takes `Bearer ` exactly in a value of nine
+   characters or more (`AuthenticationFilterUtils.getOauthTokenKeyValue`, with
+   `old.check.for.oath.token.length` at its default), and
+   `RequestUtils.getBearerAuthenticationValue` takes `bearer ` in any case followed by a value
+   that is not blank. No filter of the open source chain reads another scheme, and the props
+   filter skips a blank `X-JFrog-Art-Api` (`getApiKeyTokenKeyValue`). The Basic filter also declines the anonymous user name, in any case, while
+   anonymous access is off (`isAnonAccessEnabled() || !UserInfo.isAnonymous(username)`). So
+   `AccessFilter.useAnonymousIfPossible` serves `Basic Og==`, a blank `Basic`, the Basic scheme
+   in another case (`basic`, `BASIC`) or followed by a tab, `Bearer` with no token, another
+   scheme (`Negotiate`, `Token`, `Digest`) or a bare value, a blank `X-JFrog-Art-Api`, and,
+   while anonymous access is off, Basic credentials naming `anonymous` as a request without
+   credentials: anonymous while
+   anonymous access is on, 401 "Authentication is required" while it is off, and a ping
+   either way (`AnonymousPingInterceptor`). JFrog settled it for `Og==` in 3.4.0: "Artifactory
+   should ignore it and continue as anonymous", which "is a must when using Docker as
+   anonymous without ~/.dockercfg file" (**[J]**
+   [RTFACT-6765](https://jfrog.atlassian.net/browse/RTFACT-6765)). artifactweave does the
+   same on every route and counts no failed login for these values
+   ([#1451](https://github.com/weaveplatform/artifactweave/issues/1451)); Cargo's and
+   RubyGems' bare tokens are still read on their own paths. A credential in another header
+   still counts: the props filter reads `X-JFrog-Art-Api` whatever `Authorization` says
+   (`AuthenticationFilterUtils.getTokenKeyValue`), and the NuGet routes read `X-NuGet-ApiKey`
+   when no `Authorization` value counts **[I]**. The Basic filter stands aside on
+   `/api/docker/`, `/api/oci/`, `/api/nuget/` and `/api/vagrant/`
    (`RequestUtils.pkgEndpointMatchBasicAuth`), where filters outside the open source read
-   Basic; that they treat these values alike is **[I]**, as is any commercial filter that
-   might read them elsewhere.
+   Basic, and the filter that verifies a Bearer token is not open source either; that they
+   treat these values alike is **[I]**, as is any commercial filter that might read them
+   elsewhere. The Basic filter declines a password that fails the password policy too, but
+   only while Access's `security.authentication.verify-password-policy` is on, which the
+   supported Access configurations page documents as `false` by default; artifactweave has
+   no such setting and never declines on the policy.
 
 Built-in principals that Artifactory ships and artifactweave seeds at first start:
 `admin`, `anonymous`, the `readers` group, and the `Anything` and `Any Remote` permission
@@ -775,10 +790,14 @@ records.
 - The status and message for a locked account. **[I]** 403 "User is Locked.\nContact System
   Administrator to Unlock The Account.", from OSS 6.20's entry point and
   `UserLockedException`; no 7.x capture of the response is published.
-- Whether the commercial filters read `Basic Og==`, a blank `Basic` or a Basic scheme spelled
-  other than `Basic `. **[I]** None does: the open source chain serves them as anonymous
-  (item 8 of [Authentication](#authentication-accepted-on-every-endpoint)), on the Docker,
-  OCI, NuGet and Vagrant paths too, and `X-NuGet-ApiKey` is read beside them.
+- Whether the commercial filters read `Basic Og==`, a blank `Basic`, a Basic scheme spelled
+  other than `Basic `, a blank `Bearer`, another scheme or a bare value. **[I]** None does:
+  the open source chain serves them as anonymous (item 8 of
+  [Authentication](#authentication-accepted-on-every-endpoint)), on the Docker, OCI, NuGet
+  and Vagrant paths too, and `X-NuGet-ApiKey` is read beside them.
+- What Access answers Basic credentials naming `anonymous` while anonymous access is on,
+  which the Basic filter reads and passes to Access. **[I]** 401 "Bad credentials", counted
+  as a failed login: the anonymous user has no password.
 - The legacy delete of the built-in `admin` or `anonymous` user. **[I]** 400 with
   `the built-in user "admin" cannot be deleted`, the message of Access v2's 403. Access, which refuses
   it in 7.x, is closed; the UI's `DeleteUserService` answers 403 "Action cancelled. " followed

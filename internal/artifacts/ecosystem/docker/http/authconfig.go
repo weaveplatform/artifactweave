@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -44,7 +43,7 @@ func (g *Registry) serveV1Auth(w http.ResponseWriter, r *http.Request) {
 // 401: it has nothing to put in the entry.
 func (g *Registry) writeAuth(w http.ResponseWriter, r *http.Request, s apierror.Profile) {
 	p, ok := kernel.FromContext(r.Context())
-	secret := presented(r)
+	secret := presented(r, p.Name)
 	if !ok || p.Anonymous || secret == "" {
 		apierror.Write(w, s, Errorf(http.StatusUnauthorized, CodeUnauthorized,
 			"authentication required"))
@@ -88,18 +87,23 @@ func registryURL(r *http.Request) string {
 	return scheme + "://" + r.Host
 }
 
-// presented is the secret of the request's credential: a Basic password,
-// a Bearer token or an X-JFrog-Art-Api reference token. Basic is read as
-// the authentication reads it (accessapi.BasicCredentials): a lower-case
-// "basic" value authenticates nothing, so beside a key that did, its
-// secret is not the one to hand back.
-func presented(r *http.Request) string {
-	if _, password, ok := accessapi.BasicCredentials(r.Header.Get("Authorization")); ok {
+// presented is the secret of the credential the request authenticated as
+// name with: a Basic password, a Bearer token or an X-JFrog-Art-Api
+// reference token. Basic and Bearer are read as the authentication reads
+// them (accessapi.BasicCredentials, accessapi.BearerToken): a lower-case
+// "basic" value, a blank "Bearer" or another scheme authenticates nothing
+// in 7.x, so beside a key that did, its secret is not the one to hand
+// back. Nor is the password of Basic credentials naming another user, such
+// as the anonymous name the authentication declines while anonymous access
+// is off; an empty name is the token's subject (authn.Authenticator.Token).
+func presented(r *http.Request, name string) string {
+	h := r.Header.Get("Authorization")
+	if user, password, ok := accessapi.BasicCredentials(h); ok &&
+		(user == "" || accessapi.SameUsername(user, name)) {
 		return password
 	}
-	if scheme, raw, ok := strings.Cut(r.Header.Get("Authorization"), " "); ok &&
-		strings.EqualFold(scheme, "Bearer") {
-		return strings.TrimSpace(raw)
+	if token, ok := accessapi.BearerToken(h); ok {
+		return token
 	}
 	return r.Header.Get("X-JFrog-Art-Api")
 }
