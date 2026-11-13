@@ -158,32 +158,35 @@ func (s *Kit) traceDownload(
 		_, _, sidecar := item.Sidecar(req.Path)
 		cachedItem, lookupErr := st.Items().Get(ctx, c.Key, true, req.Path)
 		if !sidecar && (lookupErr != nil || !cachedItem.Folder) {
+			// The trace answers as getRemoteItem does: a copy the cache
+			// already holds is matched before the upstream is asked, and
+			// the upstream's answer to a URL carrying the matrix
+			// parameters is not matched again (RemoteCopyMatches).
+			matches, matchErr := RemoteCopyMatches(ctx, st, c, req.Path, req)
+			if matchErr != nil {
+				return s.InternalError(ctx, "trace properties", matchErr)
+			}
+			if !matches {
+				t.stepf("Found resource in local cache, but property doesn't match.")
+				return ItemNotFound()
+			}
 			t.stepf("Resolving remote source with current read authorization")
 			result, readErr := s.RemoteSources.Read(ctx, source.Request{
-				Repo:     c,
-				Subject:  accessapi.SubjectOf(p),
-				Access:   acc.Decider,
-				Resource: RemoteResource(r, req.Path),
-				Matrix:   req.matrix(),
-				Project:  c.ProjectKey,
+				Repo:         c,
+				Subject:      accessapi.SubjectOf(p),
+				Access:       acc.Decider,
+				Resource:     RemoteResource(r, req.Path),
+				Matrix:       req.matrix(),
+				MatrixParams: pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
+				Project:      c.ProjectKey,
 			})
 			if readErr != nil {
 				return s.ItemError(ctx, "trace source", pkgroute.SourceError(readErr, p.Anonymous))
 			}
 			if result.Stream != nil {
 				_ = result.Stream.Body.Close()
-				if !req.matrix().Matches(nil) {
-					return ItemNotFound()
-				}
 				t.stepf("Returning validated transient resource")
 			} else {
-				matches, matchErr := matchesMatrix(ctx, st, *result.Item, req)
-				if matchErr != nil {
-					return s.InternalError(ctx, "trace properties", matchErr)
-				}
-				if !matches {
-					return ItemNotFound()
-				}
 				t.stepf("Returning found resource from %s", traceRepoPath(c, true, req.Path))
 			}
 			traceResponding(method, t)

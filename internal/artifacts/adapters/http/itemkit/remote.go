@@ -53,6 +53,11 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 		return false
 	}
 	resource := RemoteResource(r, req.Path)
+	// The item route checks an upstream's label against the client's
+	// Accept, and answers a refusal 409, as 7.x's download does.
+	resource.ClientMIME = &source.ClientMIME{
+		Accept: append([]string(nil), r.Header.Values("Accept")...),
+	}
 	sidecar := ""
 	if artifact, alg, ok := item.Sidecar(req.Path); ok && errors.Is(err, kernel.ErrNotFound) {
 		// A checksum cannot disclose a file the caller cannot read. Cold SHA-256
@@ -74,19 +79,36 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 		case errors.Is(getErr, kernel.ErrNotFound) && string(alg) == "sha256" &&
 			c.RetrieveSha256FromServer != nil && *c.RetrieveSha256FromServer:
 			resource.ChecksumOnly = true
+			// 7.x never fetches a checksum from the upstream ("Checksums are
+			// not downloadable", RemoteRepoBase.getInfo), so this retrieval
+			// has no 7.x refusal to answer: its refused label stays a 502.
+			resource.ClientMIME = nil
 		default:
 			httpkit.WriteErr(w, r, ItemNotFound())
 			return true
 		}
 	}
+	// The copy the cache already holds is matched before the upstream is
+	// asked: a mismatch is not found, and the upstream is not asked, as
+	// 7.x's RemoteRepoBase.internalGetInfo returns the PROPERTY_MISMATCH
+	// that DbStoringRepoMixin.getInfo answers for a cached copy
+	// (shouldReturnCachedResource), in 7.161.26.
+	if ok, matchErr := RemoteCopyMatches(ctx, s.Store, c, resource.Path, req); matchErr != nil {
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "item properties", matchErr))
+		return true
+	} else if !ok {
+		httpkit.WriteErr(w, r, ItemNotFound())
+		return true
+	}
 	query := source.Request{
-		Repo:      c,
-		Subject:   accessapi.SubjectOf(p),
-		Access:    acc.Decider,
-		Resource:  resource,
-		Matrix:    req.matrix(),
-		Project:   c.ProjectKey,
-		CacheOnly: strings.HasSuffix(req.Key, model.CacheSuffix),
+		Repo:         c,
+		Subject:      accessapi.SubjectOf(p),
+		Access:       acc.Decider,
+		Resource:     resource,
+		Matrix:       req.matrix(),
+		MatrixParams: pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
+		Project:      c.ProjectKey,
+		CacheOnly:    strings.HasSuffix(req.Key, model.CacheSuffix),
 	}
 	query, err = s.formatRemoteSourceRequest(ctx, query, acc)
 	if err != nil {
@@ -103,38 +125,85 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 		)
 		return true
 	}
+	// What the source returns now is the upstream's answer to a URL that
+	// carried the matrix parameters, or the copy matched above, so it is
+	// served without another match: 7.x's downloadAndSave hands back the
+	// copy it just saved, and a remote that stores nothing streams the
+	// upstream's answer ("resource will be stream directly to the user"),
+	// neither matched against the request's properties (7.161.26).
 	if result.Stream != nil {
 		s.ServeRemoteStream(w, r, result, c, req, resource, sidecar, p.Anonymous)
 		return true
 	}
-	check := req
-	check.Path = resource.Path
-	ok, matchErr := matchesMatrix(ctx, s.Store, *result.Item, check)
-	switch {
-	case matchErr != nil:
-		httpkit.WriteErr(w, r, s.InternalError(ctx, "item properties", matchErr))
-	case !ok:
-		httpkit.WriteErr(w, r, ItemNotFound())
-	default:
-		if !s.RemoteDeliveryAllowed(w, r, result, p.Anonymous) {
-			return true
+	if !s.RemoteDeliveryAllowed(w, r, result, p.Anonymous) {
+		return true
+	}
+	if sidecar != "" {
+		sw := &StatusWriter{ResponseWriter: w}
+		s.serveRemoteChecksum(
+			sw,
+			r,
+			req.Path,
+			item.ServedChecksum(c, *result.Item, item.Algorithm(sidecar)),
+			result.Item.Modified,
+		)
+		if sw.Complete(r) && result.Used != nil {
+			_ = result.Used(ctx)
 		}
-		if sidecar != "" {
-			sw := &StatusWriter{ResponseWriter: w}
-			s.serveRemoteChecksum(
-				sw,
-				r,
-				item.ServedChecksum(c, *result.Item, item.Algorithm(sidecar)),
-				result.Item.Modified,
-			)
-			if sw.Complete(r) && result.Used != nil {
-				_ = result.Used(ctx)
-			}
-		} else {
-			s.ServeFile(w, r, s.Store, Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
-		}
+	} else {
+		s.ServeItemFile(w, r, s.Store, Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 	}
 	return true
+}
+
+// Matrix returns the request's matrix parameters as a download matches them.
+func (r ItemRequest) Matrix() model.Matrix { return r.matrix() }
+
+// MatchesMatrix reports whether it, a stored file, matches req's matrix
+// parameters, as a download matches its properties: a key it carries must
+// have a value asked for, and a mandatory key ("key+=") must be carried
+// (JFrog's guide, Using Properties in Deployment and Resolution; 7.x's
+// DbStoringRepoMixin.getInfo). With no parameters it reads nothing.
+func MatchesMatrix(ctx context.Context, st Store, it model.Item, req ItemRequest) (bool, error) {
+	return matchesMatrix(ctx, st, it, req)
+}
+
+// RemoteCopyMatches reports whether the copy of path that the remote
+// repository c's cache already holds matches req's matrix parameters: an
+// item by its properties, a document the cache keeps without an item by
+// none, so that only a mandatory key refuses it. With no copy it reports
+// true, since the upstream, asked with the parameters, decides; 7.x
+// matches only a cached copy (RemoteRepoBase.internalGetInfo, 7.161.26).
+// With no parameters it reads nothing.
+func RemoteCopyMatches(
+	ctx context.Context, st Store, c repo.Config, path string, req ItemRequest,
+) (bool, error) {
+	if len(req.Props) == 0 {
+		return true, nil
+	}
+	it, err := st.Items().Get(ctx, c.Key, true, path)
+	switch {
+	case err == nil && !it.Folder:
+		return matchesMatrix(ctx, st, it, req)
+	case err != nil && !errors.Is(err, kernel.ErrNotFound):
+		return false, fmt.Errorf("cached copy of %s: %w", path, err)
+	}
+	page := kernel.Page{}
+	for {
+		entries, next, err := st.RemoteCache().Exact(ctx, c.Key, path, page)
+		if err != nil {
+			return false, fmt.Errorf("cached document %s: %w", path, err)
+		}
+		for _, e := range entries {
+			if e.ItemID == 0 && e.Blob.Checksums.SHA256 != "" && e.NegativeUntil.IsZero() {
+				return req.matrix().Matches(nil), nil
+			}
+		}
+		if next == "" {
+			return true, nil
+		}
+		page.After = next
+	}
 }
 
 func (s *Kit) formatRemoteSourceRequest(
@@ -165,15 +234,18 @@ func (s *Kit) formatRemoteSourceRequest(
 }
 
 // P2SourceRequest admits only the P2 resources p2.Classify names, without
-// a query or range, and validates their bytes before they are served or
-// cached; an index or metadata file is metadata to the source boundary.
+// a range, and validates their bytes before they are served or cached; an
+// index or metadata file is metadata to the source boundary. A query
+// refuses none: the source boundary passes it to the upstream only under
+// Propagate Query Params, as for any remote file (#1350, the rule #1349
+// settled for Debian from 6.20's HttpRepo.addQueryParams).
 func P2SourceRequest(q source.Request) (source.Request, error) {
 	name := q.Resource.Path
 	kind := p2.Classify(name)
 	if kind == p2.KindInvalid {
 		return q, kernel.ErrNotFound
 	}
-	if q.Resource.Query != "" || q.Resource.Range != "" {
+	if q.Resource.Range != "" {
 		return q, source.ErrInvalidRequest
 	}
 	q.Resource.Variant = "p2-native-v1"
@@ -207,7 +279,10 @@ func P2SourceRequest(q source.Request) (source.Request, error) {
 // ServeRemoteStream answers an item GET or HEAD from a remote source's
 // result: the stream itself, or the checksum sidecar of the file it
 // describes, once RemoteDeliveryAllowed admits it. A use is recorded only
-// for a complete response.
+// for a complete response. The request's matrix parameters are not matched
+// here: a caller matches a copy the cache held before the read
+// (RemoteCopyMatches), and a stream the upstream answered was asked for
+// with them.
 func (s *Kit) ServeRemoteStream(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -220,11 +295,6 @@ func (s *Kit) ServeRemoteStream(
 ) {
 	ctx := r.Context()
 
-	if !req.matrix().Matches(nil) {
-		_ = result.Stream.Body.Close()
-		httpkit.WriteErr(w, r, ItemNotFound())
-		return
-	}
 	if !s.RemoteDeliveryAllowed(w, r, result, anonymous) {
 		return
 	}
@@ -239,14 +309,14 @@ func (s *Kit) ServeRemoteStream(
 			checksum = strings.Repeat("0", size)
 		}
 		sw := &StatusWriter{ResponseWriter: w}
-		s.serveRemoteChecksum(sw, r, checksum, result.Stream.Modified)
+		s.serveRemoteChecksum(sw, r, req.Path, checksum, result.Stream.Modified)
 		if sw.Complete(r) && result.Used != nil {
 			_ = result.Used(ctx)
 		}
 		return
 	}
 	if resource.ChecksumOnly && r.Method != http.MethodHead {
-		s.serveColdChecksum(w, r, result.Stream)
+		s.serveColdChecksum(w, r, req.Path, result.Stream)
 		return
 	}
 	if resource.ChecksumOnly {
@@ -254,7 +324,7 @@ func (s *Kit) ServeRemoteStream(
 		// characters. HEAD cannot inspect that body, but must describe the same
 		// representation rather than the upstream checksum file's byte length.
 		result.Stream.Size = 64
-		result.Stream.MediaType = "text/plain"
+		result.Stream.MediaType = checksumType(r, req.Path)
 		result.Stream.ETag = ""
 		result.Stream.Checksums = kernel.Checksums{}
 		result.Stream.ContentRange = ""
@@ -316,14 +386,14 @@ func RemoteResource(r *http.Request, path string) source.Resource {
 	return resource
 }
 
-// AlpineSourceRequest refuses a query on an Alpine package or index, and
-// validates a remote APKINDEX as metadata before it is served or cached.
+// AlpineSourceRequest validates a remote APKINDEX as metadata, and a
+// package with the parser local uploads go through, before either is
+// served or cached. A query refuses neither: the source boundary passes it
+// to the upstream only under Propagate Query Params, as for any remote file
+// (#1350, the rule #1349 settled for Debian from 6.20's
+// HttpRepo.addQueryParams).
 func AlpineSourceRequest(q source.Request) (source.Request, error) {
 	path := q.Resource.Path
-	if q.Resource.Query != "" &&
-		(strings.HasSuffix(path, ".apk") || strings.HasSuffix(path, "/"+alpine.IndexName)) {
-		return q, source.ErrInvalidRequest
-	}
 	if strings.HasSuffix(path, "/"+alpine.IndexName) {
 		if _, _, _, ok := alpine.ParseIndexPath(path); !ok {
 			return q, kernel.ErrNotFound
@@ -375,14 +445,14 @@ func AlpineSourceRequest(q source.Request) (source.Request, error) {
 }
 
 // CranSourceRequest validates a remote CRAN index as metadata and a
-// package with the parser local uploads go through, refuses a query on
-// either, and answers the paths CRAN never serves remotely as not found.
+// package with the parser local uploads go through, and answers the paths
+// CRAN never serves remotely as not found. A query refuses neither: the
+// source boundary passes it to the upstream only under Propagate Query
+// Params, as for any remote file (#1350, the rule #1349 settled for Debian
+// from 6.20's HttpRepo.addQueryParams).
 func CranSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
 	if feed, _, ok := cran.IndexPath(p); ok {
-		if q.Resource.Query != "" {
-			return q, source.ErrInvalidRequest
-		}
 		q.Resource.Kind = source.ResourceKindMetadata
 		q.Resource.PermissionFolder = true
 		q.Resource.PermissionPath = feed
@@ -411,9 +481,6 @@ func CranSourceRequest(q source.Request) (source.Request, error) {
 		return q, nil
 	}
 	if cran.IsPackage(p) {
-		if q.Resource.Query != "" {
-			return q, source.ErrInvalidRequest
-		}
 		q.Resource.Variant = "cran-package-v1"
 		q.Resource.Validate = func(ctx context.Context, body io.ReadSeeker, size int64) error {
 			if _, err := cran.ReadPackage(ctx, body, size, p); err != nil {
@@ -433,13 +500,13 @@ func CranSourceRequest(q source.Request) (source.Request, error) {
 	return q, nil
 }
 
-// OpkgSourceRequest refuses a query on an opkg feed index or package, and
-// validates a remote feed index as metadata before it is served or cached.
+// OpkgSourceRequest validates a remote feed index as metadata before it is
+// served or cached, and a package with the parser local uploads go through.
+// A query refuses neither: the source boundary passes it to the upstream
+// only under Propagate Query Params, as for any remote file (#1350, the
+// rule #1349 settled for Debian from 6.20's HttpRepo.addQueryParams).
 func OpkgSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
-	if q.Resource.Query != "" && (opkg.IsIndex(p) || strings.HasSuffix(p, ".ipk")) {
-		return q, source.ErrInvalidRequest
-	}
 	if opkg.IsIndex(p) {
 		if _, ok := opkg.FeedPath(p); !ok {
 			return q, kernel.ErrNotFound
@@ -501,15 +568,13 @@ func OpkgSourceRequest(q source.Request) (source.Request, error) {
 	return q, nil
 }
 
-// RPMSourceRequest refuses a query on an RPM package or repodata file, and
-// validates a remote package and the repodata files before they are served
-// or cached.
+// RPMSourceRequest validates a remote package and the repodata files
+// before they are served or cached. A query refuses neither: the source
+// boundary passes it to the upstream only under Propagate Query Params, as
+// for any remote file (#1350, the rule #1349 settled for Debian from 6.20's
+// HttpRepo.addQueryParams).
 func RPMSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
-	if q.Resource.Query != "" && (strings.HasSuffix(p, ".rpm") ||
-		strings.Contains(p, "repodata/")) {
-		return q, source.ErrInvalidRequest
-	}
 	if strings.HasSuffix(p, ".rpm") {
 		q.Resource.Variant = "rpm-package-v1"
 		q.Resource.Validate = func(ctx context.Context, r io.ReadSeeker, size int64) error {
@@ -575,6 +640,7 @@ func RPMSourceIntegrity() error {
 func (s *Kit) serveRemoteChecksum(
 	w http.ResponseWriter,
 	r *http.Request,
+	name string,
 	value string,
 	modified time.Time,
 ) {
@@ -582,7 +648,7 @@ func (s *Kit) serveRemoteChecksum(
 		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Type", checksumType(r, name))
 	http.ServeContent(w, r, "", modified, strings.NewReader(value))
 }
 
@@ -621,6 +687,7 @@ func (s *Kit) recordCacheUse(ctx context.Context, f Found) {
 func (s *Kit) serveColdChecksum(
 	w http.ResponseWriter,
 	r *http.Request,
+	name string,
 	stream *source.Stream,
 ) {
 	defer func() { _ = stream.Body.Close() }()
@@ -638,7 +705,7 @@ func (s *Kit) serveColdChecksum(
 		)
 		return
 	}
-	s.serveRemoteChecksum(w, r, sums.SHA256, stream.Modified)
+	s.serveRemoteChecksum(w, r, name, sums.SHA256, stream.Modified)
 }
 
 func (s *Kit) mavenSourceRequest(

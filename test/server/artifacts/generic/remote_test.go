@@ -495,6 +495,9 @@ func TestAccGenericRemoteRejectsMalformedColdChecksum(t *testing.T) {
 	}
 }
 
+// TestAccGenericRemoteColdChecksumHeadDescribesNormalizedGet: a HEAD of a
+// SHA-256 the remote would retrieve describes the GET's normalized answer,
+// typed application/x-checksum as a checksum HEAD is (#1378).
 func TestAccGenericRemoteColdChecksumHeadDescribesNormalizedGet(t *testing.T) {
 	w := newRemoteWorld(t)
 	w.c.RetrieveSha256FromServer = new(true)
@@ -510,7 +513,7 @@ func TestAccGenericRemoteColdChecksumHeadDescribesNormalizedGet(t *testing.T) {
 	head := w.request("HEAD", "/artifactory/remote/named.bin.sha256", "reader", "")
 	remoteStatus(t, head, 200)
 	if head.Header().Get("Content-Length") != "64" ||
-		head.Header().Get("Content-Type") != "text/plain" ||
+		head.Header().Get("Content-Type") != "application/x-checksum" ||
 		head.Header().Get("ETag") != "" ||
 		head.Header().Get("X-Checksum-Sha256") != "" ||
 		head.Body.Len() != 0 {

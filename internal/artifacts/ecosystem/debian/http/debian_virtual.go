@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
@@ -344,7 +345,7 @@ func (s DebianAPI) serveVirtualDebianFile(
 			httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian virtual "+what, err))
 			return
 		}
-		s.ServeFile(w, r, st, itemkit.Found{Repo: member, Item: it}, p)
+		s.ServeItemFile(w, r, st, itemkit.Found{Repo: member, Item: it}, p)
 		return
 	}
 	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
@@ -367,16 +368,25 @@ func (s DebianAPI) serveVirtualDebianSources(
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	ctx := r.Context()
-	// A remote member's own GET of its index refuses matrix parameters
-	// (serveDebianIndex), so that member lacks the file here. It takes a
-	// query, which it passes on as its own GET would (#1349).
-	if member.Class == repo.Remote && len(req.Props) != 0 {
-		return false
-	}
-	if member.Class != repo.Remote && len(req.Props) != 0 {
-		it, err := st.Items().Get(ctx, member.Key, false, req.Path)
-		if err == nil && !it.Folder {
-			err = matchDebianMatrix(ctx, st, it, req)
+	// A member takes the request as its own GET of the index would
+	// (serveDebianIndex): a stored index, or a copy a remote member's cache
+	// holds, is matched against the matrix parameters, and a member whose
+	// file does not match lacks it here. A remote member passes the query
+	// (#1349) and the matrix parameters (#1371) to its upstream.
+	if len(req.Props) != 0 {
+		var err error
+		if member.Class == repo.Remote {
+			var matches bool
+			matches, err = itemkit.RemoteCopyMatches(ctx, st, member, req.Path, req)
+			if err == nil && !matches {
+				err = kernel.ErrNotFound
+			}
+		} else {
+			var it model.Item
+			it, err = st.Items().Get(ctx, member.Key, false, req.Path)
+			if err == nil && !it.Folder {
+				err = matchDebianMatrix(ctx, st, it, req)
+			}
 		}
 		if errors.Is(err, kernel.ErrNotFound) {
 			return false
@@ -387,7 +397,8 @@ func (s DebianAPI) serveVirtualDebianSources(
 		}
 	}
 	body, checkPermission, err := s.debianMemberRead(ctx, st, member, req.Path,
-		itemkit.RemoteResource(r, req.Path).Query, p, acc)
+		itemkit.RemoteResource(r, req.Path).Query, pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
+		p, acc)
 	if errors.Is(err, kernel.ErrNotFound) || errors.Is(err, source.ErrDenied) {
 		return false
 	}
@@ -429,11 +440,24 @@ func (s DebianAPI) serveRemoteVirtualDebianFile(
 	}
 	// The member gets the request as its own GET would: the query, less
 	// the server's own controls such as skipUpdateStats, and the matrix
-	// parameters, which its stream or cached file must match.
+	// parameters, which a copy its cache holds must match and which its
+	// upstream is asked with. 7.x resolves a virtual repository's remote
+	// member through that member's own internalGetInfo, which matches only
+	// a cached copy and serves the upstream's answer unmatched (7.161.26),
+	// so a member whose cached copy does not match is passed over and a
+	// stream or a fresh copy is served whatever the parameters.
+	if matches, err := itemkit.RemoteCopyMatches(
+		r.Context(), s.Store, member, req.Path, req,
+	); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian virtual "+what, err))
+		return true
+	} else if !matches {
+		return false
+	}
 	q := source.Request{
 		Repo: member, Subject: accessapi.SubjectOf(p), Access: acc.Decider,
 		Project: member.ProjectKey, Resource: itemkit.RemoteResource(r, req.Path),
-		Matrix: debianMatrix(req),
+		Matrix: debianMatrix(req), MatrixParams: pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
 	}
 	q, err := itemkit.DebianSourceRequest(q)
 	if errors.Is(err, kernel.ErrNotFound) && strings.HasPrefix(req.Path, "dists/") {
@@ -461,12 +485,6 @@ func (s DebianAPI) serveRemoteVirtualDebianFile(
 		return true
 	}
 	if result.Stream != nil {
-		// A stream carries no properties, so only a mandatory key refuses
-		// it, as the item route's trace of a remote read answers [I].
-		if !q.Matrix.Matches(nil) {
-			_ = result.Stream.Body.Close()
-			return false
-		}
 		s.ServeRemoteStream(w, r, result, member, req, q.Resource, "", p.Anonymous)
 		return true
 	}
@@ -481,15 +499,7 @@ func (s DebianAPI) serveRemoteVirtualDebianFile(
 		)
 		return true
 	}
-	if err := matchDebianMatrix(r.Context(), s.Store, *result.Item, req); errors.Is(
-		err, kernel.ErrNotFound,
-	) {
-		return false
-	} else if err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Debian virtual "+what, err))
-		return true
-	}
-	s.ServeFile(w, r, s.Store,
+	s.ServeItemFile(w, r, s.Store,
 		itemkit.Found{Repo: member, Item: *result.Item, Used: result.Used}, p)
 	return true
 }
@@ -509,13 +519,14 @@ func (s DebianAPI) debianMemberBytes(
 	ctx context.Context, st itemkit.Store, member repo.Config, path string,
 	p kernel.Principal, acc itemkit.Access,
 ) ([]byte, func(context.Context, string) error, error) {
-	return s.debianMemberRead(ctx, st, member, path, "", p, acc)
+	return s.debianMemberRead(ctx, st, member, path, "", "", p, acc)
 }
 
-// debianMemberRead is debianMemberBytes for a request that carried query,
-// which a remote member passes to its upstream as its own GET would.
+// debianMemberRead is debianMemberBytes for a request that carried query
+// and the matrix parameters matrix (source.Request.MatrixParams), which a
+// remote member passes to its upstream as its own GET would.
 func (s DebianAPI) debianMemberRead(
-	ctx context.Context, st itemkit.Store, member repo.Config, path, query string,
+	ctx context.Context, st itemkit.Store, member repo.Config, path, query, matrix string,
 	p kernel.Principal, acc itemkit.Access,
 ) ([]byte, func(context.Context, string) error, error) {
 	if !acc.File(member, path, accessapi.ActionRead) {
@@ -530,7 +541,7 @@ func (s DebianAPI) debianMemberRead(
 		}
 		q := source.Request{
 			Repo: member, Subject: accessapi.SubjectOf(p), Access: acc.Decider,
-			Project: member.ProjectKey,
+			Project: member.ProjectKey, MatrixParams: matrix,
 			Resource: source.Resource{
 				Path: path, EscapedPath: httpkit.EscapePath(path), Method: http.MethodGet,
 				Query: query,

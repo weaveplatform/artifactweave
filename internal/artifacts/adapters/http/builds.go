@@ -142,11 +142,16 @@ func (s ArtifactoryAPI) GetAllBuilds(
 	return artgen.GetAllBuilds200JSONResponse{Uri: httpkit.PtrTo(buildURI(ctx)), Builds: &list}, nil
 }
 
-// UploadBuild publishes a build-info document and answers 204, as 7.x
-// documents (uploadbuild-1) and Artifactory 6.20's BuildResource.addBuild
-// does; the JFrog CLI accepts 200, 201 and 204. The handler reads the raw
-// body the router's request details kept rather than the decoded one, which
-// would drop the fields the spec does not list.
+// UploadBuild publishes a build-info document and answers 204 with the
+// stored document's SHA-256 in X-Checksum-Sha256. JFrog's uploadbuild page
+// documents 200 and no header, but no 7.x release note or Jira issue
+// records a move from the 204 that Artifactory 6.20's
+// BuildResource.addBuild answers (RTFACT-20291 reports it too), so the 204
+// stays until P19 compares it with 7.x. The JFrog CLI accepts 200, 201 and
+// 204, and reads the header for --detailed-summary (jfrog-client-go
+// PublishBuildInfo). The handler reads the raw body the router's request
+// details kept rather than the decoded one, which would drop the fields the
+// spec does not list.
 func (s ArtifactoryAPI) UploadBuild(
 	ctx context.Context,
 	req artgen.UploadBuildRequestObject,

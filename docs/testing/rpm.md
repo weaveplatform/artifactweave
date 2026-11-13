@@ -37,6 +37,17 @@ reconcile hosted indexes. Virtual repositories compose readable member
 metadata in configured order and serve packages from the selected member;
 their view is generated from current member metadata.
 
+A GET of a virtual repository's repodata or package, like a GET of a local
+or remote repository's files, takes the query parameters Artifactory
+documents for any file, such as `skipUpdateStats`, and matrix parameters,
+matched against the file's properties as on any other GET, once the caller's
+read permission is settled (#1350). The composed repodata carries no
+properties, so only a mandatory key (`;key+=value`) refuses it, and a virtual
+package GET passes over a member whose file does not match for the next
+member that lists the package. A remote member is asked with the matrix
+parameters after the path, and the query only when its Propagate Query
+Params is set; a copy its cache already holds is matched first.
+
 Use `primaryKeyPairRef` with a GPG keypair to sign local or federated
 `repomd.xml`. A virtual repository uses its `keyPair`. Download the public key
 from `GET /artifactory/api/security/keypair/public/repositories/<repo>` and set

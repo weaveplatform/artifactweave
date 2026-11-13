@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/cran"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
@@ -34,6 +35,9 @@ type cranIndexView struct {
 	checkPermission func(context.Context, string) error
 	revalidate      func(context.Context) error
 	used            func(context.Context) error
+	// stored is a local or federated repository's PACKAGES item, whose
+	// properties a request's matrix parameters are matched against.
+	stored *model.Item
 }
 
 type cranCandidate struct {
@@ -93,8 +97,7 @@ func (s CranAPI) serveCranIndex(
 ) {
 	ctx := r.Context()
 	feed, name, ok := cran.IndexPath(req.Path)
-	if !ok || len(req.Props) != 0 || r.URL.RawQuery != "" ||
-		cached && c.Class != repo.Remote {
+	if !ok || cached && c.Class != repo.Remote {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
@@ -112,6 +115,31 @@ func (s CranAPI) serveCranIndex(
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "CRAN index download", err))
 		return
 	}
+	// An index takes a query and matrix parameters as any other file's GET
+	// does (#1350): 7.x documents skipUpdateStats and trace for a GET of any
+	// file (RTFACT-25636, 7.21.3), so a query changes nothing here, and
+	// matrix parameters "make resolution conditional on properties"
+	// (JFrog's guide, Using Properties in Deployment and Resolution). A
+	// virtual repository's composed index carries no properties [I], so
+	// only a mandatory key refuses it; a stored index is matched below, and
+	// a remote's as any remote file is (#1371).
+	switch c.Class {
+	case repo.Virtual:
+		if !req.Matrix().Matches(nil) {
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+			return
+		}
+	case repo.Remote:
+		matches, err := itemkit.RemoteCopyMatches(ctx, st, c, req.Path, req)
+		if err != nil {
+			httpkit.WriteErr(w, r, s.InternalError(ctx, "CRAN index properties", err))
+			return
+		}
+		if !matches {
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+			return
+		}
+	}
 	var candidates []cranCandidate
 	var err error
 	var used func(context.Context) error
@@ -120,7 +148,16 @@ func (s CranAPI) serveCranIndex(
 			map[string]bool{})
 	} else {
 		var view cranIndexView
-		view, err = s.cranMemberIndex(ctx, st, c, cached, false, req.Path, p, acc)
+		view, err = s.cranIndexRead(ctx, st, c, cached, false, req.Path,
+			itemkit.RemoteResource(r, req.Path).Query, pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
+			p, acc)
+		if err == nil && view.stored != nil {
+			var matches bool
+			matches, err = itemkit.MatchesMatrix(ctx, st, *view.stored, req)
+			if err == nil && !matches {
+				err = itemkit.ItemNotFound()
+			}
+		}
 		if err == nil && view.revalidate != nil {
 			err = view.revalidate(ctx)
 		}
@@ -200,6 +237,19 @@ func (s CranAPI) cranMemberIndex(
 	ctx context.Context, st itemkit.Store, c repo.Config, cached, lookup bool, indexPath string,
 	p kernel.Principal, acc itemkit.Access,
 ) (cranIndexView, error) {
+	return s.cranIndexRead(ctx, st, c, cached, lookup, indexPath, "", "", p, acc)
+}
+
+// cranIndexRead reads the index as cranMemberIndex does, and passes a
+// remote's upstream the client's query (only under Propagate Query Params,
+// which the source boundary applies) and its matrix parameters
+// (source.Request.MatrixParams), as for any remote file. A virtual index's
+// member and a package GET's lookup read a document the client did not ask
+// for, so they pass neither (cranMemberIndex).
+func (s CranAPI) cranIndexRead(
+	ctx context.Context, st itemkit.Store, c repo.Config, cached, lookup bool,
+	indexPath, rawQuery, matrix string, p kernel.Principal, acc itemkit.Access,
+) (cranIndexView, error) {
 	view := cranIndexView{repo: c}
 	var body []byte
 	var err error
@@ -215,8 +265,8 @@ func (s CranAPI) cranMemberIndex(
 		}
 		query := source.Request{
 			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
-			CacheOnly: cached,
-			Resource:  source.Resource{Path: indexPath, Method: http.MethodGet},
+			CacheOnly: cached, MatrixParams: matrix,
+			Resource: source.Resource{Path: indexPath, Method: http.MethodGet, Query: rawQuery},
 		}
 		query, err = itemkit.CranSourceRequest(query)
 		if err != nil {
@@ -269,6 +319,7 @@ func (s CranAPI) cranMemberIndex(
 		if it.Folder {
 			return view, kernel.ErrNotFound
 		}
+		view.stored = &it
 		body, err = s.readCranBlob(ctx, it.Actual.SHA256)
 		if err != nil {
 			return view, fmt.Errorf("cran: hosted index body: %w", err)
@@ -314,7 +365,10 @@ func (s CranAPI) readCranBlob(ctx context.Context, sha string) ([]byte, error) {
 // virtual indexes do (RTFACT-30656), so the name belongs to that row. With
 // download true, for a package GET, such a row is left out before names are
 // claimed, so the GET passes over that member to the next one that lists
-// the name, as it did before the index kept the row.
+// the name, as it did before the index kept the row. A package GET also
+// keeps the later members' rows for the path that claimed the name, so a GET
+// whose matrix parameters the first member's file does not match can pass
+// over to the next (serveCranPackage).
 func (s CranAPI) cranCandidates(
 	ctx context.Context, st itemkit.Store, c repo.Config, indexPath string,
 	p kernel.Principal, acc itemkit.Access, download bool, seen map[string]bool,
@@ -325,7 +379,8 @@ func (s CranAPI) cranCandidates(
 	seen[c.Key] = true
 	defer delete(seen, c.Key)
 	var out []cranCandidate
-	selected := map[string]bool{}
+	// selected maps a package name to the path of the row that claimed it.
+	selected := map[string]string{}
 	for _, key := range c.Repositories {
 		member, err := st.Repos().Get(ctx, key)
 		if errors.Is(err, kernel.ErrNotFound) {
@@ -381,14 +436,17 @@ func (s CranAPI) cranCandidates(
 			return nil, fmt.Errorf("cran: member %s index: %w", key, err)
 		}
 		for _, entry := range entries {
-			if selected[entry.pkg.Name] ||
+			if claimed, ok := selected[entry.pkg.Name]; ok &&
+				(!download || claimed != entry.pkg.Path) ||
 				!acc.File(c, entry.pkg.Path, accessapi.ActionRead) {
 				continue
 			}
 			if download && generic.CheckDownload(c, entry.pkg.Path, false) != nil {
 				continue
 			}
-			selected[entry.pkg.Name] = true
+			if _, ok := selected[entry.pkg.Name]; !ok {
+				selected[entry.pkg.Name] = entry.pkg.Path
+			}
 			out = append(out, entry)
 		}
 	}
@@ -415,7 +473,7 @@ func (s CranAPI) serveCranPackage(
 	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
-	if len(req.Props) != 0 || r.URL.RawQuery != "" || cached && c.Class != repo.Remote {
+	if cached && c.Class != repo.Remote {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
@@ -433,6 +491,20 @@ func (s CranAPI) serveCranPackage(
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "CRAN package download", err))
 		return
+	}
+	// A remote's cached copy of the package is matched against the matrix
+	// parameters before the index that pins it is read, so a copy that does
+	// not match asks the upstream nothing (itemkit.RemoteCopyMatches).
+	if c.Class == repo.Remote {
+		matches, err := itemkit.RemoteCopyMatches(r.Context(), st, c, req.Path, req)
+		if err != nil {
+			httpkit.WriteErr(w, r, s.InternalError(r.Context(), "CRAN package properties", err))
+			return
+		}
+		if !matches {
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+			return
+		}
 	}
 	feed, _, _, _ := cran.PackagePath(req.Path)
 	indexPath := feed + "/" + cran.PackagesName
@@ -458,11 +530,29 @@ func (s CranAPI) serveCranPackage(
 			pkgroute.SourceError(err, p.Anonymous)))
 		return
 	}
+	// A member's file that the matrix parameters do not match does not
+	// serve the GET, and the next member that lists the package is asked,
+	// as 7.x's virtual download passes over a member that does not find the
+	// file (ArtifactoryVirtualDownloadStrategy.processStandard, 7.161.26),
+	// a property mismatch among the reasons (DbStoringRepoMixin.getInfo)
+	// [I]. A remote member's copy is matched only when its cache holds one.
 	for _, candidate := range candidates {
 		if candidate.pkg.Path != req.Path {
 			continue
 		}
 		if candidate.repo.Class == repo.Remote {
+			if c.Class == repo.Virtual {
+				matches, matchErr := itemkit.RemoteCopyMatches(
+					r.Context(), st, candidate.repo, req.Path, req)
+				if matchErr != nil {
+					httpkit.WriteErr(w, r,
+						s.InternalError(r.Context(), "CRAN member package properties", matchErr))
+					return
+				}
+				if !matches {
+					continue
+				}
+			}
 			s.serveRemoteCranPackage(w, r, candidate.repo, cached, req, candidate.pkg, p, acc)
 			return
 		}
@@ -475,7 +565,16 @@ func (s CranAPI) serveCranPackage(
 			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
-		s.ServeFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
+		matches, matchErr := itemkit.MatchesMatrix(r.Context(), st, it, req)
+		if matchErr != nil {
+			httpkit.WriteErr(w, r,
+				s.InternalError(r.Context(), "CRAN member package properties", matchErr))
+			return
+		}
+		if !matches {
+			continue
+		}
+		s.ServeItemFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
 		return
 	}
 	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
@@ -492,12 +591,15 @@ func (s CranAPI) serveRemoteCranPackage(
 		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "CRAN source", source.ErrUnavailable))
 		return
 	}
+	// The upstream is asked with the client's query, under Propagate Query
+	// Params, and its matrix parameters, as for any remote file (#1371).
 	query := source.Request{
 		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
-		CacheOnly: cached,
+		CacheOnly: cached, MatrixParams: pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
 		Resource: source.Resource{
 			Kind: source.ResourceKindArtifact, Path: req.Path, Method: r.Method,
 			Checksums: kernel.Checksums{MD5: expected.MD5},
+			Query:     itemkit.RemoteResource(r, req.Path).Query,
 		},
 	}
 	query, err := itemkit.CranSourceRequest(query)
@@ -525,6 +627,6 @@ func (s CranAPI) serveRemoteCranPackage(
 		httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
 		return
 	}
-	s.ServeFile(w, r, s.Store,
+	s.ServeItemFile(w, r, s.Store,
 		itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }

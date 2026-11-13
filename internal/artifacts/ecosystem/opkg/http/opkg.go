@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/opkg"
@@ -37,6 +38,9 @@ type opkgIndexView struct {
 	checkPermission func(context.Context, string) error
 	revalidate      func(context.Context) error
 	used            func(context.Context) error
+	// stored is a local or federated repository's feed item, whose
+	// properties a request's matrix parameters are matched against.
+	stored *model.Item
 }
 
 type opkgCandidate struct {
@@ -88,8 +92,7 @@ func (s opkgItems) serveOpkgIndex(
 ) {
 	ctx := r.Context()
 	feed, ok := opkg.FeedPath(req.Path)
-	if !ok || len(req.Props) != 0 || r.URL.RawQuery != "" ||
-		cached && c.Class != repo.Remote {
+	if !ok || cached && c.Class != repo.Remote {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
@@ -106,6 +109,18 @@ func (s opkgItems) serveOpkgIndex(
 	// as the remote does.
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "Opkg feed download", err))
+		return
+	}
+	// A feed file takes a query and matrix parameters as any other file's
+	// GET does (#1350): 7.x documents skipUpdateStats and trace for a GET of
+	// any file (RTFACT-25636, 7.21.3), so a query changes nothing here, and
+	// matrix parameters "make resolution conditional on properties"
+	// (JFrog's guide, Using Properties in Deployment and Resolution). A
+	// virtual repository's composed feed carries no properties [I], so only
+	// a mandatory key refuses it; a stored feed is matched below, and a
+	// remote's as any remote file is (#1371).
+	if c.Class == repo.Virtual && !req.Matrix().Matches(nil) {
+		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
 	var body []byte
@@ -136,10 +151,34 @@ func (s opkgItems) serveOpkgIndex(
 			return
 		}
 	} else {
-		view, err := s.opkgMemberIndex(ctx, st, c, cached, req.Path, p, acc)
+		if c.Class == repo.Remote {
+			matches, err := itemkit.RemoteCopyMatches(ctx, st, c, req.Path, req)
+			if err != nil {
+				httpkit.WriteErr(w, r, s.InternalError(ctx, "Opkg feed properties", err))
+				return
+			}
+			if !matches {
+				httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+				return
+			}
+		}
+		view, err := s.opkgIndexRead(ctx, st, c, cached, req.Path,
+			itemkit.RemoteResource(r, req.Path).Query, pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
+			p, acc)
 		if err != nil {
 			httpkit.WriteErr(w, r, s.ItemError(ctx, "Opkg feed", err))
 			return
+		}
+		if view.stored != nil {
+			matches, err := itemkit.MatchesMatrix(ctx, st, *view.stored, req)
+			if err != nil {
+				httpkit.WriteErr(w, r, s.InternalError(ctx, "Opkg feed properties", err))
+				return
+			}
+			if !matches {
+				httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+				return
+			}
 		}
 		if view.revalidate != nil {
 			if err := view.revalidate(ctx); err != nil {
@@ -192,9 +231,24 @@ func opkgPackageReadable(
 	return true, nil
 }
 
+// opkgMemberIndex reads the feed at indexPath of a local, federated or
+// remote repository as a lookup: a virtual feed's member or the feed that
+// pins an IPK's SHA-256, which the client did not ask for, so nothing of
+// the client's request goes to a remote's upstream.
 func (s opkgItems) opkgMemberIndex(
 	ctx context.Context, st itemkit.Store, c repo.Config, cached bool, indexPath string,
 	p kernel.Principal, acc itemkit.Access,
+) (opkgIndexView, error) {
+	return s.opkgIndexRead(ctx, st, c, cached, indexPath, "", "", p, acc)
+}
+
+// opkgIndexRead reads the feed at indexPath as opkgMemberIndex does, and
+// passes a remote's upstream the client's query (only under Propagate
+// Query Params, which the source boundary applies) and its matrix
+// parameters (source.Request.MatrixParams), as for any remote file.
+func (s opkgItems) opkgIndexRead(
+	ctx context.Context, st itemkit.Store, c repo.Config, cached bool,
+	indexPath, rawQuery, matrix string, p kernel.Principal, acc itemkit.Access,
 ) (opkgIndexView, error) {
 	view := opkgIndexView{repo: c}
 	if c.Class == repo.Remote {
@@ -203,8 +257,8 @@ func (s opkgItems) opkgMemberIndex(
 		}
 		query := source.Request{
 			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
-			CacheOnly: cached,
-			Resource:  source.Resource{Path: indexPath, Method: http.MethodGet},
+			CacheOnly: cached, MatrixParams: matrix,
+			Resource: source.Resource{Path: indexPath, Method: http.MethodGet, Query: rawQuery},
 		}
 		query, err := itemkit.OpkgSourceRequest(query)
 		if err != nil {
@@ -242,6 +296,7 @@ func (s opkgItems) opkgMemberIndex(
 		if it.Folder {
 			return view, kernel.ErrNotFound
 		}
+		view.stored = &it
 		view.raw, err = s.readOpkgBlob(ctx, it.Actual.SHA256)
 		if err != nil {
 			return view, err
@@ -272,7 +327,10 @@ func (s opkgItems) readOpkgBlob(ctx context.Context, sha string) ([]byte, error)
 }
 
 // opkgCandidates walks ordered virtual members. A duplicate path belongs to
-// the first readable member. A member whose download policy refuses its
+// the first readable member; for an IPK GET (download true) the later
+// members' rows for it follow, so a GET whose matrix parameters the first
+// member's file does not match can pass over to the next (serveOpkgPackage).
+// A member whose download policy refuses its
 // feed takes no part in the feed, and only a blacked-out one in an IPK GET
 // (opkgMemberRefusesFeed). With download false, for the feed, a row stays
 // when the member's or the virtual repository's patterns reject its file,
@@ -339,7 +397,7 @@ func (s opkgItems) opkgCandidates(
 			return nil, fmt.Errorf("opkg: member %s index: %w", key, err)
 		}
 		for _, entry := range entries {
-			if selected[entry.pkg.Path] ||
+			if !download && selected[entry.pkg.Path] ||
 				!acc.File(c, entry.pkg.Path, accessapi.ActionRead) {
 				continue
 			}
@@ -373,7 +431,7 @@ func (s opkgItems) serveOpkgPackage(
 	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
-	if len(req.Props) != 0 || r.URL.RawQuery != "" || cached && c.Class != repo.Remote {
+	if cached && c.Class != repo.Remote {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
@@ -391,6 +449,20 @@ func (s opkgItems) serveOpkgPackage(
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Opkg package download", err))
 		return
+	}
+	// A remote's cached copy of the IPK is matched against the matrix
+	// parameters before the feed that pins it is read, so a copy that does
+	// not match asks the upstream nothing (itemkit.RemoteCopyMatches).
+	if c.Class == repo.Remote {
+		matches, err := itemkit.RemoteCopyMatches(r.Context(), st, c, req.Path, req)
+		if err != nil {
+			httpkit.WriteErr(w, r, s.InternalError(r.Context(), "Opkg package properties", err))
+			return
+		}
+		if !matches {
+			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+			return
+		}
 	}
 	indexPath := opkg.IndexPath(opkg.Feed(req.Path), opkg.PackagesName)
 	var candidates []opkgCandidate
@@ -414,11 +486,29 @@ func (s opkgItems) serveOpkgPackage(
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Opkg package index", err))
 		return
 	}
+	// A member's file that the matrix parameters do not match does not
+	// serve the GET, and the next member that lists the IPK is asked, as
+	// 7.x's virtual download passes over a member that does not find the
+	// file (ArtifactoryVirtualDownloadStrategy.processStandard, 7.161.26),
+	// a property mismatch among the reasons (DbStoringRepoMixin.getInfo)
+	// [I]. A remote member's copy is matched only when its cache holds one.
 	for _, candidate := range candidates {
 		if candidate.pkg.Path != req.Path {
 			continue
 		}
 		if candidate.repo.Class == repo.Remote {
+			if c.Class == repo.Virtual {
+				matches, err := itemkit.RemoteCopyMatches(
+					r.Context(), st, candidate.repo, req.Path, req)
+				if err != nil {
+					httpkit.WriteErr(w, r,
+						s.InternalError(r.Context(), "Opkg member package properties", err))
+					return
+				}
+				if !matches {
+					continue
+				}
+			}
 			s.serveRemoteOpkgPackage(w, r, candidate.repo, cached, req, candidate.pkg, p, acc)
 			return
 		}
@@ -431,7 +521,16 @@ func (s opkgItems) serveOpkgPackage(
 			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
-		s.ServeFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
+		matches, err := itemkit.MatchesMatrix(r.Context(), st, it, req)
+		if err != nil {
+			httpkit.WriteErr(w, r,
+				s.InternalError(r.Context(), "Opkg member package properties", err))
+			return
+		}
+		if !matches {
+			continue
+		}
+		s.ServeItemFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
 		return
 	}
 	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
@@ -447,12 +546,15 @@ func (s opkgItems) serveRemoteOpkgPackage(
 		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "Opkg source", source.ErrUnavailable))
 		return
 	}
+	// The upstream is asked with the client's query, under Propagate Query
+	// Params, and its matrix parameters, as for any remote file (#1371).
 	query := source.Request{
 		Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey,
-		CacheOnly: cached,
+		CacheOnly: cached, MatrixParams: pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
 		Resource: source.Resource{
 			Kind: source.ResourceKindArtifact, Path: req.Path, Method: r.Method,
 			Checksums: kernel.Checksums{SHA256: expected.SHA256},
+			Query:     itemkit.RemoteResource(r, req.Path).Query,
 		},
 	}
 	query, err := itemkit.OpkgSourceRequest(query)
@@ -481,6 +583,6 @@ func (s opkgItems) serveRemoteOpkgPackage(
 		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "Opkg source", source.ErrInvalidResult))
 		return
 	}
-	s.ServeFile(w, r, s.Store,
+	s.ServeItemFile(w, r, s.Store,
 		itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }

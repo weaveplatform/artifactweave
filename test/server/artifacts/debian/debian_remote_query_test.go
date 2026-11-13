@@ -199,32 +199,6 @@ func TestAccDebianRemoteIndexServesAQueryAsWithoutOne(t *testing.T) {
 	}
 }
 
-// TestAccDebianRemoteIndexKeepsRefusingAMatrixParameter (#1349): 7.x
-// appends a request's matrix parameters to a remote repository's upstream
-// URL (RTFACT-26349), which artifactweave's remote read does not do for any
-// format (#1371), so a remote Debian index asked for with one still answers
-// 404 "Could not find resource" to a caller who may read it, without asking
-// the upstream, and a virtual over it passes it over for its Sources index.
-func TestAccDebianRemoteIndexKeepsRefusingAMatrixParameter(t *testing.T) {
-	files, paths := queryArchive(t)
-	w, up := queryRemote(t, files)
-	for _, p := range paths {
-		if !debian.PackagesIndexPath(p) && !debian.SourcesIndexPath(p) {
-			continue // the item route serves these as any remote file (#1330)
-		}
-		for _, key := range []string{"remote", "deb-virtual"} {
-			if key == "deb-virtual" && strings.Contains(p, "/Packages") {
-				continue // a virtual composes its Packages index (#1330)
-			}
-			r := w.Request(http.MethodGet, "/artifactory/"+key+"/"+p+";x=1", "reader", "")
-			queryRefusal(t, r, http.StatusNotFound, "Could not find resource")
-			if got := up.take(); len(got) != 0 {
-				t.Errorf("%s %s;x=1 asked the upstream for %q", key, p, got)
-			}
-		}
-	}
-}
-
 // TestAccDebianRemoteIndexPropagatesAQueryWhenSet (#1349): a remote
 // repository with Propagate Query Params set asks the upstream for a
 // Release file or an index with the request's query, as 6.20's HttpRepo

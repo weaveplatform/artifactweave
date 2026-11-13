@@ -87,6 +87,20 @@
 //   - A server built without a remote source service answers a remote
 //     index or package read, made directly or through a virtual
 //     repository, 500, a fault of its own, not the upstream's.
+//   - An index and a remote or virtual package take a query and matrix
+//     parameters as any other file's GET does, once read permission and
+//     the download policy are settled (#1350): a query, such as
+//     skipUpdateStats (RTFACT-25636), changes nothing, and matrix
+//     parameters are matched against the file's properties (JFrog's
+//     guide, Using Properties in Deployment and Resolution), a local or
+//     federated index's against the stored PACKAGES. A virtual
+//     repository's composed index carries none [I], so only a mandatory
+//     key refuses it, and a virtual package's GET passes over a member
+//     whose file does not match to the next member that lists it [I]. A
+//     remote's index and packages match the copy its cache holds before
+//     the upstream is asked, and pass the query, under Propagate Query
+//     Params, and the matrix parameters to the upstream (#1371); the index
+//     read that pins a package's MD5 passes neither.
 //   - An upload is spooled up to 512 MiB and read in full before the item
 //     service commits it, under the file name its archive's name and
 //     version give in the feed the URL names; it needs write on both.

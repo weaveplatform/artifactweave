@@ -1434,9 +1434,10 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributeartifact.md
   /api/download/{repoKey}/{filePath}:
     get:
-      description: Downloads a file while emitting progress marks so clients with short timeouts stay connected
-        during a slow remote fetch. With `content=none` only the marks are sent; with `content=progress` the marks
-        precede the content. Resolution and statistics behave as for the plain download.
+      description: 'Not implemented; answers 501. It would download a file while emitting progress marks, so clients
+        with short timeouts stay connected during a slow remote fetch: with `content=none` only the marks are sent,
+        and with `content=progress` the marks precede the content. Resolution and statistics would behave as for the
+        plain download.'
       operationId: artifactSyncDownload
       parameters:
       - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
@@ -1523,6 +1524,7 @@ paths:
       - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/artifactsyncdownload.md
+      x-tier: stub
   /api/gems/{repoName}/names:
     get:
       operationId: getRubyGemsCompactNames
@@ -3051,10 +3053,15 @@ paths:
         `downloadRedirect` or `cdnRedirect`, a GET of a file at least `download.redirect.min_size` long answers 302
         to a signed URL on the CDN in front of the blob store, if it has one, or on the object store itself
         (`downloadRedirect` only), carrying the file name and media type as response overrides. HEAD and conditional
-        requests are always answered here. A path ending in `.md5`, `.sha1`, `.sha256` or `.sha512` beside a file
-        answers that checksum of the file as plain text: under `client-checksums` the one the client sent, and 404
+        requests are always answered here. A file is typed by its name, or by its `artifactory.content-type`
+        property when that is set. A path ending in `.md5`, `.sha1`, `.sha256` or `.sha512` beside a file answers
+        that checksum of the file as text, typed `application/x-checksum` (`application/octet-stream` for `.sha512`)
+        on a GET and `application/x-checksum` on a HEAD: under `client-checksums` the one the client sent, and 404
         while it has sent none (every deploy records the SHA-256); under `server-generated-checksums`, for
-        `maven-metadata.xml` and in a remote cache, the computed one.'
+        `maven-metadata.xml` and in a remote cache, the computed one. A remote that refuses an upstream file for its
+        `Content-Type` label, checked against the types in the request `Accept` header or else the type of the path,
+        answers 409, or serves its expired cached copy of the file on that request, and answers the path 409 until
+        `missedRetrievalCachePeriodSecs` pass.'
       operationId: retrieveArtifact
       parameters:
       - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as

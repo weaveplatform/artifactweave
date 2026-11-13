@@ -50,9 +50,17 @@ that response is bounded to 4096 bytes and must contain a valid SHA-256 digest
 (optionally followed by a filename). It remains transient, and does not fetch or cache
 the artifact itself. Its HEAD response describes the normalized 64-character digest
 without fetching a body; GET performs the syntax validation. Other cold checksum
-requests return 404. Matrix parameters filter
-stored properties; transient content has no properties, so mandatory filters cannot
-match. Existing cached folder and archive browsing remains available.
+requests return 404. Existing cached folder and archive browsing remains available.
+
+Matrix parameters on a remote file's GET or HEAD
+(`/artifactory/vendor/path/file;key=value`) go to the upstream after the path, as
+Artifactory appends them to the remote request URL, and the file is cached at its bare
+path. A copy the cache already holds is matched against them first, without asking the
+upstream: a mandatory key (`;key+=value`) the copy does not carry, or a key it carries
+with another value, answers 404. The upstream's own answer is served as it comes,
+whether the repository stores it or streams it, and a copy stored that way carries no
+properties until some are set on it. Checksum files a Maven remote reads beside an
+artifact are asked for at their own paths, without the parameters.
 
 ## Remote folder browsing
 

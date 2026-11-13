@@ -93,8 +93,21 @@
 //     virtual repository, 500, a fault of its own, not the upstream's. A
 //     composite child path that is not well formed is refused before any
 //     read, as it is with a service.
-//   - A folder, matrix parameters, a query, a path P2 does not class, or a
-//     P2 repository that is neither remote nor virtual answers 404.
+//   - A folder, a path P2 does not class, or a P2 repository that is
+//     neither remote nor virtual answers 404.
+//   - A file takes a query and matrix parameters as any other file's GET
+//     does, once read permission and the download policy are settled
+//     (#1350): a query, such as skipUpdateStats (RTFACT-25636), changes
+//     nothing, and matrix parameters are matched against the file's
+//     properties (JFrog's guide, Using Properties in Deployment and
+//     Resolution). A virtual repository's p2.index and composite files
+//     carry none [I], so only a mandatory key refuses them, and a member's
+//     file under <member key>/ is asked of the member with both, as its own
+//     GET would be. A remote matches the copy its cache holds before the
+//     upstream is asked; a file at the remote's own URL passes the query,
+//     under Propagate Query Params, and the matrix parameters to the
+//     upstream (#1371), and an external child or a site archive entry,
+//     fetched from another URL, passes neither [I].
 //   - The __p2_ext/ paths and the digest's input are the cache paths of
 //     external content, and the source variants name its validation, so
 //     both stay byte-identical, as do statuses and error and log text.

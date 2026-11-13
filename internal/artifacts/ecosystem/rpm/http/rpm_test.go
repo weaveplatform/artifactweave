@@ -105,9 +105,12 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 				}
 			})
 		}
+		// A query is kept for the source boundary, which passes it on only
+		// under Propagate Query Params (#1350).
 		q.Resource.Query = "download=1"
-		if _, err := itemkit.RPMSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
-			t.Errorf("%s: metadata query allowed: %v", tc.path, err)
+		if got, err := itemkit.RPMSourceRequest(q); err != nil ||
+			got.Resource.Query != "download=1" || got.Resource.ValidateMetadata == nil {
+			t.Errorf("%s: metadata query: %+v, %v; want it kept", tc.path, got.Resource, err)
 		}
 	}
 
@@ -137,8 +140,9 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 		t.Fatal("corrupt upstream RPM accepted")
 	}
 	q.Resource.Query = "download=1"
-	if _, err := itemkit.RPMSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
-		t.Errorf("RPM package query allowed: %v", err)
+	if got, err := itemkit.RPMSourceRequest(q); err != nil ||
+		got.Resource.Query != "download=1" || got.Resource.Validate == nil {
+		t.Errorf("RPM package query: %+v, %v; want it kept", got.Resource, err)
 	}
 }
 
@@ -198,7 +202,7 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 	}{
 		{"/artifactory/rpm-missing/repodata/repomd.xml", "admin", http.StatusOK},
 		{"/artifactory/rpm-missing/repodata/not-published.xml", "admin", http.StatusNotFound},
-		{"/artifactory/rpm-missing/repodata/repomd.xml?download=1", "admin", http.StatusNotFound},
+		{"/artifactory/rpm-missing/repodata/repomd.xml?download=1", "admin", http.StatusOK},
 		{"/artifactory/rpm-missing/repodata/repomd.xml", "user", http.StatusForbidden},
 		{"/artifactory/rpm-cycle/repodata/repomd.xml", "admin", http.StatusInternalServerError},
 		{"/artifactory/rpm-mixed/repodata/repomd.xml", "admin", http.StatusInternalServerError},
