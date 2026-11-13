@@ -15,32 +15,17 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
-// unevaluatedPreconditions are the conditional headers Artifactory's
-// download never reads. 7.x decides a download's conditional answer in
-// DownloadServiceImpl.isNotModified, from If-Modified-Since and
-// If-None-Match alone, before it serves a local, cached or remote file or
-// its checksum, GET or HEAD, and never answers 412 (DownloadServiceImpl
-// respond and isNotModified, Artifactory OSS 7.161.26 sources; 6.20 has
-// the same). No class in those sources reads If-Match or
-// If-Unmodified-Since. JFrog closed RTFACT-17259, which asked for both, as
-// "No plans to implement in near future". 7.125.6 put If-None-Match before
-// If-Modified-Since, as RFC 9110 orders them (RTDEV-64461), and named no
-// other precondition.
-var unevaluatedPreconditions = []string{"If-Match", "If-Unmodified-Since"}
-
-// withoutUnevaluatedPreconditions is r without unevaluatedPreconditions, so
-// that a file download answers neither with 412, whatever tag or date they
-// carry. http.ServeContent and answerPreconditions apply every RFC 9110
-// precondition, so without this a client sending back the bare SHA-1 it
-// was given as the ETag in If-Match would get 412 for a file that has not
-// changed. If-None-Match, If-Modified-Since and If-Range stay, and answer
-// as before. The copy leaves the caller's request as it was sent.
+// withoutUnevaluatedPreconditions is r without the conditional headers
+// Artifactory's download never reads, If-Match and If-Unmodified-Since
+// (pkgroute.UnevaluatedPreconditions), so that a file download answers
+// neither with 412, whatever tag or date they carry. If-None-Match,
+// If-Modified-Since and If-Range stay.
 func withoutUnevaluatedPreconditions(r *http.Request) *http.Request {
-	return withoutHeaders(r, unevaluatedPreconditions...)
+	return pkgroute.WithoutUnevaluatedPreconditions(r)
 }
 
 // downloadRequest is r as Artifactory's download reads it: without
-// unevaluatedPreconditions and, on a HEAD, without Range and If-Range. A
+// pkgroute.UnevaluatedPreconditions and, on a HEAD, without Range and If-Range. A
 // HEAD answers 200 with the whole length, never 206 or 416: 7.x answers a
 // HEAD through RequestResponseHelper.sendHeadResponse, which never reads
 // Range (7.161.26), and RFC 9110 section 14.2 has a server ignore Range on

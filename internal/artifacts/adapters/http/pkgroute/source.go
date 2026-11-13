@@ -234,6 +234,11 @@ func (e *sourceRefusal) Unwrap() []error { return []error{e.answer, e.rejection}
 // unknown-length body must not look like a successfully completed artifact.
 func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error {
 	defer func() { _ = s.Body.Close() }()
+	// A stream answers If-Match and If-Unmodified-Since as the cached copy
+	// it becomes does: never with 412, since 7.x's download reads neither
+	// (UnevaluatedPreconditions). Without this a remote file served from
+	// the upstream's stream answered 412 where its cached copy answers 200.
+	r = WithoutUnevaluatedPreconditions(r)
 	if r.Method == http.MethodHead {
 		// A HEAD answers 200 with the whole length, never 206 or 416, as the
 		// item kit's ServeFile answers one. 6.20's download answers a HEAD
