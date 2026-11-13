@@ -81,7 +81,7 @@ func (s DebianAPI) serveVirtualDebianMetadata(
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Cache-Control", "private, no-store")
-	http.ServeContent(w, r, req.Path, time.Time{}, bytes.NewReader(body))
+	itemkit.ServeContent(w, r, req.Path, time.Time{}, bytes.NewReader(body))
 }
 
 func (s DebianAPI) buildVirtualDebianView(

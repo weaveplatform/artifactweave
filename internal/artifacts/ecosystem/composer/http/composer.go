@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -618,5 +619,5 @@ func respondJSON(w http.ResponseWriter, r *http.Request, v any) {
 	w.Header().Set("Cache-Control", "private, no-cache")
 	w.Header().Set("ETag", fmt.Sprintf(`"%x"`, digest))
 	w.Header().Set("Last-Modified", time.Now().UTC().Truncate(time.Second).Format(http.TimeFormat))
-	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
+	itemkit.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
 }

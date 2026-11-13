@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
@@ -360,7 +361,7 @@ func serveMetadata(w http.ResponseWriter, r *http.Request, path, media string, b
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.Header().Set("ETag", "\""+etag+"\"")
 	w.Header().Set("Repr-Digest", "sha-256=\""+base64.StdEncoding.EncodeToString(sum[:])+"\"")
-	http.ServeContent(w, r, path, time.Time{}, bytes.NewReader(b))
+	itemkit.ServeContent(w, r, path, time.Time{}, bytes.NewReader(b))
 }
 
 func render(path string, rows []entry) ([]byte, string, error) {

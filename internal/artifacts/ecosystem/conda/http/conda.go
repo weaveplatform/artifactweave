@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
@@ -159,7 +160,7 @@ func (h handler) serveBytes(w http.ResponseWriter, r *http.Request, body []byte,
 		w.Header().Set("Cache-Control", "private, max-age=0, must-revalidate, immutable")
 	}
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
-	http.ServeContent(w, r, path.Base(r.URL.Path), time.Time{}, bytes.NewReader(body))
+	itemkit.ServeContent(w, r, path.Base(r.URL.Path), time.Time{}, bytes.NewReader(body))
 }
 
 // readPolicy is how the download policy applies to the reads an index is

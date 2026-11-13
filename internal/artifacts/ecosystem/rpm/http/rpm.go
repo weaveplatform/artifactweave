@@ -124,7 +124,7 @@ func (s RPMAPI) serveVirtualRPMMetadata(
 		return
 	}
 	sw := &itemkit.StatusWriter{ResponseWriter: w}
-	http.ServeContent(sw, r, name, time.Time{}, bytes.NewReader(body))
+	itemkit.ServeContent(sw, r, name, time.Time{}, bytes.NewReader(body))
 	_ = sw.Complete(r)
 }
 

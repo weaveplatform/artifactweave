@@ -206,14 +206,15 @@ func (s *Kit) signFailed(
 }
 
 // answerPreconditions answers the request when its conditional headers
-// decide the response (304 Not Modified or 412 Precondition Failed) and
-// reports whether it did. http.ServeContent evaluates them before it reads
-// any content, so a probe with an empty body applies exactly the standard
-// library's rules (RFC 9110 section 13.2.2); its response is discarded
-// unless it is that decision. The ETag must already be in w's headers. A
-// file download reaches it without If-Match and If-Unmodified-Since
-// (serveFile), so of the redirects only a registry manifest's can answer
-// 412.
+// decide the response and reports whether it did. http.ServeContent
+// evaluates them before it reads any content, so a probe with an empty
+// body applies exactly the standard library's rules (RFC 9110 section
+// 13.2.2); its response is discarded unless it is that decision. The ETag
+// must already be in w's headers. Every redirect reaches it without
+// If-Match and If-Unmodified-Since, which Artifactory's download never
+// reads: a file download's serveFile and the registry's pullRequest drop
+// both first. So it answers 304 Not Modified or nothing; the 412 branch is
+// reached only by a caller that keeps them.
 func answerPreconditions(w http.ResponseWriter, r *http.Request, modified time.Time) bool {
 	probe := &headerProbe{header: w.Header().Clone()}
 	http.ServeContent(probe, r, "", modified, strings.NewReader(""))

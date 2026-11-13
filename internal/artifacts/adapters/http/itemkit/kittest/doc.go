@@ -28,6 +28,9 @@
 //   - World.Kit: an itemkit.Kit over the world.
 //   - Admin, AdminAccess and Request: an administrator, its access, and a
 //     request carrying both as the authentication middleware leaves them.
+//   - Send and WantDownloadConditionals: the check, for a package route's
+//     tests, that a document the route builds answers conditional requests
+//     and ranges as the download answers a file (itemkit.ServeContent).
 //
 // # Invariants
 //
@@ -56,7 +59,8 @@
 // # Testing
 //
 // It has no tests of its own: the item kit's tests (itemkit's kit_test.go)
-// build every world they use with it. Its remaining branches are t.Fatal paths
+// build every world they use with it, and the package routes' conditional
+// tests call WantDownloadConditionals. Its remaining branches are t.Fatal paths
 // taken only when the store or the blob directory fails, so it is excluded
 // from coverage (.testcoverage.yml) like the other fixtures.
 package kittest

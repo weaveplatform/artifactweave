@@ -612,7 +612,7 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 		w.Header().Set("Content-Type", "application/octet-stream")
 	}
 	sw := &itemkit.StatusWriter{ResponseWriter: w}
-	http.ServeContent(sw, r, filename, time.Time{}, bytes.NewReader(body))
+	itemkit.ServeContent(sw, r, filename, time.Time{}, bytes.NewReader(body))
 	if sw.Complete(r) && result.used != nil {
 		_ = result.used(r.Context())
 	}

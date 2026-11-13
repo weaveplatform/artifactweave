@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	format "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/huggingface/xet"
@@ -359,7 +360,7 @@ func (h handler) xetData(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Cache-Control", "private, no-store")
-	http.ServeContent(w, r, "", h.now(), bytes.NewReader(data))
+	itemkit.ServeContent(w, r, "", h.now(), bytes.NewReader(data))
 }
 
 func (h handler) xetResolveHeaders(

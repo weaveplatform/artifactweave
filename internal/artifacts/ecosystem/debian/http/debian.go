@@ -233,7 +233,7 @@ func writeDebianIndex(
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "private, no-store")
 	sw := &itemkit.StatusWriter{ResponseWriter: w}
-	http.ServeContent(sw, r, path, time.Time{}, bytes.NewReader(body))
+	itemkit.ServeContent(sw, r, path, time.Time{}, bytes.NewReader(body))
 	if sw.Complete(r) && used != nil {
 		_ = used(r.Context())
 	}

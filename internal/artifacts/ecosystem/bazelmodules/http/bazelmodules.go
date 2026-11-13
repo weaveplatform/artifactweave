@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
@@ -361,7 +362,7 @@ func (h handler) localSource(w http.ResponseWriter, r *http.Request, q requestPa
 func writeJSON(w http.ResponseWriter, r *http.Request, body []byte) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "private, no-store")
-	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(body))
+	itemkit.ServeContent(w, r, "", time.Time{}, bytes.NewReader(body))
 }
 
 // A remote metadata result remains source-fenced until immediately before
@@ -711,7 +712,7 @@ func revalidateAll(r *http.Request, results ...source.Result) error {
 func writeContent(w http.ResponseWriter, r *http.Request, mime string, body []byte) {
 	w.Header().Set("Content-Type", mime)
 	w.Header().Set("Cache-Control", "private, no-store")
-	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(body))
+	itemkit.ServeContent(w, r, "", time.Time{}, bytes.NewReader(body))
 }
 
 func (h handler) upstreamSource(

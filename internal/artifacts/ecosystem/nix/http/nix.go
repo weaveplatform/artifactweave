@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
@@ -198,7 +199,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 func write(w http.ResponseWriter, r *http.Request, data []byte, mediaType string) {
 	w.Header().Set("Content-Type", mediaType)
 	w.Header().Set("Cache-Control", "private, no-cache")
-	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
+	itemkit.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
 }
 
 // missing reports a member that a virtual repository passes over: one

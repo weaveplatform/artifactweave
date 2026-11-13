@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	bowerfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/bower"
@@ -135,5 +136,11 @@ func (h handler) localBinary(w http.ResponseWriter, r *http.Request, name, versi
 	}
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Cache-Control", "private, no-store")
-	http.ServeContent(w, r, name+"-"+version+".tar.gz", time.Time{}, bytes.NewReader(out.Bytes()))
+	itemkit.ServeContent(
+		w,
+		r,
+		name+"-"+version+".tar.gz",
+		time.Time{},
+		bytes.NewReader(out.Bytes()),
+	)
 }

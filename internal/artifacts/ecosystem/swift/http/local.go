@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	swiftfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/swift"
@@ -241,7 +242,7 @@ func (h handler) localManifest(
 	w.Header().Set("Content-Type", "text/x-swift")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, wanted))
 	w.Header().Set("Cache-Control", "private, no-store")
-	http.ServeContent(w, r, wanted, it.Created, bytes.NewReader(data))
+	itemkit.ServeContent(w, r, wanted, it.Created, bytes.NewReader(data))
 }
 
 func validToolsVersion(s string) bool {

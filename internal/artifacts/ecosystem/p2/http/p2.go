@@ -184,7 +184,7 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Cache-Control", "private, no-store")
 	sw := &itemkit.StatusWriter{ResponseWriter: w}
-	http.ServeContent(sw, r, path.Base(req.Path), time.Time{}, bytes.NewReader(body))
+	itemkit.ServeContent(sw, r, path.Base(req.Path), time.Time{}, bytes.NewReader(body))
 	if sw.Complete(r) && result.Used != nil {
 		_ = result.Used(r.Context())
 	}
@@ -301,7 +301,7 @@ func (s p2Items) serveP2Virtual(
 	} else {
 		w.Header().Set("Content-Type", "application/xml")
 	}
-	http.ServeContent(w, r, req.Path, time.Time{}, bytes.NewReader(body))
+	itemkit.ServeContent(w, r, req.Path, time.Time{}, bytes.NewReader(body))
 }
 
 // p2EscapePath escapes each segment of an item path for a URL path, so a
