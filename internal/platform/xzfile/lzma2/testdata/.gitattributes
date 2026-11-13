@@ -1,0 +1,6 @@
+# ulikunitz/xz v0.5.17's test files, as the LZMA SDK published them: a.txt
+# is the content the .lzma files decode to, CRLF line ends and trailing
+# spaces included, so no checkout may change a byte of them, and git diff
+# --check must not read their spaces as faults.
+*.txt binary
+*.lzma binary

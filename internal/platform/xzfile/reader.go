@@ -15,7 +15,7 @@ import (
 	"math"
 	"runtime"
 
-	"github.com/ulikunitz/xz/lzma"
+	"github.com/weaveplatform/artifactweave/internal/platform/xzfile/lzma2"
 )
 
 // MaxDict is the largest dictionary a block header may name: 1.5 GiB,
@@ -94,8 +94,9 @@ var (
 // file whose index and footer were cut off was admitted although no
 // client can read it (#1297, #1331). SingleStream does not change that:
 // the reader still sees the end of the input first. This reader keeps
-// that package's LZMA2 decoder and the checks its Reader makes, and parses
-// the container itself, so the end of the input is an error anywhere but
+// that package's LZMA2 decoder, copied into lzma2 so its dictionary grows
+// as it fills (#1413), and the checks its Reader makes, and parses the
+// container itself, so the end of the input is an error anywhere but
 // between streams. Parsing the container is also what lets it choose the
 // dictionary, which that Reader takes from the block header (#1332).
 type reader struct {
@@ -128,12 +129,13 @@ type record struct{ unpadded, uncompressed int64 }
 // further back than the content decoded, so a block is decoded with a
 // dictionary no larger than limit and reads everything the caller does.
 //
-// Each block takes its dictionary from the process's budget (SetBudget)
-// before it is allocated, waiting while it does not fit, and gives it back
-// when the block ends, when Read fails or returns io.EOF, and on Close. A
-// wait that ctx ends fails Read with ctx's error. The caller closes the
-// reader; one dropped unclosed gives its dictionary back only once the
-// garbage collector finds it unreachable.
+// Each block's dictionary is allocated as it fills, from 64 KiB, and takes
+// each allocation from the process's budget (SetBudget) before it is made,
+// waiting while it does not fit; it gives it all back when the block ends,
+// when Read fails or returns io.EOF, and on Close. A wait that ctx ends
+// fails Read with ctx's error. The caller closes the reader; one dropped
+// unclosed gives its dictionary back only once the garbage collector finds
+// it unreachable.
 func NewReader(ctx context.Context, in io.Reader, limit int64) (io.ReadCloser, error) {
 	x := &reader{
 		in:    bufio.NewReaderSize(in, 32<<10),
@@ -171,13 +173,20 @@ func (x *reader) stop(err error) {
 }
 
 // dictSize returns the dictionary for a block whose header names dict: dict,
-// as XZ for Java and liblzma allocate it, but no more than the caller
-// reads, and no less than the 4 KiB the LZMA2 decoder takes.
+// as XZ for Java and liblzma size it, but no more than the caller reads,
+// and no less than the 4 KiB the LZMA2 decoder takes. It is the most the
+// dictionary grows to.
 func dictSize(dict, limit int64) int {
 	if limit > 0 {
 		dict = min(dict, limit)
 	}
-	return int(max(dict, lzma.MinDictCap))
+	return int(max(dict, lzma2.MinDictCap))
+}
+
+// grow takes from the budget the dictionary the current block's decoder
+// is about to grow to, before the decoder allocates it.
+func (x *reader) grow(capacity int) error {
+	return x.acct.hold(x.ctx, int64(capacity))
 }
 
 func (x *reader) Read(p []byte) (int, error) {
@@ -360,16 +369,18 @@ func (x *reader) startBlock(size byte) error {
 	// Allocating what the header names, as ulikunitz/xz did, let a file of
 	// a few bytes take 4 GiB (#1332). The caller never reads past limit,
 	// so a dictionary of limit refuses nothing the header's would read.
-	// The budget is taken first, so a decode that waits has allocated
-	// nothing yet (#1354).
-	dictCap := dictSize(dict, x.limit)
-	if err := x.acct.take(x.ctx, int64(dictCap)); err != nil {
-		return err
-	}
+	// Within that, the dictionary is allocated as it fills, so a file of a
+	// few bytes takes 64 KiB, not 1.5 GiB (#1413); a match that reaches past
+	// the content decoded is refused as before, whatever it has grown to.
+	// Each allocation is taken from the budget first, so a decode that
+	// waits holds only what it has filled (#1354).
 	b.read = &count{r: x.in}
-	b.data, err = lzma.Reader2Config{DictCap: dictCap}.NewReader2(b.read)
+	b.data, err = lzma2.Reader2Config{
+		DictCap: dictSize(dict, x.limit),
+		Grow:    x.grow,
+	}.NewReader2(b.read)
 	if err != nil {
-		return err //nolint:wrapcheck // the decoder's own text, as ulikunitz/xz gives it
+		return err //nolint:wrapcheck // the decoder's own text, as ulikunitz/xz gives it, or ctx's error
 	}
 	switch x.flags {
 	case checkCRC32:

@@ -8,9 +8,10 @@ import (
 
 // DefaultBudget is the dictionary budget a process starts with, and the
 // default of the xz.dictionary_budget setting: 1 GiB. It lets one decode
-// of a block that names up to 1 GiB, or a hundred and twenty-eight of
-// xz -6's 8 MiB, hold its dictionary at once; a block that names more, up
-// to MaxDict, decodes alone.
+// whose dictionary fills up to 1 GiB, or a hundred and twenty-eight that
+// fill xz -6's 8 MiB, hold their dictionaries at once; one that fills
+// more, up to MaxDict, grows alone. A file shorter than its dictionary
+// holds only what it fills, from 64 KiB (#1413).
 const DefaultBudget int64 = 1 << 30
 
 // dictionaries is the process's budget. SetBudget sizes it once at start;
@@ -19,9 +20,10 @@ var dictionaries = &budget{size: DefaultBudget, waiting: list.New()}
 
 // SetBudget sets how many bytes of LZMA2 dictionary the process's xz
 // decodes may hold at once; 0 turns the budget off. A decode whose
-// dictionary does not fit waits for others to give theirs back, and is
-// never refused for it: Artifactory decodes xz with XZ for Java, which
-// has no such bound, so a refusal would change an answer (#1354).
+// dictionary does not fit, as it starts or as it grows, waits for others
+// to give theirs back, and is never refused for it: Artifactory decodes
+// xz with XZ for Java, which has no such bound, so a refusal would change
+// an answer (#1354).
 func SetBudget(n int64) {
 	b := dictionaries
 	b.mu.Lock()
@@ -50,12 +52,18 @@ type holder struct{ held int64 }
 
 // budget is a weighted semaphore over dictionary bytes. It admits in
 // order of arrival, so a large dictionary is not passed over for ever by
-// smaller ones, except for a holder already inside (see WithRequest).
+// smaller ones, except for a holder already inside (see WithRequest),
+// which a dictionary that grows always is.
 type budget struct {
 	mu      sync.Mutex
 	size    int64
 	used    int64
 	waiting *list.List // of *waiter
+	// holders counts the holders that hold part of the budget.
+	holders int
+	// alone is the holder let past the budget because every holder inside
+	// waited to grow (stalled), until it holds nothing.
+	alone *holder
 }
 
 type waiter struct {
@@ -65,9 +73,10 @@ type waiter struct {
 	ready chan struct{}
 }
 
-// account is the part of the budget one reader holds: its current block's
-// dictionary, or nothing between blocks. It is kept apart from the reader
-// so a cleanup can give it back once the reader is unreachable.
+// account is the part of the budget one reader holds: what its current
+// block's dictionary has grown to, or nothing between blocks. It is kept
+// apart from the reader so a cleanup can give it back once the reader is
+// unreachable.
 type account struct {
 	b *budget
 	h *holder
@@ -82,22 +91,23 @@ func newAccount(ctx context.Context) *account {
 	return &account{b: dictionaries, h: h}
 }
 
-// take waits until n bytes of dictionary fit, or ctx is done. A decode
-// that fits at once goes ahead whatever ctx says, as it did before there
-// was a budget. A wait that ctx ends takes nothing and returns ctx's
-// error; if the budget was granted as ctx ended, it is given back.
-func (a *account) take(ctx context.Context, n int64) error {
+// hold waits until the reader holds n bytes of dictionary in all, taking
+// what it does not hold yet, or until ctx is done. A share that fits at
+// once goes ahead whatever ctx says, as it did before there was a budget.
+// A wait that ctx ends takes nothing more and returns ctx's error; if the
+// share was granted as ctx ended, it is given back.
+func (a *account) hold(ctx context.Context, n int64) error {
 	b := a.b
 	b.mu.Lock()
-	if b.size == 0 {
+	if b.size == 0 || n <= a.n {
 		b.mu.Unlock()
 		return nil
 	}
-	w := &waiter{h: a.h, n: n, ready: make(chan struct{})}
+	w := &waiter{h: a.h, n: n - a.n, ready: make(chan struct{})}
 	b.waiting.PushBack(w)
 	b.grant()
 	if w.taken {
-		a.n = w.n
+		a.n += w.n
 		b.mu.Unlock()
 		return nil
 	}
@@ -105,7 +115,7 @@ func (a *account) take(ctx context.Context, n int64) error {
 	select {
 	case <-w.ready:
 		b.mu.Lock()
-		a.n = w.n
+		a.n += w.n
 		b.mu.Unlock()
 		return nil
 	case <-ctx.Done():
@@ -144,13 +154,37 @@ func (a *account) release() {
 func (b *budget) giveBack(h *holder, n int64) {
 	b.used -= n
 	h.held -= n
+	if n > 0 && h.held == 0 {
+		b.holders--
+		if b.alone == h {
+			b.alone = nil
+		}
+	}
 }
 
-// grant lets in, in order, every waiter whose dictionary fits, or that
-// would be the only holder inside. Once one does not get in, the waiters
-// behind it wait too, except a holder already inside, which may pass.
-// With the budget off every waiter goes in, and holds nothing.
+// grant lets in, in order, every waiter whose share fits, or whose holder
+// would be the only one inside, or is let past the budget alone. Once one
+// does not get in, the waiters behind it wait too, except a holder already
+// inside, which may pass. With the budget off every waiter goes in, and
+// holds nothing.
+//
+// A dictionary that grows waits for its growth while it holds what it has
+// grown to (#1413), so decodes that grow at once can each wait for what
+// the others hold. When every holder inside waits, none of them will give
+// any back, so the one that has waited longest goes in past the budget,
+// and alone: no other goes past it until that one holds nothing. The
+// budget is then exceeded by that one decode's dictionary at most.
 func (b *budget) grant() {
+	b.admitInOrder()
+	if b.alone == nil && b.size > 0 {
+		if h := b.stalled(); h != nil {
+			b.alone = h
+			b.admitInOrder()
+		}
+	}
+}
+
+func (b *budget) admitInOrder() {
 	blocked := false
 	for e := b.waiting.Front(); e != nil; {
 		w, next := e.Value.(*waiter), e.Next()
@@ -158,7 +192,8 @@ func (b *budget) grant() {
 		case b.size == 0:
 			w.n = 0
 			b.admit(e, w)
-		case (!blocked || w.h.held > 0) && (b.used+w.n <= b.size || b.used == w.h.held):
+		case (!blocked || w.h.held > 0) &&
+			(b.used+w.n <= b.size || b.used == w.h.held || w.h == b.alone):
 			b.admit(e, w)
 		case w.h.held == 0:
 			blocked = true
@@ -167,8 +202,32 @@ func (b *budget) grant() {
 	}
 }
 
+// stalled returns the holder of the first waiter that holds part of the
+// budget, if every holder that holds part of it is waiting for more. A
+// holder whose readers run on more than one goroutine may be let in sooner
+// than it needed, which costs memory but never a wait.
+func (b *budget) stalled() *holder {
+	var first *holder
+	waiting := map[*holder]bool{}
+	for e := b.waiting.Front(); e != nil; e = e.Next() {
+		if h := e.Value.(*waiter).h; h.held > 0 {
+			if first == nil {
+				first = h
+			}
+			waiting[h] = true
+		}
+	}
+	if len(waiting) < b.holders {
+		return nil
+	}
+	return first
+}
+
 func (b *budget) admit(e *list.Element, w *waiter) {
 	b.waiting.Remove(e)
+	if w.n > 0 && w.h.held == 0 {
+		b.holders++
+	}
 	b.used += w.n
 	w.h.held += w.n
 	w.taken = true
