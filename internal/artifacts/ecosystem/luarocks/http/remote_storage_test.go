@@ -344,7 +344,11 @@ func TestAccRemoteRockAnswersAStoreFaultAsAServerFault(t *testing.T) {
 		if err = f.db.Repos().Update(t.Context(), c); err != nil {
 			t.Fatal(err)
 		}
-		t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
+		// os.TempDir reads TMPDIR on Unix, and TMP, then TEMP, on Windows.
+		missing := filepath.Join(t.TempDir(), "missing")
+		for _, name := range []string{"TMPDIR", "TMP", "TEMP"} {
+			t.Setenv(name, missing)
+		}
 		wantError(t, f.do(http.MethodGet, remoteBase+path, nil, "", "admin"),
 			http.StatusInternalServerError, "internal error")
 		f.wantStorageFault("spool", fs.ErrNotExist)

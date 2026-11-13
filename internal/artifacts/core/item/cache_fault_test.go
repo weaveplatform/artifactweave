@@ -293,7 +293,7 @@ func TestUnitCacheMarksAFailedReadOfAHook(t *testing.T) {
 func TestUnitCacheTransientMarksAFailedSpool(t *testing.T) {
 	w, u := remoteWorld(t)
 	u.NoStore = true
-	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
+	missingTempDir(t)
 	_, err := w.svc.Cache(t.Context(), u)
 	var fault *StorageFault
 	if !errors.As(err, &fault) || !errors.Is(fault.Cause, fs.ErrNotExist) {
@@ -333,6 +333,17 @@ func TestUnitSpoolUpstreamTellsTheStorageFromTheUpstream(t *testing.T) {
 	); n != 7 ||
 		err != nil {
 		t.Fatal(n, err)
+	}
+}
+
+// missingTempDir points os.TempDir at a directory that does not exist, so
+// os.CreateTemp fails. os.TempDir reads TMPDIR on Unix, and TMP, then TEMP,
+// on Windows.
+func missingTempDir(t *testing.T) {
+	t.Helper()
+	missing := filepath.Join(t.TempDir(), "missing")
+	for _, name := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(name, missing)
 	}
 }
 
