@@ -112,7 +112,10 @@ const forcedJar = "/artifactory/mvn-forced/org/a/1.0/a-1.0.jar"
 // missing file, the repository's root with and without its slash, and a key
 // with matrix parameters. The PUT stores nothing. Signed-in callers, and
 // anonymous on the same virtual repository with the flag off, keep their
-// answers, as does the package API route over the forced repository.
+// answers, as does the package API route over the forced repository. The
+// anonymous user's Basic credentials and a Bearer token that does not
+// verify count as none on the forced repository, as in 7.x's filter while
+// anonymous access is on.
 //
 // Only the flag of the Maven virtual repository a request names counts. The
 // forced repository read through an unforced one serves anonymous, as 7.x's
@@ -195,6 +198,19 @@ func TestAccMavenForceAuthenticationOnAVirtual(t *testing.T) {
 		basic("admin", "wrong")["Authorization"],
 	)
 	wantAnswer(t, "a wrong password", bad, http.StatusUnauthorized, `"message":"Bad credentials"`)
+	// While anonymous access is on, the anonymous user's Basic credentials
+	// and a Bearer token that does not verify count as none, as in 7.x's
+	// filter (OssForceAuthenticationFilter.checkIfAuthenticationShouldBeIgnored,
+	// 7.161.26). On an unforced repository the authentication answers them,
+	// as before.
+	const badCredentials = `"message":"Bad credentials"`
+	open := "/artifactory/mvn-open/org/a/1.0/a-1.0.jar"
+	for _, value := range []string{basic("anonymous", "")["Authorization"], "Bearer not-a-token"} {
+		wantForced(t, http.MethodGet, forcedJar+" as "+value,
+			w.do(http.MethodGet, forcedJar, "", "", "Authorization", value))
+		rec := w.do(http.MethodGet, open, "", "", "Authorization", value)
+		wantAnswer(t, "unforced, "+value, rec, http.StatusUnauthorized, badCredentials)
+	}
 }
 
 // TestAccMavenForceAuthenticationWithAnonymousAccessOff: with anonymous
@@ -202,7 +218,8 @@ func TestAccMavenForceAuthenticationOnAVirtual(t *testing.T) {
 // repository gets the filter's 401 "Unauthorized", where every other path
 // keeps "Authentication is required", as 7.x's filter answers before its
 // anonymous fallback refuses the request (AccessFilter.doFilterInternal,
-// 7.161.26). Signed-in callers keep their answers (#1435).
+// 7.161.26). Signed-in callers, and the anonymous user's Basic credentials,
+// which the authentication refuses, keep their answers (#1435).
 func TestAccMavenForceAuthenticationWithAnonymousAccessOff(t *testing.T) {
 	w := forcedMavenWorld(t, false)
 	for _, tc := range []struct{ method, path string }{
@@ -224,4 +241,10 @@ func TestAccMavenForceAuthenticationWithAnonymousAccessOff(t *testing.T) {
 		}
 	}
 	wantAnswer(t, "admin GET", w.do(http.MethodGet, forcedJar, "admin", ""), http.StatusOK, "jar")
+	// With anonymous access off, the anonymous user's Basic credentials are
+	// credentials like any other, which the authentication answers.
+	anonymousBasic := basic("anonymous", "")["Authorization"]
+	wantAnswer(t, "the anonymous user's Basic credentials",
+		w.do(http.MethodGet, forcedJar, "", "", "Authorization", anonymousBasic),
+		http.StatusUnauthorized, `"message":"Bad credentials"`)
 }

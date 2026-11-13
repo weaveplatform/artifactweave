@@ -2,6 +2,7 @@ package itemkit
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -52,15 +53,15 @@ func Forced(c repo.Config) bool {
 func isTrue(b *bool) bool { return b != nil && *b }
 
 // ForceAuthentication is the middleware that answers errForced to a
-// request without credentials whose path, /artifactory/<key>[/...], names a
-// repository that Forced reports, for every method and query, ?trace
-// included, before the request is routed or anything in the repository is
-// read. The client sends credentials only after a 401: an anonymous Maven
-// or Eclipse client that got the anonymous user's view would never send
-// them ([D] maven-repositories, "Force Authentication on Virtual Maven
-// Repositories": Artifactory "will request authentication parameters from
-// the Maven client before trying to access this repository"; [D]
-// p2-repositories; [J] RTFACT-29198).
+// request without credentials (withoutCredentials) whose path,
+// /artifactory/<key>[/...], names a repository that Forced reports, for
+// every method and query, ?trace included, before the request is routed or
+// anything in the repository is read. The client sends credentials only
+// after a 401: an anonymous Maven or Eclipse client that got the anonymous
+// user's view would never send them ([D] maven-repositories, "Force
+// Authentication on Virtual Maven Repositories": Artifactory "will request
+// authentication parameters from the Maven client before trying to access
+// this repository"; [D] p2-repositories; [J] RTFACT-29198).
 //
 // It runs ahead of authentication, where 7.x's filter sits in its
 // authentication chain, so the answer is the same whether anonymous access
@@ -68,13 +69,16 @@ func isTrue(b *bool) bool { return b != nil && *b }
 // (HttpArtifactoryRequest.getRepoKey), so only the flag of the repository
 // the request names counts: a nested virtual repository read through
 // another one is not asked [I]. Requests under /artifactory/api/, /ui/ and
-// /webapp/, which the filter leaves alone, and every request that carries
-// credentials (hasCredentials) pass untouched. A store that cannot tell
-// whether the repository is forced answers 500 rather than serve it.
+// /webapp/, which the filter leaves alone, and every request whose
+// credential names a user other than anonymous pass untouched, without a
+// store read. A store that cannot tell whether the repository is forced,
+// or an anonymous access setting that cannot be read, answers 500 rather
+// than serve it.
 func (s *Kit) ForceAuthentication(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key, ok := pathRepoKey(r.URL.EscapedPath())
-		if !ok || hasCredentials(r) || s.Store == nil {
+		cred := presented(r)
+		if !ok || cred == namedCredential || s.Store == nil {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -84,17 +88,110 @@ func (s *Kit) ForceAuthentication(next http.Handler) http.Handler {
 			return
 		}
 		c, err := s.Store.Repos().Get(r.Context(), key)
-		switch {
-		case errors.Is(err, kernel.ErrNotFound):
+		if errors.Is(err, kernel.ErrNotFound) || (err == nil && !Forced(c)) {
 			next.ServeHTTP(w, r)
+			return
+		}
+		none := false
+		if err == nil {
+			none, err = s.withoutCredentials(r, cred)
+		}
+		switch {
 		case err != nil:
 			httpkit.WriteErr(w, r, s.InternalError(r.Context(), "force authentication", err))
-		case Forced(c):
+		case none:
 			httpkit.WriteErr(w, r, errForced)
 		default:
 			next.ServeHTTP(w, r)
 		}
 	})
+}
+
+// credential is the kind of credential a request presents, as far as the
+// force-authentication check needs to know it.
+type credential int
+
+const (
+	// noCredential: no Authorization header and no X-JFrog-Art-Api.
+	noCredential credential = iota
+	// anonymousBasic: Basic credentials whose user name is blank or
+	// anonymous, or that do not decode to a user name and a secret.
+	anonymousBasic
+	// bearer: a Bearer token, whose subject only verifying it tells.
+	bearer
+	// namedCredential: any other credential, valid or not: Basic with
+	// another user name, another scheme, or X-JFrog-Art-Api.
+	namedCredential
+)
+
+// presented classes the credential r carries in the forms the
+// authentication middleware reads on an item path (decision 0005): the
+// Authorization header, Basic or Bearer, ahead of an X-JFrog-Art-Api
+// reference token. NuGet's X-NuGet-ApiKey counts only under
+// /artifactory/api/nuget/, which pathRepoKey never reports. 7.x's filter
+// tests a credential's presence (AuthenticationFilterUtils.
+// isRequestContainsAuthentication), so a named user's wrong password gets
+// the authentication's 401, not this one.
+func presented(r *http.Request) credential {
+	h := r.Header.Get("Authorization")
+	if h == "" {
+		if r.Header.Get("X-JFrog-Art-Api") != "" {
+			return namedCredential
+		}
+		return noCredential
+	}
+	scheme, _, _ := strings.Cut(h, " ")
+	switch {
+	case strings.EqualFold(scheme, "Bearer"):
+		return bearer
+	case !strings.EqualFold(scheme, "Basic"):
+		return namedCredential
+	}
+	user, _, ok := r.BasicAuth()
+	if !ok || strings.TrimSpace(user) == "" || strings.EqualFold(user, kernel.AnonymousUser) {
+		return anonymousBasic
+	}
+	return namedCredential
+}
+
+// withoutCredentials reports whether a request whose credential is cred
+// counts as carrying none. While anonymous access is on, 7.x's filter
+// counts Basic credentials of a blank or anonymous user name, and a Bearer
+// token that does not verify or whose subject is anonymous, as none, so
+// that they do not reach the repository as the anonymous user
+// (OssForceAuthenticationFilter.checkIfAuthenticationShouldBeIgnored and
+// verifyBearerAuthPresent, 7.161.26). A Bearer token whose check fails for
+// another reason, such as a store error or a restricted user, is left to
+// the authentication to answer. While anonymous access is off, any
+// credential counts, and the authentication answers it. 7.x's filter does
+// not class an empty Basic credential, "Basic Og==", as Basic
+// (RequestUtils.getBasicAuthorization), so it passes that one on; it
+// counts as none here, as the flag means it to.
+func (s *Kit) withoutCredentials(r *http.Request, cred credential) (bool, error) {
+	auth := s.Access.Authenticator
+	if cred == noCredential || auth == nil {
+		return cred == noCredential, nil
+	}
+	ctx := r.Context()
+	on, err := auth.AnonymousAllowed(ctx)
+	if err != nil {
+		return false, fmt.Errorf("anonymous access: %w", err)
+	}
+	if !on {
+		return false, nil
+	}
+	if cred == anonymousBasic {
+		return true, nil
+	}
+	_, raw, _ := strings.Cut(r.Header.Get("Authorization"), " ")
+	if raw = strings.TrimSpace(raw); raw == "" {
+		return true, nil
+	}
+	p, err := auth.Token(ctx, raw, "")
+	if err != nil {
+		return errors.Is(err, kernel.ErrBadCredentials), nil
+	}
+	return p.Anonymous || strings.EqualFold(p.Name, kernel.AnonymousUser), nil
 }
 
 // pathRepoKey returns the repository key an escaped request path names
@@ -116,16 +213,4 @@ func pathRepoKey(escaped string) (string, bool) {
 		return "", false
 	}
 	return key, true
-}
-
-// hasCredentials reports whether r carries a credential, valid or not, in
-// one of the forms the authentication middleware reads on an item path
-// (decision 0005): an Authorization header, Basic or Bearer, or an
-// X-JFrog-Art-Api reference token. NuGet's X-NuGet-ApiKey counts only under
-// /artifactory/api/nuget/, which pathRepoKey never reports. 7.x's filter
-// tests for a credential's presence too, not its validity
-// (AuthenticationFilterUtils.isRequestContainsAuthentication), so a wrong
-// password gets the authentication's 401, not this one.
-func hasCredentials(r *http.Request) bool {
-	return r.Header.Get("Authorization") != "" || r.Header.Get("X-JFrog-Art-Api") != ""
 }

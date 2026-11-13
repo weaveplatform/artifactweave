@@ -46,7 +46,9 @@
 //     whatever its method or query and whether anonymous access is on or
 //     off, and the answers it leaves to signed-in callers, to the flag off,
 //     to the package API, to a read through another virtual repository and
-//     to Gradle, Ivy and SBT virtual repositories (#1435).
+//     to Gradle, Ivy and SBT virtual repositories; while anonymous access is
+//     on, the same 401 for the anonymous user's Basic credentials and a
+//     Bearer token that does not verify (#1435).
 //
 // # References
 //

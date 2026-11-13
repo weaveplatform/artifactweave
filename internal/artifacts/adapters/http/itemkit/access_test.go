@@ -2,6 +2,7 @@ package itemkit
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -236,5 +237,117 @@ func TestUnitForceAuthenticationChallengesBeforeRouting(t *testing.T) {
 	// request line before any handler, so pathRepoKey is asked directly.
 	if key, ok := pathRepoKey("/artifactory/mvn%zzforced/a.jar"); ok {
 		t.Errorf("undecodable key: %q reported", key)
+	}
+}
+
+// TestUnitForceAuthenticationCountsAnonymousCredentialsAsNone: while
+// anonymous access is on, Basic credentials whose user name is blank or
+// anonymous or that do not decode, and a Bearer token that is blank, does
+// not verify or verifies as the anonymous user, count as none on a forced
+// repository, as in 7.x's filter (OssForceAuthenticationFilter.
+// checkIfAuthenticationShouldBeIgnored, 7.161.26). Another user's Basic
+// credentials, a token of another user or whose check fails for another
+// reason, another scheme, a reference token, and every credential while
+// anonymous access is off pass the request on. An anonymous access setting
+// that cannot be read answers 500 to a credential it decides.
+func TestUnitForceAuthenticationCountsAnonymousCredentialsAsNone(t *testing.T) {
+	on := true
+	db := inmem.New()
+	forced := repo.Config{Key: "mvn-forced", Class: repo.Virtual, PackageType: repo.Maven}
+	forced.ForceMavenAuthentication = &on
+	if err := db.Repos().Create(t.Context(), *repo.Defaults(&forced)); err != nil {
+		t.Fatal(err)
+	}
+	anonymous, setting := true, error(nil)
+	auth := &accessapitest.Authenticator{
+		AnonymousAllowedFunc: func(context.Context) (bool, error) { return anonymous, setting },
+		TokenFunc: func(_ context.Context, raw, _ string) (kernel.Principal, error) {
+			switch raw {
+			case "user-token":
+				return kernel.Principal{Name: "deployer"}, nil
+			case "anonymous-token":
+				return kernel.Anonymous, nil
+			case "restricted-token":
+				return kernel.Principal{}, kernel.ErrAPIRestricted
+			case "unreadable-token":
+				return kernel.Principal{}, errBoom
+			}
+			return kernel.Principal{}, kernel.ErrBadCredentials
+		},
+	}
+	kit := New(Deps{
+		Store: db, Logger: slog.New(slog.DiscardHandler),
+		Access: accessapi.API{Authenticator: auth},
+	})
+	const target = "/artifactory/mvn-forced/a.jar"
+	serve := func(name, value string) (*httptest.ResponseRecorder, bool) {
+		reached := false
+		h := kit.ForceAuthentication(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			reached = true
+			w.WriteHeader(http.StatusTeapot)
+		}))
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
+		if name != "" {
+			r.Header.Set(name, value)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		return rec, reached
+	}
+	b64 := base64.StdEncoding.EncodeToString
+	const forcedBody = `{"errors":[{"message":"Unauthorized","status":401}]}` + "\n"
+	none := []string{
+		"Basic " + b64([]byte("anonymous:")),
+		"Basic " + b64([]byte("Anonymous:secret")),
+		"Basic " + b64([]byte(":secret")),
+		"Basic " + b64([]byte(" :secret")),
+		"Basic " + b64([]byte("nocolon")),
+		"Basic Og==",
+		"Basic !!!",
+		"basic " + b64([]byte("anonymous:x")),
+		"Bearer not-a-token",
+		"bearer not-a-token",
+		"Bearer anonymous-token",
+		"Bearer ",
+	}
+	for _, value := range none {
+		rec, reached := serve("Authorization", value)
+		if reached || rec.Code != http.StatusUnauthorized || rec.Body.String() != forcedBody {
+			t.Errorf("anonymous access on, %q: reached %v, %d %q; want the forced 401",
+				value, reached, rec.Code, rec.Body)
+		}
+	}
+	for _, h := range [][2]string{
+		{"Authorization", "Basic " + b64([]byte("admin:wrong"))},
+		{"Authorization", "Bearer user-token"},
+		{"Authorization", "Bearer restricted-token"},
+		{"Authorization", "Bearer unreadable-token"},
+		{"Authorization", "Token user-token"},
+		{"X-JFrog-Art-Api", "cmVmdGtu"},
+	} {
+		if rec, reached := serve(h[0], h[1]); !reached {
+			t.Errorf("anonymous access on, %s %q: %d %q; want it passed on",
+				h[0], h[1], rec.Code, rec.Body)
+		}
+	}
+	anonymous = false
+	for _, value := range none {
+		if rec, reached := serve("Authorization", value); !reached {
+			t.Errorf("anonymous access off, %q: %d %q; want it passed on",
+				value, rec.Code, rec.Body)
+		}
+	}
+	if rec, reached := serve("", ""); reached || rec.Code != http.StatusUnauthorized {
+		t.Errorf("anonymous access off, no credentials: reached %v, %d; want the forced 401",
+			reached, rec.Code)
+	}
+	anonymous, setting = true, errBoom
+	rec, reached := serve("Authorization", none[0])
+	if reached || rec.Code != http.StatusInternalServerError {
+		t.Errorf("unreadable setting: reached %v, %d %q; want 500", reached, rec.Code, rec.Body)
+	}
+	if rec, reached := serve("", ""); reached || rec.Code != http.StatusUnauthorized {
+		t.Errorf("unreadable setting, no credentials: reached %v, %d; want the forced 401",
+			reached, rec.Code)
 	}
 }

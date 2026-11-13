@@ -896,8 +896,12 @@ virtual repository of type Maven with `forceMavenAuthentication` on or of type P
 `forceP2Authentication` on. It answers 401 with `WWW-Authenticate: Basic realm="Artifactory
 Realm"` and `{"errors":[{"status":401,"message":"Unauthorized"}]}`, whether anonymous access
 is on or off; [J] [RTFACT-30189](https://jfrog.atlassian.net/browse/RTFACT-30189) shows that
-answer from 7.71.8. artifactweave applies it the same way, ahead of authentication and
-routing ([#1435](https://github.com/weaveplatform/artifactweave/issues/1435);
+answer from 7.71.8. While anonymous access is on, the filter counts the anonymous user's
+Basic credentials, Basic credentials with a blank user name, and a Bearer token that does not
+verify or whose subject is anonymous as no credentials (`checkIfAuthenticationShouldBeIgnored`);
+any other credential, verified or not, is left to authentication. artifactweave applies it the
+same way, ahead of authentication and routing
+([#1435](https://github.com/weaveplatform/artifactweave/issues/1435);
 `itemkit.ForceAuthentication`). Two points no source settles **[I]**: a Gradle, Ivy or SBT
 virtual repository stores `forceMavenAuthentication` with no effect, as the filter checks the
 Maven type alone and [J] [RTFACT-29829](https://jfrog.atlassian.net/browse/RTFACT-29829), a
