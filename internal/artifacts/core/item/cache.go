@@ -2,6 +2,7 @@ package item
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf16"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -70,6 +72,12 @@ type CacheUpload struct {
 	// default 64MiB for metadata and no additional artifact size limit.
 	MaxBytes     int64
 	CheckCurrent func(context.Context, Store) error
+	// ClientAccept is the client's Accept values for a file with no format
+	// hint, which 7.x's MIME check takes the requested types from
+	// (HttpRepo.getAcceptableHeaders); nil, as for a format route, takes
+	// the path's type. Only that check reads it: it is not part of the
+	// cache identity.
+	ClientAccept []string
 }
 
 // CacheResult is either committed content or an owned transient reader. Close
@@ -354,21 +362,21 @@ const defaultBlockedMIME = "text/html,application/xhtml+xml"
 
 // blockedMIME is 7.x's HttpRepo.blockMismatchingMimeTypes (7.161.26
 // sources, unchanged since 6.20): an upstream's label refuses a file only
-// when it differs from the requested type and is on the block list. The
+// when it is none of the requested types and is on the block list. The
 // body is not read for its type, so a file an upstream labels as an archive
 // is cached whatever its bytes; an archive format's own validator still
 // reads them. Nothing is refused when the label is absent, */* or
-// application/octet-stream, or the requested type is
+// application/octet-stream, or the requested types include
 // application/octet-stream, which no label can be said to mismatch.
 //
 // The override list is the block list itself, as the 7.x configuration
 // schema describes mismatchingMimeTypesOverrideList ("mime types that will
 // be blocked by this repo if the original request was for a different mime
 // type"), not types let through despite it.
-func blockedMIME(u CacheUpload, requested string) error {
+func blockedMIME(u CacheUpload, requested []string) error {
 	got := mediaTypeOf(u.ContentType)
 	if got == "" || got == "*/*" || got == "application/octet-stream" ||
-		requested == "application/octet-stream" || got == requested {
+		slices.Contains(requested, "application/octet-stream") || slices.Contains(requested, got) {
 		return nil
 	}
 	blocked := u.Repo.MismatchingMimeTypesOverrideList
@@ -377,10 +385,121 @@ func blockedMIME(u CacheUpload, requested string) error {
 	}
 	for _, entry := range strings.Split(blocked, ",") {
 		if mediaTypeOf(entry) == got {
-			return ErrRemoteMIME
+			return &MIMERefusal{Requested: requested, Label: got}
 		}
 	}
 	return nil
+}
+
+// MIMERefusal is ErrRemoteMIME with what 7.x's refusal names: the requested
+// types, in the order its message lists them, and the upstream's label.
+type MIMERefusal struct {
+	Requested []string
+	Label     string
+}
+
+func (e *MIMERefusal) Error() string { return ErrRemoteMIME.Error() }
+
+// Is makes a refusal ErrRemoteMIME, which a format route answers as before.
+func (e *MIMERefusal) Is(target error) bool { return target == ErrRemoteMIME }
+
+// Message is HttpRepo.blockMismatchingMimeTypes's text for a refusal of the
+// file at url. The list is a Java Set's toString, "[a, b]".
+func (e *MIMERefusal) Message(url string) string {
+	return "Error fetching " + url + ": Mismatching mime types found in request: [" +
+		strings.Join(e.Requested, ", ") + "] and response: " + e.Label +
+		", and this repo blocks " + e.Label + " on mismatch"
+}
+
+// RefuseLabel is the check Cache makes of a file with no format hint, for
+// an upstream answer whose body is not cached, such as a HEAD's: a
+// *MIMERefusal when c refuses label for path under the client's accept
+// values, nil otherwise.
+func RefuseLabel(c repo.Config, path, label string, accept []string) error {
+	if c.BlockMismatchingMimeTypes != nil && !*c.BlockMismatchingMimeTypes {
+		return nil
+	}
+	u := CacheUpload{Repo: c, ContentType: label, ClientAccept: accept}
+	u.Token.Key.Path = path
+	return blockedMIME(u, requestedMIME(u))
+}
+
+// requestedMIME is the requested types of 7.x's getAcceptableMimeTypes:
+// every Accept value split on "," as Java's String.split splits it, without
+// parameters, trimmed and lowercased, or the path's type when the client
+// sent no Accept. */* is dropped first, so a client that accepts anything
+// is checked against the path's type as one that sends no Accept is. 7.x
+// skips the check for it instead, which JFrog's Known Issues page lists as
+// RTDEV-46375, a fault this does not mirror [I].
+//
+// The types are in the order 7.x's message lists them: each Accept value's
+// types are collected into a Java HashSet, and those into one more.
+func requestedMIME(u CacheUpload) []string {
+	all := make([]string, 0, len(u.ClientAccept))
+	wildcard := false
+	for _, value := range u.ClientAccept {
+		var types []string
+		for _, part := range javaSplitComma(value) {
+			media, _, _ := strings.Cut(part, ";")
+			media = strings.ToLower(strings.TrimSpace(media))
+			if media == "*/*" {
+				wildcard = true
+				continue
+			}
+			types = append(types, media)
+		}
+		all = append(all, javaHashSetOrder(types)...)
+	}
+	if len(u.ClientAccept) == 0 || len(all) == 0 && wildcard {
+		return []string{mediaTypeOf(MimeType(u.Token.Key.Path))}
+	}
+	return javaHashSetOrder(all)
+}
+
+// javaSplitComma is Java's value.split(","): a value without a comma is
+// itself, and the empty strings at the end of a split are dropped.
+func javaSplitComma(value string) []string {
+	parts := strings.Split(value, ",")
+	if len(parts) == 1 {
+		return parts
+	}
+	for len(parts) > 0 && parts[len(parts)-1] == "" {
+		parts = parts[:len(parts)-1]
+	}
+	return parts
+}
+
+// javaHashSetOrder is the order a default java.util.HashSet iterates
+// values added in this order, without repeats: by bucket, the spread
+// String.hashCode masked by a table that starts at 16 and doubles past a
+// load of 0.75, and in insertion order within a bucket, which a resize
+// keeps.
+func javaHashSetOrder(values []string) []string {
+	var unique []string
+	table, size := uint32(16), uint32(0)
+	for _, v := range values {
+		if slices.Contains(unique, v) {
+			continue
+		}
+		unique = append(unique, v)
+		// HashMap.putVal: if (++size > threshold) resize().
+		if size++; size > table/4*3 {
+			table *= 2
+		}
+	}
+	bucket := func(v string) uint32 {
+		var h int32
+		for _, unit := range utf16.Encode([]rune(v)) {
+			h = 31*h + int32(unit)
+		}
+		spread := uint32(h) ^ uint32(h)>>16
+		return spread & (table - 1)
+	}
+	slices.SortStableFunc(
+		unique,
+		func(a, b string) int { return cmp.Compare(bucket(a), bucket(b)) },
+	)
+	return unique
 }
 
 // mediaTypeOf is a Content-Type value's media type as 7.x reads a label or
@@ -393,10 +512,9 @@ func mediaTypeOf(value string) string {
 }
 
 // remoteExpectedMIME holds a file with no format hint to 7.x's rule with
-// its path's type as the requested type. 7.x takes the requested type from
-// the client's Accept when one is sent, and skips the check on Accept: */*,
-// which its known issue RTDEV-46375 lists as a fault; the cache sees no
-// client header, so the path's type stands in for it [I].
+// the types requestedMIME reads from the client's Accept, or the path's
+// type. A format route passes no Accept, so its files are checked against
+// their path's type [I].
 //
 // Raw metadata whose format adapter expects a type (ExpectedContentType)
 // is held to 7.x's rule with that type requested, and also to the
@@ -404,14 +522,14 @@ func mediaTypeOf(value string) string {
 // bytes as that type, so an error page under any label stays out.
 func remoteExpectedMIME(u CacheUpload, body *bufio.Reader) error {
 	if u.ExpectedContentType == "" {
-		return blockedMIME(u, mediaTypeOf(MimeType(u.Token.Key.Path)))
+		return blockedMIME(u, requestedMIME(u))
 	}
 	expected, _, err := mime.ParseMediaType(u.ExpectedContentType)
 	if u.Kind != model.RemoteMetadata || err != nil || !strings.Contains(expected, "/") ||
 		strings.Contains(expected, "*") {
 		return ErrRemoteMIME
 	}
-	if err := blockedMIME(u, expected); err != nil {
+	if err := blockedMIME(u, []string{expected}); err != nil {
 		return err
 	}
 	got := u.ContentType

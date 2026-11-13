@@ -177,10 +177,28 @@ type p2ReadResult struct {
 	used func(context.Context) error
 }
 
-//nolint:gocyclo // This bounded read handles cached, streamed, and archive-backed P2 resources.
+// p2Read reads pathName from the remote c, or from external, without the
+// client's query or matrix parameters (p2ReadUpstream).
 func (s p2Items) p2Read(r *http.Request, c repo.Config, cached bool,
 	pathName string, external *url.URL, archiveEntry string, p kernel.Principal, acc itemkit.Access,
 	expected ...kernel.Checksums,
+) (p2ReadResult, error) {
+	return s.p2ReadUpstream(r, c, cached, pathName, external, archiveEntry, "", "", p, acc,
+		expected...)
+}
+
+// p2ReadUpstream reads as p2Read does, and passes the remote's upstream the
+// client's query (only under Propagate Query Params, which the source
+// boundary applies) and matrix parameters (source.Request.MatrixParams)
+// when it reads the remote's own URL, as for any remote file (#1371). An
+// external child or archive is another URL, so it takes neither [I]; a
+// parent composite or artifacts file read to resolve or pin a child is a
+// lookup and goes through p2Read.
+//
+//nolint:gocyclo // This bounded read handles cached, streamed, and archive-backed P2 resources.
+func (s p2Items) p2ReadUpstream(r *http.Request, c repo.Config, cached bool,
+	pathName string, external *url.URL, archiveEntry, rawQuery, matrix string,
+	p kernel.Principal, acc itemkit.Access, expected ...kernel.Checksums,
 ) (p2ReadResult, error) {
 	if s.RemoteSources == nil {
 		return p2ReadResult{}, errNoRemoteSources
@@ -208,6 +226,9 @@ func (s p2Items) p2Read(r *http.Request, c repo.Config, cached bool,
 			Path:   pathName,
 			Method: http.MethodGet,
 		},
+	}
+	if external == nil {
+		q.Resource.Query, q.MatrixParams = rawQuery, matrix
 	}
 	var want kernel.Checksums
 	if len(expected) > 0 {
@@ -493,6 +514,9 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
+	if !s.p2CopyMatches(w, r, c, req) {
+		return
+	}
 	var target *url.URL
 	var err error
 	name := req.Path
@@ -529,7 +553,9 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 			return
 		}
 	}
-	result, err := s.p2Read(r, c, cached, name, external, archiveEntry, p, acc, expected)
+	result, err := s.p2ReadUpstream(r, c, cached, name, external, archiveEntry,
+		itemkit.RemoteResource(r, req.Path).Query, pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
+		p, acc, expected)
 	if err != nil {
 		s.writeP2SourceError(w, r, err, p)
 		return

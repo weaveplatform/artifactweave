@@ -39,6 +39,16 @@ order and omit packages the caller cannot read from both the member and the
 virtual repository. Archive files under `src/contrib/Archive/<name>/` remain
 addressable without appearing in the latest version index.
 
+A GET of a `PACKAGES` index or a package archive takes the query parameters Artifactory documents for any
+file, such as `skipUpdateStats`, and matrix parameters, matched against the
+file's properties as on any other GET, once the caller's read permission is
+settled (#1350). A virtual repository's composed index carries no properties,
+so only a mandatory key (`;key+=value`) refuses it, and a virtual package GET
+passes over a member whose file does not match for the next member that lists
+the package. A remote repository passes the matrix parameters to its upstream
+after the path, and the query only when its Propagate Query Params is set; a
+copy its cache already holds is matched first.
+
 ## Migrate legacy source archives
 
 Set `archive_mover_enabled: true` in the `cran` YAML section, or

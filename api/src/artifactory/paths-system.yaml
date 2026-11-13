@@ -451,9 +451,10 @@ paths:
       x-tier: stub
   /api/system/configuration/baseUrl:
     put:
-      description: 'Sets the urlBase section of the descriptor: the scheme, host and optional path prefix that embedded
-        links use when no `X-JFrog-Override-Base-Url` or `X-Forwarded-*` header is present (decision 0002). Sending
-        an empty body clears it, after which links derive from the request. Admin only.'
+      description: 'Not implemented; answers 501. It would set the urlBase section of the descriptor: the scheme,
+        host and optional path prefix that embedded links use when no `X-JFrog-Override-Base-Url` or `X-Forwarded-*`
+        header is present (decision 0002). An empty body would clear it, after which links derive from the request.
+        Admin only.'
       operationId: updateCustomUrlBase
       requestBody:
         content:
@@ -482,6 +483,7 @@ paths:
       - system
       - handwritten
       x-handwritten: true
+      x-tier: stub
   /api/system/configuration/reverseProxy/nginx:
     get:
       description: 'Renders an nginx server block from the stored reverse proxy configuration: the server name,

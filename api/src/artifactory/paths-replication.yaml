@@ -345,14 +345,15 @@ paths:
       x-tier: stub
   /api/replication/execute/{repoPath}:
     post:
-      description: 'Starts a replication now, independently of any schedule. The direction follows the repository
-        class: a local repository pushes to the targets in the body or, when the body is omitted, to its stored
-        configuration; a remote repository pulls from its upstream into the cache, and its body may name at most
-        one target. The path may name a folder below the repository to limit the run. The run is scheduled and the
-        call answers 200 with an empty body as soon as it is accepted; progress and per-file messages go to the
-        server log, and the status operation reports the outcome. A body with more than one target is rejected with
-        400. Callers other than administrators are limited to the user query result limit when choosing files. The
-        caller needs manage permission on the repository.'
+      description: 'Not implemented; answers 501. It would start a replication now, independently of any schedule.
+        The direction would follow the repository class: a local repository pushes to the targets in the body or,
+        when the body is omitted, to its stored configuration; a remote repository pulls from its upstream into the
+        cache, and its body may name at most one target. The path may name a folder below the repository to limit
+        the run. The run would be scheduled and the call would answer 200 with an empty body as soon as it is
+        accepted; progress and per-file messages would go to the server log, and the status operation would report
+        the outcome. A body with more than one target would be rejected with 400. Callers other than administrators
+        would be limited to the user query result limit when choosing files. The caller would need manage permission
+        on the repository.'
       operationId: executePullPushReplication
       parameters:
       - description: Required path parameter. Repository key, optionally followed by a folder path, for example
@@ -409,11 +410,12 @@ paths:
       - replication
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/executepullpushreplication.md
+      x-tier: stub
   /api/replication/{repoPath}:
     get:
-      description: Reports the outcome of the last replication that touched a repository or a folder in it, read
-        from the replication properties the run annotated on the items. The caller needs read permission on the
-        repository.
+      description: Not implemented; answers 501. It would report the outcome of the last replication that touched a
+        repository or a folder in it, read from the replication properties the run annotated on the items. The
+        caller would need read permission on the repository.
       operationId: getReplicationStatus
       parameters:
       - description: Required path parameter. Repository key, optionally followed by a folder path. May span several
@@ -455,6 +457,7 @@ paths:
       - replication
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreplicationstatus.md
+      x-tier: stub
   /api/replications/channels/release:
     post:
       description: Not implemented; answers 501. It would close every event-based pull replication channel other

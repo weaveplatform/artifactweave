@@ -749,6 +749,11 @@ func (s ArtifactoryAPI) zapCache(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "zap", err))
 		return
 	}
+	if s.RemoteSources != nil {
+		// 7.x's zap also clears the missed-retrieval cache, so a path
+		// refused for its upstream label is fetched again at once.
+		s.RemoteSources.ForgetRefusals(c.Key, rest)
+	}
 	httpkit.WriteJSON(w, http.StatusOK, map[string]string{
 		"Message": "Completed zapping cache in path " + rp,
 	})

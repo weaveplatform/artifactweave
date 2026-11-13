@@ -23,7 +23,7 @@ import (
 // it lands. A format that lands as a Reindexer then answers the same rows
 // itself, and adds its operation to reindexStatusPart's generated, since
 // the stub test no longer holds it to 501. The RPM and Debian metadata
-// calculations answer from their own formats.
+// calculations, and formatReindexes, answer from their own formats.
 
 const (
 	reindexPyPI      = "POST /artifactory/api/pypi/{repoKey}/reindex"
@@ -33,7 +33,97 @@ const (
 	reindexTerraform = "POST /artifactory/api/terraform/{repoKey}/reindex"
 	reindexYum       = "POST /artifactory/api/yum/{repoKey}"
 	reindexDebian    = "POST /artifactory/api/deb/reindex/{repoKey}"
+	reindexAlpine    = "POST /artifactory/api/alpine/{repoKey}/reindex"
+	reindexBower     = "POST /artifactory/api/bower/{repoKey}/reindex"
+	reindexCargo     = "POST /artifactory/api/cargo/{repoKey}/reindex"
+	reindexCocoaPods = "POST /artifactory/api/cocoapods/{repoKey}/reindex"
+	reindexConan     = "POST /artifactory/api/conan/{repoKey}/reindex"
+	reindexConda     = "POST /artifactory/api/conda/{repoKey}/reindex"
+	reindexCran      = "POST /artifactory/api/cran/reindex/{repoKey}"
+	reindexGems      = "POST /artifactory/api/gems/{repoKey}/reindex"
+	reindexOpkg      = "POST /artifactory/api/opkg/reindex/{repoKey}"
+	reindexPub       = "POST /artifactory/api/pub/{repoKey}/reindex"
+	reindexSwift     = "POST /artifactory/api/swift/{repoKey}/reindex"
 )
+
+// formatReindex is the reindex operation of a package type whose format
+// rebuilds its own index, as itemkit.ReindexOps serves it: Manage on the
+// repository, and local repositories, with federated ones when hosted.
+type formatReindex struct {
+	route  string
+	t      repo.PackageType
+	hosted bool
+	// async is whether the operation declares the async query, which the
+	// binder then refuses unless it is a boolean.
+	async bool
+}
+
+// formatReindexes act on reindex-<type>, a local repository, and
+// reindex-<type>-fed, a federated one.
+var formatReindexes = []formatReindex{
+	{reindexAlpine, repo.Alpine, true, false},
+	{reindexBower, repo.Bower, true, false},
+	{reindexCargo, repo.Cargo, true, true},
+	{reindexCocoaPods, repo.CocoaPods, true, false},
+	{reindexConan, repo.Conan, true, true},
+	{reindexConda, repo.Conda, true, true},
+	{reindexCran, repo.Cran, false, true},
+	{reindexGems, repo.Gems, true, false},
+	{reindexOpkg, repo.Opkg, true, true},
+	{reindexPub, repo.Pub, true, true},
+	{reindexSwift, repo.Swift, true, false},
+}
+
+// key is the local repository r acts on.
+func (r formatReindex) key() string { return "reindex-" + string(r.t) }
+
+// path is r's request path for the repository key.
+func (r formatReindex) path(key string) string {
+	return strings.Replace(strings.TrimPrefix(r.route, "POST "), "{repoKey}", key, 1)
+}
+
+// formatReindexRepos are formatReindexes' repositories.
+func formatReindexRepos() []repo.Config {
+	out := make([]repo.Config, 0, 2*len(formatReindexes))
+	for _, r := range formatReindexes {
+		out = append(out,
+			repo.Config{Key: r.key(), Class: repo.Local, PackageType: r.t},
+			repo.Config{Key: r.key() + "-fed", Class: repo.Federated, PackageType: r.t},
+		)
+	}
+	return out
+}
+
+// formatReindexStatusRows are formatReindexes' rows: the classes each
+// reindexes, its refusals, and its async query where it declares one.
+func formatReindexStatusRows() []statusCase {
+	const manager = "reindexer:pw"
+	var rows []statusCase
+	for _, r := range formatReindexes {
+		federated := 400
+		if r.hosted {
+			federated = 200
+		}
+		rows = append(rows,
+			statusCase{r.route, r.path(r.key()), "admin", "", 200},
+			statusCase{r.route, r.path(r.key()), manager, "", 200},
+			statusCase{r.route, r.path(r.key() + "-fed"), "admin", "", federated},
+			statusCase{r.route, r.path(r.key()), "user", "", 403},
+			statusCase{r.route, r.path(r.key()), "anonymous", "", 401},
+			statusCase{r.route, r.path(r.key()), "", "", 401},
+			statusCase{r.route, r.path("missing"), "admin", "", 404},
+			statusCase{r.route, r.path("reindex-helm"), "admin", "", 400},
+		)
+		if r.async {
+			rows = append(rows,
+				statusCase{r.route, r.path(r.key()) + "?async=true", manager, "", 200},
+				statusCase{r.route, r.path(r.key()) + "?async=false", "admin", "", 200},
+				statusCase{r.route, r.path(r.key()) + "?async=maybe", "admin", "", 400},
+			)
+		}
+	}
+	return rows
+}
 
 // p8Types are the package types whose reindex operations P8 serves.
 var p8Types = []repo.PackageType{repo.PyPI, repo.NuGet, repo.Helm, repo.Terraform}
@@ -41,7 +131,7 @@ var p8Types = []repo.PackageType{repo.PyPI, repo.NuGet, repo.Helm, repo.Terrafor
 // reindexRepos are the repositories the reindex rows act on. Their keys
 // are their own, so they never meet the fixture repositories each P8
 // format adds under its name.
-var reindexRepos = []repo.Config{
+var reindexRepos = append([]repo.Config{
 	{Key: "reindex-pypi", Class: repo.Local, PackageType: repo.PyPI},
 	{
 		Key:         "reindex-pypi-remote",
@@ -82,7 +172,7 @@ var reindexRepos = []repo.Config{
 		Repositories: []string{"reindex-rpm"},
 	},
 	{Key: "reindex-debian", Class: repo.Local, PackageType: repo.Debian},
-}
+}, formatReindexRepos()...)
 
 // reindexFake is the format of a P8 package type until its own lands: the
 // generic format made a PathReindexer whose rebuilds change nothing.
@@ -136,10 +226,7 @@ func createReindexRepos(t *testing.T, st *inmem.Store) {
 var reindexStatusPart = statusPart{
 	// The partial reindex is matched before routing (HelmPartialReindex).
 	handwritten: map[string]bool{reindexHelmPath: true},
-	generated: map[string]bool{
-		reindexPyPI: true, reindexHelm: true, reindexTerraform: true,
-		reindexYum: true, reindexDebian: true,
-	},
+	generated:   reindexGenerated(),
 	rows: func() []statusCase {
 		const (
 			pypi      = "/artifactory/api/pypi/"
@@ -150,7 +237,7 @@ var reindexStatusPart = statusPart{
 			deb       = "/artifactory/api/deb/reindex/"
 			manager   = "reindexer:pw"
 		)
-		return []statusCase{
+		return append([]statusCase{
 			// Synchronous by default, and at once with async.
 			{reindexPyPI, pypi + "reindex-pypi/reindex", "admin", "", 200},
 			{reindexPyPI, pypi + "reindex-pypi/reindex?async=true", "admin", "", 200},
@@ -234,7 +321,7 @@ var reindexStatusPart = statusPart{
 			{reindexDebian, deb + "reindex-debian", "", "", 401},
 			{reindexDebian, deb + "missing", "admin", "", 404},
 			{reindexDebian, deb + "reindex-helm", "admin", "", 400},
-		}
+		}, formatReindexStatusRows()...)
 	},
 	seed: func(t *testing.T, db *inmem.Store, _ blob.Store) {
 		t.Helper()
@@ -262,4 +349,17 @@ var reindexStatusPart = statusPart{
 		}
 	},
 	tune: withReindexFakes,
+}
+
+// reindexGenerated are the reindex operations the rows hold to their
+// formats' answers, which the stub test then no longer holds to 501.
+func reindexGenerated() map[string]bool {
+	out := map[string]bool{
+		reindexPyPI: true, reindexNuGet: true, reindexHelm: true, reindexTerraform: true,
+		reindexYum: true, reindexDebian: true,
+	}
+	for _, r := range formatReindexes {
+		out[r.route] = true
+	}
+	return out
 }

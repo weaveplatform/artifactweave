@@ -1936,8 +1936,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getrestoreprocessstatus.md
   /api/retention/search:
     post:
-      description: Runs an AQL items query against archived items only, with the same grammar and limits as the
-        AQL search. Platform administrators only.
+      description: Not implemented; answers 501. It would run an AQL items query against archived items only, with
+        the same grammar and limits as the AQL search. Platform administrators only.
       operationId: searchArchives
       requestBody:
         content:
@@ -1965,6 +1965,7 @@ paths:
       - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/administration/reference/searcharchives.md
+      x-tier: stub
   /api/retention/searchPackages:
     post:
       description: Finds archived package versions by type, repository, name, version and archive time. Platform

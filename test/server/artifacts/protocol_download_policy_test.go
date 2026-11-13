@@ -669,3 +669,94 @@ func TestAccProtocolMetadataPolicyVirtual(t *testing.T) {
 		})
 	}
 }
+
+// customType is the artifactory.content-type value the suite sets.
+const customType = "text/x-custom"
+
+// setContentType sets file's artifactory.content-type property in the
+// repository key to customType.
+func (w *itemWorld) setContentType(key, file string) {
+	w.t.Helper()
+	wantStatus(w.t, w.do(http.MethodPut, "/artifactory/api/storage/"+key+"/"+file+
+		"?properties=artifactory.content-type=text%2Fx-custom", "admin", ""), http.StatusNoContent)
+}
+
+// TestAccContentTypePropertyRoutes: a file's artifactory.content-type
+// property types its download on the item route, GET and HEAD, whatever
+// the repository's package type, as 7.x's item download
+// (DownloadServiceImpl) sends the type of the resource that
+// DbStoringRepoMixin.setMimeType types by the property for a repository
+// of any package type (#1380). The format's native download of the same
+// file keeps the type it had without the property: 7.x's native APIs are
+// not in its OSS sources and JFrog's docs do not name them.
+func TestAccContentTypePropertyRoutes(t *testing.T) {
+	for _, c := range protocolDownloads() {
+		t.Run(c.name, func(t *testing.T) {
+			w := newItemWorld(t, false)
+			c.repo.Class = repo.Local
+			if err := w.db.Repos().
+				Create(context.Background(), *repo.Defaults(&c.repo)); err != nil {
+				t.Fatal(err)
+			}
+			for _, f := range append(c.also, seeded{c.file, c.body}) {
+				if !c.deploy {
+					w.storeFile(c.repo.Key, f.path, f.body)
+					continue
+				}
+				wantStatus(t, w.do(http.MethodPut, "/artifactory/"+c.repo.Key+"/"+f.path, "admin",
+					f.body), http.StatusCreated)
+			}
+			native := "/artifactory/api/" + c.route
+			methods := []string{http.MethodGet, http.MethodHead}
+			before := map[string]string{}
+			for _, m := range methods {
+				rec := w.do(m, native, "admin", "")
+				wantStatus(t, rec, http.StatusOK)
+				before[m] = rec.Header().Get("Content-Type")
+			}
+			w.setContentType(c.repo.Key, c.file)
+			for _, m := range methods {
+				rec := w.do(m, "/artifactory/"+c.repo.Key+"/"+c.file, "admin", "")
+				wantStatus(t, rec, http.StatusOK)
+				if got := rec.Header().Get("Content-Type"); got != customType {
+					t.Fatalf("%s item route: Content-Type %q, want %q", m, got, customType)
+				}
+				rec = w.do(m, native, "admin", "")
+				wantStatus(t, rec, http.StatusOK)
+				if got := rec.Header().Get("Content-Type"); got != before[m] {
+					t.Fatalf("%s %s: Content-Type %q, want %q as without the property",
+						m, native, got, before[m])
+				}
+			}
+		})
+	}
+}
+
+// TestAccContentTypePropertyVirtualOverlay: a virtual repository's package,
+// served by its format's item-route overlay from a member, is typed by the
+// member file's property too, as 7.x's virtual repository answers with
+// its member's resource (#1380).
+func TestAccContentTypePropertyVirtualOverlay(t *testing.T) {
+	const file = "pool/main/d/demo/demo_1.0_amd64.deb"
+	w := newItemWorld(t, false)
+	for _, c := range []repo.Config{
+		{Key: "deb-local", Class: repo.Local, PackageType: repo.Debian},
+		{
+			Key: "deb-virtual", Class: repo.Virtual, PackageType: repo.Debian,
+			Repositories: []string{"deb-local"},
+		},
+	} {
+		if err := w.db.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w.storeFile("deb-local", file, "debian package")
+	w.setContentType("deb-local", file)
+	for _, m := range []string{http.MethodGet, http.MethodHead} {
+		rec := w.do(m, "/artifactory/deb-virtual/"+file, "admin", "")
+		wantStatus(t, rec, http.StatusOK)
+		if got := rec.Header().Get("Content-Type"); got != customType {
+			t.Fatalf("%s virtual: Content-Type %q, want %q", m, got, customType)
+		}
+	}
+}

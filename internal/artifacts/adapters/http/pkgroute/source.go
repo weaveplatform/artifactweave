@@ -318,7 +318,10 @@ func (h headContent) Seek(_ int64, whence int) (int64, error) {
 }
 
 // EscapedResourcePath drops the route prefix without decoding package slashes.
-// Matrix parameters describe local selection, not an upstream path segment.
+// It cuts the matrix parameters from every segment: the escaped path is the
+// cache identity, and 7.x caches a file at its bare path. The parameters
+// still reach the upstream, after the URL's last segment, through
+// source.Request.MatrixParams (UpstreamMatrix).
 func EscapedResourcePath(r *http.Request, prefix string) string {
 	path := strings.TrimPrefix(r.URL.EscapedPath(), prefix)
 	segments := strings.Split(path, "/")

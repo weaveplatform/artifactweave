@@ -554,7 +554,9 @@ func TestUnitDebianSourceRequestValidatesRemoteMetadata(t *testing.T) {
 }
 
 // TestUnitSourceRequestsCheckAlpineAndPassOtherPaths: a query on an Alpine
-// package is refused, and the APKINDEX and package validators refuse, as a
+// package is kept for the source boundary, which passes it on only under
+// Propagate Query Params (#1350), and the APKINDEX and package validators
+// refuse, as a
 // 502 integrity failure, a body of no or the wrong size and one that does not
 // parse; CRAN and RPM pass a path they do not validate through unchanged.
 func TestUnitSourceRequestsCheckAlpineAndPassOtherPaths(t *testing.T) {
@@ -564,8 +566,10 @@ func TestUnitSourceRequestsCheckAlpineAndPassOtherPaths(t *testing.T) {
 			Resource: source.Resource{Path: p, Query: query},
 		})
 	}
-	if _, err := alpineRequest(pkg, "x=1"); !errors.Is(err, source.ErrInvalidRequest) {
-		t.Errorf("query on an Alpine package: %v; want ErrInvalidRequest", err)
+	for _, p := range []string{pkg, index} {
+		if q, err := alpineRequest(p, "x=1"); err != nil || q.Resource.Query != "x=1" {
+			t.Errorf("query on Alpine %s: %+v, %v; want it kept", p, q.Resource, err)
+		}
 	}
 	integrity := func(name string, err error) {
 		t.Helper()

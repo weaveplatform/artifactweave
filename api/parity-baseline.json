@@ -82,10 +82,7 @@
       "missing response 200 property total"
     ],
     "GET /artifactory/api/repositories": [
-      "missing query parameter limit",
-      "missing query parameter offset",
-      "missing response 200 property [].upstreamRepoKey",
-      "missing response 400"
+      "missing response 200 property [].upstreamRepoKey"
     ],
     "GET /artifactory/api/repositories/{}": [
       "missing response 200 property projectScopedReadUpstream",

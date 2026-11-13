@@ -51,8 +51,9 @@ func TestUnitCRANSourceValidatesPublishedBytes(t *testing.T) {
 		})
 	}
 	q.Resource.Query = "malformed=1"
-	if _, err := itemkit.CranSourceRequest(q); !errors.Is(err, source.ErrInvalidRequest) {
-		t.Fatalf("index query admitted: %v", err)
+	if got, err := itemkit.CranSourceRequest(q); err != nil ||
+		got.Resource.Query != "malformed=1" || got.Resource.ValidateMetadata == nil {
+		t.Fatalf("index query: %+v, %v; want it kept", got.Resource, err)
 	}
 	pkg, err := itemkit.CranSourceRequest(source.Request{Resource: source.Resource{
 		Path: "src/contrib/assertthat_0.2.1.tar.gz", Method: http.MethodGet,
