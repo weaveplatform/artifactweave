@@ -43,11 +43,15 @@
 //   - Authenticate decides in the order its comment lists (decision 0005):
 //     self-authenticated routes and skips, then credentials, which answer
 //     401 at once when they do not verify, then anonymous access, and only
-//     then the public routes. An Authorization value 7.x reads no
-//     credential from, such as "Basic Og==", "Bearer" without a token or
-//     another scheme, counts as no credential at all, as do a blank
-//     X-JFrog-Art-Api and Basic credentials naming the anonymous user
-//     while anonymous access is off.
+//     then the public routes. An API key (X-JFrog-Art-Api, or X-Api-Key
+//     after a blank one) is read first and alone, whatever the
+//     Authorization header says, as 7.x's props filter reads it. A refused
+//     key that is not blank answers 403 with the Basic challenge, as 7.x's
+//     entry point answers it. An Authorization value 7.x reads no credential from,
+//     such as "Basic Og==", "Bearer" without a token or another scheme,
+//     counts as no credential at all, as do a blank X-JFrog-Art-Api and
+//     Basic credentials naming the anonymous user while anonymous access
+//     is off.
 //   - Every principal it lets through is authorised once, and handlers ask
 //     that decider (decision 0006).
 //   - A key pair delete clears the repositories' references to the pair and

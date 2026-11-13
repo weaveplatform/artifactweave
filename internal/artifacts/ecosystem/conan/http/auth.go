@@ -22,6 +22,17 @@ func (h handler) authenticate(w http.ResponseWriter, r *http.Request) {
 		h.error(w, r, err)
 		return
 	}
+	// An API key authenticates a request that sends one whatever its
+	// Authorization header says, as 7.x's props filter does, so a Basic
+	// value beside it was never verified and is not exchanged. The key is
+	// the token the caller supplied, and comes back as it is, as a token
+	// sent as the Basic password does and as npm's and Docker's credential
+	// answers hand it back. 7.x's Conan handler is not open source, so its
+	// answer to a key is [I].
+	if key, ok := accessapi.APIKey(r.Header); ok {
+		writeToken(w, key)
+		return
+	}
 	// The Basic name must be the principal's, matched as the authenticator
 	// matched it: without regard to case (accessapi.FoldUsername). The Conan
 	// client sends the name as the user typed it (conan/internal/rest/
@@ -53,11 +64,17 @@ func (h handler) authenticate(w http.ResponseWriter, r *http.Request) {
 		}
 		secret = issued.AccessToken
 	}
+	writeToken(w, secret)
+}
+
+// writeToken answers Conan's login with token, as plain text the client
+// keeps as its Bearer token.
+func writeToken(w http.ResponseWriter, token string) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Cache-Control", "no-store")
 	//nolint:gosec // This is Conan's plain-text token exchange, not HTML.
 	_, _ = w.Write(
-		[]byte(secret),
+		[]byte(token),
 	)
 }
 

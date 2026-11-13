@@ -10,7 +10,8 @@ import (
 // Credential is what GET /api/npm/auth and its scoped form write into
 // .npmrc for a caller (decision 0034): a user name and the secret that
 // stands for the password, for a caller that sent Basic credentials, or the
-// token a caller sent as Bearer or X-JFrog-Art-Api.
+// token a caller sent as Bearer or as an API key (X-JFrog-Art-Api or
+// X-Api-Key).
 type Credential struct {
 	// User and Password are set for a Basic caller. Password is the
 	// caller's encrypted password (DV-004) when it sent its password, and

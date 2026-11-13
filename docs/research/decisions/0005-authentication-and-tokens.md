@@ -23,14 +23,24 @@ telemetry and, on recent versions, a jfconnect metrics log.
 
 **Mechanisms accepted on every endpoint:** Basic (password, access token or reference
 token as the password; the username must match the token subject), `Bearer` (JWT or
-reference token), `X-JFrog-Art-Api` (reference tokens only), and anonymous when
-`anonAccessEnabled` is on and the anonymous principal has permission. On the NuGet routes
+reference token), an API key header (reference tokens only), and anonymous when
+`anonAccessEnabled` is on and the anonymous principal has permission. The API key header is
+`X-JFrog-Art-Api`, or its older name `X-Api-Key` when `X-JFrog-Art-Api` is blank, and it is
+read first and alone: a request that sends one is authenticated by the key whatever its
+`Authorization` header says, so a Basic password beside a key is never checked nor counted
+as a failed login, as 7.x's props filter, which comes before the Basic filter and accepts
+every request that sends a key, reads it. A key that does not verify answers 403 "Bad
+credentials" with the Basic challenge while either header is not blank, as 7.x's entry point
+answers it so that a client stops asking for credentials; an `X-Api-Key` sent empty is read
+as a key and refused 401 **[I]**
+([#1464](https://github.com/weaveplatform/artifactweave/issues/1464)).
+On the NuGet routes
 alone, `X-NuGet-ApiKey: <user>:<password or token>` is read as Basic credentials when the
 request has no `Authorization` header (decision [0038](0038-nuget.md),
 [#532](https://github.com/weaveplatform/artifactweave/issues/532)). Basic is the scheme spelled
 exactly `Basic `, and Bearer is `bearer ` in any case followed by a token, or `Bearer ` exactly
 in a value of nine characters or more: `Basic Og==`, a blank `Basic`, the Basic scheme in
-another case, `Bearer` without a token, any other scheme and a blank `X-JFrog-Art-Api` carry
+another case, `Bearer` without a token, any other scheme and a blank `X-JFrog-Art-Api` beside no `X-Api-Key` carry
 no credential, as in 7.x, and neither do Basic credentials naming `anonymous` while anonymous
 access is off. They count as no `Authorization` header and no failed login
 ([research 05](../05-platform-identity-and-security-apis.md#authentication-accepted-on-every-endpoint),

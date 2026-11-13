@@ -92,10 +92,12 @@ func TestAccAuthentication(t *testing.T) {
 			map[string]string{"Authorization": "Bearer abc"},
 			want{http.StatusUnauthorized, true, "Bad credentials"},
 		},
+		// A refused API key answers 403 with the challenge, as 7.x's entry
+		// point answers it (isAlreadyAuthedApiKeyRequest, #1464).
 		"api key header": {
 			"GET", protected,
 			map[string]string{"X-JFrog-Art-Api": "cmVmd123"},
-			want{http.StatusUnauthorized, true, "Bad credentials"},
+			want{http.StatusForbidden, true, "Bad credentials"},
 		},
 	} {
 		rec := do(t, h, tc.method, tc.path, tc.headers, "")
