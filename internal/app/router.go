@@ -495,6 +495,11 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	mounted := append(artifactshttp.Protocols(artifactsDeps(cfg)), cfg.Protocols...)
 	if cfg.Auth != nil {
 		r.Use(
+			// Ahead of authentication, as 7.x's force-authentication filter
+			// is part of its authentication chain: a request without
+			// credentials to a forced Maven or P2 virtual repository is
+			// challenged whether anonymous access is on or off.
+			kit.ForceAuthentication,
 			accesshttp.Authenticate(
 				newAuthnOptions(cfg.Auth, cfg.Store, func(req *http.Request) bool {
 					if terraformbackendhttp.IsPath(req.URL.Path) {

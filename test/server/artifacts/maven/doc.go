@@ -40,6 +40,15 @@
 //     which survive a restart, and the family layouts; and for mapped
 //     remotes (mapped_remote_test.go): descriptor downloads, alias denial,
 //     and the publication and delivery fences of a mapped root.
+//   - TestAcc results for forceMavenAuthentication
+//     (maven_force_auth_test.go): the 401 with the Basic challenge for every
+//     request without credentials to a forced Maven virtual repository,
+//     whatever its method or query and whether anonymous access is on or
+//     off, and the answers it leaves to signed-in callers, to the flag off,
+//     to the package API, to a read through another virtual repository and
+//     to Gradle, Ivy and SBT virtual repositories; while anonymous access is
+//     on, the same 401 for the anonymous user's Basic credentials and a
+//     Bearer token that does not verify (#1435).
 //
 // # References
 //
