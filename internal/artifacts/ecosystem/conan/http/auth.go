@@ -22,8 +22,13 @@ func (h handler) authenticate(w http.ResponseWriter, r *http.Request) {
 		h.error(w, r, err)
 		return
 	}
+	// The Basic name must be the principal's, matched as the authenticator
+	// matched it: without regard to case (accessapi.FoldUsername). The Conan
+	// client sends the name as the user typed it (conan/internal/rest/
+	// rest_client_v2.py, authenticate: HTTPBasicAuth(user, password)), so
+	// BOB logs in as bob here as on every other route.
 	name, secret, ok := r.BasicAuth()
-	if !ok || name != p.Name || secret == "" {
+	if !ok || !accessapi.SameUsername(name, p.Name) || secret == "" {
 		h.error(w, r, kernel.ErrUnauthenticated)
 		return
 	}
