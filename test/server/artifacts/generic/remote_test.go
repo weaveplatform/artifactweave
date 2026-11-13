@@ -50,23 +50,20 @@ func TestAccGenericRemoteDownloadLifecycle(t *testing.T) {
 	if len(w.up.Requests()) != 0 {
 		t.Fatal("cache miss fetched")
 	}
-	head := w.request("HEAD", "/artifactory/remote/a/file.bin", "reader", "")
-	remoteStatus(t, head, 200)
-	if head.Body.Len() != 0 || head.Header().Get("Content-Length") != "25" ||
-		head.Header().Get("X-Checksum-Sha256") != digest {
-		t.Fatal(head.Header(), head.Body)
-	}
-	if _, err := w.rt.Store.Items().
-		Get(t.Context(), "remote", true, "a/file.bin"); !errors.Is(
-		err,
-		kernel.ErrNotFound,
-	) {
-		t.Fatalf("HEAD cached: %v", err)
-	}
+	// A cold Range GET keeps the whole file and serves the range. A cold
+	// HEAD keeps it too (#1391), so the HEAD comes after and is answered
+	// from the copy kept (remote_cold_head_test.go has the cold HEAD).
 	part := w.request("GET", "/artifactory/remote/a/file.bin", "reader", "", "Range", "bytes=3-8")
 	remoteStatus(t, part, 206)
 	if part.Body.String() != body[3:9] {
 		t.Fatal(part.Body)
+	}
+	fetched := len(w.up.Requests())
+	head := w.request("HEAD", "/artifactory/remote/a/file.bin", "reader", "")
+	remoteStatus(t, head, 200)
+	if head.Body.Len() != 0 || head.Header().Get("Content-Length") != "25" ||
+		head.Header().Get("X-Checksum-Sha256") != digest || len(w.up.Requests()) != fetched {
+		t.Fatal(head.Header(), head.Body, w.up.Requests())
 	}
 	it, err := w.rt.Store.Items().Get(t.Context(), "remote", true, "a/file.bin")
 	if err != nil {

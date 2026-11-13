@@ -3,6 +3,7 @@ package remote_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -10,55 +11,67 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
+// TestAccPolicyHEADRevalidatesWithoutGETAndPreservesStale: a HEAD of an
+// expired entry whose upstream still answers its validator revalidates it
+// without a GET, a HEAD that meets an upstream failure is answered from the
+// stale entry, and a HEAD's miss is remembered, whether the HEAD fills the
+// cache (#1391) or, for a checksum request, sends the upstream a HEAD only.
 func TestAccPolicyHEADRevalidatesWithoutGETAndPreservesStale(t *testing.T) {
-	w := policyFixture(t)
-	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good"), ETag: `"one"`})
-	q := w.request("meta.txt", source.ResourceKindMetadata)
-	w.mustRead(q, "good")
-	w.clock.Advance(30 * time.Second)
-	q.Resource.Method = http.MethodHead
-	r, err := w.read(q)
-	if err != nil || r.Stream == nil || r.Stream.Representation.Size != 4 {
-		t.Fatal(err)
-	}
-	if w.up.Count("GET", "") != 1 || w.up.Count("HEAD", "") != 2 {
-		t.Fatal(w.up.Requests())
-	}
-	e, err := w.db.RemoteCache().Read(t.Context(), w.p.CacheKey(q, "credential-1"))
-	if err != nil || !e.ValidatedAt.Equal(w.clock.Now()) {
-		t.Fatal(e, err)
-	}
-	w.clock.Advance(30 * time.Second)
-	w.up.Set("/meta.txt", fakeupstream.Resource{Status: 503})
-	r, err = w.read(q)
-	if err != nil || r.Stream == nil || r.Stream.Representation.Size != 4 {
-		t.Fatal(r, err)
-	}
-	_ = r.Stream.Body.Close()
-	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("new"), ETag: `"two"`})
-	r, err = w.read(q)
-	if err != nil || r.Stream == nil || r.Stream.Representation.ETag != `"two"` ||
-		r.Stream.Representation.Size != 3 {
-		t.Fatal(r, err)
-	}
-	_ = r.Stream.Body.Close()
-	q.Resource.Method = http.MethodGet
-	w.mustRead(q, "new")
-	missing := w.request("absent", source.ResourceKindArtifact)
-	missing.Resource.Method = http.MethodHead
-	if _, err = w.read(missing); !errors.Is(err, kernel.ErrNotFound) {
-		t.Fatal(err)
-	}
-	if _, err = w.read(missing); !errors.Is(err, kernel.ErrNotFound) {
-		t.Fatal(err)
-	}
-	if w.up.Count("HEAD", "/absent") != 1 {
-		t.Fatal("HEAD negative was not cached")
+	for _, checksum := range []bool{false, true} {
+		t.Run(fmt.Sprint("checksum request ", checksum), func(t *testing.T) {
+			w := policyFixture(t)
+			w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good"), ETag: `"one"`})
+			q := w.request("meta.txt", source.ResourceKindMetadata)
+			q.Resource.ChecksumRequest = checksum
+			w.mustRead(q, "good")
+			w.clock.Advance(30 * time.Second)
+			q.Resource.Method = http.MethodHead
+			r, err := w.read(q)
+			if err != nil || r.Stream == nil || r.Stream.Representation.Size != 4 {
+				t.Fatal(err)
+			}
+			if w.up.Count("GET", "") != 1 || w.up.Count("HEAD", "") != 2 {
+				t.Fatal(w.up.Requests())
+			}
+			e, err := w.db.RemoteCache().Read(t.Context(), w.p.CacheKey(q, "credential-1"))
+			if err != nil || !e.ValidatedAt.Equal(w.clock.Now()) {
+				t.Fatal(e, err)
+			}
+			w.clock.Advance(30 * time.Second)
+			w.up.Set("/meta.txt", fakeupstream.Resource{Status: 503})
+			r, err = w.read(q)
+			if err != nil || r.Stream == nil || r.Stream.Representation.Size != 4 {
+				t.Fatal(r, err)
+			}
+			_ = r.Stream.Body.Close()
+			w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("new"), ETag: `"two"`})
+			r, err = w.read(q)
+			if err != nil || r.Stream == nil || r.Stream.Representation.ETag != `"two"` ||
+				r.Stream.Representation.Size != 3 {
+				t.Fatal(r, err)
+			}
+			_ = r.Stream.Body.Close()
+			q.Resource.Method = http.MethodGet
+			w.mustRead(q, "new")
+			missing := w.request("absent", source.ResourceKindArtifact)
+			missing.Resource.Method = http.MethodHead
+			missing.Resource.ChecksumRequest = checksum
+			if _, err = w.read(missing); !errors.Is(err, kernel.ErrNotFound) {
+				t.Fatal(err)
+			}
+			if _, err = w.read(missing); !errors.Is(err, kernel.ErrNotFound) {
+				t.Fatal(err)
+			}
+			if w.up.Count("HEAD", "/absent") != 1 {
+				t.Fatal("HEAD negative was not cached")
+			}
+		})
 	}
 }
 
@@ -317,13 +330,93 @@ func TestAccPolicyVariantReplacementRefetchesAndNeverReturnsWrongBytes(t *testin
 	}
 }
 
-func TestAccPolicyRecoveryHEADWaiterHonorsRenewedCooldown(t *testing.T) {
+// TestAccPolicyRecoveryHEADJoinsTheGETsFill: a HEAD that arrives while a
+// GET's recovery probe runs on a remote that stores artifacts locally
+// joins the GET's fill, as a HEAD downloads as a GET does (#1391), and is
+// answered from the stale copy the failed probe falls back to, with no
+// upstream request of its own.
+func TestAccPolicyRecoveryHEADJoinsTheGETsFill(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("meta.txt", source.ResourceKindMetadata)
 	q.Repo.BypassHeadRequests = ptr(true)
 	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good")})
 	w.mustRead(q, "good")
 	w.clock.Advance(time.Hour)
+	recoveryState(t, w)
+	gate, first, second := recoveryReads(w, q)
+	key := w.p.FlightKey(w.p.CacheKey(q, "credential-1"), w.permit.Identity)
+	waitFor(t, func() bool { return w.p.FlightWaiters(key) == 2 })
+	gate.Release()
+	if err := <-first; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-second; err != nil {
+		t.Fatal(err)
+	}
+	if w.up.Count("HEAD", "") != 0 || w.up.Count("GET", "") != 2 {
+		t.Fatal(w.up.Requests())
+	}
+}
+
+// TestAccPolicyChecksumRecoveryHEADWaiterHonorsRenewedCooldown: a checksum
+// request's HEAD, which sends the upstream a HEAD only, waits on a GET's
+// recovery probe and, when the probe fails and renews the cooldown, is
+// answered from the stale copy without an upstream request of its own.
+func TestAccPolicyChecksumRecoveryHEADWaiterHonorsRenewedCooldown(t *testing.T) {
+	w := policyFixture(t)
+	q := w.request("meta.txt", source.ResourceKindMetadata)
+	q.Repo.BypassHeadRequests = ptr(true)
+	q.Resource.ChecksumRequest = true
+	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good")})
+	w.mustRead(q, "good")
+	w.clock.Advance(time.Hour)
+	state := recoveryState(t, w)
+	gate, first, second := recoveryReads(w, q)
+	key := w.p.ProbeKey(w.p.CacheKey(q, "credential-1"), w.permit, state)
+	waitFor(t, func() bool { return w.p.ProbeWaiters(key) == 2 })
+	gate.Release()
+	if err := <-first; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-second; err != nil {
+		t.Fatal(err)
+	}
+	if w.up.Count("HEAD", "") != 0 || w.up.Count("GET", "") != 2 {
+		t.Fatal(w.up.Requests())
+	}
+}
+
+// TestAccPolicyNoStoreRecoveryHEADWaiterHonorsRenewedCooldown: on a remote
+// that stores nothing, a HEAD waits on a GET's recovery probe and, when the
+// probe fails and renews the cooldown, answers its failure without an
+// upstream request of its own.
+func TestAccPolicyNoStoreRecoveryHEADWaiterHonorsRenewedCooldown(t *testing.T) {
+	w := policyFixture(t)
+	q := w.request("file.txt", source.ResourceKindArtifact)
+	q.Repo.BypassHeadRequests = ptr(true)
+	q.Repo.StoreArtifactsLocally = ptr(false)
+	state := recoveryState(t, w)
+	gate, first, second := recoveryReads(w, q)
+	key := w.p.ProbeKey(w.p.CacheKey(q, "credential-1"), w.permit, state)
+	waitFor(t, func() bool { return w.p.ProbeWaiters(key) == 2 })
+	gate.Release()
+	for _, done := range []chan error{first, second} {
+		var failure *source.HTTPError
+		if err := <-done; !errors.As(err, &failure) || failure.Status != http.StatusBadGateway ||
+			failure.Kind != source.FailureKindConnectivity {
+			t.Fatalf("%v, want a 502 connectivity failure", err)
+		}
+	}
+	if w.up.Count("HEAD", "") != 0 {
+		t.Fatal(w.up.Requests())
+	}
+}
+
+// recoveryState marks w's remote assumed offline until now, so the next
+// read that needs the upstream runs the recovery probe, and returns the
+// state it stored.
+func recoveryState(t *testing.T, w *policyWorld) model.RemoteSourceState {
+	t.Helper()
 	state, err := w.db.RemoteCache().State(t.Context(), w.c.Key)
 	if err != nil {
 		t.Fatal(err)
@@ -334,43 +427,37 @@ func TestAccPolicyRecoveryHEADWaiterHonorsRenewedCooldown(t *testing.T) {
 	if err = w.db.RemoteCache().PutState(t.Context(), w.c.Key, state); err != nil {
 		t.Fatal(err)
 	}
+	return state
+}
+
+// recoveryReads has the upstream hold q's path until the returned gate
+// opens and then drop the connection, starts a GET of q, and once the
+// upstream holds it starts a HEAD of q. Their errors arrive on first and
+// second.
+func recoveryReads(
+	w *policyWorld,
+	q source.Request,
+) (gate *fakeupstream.Barrier, first, second chan error) {
 	w.pool.Remove(w.c.Key)
-	gate := new(fakeupstream.Barrier)
+	gate = new(fakeupstream.Barrier)
 	w.up.Set(
-		"/meta.txt",
+		"/"+q.Resource.Path,
 		fakeupstream.Resource{Fault: fakeupstream.Fault{BeforeHeaders: gate, DropConnection: true}},
 	)
-	first := make(chan error, 1)
-	go func() {
+	first, second = make(chan error, 1), make(chan error, 1)
+	read := func(q source.Request, done chan error) {
 		r, e := w.read(q)
-		if e == nil {
+		if e == nil && r.Stream != nil {
 			_ = r.Stream.Body.Close()
 		}
-		first <- e
-	}()
+		done <- e
+	}
+	go read(q, first)
 	<-gate.Reached()
 	head := q
 	head.Resource.Method = http.MethodHead
-	second := make(chan error, 1)
-	go func() {
-		r, e := w.read(head)
-		if e == nil {
-			_ = r.Stream.Body.Close()
-		}
-		second <- e
-	}()
-	key := w.p.ProbeKey(w.p.CacheKey(q, "credential-1"), w.permit, state)
-	waitFor(t, func() bool { return w.p.ProbeWaiters(key) == 2 })
-	gate.Release()
-	if err = <-first; err != nil {
-		t.Fatal(err)
-	}
-	if err = <-second; err != nil {
-		t.Fatal(err)
-	}
-	if w.up.Count("HEAD", "") != 0 || w.up.Count("GET", "") != 2 {
-		t.Fatal(w.up.Requests())
-	}
+	go read(head, second)
+	return gate, first, second
 }
 
 func TestAccPolicyDisableCircuitAndCredentialRotationRecoverImmediately(t *testing.T) {
