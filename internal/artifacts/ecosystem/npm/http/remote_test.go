@@ -69,6 +69,10 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		t.Fatal(err)
 	}
 	clock := fakeupstream.NewClock(time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC))
+	// The item service stamps each cache entry, and the policy measures its
+	// age, so both read one clock: with the fixture's own, which starts
+	// weeks earlier, every entry would be stale and every read refetch.
+	f.items.Now = clock.Now
 	pool := new(upstream.Pool)
 	p := &remote.Policy{
 		Store:   f.db,
