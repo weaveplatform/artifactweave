@@ -437,9 +437,9 @@ func (p failingPackages) SearchNuGet(
 	return found, next, err //nolint:wrapcheck // a test's pass-through
 }
 
-// CountPackages and PackagesAt, a whole reader's reads of the packages,
-// fail as List does, and Candidates, its read of their versions, as
-// Versions does.
+// CountPackages, PackagesAt, CountRangeVersions and RangeVersionsAt, a
+// whole reader's reads of the packages, fail as List does, and
+// Candidates, its read of their versions, as Versions does.
 func (p failingPackages) CountPackages(ctx context.Context, r port.PackageRange) (int, error) {
 	if p.failing == "list" {
 		return 0, errBroken
@@ -461,6 +461,24 @@ func (p failingPackages) PackagesAt(
 		offset,
 		limit,
 	) //nolint:wrapcheck // a test's pass-through
+}
+
+func (p failingPackages) CountRangeVersions(ctx context.Context, r port.PackageRange) (int, error) {
+	if p.failing == "list" {
+		return 0, errBroken
+	}
+	return p.PackageStore.CountRangeVersions(ctx, r) //nolint:wrapcheck // a test's pass-through
+}
+
+func (p failingPackages) RangeVersionsAt(
+	ctx context.Context,
+	r port.PackageRange,
+	offset, limit int,
+) ([]port.ReleaseName, error) {
+	if p.failing == "list" || p.failing == "page" {
+		return nil, errBroken
+	}
+	return p.PackageStore.RangeVersionsAt(ctx, r, offset, limit) //nolint:wrapcheck // a test's pass-through
 }
 
 func (p failingPackages) Candidates(
