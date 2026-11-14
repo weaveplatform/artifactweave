@@ -26,8 +26,9 @@
 //     ImageManifests.
 //   - RunRepoPages, the contract of RepoStore.Page: the window, its More
 //     and Total, and the class, project, package type and visibility
-//     filters, in key order whatever the insertion order (#1408). It is a
-//     subtest of its own, RepoPages, run beside Run.
+//     filters, in key order whatever the insertion order (#1408), and the
+//     window after a key that a walk of the whole list reads (#1409). It is
+//     a subtest of its own, RepoPages, run beside Run.
 //   - RunVersionNames, the contract of PackageVersionNames: a package's
 //     version names in exactly Versions' order, following later writes and
 //     deletes, and a package's own (#1404). It is a subtest of its own,
@@ -35,13 +36,16 @@
 //   - The subtests, one per concern, each on a store of its own: Blobs,
 //     ColdBlobs, BlobDeletion, ColdBlobDeletion, BlobTiersSeparate,
 //     Replicas, ReplicaTiersSeparate, Repos, Items, ItemCreate, ColonPaths,
-//     ItemProperties, RepositoryRoot, ItemStats, ItemSearch,
+//     ItemProperties, RepositoryRoot, ItemStats, ItemSearch, ItemsByFullPath
+//     (a folder's descendants in full path byte order, the storage file
+//     list's, #1409),
 //     LongPropertyValues, LongPropertyKeys, Trash, Packages, GitLFSLocks,
 //     BowerRegistrations, RemoteCache, RemoteCacheFences, RemoteCacheAtomic,
 //     RemoteCacheEvict, RemoteCacheConcurrent, RemoteCacheUsage,
 //     RemoteSmartState, ArchivedItems, Builds, BuildRuns, BuildDeletes,
-//     BuildRename, BuildPromotions, BuildFiles, BuildRetention and
-//     BuildReports.
+//     BuildRename, BuildPromotions, BuildFiles (with DependencyPage, a
+//     checksum's dependencies a keyset page at a time in FindDependencies'
+//     order, #1409), BuildRetention and BuildReports.
 //   - LongText, the random text the long property cases store, which the
 //     server's long-property test shares.
 //

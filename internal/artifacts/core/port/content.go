@@ -43,6 +43,11 @@ type RepoListing struct {
 	// skips that many matching repositories before a capped window; it
 	// needs a Limit, as Get Repositories' offset does.
 	Offset, Limit int
+	// After, when set, starts the list after the repository of that key:
+	// the keyset continuation of a caller that walks the whole list a
+	// window at a time (#1409). A repository created or removed during the
+	// walk shifts no later window, as an Offset would.
+	After string
 	// Count asks for Total, the number of matching repositories on every
 	// page together.
 	Count bool
@@ -156,6 +161,14 @@ type ItemStore interface {
 	) ([]model.Item, string, error)
 	// Descendants lists every item below folder, ordered by (path, name).
 	Descendants(
+		ctx context.Context, repoKey string, cached bool, folder string, p kernel.Page,
+	) ([]model.Item, string, error)
+	// DescendantsByFullPath lists every item below folder, ordered by full
+	// path byte by byte: the order of the storage API's file list, which
+	// sorts its entries by their uri, so that list can be written a page at
+	// a time (#1409). Children's name order is the same order one level
+	// down.
+	DescendantsByFullPath(
 		ctx context.Context, repoKey string, cached bool, folder string, p kernel.Page,
 	) ([]model.Item, string, error)
 	// Delete removes the item at fullPath and, for a folder, everything below

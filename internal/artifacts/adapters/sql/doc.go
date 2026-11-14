@@ -39,7 +39,14 @@
 //     indexes items_docker_tags and items_docker_images (migration 0002,
 //     #1402). Repos' Page counts and reads a window of the repository list
 //     in SQL, its filters and the caller's visibility in the WHERE clause
-//     and LIMIT one past the window (#1408).
+//     and LIMIT one past the window (#1408), or the window after a key for
+//     a caller that walks the whole list (#1409). Items'
+//     DescendantsByFullPath reads a folder's descendants in full path byte
+//     order from the expression index items_full_path, and Builds'
+//     DependencyPage a checksum's dependencies in run, module and file
+//     order from build_dependencies_sha1_order, which replaces
+//     build_dependencies_sha1 (migration 0004, #1409); each is cut a page
+//     at a time, so a streamed list holds one page.
 //   - Module: the name artifacts, the stream migrations.FS, the two sealed
 //     columns and the BeforeReseal and AfterMigrate hooks.
 //
@@ -171,6 +178,13 @@
 //     (on 5000 tags of one image and 5000 images, a late page of each is
 //     read through its index, with no sort, on SQLite and PostgreSQL) and
 //     TestAccDockerPagesClosedDatabase.
+//   - streamed_lists_test.go: TestAccStreamedListsAtScale (over 15,000
+//     items and 5,000 dependency rows sharing one checksum, a late page of a
+//     deep list and of a dependency search is one seek on items_full_path or
+//     build_dependencies_sha1_order, with no sort, on SQLite and PostgreSQL)
+//     and TestAccStreamedListsClosedDatabase. Their contracts run in
+//     adapters/storetest (ItemsByFullPath, the build store's DependencyPage
+//     and the repository window's After).
 //   - repo_page_test.go: TestAccRepoPagesContract (the repository window's
 //     contract, adapters/storetest.RunRepoPages, on SQLite in memory and in
 //     a file and on PostgreSQL) and TestAccRepoPagesAtScale (the first and

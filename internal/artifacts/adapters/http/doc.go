@@ -79,6 +79,14 @@
 //     relocate or skip them by each format's own rule.
 //   - Statuses, envelopes and error, log and metric text are what JFrog's
 //     clients and the operators' logs read, so they stay byte-identical.
+//   - A complete list written from store pages (decision 0043, "Streaming
+//     complete lists"; #1409) answers the bytes it answered when it was
+//     collected whole. The storage API's file list merges its trees' walks
+//     in full path byte order, the order its uri sort gave, keeping the
+//     first readable tree's item at each path; the dependency search names
+//     each build once across its keyset pages; Get Repositories without
+//     limit reads windows after the last key. Folder information's children
+//     and the trash can's file list still collect.
 //
 // # References
 //
@@ -117,9 +125,12 @@
 // The tests here call the partial and its helpers without the router, over
 // in-memory stores and the access module of accesstest, which the package's
 // test fixture binds as the router would: the storage summary and its
-// formatting, the storage view's permissions, the repository operations,
-// the build actions' replay bindings and keyed appends, deletes and
-// promotions through the shared replay, the transitive AQL peer rows and
+// formatting, the storage view's permissions, the streamed file list
+// against the list collected whole, on the in-memory store, SQLite and
+// PostgreSQL, and its store faults (storage_list_stream_test.go), the
+// repository operations, the build actions' replay bindings and keyed
+// appends, deletes and promotions through the shared replay, the
+// transitive AQL peer rows and
 // bounds, the AQL timeouts behind a router of the item routes alone, and
 // the upstream search disclosures. The route suites under
 // test/server/artifacts reach the rest through the router.

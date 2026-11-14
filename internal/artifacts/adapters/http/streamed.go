@@ -33,3 +33,11 @@ func (s streamed) VisitSearchPatternResponse(w http.ResponseWriter) error { retu
 func (s streamed) VisitSearchPropertyResponse(w http.ResponseWriter) error { return s.Write(w) }
 
 func (s streamed) VisitSearchUsageResponse(w http.ResponseWriter) error { return s.Write(w) }
+
+func (s streamed) VisitSearchDependencyResponse(w http.ResponseWriter) error {
+	return s.Write(w)
+}
+
+func (s streamed) VisitGetRepositoriesByTypeAndProjectResponse(w http.ResponseWriter) error {
+	return s.Write(w)
+}

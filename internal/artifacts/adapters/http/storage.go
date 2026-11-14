@@ -308,6 +308,15 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
+	if mode == "list" {
+		l, err := v.list(ctx, f, q)
+		if err != nil {
+			httpkit.WriteErr(w, r, s.ItemError(ctx, "storage list", err))
+			return
+		}
+		_ = l.Write(w)
+		return
+	}
 	var (
 		media string
 		body  any
@@ -315,8 +324,6 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 	switch mode {
 	case "":
 		media, body, err = v.info(ctx, f)
-	case "list":
-		media, body, err = v.list(ctx, f, q)
 	case "properties":
 		media, body, err = v.properties(ctx, f, q.Get("properties"))
 	case "stats":
@@ -415,28 +422,150 @@ func (v storageView) info(ctx context.Context, f itemkit.Found) (string, any, er
 	return mediaFolderInfo, body, nil
 }
 
-// list renders the FileList view of a folder.
-func (v storageView) list(ctx context.Context, f itemkit.Found, q url.Values) (string, any, error) {
+// list answers the FileList view of a folder: the items below it in every
+// tree the view reads, sorted by uri, which is their full paths' byte
+// order. It is written a store page per tree at a time (decision 0043,
+// "Streaming complete lists"): the trees' walks in that order are merged,
+// so the answer is the one render would sort, never held whole.
+func (v storageView) list(
+	ctx context.Context,
+	f itemkit.Found,
+	q url.Values,
+) (*httpkit.ListStream, error) {
 	if !f.Item.Folder {
-		return "", nil, httpkit.BadRequestf(
+		return nil, httpkit.BadRequestf(
 			"%s is a file; list needs a folder",
 			f.Item.StoragePath(),
 		)
 	}
 	l, err := parseListing(q)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	folder := f.Item.FullPath()
-	items, err := v.below(ctx, folder, l.isDeep)
+	trees, err := v.trees(ctx, v.repo, map[string]bool{})
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
-	files := make([]listed, 0, len(items))
-	for _, it := range items {
-		files = append(files, listed{path: it.FullPath(), item: it})
+	walk := fileListWalk{v: v, folder: folder, self: f.Item, root: l.shouldIncludeRootPath}
+	for _, t := range trees {
+		list := v.st.Items().Children
+		if l.isDeep {
+			list = v.st.Items().DescendantsByFullPath
+		}
+		walk.trees = append(walk.trees, &treeWalk{
+			t: t,
+			pages: kernel.NewPages(
+				func(ctx context.Context, p kernel.Page) ([]model.Item, string, error) {
+					return list(ctx, t.Repo.Key, t.Item.Cached, folder, p)
+				},
+				kernel.MaxLimit,
+			),
+		})
 	}
-	return mediaFileList, l.render(v.uri(ctx, folder), folder, f.Item, files), nil
+	// A constant document, which always splits.
+	env, _ := httpkit.EnvelopeOf(map[string]any{
+		"uri": v.uri(ctx, folder), "created": httpkit.FormatTime(time.Now()),
+		"files": []map[string]any{},
+	}, "files")
+	//nolint:wrapcheck // a store error the handler maps, as below's was
+	return httpkit.StreamList(ctx, kernel.NewPages(walk.read, kernel.MaxLimit),
+		func(e fileListEntry) (map[string]any, bool, error) {
+			if e.self {
+				return l.rootEntry(e.item), true, nil
+			}
+			m, ok := l.entry(folder, e.listed)
+			return m, ok, nil
+		},
+		httpkit.ListOptions{ContentType: mediaFileList, Envelope: env})
+}
+
+// fileListEntry is an entry a file list's walk yields: an item below the
+// folder, or (self) the folder itself, which includeRootPath lists first.
+type fileListEntry struct {
+	listed
+	self bool
+}
+
+// fileListWalk merges the walks of a file list's trees in full path order.
+// Where several trees hold an item at one path, the first tree's that the
+// caller may read is listed and the others are skipped, as below keeps the
+// first readable one.
+type fileListWalk struct {
+	v      storageView
+	folder string
+	self   model.Item
+	root   bool
+	trees  []*treeWalk
+}
+
+// treeWalk is one tree's walk: its store pages and the rows of the current
+// page not yet merged.
+type treeWalk struct {
+	t     itemkit.Found
+	pages *kernel.Pages[model.Item]
+	rows  []model.Item
+	done  bool
+}
+
+// head is the tree's next item, reading its next page when the current
+// one is used up; false once the tree has no more.
+func (w *treeWalk) head(ctx context.Context, folder string) (model.Item, bool, error) {
+	for len(w.rows) == 0 && !w.done {
+		rows, ok, err := w.pages.Next(ctx)
+		if err != nil {
+			return model.Item{}, false, fmt.Errorf("list %s/%s: %w", w.t.Repo.Key, folder, err)
+		}
+		w.rows, w.done = rows, !ok
+	}
+	if len(w.rows) == 0 {
+		return model.Item{}, false, nil
+	}
+	return w.rows[0], true, nil
+}
+
+// read is the merged walk as a PageFunc: up to limit entries in uri order,
+// and a cursor while more may follow. The cursor only marks that more
+// follows, so it is a constant that never ends the walk early; the walk
+// keeps its own place.
+func (m *fileListWalk) read(ctx context.Context, p kernel.Page) ([]fileListEntry, string, error) {
+	var out []fileListEntry
+	if m.root {
+		// "/" sorts before every other entry's uri, which all begin with it.
+		out, m.root = append(out, fileListEntry{listed: listed{item: m.self}, self: true}), false
+	}
+	for len(out) < max(p.Limit, 1) {
+		least, found := "", false
+		for _, w := range m.trees {
+			it, ok, err := w.head(ctx, m.folder)
+			if err != nil {
+				return nil, "", err
+			}
+			if ok && (!found || it.FullPath() < least) {
+				least, found = it.FullPath(), true
+			}
+		}
+		if !found {
+			return out, "", nil
+		}
+		picked := false
+		for _, w := range m.trees {
+			if len(w.rows) == 0 || w.rows[0].FullPath() != least {
+				continue
+			}
+			it := w.rows[0]
+			w.rows = w.rows[1:]
+			// What the caller may not see is left out; a folder shows when
+			// something below it is readable.
+			if !picked && m.v.acc.Item(w.t.Repo, least, it.Folder, api.ActionRead) {
+				out, picked = append(
+					out,
+					fileListEntry{listed: listed{path: least, item: it}},
+				), true
+			}
+		}
+	}
+	return out, kernel.Cursor("more"), nil
 }
 
 // listing holds the FileList view's parameters.
@@ -481,23 +610,17 @@ type listed struct {
 }
 
 // render is the FileList body of folder, whose own item is self, over the
-// items below it.
+// items below it. The trash can's list answers with it; a repository's is
+// written as list walks it, with the same entries in the same order.
 func (l listing) render(uri, folder string, self model.Item, items []listed) map[string]any {
-	base := segments(folder)
 	files := make([]map[string]any, 0, len(items)+1)
 	if l.shouldIncludeRootPath {
-		// The listed folder itself, at "/" relative to itself. The
-		// Terraform provider's TestAccDataSourceFileList_include_root_path
-		// expects this entry first at a repository root, with size -1.
-		files = append(files, listEntry(self, "/", l.shouldIncludeMDTimestamps))
+		files = append(files, l.rootEntry(self))
 	}
 	for _, it := range items {
-		if it.item.Folder && !l.shouldListFolders ||
-			l.depth > 0 && segments(it.path)-base > l.depth {
-			continue
+		if e, ok := l.entry(folder, it); ok {
+			files = append(files, e)
 		}
-		rel := "/" + strings.TrimPrefix(strings.TrimPrefix(it.path, folder), "/")
-		files = append(files, listEntry(it.item, rel, l.shouldIncludeMDTimestamps))
 	}
 	slices.SortFunc(files, func(a, b map[string]any) int {
 		return strings.Compare(
@@ -506,6 +629,25 @@ func (l listing) render(uri, folder string, self model.Item, items []listed) map
 		) //nolint:forcetypeassert // set above
 	})
 	return map[string]any{"uri": uri, "created": httpkit.FormatTime(time.Now()), "files": files}
+}
+
+// rootEntry is the listed folder itself, at "/" relative to itself. The
+// Terraform provider's TestAccDataSourceFileList_include_root_path expects
+// this entry first at a repository root, with size -1.
+func (l listing) rootEntry(self model.Item) map[string]any {
+	return listEntry(self, "/", l.shouldIncludeMDTimestamps)
+}
+
+// entry is the FileList entry of an item below folder, with its uri
+// relative to folder; false for a folder without listFolders or an item
+// deeper than depth.
+func (l listing) entry(folder string, it listed) (map[string]any, bool) {
+	if it.item.Folder && !l.shouldListFolders ||
+		l.depth > 0 && segments(it.path)-segments(folder) > l.depth {
+		return nil, false
+	}
+	rel := "/" + strings.TrimPrefix(strings.TrimPrefix(it.path, folder), "/")
+	return listEntry(it.item, rel, l.shouldIncludeMDTimestamps), true
 }
 
 // listEntry is one entry of a FileList. size is a JSON number, -1 for a

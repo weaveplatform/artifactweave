@@ -29,10 +29,6 @@ const (
 	mediaBuildArtifactsSearch = "application/vnd.org.jfrog.artifactory.search.BuildArtifactsSearchResult+json"
 )
 
-func (r searchResponse) VisitSearchDependencyResponse(w http.ResponseWriter) error {
-	return r.write(w)
-}
-
 func (r searchResponse) VisitSearchBuildArtifactsResponse(w http.ResponseWriter) error {
 	return r.write(w)
 }
@@ -52,36 +48,59 @@ func (s ArtifactoryAPI) SearchDependency(
 	if !checksumHex["sha1"].MatchString(sha1) {
 		return nil, httpkit.BadRequestf("%s is not a hex sha1 checksum", req.Params.Sha1)
 	}
-	refs, err := r.st.Builds().FindDependencies(ctx, kernel.Checksums{SHA1: sha1})
-	if err != nil {
-		return nil, s.InternalError(ctx, "dependency search", err)
-	}
 	a, limit := buildAccess{r.acc}, r.Capped(0)
+	// The builds named so far, so each is named once: a key per build the
+	// answer names, never per dependency row, and no more than limit when
+	// the result cap sets one, since the walk ends at the last.
 	seen := map[[3]string]bool{}
-	entries := []map[string]any{}
-	for _, ref := range refs {
-		run := ref.Run
-		id := [3]string{run.ProjectKey, run.Name, run.Number}
-		if seen[id] {
-			continue
-		}
-		repoKey, doc := model.Build{
-			ProjectKey: run.ProjectKey, Name: run.Name, Number: run.Number, Started: run.Started,
-		}.DocumentItem()
-		if !a.Build(repoKey, doc, false, api.ActionRead) {
-			continue
-		}
-		seen[id] = true
-		u := buildURI(ctx, run.Name, run.Number)
-		if run.ProjectKey != "" {
-			u += "?project=" + url.QueryEscape(run.ProjectKey)
-		}
-		entries = append(entries, map[string]any{"uri": u})
-		if len(entries) == limit {
-			break
-		}
+	pages := kernel.NewPages(
+		func(ctx context.Context, p kernel.Page) ([]model.BuildRun, string, error) {
+			refs, next, err := r.st.Builds().DependencyPage(ctx, kernel.Checksums{SHA1: sha1}, p)
+			if err != nil {
+				return nil, "", s.InternalError(ctx, "dependency search", err)
+			}
+			var out []model.BuildRun
+			for _, ref := range refs {
+				run := ref.Run
+				id := [3]string{run.ProjectKey, run.Name, run.Number}
+				if seen[id] {
+					continue
+				}
+				repoKey, doc := model.Build{
+					ProjectKey: run.ProjectKey,
+					Name:       run.Name,
+					Number:     run.Number,
+					Started:    run.Started,
+				}.DocumentItem()
+				if !a.Build(repoKey, doc, false, api.ActionRead) {
+					continue
+				}
+				seen[id] = true
+				out = append(out, run)
+				if len(seen) == limit {
+					return out, "", nil
+				}
+			}
+			return out, next, nil
+		},
+		kernel.MaxLimit,
+	)
+	l, err := httpkit.StreamList(
+		ctx,
+		pages,
+		func(run model.BuildRun) (map[string]any, bool, error) {
+			u := buildURI(ctx, run.Name, run.Number)
+			if run.ProjectKey != "" {
+				u += "?project=" + url.QueryEscape(run.ProjectKey)
+			}
+			return map[string]any{"uri": u}, true, nil
+		},
+		streamedResults(ctx, mediaDependencySearch),
+	)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // Internal's error, already an answer
 	}
-	return answer(ctx, mediaDependencySearch, results(entries)), nil
+	return streamed{l}, nil
 }
 
 // SearchBuildArtifacts answers the build artifacts search: the download
