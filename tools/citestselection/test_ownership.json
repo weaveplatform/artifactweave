@@ -179,6 +179,8 @@
       "roles_status_test.go",
       "roles_test.go",
       "security_test.go",
+      "streamed_lists_test.go",
+      "streamed_memory_test.go",
       "token_auth_test.go",
       "tokens_test.go",
       "username_case_test.go"
