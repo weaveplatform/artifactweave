@@ -440,6 +440,9 @@ paths:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/exportrepositorywithmetadata.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/curation/interfaceSettings:
     get:
       description: Not implemented; answers 501.
@@ -462,6 +465,8 @@ paths:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/getcurationinterfacesettings.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Not implemented; answers 501.
       operationId: updateCurationInterfaceSettings
@@ -488,6 +493,10 @@ paths:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatecurationinterfacesettings.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/export/system:
     get:
       description: Not implemented; answers 501.
@@ -517,6 +526,8 @@ paths:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/getexportsystemsettingsexample.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: expensive
     post:
       description: Not implemented; answers 501.
       operationId: exportSystem
@@ -553,6 +564,9 @@ paths:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/exportsystem.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/import/repositories:
     post:
       description: Not implemented; answers 501.
@@ -616,6 +630,11 @@ paths:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/importrepositorycontent.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - query:path
+      - query:repo
+      x-cost: expensive
   /api/import/system:
     get:
       description: Not implemented; answers 501.
@@ -649,6 +668,8 @@ paths:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/getimportsystemsettingsexample.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: expensive
     post:
       description: Not implemented; answers 501.
       operationId: fullSystemImport
@@ -691,6 +712,10 @@ paths:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/fullsystemimport.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/system/debug/loggers:
     delete:
       description: Ends a temporary logger override set with POST before its timer expires and returns every affected
@@ -715,6 +740,10 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteloggerdebuglevels.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
     post:
       description: 'Raises or lowers the log level of named loggers for a limited time, without changing configuration
         or restarting, so an operator can collect detailed logs while reproducing a problem. When the timer expires
@@ -748,6 +777,10 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/setloggerdebuglevels.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/system/debug/loggers/{className}:
     get:
       description: Returns the level a named logger currently logs at, including any active temporary override.
@@ -778,6 +811,8 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/getloggerdebuglevel.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/system/locks:
     get:
       description: Returns a snapshot of the leases the server holds in its database, so an operator can find a stuck
@@ -809,6 +844,10 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/getclusterlocks.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/system/locks/local:
     get:
       description: Same as the lock snapshot but limited to the process that answers, without asking any other process.
@@ -837,6 +876,10 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/getnodelocks.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/system/logs/config:
     get:
       description: Not implemented; answers 501.
@@ -878,6 +921,8 @@ paths:
       - system
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getlivelogsconfig.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
   /api/system/logs/data:
     get:
       description: Not implemented; answers 501.
@@ -934,6 +979,8 @@ paths:
       - system
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getlivelogsdata.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/service_trust/pairing/{usecase}:
     delete:
       description: Not implemented; answers 501. It would remove the trust relationship with one peer for the use
@@ -1005,6 +1052,9 @@ paths:
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/unregisterpairingtoken.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
     post:
       description: 'Not implemented; answers 501. It would create a one-time pairing token for establishing trust
         with another instance of this server (decision 0021). The token would be a signed JWT whose subject is the
@@ -1057,6 +1107,9 @@ paths:
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: secret-response
+      x-cost: expensive
     put:
       description: Not implemented; answers 501. It would redeem a pairing token generated on the peer, completing
         trust between the two instances for the use case. It would run on the instance that did not generate the
@@ -1123,3 +1176,6 @@ paths:
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/exchangepairingtoken.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
