@@ -315,6 +315,11 @@ func TestUnitScaffold(t *testing.T) {
 		put["description"] != Placeholder {
 		t.Fatalf("put op %v", put)
 	}
+	for _, class := range []string{"x-idempotency", "x-cost", "x-pagination"} {
+		if put[class] != Placeholder {
+			t.Fatalf("%s is %v, want %s", class, put[class], Placeholder)
+		}
+	}
 	if put["x-oracle-source"] != "https://docs.jfrog.com/artifactory/reference/createrepository.md" {
 		t.Fatalf("source %v", put["x-oracle-source"])
 	}

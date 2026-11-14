@@ -483,8 +483,12 @@ paths:
         '405':
           description: The repository is a remote or virtual repository; the body is a registry error with the code
             UNSUPPORTED.
+        '429':
+          $ref: '#/components/responses/RegistryTooManyRequests'
         '500':
           $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+        '503':
+          $ref: '#/components/responses/RegistryServiceUnavailable'
       tags:
       - searches
       - handwritten
@@ -629,8 +633,12 @@ paths:
         '405':
           description: The repository is a remote or virtual repository; the body is a registry error with the code
             UNSUPPORTED.
+        '429':
+          $ref: '#/components/responses/RegistryTooManyRequests'
         '500':
           $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+        '503':
+          $ref: '#/components/responses/RegistryServiceUnavailable'
       tags:
       - searches
       - handwritten

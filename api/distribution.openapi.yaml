@@ -60,6 +60,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Importing needs an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Import an exported release bundle v1 archive
       tags:
         - release-bundles
@@ -93,6 +97,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List edge nodes
       tags:
         - distribution
@@ -136,6 +144,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller has no destination permission covering one of the selected edges.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Distribute a release bundle v1 version
       tags:
         - distribution
@@ -170,6 +182,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Abort a release bundle v1 distribution
       tags:
         - distribution
@@ -213,6 +229,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller has no destination permission with `delete` covering one of the selected edges.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a release bundle v1 version from edges
       tags:
         - distribution
@@ -260,6 +280,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create, sign and distribute a release bundle in one call
       tags:
         - distribution
@@ -280,6 +304,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete an exported release bundle archive
       tags:
         - release-bundles
@@ -311,6 +339,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Export a release bundle v1 version for air-gapped transfer
       tags:
         - release-bundles
@@ -345,6 +377,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the export status of a release bundle v1 version
       tags:
         - release-bundles
@@ -366,6 +402,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the default GPG signing key
       tags:
         - signing-keys
@@ -399,6 +439,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Add a GPG signing key
       tags:
         - signing-keys
@@ -422,6 +466,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List GPG key aliases
       tags:
         - signing-keys
@@ -455,6 +503,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Propagate GPG keys to edges
       tags:
         - signing-keys
@@ -485,6 +537,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a GPG key
       tags:
         - signing-keys
@@ -518,6 +574,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a GPG key by alias
       tags:
         - signing-keys
@@ -566,6 +626,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Rename a GPG key
       tags:
         - signing-keys
@@ -606,6 +670,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Redistribute recent release bundles to an edge
       tags:
         - system
@@ -665,6 +733,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Run a maintenance action
       tags:
         - system
@@ -713,6 +785,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a maintenance token
       tags:
         - system
@@ -742,6 +818,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List stuck distributions
       tags:
         - system
@@ -769,6 +849,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Reading metrics needs an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get distribution metrics
       tags:
         - system
@@ -810,6 +894,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List release bundle v1 versions
       tags:
         - release-bundles
@@ -868,6 +956,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A version with this name and version already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a release bundle v1 version
       tags:
         - release-bundles
@@ -891,6 +983,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List distribution statuses
       tags:
         - release-bundles
@@ -921,6 +1017,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete every version of a release bundle
       tags:
         - release-bundles
@@ -969,6 +1069,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No release bundle has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List the versions of one release bundle
       tags:
         - release-bundles
@@ -998,6 +1102,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No release bundle has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the latest version of a release bundle
       tags:
         - release-bundles
@@ -1023,6 +1131,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List distribution statuses of a release bundle
       tags:
         - release-bundles
@@ -1054,6 +1166,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a release bundle v1 version
       tags:
         - release-bundles
@@ -1116,6 +1232,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such version, or a signed form was requested for an OPEN version.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a release bundle v1 version
       tags:
         - release-bundles
@@ -1138,6 +1258,10 @@ paths:
           description: Credentials were missing or rejected.
         '404':
           description: No such version, or it is not signed yet.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the checksum of a release bundle v1 version
       tags:
         - release-bundles
@@ -1185,6 +1309,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Update an unsigned release bundle v1 version
       tags:
         - release-bundles
@@ -1211,6 +1339,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List distribution statuses of a version
       tags:
         - release-bundles
@@ -1236,6 +1368,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a distribution tracker
       tags:
         - release-bundles
@@ -1290,6 +1426,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Sign a release bundle v1 version
       tags:
         - release-bundles
@@ -1321,12 +1461,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Scan a release bundle v1 version with Xray
       tags:
         - release-bundles
@@ -1351,6 +1495,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List destination permissions
       tags:
         - security
@@ -1381,6 +1529,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a destination permission
       tags:
         - security
@@ -1414,6 +1566,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a destination permission
       tags:
         - security
@@ -1460,6 +1616,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The body names a different permission than the path.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create or replace a destination permission
       tags:
         - security
@@ -1487,6 +1647,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Listing tokens needs an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List tokens
       tags:
         - security
@@ -1561,6 +1725,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A non-administrator asked for admin scope or another user's token.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create or refresh a token
       tags:
         - security
@@ -1611,6 +1779,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No token with that id.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Revoke a token
       tags:
         - security
@@ -1632,6 +1804,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get distribution system information
       tags:
         - system
@@ -1653,12 +1829,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A dependency is unavailable; the message names it.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Ping the distribution service
       tags:
         - system
@@ -1686,6 +1866,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get distribution settings
       tags:
         - system
@@ -1715,6 +1899,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Update distribution settings
       tags:
         - system
@@ -1755,12 +1943,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An internal error; the body explains it.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a support bundle
       tags:
         - system
@@ -1797,12 +1989,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An internal error; the body explains it.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a support bundle
       tags:
         - system
@@ -1842,12 +2038,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An internal error; the body explains it.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a support bundle
       tags:
         - system
@@ -1900,12 +2100,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An internal error; the body explains it.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a support bundle with a given id
       tags:
         - system
@@ -1947,12 +2151,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An internal error; the body explains it.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Download a support bundle
       tags:
         - system
@@ -1980,12 +2188,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An internal error; the body explains it.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List support bundles
       tags:
         - system
@@ -2022,12 +2234,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Abort a Release Bundle v2 distribution
       tags:
         - distribution
@@ -2080,12 +2296,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The request conflicts with the current state.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Distribute a Release Bundle v2 version
       tags:
         - distribution
@@ -2121,6 +2341,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Propagating keys needs an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Propagate a signing key to edges
       tags:
         - signing-keys
@@ -2155,6 +2379,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Reading signing keys needs an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a signing key's public part
       tags:
         - signing-keys
@@ -2200,12 +2428,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a Release Bundle v2 version from edges
       tags:
         - distribution
@@ -2241,12 +2473,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List Release Bundle v2 distribution trackers
       tags:
         - distribution
@@ -2279,12 +2515,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a Release Bundle v2 distribution tracker
       tags:
         - distribution
@@ -2336,19 +2576,60 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Change the priority of a Release Bundle v2 distribution
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatereleasebundlev2distributionpriority.md
       x-tier: stub
 components:
+  headers:
+    LinkNext:
+      description: >-
+        The next page, as `<target>; rel="next"` (RFC 8288): the path and query the client sent, every parameter kept and only the position changed. Sent only while more items remain, so its absence marks the last page. Declared only by the operations that send it.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RateLimit:
+      description: >-
+        The caller's remaining allowance under the policy admission evaluated, in RateLimit draft-11 syntax, for example `"api";r=5999;t=42`: the policy, the requests left and the seconds until its window resets. Also sent on every other response after admission, whatever its status, and on every response under the `recovery` policy, though no other response declares it. Not sent on health probes, on a refusal reached before any allowance was evaluated, or on an authentication 401 or a restriction 403.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RateLimitPolicy:
+      description: >-
+        The policy admission evaluated, in RateLimit draft-11 syntax, for example `"api";q=6000;w=60`: the policy name (`api`, `expensive`, `authentication` or `recovery`), its quota and its window in seconds. Sent wherever `RateLimit` is.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RetryAfter:
+      description: >-
+        Seconds to wait before retrying, at least 1: the rest of the blocked window for a rate refusal, otherwise 1. Also sent on an operation's own 503 that reports a transient condition; a 503 that reports configuration or a size bound carries none.
+      required: true
+      x-artifactweave-extension: true
+      schema:
+        type: integer
+        minimum: 1
   parameters:
+    IdempotencyKey:
+      description: >-
+        Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, retries with the same credential, canonical resource and identical body bytes return 204 without appending again. Reuse with different bytes returns 422. Replays remain bound to the original run and require current permission. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window.
+      in: header
+      name: Idempotency-Key
+      x-artifactweave-extension: true
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 130
     distributionTrackerPath:
       description: Required path parameter. Numeric id of a distribution tracker, as returned in `id` by a distribute or delete call.
       in: path
@@ -2383,6 +2664,37 @@ components:
       name: repository_key
       schema:
         type: string
+  responses:
+    ServiceUnavailable:
+      description: >-
+        A dependency of the request is briefly unavailable: admission or restriction storage, or, for a retry with an `Idempotency-Key`, the first request still running when the retry's wait budget ran out. Wait for `Retry-After` before retrying. `RateLimit` and `RateLimit-Policy` are present when the answer follows admission, as a keyed retry's does.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: >-
+        A request limit refused the request: a rate allowance or a concurrency permit. Wait for `Retry-After` before retrying. `RateLimit` and `RateLimit-Policy` report the allowance; they are absent when the process's concurrency permits refused the request before any allowance was evaluated.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
     DeleteReleaseBundleRequest:
       description: Which edges should remove a distributed version.

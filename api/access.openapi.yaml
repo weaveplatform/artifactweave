@@ -58,12 +58,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A resource with that name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: AWS IAM role mapping is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Assign an AWS IAM role (not supported)
       tags:
         - aws
@@ -102,12 +106,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: AWS IAM role mapping is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Remove a user's AWS IAM role (not supported)
       tags:
         - aws
@@ -155,12 +163,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: AWS IAM role mapping is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a user's AWS IAM role (not supported)
       tags:
         - aws
@@ -184,6 +196,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No valid credentials.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the CA certificate
       tags:
         - certificates
@@ -213,6 +229,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No valid credentials.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the root certificate
       tags:
         - certificates
@@ -244,6 +264,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the basic authentication switch
       tags:
         - config
@@ -285,6 +309,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Set the basic authentication switch
       tags:
         - config
@@ -321,6 +349,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Update the password policy
       tags:
         - config
@@ -356,6 +388,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace the password policy
       tags:
         - config
@@ -383,6 +419,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the user lock policy
       tags:
         - config
@@ -422,6 +462,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace the user lock policy
       tags:
         - config
@@ -453,6 +497,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the default token lifetime
       tags:
         - config
@@ -488,6 +536,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Set the default token lifetime
       tags:
         - config
@@ -515,12 +567,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: Atlassian Crowd integration is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the Crowd configuration (not supported)
       tags:
         - crowd
@@ -562,12 +618,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: Atlassian Crowd integration is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Set the Crowd configuration (not supported)
       tags:
         - crowd
@@ -600,6 +660,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List global environments
       tags:
         - environments
@@ -644,6 +708,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An environment with this name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a global environment
       tags:
         - environments
@@ -674,6 +742,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No environment with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a global environment
       tags:
         - environments
@@ -721,6 +793,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No environment with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Rename a global environment
       tags:
         - environments
@@ -747,12 +823,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: HTTP single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the HTTP single sign-on configuration (not supported)
       tags:
         - httpsso
@@ -794,12 +874,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: HTTP single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Set the HTTP single sign-on configuration (not supported)
       tags:
         - httpsso
@@ -831,6 +915,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List LDAP group settings
       tags:
         - ldap
@@ -870,6 +958,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create an LDAP group setting
       tags:
         - ldap
@@ -909,6 +1001,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace an LDAP group setting
       tags:
         - ldap
@@ -945,6 +1041,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Import LDAP groups
       tags:
         - ldap
@@ -988,6 +1088,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Search LDAP groups
       tags:
         - ldap
@@ -1022,6 +1126,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a group mapping strategy
       tags:
         - ldap
@@ -1058,6 +1166,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No group setting has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete an LDAP group setting
       tags:
         - ldap
@@ -1097,6 +1209,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No group setting has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get an LDAP group setting
       tags:
         - ldap
@@ -1160,6 +1276,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No group setting has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Refresh LDAP groups
       tags:
         - ldap
@@ -1189,6 +1309,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List LDAP connections
       tags:
         - ldap
@@ -1228,6 +1352,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create an LDAP connection
       tags:
         - ldap
@@ -1267,6 +1395,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace an LDAP connection
       tags:
         - ldap
@@ -1303,6 +1435,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Test an LDAP connection
       tags:
         - ldap
@@ -1339,6 +1475,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No connection has that key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete an LDAP connection
       tags:
         - ldap
@@ -1378,6 +1518,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No connection has that key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get an LDAP connection
       tags:
         - ldap
@@ -1420,12 +1564,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: Cloud log collection is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Switch cloud log collection (not supported)
       tags:
         - logshipping
@@ -1457,6 +1605,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List OIDC providers
       tags:
         - oidc
@@ -1496,6 +1648,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create an OIDC provider
       tags:
         - oidc
@@ -1530,6 +1686,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The subject token does not verify against the provider.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Exchange an ID token for an access token
       tags:
         - oidc
@@ -1566,6 +1726,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No provider has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete an OIDC provider
       tags:
         - oidc
@@ -1605,6 +1769,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No provider has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get an OIDC provider
       tags:
         - oidc
@@ -1651,6 +1819,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace an OIDC provider
       tags:
         - oidc
@@ -1699,6 +1871,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No provider has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List identity mappings
       tags:
         - oidc
@@ -1745,6 +1921,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create an identity mapping
       tags:
         - oidc
@@ -1787,6 +1967,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The provider or the mapping does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete an identity mapping
       tags:
         - oidc
@@ -1832,6 +2016,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The provider or the mapping does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get an identity mapping
       tags:
         - oidc
@@ -1890,6 +2078,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The provider or the mapping does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace an identity mapping
       tags:
         - oidc
@@ -1921,6 +2113,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The caller lacks the privilege this operation needs (see the description).
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectslist.md
@@ -1969,6 +2165,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A project with this key or display name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/createproject.md
@@ -2008,6 +2208,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: >-
@@ -2068,6 +2272,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/attachrepositorytoproject.md
@@ -2139,6 +2347,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectrepositorystatus.md
@@ -2178,6 +2390,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: >-
@@ -2224,6 +2440,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: >-
@@ -2270,6 +2490,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: >-
@@ -2329,6 +2553,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: >-
@@ -2369,6 +2597,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/deleteproject.md
@@ -2411,6 +2643,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getproject.md
@@ -2467,6 +2703,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/updateproject.md
@@ -2505,6 +2745,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No project with this key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List a project's environments
       tags:
         - environments
@@ -2557,6 +2801,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An environment with this name already exists in the project or globally.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a project environment
       tags:
         - environments
@@ -2588,6 +2836,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such project or environment.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a project environment
       tags:
         - environments
@@ -2636,6 +2888,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such project or environment.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Rename a project environment
       tags:
         - environments
@@ -2684,6 +2940,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectgroups.md
@@ -2729,6 +2989,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/deleteprojectgroup.md
@@ -2776,6 +3040,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The project does not exist or the group holds no role in it.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectgroup.md
@@ -2838,6 +3106,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/updateprojectgroup.md
@@ -2883,6 +3155,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectroles.md
@@ -2939,6 +3215,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/createprojectrole.md
@@ -2984,6 +3264,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/deleteprojectrole.md
@@ -3032,6 +3316,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectrole.md
@@ -3094,6 +3382,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/updateprojectrole.md
@@ -3143,6 +3435,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectusers.md
@@ -3188,6 +3484,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/deleteprojectuser.md
@@ -3235,6 +3535,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The project does not exist or the user holds no role in it.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectuser.md
@@ -3297,6 +3601,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/addorupdateprojectuser.md
@@ -3327,6 +3635,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List global roles
       tags:
         - roles
@@ -3371,6 +3683,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A role with this name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a global role
       tags:
         - roles
@@ -3407,6 +3723,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No role with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a global role
       tags:
         - roles
@@ -3440,6 +3760,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No role with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a global role
       tags:
         - roles
@@ -3482,6 +3806,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No role with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace a global role
       tags:
         - roles
@@ -3510,12 +3838,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SAML single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List SAML settings (not supported)
       tags:
         - saml
@@ -3557,12 +3889,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SAML single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a SAML setting (not supported)
       tags:
         - saml
@@ -3592,12 +3928,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SAML single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the SAML switch (not supported)
       tags:
         - saml
@@ -3641,12 +3981,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SAML single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Set the SAML switch (not supported)
       tags:
         - saml
@@ -3679,12 +4023,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SAML single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a SAML setting (not supported)
       tags:
         - saml
@@ -3726,12 +4074,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SAML single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a SAML setting (not supported)
       tags:
         - saml
@@ -3780,12 +4132,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SAML single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace a SAML setting (not supported)
       tags:
         - saml
@@ -3830,12 +4186,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No valid credentials.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List SCIM groups (not supported)
       tags:
         - scim
@@ -3877,12 +4237,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A resource with that name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a SCIM group (not supported)
       tags:
         - scim
@@ -3915,12 +4279,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a SCIM group (not supported)
       tags:
         - scim
@@ -3961,12 +4329,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a SCIM group (not supported)
       tags:
         - scim
@@ -4017,12 +4389,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Patch a SCIM group (not supported)
       tags:
         - scim
@@ -4071,12 +4447,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace a SCIM group (not supported)
       tags:
         - scim
@@ -4100,12 +4480,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No valid credentials.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List SCIM resource types (not supported)
       tags:
         - scim
@@ -4129,12 +4513,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No valid credentials.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List SCIM schemas (not supported)
       tags:
         - scim
@@ -4171,12 +4559,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a SCIM schema (not supported)
       tags:
         - scim
@@ -4200,12 +4592,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No valid credentials.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the SCIM service provider configuration (not supported)
       tags:
         - scim
@@ -4250,12 +4646,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No valid credentials.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List SCIM users (not supported)
       tags:
         - scim
@@ -4297,12 +4697,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A resource with that name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a SCIM user (not supported)
       tags:
         - scim
@@ -4335,12 +4739,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a SCIM user (not supported)
       tags:
         - scim
@@ -4381,12 +4789,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a SCIM user (not supported)
       tags:
         - scim
@@ -4435,12 +4847,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Patch a SCIM user (not supported)
       tags:
         - scim
@@ -4489,12 +4905,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace a SCIM user (not supported)
       tags:
         - scim
@@ -4548,12 +4968,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unknown use case.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The use case is mission-control or bridge, which are not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a pairing token
       tags:
         - tokens
@@ -4576,12 +5000,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: Access backup export and import is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Export the Access configuration (not supported)
       tags:
         - backup
@@ -4613,12 +5041,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: Access backup export and import is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Import the Access configuration (not supported)
       tags:
         - backup
@@ -4648,6 +5080,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List federation targets
       tags:
         - federation
@@ -4693,6 +5129,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A target with this name already exists and force_override was not set.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Register a federation target
       tags:
         - federation
@@ -4729,6 +5169,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Validate a candidate federation target
       tags:
         - federation
@@ -4765,6 +5209,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No target has this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Unregister a federation target
       tags:
         - federation
@@ -4810,6 +5258,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No target has this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a federation target
       tags:
         - federation
@@ -4865,6 +5317,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No target has this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Update a federation target
       tags:
         - federation
@@ -4911,6 +5367,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No target has this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Run a full broadcast to a target
       tags:
         - federation
@@ -4930,6 +5390,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccessProbe"
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/system/ping:
     get:
       operationId: accessPing
@@ -4946,6 +5410,8 @@ paths:
               schema:
                 type: string
                 example: OK
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         "500":
           description: >-
             The database does not answer within 5 seconds. The plain-text body is the reason, `The database is not available`.
@@ -4954,6 +5420,8 @@ paths:
               schema:
                 type: string
                 example: The database is not available
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/system/readiness:
     get:
       operationId: accessReadiness
@@ -4969,6 +5437,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccessProbe"
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         "500":
           description: >-
             The database does not answer within 5 seconds; the message is the reason, `The database is not available`.
@@ -4976,6 +5446,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/system/version:
     get:
       operationId: getAccessVersion
@@ -4990,6 +5462,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccessVersion"
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/tokens:
     get:
       description: A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens and tokens that are not revocable are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.
@@ -5019,6 +5495,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller's token does not permit listing.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List access tokens
       tags:
         - tokens
@@ -5060,6 +5540,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'The requested token details are forbidden: the caller may not mint a token with this username or scope, or a non-admin asked for expires_in 0, a token that never expires.'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create or refresh an access token
       tags:
         - tokens
@@ -5114,6 +5598,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The value does not correspond to a known, unexpired, revocable token, answered with the message `Token not found or not revocable`.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Revoke a token by its value
       tags:
         - tokens
@@ -5150,6 +5638,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such token.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Revoke a token by id
       tags:
         - tokens
@@ -5183,6 +5675,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such token, or it has expired or been revoked.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a token's metadata
       tags:
         - tokens
@@ -5211,6 +5707,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List Vault connections
       tags:
         - vault
@@ -5253,12 +5753,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The body is not application/json.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The test could not be completed.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Test a Vault connection
       tags:
         - vault
@@ -5295,6 +5799,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No connection has that key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a Vault connection
       tags:
         - vault
@@ -5347,6 +5855,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The body is not application/json.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create or replace a Vault connection
       tags:
         - vault
@@ -5425,6 +5937,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is neither an admin nor holds system:identities:r.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List groups
       tags:
         - groups
@@ -5475,6 +5991,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A group with this name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a group
       tags:
         - groups
@@ -5505,6 +6025,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No group with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a group
       tags:
         - groups
@@ -5544,6 +6068,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No group with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a group
       tags:
         - groups
@@ -5590,6 +6118,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No group with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Update a group
       tags:
         - groups
@@ -5642,6 +6174,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A user in members does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create or replace a group
       tags:
         - groups
@@ -5708,6 +6244,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No group with this name, or a username in add does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Add or remove members
       tags:
         - groups
@@ -5795,6 +6335,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A filtered user or group does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List permissions
       tags:
         - permissions
@@ -5839,6 +6383,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A permission with this name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a permission
       tags:
         - permissions
@@ -5875,6 +6423,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No permission with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a permission
       tags:
         - permissions
@@ -5914,6 +6466,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No permission with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a permission
       tags:
         - permissions
@@ -5951,6 +6507,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such permission, or it has no section for this resource type.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete one resource section
       tags:
         - permissions
@@ -5991,6 +6551,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such permission, or it has no section for this resource type.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get one resource section of a permission
       tags:
         - permissions
@@ -6038,6 +6602,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such permission, or it has no section for this resource type.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Merge into one resource section
       tags:
         - permissions
@@ -6085,6 +6653,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No permission with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace one resource section
       tags:
         - permissions
@@ -6165,6 +6737,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No global role exists with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectsforrole.md
@@ -6257,6 +6833,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is neither an admin nor holds system:identities:r.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List users
       tags:
         - users
@@ -6301,6 +6881,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A user with this username already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a user
       tags:
         - users
@@ -6328,6 +6912,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Expire every internal password
       tags:
         - users
@@ -6355,6 +6943,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Clear the expired flag on every password
       tags:
         - users
@@ -6385,6 +6977,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No user with this username.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a user
       tags:
         - users
@@ -6424,6 +7020,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No user with this username.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a user
       tags:
         - users
@@ -6470,6 +7070,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No user with this username.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Update a user
       tags:
         - users
@@ -6541,6 +7145,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No user with this username.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Add or remove group memberships
       tags:
         - users
@@ -6593,6 +7201,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No user with this username.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Set a user's password
       tags:
         - users
@@ -6623,6 +7235,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No user with this username.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Expire a user's password
       tags:
         - users
@@ -6653,11 +7269,52 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No user with this username.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Unlock a user
       tags:
         - users
 components:
+  headers:
+    LinkNext:
+      description: >-
+        The next page, as `<target>; rel="next"` (RFC 8288): the path and query the client sent, every parameter kept and only the position changed. Sent only while more items remain, so its absence marks the last page. Declared only by the operations that send it.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RateLimit:
+      description: >-
+        The caller's remaining allowance under the policy admission evaluated, in RateLimit draft-11 syntax, for example `"api";r=5999;t=42`: the policy, the requests left and the seconds until its window resets. Also sent on every other response after admission, whatever its status, and on every response under the `recovery` policy, though no other response declares it. Not sent on health probes, on a refusal reached before any allowance was evaluated, or on an authentication 401 or a restriction 403.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RateLimitPolicy:
+      description: >-
+        The policy admission evaluated, in RateLimit draft-11 syntax, for example `"api";q=6000;w=60`: the policy name (`api`, `expensive`, `authentication` or `recovery`), its quota and its window in seconds. Sent wherever `RateLimit` is.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RetryAfter:
+      description: >-
+        Seconds to wait before retrying, at least 1: the rest of the blocked window for a rate refusal, otherwise 1. Also sent on an operation's own 503 that reports a transient condition; a 503 that reports configuration or a size bound carries none.
+      required: true
+      x-artifactweave-extension: true
+      schema:
+        type: integer
+        minimum: 1
   parameters:
+    IdempotencyKey:
+      description: >-
+        Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, retries with the same credential, canonical resource and identical body bytes return 204 without appending again. Reuse with different bytes returns 422. Replays remain bound to the original run and require current permission. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window.
+      in: header
+      name: Idempotency-Key
+      x-artifactweave-extension: true
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 130
     environmentName:
       description: Required path parameter. The environment name, matched case-insensitively.
       in: path
@@ -6718,6 +7375,37 @@ components:
       required: true
       schema:
         type: string
+  responses:
+    ServiceUnavailable:
+      description: >-
+        A dependency of the request is briefly unavailable: admission or restriction storage, or, for a retry with an `Idempotency-Key`, the first request still running when the retry's wait budget ran out. Wait for `Retry-After` before retrying. `RateLimit` and `RateLimit-Policy` are present when the answer follows admission, as a keyed retry's does.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: >-
+        A request limit refused the request: a rate allowance or a concurrency permit. Wait for `Retry-After` before retrying. `RateLimit` and `RateLimit-Policy` report the allowance; they are absent when the process's concurrency permits refused the request before any allowance was evaluated.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
     AccessProbe:
       type: object

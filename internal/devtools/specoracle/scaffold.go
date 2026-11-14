@@ -275,6 +275,12 @@ func (s *scaffolder) operation(
 	out["tags"] = []any{s.tag}
 	out["description"] = Placeholder
 	out["x-draft"] = true
+	// Decision 0043 has every operation declare these three classes. The
+	// author picks each, removing x-pagination from one that answers no
+	// collection; TestAccAPIPrinciples fails a placeholder once x-draft goes.
+	for _, class := range []string{"x-idempotency", "x-cost", "x-pagination"} {
+		out[class] = Placeholder
+	}
 	out["x-oracle-source"] = b.source
 	if _, ok := out["responses"]; !ok {
 		out["responses"] = map[string]any{"default": map[string]any{"description": Placeholder}}

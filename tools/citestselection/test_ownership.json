@@ -94,6 +94,8 @@
       "access_identity_status_test.go",
       "access_test.go",
       "api_ledger_test.go",
+      "api_principles_fixtures_test.go",
+      "api_principles_test.go",
       "api_restrictions_parts_test.go",
       "bootstrap_test.go",
       "builds_status_test.go",

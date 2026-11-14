@@ -27,6 +27,31 @@ implementation. Partial entries retain unsupported modes and native dispatch
 limitations; neither repository CRUD nor a mounted wildcard proves full native
 support.
 
+A specified operation's `retry`, `admission` and `pagination_execution` are derived
+from the classes its spec declares
+([decision 0043](../decisions/0043-api-reliability.md#rules-for-every-operation)),
+so the ledger states what admission, the key gate and paging read:
+
+- `retry` starts with the `x-idempotency` class: a `natural` operation's
+  identifiers, a `none` operation's reason, and for `key` whether the operation
+  references the shared `IdempotencyKey` (one that does not yet answers a key
+  with 400). The advice that follows is the class's.
+- `admission` starts with the `x-cost` class and gives its policy and limits, plus
+  each `x-cost-expensive-query` parameter that selects the expensive policy.
+- `pagination_execution` gives the `x-pagination` class with its position, size
+  and next pointer, then the persistence family's review of how the store executes
+  it, since the class describes the wire, not the store. An operation that declares
+  its other classes but no `x-pagination` is "not a collection".
+- A stub keeps its 501 advice ("501 is not transient", "schema-only") and appends
+  its intended idempotency and paging classes; it is admitted like any operation,
+  so its `admission` is derived too.
+
+A class not declared yet, or still `TODO(author)` on a draft, leaves that field to
+the route heuristics, as do the hand-written aliases and dispatch bindings, which
+have no spec operation. The guard `TestAccAPIPrinciples` holds the classes
+themselves to the decision's rules
+([conventions](../../implementation/api-description-conventions.md#retry-cost-and-paging-classes)).
+
 `TestAccAPIReliabilityLedger` rebuilds this join and rejects drift. After reviewing
 an implementation change, refresh the retained evidence with `make api-ledger`.
 This refresh is not a substitute for reviewing semantics: source method presence

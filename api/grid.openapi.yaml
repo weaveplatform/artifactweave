@@ -74,12 +74,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List known instances
       tags:
         - topology
@@ -107,12 +111,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List topologies
       tags:
         - topology
@@ -158,12 +166,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A topology with the derived key already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a topology
       tags:
         - topology
@@ -207,12 +219,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/TopologyResponse'
           description: The topology was kept because removing Access federation from one or more sites failed. The body is the stored topology; each failed site shows Disconnected with the reason in status_description. Retry the delete to finish removal.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a topology
       tags:
         - topology
@@ -252,12 +268,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No topology has this key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a topology
       tags:
         - topology
@@ -310,12 +330,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No topology has this key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Update a topology
       tags:
         - topology
@@ -395,12 +419,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No topology has this key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List monitored entities
       tags:
         - topology
@@ -468,12 +496,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No topology has this key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Summarise entity sync
       tags:
         - topology
@@ -543,17 +575,90 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No topology has this key, or the entity is unknown.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get one entity's sync state
       tags:
         - topology
       x-oracle-source: https://docs.jfrog.com/administration/reference/getmonitoringentitydetail.md
 components:
+  headers:
+    LinkNext:
+      description: >-
+        The next page, as `<target>; rel="next"` (RFC 8288): the path and query the client sent, every parameter kept and only the position changed. Sent only while more items remain, so its absence marks the last page. Declared only by the operations that send it.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RateLimit:
+      description: >-
+        The caller's remaining allowance under the policy admission evaluated, in RateLimit draft-11 syntax, for example `"api";r=5999;t=42`: the policy, the requests left and the seconds until its window resets. Also sent on every other response after admission, whatever its status, and on every response under the `recovery` policy, though no other response declares it. Not sent on health probes, on a refusal reached before any allowance was evaluated, or on an authentication 401 or a restriction 403.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RateLimitPolicy:
+      description: >-
+        The policy admission evaluated, in RateLimit draft-11 syntax, for example `"api";q=6000;w=60`: the policy name (`api`, `expensive`, `authentication` or `recovery`), its quota and its window in seconds. Sent wherever `RateLimit` is.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RetryAfter:
+      description: >-
+        Seconds to wait before retrying, at least 1: the rest of the blocked window for a rate refusal, otherwise 1. Also sent on an operation's own 503 that reports a transient condition; a 503 that reports configuration or a size bound carries none.
+      required: true
+      x-artifactweave-extension: true
+      schema:
+        type: integer
+        minimum: 1
+  parameters:
+    IdempotencyKey:
+      description: >-
+        Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, retries with the same credential, canonical resource and identical body bytes return 204 without appending again. Reuse with different bytes returns 422. Replays remain bound to the original run and require current permission. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window.
+      in: header
+      name: Idempotency-Key
+      x-artifactweave-extension: true
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 130
+  responses:
+    ServiceUnavailable:
+      description: >-
+        A dependency of the request is briefly unavailable: admission or restriction storage, or, for a retry with an `Idempotency-Key`, the first request still running when the retry's wait budget ran out. Wait for `Retry-After` before retrying. `RateLimit` and `RateLimit-Policy` are present when the answer follows admission, as a keyed retry's does.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: >-
+        A request limit refused the request: a rate allowance or a concurrency permit. Wait for `Retry-After` before retrying. `RateLimit` and `RateLimit-Policy` report the allowance; they are absent when the process's concurrency permits refused the request before any allowance was evaluated.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
     AllEntityTypesSummaryResponse:
       description: Sync counts per entity type across the topology.

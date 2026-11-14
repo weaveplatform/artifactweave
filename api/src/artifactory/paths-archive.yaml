@@ -1527,8 +1527,12 @@ paths:
           $ref: '#/components/responses/ColdStorageUnauthorized'
         '403':
           $ref: '#/components/responses/ColdStorageForbidden'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: List archive executions
       tags:
       - archive
@@ -1554,8 +1558,12 @@ paths:
           $ref: '#/components/responses/ColdStorageUnauthorized'
         '403':
           $ref: '#/components/responses/ColdStorageForbidden'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: List cold storage archive policies
       tags:
       - archive
@@ -1591,8 +1599,12 @@ paths:
           $ref: '#/components/responses/ColdStorageUnauthorized'
         '403':
           $ref: '#/components/responses/ColdStorageForbidden'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: Convert a search criteria form to AQL
       tags:
       - archive
@@ -1669,8 +1681,12 @@ paths:
           $ref: '#/components/responses/ColdStorageUnauthorized'
         '403':
           $ref: '#/components/responses/ColdStorageForbidden'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: Preview a policy that is not saved
       tags:
       - archive
@@ -1701,8 +1717,12 @@ paths:
           $ref: '#/components/responses/ColdStorageForbidden'
         '404':
           $ref: '#/components/responses/ColdStorageNotFound'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: Delete a cold storage archive policy
       tags:
       - archive
@@ -1734,8 +1754,12 @@ paths:
           $ref: '#/components/responses/ColdStorageForbidden'
         '404':
           $ref: '#/components/responses/ColdStorageNotFound'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: Get a cold storage archive policy
       tags:
       - archive
@@ -1775,8 +1799,12 @@ paths:
           $ref: '#/components/responses/ColdStorageForbidden'
         '409':
           $ref: '#/components/responses/ColdStorageConflict'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: Create a cold storage archive policy
       tags:
       - archive
@@ -1817,8 +1845,12 @@ paths:
           $ref: '#/components/responses/ColdStorageForbidden'
         '404':
           $ref: '#/components/responses/ColdStorageNotFound'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: Update a cold storage archive policy
       tags:
       - archive
@@ -1852,8 +1884,12 @@ paths:
           $ref: '#/components/responses/ColdStorageForbidden'
         '404':
           $ref: '#/components/responses/ColdStorageNotFound'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: Preview a saved policy
       tags:
       - archive
@@ -1881,8 +1917,12 @@ paths:
           $ref: '#/components/responses/ColdStorageForbidden'
         '404':
           $ref: '#/components/responses/ColdStorageNotFound'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: Stop a cold storage policy execution
       tags:
       - archive
@@ -1918,8 +1958,12 @@ paths:
           $ref: '#/components/responses/ColdStorageForbidden'
         '404':
           $ref: '#/components/responses/ColdStorageNotFound'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: Run a cold storage policy now
       tags:
       - archive
@@ -1942,8 +1986,12 @@ paths:
           $ref: '#/components/responses/ColdStorageUnauthorized'
         '403':
           $ref: '#/components/responses/ColdStorageForbidden'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: Get the cold storage namespace
       tags:
       - archive
@@ -1976,8 +2024,12 @@ paths:
           $ref: '#/components/responses/ColdStorageUnauthorized'
         '403':
           $ref: '#/components/responses/ColdStorageForbidden'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: Restore archived items
       tags:
       - archive
@@ -2012,8 +2064,12 @@ paths:
           $ref: '#/components/responses/ColdStorageUnauthorized'
         '403':
           $ref: '#/components/responses/ColdStorageForbidden'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: List restore executions
       tags:
       - archive
@@ -2045,8 +2101,12 @@ paths:
           $ref: '#/components/responses/ColdStorageUnauthorized'
         '403':
           $ref: '#/components/responses/ColdStorageForbidden'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: Search archived items with AQL
       tags:
       - archive
@@ -2089,8 +2149,12 @@ paths:
           $ref: '#/components/responses/ColdStorageUnauthorized'
         '403':
           $ref: '#/components/responses/ColdStorageForbidden'
+        '429':
+          $ref: '#/components/responses/ColdStorageTooManyRequests'
         '500':
           $ref: '#/components/responses/ColdStorageInternalServerError'
+        '503':
+          $ref: '#/components/responses/ColdStorageServiceUnavailable'
       summary: Search archived package versions
       tags:
       - archive
