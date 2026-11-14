@@ -63,6 +63,11 @@
 //     Basic values that carry no credential at all, BearerToken reads the
 //     token of a Bearer value as the props filter and RequestUtils read
 //     it, and Blank is Java's isBlank, which 7.x applies to those values.
+//   - API keys as 7.x reads them: APIKey is the key a request sends,
+//     X-JFrog-Art-Api unless it is blank and otherwise X-Api-Key whenever
+//     it is sent, which authenticates the request whatever its
+//     Authorization header says; APIKeySent reports a key header that is
+//     not blank, for which a refusal answers 403.
 //   - Authorizer: evaluating a principal's permissions once for a request
 //     (Authorize), for a principal the request did not authorise (For), and
 //     for a subject no request authenticated (Decide). SubjectOf is the
@@ -183,4 +188,7 @@
 //     Authorization values 7.x reads as Basic or Bearer credentials, which
 //     it reads no credential from, blank as Java's isBlank tells it, and
 //     the user, secret or token it reads.
+//   - TestUnitAPIKey: which key header is read, the first line of it, a
+//     blank X-JFrog-Art-Api giving way to X-Api-Key, an X-Api-Key sent
+//     empty read as a key, and which requests sent a key that is not blank.
 package api

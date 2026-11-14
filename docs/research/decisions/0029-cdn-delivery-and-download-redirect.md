@@ -96,7 +96,9 @@ checksum check after a redirect (research 19 section 2).
 order:
 
 1. A conditional request whose validators decide the answer (304) is answered locally from
-   the item's metadata. A file download and a registry manifest ignore `If-Match` and
+   the item's metadata, as 7.x's download decides it for a file (decision
+   [0004](0004-storage-sql-metadata-and-blobs.md),
+   [#1469](https://github.com/weaveplatform/artifactweave/issues/1469)). A file download and a registry manifest ignore `If-Match` and
    `If-Unmodified-Since`, as Artifactory's download does, so each is answered as the plain
    request would be ([#1314](https://github.com/weaveplatform/artifactweave/issues/1314),
    [#1437](https://github.com/weaveplatform/artifactweave/issues/1437)).

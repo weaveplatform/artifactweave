@@ -56,7 +56,11 @@
 //     store's verdicts, not found, conflict and invalid, excepted). It is
 //     format.ErrStorageFault, a server fault, not the upstream's; a failed
 //     read of the upstream's body stays the upstream's
-//     (https://github.com/weaveplatform/artifactweave/issues/1269).
+//     (https://github.com/weaveplatform/artifactweave/issues/1269). So is a
+//     format hook's failure (guard, Admit, Deployed, Annotated) while the
+//     cache keeps a file when a statement the store failed to run lies
+//     under it (kernel.ErrStore); a hook's refusal keeps its error
+//     (https://github.com/weaveplatform/artifactweave/issues/1470).
 //
 // # Invariants
 //
@@ -104,10 +108,11 @@
 //   - transfer*_test.go, archive_test.go and sidecar_test.go: copy and move,
 //     explode and checksum sidecars.
 //   - cache_test.go, cache_check_test.go, cache_fault_test.go,
-//     cache_maintenance_test.go, smart_test.go and restore_test.go: the
-//     remote cache, a failed read of its copy under check, a failed write
-//     or store call while it keeps one, its cleanup, smart remote properties,
-//     restore and zap. cache_restart_test.go's TestAcc tests run
+//     cache_hook_test.go, cache_maintenance_test.go, smart_test.go and
+//     restore_test.go: the remote cache, a failed read of its copy under
+//     check, a failed write or store call while it keeps one, a statement
+//     the store failed to run under a hook, its cleanup, smart remote
+//     properties, restore and zap. cache_restart_test.go's TestAcc tests run
 //     the cleanup over SQLite across a restart and a concurrent download.
 //   - work_test.go: derived work and reindexes; fault_test.go,
 //     guard_test.go and the *_absent_test.go files: store failures, write

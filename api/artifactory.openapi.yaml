@@ -3516,7 +3516,7 @@ paths:
       x-tier: implemented
   /api/conan/{repoKey}/reindex:
     post:
-      description: Queues a rebuild of the package index of a local or federated Conan repository from its completed recipe and package revisions, and returns once the work is queued. Requires Manage on the repository; other package types and classes are rejected with 400.
+      description: Rebuilds the package index of a local or federated Conan repository from its completed recipe and package revisions. Waits for the work to finish unless async is true. Requires an administrator; other package types and classes are rejected with 400.
       operationId: calculateConanRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -3526,20 +3526,20 @@ paths:
           schema:
             description: Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
             type: string
-        - description: Optional query parameter. Accepted with either value; the work is always queued and the response returns once it is queued.
+        - description: Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
           in: query
           name: async
           schema:
-            description: Accepted with either value; the work is always queued.
+            description: When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
             type: boolean
       responses:
         '200':
           content:
             text/plain:
               schema:
-                description: Plain-text acknowledgement of the queued reindex.
+                description: Plain-text acknowledgement of the reindex.
                 type: string
-          description: The Conan reindex was scheduled.
+          description: The Conan reindex ran, or was scheduled when async is true.
         '401':
           content:
             application/json:
@@ -3551,7 +3551,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs; the body carries the error envelope.
+          description: The caller is not an administrator; the body carries the error envelope.
         '500':
           content:
             application/json:
@@ -20921,7 +20921,7 @@ components:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableConanSupport:
-          description: Optional within this object. Stored only and returned as it was sent; it changes no answer.
+          description: Optional within this object. Accepted and changes no answer. The v1 read reports it true for a Conan repository whatever was sent, as 7.x derives it from the package type; the v2 read and the configurations list leave it out.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
@@ -21765,7 +21765,7 @@ components:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableConanSupport:
-          description: Optional within this object. Stored only and returned as it was sent; it changes no answer.
+          description: Optional within this object. Accepted and changes no answer. The v1 read reports it true for a Conan repository whatever was sent, as 7.x derives it from the package type; the v2 read and the configurations list leave it out.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
@@ -23388,6 +23388,9 @@ components:
         downloadRedirect:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
+        enableConanSupport:
+          description: Optional within this object. Accepted and changes no answer. The v1 read reports it true for a Conan repository whatever was sent, as 7.x derives it from the package type; the v2 read and the configurations list leave it out.
+          type: boolean
         enableCookieManagement:
           description: Optional within this object. When true upstream cookies are stored and replayed. Defaults to false.
           type: boolean
@@ -24798,6 +24801,9 @@ components:
           enum:
             - V2
           type: string
+        enableConanSupport:
+          description: Optional within this object. Accepted and changes no answer. The v1 read reports it true for a Conan repository whatever was sent, as 7.x derives it from the package type; the v2 read and the configurations list leave it out.
+          type: boolean
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD. Mandatory when projectKey is set; a repository may belong to several environments. An administrator's read lists none as an empty array rather than leaving the field out.
           items:

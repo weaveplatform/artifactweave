@@ -165,21 +165,22 @@ func TestAccGenericRemotePassesMatrixParametersUpstream(t *testing.T) {
 // Before, both answered 404 "Could not find resource", the GET and its
 // ?trace alike. A copy stored that way carries no properties, so the next
 // GET with the mandatory key is not found without asking the upstream,
-// and its ?trace says why.
+// and its ?trace says why. A cold HEAD stores the copy as a GET does
+// (#1391), so each method starts from an empty cache.
 func TestAccGenericRemoteServesTheUpstreamsAnswerUnmatched(t *testing.T) {
 	for _, store := range []bool{true, false} {
-		name := "stored"
-		if !store {
-			name = "streamed"
-		}
-		t.Run(name, func(t *testing.T) {
-			w := newRemoteWorld(t)
-			w.c.StoreArtifactsLocally = &store
-			w.update()
-			matrixUpstream(w, ";x+=1")
-			seen := 0
-			target := "/artifactory/remote" + matrixPath + ";x+=1"
-			for _, method := range []string{http.MethodHead, http.MethodGet} {
+		for _, method := range []string{http.MethodHead, http.MethodGet} {
+			name := "stored " + method
+			if !store {
+				name = "streamed " + method
+			}
+			t.Run(name, func(t *testing.T) {
+				w := newRemoteWorld(t)
+				w.c.StoreArtifactsLocally = &store
+				w.update()
+				matrixUpstream(w, ";x+=1")
+				seen := 0
+				target := "/artifactory/remote" + matrixPath + ";x+=1"
 				got := w.request(method, target, "reader", "")
 				if got.Code != http.StatusOK ||
 					method == http.MethodGet && got.Body.String() != matrixBody {
@@ -190,27 +191,27 @@ func TestAccGenericRemoteServesTheUpstreamsAnswerUnmatched(t *testing.T) {
 					t.Fatalf("%s asked the upstream %q, want only %q", method, paths,
 						matrixPath+";x+=1")
 				}
-			}
-			trace := w.request(http.MethodGet, target+"?trace", "reader", "")
-			if !store {
-				if trace.Code != http.StatusOK ||
-					!strings.Contains(trace.Body.String(), "Request succeeded") {
-					t.Errorf("trace of a streamed file answered %d %q", trace.Code, trace.Body)
+				trace := w.request(http.MethodGet, target+"?trace", "reader", "")
+				if !store {
+					if trace.Code != http.StatusOK ||
+						!strings.Contains(trace.Body.String(), "Request succeeded") {
+						t.Errorf("trace of a streamed file answered %d %q", trace.Code, trace.Body)
+					}
+					return
 				}
-				return
-			}
-			wantMatrixError(t, w.request(http.MethodGet, target, "reader", ""),
-				http.StatusNotFound, "Could not find resource")
-			if trace.Code != http.StatusOK || !strings.Contains(trace.Body.String(),
-				"Found resource in local cache, but property doesn't match.") ||
-				!strings.Contains(trace.Body.String(), "Responding with unfound resource") {
-				t.Errorf("trace of a cached copy that does not match answered %d %q",
-					trace.Code, trace.Body)
-			}
-			if paths := upstreamPaths(w, &seen); len(paths) != 0 {
-				t.Errorf("a cached copy that does not match asked the upstream %q", paths)
-			}
-		})
+				wantMatrixError(t, w.request(http.MethodGet, target, "reader", ""),
+					http.StatusNotFound, "Could not find resource")
+				if trace.Code != http.StatusOK || !strings.Contains(trace.Body.String(),
+					"Found resource in local cache, but property doesn't match.") ||
+					!strings.Contains(trace.Body.String(), "Responding with unfound resource") {
+					t.Errorf("trace of a cached copy that does not match answered %d %q",
+						trace.Code, trace.Body)
+				}
+				if paths := upstreamPaths(w, &seen); len(paths) != 0 {
+					t.Errorf("a cached copy that does not match asked the upstream %q", paths)
+				}
+			})
+		}
 	}
 }
 

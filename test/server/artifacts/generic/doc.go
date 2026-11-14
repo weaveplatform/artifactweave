@@ -45,6 +45,11 @@
 //   - head_range_test.go: a HEAD with Range answers 200 with the whole
 //     length on a local, redirecting, virtual, PyPI and remote file, where
 //     a GET still gets the range (#1338).
+//   - remote_cold_head_test.go: a cold HEAD on a remote that stores
+//     artifacts locally downloads and keeps the file, answers with its own
+//     type, length and checksums, counts no download, and answers a failed
+//     download as the GET does; with storeArtifactsLocally false it sends
+//     a HEAD only and keeps nothing (#1391).
 //   - remote_upstream_nostore_test.go: a generic, Maven, npm and PyPI
 //     remote keeps the answers an upstream marks Cache-Control: no-store,
 //     serves them again without the upstream and once it is gone, and

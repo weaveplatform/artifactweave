@@ -20,7 +20,9 @@
 // # Outputs
 //
 //   - Sentinel errors that store adapters wrap and callers test with
-//     errors.Is: ErrNotFound, ErrConflict, ErrInvalidCursor and ErrInvalid.
+//     errors.Is: ErrNotFound, ErrConflict, ErrInvalidCursor and ErrInvalid;
+//     and ErrStore, which marks the store's own failure beside the driver's
+//     error rather than a verdict on the record.
 //   - Keyset paging: Page with Normalize and Key, DefaultLimit, MaxLimit,
 //     Cursor and Trim.
 //   - Clone, the deep copy a store hands out so that no caller shares stored

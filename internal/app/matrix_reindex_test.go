@@ -8,8 +8,8 @@ import (
 
 // reindexMatrixPart is the reindex operations' share of the matrix:
 // Manage on the repository, which only the administrators hold on
-// reindexRepos here, and an administrator for Terraform's. The status
-// table's reindexer holds Manage alone.
+// reindexRepos here, and an administrator for Terraform's and Conan's. The
+// status table's reindexer holds Manage alone.
 var reindexMatrixPart = matrixPart{
 	rows: func() []matrixRow {
 		const (
@@ -34,7 +34,11 @@ var reindexMatrixPart = matrixPart{
 			row(reindexDebian, deb+"reindex-debian", "", manages("reindex-debian"), 200),
 		}
 		for _, r := range formatReindexes {
-			rows = append(rows, row(r.route, r.path(r.key()), "", manages(r.key()), 200))
+			who := manages(r.key())
+			if r.admin {
+				who = administrators
+			}
+			rows = append(rows, row(r.route, r.path(r.key()), "", who, 200))
 		}
 		return rows
 	},

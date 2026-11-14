@@ -30,6 +30,10 @@
 //   - Digest, the four digests of a byte slice and the oracle the cases
 //     check against; Content, deterministic bytes for a seed; and Put, one
 //     append and a commit. Other tests seed stores with them.
+//   - ReadFaults, a store whose reads of a blob fail (ErrDropped, or the
+//     error a test gives) from a chosen open on, as a store whose
+//     connection drops does, for the tests of the server's answer to its
+//     own storage's faults.
 //
 // # References
 //
@@ -61,7 +65,8 @@
 //
 // # Testing
 //
-// The package has no tests of its own. Every backend runs Run: fs on a
+// The package has no tests of its own; ReadFaults is exercised by the
+// format route tests that use it. Every backend runs Run: fs on a
 // temporary directory; s3, gcs and azure on an in-memory fake, again with
 // their sessions kept in the uploads table, on MinIO, the GCS emulator and
 // Azurite where Docker runs Linux containers, and on the real clouds in the

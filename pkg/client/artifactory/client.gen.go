@@ -7018,7 +7018,7 @@ type GetCleanupPoliciesViewParamsItemTypes string
 
 // CalculateConanRepositoryMetadataParams defines parameters for CalculateConanRepositoryMetadata.
 type CalculateConanRepositoryMetadataParams struct {
-	// Async Optional query parameter. Accepted with either value; the work is always queued and the response returns once it is queued.
+	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 }
 
@@ -10216,7 +10216,7 @@ type ClientInterface interface {
 
 	// CalculateConanRepositoryMetadata performs a POST /api/conan/{repoKey}/reindex (the `CalculateConanRepositoryMetadata` operationId) request.
 	//
-	// Queues a rebuild of the package index of a local or federated Conan repository from its completed recipe and package revisions, and returns once the work is queued. Requires Manage on the repository; other package types and classes are rejected with 400.
+	// Rebuilds the package index of a local or federated Conan repository from its completed recipe and package revisions. Waits for the work to finish unless async is true. Requires an administrator; other package types and classes are rejected with 400.
 	CalculateConanRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateConanRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateCondaRepositoryMetadata performs a POST /api/conda/{repoKey}/reindex (the `CalculateCondaRepositoryMetadata` operationId) request.
@@ -14527,7 +14527,7 @@ func (c *Client) CalculateCocoaPodsIndex(ctx context.Context, repoKey string, re
 
 // CalculateConanRepositoryMetadata performs a POST /api/conan/{repoKey}/reindex (the `CalculateConanRepositoryMetadata` operationId) request.
 //
-// Queues a rebuild of the package index of a local or federated Conan repository from its completed recipe and package revisions, and returns once the work is queued. Requires Manage on the repository; other package types and classes are rejected with 400.
+// Rebuilds the package index of a local or federated Conan repository from its completed recipe and package revisions. Waits for the work to finish unless async is true. Requires an administrator; other package types and classes are rejected with 400.
 func (c *Client) CalculateConanRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateConanRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateConanRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -37464,7 +37464,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateConanRepositoryMetadataWithResponse performs a POST /api/conan/{repoKey}/reindex (the `CalculateConanRepositoryMetadata` operationId) request.
 	//
-	// Queues a rebuild of the package index of a local or federated Conan repository from its completed recipe and package revisions, and returns once the work is queued. Requires Manage on the repository; other package types and classes are rejected with 400.
+	// Rebuilds the package index of a local or federated Conan repository from its completed recipe and package revisions. Waits for the work to finish unless async is true. Requires an administrator; other package types and classes are rejected with 400.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateConanRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateConanRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateConanRepositoryMetadataResponse, error)
@@ -64146,7 +64146,7 @@ func (c *ClientWithResponses) CalculateCocoaPodsIndexWithResponse(ctx context.Co
 
 // CalculateConanRepositoryMetadataWithResponse performs a POST /api/conan/{repoKey}/reindex (the `CalculateConanRepositoryMetadata` operationId) request.
 //
-// Queues a rebuild of the package index of a local or federated Conan repository from its completed recipe and package revisions, and returns once the work is queued. Requires Manage on the repository; other package types and classes are rejected with 400.
+// Rebuilds the package index of a local or federated Conan repository from its completed recipe and package revisions. Waits for the work to finish unless async is true. Requires an administrator; other package types and classes are rejected with 400.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateConanRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateConanRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateConanRepositoryMetadataResponse, error) {

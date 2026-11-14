@@ -83,9 +83,11 @@ type Resource struct {
 	// item route makes it: the client's Accept values are the requested
 	// types, and a refused label answers 409 with 7.x's message, which
 	// Service.Read then answers for the path until the repository's
-	// missedRetrievalCachePeriodSecs pass. Nil, as on a format route, keeps
-	// the check on the path's type and its 502. Accept here never reaches
-	// the upstream or the cache identity.
+	// missedRetrievalCachePeriodSecs pass. Without Accept the requested
+	// type is the type of the URL asked for. A format route's read through
+	// pkgroute sets it with no Accept unless the resource has a format
+	// hint (#1392); nil keeps the check and answers its 502. Accept here
+	// never reaches the upstream or the cache identity.
 	ClientMIME *ClientMIME
 	Validate   func(context.Context, io.ReadSeeker, int64) error
 	// ValidateMetadata validates complete metadata against the actual response
@@ -131,6 +133,12 @@ type Resource struct {
 	// ChecksumOnly is the trusted generic cold SHA-256 sidecar route. It must
 	// remain transient and authorize the artifact it describes.
 	ChecksumOnly bool
+	// ChecksumRequest marks a read of the file a checksum request (a
+	// .sha1, .md5, .sha256 or .sha512 path) names. Its HEAD is answered
+	// from the upstream's info and keeps no body, where any other HEAD on
+	// a remote that stores artifacts locally downloads the file, as 7.x
+	// leaves checksum requests out of that download.
+	ChecksumRequest bool
 	// Mutable marks a refreshable artifact name, such as a non-unique Maven
 	// snapshot. It does not turn a binary into metadata for zap semantics.
 	Mutable     bool

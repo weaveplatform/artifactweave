@@ -88,15 +88,21 @@ func registryURL(r *http.Request) string {
 }
 
 // presented is the secret of the credential the request authenticated as
-// name with: a Basic password, a Bearer token or an X-JFrog-Art-Api
-// reference token. Basic and Bearer are read as the authentication reads
-// them (accessapi.BasicCredentials, accessapi.BearerToken): a lower-case
-// "basic" value, a blank "Bearer" or another scheme authenticates nothing
-// in 7.x, so beside a key that did, its secret is not the one to hand
-// back. Nor is the password of Basic credentials naming another user, such
-// as the anonymous name the authentication declines while anonymous access
-// is off; an empty name is the token's subject (authn.Authenticator.Token).
+// name with: an API key's reference token, a Basic password or a Bearer
+// token, read as the authentication reads them. An API key comes first
+// (accessapi.APIKey): it authenticates a request that sends one whatever
+// its Authorization header says, as 7.x's props filter does, so a Basic
+// or Bearer value beside it, which nothing verified, is not the one to
+// hand back. Basic and Bearer are read with accessapi.BasicCredentials and
+// accessapi.BearerToken: a lower-case "basic" value, a blank "Bearer" or
+// another scheme authenticates nothing in 7.x. Nor is the password of
+// Basic credentials naming another user, such as the anonymous name the
+// authentication declines while anonymous access is off; an empty name is
+// the token's subject (authn.Authenticator.Token).
 func presented(r *http.Request, name string) string {
+	if key, ok := accessapi.APIKey(r.Header); ok {
+		return key
+	}
 	h := r.Header.Get("Authorization")
 	if user, password, ok := accessapi.BasicCredentials(h); ok &&
 		(user == "" || accessapi.SameUsername(user, name)) {
@@ -105,5 +111,5 @@ func presented(r *http.Request, name string) string {
 	if token, ok := accessapi.BearerToken(h); ok {
 		return token
 	}
-	return r.Header.Get("X-JFrog-Art-Api")
+	return ""
 }

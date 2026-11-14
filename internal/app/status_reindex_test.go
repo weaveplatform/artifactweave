@@ -48,7 +48,8 @@ const (
 
 // formatReindex is the reindex operation of a package type whose format
 // rebuilds its own index, as itemkit.ReindexOps serves it: Manage on the
-// repository, and local repositories, with federated ones when hosted.
+// repository, or an administrator when admin, and local repositories, with
+// federated ones when hosted.
 type formatReindex struct {
 	route  string
 	t      repo.PackageType
@@ -56,22 +57,24 @@ type formatReindex struct {
 	// async is whether the operation declares the async query, which the
 	// binder then refuses unless it is a boolean.
 	async bool
+	admin bool
 }
 
 // formatReindexes act on reindex-<type>, a local repository, and
 // reindex-<type>-fed, a federated one.
 var formatReindexes = []formatReindex{
-	{reindexAlpine, repo.Alpine, true, false},
-	{reindexBower, repo.Bower, true, false},
-	{reindexCargo, repo.Cargo, true, true},
-	{reindexCocoaPods, repo.CocoaPods, true, false},
-	{reindexConan, repo.Conan, true, true},
-	{reindexConda, repo.Conda, true, true},
-	{reindexCran, repo.Cran, false, true},
-	{reindexGems, repo.Gems, true, false},
-	{reindexOpkg, repo.Opkg, true, true},
-	{reindexPub, repo.Pub, true, true},
-	{reindexSwift, repo.Swift, true, false},
+	{reindexAlpine, repo.Alpine, true, false, false},
+	{reindexBower, repo.Bower, true, false, false},
+	{reindexCargo, repo.Cargo, true, true, false},
+	{reindexCocoaPods, repo.CocoaPods, true, false, false},
+	// "Requires a valid admin user" (the archived 7.x reference).
+	{reindexConan, repo.Conan, true, true, true},
+	{reindexConda, repo.Conda, true, true, false},
+	{reindexCran, repo.Cran, false, true, false},
+	{reindexGems, repo.Gems, true, false, false},
+	{reindexOpkg, repo.Opkg, true, true, false},
+	{reindexPub, repo.Pub, true, true, false},
+	{reindexSwift, repo.Swift, true, false, false},
 }
 
 // key is the local repository r acts on.
@@ -100,13 +103,16 @@ func formatReindexStatusRows() []statusCase {
 	const manager = "reindexer:pw"
 	var rows []statusCase
 	for _, r := range formatReindexes {
-		federated := 400
+		federated, managed := 400, 200
 		if r.hosted {
 			federated = 200
 		}
+		if r.admin {
+			managed = 403
+		}
 		rows = append(rows,
 			statusCase{r.route, r.path(r.key()), "admin", "", 200},
-			statusCase{r.route, r.path(r.key()), manager, "", 200},
+			statusCase{r.route, r.path(r.key()), manager, "", managed},
 			statusCase{r.route, r.path(r.key() + "-fed"), "admin", "", federated},
 			statusCase{r.route, r.path(r.key()), "user", "", 403},
 			statusCase{r.route, r.path(r.key()), "anonymous", "", 401},
@@ -116,7 +122,8 @@ func formatReindexStatusRows() []statusCase {
 		)
 		if r.async {
 			rows = append(rows,
-				statusCase{r.route, r.path(r.key()) + "?async=true", manager, "", 200},
+				statusCase{r.route, r.path(r.key()) + "?async=true", manager, "", managed},
+				statusCase{r.route, r.path(r.key()) + "?async=true", "admin", "", 200},
 				statusCase{r.route, r.path(r.key()) + "?async=false", "admin", "", 200},
 				statusCase{r.route, r.path(r.key()) + "?async=maybe", "admin", "", 400},
 			)
@@ -222,7 +229,7 @@ func createReindexRepos(t *testing.T, st *inmem.Store) {
 
 // reindexStatusPart is the reindex operations' share of the status
 // table. reindexer holds Manage on their repositories and nothing else,
-// which every operation but Terraform's needs.
+// which every operation but Terraform's and Conan's needs.
 var reindexStatusPart = statusPart{
 	// The partial reindex is matched before routing (HelmPartialReindex).
 	handwritten: map[string]bool{reindexHelmPath: true},

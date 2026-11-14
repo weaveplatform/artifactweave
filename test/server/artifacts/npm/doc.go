@@ -23,6 +23,9 @@
 //     support.NPMRoutes has no status row or no principal row.
 //   - TestAcc results for login and logout (no logout token is logged), the
 //     auth lines, the queued reindex and the strict-layout conversion.
+//   - TestAccNPMRemoteTarballMIMERefusal fails while an upstream tarball
+//     whose label the remote's block list refuses answers other than 7.x's
+//     409, remembered, without asking the upstream again (issue 1392).
 //
 // # References
 //

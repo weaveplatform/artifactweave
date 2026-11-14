@@ -29,7 +29,17 @@ revision, the server checks the manifest's MD5 entries against the uploaded
 files or the safely unpacked archive. Incomplete revisions do not appear in
 search or downloads. Reindex (`POST /artifactory/api/conan/<repo-key>/reindex`)
 rebuilds the package index from committed manifests; deletion and restore use
-the existing item lifecycle and rebuild it as needed.
+the existing item lifecycle and rebuild it as needed. As in 7.x, the reindex is
+for an administrator only, waits for the work to finish unless `async=true`, and
+answers `Recalculating index for Conan repository <repo-key> scheduled to run.`
+("Calculate Conan Repository Metadata": the current reference and the archived
+7.x page, which carries the security line and the sample answer).
+
+A repository with `forceConanAuthentication` answers a request without
+credentials 401 with the Basic challenge, so the client sends the credentials it
+holds. A Conan repository's v1 read reports `enableConanSupport: true` whatever
+the create sent, because 7.x derives the flag from the package type; the v2 read
+and the configurations list leave the key out.
 
 Remote repositories use the shared source service for upstream access and
 cache policy. Metadata is bounded and validated before disclosure; downloadable
@@ -51,7 +61,11 @@ in `test/server/artifacts/conan/conan_client_remote_test.go` also downloads each
 recipe and binary package through a remote cache backed by the production
 source policy. Local and remote/virtual protocol, uncommitted revision and
 generic-upload boundary tests are in
-`test/server/artifacts/conan/conan_test.go`. Unit
+`test/server/artifacts/conan/conan_test.go`. `TestAccConanReindexWaitsUnlessAsync`
+(`reindex_test.go`), `TestAccConanForceAuthentication`
+(`force_authentication_test.go`) and `TestAccConanEnableConanSupportReads`
+(`configuration_test.go`) in the same package cover the reindex, the
+authentication flag and the configuration reads. Unit
 tests for paths, manifests, metadata and archive safety live in
 `internal/artifacts/ecosystem/conan` and
 `internal/artifacts/ecosystem/conan/http`. The production source/cache test

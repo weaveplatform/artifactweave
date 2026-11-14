@@ -66,7 +66,13 @@ type Error struct {
 	Detail  any
 	// NoChallenge distinguishes an upstream refusal from a request to authenticate
 	// against this server. Never turn upstream credentials into a local challenge.
-	NoChallenge       bool
+	NoChallenge bool
+	// Challenge gives a status other than 401 the profile's challenge too:
+	// 7.x's ArtifactoryBasicAuthenticationEntryPoint adds its Basic
+	// challenge to every answer it gives, so the credentials it refuses
+	// with 403 rather than 401, a refused API key's and a NuGet client's,
+	// still carry one (sendErrorResponse, 7.161.26).
+	Challenge         bool
 	RetryAfterSeconds int
 }
 
@@ -116,13 +122,12 @@ func Write(w http.ResponseWriter, s Profile, err error) {
 	if e.RetryAfterSeconds > 0 {
 		w.Header().Set("Retry-After", strconv.Itoa(e.RetryAfterSeconds))
 	}
-	if e.Status == http.StatusUnauthorized && !e.NoChallenge && s == ProfilePub &&
-		w.Header().Get("WWW-Authenticate") == "" {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="pub"`)
-	}
-	if e.Status == http.StatusUnauthorized && !e.NoChallenge && s != ProfilePub &&
-		w.Header().Get("WWW-Authenticate") == "" {
-		w.Header().Set("WWW-Authenticate", BasicChallenge)
+	if challenged(s, e) && w.Header().Get("WWW-Authenticate") == "" {
+		challenge := BasicChallenge
+		if s == ProfilePub {
+			challenge = pubChallenge(e.Message)
+		}
+		w.Header().Set("WWW-Authenticate", challenge)
 	}
 	if s == ProfileText {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -151,6 +156,49 @@ func Write(w http.ResponseWriter, s Profile, err error) {
 	}
 	w.WriteHeader(e.Status)
 	_ = json.NewEncoder(w).Encode(envelope(s, e))
+}
+
+// challenged reports whether e's answer under s carries a challenge: a
+// 401, an error that asks for one (Challenge), and under ProfilePub a 403
+// too, unless the error is an upstream's (NoChallenge). The hosted pub
+// repository specification v2 requires one on both: a server "must
+// respond" to a missing or invalid token with 401 and to a token without
+// permission with 403, each with WWW-Authenticate: Bearer realm="pub",
+// message="<message>" (doc/repository-spec-v2.md in dart-lang/pub).
+func challenged(s Profile, e *Error) bool {
+	if e.NoChallenge {
+		return false
+	}
+	return e.Status == http.StatusUnauthorized || e.Challenge ||
+		s == ProfilePub && e.Status == http.StatusForbidden
+}
+
+// pubChallenge is the challenge the pub specification requires, carrying
+// message: dart pub prints only a message it finds in a Bearer challenge
+// whose realm is pub (_throwAuthException in lib/src/authentication/
+// client.dart), after its own text. The message is an RFC 9110
+// quoted-string, which holds printable ASCII alone: a quote or a backslash
+// is escaped, a control character such as the newline in a locked
+// account's message becomes a space, and any other character a question
+// mark, so the header stays one valid line that the client parses.
+func pubChallenge(message string) string {
+	var b strings.Builder
+	b.WriteString(`Bearer realm="pub", message="`)
+	for _, r := range message {
+		switch {
+		case r == '"' || r == '\\':
+			b.WriteByte('\\')
+			b.WriteRune(r)
+		case r < ' ' || r == 0x7f:
+			b.WriteByte(' ')
+		case r > '~':
+			b.WriteByte('?')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
 }
 
 func envelope(s Profile, e *Error) any {

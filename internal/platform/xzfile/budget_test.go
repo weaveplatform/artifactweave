@@ -52,9 +52,15 @@ func waitFor(t *testing.T, used int64, waiting int) {
 	})
 }
 
-// hugeHeader is an xz file of a few dozen bytes holding content, whose
-// block header names a 1.5 GiB dictionary (property 37), as the files of
-// #1354 do; the caller's limit lowers what is allocated.
+// firstDict is the dictionary a block starts with, lzma2's startCap: a
+// dictionary of up to 64 KiB is taken from the budget whole as the block
+// starts, and a larger one 64 KiB at a time, as it fills (#1413).
+const firstDict = 64 << 10
+
+// hugeHeader is an xz file of 52 bytes holding content, whose block header
+// names a 1.5 GiB dictionary (property 37), as the files of #1354 and
+// #1413 do. The tests of the queue lower it with the caller's limit below
+// firstDict, so the block takes all of it as it starts.
 var hugeHeaderContent = []byte("abc")
 
 func hugeHeader() []byte {
@@ -72,8 +78,8 @@ func hugeHeader() []byte {
 }
 
 // gate holds a decode inside its block until it is opened: the reader has
-// taken and allocated the block's dictionary, and is reading the LZMA2
-// data behind the gate.
+// taken and allocated what the block's dictionary holds so far, and is
+// reading the LZMA2 data behind the gate.
 type gate struct {
 	open    chan struct{}
 	arrived *atomic.Int64
@@ -116,12 +122,52 @@ func decode(ctx context.Context, in io.Reader, limit int64) <-chan result {
 	return done
 }
 
+// decodeAgainst reads in in a goroutine and compares it with want as it
+// goes, holding no more of it than a 4 KiB buffer, and sends a mismatch as
+// its error.
+func decodeAgainst(ctx context.Context, in io.Reader, limit int64, want []byte) <-chan result {
+	done := make(chan result, 1)
+	go func() {
+		r, err := NewReader(ctx, in, limit)
+		if err != nil {
+			done <- result{err: err}
+			return
+		}
+		defer func() { _ = r.Close() }()
+		c := &comparer{want: want}
+		if _, err = io.CopyBuffer(c, r, make([]byte, 4<<10)); err == nil && len(c.want) > 0 {
+			err = errors.New("the content ended early")
+		}
+		done <- result{err: err}
+	}()
+	return done
+}
+
+// comparer is a writer that fails as soon as what it is written stops
+// matching want.
+type comparer struct{ want []byte }
+
+func (c *comparer) Write(p []byte) (int, error) {
+	if !bytes.HasPrefix(c.want, p) {
+		return 0, errors.New("the content differs")
+	}
+	c.want = c.want[len(p):]
+	return len(p), nil
+}
+
 func wantContent(t *testing.T, what string, done <-chan result) {
+	t.Helper()
+	wantRead(t, what, done, hugeHeaderContent)
+}
+
+// wantRead fails t unless the decode reads content whole within ten
+// seconds.
+func wantRead(t *testing.T, what string, done <-chan result, content []byte) {
 	t.Helper()
 	select {
 	case r := <-done:
-		if r.err != nil || !bytes.Equal(r.got, hugeHeaderContent) {
-			t.Fatalf("%s: %q %v", what, r.got, r.err)
+		if r.err != nil || !bytes.Equal(r.got, content) {
+			t.Fatalf("%s: %d bytes %v", what, len(r.got), r.err)
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatalf("%s did not finish", what)
@@ -138,59 +184,84 @@ func pending(done <-chan result) bool {
 	}
 }
 
-// Sixteen decodes at once of a file whose header names 1.5 GiB, each with
-// a 1 MiB limit, hold no more dictionary than a 2 MiB budget: two decode
-// and the rest wait, having allocated nothing. With the budget off all
-// sixteen hold theirs, which shows the files do allocate what is measured.
+// Sixteen decodes at once of files whose header names 1.5 GiB, each with a
+// 1 MiB limit and content that fills it, hold no more dictionary than a
+// 2 MiB budget and the one dictionary let past it: the rest wait to start
+// or to grow, having allocated no more than they hold. With the budget off
+// all sixteen hold theirs, which shows the files do allocate what is
+// measured.
 func TestUnitTheBudgetBoundsConcurrentDecodes(t *testing.T) {
 	const decodes, limit = 16, 1 << 20
-	live := func(t *testing.T, budget int64, holding, waiting int) uint64 {
+	live := func(t *testing.T, budget int64) (heap uint64, arrivedAll bool) {
 		t.Helper()
 		withBudget(t, budget)
 		var arrived atomic.Int64
 		gates, done := make([]gate, decodes), make([]<-chan result, decodes)
+		file, content := filling(limit)
 		var before, during runtime.MemStats
 		runtime.GC()
 		runtime.ReadMemStats(&before)
 		for i := range gates {
 			gates[i] = newGate(&arrived)
-			done[i] = decode(t.Context(), gated(hugeHeader(), gates[i]), limit)
+			done[i] = decodeAgainst(
+				t.Context(),
+				gatedAt(file, []int{endOfContent(file, len(content))}, gates[i]),
+				limit,
+				content,
+			)
 		}
-		eventually(t, "the decodes to hold or wait", func() bool {
+		eventually(t, "each decode to hold its dictionary or wait", func() bool {
 			_, w := budgetState()
-			return arrived.Load() == int64(holding) && w == waiting
+			return arrived.Load()+int64(w) == decodes
 		})
+		if used, _ := budgetState(); budget > 0 && used > budget+limit {
+			t.Errorf("the decodes hold %d KiB of a %d KiB budget", used>>10, budget>>10)
+		}
 		runtime.GC()
 		runtime.ReadMemStats(&during)
+		all := arrived.Load() == decodes
 		for _, g := range gates {
 			close(g.open)
 		}
 		for _, d := range done {
-			wantContent(t, "a decode", d)
+			wantRead(t, "a decode", d, nil)
 		}
-		return during.HeapAlloc - min(before.HeapAlloc, during.HeapAlloc)
+		return during.HeapAlloc - min(before.HeapAlloc, during.HeapAlloc), all
 	}
-	on := live(t, 2*limit, 2, decodes-2)
-	off := live(t, 0, decodes, 0)
-	// Each decode also holds a 32 KiB input buffer: half a MiB for all.
-	if on > 2*limit+limit {
-		t.Errorf("with a 2 MiB budget the decodes held %d KiB, want at most 3 MiB", on>>10)
+	on, onAll := live(t, 2*limit)
+	off, offAll := live(t, 0)
+	t.Logf("the decodes held %d KiB with the budget and %d KiB without", on>>10, off>>10)
+	// Besides its dictionary each decode holds 45 to 70 KiB: its 32 KiB
+	// input buffer, its output buffer and its coder's state. The bound
+	// allows 128 KiB each because under the race detector the stalled
+	// decode is let past the budget more often and the heap measures up
+	// to 4.1 MiB; that is still far below the 16 MiB with the budget off.
+	if on > 2*limit+limit+decodes*128<<10 || onAll {
+		t.Errorf(
+			"with a 2 MiB budget the decodes held %d KiB, all at once %v; want at most 5 MiB",
+			on>>10,
+			onAll,
+		)
 	}
-	if off < decodes*limit {
-		t.Errorf("with the budget off the decodes held %d KiB, want at least 16 MiB", off>>10)
+	if off < decodes*limit || !offAll {
+		t.Errorf(
+			"with the budget off the decodes held %d KiB, all at once %v; want at least 16 MiB",
+			off>>10,
+			offAll,
+		)
 	}
 }
 
 // A decode whose dictionary does not fit waits, and decodes whole once the
 // decode ahead of it gives its dictionary back.
 func TestUnitADecodeThatDoesNotFitWaits(t *testing.T) {
-	withBudget(t, 2<<20)
+	withBudget(t, 64<<10)
 	var arrived atomic.Int64
 	g := newGate(&arrived)
-	first := decode(t.Context(), gated(hugeHeader(), g), 2<<20)
-	waitFor(t, 2<<20, 0)
-	second := decode(t.Context(), bytes.NewReader(hugeHeader()), 1<<20)
-	waitFor(t, 2<<20, 1)
+	first := decode(t.Context(), gated(hugeHeader(), g), 64<<10)
+	waitFor(t, 64<<10, 0)
+	second := decode(t.Context(), bytes.NewReader(hugeHeader()), 32<<10)
+	waitFor(t, 64<<10, 1)
 	if !pending(second) {
 		t.Fatal("the second decode did not wait")
 	}
@@ -203,18 +274,18 @@ func TestUnitADecodeThatDoesNotFitWaits(t *testing.T) {
 // nothing else holds the budget, and the decodes behind it wait until it
 // is done, though they would fit.
 func TestUnitADictionaryLargerThanTheBudgetDecodesAlone(t *testing.T) {
-	withBudget(t, 1<<20)
+	withBudget(t, 32<<10)
 	var arrived atomic.Int64
 	small, large := newGate(&arrived), newGate(&arrived)
-	first := decode(t.Context(), gated(hugeHeader(), small), 512<<10)
-	waitFor(t, 512<<10, 0)
-	alone := decode(t.Context(), gated(hugeHeader(), large), 4<<20)
-	waitFor(t, 512<<10, 1)
-	behind := decode(t.Context(), bytes.NewReader(hugeHeader()), 64<<10)
-	waitFor(t, 512<<10, 2)
+	first := decode(t.Context(), gated(hugeHeader(), small), 16<<10)
+	waitFor(t, 16<<10, 0)
+	alone := decode(t.Context(), gated(hugeHeader(), large), 128<<10)
+	waitFor(t, 16<<10, 1)
+	behind := decode(t.Context(), bytes.NewReader(hugeHeader()), 4<<10)
+	waitFor(t, 16<<10, 2)
 	close(small.open)
 	wantContent(t, "the first decode", first)
-	waitFor(t, 4<<20, 1)
+	waitFor(t, firstDict, 1)
 	if !pending(behind) {
 		t.Fatal("a decode went in beside one larger than the budget")
 	}
@@ -227,17 +298,17 @@ func TestUnitADictionaryLargerThanTheBudgetDecodesAlone(t *testing.T) {
 // takes nothing and lets in the waiters it held up. A decode that fits
 // goes ahead whatever its context says, as it did without a budget.
 func TestUnitACancelledWaitTakesNothing(t *testing.T) {
-	withBudget(t, 2<<20)
+	withBudget(t, 64<<10)
 	var arrived atomic.Int64
 	g := newGate(&arrived)
-	holding := decode(t.Context(), gated(hugeHeader(), g), 1536<<10)
-	waitFor(t, 1536<<10, 0)
+	holding := decode(t.Context(), gated(hugeHeader(), g), 48<<10)
+	waitFor(t, 48<<10, 0)
 	ctx, cancel := context.WithCancel(t.Context())
-	cancelled := decode(ctx, bytes.NewReader(hugeHeader()), 1<<20)
-	waitFor(t, 1536<<10, 1)
+	cancelled := decode(ctx, bytes.NewReader(hugeHeader()), 32<<10)
+	waitFor(t, 48<<10, 1)
 	// It fits, but arrived after the waiter ahead of it.
-	behind := decode(t.Context(), bytes.NewReader(hugeHeader()), 256<<10)
-	waitFor(t, 1536<<10, 2)
+	behind := decode(t.Context(), bytes.NewReader(hugeHeader()), 8<<10)
+	waitFor(t, 48<<10, 2)
 	cancel()
 	select {
 	case r := <-cancelled:
@@ -248,13 +319,13 @@ func TestUnitACancelledWaitTakesNothing(t *testing.T) {
 		t.Fatal("the cancelled decode went on waiting")
 	}
 	wantContent(t, "the decode behind it", behind)
-	waitFor(t, 1536<<10, 0)
+	waitFor(t, 48<<10, 0)
 	done, stop := context.WithCancel(t.Context())
 	stop()
 	wantContent(
 		t,
 		"a decode that fits, cancelled",
-		decode(done, bytes.NewReader(hugeHeader()), 256<<10),
+		decode(done, bytes.NewReader(hugeHeader()), 8<<10),
 	)
 	close(g.open)
 	wantContent(t, "the decode that held the budget", holding)
@@ -266,13 +337,13 @@ func TestUnitACancelledWaitTakesNothing(t *testing.T) {
 // budget. Readers of no request each hold for themselves, and the second
 // one waits behind that decode, which waits for the first: the deadlock.
 func TestUnitOneRequestReadsTwoStreams(t *testing.T) {
-	withBudget(t, 2<<20)
+	withBudget(t, 64<<10)
 	for _, request := range []bool{true, false} {
 		ctx := t.Context()
 		if request {
 			ctx = WithRequest(ctx)
 		}
-		first, err := NewReader(ctx, bytes.NewReader(hugeHeader()), 1<<20)
+		first, err := NewReader(ctx, bytes.NewReader(hugeHeader()), 32<<10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -280,15 +351,15 @@ func TestUnitOneRequestReadsTwoStreams(t *testing.T) {
 		if _, err = io.ReadFull(first, b[:]); err != nil {
 			t.Fatal(err)
 		}
-		waitFor(t, 1<<20, 0)
-		other := decode(t.Context(), bytes.NewReader(hugeHeader()), 2<<20)
-		waitFor(t, 1<<20, 1)
+		waitFor(t, 32<<10, 0)
+		other := decode(t.Context(), bytes.NewReader(hugeHeader()), 64<<10)
+		waitFor(t, 32<<10, 1)
 		secondCtx, cancel := context.WithCancel(ctx)
-		second := decode(secondCtx, bytes.NewReader(hugeHeader()), 1536<<10)
+		second := decode(secondCtx, bytes.NewReader(hugeHeader()), 48<<10)
 		if request {
 			wantContent(t, "the request's second stream", second)
 		} else {
-			waitFor(t, 1<<20, 2)
+			waitFor(t, 32<<10, 2)
 			cancel()
 			if r := <-second; !errors.Is(r.err, context.Canceled) {
 				t.Fatalf(
@@ -310,10 +381,10 @@ func TestUnitOneRequestReadsTwoStreams(t *testing.T) {
 // it fails, on Close, and, dropped unclosed in the middle of a block, once
 // the garbage collector finds it.
 func TestUnitTheDictionaryIsGivenBack(t *testing.T) {
-	withBudget(t, 2<<20)
+	withBudget(t, 64<<10)
 	open := func(t *testing.T, file []byte) io.ReadCloser {
 		t.Helper()
-		r, err := NewReader(t.Context(), bytes.NewReader(file), 1<<20)
+		r, err := NewReader(t.Context(), bytes.NewReader(file), 32<<10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -321,7 +392,7 @@ func TestUnitTheDictionaryIsGivenBack(t *testing.T) {
 		if _, err = io.ReadFull(r, b[:]); err != nil {
 			t.Fatal(err)
 		}
-		waitFor(t, 1<<20, 0)
+		waitFor(t, 32<<10, 0)
 		return r
 	}
 	t.Run("Close", func(t *testing.T) {
@@ -368,7 +439,7 @@ func TestUnitTheDictionaryIsGivenBack(t *testing.T) {
 		if n, err := io.ReadFull(r, b[:]); err != nil || string(b[:n]) != "bcde" {
 			t.Fatalf("%q %v", b[:n], err)
 		}
-		waitFor(t, 1<<20, 0)
+		waitFor(t, 32<<10, 0)
 		_ = r.Close()
 	})
 	t.Run("dropped", func(t *testing.T) {
@@ -384,16 +455,16 @@ func TestUnitTheDictionaryIsGivenBack(t *testing.T) {
 // Turning the budget off lets every waiting decode in; the dictionaries
 // already held are still given back.
 func TestUnitTurningTheBudgetOffLetsWaitersIn(t *testing.T) {
-	withBudget(t, 1<<20)
+	withBudget(t, 32<<10)
 	var arrived atomic.Int64
 	g := newGate(&arrived)
-	holding := decode(t.Context(), gated(hugeHeader(), g), 1<<20)
-	waitFor(t, 1<<20, 0)
-	waiting := decode(t.Context(), bytes.NewReader(hugeHeader()), 1<<20)
-	waitFor(t, 1<<20, 1)
+	holding := decode(t.Context(), gated(hugeHeader(), g), 32<<10)
+	waitFor(t, 32<<10, 0)
+	waiting := decode(t.Context(), bytes.NewReader(hugeHeader()), 32<<10)
+	waitFor(t, 32<<10, 1)
 	SetBudget(0)
 	wantContent(t, "the waiting decode", waiting)
-	waitFor(t, 1<<20, 0)
+	waitFor(t, 32<<10, 0)
 	close(g.open)
 	wantContent(t, "the holding decode", holding)
 }

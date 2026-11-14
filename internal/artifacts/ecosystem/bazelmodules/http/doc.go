@@ -113,4 +113,7 @@
 //   - read_fault_test.go: a deploy whose stored MODULE.bazel or archive
 //     fails a read answers 500 as the item routes answer it, and stores
 //     nothing, while invalid uploads are still refused 409.
+//   - served_copy_fault_test.go: a cached remote metadata.json,
+//     MODULE.bazel or source.json whose copy fails a read answers 500, logs
+//     the fault once and stays cached.
 package bazelmoduleshttp

@@ -82,9 +82,10 @@ type AuthnOptions struct {
 //     (pkgroute.Protocol.SkipsAuthentication).
 //  3. Credentials that do not verify answer 401 at once, even on a public
 //     route, as Artifactory does: a client with a wrong password learns it
-//     on its first call. An expired password may still change itself
-//     (ownPasswordChange), and a registry token is good for the registry
-//     alone (decision 0005).
+//     on its first call. A refused API key (refusedAPIKey) and a NuGet
+//     client's refused password (refusedNuGetPassword) answer 403 instead.
+//     An expired password may still change itself (ownPasswordChange), and
+//     a registry token is good for the registry alone (decision 0005).
 //  4. The exception is an expired Bearer access token on refreshRoute
 //     (expiredRefresh).
 //  5. A principal that verified is authorised once (authn.Authorize): its
@@ -191,12 +192,20 @@ func ownPasswordChange(r *http.Request, user string) bool {
 
 // credentials verifies whatever credential the request presents, reporting
 // presented false when there is none. Every form decision 0005 accepts:
+// an API key header with a reference token (API keys are retired);
 // Basic with a password, or with an access or reference token as the
 // password (the user name must be the token's subject); Bearer with either
-// token; X-JFrog-Art-Api with a reference token (API keys are retired); and
-// on the NuGet routes alone, X-NuGet-ApiKey (nugetAPIKey). A credential
-// that does not verify answers 401 rather than quietly becoming anonymous,
-// and so does a Basic value 7.x reads but cannot decode.
+// token; and on the NuGet routes alone, X-NuGet-ApiKey (nugetAPIKey). A
+// credential that does not verify answers 401 rather than quietly becoming
+// anonymous, and so does a Basic value 7.x reads but cannot decode, but for
+// the 403s of refusedAPIKey and refusedNuGetPassword.
+//
+// An API key is read first, and alone (accessapi.APIKey): 7.161.26's props
+// filter, which reads X-JFrog-Art-Api unless it is blank and otherwise
+// X-Api-Key, comes before the Basic filter and accepts every request that
+// sends a key, so a key authenticates the request whatever its
+// Authorization header says, and a Basic password beside it is never
+// checked, nor counted as a failed login.
 //
 // An Authorization value 7.x reads no credential from counts as no
 // Authorization header at all: the request goes on to the other headers
@@ -207,16 +216,16 @@ func ownPasswordChange(r *http.Request, user string) bool {
 // (accessapi.BearerToken), and no other scheme. Its Basic filter also
 // declines the anonymous user name while anonymous access is off
 // (ArtifactoryBasicAuthenticationFilter.acceptFilter). Cargo's and
-// RubyGems' bare tokens are read on their own paths. The props filter
-// reads X-JFrog-Art-Api whatever the Authorization header says, unless it
-// is blank (AuthenticationFilterUtils.getTokenKeyValue), so a key sent
-// beside such a value still authenticates, and a blank key is no
-// credential either.
+// RubyGems' bare tokens are read on their own paths.
 func credentials(
 	ctx context.Context,
 	a *authn.Authenticator,
 	r *http.Request,
 ) (p kernel.Principal, presented bool, err error) {
+	if key, ok := accessapi.APIKey(r.Header); ok {
+		p, err = apiKeyCredentials(ctx, a, key)
+		return p, true, refusedAPIKey(r, err)
+	}
 	h := r.Header.Get("Authorization")
 	switch {
 	case accessapi.IgnoredAuthorization(h):
@@ -232,7 +241,7 @@ func credentials(
 		}
 		if !declined {
 			p, err = basicCredentials(ctx, a, user, password)
-			return p, true, err
+			return p, true, refusedNuGetPassword(r, password, err)
 		}
 		h = ""
 	case h != "":
@@ -245,21 +254,75 @@ func credentials(
 		}
 		h = ""
 	}
-	if k := r.Header.Get("X-JFrog-Art-Api"); !accessapi.Blank(k) {
-		if !accessapi.IsReferenceToken(k) {
-			return kernel.Principal{}, true, kernel.ErrBadCredentials
-		}
-		p, err = a.Token(ctx, k, "")
-		return p, true, err //nolint:wrapcheck // apierror values, rendered by status
-	}
 	if user, secret, ok := nugetAPIKey(r, h); ok {
 		if user == "" || secret == "" {
 			return kernel.Principal{}, true, kernel.ErrBadCredentials
 		}
 		p, err = basicCredentials(ctx, a, user, secret)
-		return p, true, err
+		return p, true, refusedNuGetPassword(r, secret, err)
 	}
 	return kernel.Principal{}, false, nil
+}
+
+// apiKeyCredentials verifies an API key: a reference token alone, since
+// API keys are retired and 7.x refuses an access token sent as one
+// (AccessTokenAuthenticationProviderV2.assertNotTokenWithApiKeyHeader).
+func apiKeyCredentials(
+	ctx context.Context,
+	a *authn.Authenticator,
+	key string,
+) (kernel.Principal, error) {
+	if !accessapi.IsReferenceToken(key) {
+		return kernel.Principal{}, kernel.ErrBadCredentials
+	}
+	return a.Token(ctx, key, "") //nolint:wrapcheck // apierror values, rendered by status
+}
+
+// refusedAPIKey is err, an API key's refusal, as 7.x's entry point answers
+// it: a 401 becomes 403 with its message and the Basic challenge while
+// either API key header is not blank (accessapi.APIKeySent), "if not the
+// client keeps asking for credentials indefinitely on 401 responses"
+// (ArtifactoryBasicAuthenticationEntryPoint.isAlreadyAuthedApiKeyRequest
+// and sendErrorResponse, 7.161.26). The message stays "Bad credentials":
+// 7.x's is the provider's, which is not open source [I]. Any other error
+// keeps its status, as the entry point keeps a 403's.
+func refusedAPIKey(r *http.Request, err error) error {
+	var e *apierror.Error
+	if !errors.As(err, &e) || e.Status != http.StatusUnauthorized ||
+		!accessapi.APIKeySent(r.Header) {
+		return err
+	}
+	return challengedForbidden(e.Message)
+}
+
+// refusedNuGetPassword is err, a password's refusal, as 7.x's entry point
+// answers a NuGet client: 403 "Bad credentials" with the Basic challenge,
+// rather than 401, when the client's User-Agent names NuGet in any case
+// and it sent an Authorization or X-NuGet-ApiKey value that is not blank,
+// so that the client stops asking for credentials, which it "keeps asking
+// for ... indefinitely on 401 responses"
+// (ArtifactoryBasicAuthenticationEntryPoint.isAlreadyAuthedNuGetRequest,
+// 7.161.26). The rule is 7.x's for a BadCredentialsException, which its
+// providers throw for a password that does not verify
+// (AccessAuthProviderUtils), on any route; a token that does not verify
+// throws another exception and keeps its 401, and so does a key without a
+// password, which decision 0038 answers 401 (RTDEV-37982).
+func refusedNuGetPassword(r *http.Request, secret string, err error) error {
+	if !errors.Is(err, kernel.ErrBadCredentials) || accessapi.LooksLikeToken(secret) ||
+		!strings.Contains(strings.ToLower(r.UserAgent()), "nuget") ||
+		accessapi.Blank(r.Header.Get("Authorization")) &&
+			accessapi.Blank(r.Header.Get("X-NuGet-ApiKey")) {
+		return err
+	}
+	return challengedForbidden(kernel.ErrBadCredentials.Message)
+}
+
+// challengedForbidden is a 403 with message that carries the challenge,
+// the answer 7.x's entry point gives the credentials it refuses with 403.
+func challengedForbidden(message string) *apierror.Error {
+	e := apierror.New(http.StatusForbidden, message)
+	e.Challenge = true
+	return e
 }
 
 // declinedBasic reports whether 7.x's Basic filter declines Basic

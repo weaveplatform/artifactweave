@@ -27,9 +27,12 @@ and cache aliases remain refused.
 
 The first GET validates a complete upstream representation before publishing it.
 A cold range therefore fetches and checks the full artifact, then serves the requested
-range. HEAD can obtain upstream headers without creating an item. Any upstream checksum
-headers on a cold HEAD are syntax-checked claims; only a completed GET computes
-checksums from bytes, which subsequent warm HEAD responses report. Warm GET/HEAD,
+range. A cold HEAD does the same as a GET: it fetches, checks and publishes the
+artifact, then answers with the published file's type, length and checksums, as
+Artifactory downloads a file on a HEAD when the remote stores artifacts locally. Its
+download is not counted as a download. A HEAD of a checksum file (`.sha1` and the
+like) downloads nothing, as in Artifactory, and with `storeArtifactsLocally` false a
+HEAD sends the upstream a HEAD only and keeps nothing. Warm GET/HEAD,
 Range and conditional responses use the existing artifact delivery path. Configured
 signed storage/CDN redirects occur after publication, so the first and subsequent
 redirects refer to the same validated bytes. Transient no-store bodies support ranges

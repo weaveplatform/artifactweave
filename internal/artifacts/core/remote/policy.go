@@ -125,12 +125,16 @@ func (p *Policy) Acquire(ctx context.Context, repoKey string) (func(), error) {
 // identity, within Acquire's capacity), and falls back to a stale entry on
 // the failures decision 0007 allows. A cache-only intent, a permit without
 // upstream network access, an offline repository and a derived resource
-// read the cache alone. With an Interceptor installed, a read that WithSmart
-// has not marked goes to it first. Errors: source.ErrUnavailable when the
-// hooks a fetch needs are not installed, kernel.ErrNotFound for a fresh
-// negative entry, source.ErrSuperseded when the credential revision moved
-// on, and PolicyError's mapping of upstream and capacity failures. A
-// successful result's Revalidate repeats Check before disclosure.
+// read the cache alone. A HEAD fills the cache as a GET does and is answered
+// from the copy kept; a read that keeps nothing (storeArtifactsLocally
+// false, a checksum-only or transient resource) and a checksum request's
+// HEAD have an upstream exchange of their own, a HEAD for a HEAD. With an
+// Interceptor installed, a read that WithSmart has not marked goes to it
+// first. Errors: source.ErrUnavailable when the hooks a fetch needs are not
+// installed, kernel.ErrNotFound for a fresh negative entry,
+// source.ErrSuperseded when the credential revision moved on, and
+// PolicyError's mapping of upstream and capacity failures. A successful
+// result's Revalidate repeats Check before disclosure.
 func (p *Policy) Read(
 	ctx context.Context,
 	q source.Request,
@@ -187,14 +191,29 @@ func (p *Policy) Read(
 		return source.Result{}, PolicyError(err)
 	}
 	defer release()
-	if noStore || q.Resource.Method == http.MethodHead {
-		// These requests own their response. A stream or a bodyless HEAD must
-		// never become the shared result of a persistent fill.
+	if noStore || q.Resource.Method == http.MethodHead && q.Resource.ChecksumRequest {
+		// These requests own their response: a stream or a bodyless HEAD
+		// must never become the shared result of a persistent fill. A
+		// checksum request's HEAD sends the upstream a HEAD only: 7.161.26's
+		// DownloadServiceImpl.respond hands a checksum request, HEAD or GET,
+		// to respondForChecksumRequest, which answers from the file's info
+		// and never downloads it. (A checksum request's GET still fills the
+		// cache here, a difference the remote retrieval contract records.)
 		return p.direct(ctx, q, permit, opts, key, noStore)
+	}
+	// 7.161.26's DownloadServiceImpl.respond answers a HEAD from the
+	// upstream's info alone only where the remote stores nothing,
+	// "otherwise download the artifact normally and return the full info
+	// for the head request". Filled as a GET, a HEAD joins a GET's flight
+	// for the same path, and its answer is the kept copy's, as a warm
+	// HEAD's is.
+	fillQ := q
+	if q.Resource.Method == http.MethodHead {
+		fillQ.Resource.Method = http.MethodGet
 	}
 	flightKey := p.FlightKey(key, permit.Identity)
 	filled, err := p.flights.Do(ctx, flightKey, func(shared context.Context) (fillResult, error) {
-		return p.fill(shared, q, permit, opts, key)
+		return p.fill(shared, fillQ, permit, opts, key)
 	})
 	if err != nil {
 		return source.Result{}, err

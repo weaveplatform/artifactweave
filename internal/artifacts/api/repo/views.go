@@ -55,6 +55,13 @@ func Masked(c Config) Config {
 	if c.PropertySets == nil && c.Class != Virtual {
 		c.PropertySets = []string{}
 	}
+	// 7.x builds a read's enableConanSupport from the package type, true for
+	// every Conan repository, and not from what the client sent
+	// (RepositoryConfigurationBase.setPackageTypeConfig, 7.161.26); its v1
+	// reads carry the key (RTFACT-16458, RTFACT-31100).
+	if c.PackageType == Conan {
+		c.EnableConanSupport = new(true)
+	}
 	if len(c.CustomHTTPHeaders) > 0 {
 		hs := slices.Clone(c.CustomHTTPHeaders)
 		for i := range hs {
@@ -85,11 +92,13 @@ func RestoreSecrets(stored Config, updated *Config) {
 }
 
 // relevance names the package types each group of package-specific fields
-// applies to. No JFrog source lists the fields the v2 read keeps per
-// package type; the groups follow the per-ecosystem sections of research 03,
-// and fields shared by several ecosystems are always kept. checksumPolicyType
-// is a Maven field here because JFrog's generic local samples, the v2 read
-// and the configurations list alike, leave it out. maxUniqueSnapshots is
+// applies to. 7.161.26's IncludeTypeSpecific annotations list the fields the
+// v2 read keeps per package type and class, but only the Conan fields have
+// been checked against them; the other groups follow the per-ecosystem
+// sections of research 03, and fields shared by several ecosystems are
+// always kept. checksumPolicyType is a Maven field here because JFrog's
+// generic local samples, the v2 read and the configurations list alike,
+// leave it out. maxUniqueSnapshots is
 // NuGet's as well as the Maven family's, as research 03's per-ecosystem
 // summary lists it and 6.20's type-specific field list has it [I]. A local or
 // federated npm repository applies the checksum policy and the release and
@@ -135,9 +144,12 @@ var relevance = []struct {
 		c.FeedContextPath, c.DownloadContextPath = nil, nil
 		c.V3FeedURL, c.SymbolServerURL = "", ""
 	}},
-	{[]PackageType{Conan}, nil, func(c *Config) {
-		c.ForceConanAuthentication, c.EnableConanSupport = nil, nil
-	}},
+	{[]PackageType{Conan}, nil, func(c *Config) { c.ForceConanAuthentication = nil }},
+	// No package type keeps enableConanSupport: 7.161.26's v2 serializer
+	// (TypeSpecificFilter) writes only the fields marked IncludeTypeSpecific,
+	// and RepositoryConfigurationBase marks forceConanAuthentication, for
+	// Conan, but none of the legacy enable<Type>Support flags.
+	{nil, nil, func(c *Config) { c.EnableConanSupport = nil }},
 	{
 		[]PackageType{P2},
 		nil,

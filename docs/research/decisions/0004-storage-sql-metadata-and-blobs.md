@@ -139,6 +139,16 @@ A sidecar answers as 7.x's download answers a checksum on every repository class
   whatever `If-Range` says, with a 416 that has no body ([#1436](https://github.com/weaveplatform/artifactweave/issues/1436),
   [#1362](https://github.com/weaveplatform/artifactweave/issues/1362)).
 
+The file itself answers `If-None-Match` and `If-Modified-Since` as its sidecar does, local,
+virtual, redirected or remote, from the cache or the upstream's stream: one `If-None-Match`
+line at a time, less a `W/` prefix and its quotes, against its SHA-1 (or its MD5 when asked),
+so `*` and a list on one line match nothing and a second line can
+(`ArtifactoryRequestBase.isNoneMatch`, **[S]** 7.161.26). A range past its end answers 416
+with `Content-Range` alone and no body, as `RequestResponseHelper.sendBodyResponse` does
+([#1469](https://github.com/weaveplatform/artifactweave/issues/1469)). A remote file served
+from the upstream's stream ignores `If-Match` and `If-Unmodified-Since` as its cached copy
+does ([#1468](https://github.com/weaveplatform/artifactweave/issues/1468)).
+
 PUT validates the client value against the
 artifact per the repository's `checksumPolicyType`: `client-checksums` rejects a mismatch
 and records the client value as `original_*`; `server-generated-checksums` records and

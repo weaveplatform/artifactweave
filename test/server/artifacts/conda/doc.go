@@ -42,6 +42,9 @@
 //     nor fallen back from, shard fetches that recheck the caller's
 //     permission and the repository's revision, and a remote's download
 //     policy.
+//   - served_copy_fault_test.go: a remote index whose served copy, a
+//     stream or a cached item, fails a read with the store's timeout
+//     answers 500 "internal error" and logs it once, not the upstream's 504.
 //
 // # References
 //

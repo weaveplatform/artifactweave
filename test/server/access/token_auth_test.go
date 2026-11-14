@@ -79,20 +79,23 @@ func TestAccTokenAuthentication(t *testing.T) {
 		"basic with reference":  {basic("admin", ref), http.StatusOK},
 		"basic, another user":   {basic("someone", jwt), http.StatusUnauthorized},
 		"api header, reference": {map[string]string{"X-JFrog-Art-Api": ref}, http.StatusOK},
-		"api header, jwt":       {map[string]string{"X-JFrog-Art-Api": jwt}, http.StatusUnauthorized},
-		"api header, api key":   {map[string]string{"X-JFrog-Art-Api": "AKCp8legacykey"}, http.StatusUnauthorized},
-		"tampered":              {map[string]string{"Authorization": "Bearer " + tampered}, http.StatusUnauthorized},
-		"revoked":               {map[string]string{"Authorization": "Bearer " + revoked.AccessToken}, http.StatusUnauthorized},
-		"empty bearer":          {map[string]string{"Authorization": "Bearer"}, http.StatusUnauthorized},
-		"other scheme":          {map[string]string{"Authorization": "Negotiate abc"}, http.StatusUnauthorized},
-		"password still works":  {basic("admin", "pw"), http.StatusOK},
+		// 7.x refuses an access token sent as an API key
+		// (assertNotTokenWithApiKeyHeader), and its entry point answers a
+		// refused key 403 (isAlreadyAuthedApiKeyRequest, #1464).
+		"api header, jwt":      {map[string]string{"X-JFrog-Art-Api": jwt}, http.StatusForbidden},
+		"api header, api key":  {map[string]string{"X-JFrog-Art-Api": "AKCp8legacykey"}, http.StatusForbidden},
+		"tampered":             {map[string]string{"Authorization": "Bearer " + tampered}, http.StatusUnauthorized},
+		"revoked":              {map[string]string{"Authorization": "Bearer " + revoked.AccessToken}, http.StatusUnauthorized},
+		"empty bearer":         {map[string]string{"Authorization": "Bearer"}, http.StatusUnauthorized},
+		"other scheme":         {map[string]string{"Authorization": "Negotiate abc"}, http.StatusUnauthorized},
+		"password still works": {basic("admin", "pw"), http.StatusOK},
 	} {
 		rec := do(t, h, http.MethodGet, admin, tc.headers, "")
 		if rec.Code != tc.expected {
 			t.Errorf("%s: %d, want %d: %s", name, rec.Code, tc.expected, rec.Body)
 		}
-		if tc.expected == http.StatusUnauthorized && rec.Header().Get("WWW-Authenticate") == "" {
-			t.Errorf("%s: 401 without a challenge", name)
+		if tc.expected != http.StatusOK && rec.Header().Get("WWW-Authenticate") == "" {
+			t.Errorf("%s: %d without a challenge", name, tc.expected)
 		}
 	}
 	// A groups-only scope does not carry the user's administrator rights:

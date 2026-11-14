@@ -2,6 +2,7 @@ package remote_test
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -15,7 +16,7 @@ import (
 
 // TestAccPolicyMIMERefusal: a resource with ClientMIME is refused 409 with
 // 7.x's message for a blocked label, on a cached, an uncacheable (Vary),
-// a transient and a HEAD read, and the URL it names is the one asked for
+// a transient, a HEAD and a checksum request's HEAD read, and the URL it names is the one asked for
 // before a redirect (#1376). Without ClientMIME, as on a format route, the
 // refusal stays a 502 integrity failure.
 func TestAccPolicyMIMERefusal(t *testing.T) {
@@ -42,17 +43,19 @@ func TestAccPolicyMIMERefusal(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct {
-		path, upstream string
-		head, store    bool
+		path, upstream        string
+		head, store, checksum bool
 	}{
-		{"a.jar", "/a.jar", false, true},
-		{"vary.jar", "/vary.jar", false, true},
-		{"a.jar", "/a.jar", false, false},
-		{"a.jar", "/a.jar", true, true},
-		{"moved.jar", "/moved.jar", false, true},
+		{"a.jar", "/a.jar", false, true, false},
+		{"vary.jar", "/vary.jar", false, true, false},
+		{"a.jar", "/a.jar", false, false, false},
+		{"a.jar", "/a.jar", true, true, false},
+		{"a.jar", "/a.jar", true, true, true},
+		{"moved.jar", "/moved.jar", false, true, false},
 	} {
 		q := w.request(tc.path, source.ResourceKindArtifact)
 		q.Resource.ClientMIME = &source.ClientMIME{}
+		q.Resource.ChecksumRequest = tc.checksum
 		if tc.head {
 			q.Resource.Method = http.MethodHead
 		}
@@ -68,17 +71,20 @@ func TestAccPolicyMIMERefusal(t *testing.T) {
 		t.Fatalf("format route: %v, want a 502 integrity failure", err)
 	}
 
-	// A HEAD whose label the client accepts, or that has a format hint,
-	// relays it unchecked.
+	// A HEAD downloads the file as its GET does (#1391), so a label the
+	// client accepts is kept, and one a format hint refuses fails as the
+	// format's GET does, 502, not with the client's refusal.
 	q.Resource.Method = http.MethodHead
 	q.Resource.ClientMIME = &source.ClientMIME{Accept: []string{"text/html"}}
-	if _, err = w.read(q); err != nil {
-		t.Fatalf("HEAD with Accept text/html: %v", err)
+	if r, headErr := w.read(q); headErr != nil || r.Item == nil {
+		t.Fatalf("HEAD with Accept text/html: %+v, %v; want the kept file", r, headErr)
 	}
 	q.Resource.ClientMIME.Accept = nil
 	q.Resource.ExpectedContentType = "application/java-archive"
-	if _, err = w.read(q); err != nil {
-		t.Fatalf("HEAD with a format hint: %v", err)
+	_, err = w.read(q)
+	if !errors.As(err, &failure) || failure.Status != http.StatusBadGateway ||
+		failure.Kind != source.FailureKindIntegrity || errors.As(err, new(*source.MIMERefusal)) {
+		t.Fatalf("HEAD with a format hint: %v, want the GET's 502 integrity failure", err)
 	}
 	if !errors.Is(item.RefuseLabel(w.c, "a.jar", "text/html", nil), item.ErrRemoteMIME) {
 		t.Fatal("RefuseLabel no longer refuses the label this test serves")
@@ -86,11 +92,12 @@ func TestAccPolicyMIMERefusal(t *testing.T) {
 }
 
 // TestAccPolicyMIMERefusalServesExpiredEntry: a refused label on a read
-// whose cached file has expired serves that file, GET and HEAD, with the
-// refusal on the result for the source service to remember, and makes the
-// entry fresh again, as 7.x's RemoteRepoBase.internalGetInfo serves an
-// expired file for a rejected resource and getInfo unexpires it. hardFail
-// does not stop it. A format route's read (no ClientMIME) still fails 502.
+// whose cached file has expired serves that file, GET, HEAD and a checksum
+// request's HEAD, with the refusal on the result for the source service to
+// remember, and makes the entry fresh again, as 7.x's
+// RemoteRepoBase.internalGetInfo serves an expired file for a rejected
+// resource and getInfo unexpires it. hardFail does not stop it. A format
+// route's read (no ClientMIME) still fails 502.
 func TestAccPolicyMIMERefusalServesExpiredEntry(t *testing.T) {
 	w := policyFixture(t)
 	resource := func(label, body string) fakeupstream.Resource {
@@ -98,11 +105,16 @@ func TestAccPolicyMIMERefusalServesExpiredEntry(t *testing.T) {
 			"Content-Type": {label}, "Cache-Control": {"max-age=10"},
 		}}
 	}
-	for _, method := range []string{http.MethodGet, http.MethodHead} {
-		path := strings.ToLower(method) + ".jar"
+	for _, tc := range []struct {
+		method   string
+		checksum bool
+	}{{http.MethodGet, false}, {http.MethodHead, false}, {http.MethodHead, true}} {
+		method := tc.method
+		path := strings.ToLower(method) + fmt.Sprint("-", tc.checksum) + ".jar"
 		w.up.Set("/"+path, resource("application/java-archive", "jar bytes"))
 		q := w.request(path, source.ResourceKindArtifact)
 		q.Resource.ClientMIME = &source.ClientMIME{}
+		q.Resource.ChecksumRequest = tc.checksum
 		q.Repo.HardFail = ptr(true)
 		w.mustRead(q, "jar bytes")
 		w.clock.Advance(11 * time.Second)

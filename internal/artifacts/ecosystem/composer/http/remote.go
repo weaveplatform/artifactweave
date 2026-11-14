@@ -37,13 +37,19 @@ func registryURL(cURL, registry string) string {
 	return strings.TrimRight(cURL, "/")
 }
 
-func readMetadata(result source.Result) ([]byte, error) {
+// readMetadata reads the metadata copy result serves. A failed read of it
+// is the server's storage fault (pkgroute.ReadServed), not the upstream's
+// invalid metadata (#1462).
+func readMetadata(ctx context.Context, result source.Result) ([]byte, error) {
 	if result.Stream == nil {
 		return nil, remoteInvalid()
 	}
 	defer result.Stream.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(result.Stream.Body, remoteMetadataLimit+1))
-	if err != nil || len(data) > remoteMetadataLimit {
+	data, err := pkgroute.ReadServed(ctx, result.Stream.Body, remoteMetadataLimit, remoteInvalid())
+	if err != nil {
+		return nil, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
+	}
+	if len(data) > remoteMetadataLimit {
 		return nil, remoteInvalid()
 	}
 	return data, nil
@@ -180,7 +186,7 @@ func (h handler) remoteRoot(r *http.Request) (source.Result, string, error) {
 	if err != nil {
 		return source.Result{}, "", fmt.Errorf("read composer root metadata: %w", err)
 	}
-	data, err := readMetadata(result)
+	data, err := readMetadata(r.Context(), result)
 	if err != nil {
 		return source.Result{}, "", err
 	}
@@ -235,7 +241,7 @@ func (h handler) remoteP2(r *http.Request, name string) ([]release, error) {
 		if e != nil {
 			return nil, fmt.Errorf("read composer package metadata %s: %w", name, e)
 		}
-		data, e := readMetadata(result)
+		data, e := readMetadata(r.Context(), result)
 		if e != nil {
 			return nil, e
 		}

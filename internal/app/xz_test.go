@@ -20,7 +20,10 @@ import (
 // it the second waits for the first, which only the waiting request can
 // close.
 func TestUnitXZRequestsMakeARequestOneHolder(t *testing.T) {
-	xzfile.SetBudget(1 << 20)
+	// A dictionary is allocated as it fills, from 64 KiB, and 300 bytes of
+	// content never grow it (#1413): a 64 KiB budget is what makes the
+	// first file hold all of it, whatever the header's 1 MiB.
+	xzfile.SetBudget(64 << 10)
 	t.Cleanup(func() { xzfile.SetBudget(xzfile.DefaultBudget) })
 	var file bytes.Buffer
 	w, err := xz.WriterConfig{DictCap: 1 << 20}.NewWriter(&file)

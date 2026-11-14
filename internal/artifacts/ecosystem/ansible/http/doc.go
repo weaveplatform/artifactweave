@@ -154,6 +154,9 @@
 //     virtual repository's ordered readable members, and pagination and
 //     path permissions.
 //   - helpers_test.go: the upstream Galaxy base and the pagination bounds.
+//   - served_copy_fault_test.go (external): a cached version list or
+//     version document whose copy fails a read answers 500, logs the fault
+//     once and stays cached.
 //   - store_page_test.go (external): the local version list's pages read
 //     without reading the versions outside them, the checks a page makes,
 //     and its store failures.

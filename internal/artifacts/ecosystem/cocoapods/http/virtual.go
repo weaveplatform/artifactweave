@@ -3,7 +3,6 @@ package cocoapodshttp
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"slices"
 	"strings"
@@ -335,10 +334,18 @@ func (h handler) virtualSourceArchive(
 			h.k.Error(w, r, pkgroute.SourceError(source.ErrInvalidResult, false))
 			return
 		}
-		data, err := io.ReadAll(io.LimitReader(result.Stream.Body, maxCDNMetadata+1))
+		data, err := pkgroute.ReadServed(
+			r.Context(),
+			result.Stream.Body,
+			maxCDNMetadata,
+			source.ErrInvalidResult,
+		)
 		_ = result.Stream.Body.Close()
-		if err != nil || len(data) > maxCDNMetadata {
-			h.k.Error(w, r, pkgroute.SourceError(source.ErrInvalidResult, false))
+		if err == nil && len(data) > maxCDNMetadata {
+			err = source.ErrInvalidResult
+		}
+		if err != nil {
+			h.k.Error(w, r, pkgroute.SourceError(err, false))
 			return
 		}
 		fields, target, _, err := sourceDetails(data, name, version)

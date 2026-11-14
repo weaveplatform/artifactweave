@@ -115,6 +115,8 @@
 //     acceptance job sets HF_CLIENT_PYTHON).
 //   - remote_test.go and virtual_test.go: remote caching, redirects,
 //     integrity and offline reads; virtual member selection.
+//   - served_copy_fault_test.go: revision info whose served copy fails a
+//     read answers 500 and logs a storage fault.
 //   - xet_boundary_test.go, xet_cache_test.go, xet_fence_test.go and
 //     xet_remote_test.go: Xet capabilities, ranges, the metadata cache and
 //     the revalidation of every delivery.

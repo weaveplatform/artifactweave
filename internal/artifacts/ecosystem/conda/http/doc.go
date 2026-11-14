@@ -103,5 +103,7 @@
 //     bounds.
 //
 // The routes are also tested end to end from test/server/artifacts/conda
-// (conda_test.go, and conda_remote_test.go over the application runtime).
+// (conda_test.go, and conda_remote_test.go over the application runtime;
+// served_copy_fault_test.go, a served index whose read times out answers
+// 500, not 504).
 package condahttp

@@ -48,6 +48,8 @@ type fixture struct {
 	source *source.Service
 	repo   repo.Config
 	data   []byte
+	// faults are the errors the router kit logged as unexpected.
+	faults []error
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -94,6 +96,7 @@ func (f *fixture) mount(remote *source.Service) {
 	}
 	pkgroute.Mount(router, pkgroute.Options{
 		Store: st, Items: func() *item.Service { return items },
+		Fault: func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
 		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 			rc, _, err := items.Blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {

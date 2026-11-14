@@ -810,6 +810,26 @@ func TestAccAuthEndpoints(t *testing.T) {
 				&kernel.Principal{Name: "ghost"}, 200,
 				entry("ghost", "ref", ""),
 			},
+			// The key authenticated the request whatever Authorization
+			// says, as 7.x's props filter reads it first, and X-Api-Key is
+			// its older name (#1464).
+			"old api key header": {
+				map[string]string{"X-Api-Key": "ref"},
+				&kernel.Principal{Name: "ghost"}, 200,
+				entry("ghost", "ref", ""),
+			},
+			"api key beside basic": {
+				map[string]string{
+					"Authorization": "Basic " +
+						base64.StdEncoding.EncodeToString([]byte("writer:pw")),
+					"X-JFrog-Art-Api": "ref",
+				},
+				&writer, 200, entry("writer", "ref", "w@example.com"),
+			},
+			"api key beside bearer": {
+				map[string]string{"Authorization": "Bearer tok", "X-Api-Key": "ref"},
+				&writer, 200, entry("writer", "ref", "w@example.com"),
+			},
 			"anonymous": {nil, &kernel.Anonymous, 401, ""},
 			"nobody":    {nil, nil, 401, ""},
 			"no secret": {nil, &writer, 401, ""},

@@ -43,6 +43,8 @@ type routeFixture struct {
 	kit    *pkgroute.Kit
 	source *source.Service
 	blobs  *fs.Store
+	// faults are the errors the router kit logged as unexpected.
+	faults []error
 }
 
 type brokenCDNBody struct{}
@@ -111,8 +113,10 @@ func newRouteFixture(t *testing.T) *routeFixture {
 		}
 		return kernel.Principal{Name: name, Admin: name == "admin"}
 	}))
-	k := pkgroute.Mount(r, pkgroute.Options{
+	f := &routeFixture{t: t, router: r, db: db, up: up, source: service, blobs: blobs}
+	f.kit = pkgroute.Mount(r, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
+		Fault: func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
 		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 			body, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
@@ -126,7 +130,7 @@ func newRouteFixture(t *testing.T) *routeFixture {
 			}
 		},
 	}, Protocol(Options{RemoteSources: service}))
-	return &routeFixture{t: t, router: r, db: db, up: up, kit: k, source: service, blobs: blobs}
+	return f
 }
 
 func (f *routeFixture) get(key, path string) *httptest.ResponseRecorder {

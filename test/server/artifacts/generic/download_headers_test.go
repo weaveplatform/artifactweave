@@ -149,7 +149,10 @@ func TestAccFileDownloadSendsTheBareSHA1AsETag(t *testing.T) {
 			{"If-None-Match quoted", http.MethodGet, []string{"If-None-Match", quoted}, notModified},
 			{"If-None-Match weak bare", http.MethodGet, []string{"If-None-Match", "W/" + sha}, notModified},
 			{"If-None-Match weak quoted", http.MethodGet, []string{"If-None-Match", "W/" + quoted}, notModified},
-			{"If-None-Match list", http.MethodGet, []string{"If-None-Match", `"other", ` + sha}, notModified},
+			// 7.x compares each If-None-Match line as a whole with the
+			// SHA-1, so a list on one line matches nothing
+			// (ArtifactoryRequestBase.isNoneMatch, 7.161.26; #1469).
+			{"If-None-Match list", http.MethodGet, []string{"If-None-Match", `"other", ` + sha}, whole},
 			{"HEAD If-None-Match bare", http.MethodHead, []string{"If-None-Match", sha}, notModified},
 			{"If-None-Match other", http.MethodGet, []string{"If-None-Match", `"other"`}, whole},
 			{"If-Range bare", http.MethodGet, []string{"Range", "bytes=2-5", "If-Range", sha}, part},
@@ -159,7 +162,9 @@ func TestAccFileDownloadSendsTheBareSHA1AsETag(t *testing.T) {
 			{
 				"Range unsatisfiable", http.MethodGet,
 				[]string{"Range", "bytes=" + size + "-"},
-				answer{http.StatusRequestedRangeNotSatisfiable, "invalid range: failed to overlap\n", "bytes */" + size, false},
+				// Content-Range alone, as 7.x's sendBodyResponse answers it
+				// (#1469).
+				answer{http.StatusRequestedRangeNotSatisfiable, "", "bytes */" + size, false},
 			},
 			{"If-Match quoted", http.MethodGet, []string{"If-Match", quoted}, whole},
 			{"If-Match bare", http.MethodGet, []string{"If-Match", sha}, whole},

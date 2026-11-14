@@ -40,9 +40,12 @@
 //     application/vnd.pub.v2+json for Dart pub. A Swift registry error also
 //     carries Content-Version: 1, without which SwiftPM does not show its
 //     detail (#1278). A 401 gets a challenge, BasicChallenge or, under
-//     ProfilePub, Bearer realm="pub", unless the error sets NoChallenge or
-//     the response has one already. A positive RetryAfterSeconds sets
-//     Retry-After.
+//     ProfilePub, Bearer realm="pub" with the error's message, as the pub
+//     repository specification requires (#1279), unless the error sets
+//     NoChallenge or the response has one already. So does an error that
+//     sets Challenge, such as the 403 7.x's entry point answers a refused
+//     API key with, and under ProfilePub any 403. A positive
+//     RetryAfterSeconds sets Retry-After.
 //   - Profile and its sixteen values; Error, with New, NotSupported and
 //     ErrNotImplemented; and BasicChallenge, Artifactory's realm.
 //
@@ -139,7 +142,11 @@
 //   - TestUnitTerraformBackendEnvelope: the JSON:API document and its
 //     content type.
 //   - TestUnitUnauthorizedChallenges: the Basic challenge on a 401, a
-//     handler's own challenge kept, and none on a 403.
+//     handler's own challenge kept, none on a 403 unless the error sets
+//     Challenge, and none on an upstream's 401 or 403 (NoChallenge).
+//   - TestUnitPubChallenge: pub's challenge on a 401 and a 403, with the
+//     error's message escaped into printable ASCII, and none on another
+//     status or an upstream's refusal (#1279).
 //   - TestUnitDefaultCodes: a table over status and profile. For each status
 //     that a handler, the middleware or a remote's upstream can send through
 //     the Access, Grid and Pub envelopes, the code New derives, with the
@@ -150,7 +157,7 @@
 //     leaves the error unchanged.
 //   - TestUnitProfileHeaders: the exact headers of every profile for a 404,
 //     and for a 401 with Retry-After: the content type, the challenge, Basic
-//     or pub's Bearer, Retry-After, and Content-Version: 1 under the Swift
+//     or pub's Bearer with the message, Retry-After, and Content-Version: 1 under the Swift
 //     registry profile and no other.
 //
 // These tests leave the APM and Swift registry problem JSON bodies to the

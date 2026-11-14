@@ -15704,7 +15704,7 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "calculateConanRepositoryMetadata",
     "state": "implemented",
-    "contract": "Queues a rebuild of the package index of a local or federated Conan repository from its completed recipe and package revisions, and returns once the work is queued. Requires Manage on the repository; other package types and classes are rejected with 400.",
+    "contract": "Rebuilds the package index of a local or federated Conan repository from its completed recipe and package revisions. Waits for the work to finish unless async is true. Requires an administrator; other package types and classes are rejected with 400.",
     "handler": "internal/artifacts/adapters/http/reindex.go: ArtifactoryAPI.CalculateConanRepositoryMetadata",
     "direct_calls": [
       "artgen.CalculateConanRepositoryMetadata200TextResponse",
@@ -18293,34 +18293,52 @@
     "route": "POST /artifactory/api/system/decrypt",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "deactivateArtifactoryKeyEncryption",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Accepted and answers DONE without changing anything. Secrets stay sealed at all times (decision 0017), and the descriptor export masks them regardless.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/access/adapters/http/encryption.go: SecurityAPI.DeactivateArtifactoryKeyEncryption",
+    "direct_calls": [
+      "artgen.DeactivateArtifactoryKeyEncryption200TextResponse",
+      "httpkit.AdminOnly"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "no key support; reconcile ambiguous completion before retrying",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /artifactory/api/system/encrypt",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "activateArtifactoryKeyEncryption",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "The counterpart of decrypt. Secrets are always sealed, so the call answers DONE and changes nothing.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/access/adapters/http/encryption.go: SecurityAPI.ActivateArtifactoryKeyEncryption",
+    "direct_calls": [
+      "artgen.ActivateArtifactoryKeyEncryption200TextResponse",
+      "httpkit.AdminOnly"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "no key support; reconcile ambiguous completion before retrying",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {

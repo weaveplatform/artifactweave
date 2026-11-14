@@ -88,10 +88,16 @@
 //     entry the archive lacks, or one of a file that is no archive or a
 //     corrupt one, answers 404.
 //   - A file download, streamed, redirected or from a remote's stream,
-//     answers If-None-Match, If-Modified-Since and If-Range, and ignores
+//     answers If-None-Match and If-Modified-Since as 7.x's download does
+//     (pkgroute.FileNotModified): one If-None-Match line at a time, less a
+//     W/ prefix and its quotes, equal to the file's SHA-1, or to its MD5
+//     when X-Artifactory-If-None-Match-MD5 asks, so neither "*" nor a list
+//     on one line matches; If-Range as http.ServeContent does; a range past
+//     its end with 416, Content-Range alone and no body; and it ignores
 //     If-Match and If-Unmodified-Since, which Artifactory's download never
-//     evaluates. So does every index or metadata document a package route
-//     builds, through ServeContent, and a HEAD of one answers 200 with its
+//     evaluates. Every index or metadata document a package route
+//     builds, through ServeContent, ignores those two as well and keeps
+//     http.ServeContent's other answers, and a HEAD of one answers 200 with its
 //     whole length whatever Range it sends. A checksum file, local, virtual
 //     or remote, answers as 7.x's download answers one: an If-None-Match
 //     naming its file's SHA-1, or an If-Modified-Since its file has not

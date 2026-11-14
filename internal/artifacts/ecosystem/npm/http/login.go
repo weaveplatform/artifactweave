@@ -75,27 +75,30 @@ type npmCredentialKey struct{}
 // KeepNPMCredential keeps, for the npm configuration operations alone, the
 // token a request authenticated with, which they write into .npmrc as it
 // came. Nothing else needs the raw token, so no other request carries it
-// further than the middleware. It reads Basic and Bearer as the middleware
-// does (accessapi.BasicCredentials, accessapi.BearerToken), not with
+// further than the middleware. It reads the credential as the middleware
+// does: an API key first (accessapi.APIKey), which authenticates a request
+// that sends one whatever its Authorization header says, as 7.x's props
+// filter does, so a Basic or Bearer value beside it, which nothing
+// verified, is never written in its place. Then Basic and Bearer
+// (accessapi.BasicCredentials, accessapi.BearerToken), not
 // Request.BasicAuth: a lower-case "basic" value, a blank "Bearer" or
-// another scheme authenticates nothing in 7.x, so beside a key that did,
-// it must not be written into .npmrc in the key's place. Nor must Basic
-// credentials naming another user, such as the anonymous name the
-// middleware declines while anonymous access is off; an empty name is the
-// token's subject (authn.Authenticator.Token).
+// another scheme authenticates nothing in 7.x. Nor do Basic credentials
+// naming another user, such as the anonymous name the middleware declines
+// while anonymous access is off; an empty name is the token's subject
+// (authn.Authenticator.Token).
 func KeepNPMCredential(ctx context.Context, r *http.Request, p kernel.Principal) context.Context {
 	if p.TokenID == "" || !NPMOperation(r.URL.Path) {
 		return ctx
 	}
 	var c Credential
 	h := r.Header.Get("Authorization")
-	if user, password, ok := accessapi.BasicCredentials(h); ok &&
+	if key, ok := accessapi.APIKey(r.Header); ok {
+		c.Token = key
+	} else if user, password, ok := accessapi.BasicCredentials(h); ok &&
 		(user == "" || accessapi.SameUsername(user, p.Name)) {
 		c.User, c.Password = user, password
 	} else if token, ok := accessapi.BearerToken(h); ok {
 		c.Token = token
-	} else {
-		c.Token = r.Header.Get("X-JFrog-Art-Api")
 	}
 	return context.WithValue(ctx, npmCredentialKey{}, c)
 }

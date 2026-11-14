@@ -100,9 +100,9 @@ func footerBytes(indexSize int, check byte) []byte {
 	return append(binary.LittleEndian.AppendUint32(nil, crc32.ChecksumIEEE(f[:6])), f...)
 }
 
-// lzma2 compresses data as one LZMA2 chunk sequence, with dict as the
+// packLZMA2 compresses data as one LZMA2 chunk sequence, with dict as the
 // encoder's dictionary.
-func lzma2(t *testing.T, dict int, data []byte) []byte {
+func packLZMA2(t *testing.T, dict int, data []byte) []byte {
 	t.Helper()
 	var b bytes.Buffer
 	w, err := lzma.Writer2Config{DictCap: dict}.NewWriter2(&b)
@@ -152,7 +152,7 @@ func build(t *testing.T, check byte, sizes bool, data ...[]byte) parts {
 	t.Helper()
 	compressed := make([][]byte, len(data))
 	for i, d := range data {
-		compressed[i] = lzma2(t, 1<<20, d)
+		compressed[i] = packLZMA2(t, 1<<20, d)
 	}
 	return stream(check, sizes, lzma.EncodeDictCap(1<<20), data, compressed)
 }
@@ -589,7 +589,7 @@ func TestUnitDataBeyondTheDictionary(t *testing.T) {
 	}
 	// The repeat is all matches 96 KiB back, past a 64 KiB dictionary.
 	data := append(append([]byte{}, random...), random...)
-	compressed := lzma2(t, 1<<20, data)
+	compressed := packLZMA2(t, 1<<20, data)
 	names := func(prop byte) []byte {
 		return stream(checkCRC32, false, prop, [][]byte{data}, [][]byte{compressed}).bytes()
 	}

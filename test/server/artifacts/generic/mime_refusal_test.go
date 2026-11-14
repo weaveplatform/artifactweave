@@ -205,12 +205,8 @@ func TestAccGenericRemoteMIMEAccept(t *testing.T) {
 				wantRefusal(t, rec, method, refusalOf(w, path, tc.requested, "text/html", path[1:]))
 				continue
 			}
-			if method == http.MethodHead {
-				// A HEAD on a miss relays the upstream's label, which is
-				// not this suite's answer.
-				remoteStatus(t, rec, http.StatusOK)
-				continue
-			}
+			// A HEAD on a miss keeps the file as the GET does and answers
+			// with the jar's own type (#1391).
 			wantDownload(t, rec, method, javaArchive, loginPage)
 		}
 	}
