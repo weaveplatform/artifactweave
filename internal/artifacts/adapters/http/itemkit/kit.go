@@ -147,11 +147,12 @@ func NotFoundRepo(key string) error {
 	return apierror.New(http.StatusNotFound, fmt.Sprintf("Repository '%s' does not exist", key))
 }
 
-// View is the configuration a reader receives: everything but secrets for
-// an admin, the public subset for anyone else.
+// View is the configuration a reader receives: everything but secrets, with
+// the fields 7.x's read model derives (repo.Full), for an admin, and the
+// public subset for anyone else.
 func View(p kernel.Principal, c repo.Config) repo.Config {
 	if p.Admin {
-		return repo.Masked(c)
+		return repo.Full(c)
 	}
 	return repo.Public(c)
 }

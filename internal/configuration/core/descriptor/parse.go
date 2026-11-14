@@ -405,11 +405,18 @@ var blocks = map[string]map[string]string{
 // Only a string may be set to null ([D] "delete an existing element"). A
 // fixed set of values such as checksumPolicyType counts as a string: the
 // page names type, which is one, as the only string that may not be null.
+// A field tagged descriptor:"-" is the JSON API's alone, so the descriptor
+// refuses it as an unknown field: the legacy enable<Type>Support flags,
+// which 7.161.26's repository descriptor (RepoBaseDescriptor) and its
+// configuration XSD (artifactory.xsd) do not have (#1479).
 var jsonFields = func() map[string]bool {
 	out := map[string]bool{}
 	t := reflect.TypeFor[repo.Config]()
 	for i := range t.NumField() {
 		f := t.Field(i)
+		if f.Tag.Get("descriptor") == "-" {
+			continue
+		}
 		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
 		kind := f.Type.Kind()
 		if kind == reflect.Pointer {

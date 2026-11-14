@@ -10,7 +10,9 @@ import (
 // the client sent, as 7.x builds the flag from the package type (#1440). The
 // v2 read and the configurations list, which take their shape from
 // Relevant, leave it out for every package type, and another type's full
-// read keeps what was stored.
+// read says false whatever was stored, as 7.x sets the flag for Conan
+// repositories only (RepositoryConfigurationBase.setPackageTypeConfig,
+// 7.161.26; RTFACT-31100's Maven read) (#1479).
 func TestUnitEnableConanSupportIsTheConanTypes(t *testing.T) {
 	for _, class := range []repo.Class{repo.Local, repo.Remote, repo.Virtual, repo.Federated} {
 		for name, sent := range map[string]*bool{
@@ -19,7 +21,7 @@ func TestUnitEnableConanSupportIsTheConanTypes(t *testing.T) {
 			c := repo.Config{
 				Key: "c", Class: class, PackageType: repo.Conan, EnableConanSupport: sent,
 			}
-			full := repo.Masked(c)
+			full := repo.Full(c)
 			if full.EnableConanSupport == nil || !*full.EnableConanSupport {
 				t.Errorf("%s, %s: full read %v, want true", class, name, full.EnableConanSupport)
 			}
@@ -28,14 +30,13 @@ func TestUnitEnableConanSupportIsTheConanTypes(t *testing.T) {
 			}
 		}
 	}
-	other := repo.Config{
-		Key: "g", Class: repo.Local, PackageType: repo.Generic, EnableConanSupport: ptr(false),
-	}
-	if got := repo.Masked(other).EnableConanSupport; got == nil || *got {
-		t.Errorf("generic full read %v, want the stored false", got)
+	other := repo.Config{Key: "g", Class: repo.Local, PackageType: repo.Generic}
+	other.EnableConanSupport = ptr(true)
+	if got := repo.Full(other).EnableConanSupport; got == nil || *got {
+		t.Errorf("generic full read %v, want false", got)
 	}
 	npm := repo.Config{Key: "n", PackageType: repo.NPM}
-	if got := repo.Masked(npm).EnableConanSupport; got != nil {
-		t.Errorf("npm full read %v, want none", *got)
+	if got := repo.Full(npm).EnableConanSupport; got == nil || *got {
+		t.Errorf("npm full read %v, want false", got)
 	}
 }

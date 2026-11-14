@@ -27,6 +27,10 @@ const (
 	DefaultTerraformRegistryURL           = "https://registry.terraform.io"
 	DefaultTerraformProvidersURL          = "https://releases.hashicorp.com"
 	DefaultNIMModelURL                    = "https://api.ngc.nvidia.com"
+	// DefaultSignedURLTTL is what a read gives signedUrlTtl when it was
+	// never set (Full), the default of 7.161.26's RepositoryConfigurationBase
+	// and RepoBaseDescriptor.
+	DefaultSignedURLTTL = 90
 )
 
 // Minimums of a remote repository's retrievalCachePeriodSecs. JFrog's
@@ -44,8 +48,11 @@ const (
 // alone so a local repository does not grow remote-only keys.
 func Defaults(c *Config) *Config {
 	if c.PackageType == "" {
-		c.PackageType = Generic
+		c.PackageType = legacyPackageType(c)
 	}
+	// 7.x keeps none of the legacy flags: its descriptor holds the package
+	// type, and every read derives them from it (Full).
+	clearTypeFlags(c)
 	setString(&c.IncludesPattern, DefaultIncludesPattern)
 	setString(&c.ExcludesPattern, "")
 	if c.RepoLayoutRef == "" {
@@ -187,7 +194,13 @@ func virtualDefaults(c *Config) {
 		c.PomRepositoryReferencesCleanupPolicy = DiscardActiveReference
 	}
 	setBool(&c.ForceMavenAuthentication, false)
+	// The three sit on 7.161.26's RepositoryConfigurationBase, which the
+	// virtual class's model extends too, each false by default; a P2
+	// virtual repository is the one whose forceP2Authentication acts
+	// (itemkit.ForceAuthentication).
 	setBool(&c.ForceNugetAuthentication, false)
+	setBool(&c.ForceP2Authentication, false)
+	setBool(&c.ForceConanAuthentication, false)
 	setBool(&c.ExternalDependenciesEnabled, false)
 	setBool(&c.HideUnauthorizedResources, false)
 	setBool(&c.ResolveDockerTagsByTimestamp, false)

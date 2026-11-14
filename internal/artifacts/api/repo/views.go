@@ -16,7 +16,11 @@ func Public(c Config) Config {
 // Masked returns c without its secrets, for every reader: the remote
 // password and the values of sensitive custom headers. An update that omits
 // the password, or sends a sensitive header back with an empty value, keeps
-// the stored secret (RestoreSecrets).
+// the stored secret (RestoreSecrets). The repositories API's reads send
+// Full, which starts from Masked; the shared remote configuration sends
+// Masked itself, as 7.x answers that read with its remote repository
+// descriptor (RepoConfigurationResource.getRemoteDescriptor, 7.161.26),
+// which holds none of the legacy enable<Type>Support flags.
 //
 // It also lists no environments as [] rather than leaving the key out, as
 // Artifactory does: the Terraform provider defaults project_environments to an
@@ -55,13 +59,6 @@ func Masked(c Config) Config {
 	if c.PropertySets == nil && c.Class != Virtual {
 		c.PropertySets = []string{}
 	}
-	// 7.x builds a read's enableConanSupport from the package type, true for
-	// every Conan repository, and not from what the client sent
-	// (RepositoryConfigurationBase.setPackageTypeConfig, 7.161.26); its v1
-	// reads carry the key (RTFACT-16458, RTFACT-31100).
-	if c.PackageType == Conan {
-		c.EnableConanSupport = new(true)
-	}
 	if len(c.CustomHTTPHeaders) > 0 {
 		hs := slices.Clone(c.CustomHTTPHeaders)
 		for i := range hs {
@@ -70,6 +67,55 @@ func Masked(c Config) Config {
 			}
 		}
 		c.CustomHTTPHeaders = hs
+	}
+	return c
+}
+
+// Full returns what an administrator's v1 read, GET /api/repositories/{key},
+// sends of c: Masked(c) with the fields 7.x's read model writes for every
+// repository of every class, whatever was stored. 7.161.26's
+// RepositoryConfigurationBase, which every class's model extends, holds
+// them with these defaults, and the v1 read writes every field of the
+// model, as its dumps of Docker, npm and Maven local repositories
+// (RTFACT-29415, RTFACT-30672, RTFACT-31100) and the Terraform provider's
+// sample reads of generic local and remote repositories and remotes of
+// other types (samples/generic-repo-local.json, samples/repository_remote)
+// show:
+//
+//   - the legacy enable<Type>Support flags, true for c's own package type
+//     and false for the rest (setPackageTypeConfig);
+//   - forceNugetAuthentication, forceP2Authentication and
+//     forceConanAuthentication, taken from the configuration of a NuGet, P2
+//     or Conan repository and false for every other type, which is what
+//     each acts on (setPackageTypeConfig sets each for its own type only);
+//   - ddebSupported and debianTrivialLayout, taken from a Debian
+//     repository's configuration (Masked) and false for every other type,
+//     as only a Debian repository's configuration sets them
+//     (LocalRepositoryConfigurationImpl.setDebianConfigIfNeeded);
+//   - signedUrlTtl, 90 when unset, which the configurations list's sample
+//     shows too ([D] getallrepositoryconfigurations).
+//
+// No dump of a virtual repository's v1 read was found, so that it carries
+// them is inferred from the model [I]. The v2 read and the configurations
+// list keep what Relevant keeps of them: signedUrlTtl, and none of the
+// legacy flags.
+func Full(c Config) Config {
+	c = Masked(c)
+	setTypeFlags(&c)
+	for own, flag := range map[PackageType]**bool{
+		NuGet: &c.ForceNugetAuthentication,
+		P2:    &c.ForceP2Authentication,
+		Conan: &c.ForceConanAuthentication,
+	} {
+		if c.PackageType != own || *flag == nil {
+			*flag = new(false)
+		}
+	}
+	if c.PackageType != Debian {
+		c.DdebSupported, c.DebianTrivialLayout = new(false), new(false)
+	}
+	if c.SignedURLTTL == nil {
+		c.SignedURLTTL = new(DefaultSignedURLTTL)
 	}
 	return c
 }
@@ -93,17 +139,17 @@ func RestoreSecrets(stored Config, updated *Config) {
 
 // relevance names the package types each group of package-specific fields
 // applies to. 7.161.26's IncludeTypeSpecific annotations list the fields the
-// v2 read keeps per package type and class, but only the Conan fields have
-// been checked against them; the other groups follow the per-ecosystem
-// sections of research 03, and fields shared by several ecosystems are
-// always kept. checksumPolicyType is a Maven field here because JFrog's
-// generic local samples, the v2 read and the configurations list alike,
-// leave it out. maxUniqueSnapshots is
-// NuGet's as well as the Maven family's, as research 03's per-ecosystem
-// summary lists it and 6.20's type-specific field list has it [I]. A local or
-// federated npm repository applies the checksum policy and the release and
-// snapshot handling too (#481), so it keeps those three fields; an npm remote
-// or virtual repository does not. also, when set, keeps a group for a
+// v2 read keeps per package type and class; the groups follow the
+// per-ecosystem sections of research 03, and fields shared by several
+// ecosystems are always kept. Research 03, "The v2 read and 7.161.26's
+// annotations", lists where the groups and the annotations differ [I]
+// (#1479). checksumPolicyType is a Maven field here because JFrog's generic
+// local samples, the v2 read and the configurations list alike, leave it
+// out. maxUniqueSnapshots is NuGet's as well as the Maven family's, as
+// 7.161.26 marks it on local repositories. A local or federated npm
+// repository applies the checksum policy and the release and snapshot
+// handling too (#481), so it keeps those three fields; an npm remote or
+// virtual repository does not. also, when set, keeps a group for a
 // configuration whose package type is not in types.
 var relevance = []struct {
 	types []PackageType
@@ -145,11 +191,11 @@ var relevance = []struct {
 		c.V3FeedURL, c.SymbolServerURL = "", ""
 	}},
 	{[]PackageType{Conan}, nil, func(c *Config) { c.ForceConanAuthentication = nil }},
-	// No package type keeps enableConanSupport: 7.161.26's v2 serializer
-	// (TypeSpecificFilter) writes only the fields marked IncludeTypeSpecific,
-	// and RepositoryConfigurationBase marks forceConanAuthentication, for
-	// Conan, but none of the legacy enable<Type>Support flags.
-	{nil, nil, func(c *Config) { c.EnableConanSupport = nil }},
+	// No package type keeps a legacy enable<Type>Support flag: 7.161.26's
+	// v2 serializer (TypeSpecificFilter) writes only the fields marked
+	// IncludeTypeSpecific, and RepositoryConfigurationBase marks none of
+	// them.
+	{nil, nil, clearTypeFlags},
 	{
 		[]PackageType{P2},
 		nil,

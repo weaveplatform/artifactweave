@@ -62,8 +62,9 @@ create (`PUT /api/repositories/{repoKey}`), update (`POST`), read (`GET`, `GET /
 batch create/update/read (`/api/v2/repositories/batch`) and the `configurations` listing.
 The oracle's read, v2 read, update and batch shapes have exactly the same field set as the
 create shape: there are no server-owned fields on this entity in the OpenAPI blocks (the
-JSON documentation page adds read-only `signedUrlTtl` and `xrayDataTtl`, see
-[03](03-repository-configuration-model.md)).
+JSON documentation page adds read-only `signedUrlTtl` and `xrayDataTtl`, and an
+administrator's v1 read the legacy `enable<Type>Support` flags, which artifactweave derives
+from the package type rather than store; see [03](03-repository-configuration-model.md)).
 
 Identity: `key` (also the path parameter; the path wins when both are given). Mutability:
 `key` and `rclass` are create-only; `packageType` is create-only in practice (changing it

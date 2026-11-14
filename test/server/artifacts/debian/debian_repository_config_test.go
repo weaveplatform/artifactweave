@@ -21,7 +21,12 @@ import (
 // v2 read keeps ddebSupported for every Debian class and debianTrivialLayout
 // for a local or federated one only, as that model's @IncludeTypeSpecific
 // marks them, so a remote's or virtual's v2 read leaves debianTrivialLayout
-// out, set or not. A remote of another package type still leaves both out.
+// out, set or not. A remote of another package type reads both as false in
+// the v1 read whatever it was sent, as only a Debian repository's
+// configuration sets them in 7.161.26
+// (LocalRepositoryConfigurationImpl.setDebianConfigIfNeeded) and the
+// provider's sample read of an RPM remote (samples/repository_remote/rpm.json)
+// gives both false, and leaves both out of the v2 read (#1479).
 func TestAccDebianRepositoryConfigurationReadsDdebSupported(t *testing.T) {
 	w := harness.NewRemoteWorld(t)
 	read := func(path string) map[string]any {
@@ -92,5 +97,8 @@ func TestAccDebianRepositoryConfigurationReadsDdebSupported(t *testing.T) {
 		"rpm-remote",
 		`{"rclass":"remote","packageType":"rpm","url":"https://rpm.example"}`,
 	)
-	want("rpm-remote", left, left)
+	want("rpm-remote", unset, left)
+	write(http.MethodPut, "rpm-remote-on", `{"rclass":"remote","packageType":"rpm",`+
+		`"url":"https://rpm.example","ddebSupported":true,"debianTrivialLayout":true}`)
+	want("rpm-remote-on", unset, left)
 }

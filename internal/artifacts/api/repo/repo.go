@@ -83,6 +83,10 @@ const (
 	// API cannot create another; an update of that one repository keeps it
 	// (ValidateStored).
 	BuildInfo PackageType = "buildinfo"
+	// Distribution is the type 7.x gives a create that sends
+	// enableDistRepoSupport and no packageType (Defaults). It is in no
+	// AllowedPackageTypes list, so such a create answers 400.
+	Distribution PackageType = "distribution"
 )
 
 // ChecksumPolicy governs client-supplied checksums on local repositories.
@@ -260,8 +264,31 @@ type Config struct {
 	ForceConanAuthentication        *bool                   `json:"forceConanAuthentication,omitempty"`
 	ForceMetadataNameVersion        *bool                   `json:"forceMetadataNameVersion,omitempty"`
 	ForceNonDuplicateChart          *bool                   `json:"forceNonDuplicateChart,omitempty"`
-	EnableConanSupport              *bool                   `json:"enableConanSupport,omitempty"`
 	Members                         []Member                `json:"members,omitempty"`
+
+	// The legacy enable<Type>Support flags of every class. A create
+	// without packageType takes its type from them (Defaults), and the v1
+	// read derives them from the package type (Full); none is stored.
+	// descriptor:"-" keeps a flag out of the YAML descriptor's keys
+	// (internal/configuration/core/descriptor, jsonFields): 7.161.26's
+	// repository descriptor (RepoBaseDescriptor) and configuration XSD hold
+	// none of them. enableConanSupport, which the descriptor took before
+	// the others were added (#1479), keeps its place there.
+	EnableBowerSupport     *bool `json:"enableBowerSupport,omitempty"     descriptor:"-"`
+	EnableChefSupport      *bool `json:"enableChefSupport,omitempty"      descriptor:"-"`
+	EnableCocoaPodsSupport *bool `json:"enableCocoaPodsSupport,omitempty" descriptor:"-"`
+	EnableComposerSupport  *bool `json:"enableComposerSupport,omitempty"  descriptor:"-"`
+	EnableConanSupport     *bool `json:"enableConanSupport,omitempty"`
+	EnableDebianSupport    *bool `json:"enableDebianSupport,omitempty"    descriptor:"-"`
+	EnableDistRepoSupport  *bool `json:"enableDistRepoSupport,omitempty"  descriptor:"-"`
+	EnableDockerSupport    *bool `json:"enableDockerSupport,omitempty"    descriptor:"-"`
+	EnableGemsSupport      *bool `json:"enableGemsSupport,omitempty"      descriptor:"-"`
+	EnableGitLfsSupport    *bool `json:"enableGitLfsSupport,omitempty"    descriptor:"-"`
+	EnableNpmSupport       *bool `json:"enableNpmSupport,omitempty"       descriptor:"-"`
+	EnableNuGetSupport     *bool `json:"enableNuGetSupport,omitempty"     descriptor:"-"`
+	EnablePuppetSupport    *bool `json:"enablePuppetSupport,omitempty"    descriptor:"-"`
+	EnablePypiSupport      *bool `json:"enablePypiSupport,omitempty"      descriptor:"-"`
+	EnableVagrantSupport   *bool `json:"enableVagrantSupport,omitempty"   descriptor:"-"`
 
 	// Cargo, local and remote
 	CargoAnonymousAccess *bool `json:"cargoAnonymousAccess,omitempty"`
