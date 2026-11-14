@@ -34,7 +34,9 @@
 //     authentication case, the error envelope of the /access routes, what
 //     a request without credentials reaches once anonymous access is on,
 //     and the API key headers, read first and alone, with a refused key's
-//     403 (issue 1464).
+//     403 (issue 1464); the Basic challenge on the 403 of a locked account,
+//     an expired password and a suspended login on each route family, and
+//     none on any refusal of a request of the UI's (issue 1485).
 //   - access_test.go: path-level permissions, scoped token isolation,
 //     administrators through a group, and the permissions view's patterns.
 //   - tokens_test.go and token_auth_test.go: creating, listing, refreshing

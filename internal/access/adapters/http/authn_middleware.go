@@ -83,9 +83,11 @@ type AuthnOptions struct {
 //  3. Credentials that do not verify answer 401 at once, even on a public
 //     route, as Artifactory does: a client with a wrong password learns it
 //     on its first call. A refused API key (refusedAPIKey) and a NuGet
-//     client's refused password (refusedNuGetPassword) answer 403 instead.
-//     An expired password may still change itself (ownPasswordChange), and
-//     a registry token is good for the registry alone (decision 0005).
+//     client's refused password (refusedNuGetPassword) answer 403 instead,
+//     and so do a locked account, an expired password and a suspended
+//     login, each with the challenge (entryPoint). An expired password may
+//     still change itself (ownPasswordChange), and a registry token is good
+//     for the registry alone (decision 0005).
 //  4. The exception is an expired Bearer access token on refreshRoute
 //     (expiredRefresh).
 //  5. A principal that verified is authorised once (authn.Authorize): its
@@ -130,7 +132,7 @@ func Authenticate(o AuthnOptions) func(http.Handler) http.Handler {
 					return
 				}
 				if err != nil {
-					httpkit.WriteErr(w, r, err)
+					httpkit.WriteErr(w, r, entryPoint(r, err))
 					return
 				}
 				httpkit.NoteUser(ctx, p.Name)
@@ -323,6 +325,60 @@ func challengedForbidden(message string) *apierror.Error {
 	e := apierror.New(http.StatusForbidden, message)
 	e.Challenge = true
 	return e
+}
+
+// entryPoint is err, the refusal of the credentials a request presented, as
+// 7.x's ArtifactoryBasicAuthenticationEntryPoint answers it (7.161.26).
+// sendErrorResponseToClient answers 403 rather than 401 for a locked
+// account, an expired password and a suspended login (refusedAccount), and
+// sendErrorResponse adds its Basic challenge to every answer, those
+// included, unless the request is the UI's (uiRequest): without the
+// challenge, a client that read only a 401's would not tell these 403s
+// from an authenticated user's lack of a right. That 403, kernel.ErrForbidden,
+// and decision 0043's API restriction never reach the entry point and keep
+// their answers, as does any error that is not a refusal.
+func entryPoint(r *http.Request, err error) error {
+	var e *apierror.Error
+	if !errors.As(err, &e) {
+		return err
+	}
+	if refusedAccount(err) {
+		e = challengedForbidden(e.Message)
+		err = e
+	}
+	if uiRequest(r) && (e.Status == http.StatusUnauthorized || e.Challenge) {
+		quiet := *e
+		quiet.Challenge, quiet.NoChallenge = false, true
+		return &quiet
+	}
+	return err
+}
+
+// refusedAccount reports whether err refuses the account rather than the
+// credential, which 7.x's entry point answers 403 (isUserLocked,
+// isCredentialsExpired and isLoginDisabled): a locked account, whose
+// UserLockedException is a LockedException; a correct but expired password,
+// a CredentialsExpiredException; and a login suspended after failures, a
+// LoginDisabledException, or from 7.98, when Access suspends it, the
+// LockedException AccessAuthProviderUtils makes of Access's 429.
+func refusedAccount(err error) bool {
+	return errors.Is(err, kernel.ErrAccountLocked) || errors.Is(err, kernel.ErrPasswordExpired) ||
+		errors.Is(err, authn.ErrLoginSuspended)
+}
+
+// uiPath prefixes the paths of 7.x's UI REST API, Artifactory's context
+// path followed by "/ui/".
+const uiPath = "/artifactory/ui/"
+
+// uiRequest reports whether r is the UI's, which 7.x's entry point answers
+// without a challenge, lest a browser show its own login dialog over the
+// UI's: a request URI under uiPath, compared as sent, or a Request-Agent
+// header whose first value is exactly "artifactoryUI"
+// (UiRequestUtils.isUiRestRequest, 7.161.26). artifactweave serves no UI,
+// so only a client that names itself so is one.
+func uiRequest(r *http.Request) bool {
+	return strings.HasPrefix(r.URL.EscapedPath(), uiPath) ||
+		r.Header.Get("Request-Agent") == "artifactoryUI"
 }
 
 // declinedBasic reports whether 7.x's Basic filter declines Basic

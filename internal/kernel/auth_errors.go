@@ -30,9 +30,13 @@ var ErrAPIRestricted = apierror.New(http.StatusForbidden, "API access is tempora
 var ErrPasswordExpired = apierror.New(http.StatusForbidden, "Password has expired")
 
 // ErrAccountLocked answers any password for a locked account. 403, as
-// Artifactory's entry point answers a locked user, with the message of its
-// UserLockedException, newline included (OSS 6.20; decision 0005). It
-// differs from the 403 of access's temporary login suspension, which ends
-// by itself, where this lasts until an administrator unlocks the account.
+// Artifactory's entry point answers a LockedException, with the message of
+// 7.161.26's UserLockedException.userLocked, which AccessFilter's lock check
+// throws before any password is read. The text names a wrong password as
+// well as the lock "to avoid any clue for the hacker to identify valid user
+// accounts" (RTFACT-24156, 7.11), so it replaces OSS 6.20's "User is
+// Locked." (decision 0005). It differs from the 403 of access's temporary
+// login suspension, which ends by itself, where this lasts until an
+// administrator unlocks the account.
 var ErrAccountLocked = apierror.New(http.StatusForbidden,
-	"User is Locked.\nContact System Administrator to Unlock The Account.")
+	"Login has failed. Due to Incorrect username/password or locked user.")

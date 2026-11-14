@@ -3,6 +3,7 @@ package accesshttp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
@@ -171,6 +173,87 @@ func TestAccAuthenticateStoreFailures(t *testing.T) {
 		h.ServeHTTP(rec, r)
 		if rec.Code != http.StatusInternalServerError {
 			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
+		}
+	}
+}
+
+// TestUnitEntryPoint: the refusals 7.x's entry point answers 403 for the
+// account, a locked account, an expired password and a suspended login,
+// carry the challenge as its sendErrorResponse adds it, while an
+// authenticated user's lack of a right and an API restriction, which never
+// reach the entry point, do not (#1485). A request of the UI's, by its path
+// or its Request-Agent, gets no challenge on any refusal
+// (UiRequestUtils.isUiRestRequest). The shared sentinels stay as they are.
+func TestUnitEntryPoint(t *testing.T) {
+	suspended := fmt.Errorf("%w: %w", authn.ErrLoginSuspended, apierror.New(http.StatusForbidden,
+		"This request is blocked due to recurrent login failures, please try again in 3 seconds"))
+	other := errors.New("database down")
+	const (
+		api = "/artifactory/api/repositories"
+		ui  = "/artifactory/ui/api/v1/ui/auth/current"
+	)
+	type want struct {
+		status              int
+		message             string
+		challenge, withheld bool
+	}
+	for _, c := range []struct {
+		name, path, agent string
+		err               error
+		want              want
+	}{
+		{"locked", api, "", kernel.ErrAccountLocked,
+			want{403, kernel.ErrAccountLocked.Message, true, false}},
+		{"expired", api, "", kernel.ErrPasswordExpired,
+			want{403, "Password has expired", true, false}},
+		{"suspended", api, "", suspended, want{
+			403, "This request is blocked due to recurrent login failures, please try again in 3 seconds",
+			true, false,
+		}},
+		{"wrapped lock", api, "", fmt.Errorf("basic: %w", kernel.ErrAccountLocked),
+			want{403, kernel.ErrAccountLocked.Message, true, false}},
+		{"forbidden", api, "", kernel.ErrForbidden, want{403, "Forbidden", false, false}},
+		{"api restricted", api, "", kernel.ErrAPIRestricted,
+			want{403, "API access is temporarily restricted", false, false}},
+		{"bad credentials", api, "", kernel.ErrBadCredentials, want{401, "Bad credentials", false, false}},
+		{"ui path, locked", ui, "", kernel.ErrAccountLocked,
+			want{403, kernel.ErrAccountLocked.Message, false, true}},
+		{"ui agent, expired", api, "artifactoryUI", kernel.ErrPasswordExpired,
+			want{403, "Password has expired", false, true}},
+		{"ui agent, bad credentials", api, "artifactoryUI", kernel.ErrBadCredentials,
+			want{401, "Bad credentials", false, true}},
+		{"ui agent, refused key", api, "artifactoryUI", challengedForbidden("Bad credentials"),
+			want{403, "Bad credentials", false, true}},
+		{"ui agent, forbidden", api, "artifactoryUI", kernel.ErrForbidden,
+			want{403, "Forbidden", false, false}},
+		// isUiRestRequest compares the header with equals and the
+		// undecoded request URI with startsWith.
+		{"agent in another case", api, "ArtifactoryUI", kernel.ErrAccountLocked,
+			want{403, kernel.ErrAccountLocked.Message, true, false}},
+		{"escaped ui path", "/artifactory/%75i/x", "", kernel.ErrAccountLocked,
+			want{403, kernel.ErrAccountLocked.Message, true, false}},
+		{"ui without its slash", "/artifactory/uix", "", kernel.ErrBadCredentials,
+			want{401, "Bad credentials", false, false}},
+	} {
+		r := httptest.NewRequest(http.MethodGet, c.path, nil)
+		if c.agent != "" {
+			r.Header.Set("Request-Agent", c.agent)
+		}
+		var e *apierror.Error
+		if got := entryPoint(r, c.err); !errors.As(got, &e) ||
+			e.Status != c.want.status || e.Message != c.want.message ||
+			e.Challenge != c.want.challenge || e.NoChallenge != c.want.withheld {
+			t.Errorf("%s: %+v, want %+v", c.name, e, c.want)
+		}
+	}
+	if got := entryPoint(httptest.NewRequest(http.MethodGet, ui, nil), other); got != other {
+		t.Errorf("an error that is no refusal: %v", got)
+	}
+	for _, e := range []*apierror.Error{
+		kernel.ErrAccountLocked, kernel.ErrPasswordExpired, kernel.ErrBadCredentials,
+	} {
+		if e.Challenge || e.NoChallenge {
+			t.Errorf("the shared %q changed: %+v", e.Message, e)
 		}
 	}
 }

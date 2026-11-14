@@ -547,11 +547,22 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
    refused whatever password it sends: 7.x checks the lock before the password, logging
    "Checking if user is not locked" and then "User is locked, denying login." with no failed
    attempt registered (**[J]** [RTFACT-29453](https://jfrog.atlassian.net/browse/RTFACT-29453),
-   7.31.10 to 7.55.6). artifactweave answers it 403 "User is Locked.\nContact System
-   Administrator to Unlock The Account." before the suspension and the password, and counts
+   7.31.10 to 7.55.6). artifactweave answers it 403 "Login has failed. Due to Incorrect
+   username/password or locked user." before the suspension and the password, and counts
    nothing ([#475](https://github.com/weaveplatform/artifactweave/issues/475)). The status and
-   message are OSS 6.20's: `ArtifactoryBasicAuthenticationEntryPoint` answers a
-   `LockedException` 403 with the `UserLockedException` message **[I]**.
+   message are 7.161.26's: `AccessFilter`'s `SecurityUtils.ensureLoginAttemptAllowed` throws
+   `UserLockedException.userLocked()` with that message before any authentication filter runs,
+   and `ArtifactoryBasicAuthenticationEntryPoint` answers the `LockedException` 403. The
+   message names a wrong password as well, by design, "to avoid any clue for the hacker to
+   identify valid user accounts" (**[J]**
+   [RTFACT-24156](https://jfrog.atlassian.net/browse/RTFACT-24156), 7.11); OSS 6.20's "User is
+   Locked.\nContact System Administrator to Unlock The Account." is not 7.x's.
+   The entry point's `sendErrorResponse` adds `WWW-Authenticate: Basic realm="Artifactory
+   Realm"` to the 403 of a locked account, an expired password and a suspended login, as to
+   every answer it gives but its UI's (`UiRequestUtils.isUiRestRequest`: a path under
+   `/artifactory/ui/` or `Request-Agent: artifactoryUI`), and artifactweave sends it with each
+   on every route, the authenticated user's 403 and the API restriction's excepted
+   ([#1485](https://github.com/weaveplatform/artifactweave/issues/1485)).
 6. The Docker token flow is described in [04-package-protocols.md](04-package-protocols.md);
    `/artifactory/api/docker/<repo>/v1|v2/auth` returns `{"auth":"<base64 user:pass>","email":"..."}`.
 7. Basic credentials create tokens through `POST /access/api/v1/tokens` only once an
@@ -706,6 +717,12 @@ in N seconds", the REST body 7.61.1 and 7.27.6 answer (**[J]** RTFACT-29934 and 
 item 5 of [Authentication](#authentication-accepted-on-every-endpoint)), where it gave the KB's
 log line before.
 
+**Settled by [#1485](https://github.com/weaveplatform/artifactweave/issues/1485).** A locked
+account, an expired password and a suspended login answer 403 with the entry point's Basic
+challenge, which no answer to a request of the UI's carries, and a locked account's message is
+7.161.26's "Login has failed. Due to Incorrect username/password or locked user." rather than
+OSS 6.20's (item 5 of [Authentication](#authentication-accepted-on-every-endpoint)).
+
 **Where artifactweave differs.** Decision 0005's
 [7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check) lists the token,
 account policy, seeding and OIDC differences, and decision 0006's
@@ -749,14 +766,13 @@ records.
   says.
 - Whether token details carry `audience` and `project_key` (Access tokens v1).
 - Whether `unexpirePassword/{userName}` still exists (the legacy table).
-- The answer to a correct password that has expired. **[I]** 403 with "Password has expired",
-  on every route but the user's own password change, on the Access APIs as on Artifactory's.
-  OSS 6.20 `ArtifactoryBasicAuthenticationEntryPoint` answers a `CredentialsExpiredException`
-  403, as it does a locked account, and its `AccessUserPassAuthenticationProvider` raises one
-  with that message when Access reports `PASSWORD_EXPIRED` (**[J]**
-  [RTFACT-17846](https://jfrog.atlassian.net/browse/RTFACT-17846) logs it); for a blocked
-  user, the 403 still holds in 7.x (**[KB]**
-  [000005331](https://jfrog.com/help/r/artifactory-intermittent-403-errors-while-working-with-artifactory/artifactory-intermittent-403-errors-while-working-with-artifactory)).
+- The answer of the Access APIs to a correct password that has expired, and to a locked
+  account. **[I]** The same 403 and message as Artifactory's routes, with its Basic challenge.
+  On Artifactory's routes 7.161.26 settles both: `AccessAuthProviderUtils` raises
+  `CredentialsExpiredException("Password has expired")` when Access reports
+  `PASSWORD_EXPIRED` (**[J]** [RTFACT-17846](https://jfrog.atlassian.net/browse/RTFACT-17846)
+  logs it), and `ArtifactoryBasicAuthenticationEntryPoint` answers it 403 with the challenge,
+  as it does a locked account; Access answers its own APIs and is not open source.
 - Whether a user may authenticate the legacy `changePassword` with its expired password.
   **[I]** It may: the call is how an expired password is replaced, and OSS 6.20's
   `canUserLogin` accepts an expired old password for it.
@@ -808,9 +824,6 @@ records.
   [RTFACT-2807](https://jfrog.atlassian.net/browse/RTFACT-2807)) points the same way.
 - The file name of a repository's public key. **[I]** `<alias>.rsa.pub`, or `<alias>.gpg.pub`
   for a GPG pair, sent as `Content-Disposition: attachment; filename=...`.
-- The status and message for a locked account. **[I]** 403 "User is Locked.\nContact System
-  Administrator to Unlock The Account.", from OSS 6.20's entry point and
-  `UserLockedException`; no 7.x capture of the response is published.
 - Whether the commercial filters read `Basic Og==`, a blank `Basic`, a Basic scheme spelled
   other than `Basic `, a blank `Bearer`, another scheme or a bare value. **[I]** None does:
   the open source chain serves them as anonymous (item 8 of

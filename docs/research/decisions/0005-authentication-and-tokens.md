@@ -409,18 +409,21 @@ decodes them; string spellings such as `"true"` and `"60"` are accepted on write
   wrong passwords only while it is enabled. Each failure is counted and, at the limit,
   the account locked, in one database statement, so concurrent attempts cannot all
   stay below it. A correct password resets the count.
-- **A locked account** answers every Basic login 403, "User is Locked.\nContact System
-  Administrator to Unlock The Account.", whatever password it sends (#475). The lock is
+- **A locked account** answers every Basic login 403, "Login has failed. Due to Incorrect
+  username/password or locked user.", whatever password it sends (#475). The lock is
   checked first, before the suspension and before the password, so the answer cannot tell a
   right password from a wrong one, and no password is hashed for it. A locked login is not
   counted as a failure, toward the lock or the suspension. 7.x checks it in the same place:
   its debug log shows "Checking if user is not locked" and then "User is locked, denying
   login." with no failed attempt registered (**[J]**
   [RTFACT-29453](https://jfrog.atlassian.net/browse/RTFACT-29453), 7.31.10 to 7.55.6). The
-  status and message are **[I]**, from OSS 6.20: `ArtifactoryAuthenticationFilterChain` checks
-  the lock before the password, and `ArtifactoryBasicAuthenticationEntryPoint` answers a
-  `LockedException` 403 with the `UserLockedException` message above. The message differs
-  from the suspension's and the expired password's, so each says what the user must do.
+  status and message are 7.161.26's: `AccessFilter` calls `SecurityUtils.ensureLoginAttemptAllowed`
+  before any authentication filter, its `ensureUserIsNotLocked` throws
+  `UserLockedException.userLocked()` with the message above, and
+  `ArtifactoryBasicAuthenticationEntryPoint` answers that `LockedException` 403. The message
+  names a wrong password as well "to avoid any clue for the hacker to identify valid user
+  accounts" (**[J]** [RTFACT-24156](https://jfrog.atlassian.net/browse/RTFACT-24156), 7.11);
+  OSS 6.20's "User is Locked.\nContact System Administrator to Unlock The Account." is gone.
   Unlocking (one, several or all users) and disabling the policy clear locks.
   `secondsToUnlock` (default 1) is stored and returned only: a lock lasts until an
   administrator lifts it.
@@ -455,9 +458,25 @@ decodes them; string spellings such as `"true"` and `"60"` are accepted on write
   it was recorded never expire on their own. Expiry is reported only after the
   password verifies, as 403 with "Password has expired" on every route but the user's own
   password change. That is the answer of Artifactory's entry point to an expired password,
-  the status it gives a locked account too, with another message (**[I]**, from OSS 6.20;
-  research 05 lists the evidence for
-  [#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+  the status it gives a locked account too, with another message: 7.161.26's
+  `AccessAuthProviderUtils` turns Access's `PASSWORD_EXPIRED` into a
+  `CredentialsExpiredException("Password has expired")`, which
+  `ArtifactoryBasicAuthenticationEntryPoint` answers 403. On the Access APIs, which Access
+  answers itself, the same answer is **[I]**, on
+  [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+- **The entry point's challenge.** A locked account, an expired password and a suspended login
+  answer their 403 with `WWW-Authenticate: Basic realm="Artifactory Realm"` (pub's
+  `Bearer realm="pub"` challenge on its paths), as do a refused API key and a NuGet client's
+  refused password: 7.161.26's `ArtifactoryBasicAuthenticationEntryPoint.sendErrorResponse`
+  adds it to every answer it gives, 401 or 403
+  ([#1485](https://github.com/weaveplatform/artifactweave/issues/1485)). The 403 of an
+  authenticated user without the right and the API restriction (decision
+  [0043](0043-api-reliability.md)) do not come from the entry point and carry none. Nor does
+  any refusal of a request that is the UI's, a path under `/artifactory/ui/` or a
+  `Request-Agent` of exactly `artifactoryUI` (`UiRequestUtils.isUiRestRequest`), which
+  artifactweave, serving no UI, meets only from a client that names itself so. On the Docker
+  paths, whose own challenge is a 401's, and on the Access APIs, the challenge is the entry
+  point's by inference **[I]**: 7.x's Docker filter and Access are not open source.
 - **The policies are cached** for 10 seconds per instance. A change made through an
   instance applies there at once, and elsewhere within the 10 seconds.
 
@@ -685,10 +704,11 @@ legacy route, the OIDC exchange and the registry token keep their own one-hour d
 - A locked account is refused whatever password it sends, its lock checked before the
   password (**Account policies** above;
   **[J]** [RTFACT-29453](https://jfrog.atlassian.net/browse/RTFACT-29453);
-  [#475](https://github.com/weaveplatform/artifactweave/issues/475)). The 403 and its message,
-  from OSS 6.20's entry point and `UserLockedException`, are inferred **[I]**, and on
-  [#216](https://github.com/weaveplatform/artifactweave/issues/216): no 7.x capture of the
-  response is published.
+  [#475](https://github.com/weaveplatform/artifactweave/issues/475)). The 403, its Basic
+  challenge and its message, "Login has failed. Due to Incorrect username/password or locked
+  user.", are 7.161.26's entry point and `UserLockedException`
+  ([#1485](https://github.com/weaveplatform/artifactweave/issues/1485); **[J]**
+  [RTFACT-24156](https://jfrog.atlassian.net/browse/RTFACT-24156)).
 - Since 7.84.3 `anonymous` is in neither the `Anything` nor the `Any Remote` permission
   ([permissions](https://docs.jfrog.com/administration/docs/permissions)), and artifactweave
   seeds both that way. Decision
@@ -779,6 +799,10 @@ source states are inferred and listed on
   `oidc.feature`, where `jf atc` mints with an exchanged token and the new token downloads.
 - A locked account (#475): `TestUnitLockoutThroughBasic`, `TestUnitLockBeforeSuspensionAndPassword`,
   `TestAccLockout`, and the status table's `locked` rows before and after the unlock.
+- The entry point's challenge (#1485): `TestUnitEntryPoint` for each refusal and the UI's
+  requests, `TestAccRefusedAccountsCarryTheChallenge` for a locked account, an expired password
+  and a suspended login on the item route, the REST API, Docker, npm, NuGet, Access and pub,
+  with the exact header and body, and `TestAccUIRequestsGetNoChallenge`.
 - OIDC projects (#476): `TestUnitProjectRolesWithoutUser`, `TestUnitMappings`, the status table's
   `project-roles` rows, and `oidc.feature`'s project roles mapping in the provider example's
   shape. One project per mapping (#493): `TestUnitMappingNamesOneProject` and the status table's
