@@ -336,15 +336,16 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
 
   # jf mvn runs Maven with the JFrog Maven extractor, which deploys each
   # module's files itself at -SNAPSHOT paths with the build's timestamp, and
-  # records them for jf rt bp. The extractor cannot start on Maven 3.10, so
-  # jf runs the Maven 3.9 client's Maven on the runner's Java. That Java is
-  # 17, below the fixtures' release 21, and the build installs into the
-  # scenario's own local repository, never the job's plugin cache.
+  # records them for jf rt bp. jf runs the runner's own Maven, 3.10, which
+  # the extractor jf 2.131.0 downloads (2.44.1) starts on (#523). The
+  # runner's Java is 17, below the fixtures' release 21, and the build
+  # installs into the scenario's own local repository, never the job's
+  # plugin cache.
   @jf @maven
   Scenario: jf mvn deploys a release and a snapshot with a build, and jf rt bp publishes it
     Given the registry is running
     And the JFrog CLI is available
-    And jf mvn runs the Maven 3.9 client's Maven
+    And mvn is on the runner's PATH
     When I PUT "/artifactory/api/repositories/mvn-jf" as admin with body:
       """
       {"rclass":"local","packageType":"maven"}

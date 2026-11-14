@@ -459,7 +459,7 @@ func TestUnitBackendRevalidationAndChecksumAuthority(t *testing.T) {
 		b.closes.Load() != 1 {
 		t.Fatalf("fence %v closed%d", err, b.closes.Load())
 	}
-	for _, path := range []string{"a.pkg.sha1", ".sha256"} {
+	for _, path := range []string{"a.pkg", "a.pkg.sha384", ".sha256", "dir/.sha1"} {
 		q.Resource.Path = path
 		q.Resource.EscapedPath = path
 		if _, err := service.Read(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {

@@ -85,7 +85,7 @@ of 2026-10-21, separate from the dated exit evidence above.
 | [#362: npm package signatures](https://github.com/weaveplatform/artifactweave/issues/362) | P28 owns local ECDSA signing, key discovery and native `npm audit signatures` acceptance; it can be pulled forward independently of P9 |
 | [#262: browser approval login](https://github.com/weaveplatform/artifactweave/issues/262) | P21 owns shared npm web login and Terraform `login.v1` with PKCE. P7 legacy npm login and P8 Terraform pasted-token login are implemented |
 | [#303: anonymous registry acceptance](https://github.com/weaveplatform/artifactweave/issues/303) | Explicitly blocked on P12 applying `security.anonAccessEnabled`; the scenario must grant anonymous Read rather than relying on the seed permission |
-| [#523: JFrog Maven 3.10 acceptance](https://github.com/weaveplatform/artifactweave/issues/523) | P28 owns the client gap; retry as soon as the upstream extractor fix ships. Native Maven 3.10 is tested; `jf mvn` uses Maven 3.9.16 meanwhile |
+| [#523: JFrog Maven 3.10 acceptance](https://github.com/weaveplatform/artifactweave/issues/523) | Delivered: `jf mvn` runs on the runner's Maven 3.10 with the JFrog Maven extractor 2.44.1 that `jf` 2.131.0 downloads, the first release that starts there |
 | [#216: live Artifactory captures](https://github.com/weaveplatform/artifactweave/issues/216) | Deliberately scheduled for P19 after P1 to P18. The P8 inference checklists have been added; successful native-client tests do not replace captures from Artifactory |
 
 ## Milestones

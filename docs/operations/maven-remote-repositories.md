@@ -40,9 +40,12 @@ distinct descriptor spelling; the [mapped discovery guide](mapped-remote-discove
 explains descriptor aliases, coordinate preservation and layout-edit fences.
 Equivalent layouts preserve metadata paths. A translation that cannot preserve all
 coordinates, including metadata with no representable target layout, fails with 400
-before upstream I/O. Native Gradle, Ivy and SBT qualification has the explicit owners
-listed below; the server layout tests cover direct Gradle/Ivy/SBT paths and a Gradle to
-Maven-2 translation.
+before upstream I/O, as does a layout that is not defined. A layout the database fails
+to read is the server's storage fault: 500 "internal error" [I], logged once, before
+upstream I/O, as [#1470](https://github.com/weaveplatform/artifactweave/issues/1470) answers
+the store's failures under a remote read. Native Gradle, Ivy and SBT qualification
+has the explicit owners listed below; the server layout tests cover direct
+Gradle/Ivy/SBT paths and a Gradle to Maven-2 translation.
 
 The `{repo}-cache` view performs no upstream I/O. Raw XML is available there after
 fetching, independently of the requesting client's Accept header. The normal shared
@@ -67,8 +70,18 @@ bytes never become a successful cached representation.
 
 Checksums are bounded and syntax checked. Actual byte digests always identify blobs;
 pass-thru claims remain separate, including for raw metadata and no-store responses.
-A cold Maven checksum request resolves and validates its owner artifact, then returns
-the appropriate checksum. A successfully delivered sidecar marks its owner used;
+A checksum request (`.md5`, `.sha1`, `.sha256` or `.sha512`) for a file the cache
+holds answers from that copy. For a file the cache does not hold, on a remote that
+stores artifacts locally, it resolves the file's path as a download does and answers
+from the file's info, the upstream's answer to one HEAD, as 7.x does: nothing is
+downloaded or kept, and no companion is scheduled. Under `pass-thru` it answers the
+checksum the upstream declared in its `X-Checksum-*` header; under the other three
+policies, and under `pass-thru` when the upstream declared none, it answers 404
+"Checksum not found for <file>". On a remote that stores nothing, a checksum request
+answers the upstream's own checksum file, `<file>.<alg>`, under every policy, after one
+HEAD of the file, whose body is never asked for: the first checksum in that file, or 404
+"Checksum not found for <file>" when the upstream has none, as 7.x's
+`getRemoteChecksum` reads it. A successfully delivered sidecar marks its owner used;
 HEAD and failed delivery do not.
 
 `maxUniqueSnapshots` applies to fetched unique builds through the existing persistent
@@ -79,8 +92,10 @@ index and trash hooks; cleanup never generates replacement upstream XML.
 ## Eager companions
 
 `fetchJarsEagerly` schedules the matching JAR after a POM read;
-`fetchSourcesEagerly` schedules the sources JAR after a binary JAR read. Background
-reads do not recursively spawn companions. Disabled flags, HEAD, cache-only and
+`fetchSourcesEagerly` schedules the sources JAR after a binary JAR read. A GET and a
+HEAD read alike: a cold HEAD downloads and keeps the file, and 7.x starts the eager
+fetch before every download. Background reads do not recursively spawn companions.
+Disabled flags, a checksum request for a file the cache does not hold, cache-only and
 no-store retrieval do not schedule new work. Eager failures do not fail an otherwise
 valid foreground response.
 
@@ -106,7 +121,7 @@ produces a different operation identity. Back up the queue with the metadata dat
 | Native Gradle remote resolution | Server Gradle-layout and translation tests pass; required native-client qualification remains P28, broadened by P41 |
 | Native Ivy remote resolution | Server Ivy-layout tests pass; required native-client qualification remains P28, broadened by P41 |
 | Native SBT remote resolution | Server SBT-layout tests pass; required native-client qualification remains P28, broadened by P41 |
-| JFrog Maven extractor | #523/P28 remains open for Maven 3.10; native Maven is not pinned backward to hide that extractor limitation |
+| JFrog Maven extractor | `maven.feature`: `jf mvn` deploys with a build and `jf rt bp` publishes it on Maven 3.10, with extractor 2.44.1 (#523) |
 
 Runtime tests cover admission failures, all checksum policies, source metadata versus
 reindex, permission/pattern denial, bounded durable companions, restart/revocation,

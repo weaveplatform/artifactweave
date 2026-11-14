@@ -224,11 +224,14 @@ func TestAccChecksumFileAnswersConditionalsAsTheDownload(t *testing.T) {
 
 // TestAccRemoteChecksumFileAnswersConditionalsAsTheDownload: a remote
 // repository's checksum files answer as a local one's, whether the cache
-// serves them (a generic remote, once its file is cached, and a Maven
-// remote that stores) or the upstream's stream does (a Maven remote that
+// serves them (a generic remote and a Maven remote that stores, each once
+// its file is cached) or the upstream's stream does (a Maven remote that
 // stores nothing). The upstream sends the file's checksums as Artifactory
 // does, so a HEAD that streams nothing still knows the file's SHA-1
-// (#1436, #1362).
+// (#1436, #1362). A Maven remote that stores answers a checksum of a file
+// it does not hold from the file's info, 404 under its default policy
+// (#1476), so its file is fetched first; one that stores nothing answers
+// the upstream's own checksum file, which the upstream keeps here.
 func TestAccRemoteChecksumFileAnswersConditionalsAsTheDownload(t *testing.T) {
 	w := harness.NewRemoteWorld(t)
 	for _, store := range []bool{true, false} {
@@ -255,11 +258,15 @@ func TestAccRemoteChecksumFileAnswersConditionalsAsTheDownload(t *testing.T) {
 			fakeupstream.Resource{Body: []byte(data), Header: headers, Modified: modified},
 		)
 	}
-	harness.WantStatus(
-		t,
-		w.Request(http.MethodGet, "/artifactory/remote/dir/sums.bin", "admin", ""),
-		http.StatusOK,
-	)
+	for ext, sum := range map[string]string{"sha1": file.sha1, "sha256": file.sha256} {
+		w.Upstream.Set("/org/a/1.0/a-1.0.jar."+ext, fakeupstream.Resource{Body: []byte(sum)})
+	}
+	for _, cached := range []string{
+		"/artifactory/remote/dir/sums.bin",
+		"/artifactory/maven-store-true/org/a/1.0/a-1.0.jar",
+	} {
+		harness.WantStatus(t, w.Request(http.MethodGet, cached, "admin", ""), http.StatusOK)
+	}
 	for _, path := range []string{
 		"/artifactory/remote/dir/sums.bin",
 		"/artifactory/maven-store-true/org/a/1.0/a-1.0.jar",

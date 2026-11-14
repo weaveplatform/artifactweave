@@ -657,17 +657,17 @@ matrix is needed.
   on the fixture POMs that pin every plugin version. The scenarios deploy with
   `package deploy:deploy`, never `install`, and resolve into a fresh local repository
   that chains to the cache, so an artifact under test is never served from the cache.
-- **The JFrog CLI's package commands** use the runner's tools for `jf npm` and `jf gradle`
-  (Gradle on the default Java 17). The Python and .NET scenarios instead mount the pinned
-  CLI into the existing Python and SDK containers, so delegated commands use those exact
-  client versions and isolated configuration.
-  `jf mvn` cannot use the runner's Maven, which is 3.10: the JFrog Maven extractor that
-  `jf` 2.126.0 downloads (`build-info-extractor-maven3` 2.43.9 in the recorded proof) fails to start
-  on Maven 3.10 with `NoSuchMethodError` on `DefaultArtifactResolver`'s constructor. The
-  `jf mvn` scenario copies Maven 3.9 out of the `maven-3.9` image and names it in
-  `M2_HOME`, which `jf` reads before it looks for `mvn` on `PATH`. Its builds set
+- **The JFrog CLI's package commands** use the runner's tools for `jf npm`, `jf mvn` and
+  `jf gradle` (Maven 3.10 and Gradle on the default Java 17). The Python and .NET scenarios
+  instead mount the pinned CLI into the existing Python and SDK containers, so delegated
+  commands use those exact client versions and isolated configuration.
+  `jf mvn` runs the JFrog Maven extractor that the pinned `jf` downloads: 2.131.0 takes
+  `build-info-extractor-maven3` 2.44.1, the first release that starts on Maven 3.10, whose
+  Maven Resolver 2.x dropped the constructors 2.43.9 called
+  ([#523](https://github.com/weaveplatform/artifactweave/issues/523)). Its builds set
   `maven.compiler.release` to 17 for the runner's Java, and install into the scenario's own
-  local repository.
+  local repository. The "Maven client versions" step prints the runner's `mvn --version`
+  beside the images'.
 - **Gradle** runs informationally for M2 (decisions 0015 and 0036). `make accept` runs with
   `ARTIFACTWEAVE_ACCEPT_TAGS=~@gradle`, and a later step with `continue-on-error` runs the
   `@gradle` scenarios against a binary built with the same flags, so its build is a cache
@@ -1412,7 +1412,7 @@ to the gitignored `dist/`.
 | `make gate` | Local vet, formatting/lint, Go unit and package acceptance tests, coverage, vulnerability scan and cross-compilation. Generation/parity, native acceptance, OCI conformance and Terraform checks are separate targets; this is not the complete CI gate |
 | `make test` | Run anchored `TestUnit` tests and the reviewed fuzz seed corpora; CI supplies the affected package list and exact name expression |
 | `make accept-go` | Run anchored `TestAcc` package tests on Linux and write `cover/accept-go`; CI supplies the affected package list and exact name expression |
-| `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN`, `ARTIFACTWEAVE_CRANE_BIN`, `ARTIFACTWEAVE_ORAS_BIN`, `ARTIFACTWEAVE_COSIGN_BIN`, `ARTIFACTWEAVE_HELM_BIN` and `ARTIFACTWEAVE_TERRAFORM_BIN` name the pinned `jf` (`.github/actions/jfrog-cli`) and `crane`, `oras`, `cosign`, `helm` and `terraform` (`.github/actions/registry-clients`); their scenarios skip without them, and the `docker` scenarios run on Linux only, where the daemon shares the binary's 127.0.0.1. `ARTIFACTWEAVE_NODE_IMAGE`, `ARTIFACTWEAVE_NPM12_IMAGE`, `ARTIFACTWEAVE_MAVEN_IMAGE`, `ARTIFACTWEAVE_MAVEN39_IMAGE`, `ARTIFACTWEAVE_PYTHON_IMAGE`, `ARTIFACTWEAVE_DOTNET_IMAGE` and `ARTIFACTWEAVE_DOTNET10_IMAGE` name the npm 11, npm 12, Maven 3.10, Maven 3.9, Python, newest .NET and .NET 10 images built from `test/acceptance/clients`, and their scenarios skip without them or off Linux; `jf mvn` needs the Maven 3.9 image too. `jf npm` and `jf gradle` run the `npm` and `gradle` on `PATH` and skip without them. `ARTIFACTWEAVE_ACCEPT_TAGS` takes a godog tag expression, such as `~@gradle`. `ARTIFACTWEAVE_MAVEN_REPO` moves the Maven repository they mount from `~/.m2/repository`. The `@go` scenarios need only `go` on `PATH` |
+| `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN`, `ARTIFACTWEAVE_CRANE_BIN`, `ARTIFACTWEAVE_ORAS_BIN`, `ARTIFACTWEAVE_COSIGN_BIN`, `ARTIFACTWEAVE_HELM_BIN` and `ARTIFACTWEAVE_TERRAFORM_BIN` name the pinned `jf` (`.github/actions/jfrog-cli`) and `crane`, `oras`, `cosign`, `helm` and `terraform` (`.github/actions/registry-clients`); their scenarios skip without them, and the `docker` scenarios run on Linux only, where the daemon shares the binary's 127.0.0.1. `ARTIFACTWEAVE_NODE_IMAGE`, `ARTIFACTWEAVE_NPM12_IMAGE`, `ARTIFACTWEAVE_MAVEN_IMAGE`, `ARTIFACTWEAVE_MAVEN39_IMAGE`, `ARTIFACTWEAVE_PYTHON_IMAGE`, `ARTIFACTWEAVE_DOTNET_IMAGE` and `ARTIFACTWEAVE_DOTNET10_IMAGE` name the npm 11, npm 12, Maven 3.10, Maven 3.9, Python, newest .NET and .NET 10 images built from `test/acceptance/clients`, and their scenarios skip without them or off Linux. `jf npm`, `jf mvn` and `jf gradle` run the `npm`, `mvn` and `gradle` on `PATH` and skip without them. `ARTIFACTWEAVE_ACCEPT_TAGS` takes a godog tag expression, such as `~@gradle`. `ARTIFACTWEAVE_MAVEN_REPO` moves the Maven repository they mount from `~/.m2/repository`. The `@go` scenarios need only `go` on `PATH` |
 | `make oci-conformance` | The OCI conformance job (needs network the first time, to fetch and build the suite into `.tools/`); reports in `oci-report/` |
 | `make generate` | Regenerate servers and clients; CI fails on drift |
 | `make terraform TERRAFORM_MODE=apply` | The terraform job (needs `terraform`; without the mode it only validates) |
@@ -1471,8 +1471,8 @@ resolution through local, remote, virtual and one-node federated repositories.
 The Gradle/sbt scenarios also publish natively to writable classes. Full runs
 place these 13 scenarios in the required `acceptance-jvm` partition so they do
 not consume the core suite's existing 35-minute test budget. These smoke
-recipes do not complete P28's broader client/workflow qualification; #523 retains
-its distinct JFrog extractor boundary and informational wrapper lane. See the
+recipes do not complete P28's broader client/workflow qualification; the JFrog
+Gradle wrapper keeps its informational lane. See the
 [operations guide](../operations/maven-remote-repositories.md) for the implemented
 policies and remaining per-workflow proof owners.
 

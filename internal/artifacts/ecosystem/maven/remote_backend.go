@@ -34,10 +34,10 @@ type MavenBackend struct {
 // and a non-unique snapshot as mutable, the path is mapped to the
 // upstream's layout when the repository names another, and the body must
 // pass ValidateRemote before it is cached, or the read fails with a 502
-// integrity failure. After a GET that cached a file, while the upstream
-// may be reached, it hands the read to Eager to queue the file's
-// companion. Other package types, and metadata a protocol adapter has
-// already prepared, go to the policy unchanged.
+// integrity failure. After a GET or HEAD that answered with the cached
+// file, while the upstream may be reached, it hands the read to Eager to
+// queue the file's companion. Other package types, and metadata a protocol
+// adapter has already prepared, go to the policy unchanged.
 func (m *MavenBackend) Read(
 	ctx context.Context,
 	q source.Request,
@@ -52,7 +52,14 @@ func (m *MavenBackend) Read(
 		return source.Result{}, err
 	}
 	result, err := m.Policy.Read(ctx, prepared, permit)
-	if err == nil && result.Item != nil && m.Eager != nil && q.Resource.Method == http.MethodGet &&
+	// A HEAD schedules as a GET does: on a remote that stores artifacts
+	// locally a cold HEAD downloads the file (#1391), and 7.161.26's
+	// RemoteRepoBase.doDownloadAndSave runs beforeResourceDownload, which
+	// starts the eager fetch, before every download whatever the method.
+	// A checksum request's cold read keeps nothing and returns no item, so
+	// it schedules nothing, as 7.x's respondForChecksumRequest never
+	// downloads the file.
+	if err == nil && result.Item != nil && m.Eager != nil &&
 		permit.UpstreamNetworkAllowed &&
 		!enabled(q.Repo.Offline) &&
 		(q.Repo.StoreArtifactsLocally == nil || *q.Repo.StoreArtifactsLocally) {
@@ -65,7 +72,7 @@ func (m *MavenBackend) Read(
 func (m *MavenBackend) prepare(ctx context.Context, q source.Request) (source.Request, error) {
 	local, err := m.Policy.Items.Layout(ctx, cmp.Or(q.Repo.RepoLayoutRef, repo.LayoutMaven2))
 	if err != nil {
-		return q, source.ErrInvalidRequest
+		return q, layoutReadFault(ctx, err)
 	}
 	r := &q.Resource
 	validationLayout, validationPath := local, r.Path
@@ -81,14 +88,25 @@ func (m *MavenBackend) prepare(ctx context.Context, q source.Request) (source.Re
 	if q.Repo.RemoteRepoLayoutRef != "" && q.Repo.RemoteRepoLayoutRef != q.Repo.RepoLayoutRef {
 		upstream, err := m.Policy.Items.Layout(ctx, q.Repo.RemoteRepoLayoutRef)
 		if err != nil {
-			return q, source.ErrInvalidRequest
+			return q, layoutReadFault(ctx, err)
 		}
-		mapped, err := mavenUpstreamPath(local, upstream, r.Path)
+		// A checksum file is the file it names, mapped, with its extension,
+		// as 7.161.26's HttpRepo.downloadResource translates the path it
+		// downloads (convertRequestPathIfNeeded).
+		file, ext := r.Path, ""
+		if r.ChecksumOnly {
+			subject, ok := source.ChecksumSubject(r.Path)
+			if !ok {
+				return q, source.ErrInvalidRequest
+			}
+			file, ext = subject, strings.TrimPrefix(r.Path, subject)
+		}
+		mapped, err := mavenUpstreamPath(local, upstream, file)
 		if err != nil {
 			return q, source.ErrInvalidRequest
 		}
-		r.UpstreamPath = (&url.URL{Path: mapped}).EscapedPath()
-		if IsPom(mapped) && !IsPom(r.Path) {
+		r.UpstreamPath = (&url.URL{Path: mapped + ext}).EscapedPath()
+		if IsPom(mapped) && !IsPom(r.Path) && !r.ChecksumOnly {
 			// Descriptor projection can change .pom to ivy-*.xml. Preserve
 			// the actual upstream POM's admission rules despite that spelling.
 			validationLayout, validationPath = upstream, mapped
@@ -111,6 +129,20 @@ func (m *MavenBackend) prepare(ctx context.Context, q source.Request) (source.Re
 		return nil
 	}
 	return q, nil
+}
+
+// layoutReadFault is err, a failed read of the layout a remote read maps
+// its path through, as the read answers it. A statement the store failed
+// to run (kernel.ErrStore) is the server's storage fault, which the routes
+// answer 500 "internal error" and log once, as #1470 answers the store's
+// failures under a remote read; 7.x's answer to a failure of its own
+// database is not documented [I]. A layout that is not defined, or does not
+// compile, refuses the read as an invalid request, 400.
+func layoutReadFault(ctx context.Context, err error) error {
+	if errors.Is(err, kernel.ErrStore) {
+		return fmt.Errorf("maven layout: %w", item.MarkStorageFault(ctx, err, err))
+	}
+	return source.ErrInvalidRequest
 }
 
 // Equivalent layout definitions preserve metadata paths; otherwise metadata has
@@ -138,6 +170,14 @@ func (m *MavenBackend) PrepareUpload(
 	opts remote.Options,
 	u *item.CacheUpload,
 ) error {
+	if Serves(q.Repo.PackageType) && q.Resource.ChecksumOnly {
+		// The upstream's checksum file is read as it is: 7.161.26's
+		// getRemoteChecksumFromPath downloads it under no checksum policy
+		// and asks for no checksum of it, so fail's demand that the
+		// upstream declare one does not apply.
+		u.Repo.RemoteRepoChecksumPolicyType = repo.IgnoreAndGenerate
+		return nil
+	}
 	if !Serves(q.Repo.PackageType) || preparedMetadata(q.Resource) ||
 		q.Repo.RemoteRepoChecksumPolicyType == repo.IgnoreAndGenerate ||
 		u.Declared != (kernel.Checksums{}) && q.Repo.RemoteRepoChecksumPolicyType != repo.PassThru {
