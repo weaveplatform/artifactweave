@@ -401,6 +401,18 @@ type Delete struct {
 // item deletes: to the trash can, and needing delete on each. It returns the
 // deleted runs; ErrNotFound when none was.
 func (s *Service) Delete(ctx context.Context, d Delete, a Access) ([]model.BuildRun, error) {
+	return s.deleteThen(ctx, d, a, nil)
+}
+
+// deleteThen is Delete, which runs then, when it is not nil, with the
+// deleted runs in the delete's own transaction, so that what then stores
+// commits or rolls back with the delete.
+func (s *Service) deleteThen(
+	ctx context.Context,
+	d Delete,
+	a Access,
+	then func(context.Context, []model.BuildRun) error,
+) ([]model.BuildRun, error) {
 	if !d.All && len(d.Numbers) == 0 {
 		return nil, fmt.Errorf("%w: no build numbers to delete", ErrInvalid)
 	}
@@ -451,6 +463,9 @@ func (s *Service) Delete(ctx context.Context, d Delete, a Access) ([]model.Build
 					return err
 				}
 			}
+		}
+		if then != nil {
+			return then(ctx, gone)
 		}
 		return nil
 	})

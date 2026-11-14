@@ -24,6 +24,7 @@ func runBuilds(t *testing.T, newStore Factory) {
 	t.Run("BuildPromotions", func(t *testing.T) { testBuildPromotions(t, newStore(t)) })
 	t.Run("BuildFiles", func(t *testing.T) { testBuildFiles(t, newStore(t)) })
 	t.Run("BuildRetention", func(t *testing.T) { testBuildRetentionPolicy(t, newStore(t)) })
+	t.Run("BuildReports", func(t *testing.T) { testBuildReports(t, newStore(t)) })
 }
 
 // sum returns checksums unique to n.

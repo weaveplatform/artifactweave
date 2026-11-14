@@ -957,14 +957,16 @@
     "contract": "Deletes the listed runs of a build, or every run, optionally with their artifacts. Needs delete permission on the build.",
     "handler": "internal/artifacts/adapters/http/builds.go: ArtifactoryAPI.deleteBuilds",
     "direct_calls": [
+      "idempotency.Report",
       "s.buildCaller",
       "s.buildError",
-      "strings.Join",
-      "svc.Delete"
+      "s.currentBuildAccess",
+      "svc.Delete",
+      "svc.DeleteKeyed"
     ],
     "review_family": "build",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
-    "retry": "key: Idempotency-Key not accepted yet and answers 400; reconcile ambiguous completion before retrying",
+    "retry": "key: optional quoted Idempotency-Key: same credential/resource/body replays the committed effect under current authorization for 24h; a duplicate in flight waits up to 30s, then 503 Retry-After; without a key every call repeats the effect",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "pagination_execution": "not a collection",
     "evidence": [
@@ -15305,13 +15307,11 @@
     "handler": "internal/artifacts/adapters/http/builds.go: ArtifactoryAPI.DeleteBuildsMultiple",
     "direct_calls": [
       "artgen.DeleteBuildsMultiple200TextResponse",
-      "httpkit.Deref",
-      "httpkit.DerefSlice",
       "s.deleteBuilds"
     ],
     "review_family": "build",
     "effects": "resource mutation/action; see served contract and handler calls",
-    "retry": "key: Idempotency-Key not accepted yet and answers 400; reconcile ambiguous completion before retrying",
+    "retry": "key: optional quoted Idempotency-Key: same credential/resource/body replays the committed effect under current authorization for 24h; a duplicate in flight waits up to 30s, then 503 Retry-After; without a key every call repeats the effect",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "pagination_execution": "not a collection",
     "evidence": [
@@ -15339,16 +15339,17 @@
       "errors.Is",
       "fmt.Sprintf",
       "httpkit.Deref",
-      "httpkit.DerefSlice",
-      "model.CheckPropertyKeyLength",
+      "idempotency.Report",
       "s.buildCaller",
       "s.buildError",
+      "s.currentBuildAccess",
       "strings.TrimPrefix",
-      "svc.Promote"
+      "svc.Promote",
+      "svc.PromoteKeyed"
     ],
     "review_family": "build",
     "effects": "resource mutation/action; see served contract and handler calls",
-    "retry": "key: Idempotency-Key not accepted yet and answers 400; reconcile ambiguous completion before retrying",
+    "retry": "key: optional quoted Idempotency-Key: same credential/resource/body replays the committed effect under current authorization for 24h; a duplicate in flight waits up to 30s, then 503 Retry-After; without a key every call repeats the effect",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "response_collections": [
       "200 application/json.messages[]"

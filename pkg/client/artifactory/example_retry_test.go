@@ -16,8 +16,10 @@ import (
 	artifactory "github.com/weaveplatform/artifactweave/pkg/client/artifactory"
 )
 
-// This example deliberately protects only build append. The generated client
-// does not infer retry safety from an HTTP method or retry every failed write.
+// These examples protect only operations whose API description declares
+// Idempotency-Key: build append and promotion here, build delete alike. The
+// generated client does not infer retry safety from an HTTP method or retry
+// every failed write.
 func ExampleClient_AppendBuildWithBody() {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
@@ -43,6 +45,29 @@ func ExampleClient_AppendBuildWithBody() {
 	// Never create a new key merely because an earlier attempt timed out.
 }
 
+// ExampleClient_PromoteBuildWithBody protects a promotion as the append is
+// protected: one key and one marshalled body per intent, the same on every
+// attempt. A replay answers 200 with the original promotion's messages,
+// although its files have since moved.
+func ExampleClient_PromoteBuildWithBody() {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	client, err := artifactory.NewClient(
+		"https://registry.example/artifactory",
+		artifactory.WithHTTPClient(&http.Client{
+			Timeout:       35 * time.Second,
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
+		}),
+	)
+	if err != nil {
+		return
+	}
+	key := `"0b6f2a9c-7d41-4c2e-9a53-2f8e1d4c6b70"`
+	params := artifactory.PromoteBuildParams{IdempotencyKey: &key}
+	body := []byte(`{"status":"released","targetRepo":"libs-release-local"}`)
+	_ = promoteWithRetry(ctx, client, "app", "42", params, body, waitRetry)
+}
+
 func appendWithRetry(
 	ctx context.Context,
 	client *artifactory.Client,
@@ -54,15 +79,49 @@ func appendWithRetry(
 	if params.IdempotencyKey == nil || *params.IdempotencyKey == "" {
 		return errors.New("protected append needs a persisted idempotency key")
 	}
+	return retryProtected(ctx, "append", http.StatusNoContent,
+		func(ctx context.Context) (*http.Response, error) {
+			return client.AppendBuildWithBody(ctx, name, number, &params,
+				"application/json", bytes.NewReader(body))
+		}, wait)
+}
+
+func promoteWithRetry(
+	ctx context.Context,
+	client *artifactory.Client,
+	name, number string,
+	params artifactory.PromoteBuildParams,
+	body []byte,
+	wait func(context.Context, time.Duration) error,
+) error {
+	if params.IdempotencyKey == nil || *params.IdempotencyKey == "" {
+		return errors.New("protected promotion needs a persisted idempotency key")
+	}
+	return retryProtected(ctx, "promotion", http.StatusOK,
+		func(ctx context.Context) (*http.Response, error) {
+			return client.PromoteBuildWithBody(ctx, name, number, &params,
+				"application/json", bytes.NewReader(body))
+		}, wait)
+}
+
+// retryProtected sends a keyed request until it answers success or a
+// status that a retry cannot change. send makes a new body reader over the
+// same bytes on every attempt.
+func retryProtected(
+	ctx context.Context,
+	action string,
+	success int,
+	send func(context.Context) (*http.Response, error),
+	wait func(context.Context, time.Duration) error,
+) error {
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	var last error
 	for attempt := range 5 {
 		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("append deadline: %w", err)
+			return fmt.Errorf("%s deadline: %w", action, err)
 		}
-		response, err := client.AppendBuildWithBody(ctx, name, number, &params,
-			"application/json", bytes.NewReader(body))
+		response, err := send(ctx)
 		var retryAfter time.Duration
 		retry := err != nil
 		last = err
@@ -70,11 +129,11 @@ func appendWithRetry(
 			// Bounded drain; http.Client.Timeout and ctx bound reads as well.
 			_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
 			_ = response.Body.Close()
-			if err == nil && response.StatusCode == http.StatusNoContent {
+			if err == nil && response.StatusCode == success {
 				return nil
 			}
 			if err == nil {
-				last = fmt.Errorf("append returned HTTP %d", response.StatusCode)
+				last = fmt.Errorf("%s returned HTTP %d", action, response.StatusCode)
 				switch response.StatusCode {
 				case 429, 500, 502, 503, 504:
 					retry = true
@@ -92,10 +151,10 @@ func appendWithRetry(
 			time.Duration(rand.Int64N(int64(min(5*time.Second, 200*time.Millisecond<<attempt)))),
 		)
 		if err := wait(ctx, delay); err != nil {
-			return fmt.Errorf("append retry: %w", err)
+			return fmt.Errorf("%s retry: %w", action, err)
 		}
 	}
-	return fmt.Errorf("append incomplete; reconcile using the original key: %w", last)
+	return fmt.Errorf("%s incomplete; reconcile using the original key: %w", action, last)
 }
 
 func retryDelay(value string, now time.Time) time.Duration {
@@ -193,5 +252,47 @@ func TestUnitProtectedAppendRetryExample(t *testing.T) {
 				t.Fatalf("unbounded/unsafe retry: %d", attempts)
 			}
 		})
+	}
+}
+
+// The promotion example sends the same key and bytes after a lost response
+// and takes the 200 a replay answers; it refuses to start without a key.
+func TestUnitProtectedPromoteRetryExample(t *testing.T) {
+	body := []byte(`{"status":"released"}`)
+	key := `"persisted-promotion"`
+	attempts := 0
+	client, err := artifactory.NewClient(
+		"https://registry.example/artifactory",
+		artifactory.WithHTTPClient(
+			retryExampleDoer(func(r *http.Request) (*http.Response, error) {
+				attempts++
+				got, err := io.ReadAll(r.Body)
+				if err != nil || !bytes.Equal(got, body) || r.Header.Get("Idempotency-Key") != key {
+					t.Fatalf("intent changed on attempt %d", attempts)
+				}
+				if attempts == 1 {
+					return nil, io.ErrUnexpectedEOF
+				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{},
+					Body:       io.NopCloser(strings.NewReader(`{"messages":[]}`)),
+				}, nil
+			}),
+		),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	noWait := func(context.Context, time.Duration) error { return nil }
+	params := artifactory.PromoteBuildParams{IdempotencyKey: &key}
+	if err := promoteWithRetry(t.Context(), client, "app", "1", params, body, noWait); err != nil ||
+		attempts != 2 {
+		t.Fatalf("recovery: attempts=%d err=%v", attempts, err)
+	}
+	if err := promoteWithRetry(
+		t.Context(), client, "app", "1", artifactory.PromoteBuildParams{}, body, noWait,
+	); err == nil {
+		t.Fatal("a promotion without a key was retried")
 	}
 }

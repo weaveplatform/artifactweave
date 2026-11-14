@@ -45,7 +45,7 @@
 //     RemoteSmartState, ArchivedItems, Builds, BuildRuns, BuildDeletes,
 //     BuildRename, BuildPromotions, BuildFiles (with DependencyPage, a
 //     checksum's dependencies a keyset page at a time in FindDependencies'
-//     order, #1409) and BuildRetention.
+//     order, #1409), BuildRetention and BuildReports.
 //   - LongText, the random text the long property cases store, which the
 //     server's long-property test shares.
 //
