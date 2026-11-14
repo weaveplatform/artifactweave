@@ -39,8 +39,9 @@
 //   - TryP2Item: the overlay that serves a virtual repository's p2.index,
 //     composite metadata and member files, and a remote's composite
 //     metadata, external children and site archive entries, and answers
-//     404 for the paths P2 refuses; a remote's own update-site files it
-//     leaves to the generic lookup.
+//     404 for the paths P2 refuses; a remote's own update-site files, and
+//     the checksum requests of those files, it leaves to the generic lookup,
+//     which answers a checksum from its file's info as 7.x does (#1495).
 //
 // # Invariants
 //

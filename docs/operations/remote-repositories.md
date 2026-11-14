@@ -48,12 +48,14 @@ upstream outage; freshness, stale fallback, negative caching and no-store behavi
 follow the [retrieval contract](../implementation/remote-retrieval-contract.md).
 
 Checksums of cached artifacts are served from their recorded digests. A cold
-`.sha256` request contacts upstream only when `retrieveSha256FromServer` is enabled;
-that response is bounded to 4096 bytes and must contain a valid SHA-256 digest
-(optionally followed by a filename). It remains transient, and does not fetch or cache
-the artifact itself. Its HEAD response describes the normalized 64-character digest
-without fetching a body; GET performs the syntax validation. Other cold checksum
-requests return 404. Existing cached folder and archive browsing remains available.
+`.md5`, `.sha1`, `.sha256` or `.sha512` request sends the upstream one HEAD of the file
+and keeps nothing. On a remote that stores artifacts locally under `pass-thru`, the
+file's declared `X-Checksum-*` value answers.
+Otherwise, when `retrieveSha256FromServer` is enabled, the upstream's own checksum file
+(`<file>.sha1` for a `.sha1` request, and so on) is read, bounded to 4096 bytes, and its
+first token answers. With no value the request answers 404 "Checksum not found for
+<file>", as Artifactory 7.x does. Existing cached folder and archive browsing remains
+available.
 
 Matrix parameters on a remote file's GET or HEAD
 (`/artifactory/vendor/path/file;key=value`) go to the upstream after the path, as

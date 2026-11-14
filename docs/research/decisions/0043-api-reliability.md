@@ -350,10 +350,11 @@ has no per-minute window to report.
 writes (the rest of the window for a rate refusal, 1 otherwise) and on the replay's
 503. An operation's own 503 that reports a transient condition carries it too. A 503
 that reports configuration, such as a missing signing key, or a size bound is not a
-hint to retry. Two handler 503s that report a transient condition, a deploy whose
-content garbage collection removed and a remote fetch that a configuration change
-superseded, carry none ([#1415](https://github.com/weaveplatform/artifactweave/issues/1415),
-open).
+hint to retry. The two handler 503s that report a transient condition, a deploy
+whose content garbage collection removed and a remote fetch that a configuration
+change superseded, carry `Retry-After: 1` with the status and body they had
+([#1415](https://github.com/weaveplatform/artifactweave/issues/1415)). No 7.x source
+documents either answer, so both are inferred until the P19 capture.
 
 In the specs, the shared 429 response declares `Retry-After` as required and
 `RateLimit` and `RateLimit-Policy` as optional (absent on the permit refusal). The
