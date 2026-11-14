@@ -420,7 +420,11 @@ does.
   [RTFACT-26059](https://jfrog.atlassian.net/browse/RTFACT-26059) (7.19.4) reports changing
   that property on a local `manifest.json` to a list of manifest types ending in `*`, which
   made a pull through Nexus work, so a pushed manifest carries it on 7.x and the registry
-  reads it somewhere. artifactweave does not set it on a push.
+  reads it somewhere. artifactweave sets it on a pushed image manifest's `manifest.json`,
+  and so serves that file on the item route with its media type (decision 0031, amended
+  2026-11-14). **[I]** No source shows it on an index's `list.manifest.json` or on a remote
+  repository's cached manifest, so neither gets it; Helm OCI, whose metadata provider
+  extends the Docker one as OCI's does, gets it as OCI does.
 - **[S]** A blob `GET` on 7.55.8 sends the headers `RequestResponseHelper` writes for a
   download (`ETag`, the `X-Checksum-*` headers, `Accept-Ranges`, `X-Artifactory-Filename`)
   and `Content-Disposition: attachment; filename="sha256__<hex>"`, the form
@@ -614,6 +618,9 @@ These go to the live-capture list ([#216](https://github.com/weaveplatform/artif
 19. Whether a blob's `GET` and `HEAD` through the registry send the type its
     `artifactory.content-type` property names, and whether a manifest's property changes
     the `Content-Type` or the `Accept` match of its read (section 5.2.1).
+20. Whether 7.x sets `artifactory.content-type` on an index's `list.manifest.json`, on a
+    remote repository's cached `manifest.json`, and on a Helm OCI chart's `manifest.json`
+    (section 5.2.1).
 
 ## 11. Versions at the research baseline
 

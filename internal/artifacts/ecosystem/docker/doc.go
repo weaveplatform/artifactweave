@@ -59,7 +59,8 @@
 //     config (Config, ReadConfig), and the properties a stored manifest
 //     carries (Properties: ManifestProperty, LabelPropertyPrefix and the
 //     rest, and SubjectProperty and ArtifactTypeProperty, from which the
-//     referrers API is answered).
+//     referrers API is answered), and PushProperties, which a pushed image
+//     manifest adds ContentTypeProperty to.
 //   - Lookups over the item store: FindBlob and FindBlobs (every copy of a
 //     blob in the image, from which a pull picks one the repository's
 //     patterns accept), FindManifest, FolderManifest, ManifestFolders,

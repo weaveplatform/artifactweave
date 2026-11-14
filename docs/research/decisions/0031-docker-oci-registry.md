@@ -356,6 +356,14 @@ its status alone.
   labels become `docker.label.<label>` properties. A manifest with a `subject` also gets
   `oci.subject` (the subject digest) and `oci.artifactType` (the descriptor's
   `artifactType` as the referrers API reports it).
+- **Content type.** An image manifest pushed to a local repository (`manifest.json`) also
+  gets `artifactory.content-type`, equal to `docker.manifest.type`, as 7.161.26's
+  `AbstractMetadataProviderTest` gives a `docker-local` and an `oci-local` `manifest.json`
+  (R23 5.2.1). The item route serves the file with that type; the registry's answer keeps
+  the pushed media type and `Accept` match, and the storage API's `mimeType` stays the
+  path's. **[I]** An index's `list.manifest.json` and a remote repository's cached manifest
+  get no such property, as no source shows one; a Helm OCI push gets it as an OCI push
+  does (amended 2026-11-14, #1396).
 - **Platform properties.** An image manifest also gets `docker.os` and `docker.architecture`,
   the config's `os` and `architecture`, as 7.x sets them on `manifest.json` from 7.125.4:
   - **Variant.** A platform `variant` (arm's `v7`, arm64's `v8`) goes into neither property:
