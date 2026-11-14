@@ -53,5 +53,6 @@ func RunWithoutWatches(t *testing.T, newStore func(t *testing.T) Store) {
 	runOutbox(t, newStore)
 	runUploads(t, newStore)
 	runReplays(t, newStore)
+	runKeyedReplays(t, newStore)
 	runRequestBudgets(t, newStore)
 }
