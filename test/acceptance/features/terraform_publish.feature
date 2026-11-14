@@ -22,12 +22,16 @@ Feature: JFrog publishes Terraform modules and their build-info
       """
     When I run jf "config add aw --url {platform} --artifactory-url {url} --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "terraform-config --server-id-deploy=aw --repo-deploy=tf-publish" in "publish"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "terraform publish --namespace=acme --provider=aws --tag=v1.2.3 --build-name=terraform-publish --build-number=1" in "publish"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bp terraform-publish 1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/terraform-publish/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules" has 1 entries
@@ -61,12 +65,15 @@ Feature: JFrog publishes Terraform modules and their build-info
       """
     When I run terraform "-chdir=root init"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And Terraform selected module "example" at version "1.2.3" in "root"
     And the file "root/.terraform/modules/example/main.tf" contains "alpha"
     When I run terraform "-chdir=root plan"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "alpha"
     When I run terraform "-chdir=root apply -auto-approve"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "alpha"
     And the server answered 204 to GET "/artifactory/api/terraform/v1/modules/tf-publish__acme/alpha/aws/1.2.3/download"

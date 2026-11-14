@@ -110,12 +110,16 @@ Feature: Go module repositories answer the GOPROXY protocol
       """
     When I run jf "c add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "go-config --server-id-resolve aw --server-id-deploy aw --repo-resolve go-local --repo-deploy go-local" in "greet"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "gp v1.0.0 --build-name go-accept --build-number 1" in "greet"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bp go-accept 1 --server-id aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/go-accept/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules.0.id" equals "example.com/acme/greet"
@@ -168,13 +172,18 @@ Feature: Go module repositories answer the GOPROXY protocol
       package greet
       """
     When I run jf "c add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
+    And the server answered no request with 500 since the last command
     And I run jf "go-config --server-id-resolve aw --server-id-deploy aw --repo-resolve go-local --repo-deploy go-local" in "greet"
+    And the server answered no request with 500 since the last command
     And I run jf "gp v1.0.0" in "greet"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "gp v1.1.0" in "greet"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "gp v1.1.1-0.20261001000000-abcdefabcdef" in "greet"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # Listed with the time of its .info, as Artifactory 7.x lists it; the
     # go command takes tagged versions only from the list and still picks
     # v1.1.0 for @latest.
@@ -209,9 +218,12 @@ Feature: Go module repositories answer the GOPROXY protocol
       package upper
       """
     When I run jf "c add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
+    And the server answered no request with 500 since the last command
     And I run jf "go-config --server-id-resolve aw --server-id-deploy aw --repo-resolve go-local --repo-deploy go-local" in "upper"
+    And the server answered no request with 500 since the last command
     And I run jf "gp v1.0.0" in "upper"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/storage/go-local/example.com/Acme/Upper/@v/v1.0.0.zip" as admin
     Then the response status is 200
     Given the registry is fronted by TLS
@@ -235,12 +247,16 @@ Feature: Go module repositories answer the GOPROXY protocol
       package legacy
       """
     When I run jf "c add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
+    And the server answered no request with 500 since the last command
     And I run jf "go-config --server-id-resolve aw --server-id-deploy aw --repo-resolve go-local --repo-deploy go-local" in "legacy"
+    And the server answered no request with 500 since the last command
     And I run jf "gp v2.0.0+incompatible" in "legacy"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # Below v2 the go command refuses +incompatible, and so does the server.
     When I run jf "gp v1.0.0+incompatible" in "legacy"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the server answered 400 to PUT "/artifactory/api/go/go-local/example.com/acme/legacy/@v/v1.0.0+incompatible.zip"
     Given the registry is fronted by TLS
     And the Go proxy is "{tlsauthurl}/api/go/go-local"
@@ -269,12 +285,16 @@ Feature: Go module repositories answer the GOPROXY protocol
       const Greeting = "hello"
       """
     When I run jf "c add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
+    And the server answered no request with 500 since the last command
     And I run jf "go-config --server-id-resolve aw --server-id-deploy aw --repo-resolve go-local --repo-deploy go-local" in "greet"
+    And the server answered no request with 500 since the last command
     And I run jf "gp v1.0.0" in "greet"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # A pipeline re-run: the .zip and .mod are the same (DV-039).
     When I run jf "gp v1.0.0" in "greet"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     Given a file "greet/greet.go" with content:
       """
       // Package greet is the module the scenario publishes.
@@ -285,6 +305,7 @@ Feature: Go module repositories answer the GOPROXY protocol
       """
     When I run jf "gp v1.0.0" in "greet"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the server answered 409 to PUT "/artifactory/api/go/go-local/example.com/acme/greet/@v/v1.0.0.zip"
 
   Scenario: The checksum database answers 404 to everyone
@@ -325,18 +346,24 @@ Feature: Go module repositories answer the GOPROXY protocol
       package greet
       """
     When I run jf "c add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
+    And the server answered no request with 500 since the last command
     And I run jf "c add rd --url {platform}/ --artifactory-url {url}/ --user reader --password Reader-pass1 --interactive=false"
+    And the server answered no request with 500 since the last command
     And I run jf "go-config --server-id-resolve aw --server-id-deploy aw --repo-resolve go-local --repo-deploy go-local" in "greet"
+    And the server answered no request with 500 since the last command
     And I run jf "gp v1.0.0" in "greet"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     Given the registry is fronted by TLS
     And the Go proxy is "https://reader:Reader-pass1@{tlshost}/artifactory/api/go/go-local"
     When I run go "mod download -json example.com/acme/greet@v1.0.0"
     Then the command succeeds
     And the output contains "GoModSum"
     When I run jf "go-config --server-id-resolve rd --server-id-deploy rd --repo-resolve go-local --repo-deploy go-local" in "greet"
+    And the server answered no request with 500 since the last command
     And I run jf "gp v1.1.0" in "greet"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the server answered 403 to PUT "/artifactory/api/go/go-local/example.com/acme/greet/@v/v1.1.0.zip"
     When I GET "/artifactory/api/go/go-local/example.com/acme/greet/@v/list" as admin
     Then the response body contains "v1.0.0 20"

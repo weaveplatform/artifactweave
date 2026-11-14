@@ -34,12 +34,14 @@ Feature: Generic remote retrieval through native clients
     And the generic upstream received 1 GET requests for "/curl.bin"
     When I run jf "rt direct-download remote/jf.bin jf-cold/ --flat --fail-no-op --url {url} --user reader --password Reader-pass1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the generic upstream received 1 GET requests for "/jf.bin"
     When I GET "/artifactory/api/storage/remote-cache/curl.bin" as "reader" with password "Reader-pass1"
     Then the response status is 200
     And the JSON field "repo" equals "remote-cache"
     When I run jf "rt s remote-cache/*.bin --url {url} --user reader --password Reader-pass1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "remote-cache/jf.bin"
     And the output contains "remote-cache/curl.bin"
     Given the generic upstream stops
@@ -48,9 +50,11 @@ Feature: Generic remote retrieval through native clients
     And the files "curl-cold.bin" and "curl-warm.bin" are identical
     When I run jf "rt direct-download remote/jf.bin jf-warm/ --flat --fail-no-op --url {url} --user reader --password Reader-pass1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "jf-cold/jf.bin" and "jf-warm/jf.bin" are identical
     When I run jf "rt dl remote-cache/*.bin alias/ --flat --fail-no-op --url {url} --user reader --password Reader-pass1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "curl-cold.bin" and "alias/curl.bin" are identical
     And the files "jf-cold/jf.bin" and "alias/jf.bin" are identical
     And the generic upstream received 1 GET requests for "/curl.bin"

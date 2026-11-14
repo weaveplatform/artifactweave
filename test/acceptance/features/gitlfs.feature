@@ -29,6 +29,7 @@ Feature: Git LFS batch and basic transfers
     Given the Git LFS client can reach the registry
     When I exercise two-user Git LFS locking through "<repo>"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "git-lfs/3.8.1"
     And the output contains "two-user Git LFS locking passed"
     And the output contains "conflicting Git pre-push rejected without advancing origin"
@@ -74,6 +75,7 @@ Feature: Git LFS batch and basic transfers
     Given the Git LFS client can reach the registry
     When I exercise two-user Git LFS locking through "lfs-lock-virtual"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "two-user Git LFS locking passed"
     And the output contains "conflicting Git pre-push rejected without advancing origin"
 
@@ -87,6 +89,7 @@ Feature: Git LFS batch and basic transfers
     Given the Git LFS client can reach the registry
     When I publish and freshly clone a Git LFS asset through "<repo>"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "git-lfs/3.8.1"
 
     Examples:
@@ -114,6 +117,7 @@ Feature: Git LFS batch and basic transfers
     Given the Git LFS client can reach the registry
     When I publish and freshly clone a Git LFS asset through "lfs-virtual"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "git-lfs/3.8.1"
 
   Scenario: a member-granted client publishes and reads through a virtual repository
@@ -157,9 +161,11 @@ Feature: Git LFS batch and basic transfers
     Given the Git LFS client can reach the registry
     When I publish and freshly clone a Git LFS asset through "lfs-view" as "lfs-writer" with password "Lfs-writer-123"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "git-lfs/3.8.1"
     When I attempt a Git LFS publish through "lfs-view" as "lfs-other-user" with password "Lfs-other-123"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the output contains "403"
 
   Scenario: the pinned client resolves a remote object through the cache while offline
@@ -173,9 +179,11 @@ Feature: Git LFS batch and basic transfers
     Given the Git LFS client can reach the registry
     When I fetch the upstream Git LFS asset through "lfs-remote" in a fresh client "cold"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     Given the native Git LFS upstream stops
     When I fetch the upstream Git LFS asset through "lfs-remote" in a fresh client "warm"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   @gitlfs_remote_locks
   Scenario: remote Git LFS lock listing is fresh and fails when the upstream stops
@@ -189,8 +197,10 @@ Feature: Git LFS batch and basic transfers
     Given the Git LFS client can reach the registry
     When I list Git LFS locks through "lfs-remote-locks" with the pinned client
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "upstream-lock-1"
     Given the native Git LFS upstream stops
     When I list Git LFS locks through "lfs-remote-locks" with the pinned client in plain mode
+    And the server answered no request with 500 since the last command
     Then the server answered 502 to GET "/artifactory/api/lfs/lfs-remote-locks/locks"
     And the command fails

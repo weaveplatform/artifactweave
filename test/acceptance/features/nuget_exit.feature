@@ -30,16 +30,21 @@ Feature: NuGet snapshot retention and JFrog build records
     And a NuGet package "Acme.Snap" at "2.0.0-ci.1" in "nupkgs"
     When I run dotnet "nuget push nupkgs/Acme.Snap.1.0.0-ci.1.nupkg --source aw --api-key admin:{password} --no-symbols"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # Name each later version in upload order. A wildcard lets the SDK
     # enumerate ci.1 again after cleanup evicts it, making it newest.
     When I run dotnet "nuget push nupkgs/Acme.Snap.1.0.0-ci.2.nupkg --source aw --api-key admin:{password} --no-symbols"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run dotnet "nuget push nupkgs/Acme.Snap.1.0.0-ci.3.nupkg --source aw --api-key admin:{password} --no-symbols"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run dotnet "nuget push nupkgs/Acme.Snap.1.0.0.nupkg --source aw --api-key admin:{password} --no-symbols"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run dotnet "nuget push nupkgs/Acme.Snap.2.0.0-ci.1.nupkg --source aw --api-key admin:{password} --no-symbols"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And within 10 seconds GET "/artifactory/nuget-local/Acme.Snap.1.0.0-ci.1.nupkg" as admin answers 404
     When I GET "/artifactory/api/nuget/v3/nuget-local/flatcontainer/acme.snap/index.json" as admin
     Then the response status is 200
@@ -52,6 +57,7 @@ Feature: NuGet snapshot retention and JFrog build records
     Then the response status is 200
     When I run dotnet "package search Acme.Snap --format json --prerelease"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "2.0.0-ci.1"
 
     Examples:
@@ -100,22 +106,28 @@ Feature: NuGet snapshot retention and JFrog build records
       """
     When I run dotnet "pack pkg/Package.csproj --output nupkgs"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf dotnet client "config add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf dotnet client "dotnet nuget push nupkgs/Acme.Build.1.0.0.nupkg --repo nuget-local --server-id aw --allow-insecure-connections --build-name nuget-publish --build-number 1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf dotnet client "rt bp nuget-publish 1 --server-id aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/nuget-publish/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules.0.artifacts" has 1 entries
     And the response body contains "Acme.Build.1.0.0.nupkg"
     When I run jf dotnet client "dotnet restore app/app.csproj --packages jf-v3 --no-http-cache --use-lock-file --repo-resolve nuget-local --server-id aw --allow-insecure-connections --build-name nuget-restore --build-number 1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "nupkgs/Acme.Build.1.0.0.nupkg" and "jf-v3/acme.build/1.0.0/acme.build.1.0.0.nupkg" are identical
     And the NuGet lockfile "app/packages.lock.json" pins "Acme.Build" to the package "nupkgs/Acme.Build.1.0.0.nupkg"
     When I run jf dotnet client "rt bp nuget-restore 1 --server-id aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/nuget-restore/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules.0.dependencies" has 1 entries
@@ -134,10 +146,12 @@ Feature: NuGet snapshot retention and JFrog build records
       """
     When I run jf dotnet client "dotnet restore app/app.csproj --configfile V2.Config --packages jf-v2 --no-http-cache --force --server-id aw --build-name nuget-restore-v2 --build-number 1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "nupkgs/Acme.Build.1.0.0.nupkg" and "jf-v2/acme.build/1.0.0/acme.build.1.0.0.nupkg" are identical
     And the server answered 200 to GET "/artifactory/api/nuget/nuget-local/Download/Acme.Build/1.0.0"
     When I run jf dotnet client "rt bp nuget-restore-v2 1 --server-id aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/nuget-restore-v2/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules.0.dependencies" has 1 entries

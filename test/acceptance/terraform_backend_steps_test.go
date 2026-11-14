@@ -34,7 +34,7 @@ func (w *world) registerTerraformBackend(sc *godog.ScenarioContext) {
 	sc.Step(`^the backend has advanced its state version$`, w.backendAdvanced)
 	sc.Step(
 		`^a second Terraform working copy cannot plan while the first holds the lock$`,
-		w.backendContention,
+		func() error { return w.asOneCommand(w.backendContention) },
 	)
 	sc.Step(`^a Terraform state of 21 MiB is ready to push$`, w.backendLargeState)
 	sc.Step(`^Terraform logs in with the issued token$`, w.backendLogin)
@@ -391,6 +391,7 @@ func (w *world) backendLogin() error {
 	defer stdin.Close()
 	var output syncBuffer
 	cmd.Stdout, cmd.Stderr = &output, &output
+	w.markCommand()
 	if err := cmd.Start(); err != nil {
 		return err
 	}

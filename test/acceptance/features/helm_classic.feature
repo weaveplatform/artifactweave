@@ -17,20 +17,26 @@ Feature: Helm pulls from a derived repository index
     And the response body contains "entries: {}"
     When I run helm "create acme"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     Given a Helm signing keyring in "signing"
     When I run helm "package acme --destination charts --sign --key artifactweave --keyring signing/private.gpg"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I deploy the files under "charts" to "/artifactory/helm-local" as admin
     And I run helm "repo add aw {url}/api/helm/helm-local --username admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run helm "repo update aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run helm "search repo aw/acme --versions"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "aw/acme"
     And the output contains "0.1.0"
     When I run helm "pull aw/acme --version 0.1.0 --verify --keyring signing/public.gpg"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "charts/acme-0.1.0.tgz" and "acme-0.1.0.tgz" are identical
     And the files "charts/acme-0.1.0.tgz.prov" and "acme-0.1.0.tgz.prov" are identical
     And the server answered 200 to GET "/artifactory/<download>/acme-0.1.0.tgz"
@@ -40,6 +46,7 @@ Feature: Helm pulls from a derived repository index
     And the Helm index has one "acme" version "0.1.0" matching "acme-0.1.0.tgz"
     When I run helm "template preview acme-0.1.0.tgz"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "kind: Deployment"
 
     Examples:
@@ -57,8 +64,10 @@ Feature: Helm pulls from a derived repository index
     Then the response status is 200
     When I run helm "create acme"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run helm "package acme --destination charts"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I deploy the file "charts/acme-0.1.0.tgz" to "/artifactory/helm-enforced/renamed.tgz" as admin
     Then the response status is 403
     And the response body contains "the package file renamed does not match the package name/version acme:0.1.0 in the metadata file"
@@ -83,8 +92,10 @@ Feature: Helm pulls from a derived repository index
     Then the response status is 200
     When I run helm "create acme"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run helm "package acme --destination first"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I deploy the file "first/acme-0.1.0.tgz" to "/artifactory/helm-life/original/acme-0.1.0.tgz" as admin
     Then the response status is 201
     Given a file "acme/newest.txt" with content:
@@ -93,6 +104,7 @@ Feature: Helm pulls from a derived repository index
       """
     When I run helm "package acme --destination second"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I deploy the file "second/acme-0.1.0.tgz" to "/artifactory/helm-life/duplicate/renamed.tgz" as admin
     Then the response status is 201
     When I GET "/artifactory/api/helm/helm-life/index.yaml" as admin

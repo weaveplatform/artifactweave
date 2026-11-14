@@ -29,11 +29,14 @@ Feature: npm reads from and publishes to npm local repositories
       """
     When I run npm "ping"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "view acme-read dist-tags.latest"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "1.0.0"
     When I run npm "install acme-read"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "node_modules/acme-read/package.json" contains "1.0.0"
     And the lockfile pins "acme-read" to the tarball at "/artifactory/api/npm/npm-read/acme-read/-/acme-read-1.0.0.tgz"
 
@@ -73,18 +76,23 @@ Feature: npm reads from and publishes to npm local repositories
       """
     When I run npm "publish ./acme-pub"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # 201, as 7.x answers a publish.
     And the server answered 201 to PUT "/artifactory/api/npm/npm-publish/acme-pub"
     When I run npm "publish ./scoped-pub --tag next"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "view acme-pub dist-tags.latest"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "1.0.0"
     When I run npm "view @acme/scoped-pub dist-tags.next"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "2.0.0"
     When I run npm "install acme-pub @acme/scoped-pub@2.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "node_modules/acme-pub/index.js" contains "published by npm"
     And the file "node_modules/@acme/scoped-pub/package.json" contains "2.0.0"
     And the lockfile pins "acme-pub" to the tarball at "/artifactory/api/npm/npm-publish/acme-pub/-/acme-pub-1.0.0.tgz"
@@ -93,6 +101,7 @@ Feature: npm reads from and publishes to npm local repositories
     # registry refuses it either way.
     When I run npm "publish ./acme-pub --force"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the output contains "403"
 
     Examples:
@@ -131,16 +140,20 @@ Feature: npm reads from and publishes to npm local repositories
       """
     When I run npm "publish ./rel"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # A pre-release is a snapshot, which npm-releases does not handle.
     When I run npm "publish ./pre --tag beta"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the output contains "409"
     And the output contains "snapshot release handling policy"
     # npm view asks again each time, with the ETag it was given.
     When I run npm "view acme-rel dist-tags.latest"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "view acme-rel dist-tags.latest"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "1.0.0"
     And the server answered 304 to GET "/artifactory/api/npm/npm-releases/acme-rel"
     # Indexing writes package.json's license, as 7.x does.
@@ -193,14 +206,18 @@ Feature: npm reads from and publishes to npm local repositories
       """
     When I run npm "publish ./v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "publish ./beta --tag beta"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # A tagged publish of a higher version leaves latest, as 7.x does
     # (RTFACT-24072).
     When I run npm "publish ./v3 --tag next"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "view acme-tags dist-tags.latest"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "1.0.0"
     # latest is stored as 7.x stores it, as npm.disttag on its tarball.
     When I GET "/artifactory/api/storage/npm-tags/acme-tags/-/acme-tags-1.0.0.tgz?properties" as admin
@@ -209,23 +226,30 @@ Feature: npm reads from and publishes to npm local repositories
     And the response body contains "latest"
     When I run npm "dist-tag add acme-tags@2.0.0-beta.1 stable"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "dist-tag ls acme-tags"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "stable: 2.0.0-beta.1"
     And the output contains "next: 3.0.0"
     And the output contains "latest: 1.0.0"
     When I run npm "install acme-tags@stable"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "node_modules/acme-tags/index.js" contains "beta"
     When I run npm "dist-tag rm acme-tags stable"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "dist-tag ls acme-tags"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output does not contain "stable"
     When I run npm "deprecate acme-tags@1.0.0 use{sp}3.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "view acme-tags@1.0.0 deprecated"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "use 3.0.0"
     When I GET "/artifactory/api/storage/npm-tags/acme-tags/-/acme-tags-1.0.0.tgz?properties" as admin
     Then the response body contains "npm.deprecated"
@@ -266,24 +290,31 @@ Feature: npm reads from and publishes to npm local repositories
       """
     When I run npm "publish ./v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "publish ./v2"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "unpublish acme-gone@1.1.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "view acme-gone versions"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "1.0.0"
     And the output does not contain "1.1.0"
     # latest moved on to the version left.
     When I run npm "view acme-gone dist-tags.latest"
+    And the server answered no request with 500 since the last command
     Then the output contains "1.0.0"
     # Through the trash can.
     When I GET "/artifactory/api/storage/auto-trashcan/npm-gone/acme-gone/-/acme-gone-1.1.0.tgz" as admin
     Then the response status is 200
     When I run npm "unpublish acme-gone --force"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "view acme-gone"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the output contains "404"
 
     Examples:

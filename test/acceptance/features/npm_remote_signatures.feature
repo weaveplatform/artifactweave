@@ -30,8 +30,10 @@ Feature: npm audit signatures verifies what an npm remote repository relays
       """
     When I run npm "install --ignore-scripts"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "audit signatures"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "2 packages have verified registry signatures"
     And the generic upstream received 1 GET requests for "/-/npm/v1/keys"
 

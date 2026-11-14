@@ -57,11 +57,13 @@ Feature: Terraform installs modules from the private registry
       """
     When I run terraform "-chdir=root init"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "root/.terraform/modules/greeting/main.tf" contains "hello from the module registry"
     And the server answered 200 to GET "/artifactory/api/terraform/v1/modules/tf-modules__acme/greeting/aws/versions"
     And the server answered 204 to GET "/artifactory/api/terraform/v1/modules/tf-modules__acme/greeting/aws/1.0.0/download"
     When I run terraform "-chdir=root apply -auto-approve"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "hello from the module registry"
     When I GET "/artifactory/api/terraform/tf-modules/v1/modules/acme/greeting/aws/1.0.0/download" with the kept token "module-token"
     Then the response status is 204

@@ -10,6 +10,7 @@ Feature: Native Xet transfer for model and dataset repositories
       """
     Then the response status is 200
     When the pinned Xet client publishes and downloads model and dataset through "<repo>"
+    And the server answered no request with 500 since the last command
 
     Examples:
       | class     | repo     |
@@ -29,7 +30,9 @@ Feature: Native Xet transfer for model and dataset repositories
       """
     Then the response status is 200
     When the pinned Xet client publishes and downloads model and dataset through "hf-virtual"
+    And the server answered no request with 500 since the last command
     And the pinned Xet client downloads model and dataset through "hf-virtual"
+    And the server answered no request with 500 since the last command
 
   Scenario: Hub client resolves remote content from cache while upstream is offline
     Given the registry is running with Hugging Face Xet
@@ -40,5 +43,7 @@ Feature: Native Xet transfer for model and dataset repositories
       """
     Then the response status is 200
     When the pinned Xet client downloads model and dataset through "hf-remote"
+    And the server answered no request with 500 since the last command
     Given the generic upstream stops
     When the pinned Xet client downloads model and dataset through "hf-remote"
+    And the server answered no request with 500 since the last command

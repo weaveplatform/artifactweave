@@ -22,11 +22,13 @@ Feature: CDN delivery through Azure Front Door
   Scenario: jf rt dl splits a large download across Front Door without credentials
     When I run jf "rt u big.bin fd-local/a/big.bin --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # Above the CLI's 5,120 KiB split threshold: the registry answers the
     # HEAD itself and redirects each ranged GET to the edge, which passes it
     # with its SAS to Azurite.
     When I run jf "rt dl fd-local/a/big.bin {dir}/out/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "big.bin" and "out/big.bin" are identical
     And the CDN edge served at least 2 ranged requests
     And the CDN edge never received an Authorization header
@@ -35,6 +37,7 @@ Feature: CDN delivery through Azure Front Door
   Scenario: one window's URL is served from the edge's cache
     When I run jf "rt u big.bin fd-local/b/big.bin --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/fd-local/b/big.bin" as admin
     Then the response status is 200
     And the response header "Content-Disposition" contains "big.bin"

@@ -907,6 +907,61 @@ run under Docker's init, so the SDK's default NativeAOT host exits after each co
 The Terraform backend exercises pasted-token login and saved-token reuse; `login.v1`
 browser approval remains deferred to #262.
 
+### Server 500s behind a passing command
+
+Some clients move on after a request fails: they try another file name, skip a
+file they treat as optional, or only warn when a checksum cannot be uploaded or
+fetched. Such a client exits 0 when the server answers one of its requests 500,
+so "the command succeeds" alone hides the server's fault (#1270, #1388). After
+each command of those clients, a scenario runs
+`the server answered no request with 500 since the last command`. It reads the
+server's access and `panic` lines written since the command started, and fails
+naming each request answered 500, followed by the server's error and warning
+lines.
+
+Every command runner (`runClient`, `runCurl`, `runJFIn`, `runAPMIn`, the
+Hugging Face CLI and the Terraform backend's login) notes how far the log has
+run when its command starts. A step that runs several commands as one, such as
+the Hugging Face transfers and the Terraform backend's lock contention, puts the
+mark back at its own start, so the check covers all its commands. Before
+reading, the step sends a ping with a request ID of its own and waits for its
+line, because the client's last access line can reach the log after the client
+exits.
+
+Research in client source and docs (#1388) found these clients move on after a
+500, so their scenarios run the step after every command:
+
+| Client | Request it moves past |
+|---|---|
+| LuaRocks | each manifest name it tries in turn (`manifest-5.5.zip`, then the others) |
+| Maven 3.9 and 3.10 | a snapshot's `maven-metadata.xml`, answered by the plain `-SNAPSHOT` name; Maven 3.9 also only warns when a checksum upload fails |
+| Gradle and Ivy (system recipes) | `.sha256` and `.sha512` uploads, `ivy.xml` and checksum fetches |
+| sbt (Coursier) | a checksum fetch, which falls back to no checksum |
+| RubyGems and Bundler | `/versions`, which falls back to the full index |
+| Mix (Hex) | an optional dependency's package record |
+| npm 11 and 12 | the packument check in `publish`, and the web login request |
+| Poetry and uv | a lazy wheel range read; uv's upload checks the file after a 500 |
+| NuGet (.NET 11 and 10) | the v2 feed root |
+| Terraform | the `tfe` ping, the organisations lookup on login, the unlock after a state push or workspace delete, and a HEAD on a module archive, answered by a GET |
+| Helm 4 | the registry token request at login |
+| Hugging Face CLI (Xet) | the deduplication query |
+| JFrog CLI (`jf`) | side requests: the skills version check, evidence verification on install, build-info and property updates, and `jf mvn` checksum uploads |
+| APT | a `by-hash` index URL, then the compressed index, each answered by the next form; `apt-get update` only warns when an index fails |
+| Eclipse P2 | `p2.index`, and a composite child that fails to load or serve an artifact |
+| R | `PACKAGES.rds` and `PACKAGES.gz`, answered by the next index form |
+| micromamba | the `repodata.json.zst` and shard index checks, and a platform subdirectory's repodata |
+| Git LFS | the lock verification before a push, when `locksverify` is unset |
+| crane | a manifest HEAD in `digest`, answered by a GET, and a cross-repository mount in `copy` |
+
+A command of these clients that the scenario expects to fail runs the step too,
+so a 500 cannot pass for the refusal the scenario expects.
+
+Dart pub, Composer, Cargo, pip, Twine, Go, CocoaPods, Bower, Chef, Puppet,
+Ansible Galaxy, FrogML, the JetBrains and VS Code clients, APM, Bazel, DNF, apk,
+opkg, Nix, Vagrant, oras, cosign and the Docker daemon on the CI runner exit
+non-zero when the server answers 500, so "the command succeeds" already covers
+them.
+
 ## Transient infrastructure failures
 
 Two failures came from the runners rather than the code, and each needed a manual rerun

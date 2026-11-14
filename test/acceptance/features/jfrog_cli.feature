@@ -11,10 +11,12 @@ Feature: JFrog CLI smoke
   Scenario: jf rt ping
     When I run jf "rt ping --url {url}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   Scenario: jf config add with a dummy token does not contact the server
     When I run jf "config add acceptance --url {url} --access-token dummy --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   # Without --sort-by or --limit, jf keeps "property" in the include, so
   # --offset sends .offset() beside it (jfrog-client-go
@@ -40,13 +42,17 @@ Feature: JFrog CLI smoke
       """
     When I run jf "rt u app-1.0.jar libs-local/org/ --flat --target-props build.name=app;release=1.0 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u app-1.0.pom libs-local/org/ --flat --target-props build.name=app --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u readme.md libs-local/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
     When I run jf "rt s libs-local/ --offset 1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "libs-local/org/app-1.0.pom"
     And the output contains "libs-local/readme.md"
     And the output does not contain "app-1.0.jar"
@@ -55,6 +61,7 @@ Feature: JFrog CLI smoke
 
     When I run jf "rt dl libs-local/ out/ --offset 1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "app-1.0.pom" and "out/org/app-1.0.pom" are identical
     And the files "readme.md" and "out/readme.md" are identical
     And the file "out/org/app-1.0.jar" does not exist

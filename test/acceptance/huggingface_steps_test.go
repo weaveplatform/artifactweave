@@ -26,7 +26,9 @@ func (w *world) registerHuggingFace(sc *godog.ScenarioContext) {
 	)
 	sc.Step(
 		`^the pinned Xet client (publishes and downloads|downloads) model and dataset through "([^"]*)"$`,
-		func(action, key string) error { return w.huggingFaceTransfer(action, key, true) },
+		func(action, key string) error {
+			return w.asOneCommand(func() error { return w.huggingFaceTransfer(action, key, true) })
+		},
 	)
 	sc.Step(
 		`^a controlled Hugging Face model and dataset upstream is available$`,
@@ -109,7 +111,7 @@ func (w *world) huggingFaceUpstream() error {
 }
 
 func (w *world) huggingFaceClient(action, repoKey string) error {
-	return w.huggingFaceTransfer(action, repoKey, false)
+	return w.asOneCommand(func() error { return w.huggingFaceTransfer(action, repoKey, false) })
 }
 
 func (w *world) huggingFaceTransfer(action, repoKey string, xetMode bool) error {
@@ -296,6 +298,7 @@ func (w *world) publishHuggingFaceFiles(
 func (w *world) runHuggingFaceCLI(client string, env []string, args ...string) error {
 	cmd := exec.Command(client, args...)
 	cmd.Env = env
+	w.markCommand()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf(

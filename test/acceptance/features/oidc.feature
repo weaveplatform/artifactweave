@@ -27,6 +27,7 @@ Feature: OIDC token exchange
       """
     When I run jf "rt u a.txt ci-local/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I POST "/access/api/v1/oidc" as admin with body:
       """
       {"name":"ci","issuer_url":"{issuer}","provider_type":"Generic OpenID Connect",
@@ -47,10 +48,12 @@ Feature: OIDC token exchange
       """
     When I run jf "eot ci {id-token} --url {platform}/ --oidc-provider-type GenericOidc --oidc-audience jfrog"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "oidc-ci-octo"
     And I keep the JSON field "AccessToken" of the output as "ci-token"
     When I run jf "rt dl ci-local/a.txt ci/ --flat --fail-no-op --url {url} --access-token {ci-token}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "ci/a.txt" and "a.txt" are identical
 
   Scenario: A token from another organisation matches no mapping, and a token for another audience does not verify
@@ -60,6 +63,7 @@ Feature: OIDC token exchange
       """
     When I run jf "eot ci {stranger} --url {platform}/ --oidc-provider-type GenericOidc"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the server answered 400 to POST "/access/api/v1/oidc/token"
     Given the OIDC provider issues an ID token for audience "elsewhere" kept as "misdirected" with claims:
       """
@@ -67,6 +71,7 @@ Feature: OIDC token exchange
       """
     When I run jf "eot ci {misdirected} --url {platform}/ --oidc-provider-type GenericOidc"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the server answered 401 to POST "/access/api/v1/oidc/token"
 
   Scenario: A dynamic mapping names the user from a claim and narrows the token to the repository a claim names
@@ -83,10 +88,12 @@ Feature: OIDC token exchange
       """
     When I run jf "eot ci {narrowed} --url {platform}/ --oidc-provider-type GenericOidc --oidc-audience jfrog"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "ci-builder"
     And I keep the JSON field "AccessToken" of the output as "narrowed-token"
     When I run jf "rt dl ci-local/a.txt dyn/ --flat --fail-no-op --url {url} --access-token {narrowed-token}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "dyn/a.txt" and "a.txt" are identical
     Given the OIDC provider issues an ID token for audience "jfrog" kept as "elsewhere" with claims:
       """
@@ -94,15 +101,18 @@ Feature: OIDC token exchange
       """
     When I run jf "eot ci {elsewhere} --url {platform}/ --oidc-provider-type GenericOidc --oidc-audience jfrog"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And I keep the JSON field "AccessToken" of the output as "elsewhere-token"
     When I run jf "rt dl ci-local/a.txt other/ --flat --fail-no-op --url {url} --access-token {elsewhere-token}"
     Then the command fails
+    And the server answered no request with 500 since the last command
     Given the OIDC provider issues an ID token for audience "jfrog" kept as "unmatched" with claims:
       """
       {"sub":"repo:dyn-org/app","repository":"dyn-org/app","actor":"ci-builder","jfrog_scope":"ci-local"}
       """
     When I run jf "eot ci {unmatched} --url {platform}/ --oidc-provider-type GenericOidc --oidc-audience jfrog"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the server answered 400 to POST "/access/api/v1/oidc/token"
 
   Scenario: A transient user from an exchange mints its own token with jf atc, which downloads as the exchanged token does
@@ -119,13 +129,16 @@ Feature: OIDC token exchange
       """
     When I run jf "eot ci {named} --url {platform}/ --oidc-provider-type GenericOidc --oidc-audience jfrog"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "ci-named"
     And I keep the JSON field "AccessToken" of the output as "named-token"
     When I run jf "atc --url {platform}/ --access-token {named-token}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And I keep the JSON field "access_token" of the output as "own-token"
     When I run jf "rt dl ci-local/a.txt own/ --flat --fail-no-op --url {url} --access-token {own-token}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "own/a.txt" and "a.txt" are identical
 
   Scenario: A project roles mapping without a username, as the jfrog/platform provider's example sends it, exchanges for a synthetic subject
@@ -143,6 +156,7 @@ Feature: OIDC token exchange
       """
     When I run jf "eot ci {roles} --url {platform}/ --oidc-provider-type GenericOidc --oidc-audience jfrog"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "oidc-ci-project-roles"
     When I PUT "/access/api/v1/oidc/ci/identity_mappings/project-roles" as admin with body:
       """

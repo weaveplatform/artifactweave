@@ -33,8 +33,10 @@ Feature: Creating tokens with a password
     And the JFrog CLI is available
     When I run jf "c add pw --url {platform}/ --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt ping --server-id pw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "OK"
     And the server answered 200 to POST "/artifactory/api/security/token"
     And the server never answered 401 to POST "/artifactory/api/security/token"

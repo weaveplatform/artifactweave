@@ -27,17 +27,20 @@ Feature: Permission APIs
       """
     When I run jf "rt permission-target-create {dir}/pt.json --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/security/permissions/jf-perm" as admin
     Then the response status is 200
     And the JSON field "principals.users.admin" equals "[r w]"
     When I run jf "rt permission-target-update {dir}/pt-update.json --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/access/api/v2/permissions/jf-perm" as admin
     Then the response status is 200
     And the JSON field "resources.artifact.actions.users.admin" equals "[READ WRITE MANAGE]"
     And the JSON field "resources.artifact.targets.perm-accept.include_patterns" equals "[org/**]"
     When I run jf "rt permission-target-delete jf-perm --quiet --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/v2/security/permissions/jf-perm" as admin
     Then the response status is 404
 

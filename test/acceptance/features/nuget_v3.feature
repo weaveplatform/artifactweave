@@ -57,6 +57,7 @@ Feature: NuGet clients restore from a NuGet repository
       """
     When I run dotnet "restore app/app.csproj"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "nupkgs/Acme.Smoke.1.0.0.nupkg" and ".nuget/packages/acme.smoke/1.0.0/acme.smoke.1.0.0.nupkg" are identical
     And the file "app/obj/project.assets.json" contains "Acme.Smoke/1.0.0"
 

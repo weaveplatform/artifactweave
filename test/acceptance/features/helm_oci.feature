@@ -13,8 +13,10 @@ Feature: Helm charts in Helm OCI repositories, pushed with jf helm
     And the JFrog CLI runs the pinned helm
     When I run jf "config add aw --url {platform} --artifactory-url {url} --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "helm create acme"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   # jf helm push finds the chart's version folder with AQL, sets the build
   # properties on it and records its manifest and blobs in a helm module
@@ -29,10 +31,13 @@ Feature: Helm charts in Helm OCI repositories, pushed with jf helm
     Then the response status is 200
     When I run jf "helm package acme --version 0.1.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "helm push acme-0.1.0.tgz oci://{host}/helmoci-local --plain-http --username admin --password {password} --build-name=charts --build-number=1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bp charts 1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/charts/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules.0.type" equals "helm"
@@ -49,15 +54,18 @@ Feature: Helm charts in Helm OCI repositories, pushed with jf helm
       """
     When I run helm "registry login {host} --plain-http --username admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     Given a file "pulled/.keep" with content:
       """
       The OCI archive is downloaded into this directory.
       """
     When I run helm "pull oci://{host}/helmoci-local/acme --version 0.1.0 --plain-http --destination pulled"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "acme-0.1.0.tgz" and "pulled/acme-0.1.0.tgz" are identical
     When I run helm "show chart oci://{host}/helmoci-local/acme --version 0.1.0 --plain-http"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "name: acme"
     And the output contains "version: 0.1.0"
     # A new tag needs only Read and Deploy. Changing its contents exercises
@@ -74,18 +82,23 @@ Feature: Helm charts in Helm OCI repositories, pushed with jf helm
     Then the response status is 200
     When I run helm "registry login {host} --plain-http --username chart-writer --password Chart-writer-123"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run helm "package acme --version 0.2.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run helm "push acme-0.2.0.tgz oci://{host}/helmoci-local --plain-http"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     Given a file "acme/replacement.txt" with content:
       """
       A replacement of the same chart version requires Delete.
       """
     When I run helm "package acme --version 0.2.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run helm "push acme-0.2.0.tgz oci://{host}/helmoci-local --plain-http"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the server answered 403 to PUT "/v2/helmoci-local/acme/manifests/0.2.0"
     When I PUT "/artifactory/api/security/permissions/chart-publish" as admin with body:
       """
@@ -94,8 +107,10 @@ Feature: Helm charts in Helm OCI repositories, pushed with jf helm
     Then the response status is 200
     When I run helm "push acme-0.2.0.tgz oci://{host}/helmoci-local --plain-http"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run helm "pull oci://{host}/helmoci-local/acme --version 0.2.0 --plain-http --destination pulled"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "acme-0.2.0.tgz" and "pulled/acme-0.2.0.tgz" are identical
 
   # Each push leaves the chart's tag folder and a digest folder holding the
@@ -108,12 +123,16 @@ Feature: Helm charts in Helm OCI repositories, pushed with jf helm
     Then the response status is 200
     When I run jf "helm package acme --version 0.1.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "helm push acme-0.1.0.tgz oci://{host}/helmoci-limited --plain-http --username admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "helm package acme --version 0.2.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "helm push acme-0.2.0.tgz oci://{host}/helmoci-limited --plain-http --username admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I POST "/artifactory/api/search/aql" as admin with body:
       """
       items.find({"repo":"helmoci-limited","name":"manifest.json"})
@@ -125,4 +144,5 @@ Feature: Helm charts in Helm OCI repositories, pushed with jf helm
     And the response body does not contain "acme/0.1.0"
     When I run jf "helm pull oci://{host}/helmoci-limited/acme --version 0.2.0 --plain-http --username admin --password {password} --untar --untardir pulled"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "pulled/acme/Chart.yaml" contains "version: 0.2.0"

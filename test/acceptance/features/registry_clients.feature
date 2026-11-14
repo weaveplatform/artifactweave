@@ -56,24 +56,32 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
     And a layer "layer.tar.gz" holding "hello.txt" with content "hello from crane"
     When I run crane "auth login {host} -u admin -p {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "append -f layer.tar.gz -t {host}/docker-local/team/base:v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "copy {host}/docker-local/team/base:v1 {host}/docker-prod/team/base:v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/storage/docker-prod/team/base/v1/manifest.json" as admin
     Then the response status is 200
     When I run crane "manifest {host}/docker-prod/team/base:v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "schemaVersion"
     When I run crane "digest {host}/docker-prod/team/base:v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And I keep the output as "digest"
     When I run crane "delete {host}/docker-prod/team/base@{digest}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "manifest {host}/docker-prod/team/base:v1"
     Then the command fails
+    And the server answered no request with 500 since the last command
     When I run crane "manifest {host}/docker-local/team/base:v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   @registry_regression
   Scenario: oras pushes, pulls, attaches and discovers an artifact
@@ -105,10 +113,13 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
     And a layer "layer.tar.gz" holding "hello.txt" with content "hello from cosign"
     When I run crane "auth login {host} -u admin -p {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "append -f layer.tar.gz -t {host}/docker-local/team/signed:v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "digest {host}/docker-local/team/signed:v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And I keep the output as "digest"
     When I run cosign "generate-key-pair"
     Then the command succeeds
@@ -126,10 +137,13 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
     And a layer "layer.tar.gz" holding "hello.txt" with content "hello from kaniko's stand-in"
     When I run crane "auth login {host} -u admin -p {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "append -f layer.tar.gz -t {host}/docker-local/team/built:v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "digest {host}/docker-local/team/built:v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And I keep the output as "digest"
     And a file "image-file" with expanded content:
       """
@@ -137,8 +151,10 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
       """
     When I run jf "rt build-docker-create docker-local --image-file image-file --build-name=docked --build-number=1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bp docked 1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/docked/1" as admin
     Then the response status is 200
     And the response body contains "team/built:v1"
@@ -150,16 +166,20 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
     And a layer "layer.tar.gz" holding "hello.txt" with content "hello from promotion"
     When I run crane "auth login {host} -u admin -p {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "append -f layer.tar.gz -t {host}/docker-local/team/promo:v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt docker-promote team/promo docker-local docker-prod --source-tag=v1 --target-tag=v1-prod --copy --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/v2/docker-prod/team/promo/manifests/v1-prod" as admin
     Then the response status is 200
     When I GET "/v2/docker-local/team/promo/manifests/v1" as admin
     Then the response status is 200
     When I run jf "rt docker-promote team/promo docker-local docker-prod --source-tag=v1 --target-docker-image=team/moved --target-tag=v1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/v2/docker-prod/team/moved/manifests/v1" as admin
     Then the response status is 200
     When I GET "/v2/docker-local/team/promo/manifests/v1" as admin
@@ -184,10 +204,13 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
     Then the command succeeds
     When I run jf "config add aw --url {platform} --artifactory-url {url} --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "docker push {host}/docker-local/team/jfapp:v1 --server-id aw --build-name=jfdock --build-number=1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bp jfdock 1 --server-id aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/jfdock/1" as admin
     Then the response status is 200
     And the response body contains "team/jfapp:v1"
@@ -195,6 +218,7 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
     Then the command succeeds
     When I run jf "docker pull {host}/docker-local/team/jfapp:v1 --server-id aw --build-name=jfdock-pull --build-number=1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   # A multi-architecture push stores each platform manifest in
   # <image>/sha256:<hex>/, as a 7.x local repository does (decision 0031).
@@ -235,13 +259,16 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
     And the JSON field "range.total" equals "2"
     When I run jf "config add aw --url {platform} --artifactory-url {url} --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     Given the JFrog CLI runs with "JFROG_RUN_NATIVE" set to "true"
     And the JFrog CLI runs with "BUILDX_BUILDER" set to "{builder}"
     When I run jf "docker build --platform linux/amd64,linux/arm64 --provenance=false --sbom=false -t {host}/docker-local/team/app:v1 -f app/Dockerfile --push --skip-login --server-id aw --build-name=jfbuild --build-number=1 app"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output does not contain "Failed to get"
     When I run jf "rt bp jfbuild 1 --server-id aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/jfbuild/1" as admin
     Then the response status is 200
     And the response body contains "team/app/sha256:"

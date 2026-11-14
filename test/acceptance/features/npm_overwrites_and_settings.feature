@@ -41,12 +41,16 @@ Feature: npm overwrites, latest by publish, and enforced paths
       """
     When I run npm "publish ./v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "publish ./v2"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "dist-tag add acme-over@2.0.0 beta"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "deprecate acme-over@2.0.0 use{sp}3.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # 0.5.0's tarball deployed by REST over 2.0.0's, as jf rt u could.
     Given an npm package "acme-over" at "0.5.0" with its tarball at "/artifactory/api/npm/npm-over/acme-over/-/acme-over-0.5.0.tgz", under "npm"
     When I deploy the file "npm/acme-over-0.5.0.tgz" to "/artifactory/npm-over/acme-over/-/acme-over-2.0.0.tgz" as admin
@@ -57,6 +61,7 @@ Feature: npm overwrites, latest by publish, and enforced paths
     And the response body does not contain "npm.deprecated"
     When I run npm "dist-tag ls acme-over"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "latest: 1.0.0"
     And the output does not contain "beta"
     # The conversion moves the overwritten tarball to 0.5.0's own path.
@@ -65,12 +70,15 @@ Feature: npm overwrites, latest by publish, and enforced paths
     When I GET "/artifactory/api/storage/npm-over/acme-over/-/acme-over-0.5.0.tgz" as admin until the response status is 200
     When I run npm "view acme-over versions"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "0.5.0"
     When I run npm "view acme-over@0.5.0 deprecated"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output does not contain "use 3.0.0"
     When I run npm "dist-tag ls acme-over"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "latest: 1.0.0"
     And the output does not contain "beta"
 
@@ -119,22 +127,28 @@ Feature: npm overwrites, latest by publish, and enforced paths
       """
     When I run npm "publish ./v2"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # npm refuses a lower version as an implicit latest unless forced; the
     # registry ignores the latest npm sends and applies its own rule.
     When I run npm "publish ./v1 --force"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "view acme-bypub dist-tags.latest"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "1.0.0"
     # A tagged publish leaves latest, as by default.
     When I run npm "publish ./v3 --tag next"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "dist-tag ls acme-bypub"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "latest: 1.0.0"
     And the output contains "next: 3.0.0"
     When I run npm "install acme-bypub"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "node_modules/acme-bypub/index.js" contains "one"
 
     Examples:
@@ -174,8 +188,10 @@ Feature: npm overwrites, latest by publish, and enforced paths
       """
     When I run npm "publish ./scoped"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "install acme-enforce @acme/enforced"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "node_modules/@acme/enforced/index.js" contains "scoped"
     And the file "node_modules/acme-enforce/package.json" contains "1.0.0"
 

@@ -19,10 +19,12 @@ Feature: CDN delivery
     And a file "big.bin" of 6000000 bytes
     When I run jf "rt u big.bin cdn-local/a/big.bin --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # Above the CLI's 5,120 KiB split threshold: it sends a HEAD, which the
     # registry answers itself, then ranged GETs, each redirected to the edge.
     When I run jf "rt dl cdn-local/a/big.bin {dir}/out/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "big.bin" and "out/big.bin" are identical
     And the CDN edge served at least 2 ranged requests
     And the CDN edge never received an Authorization header
@@ -43,6 +45,7 @@ Feature: CDN delivery
     And a file "big.bin" of 6000000 bytes
     When I run jf "rt u big.bin cdn-local/b/big.bin --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When the next request has header "X-JFrog-Download-Redirect-To" "None"
     And I GET "/artifactory/cdn-local/b/big.bin" as admin
     Then the response status is 200
@@ -74,12 +77,16 @@ Feature: CDN delivery
     And a layer "layer.tar.gz" holding "hello.txt" with content "hello through the edge"
     When I run crane "auth login {host} -u admin -p {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "append -f layer.tar.gz -t {host}/docker-cdn/team/app:v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "digest {host}/docker-cdn/team/app:v1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And I keep the output as "digest"
     When I run crane "pull {host}/docker-cdn/team/app:v1 app.tar"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the CDN edge served the object "{digest}"
     And the CDN edge never received an Authorization header

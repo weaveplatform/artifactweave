@@ -107,9 +107,10 @@ type world struct {
 	// the registry", empty until then.
 	chefImage, nixImage, puppetImage, npmImage, mavenImage, pythonImage, luarocksImage, bowerImage, composerImage, rubyImage, hexImage, cargoImage, dotnetImage, alpineImage, debianImage, fedoraImage, gitLFSImage, opkgImage, p2Image, dartImage, cocoapodsImage, condaImage, vscodeImage, rImage, vagrantImage, ansibleImage, frogMLImage string
 
-	// luaRocksLog is how far the server's log ran when the last luarocks
-	// command started, so a step can read the requests that command made.
-	luaRocksLog int
+	// commandLog is how far the server's log ran when the last client
+	// command started (markCommand), so a step can read the requests that
+	// command made.
+	commandLog int
 
 	dartRepo, dartToken, dartFrontURL string
 	dartHashes                        map[string][32]byte
@@ -268,6 +269,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^I run apm "([^"]*)" in "([^"]*)"$`, w.runAPMIn)
 	sc.Step(`^the command succeeds$`, w.commandSucceeds)
 	sc.Step(`^the command fails$`, w.commandFails)
+	sc.Step(`^the server answered no request with 500 since the last command$`, w.answeredNo500)
 	sc.Step(
 		`^I keep the JSON field "([^"]*)" of the (?:output|response) as "([^"]*)"$`,
 		w.keepOutputField,
@@ -898,6 +900,7 @@ func (w *world) runAPMIn(args, sub string) error {
 		cmd.Env = append(cmd.Env, "APM_EXTRA_CA_BUNDLE="+w.tlsCA)
 	}
 	cmd.Env = append(cmd.Env, w.apmEnv...)
+	w.markCommand()
 	out, err := cmd.CombinedOutput()
 	w.body = out
 	w.lastRC = 0
@@ -1057,6 +1060,7 @@ func (w *world) runJFIn(args, sub string) error {
 		cmd.Env = append(cmd.Env, "DOCKER_CONFIG="+w.dockerConfig)
 	}
 	cmd.Env = append(cmd.Env, w.jfEnv...)
+	w.markCommand()
 	out, err := cmd.CombinedOutput()
 	w.body = out
 	w.lastRC = 0
@@ -1078,6 +1082,93 @@ func (w *world) commandSucceeds() error {
 func (w *world) commandFails() error {
 	if w.lastRC == 0 {
 		return fmt.Errorf("the command succeeded; output:\n%s", w.body)
+	}
+	return nil
+}
+
+// markCommand notes how far the server's log has run, just before a client
+// command starts, for answeredNo500. Every runner calls it, so "since the last
+// command" means the last command of whichever client the scenario ran.
+func (w *world) markCommand() { w.commandLog = len(w.stderr.String()) }
+
+// asOneCommand runs a step that runs several client commands, such as a
+// publish followed by downloads, and then puts the mark back at the step's
+// start, so answeredNo500 reads every request the step's commands made and
+// not only its last command's.
+func (w *world) asOneCommand(step func() error) error {
+	start := len(w.stderr.String())
+	err := step()
+	w.commandLog = start
+	return err
+}
+
+// answeredNo500 fails when the server answered 500 to a request made since the
+// last client command started, naming each such request. A client that moves
+// on after a failed request (another file name, an optional file, a checksum
+// it only warns about) still exits 0 over a 500, so "the command succeeds"
+// alone hides the server's fault (#1270, #1388).
+func (w *world) answeredNo500() error {
+	if err := w.awaitLoggedSoFar(); err != nil {
+		return err
+	}
+	var answered, logged []string
+	for line := range strings.Lines(w.stderr.String()[w.commandLog:]) {
+		var rec struct {
+			Msg, Level, Method, Path string
+			Status                   int
+		}
+		if json.Unmarshal([]byte(line), &rec) != nil {
+			continue
+		}
+		switch {
+		case rec.Msg == "request" && rec.Status == http.StatusInternalServerError:
+			answered = append(answered, rec.Method+" "+rec.Path)
+		case rec.Msg == "panic":
+			// RecoverPanic sits outside AccessLog, so a request whose handler
+			// panicked is answered 500 with this line and no request line.
+			answered = append(answered, "panic at "+rec.Path)
+		}
+		if rec.Level == "ERROR" || rec.Level == "WARN" {
+			logged = append(logged, strings.TrimSpace(line))
+		}
+	}
+	if len(answered) == 0 {
+		return nil
+	}
+	return fmt.Errorf(
+		"the server answered 500 to %s since the last command; server log:\n%s",
+		strings.Join(answered, ", "),
+		strings.Join(logged, "\n"),
+	)
+}
+
+// awaitLoggedSoFar returns once every request answered so far is in the
+// server's log. An access line reaches w.stderr through exec's copying
+// goroutine after the response it records, so the client's last request can
+// trail the client's exit. A ping sent now is answered after the client's
+// requests, so once the ping's line is in the log, theirs are too.
+func (w *world) awaitLoggedSoFar() error {
+	id := "after-command-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	req, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		w.url+"/artifactory/api/system/ping",
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("X-Request-ID", id)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	_ = resp.Body.Close()
+	for deadline := time.Now().Add(2 * time.Second); !strings.Contains(w.stderr.String(), id); {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("the server's log has no line for request %q", id)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 	return nil
 }

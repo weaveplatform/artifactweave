@@ -51,18 +51,22 @@ Feature: Copy, move and archives
       """
     When I run jf "rt u {dir}/one.txt src-local/jf/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt cp src-local/jf/one.txt dst-local/cp/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 200 to POST "/artifactory/api/copy/src-local/jf/one.txt"
     When I GET "/artifactory/dst-local/cp/one.txt" as admin
     Then the response body is "one"
     When I run jf "rt mv src-local/jf/one.txt dst-local/mv/ --flat --dry-run --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 200 to POST "/artifactory/api/move/src-local/jf/one.txt"
     When I GET "/artifactory/src-local/jf/one.txt" as admin
     Then the response status is 200
     When I run jf "rt mv src-local/jf/one.txt dst-local/mv/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/src-local/jf/one.txt" as admin
     Then the response status is 404
     When I GET "/artifactory/dst-local/mv/one.txt" as admin
@@ -85,11 +89,13 @@ Feature: Copy, move and archives
     And a zip file "bundle.zip" holding "inner/readme.txt" with content "packed"
     When I run jf "rt u {dir}/bundle.zip src-local/ex/ --flat --explode --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/src-local/ex/inner/readme.txt" as admin
     Then the response body is "packed"
     When I GET "/artifactory/src-local/ex/bundle.zip" as admin
     Then the response status is 404
     When I run jf "rt u {dir}/bundle.zip src-local/kept/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/src-local/kept/bundle.zip!/inner/readme.txt" as admin
     Then the response body is "packed"

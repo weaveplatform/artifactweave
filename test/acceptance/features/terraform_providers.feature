@@ -13,10 +13,12 @@ Feature: Terraform installs signed providers and network mirror archives
     And Terraform installs from the "registry"
     When I run terraform "init -backend=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "self-signed"
     And the file ".terraform.lock.hcl" contains "h1:"
     When I run terraform "apply -auto-approve"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "1 added"
     And the server answered 200 to GET "/artifactory/api/terraform/v1/providers/tf-providers-rt-ns-hashicorp/null/versions"
 
@@ -25,8 +27,10 @@ Feature: Terraform installs signed providers and network mirror archives
     And Terraform installs from the "mirror"
     When I run terraform "init -backend=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file ".terraform.lock.hcl" contains "h1:"
     When I run terraform "apply -auto-approve"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "1 added"
     And the server answered 200 to GET "/artifactory/api/terraform/tf-providers/providers/private.example/hashicorp/null/index.json"
