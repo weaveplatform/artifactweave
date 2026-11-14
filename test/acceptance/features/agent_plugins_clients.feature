@@ -28,18 +28,24 @@ Feature: JFrog CLI installs and updates Agent Plugins from a local repository
       """
     When I run jf "config add aw --url {platform} --artifactory-url {url} --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "agent plugins publish plugin --repo plugins-clients --version 1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "agent plugins install hello-plugin --harness cursor --repo plugins-clients --version 1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "agent plugins list --harness cursor --format json"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "hello-plugin"
     And the output contains "1.0.0"
     When I run jf "rt dl plugins-clients/hello-plugin/1.0.0/hello-plugin-1.0.0.zip downloaded-v1/ --flat"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt dl plugins-clients/hello-plugin/1.0.0/hello-plugin-1.0.0.zip downloaded-v1-again/ --flat"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "downloaded-v1/hello-plugin-1.0.0.zip" and "downloaded-v1-again/hello-plugin-1.0.0.zip" are identical
     Given a file "plugin/.cursor-plugin/plugin.json" with content:
       """
@@ -51,10 +57,13 @@ Feature: JFrog CLI installs and updates Agent Plugins from a local repository
       """
     When I run jf "agent plugins publish plugin --repo plugins-clients --version 2.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "agent plugins update --slug hello-plugin --harness cursor --repo plugins-clients"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "agent plugins list --harness cursor --format json"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "2.0.0"
     When I GET "/artifactory/plugins-clients/cursor-marketplace.json" as admin
     Then the response status is 200
@@ -74,8 +83,10 @@ Feature: JFrog CLI installs and updates Agent Plugins from a local repository
       """
     When I run jf "config add aw --url {platform} --artifactory-url {url} --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "agent plugins publish claude --repo plugins-claude --version 1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/plugins-claude/claude-marketplace.json" as admin
     Then the response status is 200
     And the JSON field "plugins.0.source.source" equals "url"
@@ -135,8 +146,10 @@ Feature: JFrog CLI installs and updates Agent Plugins from a local repository
     And the JSON field "plugins.0.version" equals "1.0.0"
     When I run jf "config add aw --url {platform} --artifactory-url {url} --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "agent plugins install hello-plugin --harness cursor --repo plugins-mismatch --version 1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   Scenario: publish an Agent Plugins Standard plugin and install it for VS Code and Cursor
     Self-managed 7.173.8 indexes a root plugin.json of the Agent Plugins
@@ -174,8 +187,10 @@ Feature: JFrog CLI installs and updates Agent Plugins from a local repository
       """
     When I run jf "config add aw --url {platform} --artifactory-url {url} --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "agent plugins publish standard --repo plugins-standard --version 1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/agentplugins/plugins-standard/vscode-marketplace.json" as admin
     Then the response status is 200
     And the JSON field "plugins.0.name" equals "hello-standard"
@@ -197,8 +212,10 @@ Feature: JFrog CLI installs and updates Agent Plugins from a local repository
     And the response body contains "cursor"
     When I run jf "agent plugins install hello-standard --harness vscode --repo plugins-standard --version 1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "home/.copilot/installed-plugins/plugins-standard/hello-standard/plugin.json" contains "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
     And the file "home/.copilot/installed-plugins/plugins-standard/hello-standard/skills/greet/SKILL.md" exists
     When I run jf "agent plugins install hello-standard --harness cursor --repo plugins-standard --version 1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "home/.cursor/plugins/local/hello-standard/plugin.json" contains "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"

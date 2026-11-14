@@ -31,11 +31,14 @@ Feature: Access tokens
     And I keep the JSON field "access_token" of the response as "admin-token"
     When I run jf "atc --url {platform}/ --access-token {admin-token} --expiry 7200"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And I keep the JSON field "access_token" of the output as "token"
     When I run jf "c add token-server --url {platform}/ --access-token {token} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt ping --server-id token-server"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "OK"
     Given a file "hello.txt" with content:
       """
@@ -43,6 +46,7 @@ Feature: Access tokens
       """
     When I run jf "rt u hello.txt tokens-local/ --server-id token-server"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/tokens-local/hello.txt" as admin
     Then the response status is 200
     And the response body contains "hello from a token"
@@ -58,6 +62,7 @@ Feature: Access tokens
     And I keep the JSON field "refresh_token" of the response as "refresh"
     When I run jf "c add refresh-server --url {platform}/ --access-token {short} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     Given the jf server "refresh-server" has the refresh token kept as "refresh"
     And the access token kept as "short" has expired
     # The CLI refreshes before the request, sending the expired token as its
@@ -65,6 +70,7 @@ Feature: Access tokens
     # expired one would not.
     When I run jf "rt ping --server-id refresh-server"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "OK"
     And the server never answered 401 to POST "/access/api/v1/tokens"
     # The refresh revoked the expired token, so it cannot refresh again.
@@ -91,6 +97,7 @@ Feature: Access tokens
     # expired token as access_token, which must pair with the refresh token.
     When I run jf "rt ping --server-id legacy-server"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "OK"
     And the server answered 200 to POST "/artifactory/api/security/token"
     And the server never answered 401 to POST "/artifactory/api/security/token"
@@ -159,6 +166,7 @@ Feature: Access tokens
     # for the scope <service id>:admin.
     When I run jf "rt atc --grant-admin --expiry 3600 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 200 to GET "/artifactory/api/system/service_id"
     And the output contains "applied-permissions/admin"
     And I keep the JSON field "access_token" of the output as "granted"

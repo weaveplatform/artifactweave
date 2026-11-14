@@ -19,6 +19,7 @@ Feature: Smart Remote synchronization uses bounded authenticated peer operations
     Then the response status is 200
     When I run jf "rt direct-download smart/file.bin first/ --flat --fail-no-op --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the Smart peer eventually records 1 downloads
     When I GET "/artifactory/api/storage/smart-cache/file.bin?properties" as admin
     Then the response status is 200
@@ -42,6 +43,7 @@ Feature: Smart Remote synchronization uses bounded authenticated peer operations
     Given the Smart peer becomes unavailable
     When I run jf "rt direct-download smart-cache/file.bin offline/ --flat --fail-no-op --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "first/file.bin" and "offline/file.bin" are identical
     And the Smart peer eventually records 3 downloads
 
@@ -56,6 +58,7 @@ Feature: Smart Remote synchronization uses bounded authenticated peer operations
     Given the Smart peer property becomes "red"
     When I run jf "rt direct-download initial/file.bin warm/ --flat --fail-no-op --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the Smart peer received 1 property requests
     And the Smart peer eventually records 0 downloads
     When I GET "/artifactory/api/storage/initial-cache/file.bin?properties" as admin

@@ -28,11 +28,13 @@ Feature: Maven downloads authoritative upstream content through a remote cache
       """
     When I run mvn "-s settings.xml -C -Dmaven.repo.local=/work/cold -Dmaven.repo.local.tail={m2} org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy-dependencies -DoutputDirectory=/work/cold-jars"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the Maven upstream received a cold GET for every fixture
     And the file "cold-jars/transitive-1.0.jar" exists
     Given the generic upstream stops
     When I run mvn "-s settings.xml -C -Dmaven.repo.local=/work/warm -Dmaven.repo.local.tail={m2} org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy-dependencies -DoutputDirectory=/work/warm-jars"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "warm-jars/release-1.0.jar" exists
     And the file "warm-jars/transitive-1.0.jar" exists
     And the file "warm-jars/unique-1.1-SNAPSHOT.jar" exists

@@ -58,6 +58,7 @@ Feature: Terraform resolves a private module and provider in one root
       """
     When I run terraform "init -backend=false -no-color"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the output contains "401"
     And the server answered 401 to GET "/artifactory/api/terraform/v1/modules/tf-modules__acme/greeting/aws/versions"
     When I GET "/artifactory/api/terraform/v1/modules/tf-modules__acme/greeting/aws/versions"
@@ -72,6 +73,7 @@ Feature: Terraform resolves a private module and provider in one root
       """
     When I run terraform "init -backend=false -no-color" with the kept environment token "provider-token"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And Terraform selected module "greeting" at version "1.2.0" in "."
     And the output contains "self-signed"
     And the file ".terraform.lock.hcl" contains "h1:"
@@ -80,10 +82,12 @@ Feature: Terraform resolves a private module and provider in one root
     And the server answered 200 to GET "/artifactory/api/terraform/v1/providers/tf-providers-rt-ns-hashicorp/null/versions"
     When I run terraform "plan -no-color -out=registry.tfplan" with the kept environment token "provider-token"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "1 to add"
     And the output contains "1.2.0"
     When I run terraform "apply -no-color registry.tfplan" with the kept environment token "provider-token"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "1 added"
 
     # Files of the wrong Terraform type remain ordinary items; the registry
@@ -117,6 +121,7 @@ Feature: Terraform resolves a private module and provider in one root
     When I forget Terraform's module cache
     And I run terraform "init -backend=false -no-color" with the kept environment token "provider-token"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And Terraform selected module "greeting" at version "1.0.0" in "."
     And the file ".terraform/modules/greeting/main.tf" contains "1.0.0"
     When I POST "/artifactory/api/trash/restore/tf-modules/acme/greeting/aws/1.2.0.zip?to=tf-modules" as admin with body:
@@ -132,7 +137,9 @@ Feature: Terraform resolves a private module and provider in one root
     When I forget Terraform's module cache
     And I run terraform "init -backend=false -no-color" with the kept environment token "provider-token"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And Terraform selected module "greeting" at version "1.2.0" in "."
     When I run terraform "plan -no-color -detailed-exitcode" with the kept environment token "provider-token"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "No changes"

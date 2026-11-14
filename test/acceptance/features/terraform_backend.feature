@@ -14,46 +14,61 @@ Feature: Terraform uses local execution with the remote state backend
     And the remote configuration uses the private null provider
     When I run terraform "init -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run terraform "apply -auto-approve -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "1 added"
     When I run terraform "state pull"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And Terraform's pulled state matches the latest version and is encrypted through REST
     Given the next apply changes the null resource
     When I run terraform "apply -auto-approve -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the backend has advanced its state version
     When I run terraform "state pull"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And Terraform's pulled state matches the latest version and is encrypted through REST
     And a second Terraform working copy cannot plan while the first holds the lock
+    And the server answered no request with 500 since the last command
     When I POST "/artifactory/api/terraform/remote/v2/workspaces/tf-state__dev/actions/lock" as admin
     Then the response status is 200
     When I run terraform "force-unlock -force tf-state/dev"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run terraform "plan -lock-timeout=0s -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   Scenario: Prefix workspaces can be created, listed and deleted
     Given a Terraform remote backend with prefix "app-" and encryption enabled
     When I run terraform "init -no-color"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the output contains "No existing workspaces"
     When I run terraform "workspace new dev"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run terraform "init -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run terraform "workspace new test"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run terraform "workspace list"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "dev"
     And the output contains "test"
     When I run terraform "workspace select dev"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run terraform "workspace delete test"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/terraform/remote/v2/organizations/tf-state/workspaces/app-test" as admin
     Then the response status is 404
 
@@ -62,15 +77,19 @@ Feature: Terraform uses local execution with the remote state backend
     And a Terraform state of 21 MiB is ready to push
     When I run terraform "init -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run terraform "state push large.tfstate"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run terraform "state pull"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And Terraform's pulled state matches the latest version and is plain through REST
     When I DELETE "/artifactory/tf-state/workspaces/dev" as admin
     Then the response status is 204
     When I run terraform "init -reconfigure -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/terraform/remote/v2/organizations/tf-state/workspaces/dev" as admin
     Then the response status is 200
     When I GET "/artifactory/api/terraform/remote/v2/workspaces/tf-state__dev/current-state-version" as admin
@@ -79,8 +98,10 @@ Feature: Terraform uses local execution with the remote state backend
   Scenario: Login checks and stores a pasted token and expired bearers are unauthorized
     Given a Terraform remote backend with name "dev" and encryption enabled
     When Terraform logs in with the issued token
+    And the server answered no request with 500 since the last command
     And I run terraform "init -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I POST "/access/api/v1/tokens" as admin with body:
       """
       {"expires_in":1}
@@ -94,5 +115,6 @@ Feature: Terraform uses local execution with the remote state backend
     Given Terraform uses the kept backend token "expired-backend-token"
     When I run terraform "state pull"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the output contains "unauthorized"
     And the server answered 401 to GET "/artifactory/api/terraform/remote/v2/organizations/tf-state/entitlement-set"

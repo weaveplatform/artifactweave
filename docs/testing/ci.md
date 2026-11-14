@@ -541,14 +541,57 @@ digest, as #1321 asks of every CI download:
 |---|---|---|
 | MinIO | `cgr.dev/chainguard/minio` | `docker.io/chainguard/minio`, Chainguard's copy |
 | fake-gcs-server | `fsouza/fake-gcs-server` (Docker Hub) | `mirror.gcr.io/fsouza/fake-gcs-server`, Google's cache of Docker Hub |
-| Azurite | `mcr.microsoft.com/azure-storage/azurite` | none yet |
+| Azurite | `mcr.microsoft.com/azure-storage/azurite` | `ghcr.io/weaveplatform/artifactweave-emulators/azurite`, the project's own copy |
 
 A pull by digest is checked against that digest, so both sources give the same bytes. When
 every source fails, the start fails with each registry's error, and the next start tries
-again. Azurite has no public copy anywhere, so a run that needs it still fails when MCR does
-not answer. On a digest bump, check that each second source serves the new digest, for
-example with `docker buildx imagetools inspect`: mirror.gcr.io holds only the images it has
-cached.
+again. On a digest bump, check that MinIO's and fake-gcs-server's second sources serve the
+new digest, for example with `docker buildx imagetools inspect`: mirror.gcr.io holds only
+the images it has cached.
+
+### Azurite's copy
+
+Microsoft publishes Azurite only on MCR, and no public registry held a copy (checked
+2026-11-13), so the project keeps its own
+([#1463](https://github.com/weaveplatform/artifactweave/issues/1463)).
+`.github/workflows/emulator-copy.yml` reads the image, `azuriteDigest`, `azuriteCopy` and
+`azuriteCopyTag` from `pkg/containertest/emulators.go` and runs on every pull request and
+push to main that changes that file, and by hand (`workflow_dispatch`).
+
+- It copies the image with `crane copy` by digest, which writes each manifest's bytes as
+  fetched, so the copy keeps the index digest. A `docker pull`, `tag` and `push` would push
+  one platform's manifest under a new digest.
+- It skips the copy when the tag already serves the digest, and fails when the tag serves
+  another digest: on a bump, move `azuriteCopyTag` with `azuriteDigest`.
+- It pushes with the job's `GITHUB_TOKEN` and `packages: write`, never a personal
+  credential. A fork's pull request has a read-only token, so its run is skipped and the
+  push to main after the merge makes the copy.
+- It then checks that the copy can be pulled anonymously, as CI pulls it, and reports a
+  refusal as a warning and in the run's summary.
+
+The first run, on PR #1501 (2026-11-14), created the package public and linked to this
+repository, so CI pulls it without credentials. GitHub's Actions guide says a package a
+workflow publishes with `GITHUB_TOKEN` inherits the visibility of the workflow's repository
+([Publishing and installing a package with GitHub Actions](https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions)),
+while the Container registry guide says "When you first publish a package, the default
+visibility is private"
+([Configuring a package's access control and visibility](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility)),
+and an organisation can forbid public packages under Settings, Packages, "Package
+creation". So a copy under a new package name, or after that setting changes, may come up
+private. If a run's summary reports a refusal, an organisation owner or the package's admin
+makes the package public once:
+
+1. Open <https://github.com/orgs/weaveplatform/packages/container/package/artifactweave-emulators%2Fazurite>.
+2. Choose **Package settings**.
+3. Under **Danger Zone**, choose **Change visibility**, then **Public**, type the package
+   name `artifactweave-emulators/azurite` and confirm. A public package cannot be made
+   private again.
+4. Rerun the workflow (`workflow_dispatch`); its last step then reports that an anonymous
+   pull resolves the digest.
+
+Until the copy can be pulled anonymously, `TestAccAzuriteStartsFromItsCopy` in
+`pkg/containertest` skips and says so. Once it can, the test starts Azurite with its first
+source replaced by an unresolvable `mcr.invalid` host, so the copy is the only source.
 
 ## Package clients in acceptance
 
@@ -864,6 +907,61 @@ run under Docker's init, so the SDK's default NativeAOT host exits after each co
 (#1241, described under the NuGet exit checks above); every command still must exit zero.
 The Terraform backend exercises pasted-token login and saved-token reuse; `login.v1`
 browser approval remains deferred to #262.
+
+### Server 500s behind a passing command
+
+Some clients move on after a request fails: they try another file name, skip a
+file they treat as optional, or only warn when a checksum cannot be uploaded or
+fetched. Such a client exits 0 when the server answers one of its requests 500,
+so "the command succeeds" alone hides the server's fault (#1270, #1388). After
+each command of those clients, a scenario runs
+`the server answered no request with 500 since the last command`. It reads the
+server's access and `panic` lines written since the command started, and fails
+naming each request answered 500, followed by the server's error and warning
+lines.
+
+Every command runner (`runClient`, `runCurl`, `runJFIn`, `runAPMIn`, the
+Hugging Face CLI and the Terraform backend's login) notes how far the log has
+run when its command starts. A step that runs several commands as one, such as
+the Hugging Face transfers and the Terraform backend's lock contention, puts the
+mark back at its own start, so the check covers all its commands. Before
+reading, the step sends a ping with a request ID of its own and waits for its
+line, because the client's last access line can reach the log after the client
+exits.
+
+Research in client source and docs (#1388) found these clients move on after a
+500, so their scenarios run the step after every command:
+
+| Client | Request it moves past |
+|---|---|
+| LuaRocks | each manifest name it tries in turn (`manifest-5.5.zip`, then the others) |
+| Maven 3.9 and 3.10 | a snapshot's `maven-metadata.xml`, answered by the plain `-SNAPSHOT` name; Maven 3.9 also only warns when a checksum upload fails |
+| Gradle and Ivy (system recipes) | `.sha256` and `.sha512` uploads, `ivy.xml` and checksum fetches |
+| sbt (Coursier) | a checksum fetch, which falls back to no checksum |
+| RubyGems and Bundler | `/versions`, which falls back to the full index |
+| Mix (Hex) | an optional dependency's package record |
+| npm 11 and 12 | the packument check in `publish`, and the web login request |
+| Poetry and uv | a lazy wheel range read; uv's upload checks the file after a 500 |
+| NuGet (.NET 11 and 10) | the v2 feed root |
+| Terraform | the `tfe` ping, the organisations lookup on login, the unlock after a state push or workspace delete, and a HEAD on a module archive, answered by a GET |
+| Helm 4 | the registry token request at login |
+| Hugging Face CLI (Xet) | the deduplication query |
+| JFrog CLI (`jf`) | side requests: the skills version check, evidence verification on install, build-info and property updates, and `jf mvn` checksum uploads |
+| APT | a `by-hash` index URL, then the compressed index, each answered by the next form; `apt-get update` only warns when an index fails |
+| Eclipse P2 | `p2.index`, and a composite child that fails to load or serve an artifact |
+| R | `PACKAGES.rds` and `PACKAGES.gz`, answered by the next index form |
+| micromamba | the `repodata.json.zst` and shard index checks, and a platform subdirectory's repodata |
+| Git LFS | the lock verification before a push, when `locksverify` is unset |
+| crane | a manifest HEAD in `digest`, answered by a GET, and a cross-repository mount in `copy` |
+
+A command of these clients that the scenario expects to fail runs the step too,
+so a 500 cannot pass for the refusal the scenario expects.
+
+Dart pub, Composer, Cargo, pip, Twine, Go, CocoaPods, Bower, Chef, Puppet,
+Ansible Galaxy, FrogML, the JetBrains and VS Code clients, APM, Bazel, DNF, apk,
+opkg, Nix, Vagrant, oras, cosign and the Docker daemon on the CI runner exit
+non-zero when the server answers 500, so "the command succeeds" already covers
+them.
 
 ## Transient infrastructure failures
 

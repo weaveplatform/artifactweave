@@ -18,20 +18,26 @@ Feature: PyPI clients publish distributions and report builds
     Given the JFrog CLI is available
     When I run jf Python "config add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf Python "pip-config --server-id-resolve aw --server-id-deploy aw --repo-resolve pypi-local --repo-deploy pypi-local"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf Python "twine upload dist/acme_smoke-1.0.0-py3-none-any.whl --build-name pypi-publish --build-number 1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf Python "rt bp pypi-publish 1 --server-id aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/pypi-publish/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules.0.artifacts" has 1 entries
     And the response body contains "acme_smoke-1.0.0-py3-none-any.whl"
     When I run jf Python "pip install --user --no-deps --no-cache-dir acme-smoke==1.0.0 --build-name pypi-install --build-number 1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf Python "rt bp pypi-install 1 --server-id aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/pypi-install/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules.0.dependencies" has 1 entries
@@ -107,20 +113,25 @@ Feature: PyPI clients publish distributions and report builds
       """
     When I run jf Python "config add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf Python "uv publish --index aw dist/acme_smoke-1.0.0-py3-none-any.whl --server-id aw --build-name pypi-uv-publish --build-number 1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf Python "rt bp pypi-uv-publish 1 --server-id aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/pypi-uv-publish/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules.0.artifacts" has 1 entries
     And the response body contains "acme_smoke-1.0.0-py3-none-any.whl"
     When I run jf Python "uv sync --no-dev --server-id aw --build-name pypi-uv-install --build-number 1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run python "check_install.py .venv dist/acme_smoke-1.0.0-py3-none-any.whl acme_smoke 1.0.0"
     Then the command succeeds
     When I run jf Python "rt bp pypi-uv-install 1 --server-id aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/pypi-uv-install/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules.0.dependencies" has 1 entries
@@ -139,14 +150,19 @@ Feature: PyPI clients publish distributions and report builds
       """
     When I run jf Python "config add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf Python "poetry-config --server-id-resolve aw --repo-resolve pypi-local"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run poetry "config repositories.pypi-local {url}/api/pypi/pypi-local/"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf Python "poetry publish --repository pypi-local --username admin --password {password} --build-name pypi-poetry-publish --build-number 1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf Python "rt bp pypi-poetry-publish 1 --server-id aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/pypi-poetry-publish/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules.0.artifacts" has 1 entries

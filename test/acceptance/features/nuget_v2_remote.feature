@@ -24,13 +24,16 @@ Feature: NuGet v2 remote feeds retain native restore and bounded query behavior
       """
     When I run dotnet "package search Acme.Legacy --format json"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "1.0.0"
     And the output does not contain "2.0.0-beta.1"
     When I run dotnet "package search Acme.Legacy --format json --prerelease"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "2.0.0-beta.1"
     When I run dotnet "restore app/app.csproj --packages cold --no-http-cache"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "nupkgs/Acme.Legacy.2.0.0-beta.1.nupkg" and "cold/acme.legacy/2.0.0-beta.1/acme.legacy.2.0.0-beta.1.nupkg" are identical
     And the server answered 200 to GET "/artifactory/api/nuget/nuget-remote/FindPackagesById()"
     And the server answered 200 to GET "/artifactory/api/nuget/nuget-remote/Download/Acme.Legacy/2.0.0-beta.1"
@@ -38,6 +41,7 @@ Feature: NuGet v2 remote feeds retain native restore and bounded query behavior
     Given the generic upstream stops
     When I run dotnet "restore app/app.csproj --packages warm --no-http-cache --force"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "nupkgs/Acme.Legacy.2.0.0-beta.1.nupkg" and "warm/acme.legacy/2.0.0-beta.1/acme.legacy.2.0.0-beta.1.nupkg" are identical
 
     Examples:

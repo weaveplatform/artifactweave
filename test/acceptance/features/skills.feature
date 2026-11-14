@@ -14,6 +14,7 @@ Feature: JFrog CLI Skills against a local repository
     And the JFrog CLI runs with "JFROG_SKILLS_DISABLE_QUIET_FAILURE" set to "true"
     When I run jf "c add skills --url {platform}/ --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   Scenario: publish, list, search, install and delete a skill
     Given a file "review-skill/SKILL.md" with content:
@@ -31,14 +32,18 @@ Feature: JFrog CLI Skills against a local repository
       """
     When I run jf "agent skills publish review-skill --repo skills-local --server-id skills --skip-scan"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "agent skills list --repo skills-local --server-id skills"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "review-skill"
     When I run jf "agent skills search review --repo skills-local --server-id skills"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "review-skill"
     When I run jf "agent skills install review-skill --repo skills-local --version 1.0.0 --path install --server-id skills"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "review-skill/SKILL.md" and "install/review-skill/SKILL.md" are identical
     Given a file "review-skill/SKILL.md" with content:
       """
@@ -51,12 +56,16 @@ Feature: JFrog CLI Skills against a local repository
       """
     When I run jf "agent skills publish review-skill --repo skills-local --server-id skills --skip-scan"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "agent skills update review-skill --repo skills-local --path install --server-id skills"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "review-skill/SKILL.md" and "install/review-skill/SKILL.md" are identical
     When I run jf "agent skills delete review-skill --repo skills-local --version 1.0.0 --server-id skills"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "agent skills delete review-skill --repo skills-local --version 2.0.0 --server-id skills"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/skills/skills-local/api/v1/skills/review-skill" as admin
     Then the response status is 404

@@ -35,19 +35,24 @@ Feature: JFrog CLI installs Agent Plugins through the stored marketplace files
       """
     When I run jf "config add aw --url {platform} --artifactory-url {url} --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "agent plugins publish standard --repo plugins-latest --version 1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/storage/plugins-latest/cursor-marketplace.json" as admin until the response status is 200
     Then the JSON field "createdBy" equals "_system_"
     When I GET "/artifactory/api/storage/plugins-latest/marketplace.json" as admin until the response status is 200
     Then the JSON field "createdBy" equals "_system_"
     When I run jf "agent plugins install hello-latest --harness vscode --repo plugins-latest"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "home/.copilot/installed-plugins/plugins-latest/hello-latest/plugin.json" contains "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
     And the file "home/.copilot/installed-plugins/plugins-latest/hello-latest/skills/greet/SKILL.md" exists
     When I run jf "agent plugins install hello-latest --harness cursor --repo plugins-latest"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "home/.cursor/plugins/local/hello-latest/plugin.json" contains "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
     When I run jf "agent plugins install hello-missing --harness cursor --repo plugins-latest"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the output contains "plugin 'hello-missing' is not listed in cursor-marketplace.json"

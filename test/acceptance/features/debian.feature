@@ -21,8 +21,10 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Given the apt repository is "<repo>"
     When I run apt "update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run apt "install -y alpha"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the response body contains "Setting up alpha"
 
     Examples:
@@ -53,11 +55,13 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Given the apt repository is "deb-forms"
     When I run apt "-o Acquire::CompressionTypes::Order=<form> -o Acquire::By-Hash=no -o Debug::Acquire::http=true update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the response body contains "/dists/stable/main/binary-amd64/Packages.<form> HTTP/1.1"
     And the response body does not contain "/binary-amd64/Packages.<next> HTTP/1.1"
     And the response body does not contain "/binary-amd64/Packages.gz HTTP/1.1"
     When I run apt "install -y alpha"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the response body contains "Setting up alpha"
 
     Examples:
@@ -85,8 +89,10 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Given the apt repository is "deb-remote"
     When I run apt "update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run apt "install -y alpha"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the response body contains "Setting up alpha"
     When I GET "/artifactory/deb-remote-cache/pool/main/a/alpha/alpha_1.0_amd64.deb" as admin
     Then the response status is 200
@@ -94,8 +100,10 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     When I clear the apt client cache
     And I run apt "update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run apt "install -y alpha"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the response body contains "Setting up alpha"
 
   Scenario: a remote caches an invalid index as fetched but never invalid package bytes
@@ -165,8 +173,10 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Given the apt repository is "deb-virtual"
     When I run apt "update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run apt "install -y alpha beta"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the response body contains "Setting up alpha"
     And the response body contains "Setting up beta"
     When I POST "/artifactory/api/repositories/deb-virtual" as admin with body:
@@ -200,15 +210,19 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Given the apt repository is "deb-remote-virtual"
     When I run apt "update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run apt "install -y alpha"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the response body contains "Setting up alpha"
     Given the generic upstream stops
     When I clear the apt client cache
     And I run apt "update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run apt "install -y alpha"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the response body contains "Setting up alpha"
 
   Scenario: apt downloads a complete verified Debian source package
@@ -240,8 +254,10 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Given the apt source repository is "deb-source"
     When I run apt "update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run apt "source --download-only alpha"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "alpha_1.0-1.dsc" exists
     And the file "alpha_1.0.orig.tar.gz" exists
     And the file "alpha_1.0-1.debian.tar.xz" exists
@@ -261,8 +277,10 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Given the apt source repository is "deb-source-remote"
     When I run apt "update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run apt "source --download-only alpha"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "alpha_1.0-1.dsc" exists
     And the file "alpha_1.0.orig.tar.gz" exists
     And the file "alpha_1.0-1.debian.tar.xz" exists
@@ -270,8 +288,10 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     When I clear the apt client cache
     And I run apt "update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run apt "source --download-only alpha"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   @debian_permissions
   Scenario: index-only permission cannot disclose or deploy a Debian package
@@ -333,8 +353,10 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Given the apt repository is "deb-lifecycle"
     When I run apt "update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run apt "install -y alpha"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I DELETE "/artifactory/deb-lifecycle/pool/main/a/alpha/alpha_1.0_amd64.deb" as admin
     Then the response status is 204
     When I GET "/artifactory/deb-lifecycle/dists/stable/main/binary-amd64/Packages.gz" as admin until the response status is 404
@@ -349,8 +371,10 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     When I clear the apt client cache
     And I run apt "update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run apt "install -y alpha"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   @debian_snapshot
   Scenario: apt installs through an immutable Debian snapshot metadata root
@@ -383,8 +407,10 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Given the apt snapshot repository is "deb-snapshot-target" at tag "first"
     When I run apt "update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run apt "install -y alpha"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the response body contains "Setting up alpha"
     When I POST "/artifactory/api/deb/deb-snapshot-source/snapshot" as admin with body:
       """
@@ -440,8 +466,10 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Given the apt snapshot repository is "deb-snapshot-store" at tag "virtual"
     When I run apt "update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run apt "install -y alpha"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the response body contains "Setting up alpha"
     When I GET "/artifactory/deb-snapshot-remote-cache/pool/main/a/alpha/alpha_1.0_amd64.deb" as admin
     Then the response status is 200
@@ -455,5 +483,7 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Given the apt snapshot repository is "deb-snapshot-store" at tag "remote"
     When I run apt "update"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run apt "install -y alpha"
     Then the command succeeds
+    And the server answered no request with 500 since the last command

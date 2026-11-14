@@ -55,6 +55,7 @@ func (w *world) runCurl(args string) error {
 	cmd := exec.Command("curl", strings.Fields(w.expand(args))...)
 	cmd.Dir = w.dir
 	cmd.Env = os.Environ()
+	w.markCommand()
 	out, err := cmd.CombinedOutput()
 	w.body, w.lastRC = out, 0
 	if err != nil {

@@ -16,6 +16,7 @@ Feature: Headless P2 connection uses an explicit server-side read grant
     Given the P2 repository is "p2-recipe"
     When I run the Eclipse P2 director "install"
     Then the command fails
+    And the server answered no request with 500 since the last command
     When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
       """
       security:
@@ -32,6 +33,7 @@ Feature: Headless P2 connection uses an explicit server-side read grant
     Given I clear the Eclipse P2 client state
     When I run the Eclipse P2 director "install"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the installed P2 bundle matches the published SHA256
     And the server answered 200 to GET "/artifactory/p2-recipe/plugins/org.eclipse.glsp.layout.source_2.7.0.jar"
     When I DELETE "/access/api/v2/permissions/p2-recipe-read" as admin
@@ -39,3 +41,4 @@ Feature: Headless P2 connection uses an explicit server-side read grant
     Given I clear the Eclipse P2 client state
     When I run the Eclipse P2 director "install"
     Then the command fails
+    And the server answered no request with 500 since the last command

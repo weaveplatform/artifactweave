@@ -20,6 +20,7 @@ Feature: Remote symbol reads preserve native PDB identities and bytes
       """
     When I run dotnet "pack pkg/Package.csproj --output nupkgs"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     Given a private symbol upstream serves PDBs from "nupkgs/Acme.Symbol.1.0.0.snupkg"
     When I PUT "/artifactory/api/repositories/nuget-remote" as admin with body:
       """

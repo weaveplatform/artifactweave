@@ -38,50 +38,63 @@ Feature: JFrog CLI round trip
   Scenario: upload, search, download, copy, move, properties and delete
     When I run jf "rt u org/* libs-local/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u readme.md libs-local/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u big.bin libs-local/big/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # The second upload of the same 64 KiB is a checksum deploy that hits.
     When I run jf "rt u big.bin libs-local/again/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 201 to PUT "/artifactory/libs-local/again/big.bin"
     And the server never answered 404 to PUT "/artifactory/libs-local/again/big.bin"
 
     When I run jf "rt s libs-local/org/acme/*.jar --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "libs-local/org/acme/app-1.0.jar"
     And the output contains "libs-local/org/acme/lib/util-2.0.jar"
     And the output does not contain "app-1.0.pom"
 
     When I run jf "rt dl libs-local/org/ out/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "org/acme/app-1.0.jar" and "out/org/acme/app-1.0.jar" are identical
     And the files "org/acme/lib/util-2.0.jar" and "out/org/acme/lib/util-2.0.jar" are identical
     When I run jf "rt dl libs-local/big/big.bin split/ --flat --split-count=2 --min-split=16 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "big.bin" and "split/big.bin" are identical
     And the server answered 206 to GET "/artifactory/libs-local/big/big.bin"
 
     When I run jf "rt sp libs-local/org/acme/*.jar release=1.0 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt s libs-local/ --props release=1.0 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "libs-local/org/acme/app-1.0.jar"
     And the output does not contain "readme.md"
     When I run jf "rt delp libs-local/org/acme/*.jar release --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt s libs-local/ --props release=1.0 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output does not contain "app-1.0.jar"
 
     When I run jf "rt cp libs-local/org/acme/app-1.0.jar libs-copy/app/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/libs-copy/app/app-1.0.jar" as admin
     Then the response status is 200
     And the response body contains "the application"
     When I run jf "rt mv libs-local/readme.md libs-copy/docs/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/libs-copy/docs/readme.md" as admin
     Then the response status is 200
     When I GET "/artifactory/libs-local/readme.md" as admin
@@ -89,8 +102,10 @@ Feature: JFrog CLI round trip
 
     When I run jf "rt del libs-local/org/acme/lib/ --quiet --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt s libs-local/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output does not contain "util-2.0.jar"
     And the output contains "libs-local/org/acme/app-1.0.jar"
 
@@ -104,30 +119,39 @@ Feature: JFrog CLI round trip
       """
     When I run jf "rt u org/acme/app-1.0.jar libs-local/org/acme/ --flat --target-props build.name=app;release=1.0 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u org/acme/app-1.0.pom libs-local/org/acme/ --flat --target-props build.name=app --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u org/acme/lib/util-2.0.jar libs-local/org/acme/lib/ --flat --target-props release=2.0;owner=team-a --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u readme.md libs-local/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
     # search_recursive
     When I run jf "rt s libs-local/org/acme/*.jar --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # search_props_sort
     When I run jf "rt s libs-local/* --props build.name=app --sort-by created --sort-order desc --limit 10 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # search_root_offset_limit
     When I run jf "rt s libs-local/* --sort-by name --offset 1 --limit 2 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # search_offset: without --sort-by or --limit the include keeps
     # "property", so .offset() sits beside it in one query.
     When I run jf "rt s libs-local/* --offset 1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # download_exclusions: each pattern becomes an $or of negations, so the
     # pom alone stays behind.
     When I run jf "rt dl libs-local/org/acme* dl/ --exclusions *.pom --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "org/acme/app-1.0.jar" and "dl/org/acme/app-1.0.jar" are identical
     And the files "org/acme/lib/util-2.0.jar" and "dl/org/acme/lib/util-2.0.jar" are identical
     And the file "dl/org/acme/app-1.0.pom" does not exist
@@ -136,28 +160,36 @@ Feature: JFrog CLI round trip
     Given the remote "remote" caches the file "org/acme/app-1.0.jar" at "org/acme/app-1.0.jar"
     When I run jf "rt dl remote/*.jar remote-dl/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "org/acme/app-1.0.jar" and "remote-dl/org/acme/app-1.0.jar" are identical
     And the server answered 200 to GET "/artifactory/remote-cache/org/acme/app-1.0.jar"
     # set_props_with_props
     When I run jf "rt sp libs-local/* checked=yes --props release=* --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # copy_move_file
     When I run jf "rt cp libs-local/org/acme/app-1.0.jar libs-copy/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # The --build shapes: the jar and the pom become app/1's artifacts, as
     # they are in internal/artifacts/core/aql/aqltest's build seeds.
     When I run jf "rt u org/acme/app-1.0.* libs-local/org/acme/ --flat --build-name=app --build-number=1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bp app 1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # search_build, search_build_properties
     When I run jf "rt s libs-local/ --build=app/1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "libs-local/org/acme/app-1.0.pom"
     # download_build
     When I run jf "rt dl libs-local/ build-dl/ --build=app/1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "org/acme/app-1.0.pom" and "build-dl/org/acme/app-1.0.pom" are identical
     # delete_any
     When I run jf "rt del libs-local/org/* --quiet --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
