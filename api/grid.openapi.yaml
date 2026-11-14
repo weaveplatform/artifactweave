@@ -652,7 +652,7 @@ components:
   parameters:
     IdempotencyKey:
       description: >-
-        Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, retries with the same credential, canonical resource and identical body bytes return 204 without appending again. Reuse with different bytes returns 422. Replays remain bound to the original run and require current permission. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window.
+        Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, a retry with the same key, credential, canonical resource and identical body bytes does not repeat the operation's effect: it answers the original success status, with the body built from the committed result after the current credential and permissions are checked again. Reuse with different bytes, or with a changed parameter that alters the effect, returns 422. A resource deleted since answers 404, one moved out of the request's scope 409. Only a success is kept, so a retry after a failure runs the operation again. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window. An operation that does not declare this parameter answers a key with 400.
       in: header
       name: Idempotency-Key
       x-artifactweave-extension: true

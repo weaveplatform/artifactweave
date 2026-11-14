@@ -4,7 +4,7 @@
 // operations) and the hand-written routes beside it (items, storage,
 // trash, multipart uploads, transfer, the searches and AQL), with the item
 // overlays and private paths of the formats whose files it serves, the
-// package protocol list and build append's replay binding. The router
+// package protocol list and the build actions' replay bindings. The router
 // builds the partial from Deps with New and mounts its registrars in a
 // fixed order.
 //
@@ -55,8 +55,9 @@
 //     RegisterMultipartRoutes and RegisterSearchRoutes; SmartStatus;
 //     HelmPartialReindex; and ProtocolOptions, the router kit's options for
 //     every protocol.
-//   - The router's contributions: KeyedBindings (build append's replay
-//     binding, which confirms a committed append and answers for it),
+//   - The router's contributions: KeyedBindings (the replay bindings of
+//     build append, both build deletes and build promotion, which confirm a
+//     committed action and answer for it),
 //     SelfAuthenticated, SlashCollections, KeepsSearchQuery,
 //     KeepsRepositoryBody, KeepsBuildBody, PrivateItem, and the overlays
 //     TryCondaItem, TryMachineLearningItem and TryChefItem.
@@ -117,8 +118,8 @@
 // in-memory stores and the access module of accesstest, which the package's
 // test fixture binds as the router would: the storage summary and its
 // formatting, the storage view's permissions, the repository operations,
-// build append's replay binding and keyed appends through the shared
-// replay, the transitive AQL peer rows and
+// the build actions' replay bindings and keyed appends, deletes and
+// promotions through the shared replay, the transitive AQL peer rows and
 // bounds, the AQL timeouts behind a router of the item routes alone, and
 // the upstream search disclosures. The route suites under
 // test/server/artifacts reach the rest through the router.

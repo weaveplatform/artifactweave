@@ -2,7 +2,9 @@ package artifactshttp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -203,5 +205,303 @@ func TestUnitAppendBindingChecks(t *testing.T) {
 	gone.Name = "nobody"
 	if _, err := svc.currentBuildAccess(gone)(t.Context()); !errors.Is(err, build.ErrForbidden) {
 		t.Fatalf("unknown user: %v", err)
+	}
+}
+
+// serveKeyed runs handler, the partial's handler of the operation the Go
+// name op names, with key under the shared replay over db, as the router
+// wraps it, and renders the answer with visit as the strict server would.
+func serveKeyed(
+	t *testing.T,
+	ctx context.Context,
+	svc ArtifactoryAPI,
+	db *inmem.Store,
+	op, key string,
+	request any,
+	handler func(context.Context, any) (any, error),
+	visit func(any, http.ResponseWriter) error,
+) *httptest.ResponseRecorder {
+	t.Helper()
+	r := httptest.NewRequestWithContext(ctx, http.MethodPost, "/", nil)
+	r.Header.Set(idempotency.Header, key)
+	mw := idempotency.Strict[artgen.StrictHandlerFunc](
+		idempotency.Replay{Store: db.Replays(), Tx: db, Budget: time.Second},
+		"artifactory",
+		operations.Table,
+		svc.KeyedBindings(),
+	)
+	wrapped := mw(
+		func(ctx context.Context, _ http.ResponseWriter, _ *http.Request, request any) (any, error) {
+			return handler(ctx, request)
+		},
+		op,
+	)
+	rec := httptest.NewRecorder()
+	out, err := wrapped(ctx, rec, r, request)
+	switch {
+	case err != nil:
+		apierror.Write(rec, apierror.ProfileArtifactory, err)
+	case out != nil:
+		if err := visit(out, rec); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return rec
+}
+
+// adminCaller is a context carrying the seeded admin and its decider.
+func adminCaller(t *testing.T, ctx context.Context, w *itemWorld) context.Context {
+	t.Helper()
+	access := accesstest.Over(t, w.db).API()
+	p, err := access.Authenticator.Basic(t.Context(), "admin", "pw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, decider, err := access.Authorizer.Authorize(t.Context(), p, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return accessapi.WithCaller(ctx, p, decider)
+}
+
+func runCount(t *testing.T, w *itemWorld, name string) int {
+	t.Helper()
+	runs, _, err := w.db.Builds().Runs(t.Context(), "", name, kernel.Page{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return len(runs)
+}
+
+// A keyed delete deletes once in either form, answers its replays with
+// the runs it deleted, and refuses its key with other effect parameters.
+func TestAccDeleteBuildsIdempotency(t *testing.T) {
+	w := newItemWorld(t, false)
+	for i, number := range []string{"1", "1", "2", "3"} {
+		w.publish(artifactDoc("app", number, fmt.Sprintf("2026-10-15T09:3%d:00.000+0000", i), "a"))
+	}
+	svc := newArtifactoryAPI(
+		Config{Store: w.db, Blobs: w.blobs, Access: accesstest.Over(t, w.db).API()},
+	)
+	ctx := adminCaller(t, context.Background(), w)
+	byQuery := func(numbers string, artifacts int, key string) *httptest.ResponseRecorder {
+		req := artgen.DeleteBuildsRequestObject{BuildName: "app", Params: artgen.DeleteBuildsParams{
+			BuildNumbers: &numbers, IdempotencyKey: &key,
+		}}
+		if artifacts != 0 {
+			a := artgen.DeleteBuildsParamsArtifacts(artifacts)
+			req.Params.Artifacts = &a
+		}
+		return serveKeyed(t, ctx, svc, w.db, "DeleteBuilds", key, req,
+			func(ctx context.Context, r any) (any, error) {
+				return svc.DeleteBuilds(
+					ctx,
+					r.(artgen.DeleteBuildsRequestObject),
+				) //nolint:forcetypeassert // its own request
+			},
+			func(out any, rw http.ResponseWriter) error {
+				return out.(artgen.DeleteBuildsResponseObject).VisitDeleteBuildsResponse(
+					rw,
+				) //nolint:forcetypeassert // its own answer
+			})
+	}
+	const one = "The following builds has been deleted successfully: 'app#1'."
+	for range 2 {
+		rec := byQuery(" 1 ", 0, `"query"`)
+		wantStatus(t, rec, http.StatusOK)
+		if rec.Body.String() != one {
+			t.Fatalf("answer %q", rec.Body)
+		}
+	}
+	if n := runCount(t, w, "app"); n != 3 {
+		t.Fatalf("runs left %d, want 3", n)
+	}
+	wantStatus(t, byQuery("1", 1, `"query"`), http.StatusUnprocessableEntity)
+
+	byBody := func(body, key string) *httptest.ResponseRecorder {
+		var d artgen.DeleteBuildsMultipleJSONRequestBody
+		if err := json.Unmarshal([]byte(body), &d); err != nil {
+			t.Fatal(err)
+		}
+		req := artgen.DeleteBuildsMultipleRequestObject{
+			Params: artgen.DeleteBuildsMultipleParams{IdempotencyKey: &key}, Body: &d,
+		}
+		return serveKeyed(t, httpkit.WithRawBody(ctx, []byte(body)), svc, w.db,
+			"DeleteBuildsMultiple", key, req,
+			func(ctx context.Context, r any) (any, error) {
+				return svc.DeleteBuildsMultiple(
+					ctx,
+					r.(artgen.DeleteBuildsMultipleRequestObject),
+				) //nolint:forcetypeassert // its own request
+			},
+			func(out any, rw http.ResponseWriter) error {
+				return out.(artgen.DeleteBuildsMultipleResponseObject).VisitDeleteBuildsMultipleResponse(
+					rw,
+				) //nolint:forcetypeassert // its own answer
+			})
+	}
+	for range 2 {
+		rec := byBody(`{"buildName":"app","buildNumbers":["2"]}`, `"body"`)
+		wantStatus(t, rec, http.StatusOK)
+		if rec.Body.String() != "The following builds has been deleted successfully: 'app#2'." {
+			t.Fatalf("answer %q", rec.Body)
+		}
+	}
+	if n := runCount(t, w, "app"); n != 2 {
+		t.Fatalf("runs left %d, want 2", n)
+	}
+	wantStatus(t, byBody(`{"buildName":"app","buildNumbers":["3"]}`, `"body"`),
+		http.StatusUnprocessableEntity)
+	wantStatus(t, byBody(`{"buildName":"absent","deleteAll":true}`, `"absent"`),
+		http.StatusNotFound)
+	wantStatus(t, byQuery("", 0, `"none"`), http.StatusBadRequest)
+}
+
+// A keyed promotion promotes once and answers its replays with its report;
+// a dry run keeps no receipt, so a retry runs it again.
+func TestAccPromoteBuildIdempotency(t *testing.T) {
+	w := newItemWorld(t, false)
+	w.publish(artifactDoc("app", "1", testStarted, "a"))
+	svc := newArtifactoryAPI(
+		Config{Store: w.db, Blobs: w.blobs, Access: accesstest.Over(t, w.db).API()},
+	)
+	ctx := adminCaller(t, context.Background(), w)
+	promote := func(body, key string) *httptest.ResponseRecorder {
+		var b artgen.BuildPromotionRequest
+		if err := json.Unmarshal([]byte(body), &b); err != nil {
+			t.Fatal(err)
+		}
+		req := artgen.PromoteBuildRequestObject{
+			BuildName: "app", BuildNumber: "1",
+			Params:   artgen.PromoteBuildParams{IdempotencyKey: &key},
+			JSONBody: &b,
+		}
+		return serveKeyed(
+			t,
+			httpkit.WithRawBody(ctx, []byte(body)),
+			svc,
+			w.db,
+			"PromoteBuild",
+			key,
+			req,
+			func(ctx context.Context, r any) (any, error) {
+				return svc.PromoteBuild(
+					ctx,
+					r.(artgen.PromoteBuildRequestObject),
+				) //nolint:forcetypeassert // its own request
+			},
+			func(out any, rw http.ResponseWriter) error {
+				return out.(artgen.PromoteBuildResponseObject).VisitPromoteBuildResponse(
+					rw,
+				) //nolint:forcetypeassert // its own answer
+			},
+		)
+	}
+	promotions := func() int {
+		b, err := w.db.Builds().Get(t.Context(), "", "app", "1", time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := w.db.Builds().Promotions(t.Context(), b.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(got)
+	}
+	var first string
+	for i := range 2 {
+		rec := promote(`{"status":"released","artifacts":false}`, `"promote"`)
+		wantStatus(t, rec, http.StatusOK)
+		if i == 0 {
+			first = rec.Body.String()
+		}
+		if rec.Body.String() != first {
+			t.Fatalf("replay answered %s, want %s", rec.Body, first)
+		}
+	}
+	if n := promotions(); n != 1 {
+		t.Fatalf("promotions %d, want 1", n)
+	}
+	wantStatus(t, promote(`{"status":"other","artifacts":false}`, `"promote"`),
+		http.StatusUnprocessableEntity)
+	for range 2 {
+		wantStatus(t, promote(`{"status":"dry","artifacts":false,"dryRun":true}`, `"dry"`),
+			http.StatusOK)
+	}
+	wantStatus(t, promote(`{"targetRepo":"absent"}`, `"absent"`), http.StatusNotFound)
+	wantStatus(t, promote(`{"timestamp":"never"}`, `"refused"`), http.StatusBadRequest)
+	if n := promotions(); n != 1 {
+		t.Fatalf("promotions after refusals %d, want 1", n)
+	}
+}
+
+// The delete and promotion bindings refuse another operation's request,
+// check the caller as their handlers do, and map errors as they do.
+func TestUnitBuildActionBindingChecks(t *testing.T) {
+	w := newItemWorld(t, false)
+	svc := newArtifactoryAPI(
+		Config{Store: w.db, Blobs: w.blobs, Access: accesstest.Over(t, w.db).API()},
+	)
+	ctx := t.Context()
+	for name, b := range map[string]idempotency.Binding{
+		"delete":         svc.deleteBinding(),
+		"deleteMultiple": svc.deleteMultipleBinding(),
+		"promote":        svc.promoteBinding(),
+	} {
+		if _, err := b.Resource(ctx, struct{}{}); !errors.Is(err, errRequestType) {
+			t.Errorf("%s: resource of another request: %v", name, err)
+		}
+		if _, err := b.Reload(
+			ctx,
+			struct{}{},
+			idempotency.ReplayReceipt{},
+		); !errors.Is(
+			err,
+			errRequestType,
+		) {
+			t.Errorf("%s: reload of another request: %v", name, err)
+		}
+		var api *apierror.Error
+		if err := b.Error(ctx, struct{}{}, build.ErrNotFound); !errors.As(err, &api) ||
+			api.Status != http.StatusNotFound {
+			t.Errorf("%s: error of another request: %v", name, err)
+		}
+	}
+	if _, err := svc.deleteBinding().Fingerprint(ctx, struct{}{}); !errors.Is(err, errRequestType) {
+		t.Errorf("fingerprint of another request: %v", err)
+	}
+	body := artgen.BuildPromotionRequest{}
+	for name, call := range map[string]func() (any, error){
+		"delete resource": func() (any, error) {
+			return svc.deleteBinding().Resource(ctx, artgen.DeleteBuildsRequestObject{})
+		},
+		"delete reload": func() (any, error) {
+			return svc.deleteBinding().Reload(ctx, artgen.DeleteBuildsRequestObject{},
+				idempotency.ReplayReceipt{})
+		},
+		"multiple resource": func() (any, error) {
+			return svc.deleteMultipleBinding().Resource(ctx, artgen.DeleteBuildsMultipleRequestObject{})
+		},
+		"multiple reload": func() (any, error) {
+			return svc.deleteMultipleBinding().Reload(ctx, artgen.DeleteBuildsMultipleRequestObject{
+				Body: &artgen.DeleteBuildsMultipleJSONRequestBody{},
+			}, idempotency.ReplayReceipt{})
+		},
+		"promote resource": func() (any, error) {
+			return svc.promoteBinding().Resource(ctx, artgen.PromoteBuildRequestObject{JSONBody: &body})
+		},
+		"promote reload": func() (any, error) {
+			return svc.promoteBinding().Reload(ctx, artgen.PromoteBuildRequestObject{},
+				idempotency.ReplayReceipt{})
+		},
+	} {
+		if _, err := call(); err == nil {
+			t.Errorf("%s without a caller: no error", name)
+		}
+	}
+	// A promotion that is not JSON goes on to its handler, which refuses it.
+	if _, err := svc.promoteBinding().
+		Resource(ctx, artgen.PromoteBuildRequestObject{}); err != nil {
+		t.Errorf("promotion without a body: %v", err)
 	}
 }

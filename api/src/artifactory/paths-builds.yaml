@@ -748,6 +748,8 @@ paths:
       description: Deletes runs of one build, selected by number or all at once, optionally with their artifacts.
         Needs delete permission on the build.
       operationId: deleteBuildsMultiple
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         content:
           application/json:
@@ -770,6 +772,8 @@ paths:
           $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
         '403':
           $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
+        '422':
+          description: This unexpired key was used with different request bytes or parameters.
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/deletebuildsmultiple.md
@@ -783,6 +787,7 @@ paths:
         them is reported rather than refused. The body may use the vendor media type or application/json.
       operationId: promoteBuild
       parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
       - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped
           as %2F and is matched as a single path segment.
         in: path
@@ -839,6 +844,10 @@ paths:
           $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
         '404':
           $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+        '409':
+          description: The run a key promoted has since moved to another build name or number.
+        '422':
+          description: This unexpired key was used with different request bytes or parameters.
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/promotebuild.md
@@ -966,6 +975,7 @@ paths:
         permission on the build.
       operationId: deleteBuilds
       parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
       - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped
           as %2F and is matched as a single path segment.
         in: path
@@ -1019,6 +1029,8 @@ paths:
           $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
         '404':
           $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+        '422':
+          description: This unexpired key was used with different request bytes or parameters.
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/deletebuilds.md

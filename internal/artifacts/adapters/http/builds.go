@@ -351,21 +351,26 @@ func (s ArtifactoryAPI) DeleteBuilds(
 	ctx context.Context,
 	req artgen.DeleteBuildsRequestObject,
 ) (artgen.DeleteBuildsResponseObject, error) {
+	msg, err := s.deleteBuilds(ctx, deleteOf(req), req.Params.IdempotencyKey != nil)
+	if err != nil {
+		return nil, err
+	}
+	return artgen.DeleteBuilds200TextResponse(msg), nil
+}
+
+// deleteOf reads the runs DeleteBuilds deletes from req.
+func deleteOf(req artgen.DeleteBuildsRequestObject) build.Delete {
 	var numbers []string
 	for n := range strings.SplitSeq(httpkit.Deref(req.Params.BuildNumbers), ",") {
 		if n = strings.TrimSpace(n); n != "" {
 			numbers = append(numbers, n)
 		}
 	}
-	msg, err := s.deleteBuilds(ctx, build.Delete{
+	return build.Delete{
 		Name: req.BuildName, Numbers: numbers,
 		All:       httpkit.Deref(req.Params.DeleteAll) == 1,
 		Artifacts: httpkit.Deref(req.Params.Artifacts) == 1,
-	})
-	if err != nil {
-		return nil, err
 	}
-	return artgen.DeleteBuilds200TextResponse(msg), nil
 }
 
 // DeleteBuildsMultiple is the body form of DeleteBuilds, which jf rt bp
@@ -374,34 +379,59 @@ func (s ArtifactoryAPI) DeleteBuildsMultiple(
 	ctx context.Context,
 	req artgen.DeleteBuildsMultipleRequestObject,
 ) (artgen.DeleteBuildsMultipleResponseObject, error) {
-	msg, err := s.deleteBuilds(ctx, build.Delete{
-		ProjectKey: httpkit.Deref(req.Body.Project), Name: req.Body.BuildName,
-		Numbers: httpkit.DerefSlice(req.Body.BuildNumbers), All: httpkit.Deref(req.Body.DeleteAll),
-		Artifacts: httpkit.Deref(req.Body.DeleteArtifacts),
-	})
+	msg, err := s.deleteBuilds(ctx, deleteMultipleOf(req), req.Params.IdempotencyKey != nil)
 	if err != nil {
 		return nil, err
 	}
 	return artgen.DeleteBuildsMultiple200TextResponse(msg), nil
 }
 
-func (s ArtifactoryAPI) deleteBuilds(ctx context.Context, d build.Delete) (string, error) {
+// deleteMultipleOf reads the runs DeleteBuildsMultiple deletes from req.
+func deleteMultipleOf(req artgen.DeleteBuildsMultipleRequestObject) build.Delete {
+	return build.Delete{
+		ProjectKey: httpkit.Deref(req.Body.Project), Name: req.Body.BuildName,
+		Numbers: httpkit.DerefSlice(req.Body.BuildNumbers), All: httpkit.Deref(req.Body.DeleteAll),
+		Artifacts: httpkit.Deref(req.Body.DeleteArtifacts),
+	}
+}
+
+// deleteBuilds deletes d's runs; keyed runs it as the shared replay's
+// effect, inside its transaction, and returns the error unmapped for the
+// binding's Error, which needs it so to tell a spent budget (503) from the
+// rest.
+func (s ArtifactoryAPI) deleteBuilds(
+	ctx context.Context,
+	d build.Delete,
+	keyed bool,
+) (string, error) {
 	svc, p, a, err := s.buildCaller(ctx)
 	if err != nil {
 		return "", err
 	}
 	d.By = p.Name
+	if keyed {
+		gone, id, err := svc.DeleteKeyed(ctx, d, s.currentBuildAccess(p), reportRetention)
+		if err != nil {
+			return "", err //nolint:wrapcheck // the binding's Error maps it
+		}
+		idempotency.Report(ctx, id)
+		return deletedText(d.Name, gone), nil
+	}
 	gone, err := svc.Delete(ctx, d, a)
 	if err != nil {
 		return "", s.buildError(ctx, p, d.ProjectKey, noBuild(d.Name), err)
 	}
-	// Artifactory's text (deletebuilds), one entry per deleted run.
+	return deletedText(d.Name, gone), nil
+}
+
+// deletedText is Artifactory's answer to a delete (deletebuilds), one
+// entry per deleted run.
+func deletedText(name string, gone []model.BuildRun) string {
 	runs := make([]string, 0, len(gone))
 	for _, r := range gone {
-		runs = append(runs, "'"+d.Name+"#"+r.Number+"'")
+		runs = append(runs, "'"+name+"#"+r.Number+"'")
 	}
-	return "The following builds has been deleted successfully: " + strings.Join(runs, ", ") + ".",
-		nil
+	return "The following builds has been deleted successfully: " + strings.Join(runs, ", ") + "."
 }
 
 // GetBuildArtifacts lists where the artifacts of a number's latest run are.
@@ -444,10 +474,7 @@ func (s ArtifactoryAPI) PromoteBuild(
 	ctx context.Context,
 	req artgen.PromoteBuildRequestObject,
 ) (artgen.PromoteBuildResponseObject, error) {
-	body := req.JSONBody
-	if body == nil {
-		body = req.ApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody
-	}
+	body := promotionBody(req)
 	if body == nil {
 		return refusePromotion("The promotion request must be JSON"), nil
 	}
@@ -456,19 +483,75 @@ func (s ArtifactoryAPI) PromoteBuild(
 		return nil, err
 	}
 	project := httpkit.Deref(req.Params.Project)
+	promotion, refusal := promotionOf(req, body, p)
+	if refusal != nil {
+		return refusal, nil
+	}
+	var (
+		res build.PromotionResult
+		id  int64
+	)
+	keyed := req.Params.IdempotencyKey != nil
+	if keyed {
+		res, id, err = svc.PromoteKeyed(ctx, promotion, s.currentBuildAccess(p), reportRetention)
+	} else {
+		res, err = svc.Promote(ctx, promotion, a)
+	}
+	switch {
+	case errors.Is(err, build.ErrNoTarget):
+		return nil, apierror.New(http.StatusNotFound, fmt.Sprintf(
+			"Cannot find target repository by the key '%s'.", httpkit.Deref(body.TargetRepo)))
+	case errors.Is(err, build.ErrInvalid):
+		return refusePromotion(strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": ")), nil
+	case err != nil && keyed:
+		// The shared replay runs this as the effect and maps the error
+		// with the binding's Error, which needs it unmapped to tell a
+		// spent budget (503) from the rest.
+		return nil, err //nolint:wrapcheck // the binding's Error maps it
+	case err != nil:
+		return nil, s.buildError(ctx, p, project, unpromoted(req), err)
+	}
+	out := promotionReport(res.Messages)
+	if res.Aborted {
+		return artgen.PromoteBuild400JSONResponse(out), nil
+	}
+	// A dry run changed nothing and has no report, so it gets no
+	// receipt, and a retry runs it again.
+	if id != 0 {
+		idempotency.Report(ctx, id)
+	}
+	return artgen.PromoteBuild200JSONResponse(out), nil
+}
+
+// promotionBody is a promotion's body in either of its media types; nil
+// when it has none.
+func promotionBody(req artgen.PromoteBuildRequestObject) *artgen.BuildPromotionRequest {
+	if req.JSONBody != nil {
+		return req.JSONBody
+	}
+	return req.ApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody
+}
+
+// promotionOf reads the promotion req asks for, by p, or the answer that
+// refuses it.
+func promotionOf(
+	req artgen.PromoteBuildRequestObject,
+	body *artgen.BuildPromotionRequest,
+	p kernel.Principal,
+) (build.Promotion, artgen.PromoteBuildResponseObject) {
 	at, err := started(body.Timestamp)
 	if err != nil {
-		return refusePromotion("The timestamp " + httpkit.Deref(body.Timestamp) +
-			" is not in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ"), nil
+		return build.Promotion{}, refusePromotion("The timestamp " + httpkit.Deref(body.Timestamp) +
+			" is not in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ")
 	}
 	props, bad := promotionProperties(httpkit.Deref(body.Properties))
 	if bad != "" {
-		return refusePromotion(fmt.Sprintf(
-			"The value of property '%s' must be a string or an array of strings", bad)), nil
+		return build.Promotion{}, refusePromotion(fmt.Sprintf(
+			"The value of property '%s' must be a string or an array of strings", bad))
 	}
 	for k := range props {
 		if err := model.CheckPropertyKeyLength(k); err != nil {
-			return refusePromotion(err.Error()), nil
+			return build.Promotion{}, refusePromotion(err.Error())
 		}
 	}
 	artifacts, failFast := true, true
@@ -478,8 +561,8 @@ func (s ArtifactoryAPI) PromoteBuild(
 	if body.FailFast != nil {
 		failFast = *body.FailFast
 	}
-	res, err := svc.Promote(ctx, build.Promotion{
-		ProjectKey: project,
+	return build.Promotion{
+		ProjectKey: httpkit.Deref(req.Params.Project),
 		Name:       req.BuildName,
 		Number:     req.BuildNumber,
 		Status: httpkit.Deref(
@@ -502,22 +585,13 @@ func (s ArtifactoryAPI) PromoteBuild(
 		DryRun:     httpkit.Deref(body.DryRun),
 		FailFast:   failFast,
 		By:         p.Name,
-	}, a)
-	switch {
-	case errors.Is(err, build.ErrNoTarget):
-		return nil, apierror.New(http.StatusNotFound, fmt.Sprintf(
-			"Cannot find target repository by the key '%s'.", httpkit.Deref(body.TargetRepo)))
-	case errors.Is(err, build.ErrInvalid):
-		return refusePromotion(strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": ")), nil
-	case err != nil:
-		return nil, s.buildError(ctx, p, project, fmt.Sprintf(
-			"Unable to find build '%s' #%s.", req.BuildName, req.BuildNumber), err)
-	}
-	out := promotionReport(res.Messages)
-	if res.Aborted {
-		return artgen.PromoteBuild400JSONResponse(out), nil
-	}
-	return artgen.PromoteBuild200JSONResponse(out), nil
+	}, nil
+}
+
+// unpromoted is the 404 message for a promotion of a run that does not
+// exist.
+func unpromoted(req artgen.PromoteBuildRequestObject) string {
+	return fmt.Sprintf("Unable to find build '%s' #%s.", req.BuildName, req.BuildNumber)
 }
 
 func refusePromotion(text string) artgen.PromoteBuildResponseObject {

@@ -104,7 +104,7 @@ func TestAccKeyGateThroughRouter(t *testing.T) {
 			break
 		}
 	}
-	const refusal = "Idempotency-Key is supported only once, on build append"
+	const refusal = "Idempotency-Key is supported only once, on an operation whose API description declares it"
 	for _, c := range []struct{ method, path, body string }{
 		{http.MethodPost, stub, `{"errors":[{"message":"` + refusal + `","status":400}],"message":"` + refusal + `","status_code":400}`},
 		{http.MethodPost, "/v2/libs-local/blobs/uploads/", `{"errors":[{"code":"BAD_REQUEST","message":"` + refusal + `"}]}`},
