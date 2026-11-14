@@ -246,7 +246,7 @@ api-ledger:
 bundle:
 	$(GO) run ./tools/openapi-bundle -src api/src -out api
 
-## generate: bundle the specs, regenerate the strict chi servers, Go clients and 501 stubs
+## generate: bundle the specs, regenerate the strict chi servers, Go clients, 501 stubs and the operation table
 # Pinned by version so every developer and CI produce byte-identical output; the
 # drift check in verify-generate depends on that.
 OAPI_CODEGEN := github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0
@@ -259,6 +259,7 @@ generate: bundle
 		$(GO) run $(OAPI_CODEGEN) -config api/oapi-client-$$s.yaml api/$$s.openapi.yaml || exit 1; \
 		$(GO) run ./tools/stubgen internal/platform/gen/$$s/server.gen.go || exit 1; \
 	done
+	$(GO) run ./tools/optable -api api -out internal/platform/gen/operations/operations.gen.go
 
 ## verify-generate: fail if make generate would change the committed generated code
 # Outputs owned by make generate; verify-generate checks exactly these paths.

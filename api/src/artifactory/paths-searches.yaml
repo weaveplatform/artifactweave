@@ -69,6 +69,46 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
       description: The repository, image or path named in the request does not exist or is not visible to the caller.
+    ArtifactorySearchesApiRegistryBadRequest:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegistryErrorResponse'
+      description: The request is malformed, for example an image name outside the registry's name grammar
+        (NAME_INVALID). The body is a registry error.
+    ArtifactorySearchesApiRegistryForbidden:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegistryErrorResponse'
+      description: The caller may not read the image (UNAUTHORIZED, the code the registry sends for a permission
+        refusal), or the caller's API access is restricted (DENIED). The body is a registry error.
+    ArtifactorySearchesApiRegistryInternalServerError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegistryErrorResponse'
+      description: The listing failed inside the server (INTERNAL_ERROR). The body is a registry error.
+    ArtifactorySearchesApiRegistryMethodNotAllowed:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegistryErrorResponse'
+      description: The repository is a remote or virtual repository (UNSUPPORTED). The body is a registry error.
+    ArtifactorySearchesApiRegistryNotFound:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegistryErrorResponse'
+      description: The repository does not exist or is not a Docker, OCI or Helm OCI repository, or the image is
+        unknown (NAME_UNKNOWN, naming them in detail.name). The body is a registry error.
+    ArtifactorySearchesApiRegistryUnauthorized:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegistryErrorResponse'
+      description: Credentials were missing or rejected while anonymous access is off (UNAUTHORIZED); the response
+        carries the registry's authentication challenge. The body is a registry error.
     ArtifactorySearchesApiUnauthorized:
       content:
         application/json:
@@ -473,23 +513,33 @@ paths:
                 type: string
           description: The image names, possibly a page of them.
         '400':
-          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryBadRequest'
         '401':
-          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryUnauthorized'
         '403':
-          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryForbidden'
         '404':
-          $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryNotFound'
         '405':
-          description: The repository is a remote or virtual repository; the body is a registry error with the code
-            UNSUPPORTED.
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryMethodNotAllowed'
+        '429':
+          $ref: '#/components/responses/RegistryTooManyRequests'
         '500':
-          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryInternalServerError'
+        '503':
+          $ref: '#/components/responses/RegistryServiceUnavailable'
       tags:
       - searches
       - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/listdockerrepositories.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: native
+      x-pagination-parameters:
+        position: last
+        size: n
+      x-pagination-next: link
   /api/docker/{repo-key}/v2/parentManifests:
     post:
       description: Finds the multi-platform manifest lists that reference a given image manifest, so a caller can
@@ -557,6 +607,10 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/findparentmanifestlists.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/docker/{repo-key}/v2/{imageName}/tags/list:
     get:
       description: Lists the tags of one image in the shape of the registry tags endpoint. The tags are the image's
@@ -608,23 +662,33 @@ paths:
                 type: string
           description: The tags, possibly a page of them.
         '400':
-          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryBadRequest'
         '401':
-          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryUnauthorized'
         '403':
-          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryForbidden'
         '404':
-          $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryNotFound'
         '405':
-          description: The repository is a remote or virtual repository; the body is a registry error with the code
-            UNSUPPORTED.
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryMethodNotAllowed'
+        '429':
+          $ref: '#/components/responses/RegistryTooManyRequests'
         '500':
-          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryInternalServerError'
+        '503':
+          $ref: '#/components/responses/RegistryServiceUnavailable'
       tags:
       - searches
       - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/listdockertags.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: native
+      x-pagination-parameters:
+        position: last
+        size: n
+      x-pagination-next: link
   /api/search/aql:
     post:
       description: 'Runs an AQL query. The body is the query text, not JSON, and is limited to 6,000 characters;
@@ -725,6 +789,11 @@ paths:
       - searches
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchaql.md
+      x-idempotency: none
+      x-idempotency-reason: read-or-write
+      x-cost: expensive
+      x-pagination: native
+      x-pagination-next: none
   /api/search/archive:
     get:
       description: Not implemented; answers 501. It would find entries inside archives by member name; use AQL
@@ -763,6 +832,10 @@ paths:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searcharchive.md
       x-tier: deprecated
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/search/artifact:
     get:
       description: Finds files whose name contains the given text. Only local repositories and remote caches are
@@ -801,6 +874,10 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchartifact.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/search/badChecksum:
     get:
       description: Finds items whose checksum declared by the uploading client differs from the computed one, or
@@ -840,6 +917,10 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchbadchecksum.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/search/buildArtifacts:
     post:
       description: Lists the artifacts a build run produced, in module and artifact order. Each artifact is the
@@ -883,6 +964,10 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchbuildartifacts.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/search/checksum:
     get:
       description: Finds items whose content has the given checksum. Exactly one of md5, sha1 or sha256 should be
@@ -931,6 +1016,10 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchchecksum.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/search/creation:
     get:
       description: Finds items created between two instants. Only local repositories and remote caches are searched.
@@ -976,6 +1065,10 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchcreation.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/search/dates:
     get:
       description: Finds items for which at least one of the requested date fields falls inside the window. Only
@@ -1028,6 +1121,10 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchdates.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/search/dependency:
     get:
       description: Finds the build runs whose recorded dependencies include the artifact with the given SHA-1,
@@ -1063,6 +1160,10 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchdependency.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/search/gavc:
     get:
       description: Finds files by Maven coordinates read through each repository's layout, in repositories whose
@@ -1133,6 +1234,10 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchgavc.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/search/latestVersion:
     get:
       description: Returns the latest version of a module as plain text, using the repository layout to extract
@@ -1198,6 +1303,8 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchlatestversion.md
+      x-idempotency: safe
+      x-cost: expensive
   /api/search/license:
     get:
       description: Finds items whose licence properties match the requested statuses. The search reads the licence
@@ -1289,6 +1396,10 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchlicense.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/search/pattern:
     get:
       description: Lists files matching an Ant-style path pattern inside one repository. The pattern is prefixed
@@ -1325,6 +1436,10 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchpattern.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/search/prop:
     get:
       description: Finds items by property values. Every query parameter except repos is read as a property key
@@ -1356,6 +1471,10 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchproperty.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/search/usage:
     get:
       description: Finds items that have not been downloaded since an instant, which is the raw material for retention
@@ -1402,6 +1521,10 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchusage.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/search/versions:
     get:
       description: Lists every version of a module found through the repository layout, newest first in the
@@ -1468,6 +1591,10 @@ paths:
       tags:
       - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchversions.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/versions/{repo}/{path}:
     get:
       description: Returns the highest value of the lowercase version property among the files under a path,
@@ -1525,3 +1652,5 @@ paths:
       - searches
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchlatestversionbyproperties.md
+      x-idempotency: safe
+      x-cost: ordinary

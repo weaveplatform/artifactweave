@@ -10,6 +10,18 @@ directory; edit the fragments, never the bundle. One directory per service
 | `paths-<family>.yaml` | `paths` and the `components` only that family uses |
 | `components-common.yaml` | Schemas shared by every family (the error envelope) |
 
+`components-shared.yaml`, beside the service directories, holds what every service
+shares (decision 0043, "Where the declarations live"): the `IdempotencyKey`
+parameter, the `Retry-After`, `RateLimit`, `RateLimit-Policy` and `Link` headers,
+and the `TooManyRequests` and `ServiceUnavailable` responses, whose bodies reference
+each service's own `ErrorResponse`. It is not a service directory, so the bundler,
+the scaffold and the parity tools do not treat it as one. The bundler merges its
+components into every bundle and adds `TooManyRequests` as the 429 and
+`ServiceUnavailable` as the 503 of each operation whose `x-cost` is not `exempt`,
+leaving a 429 or 503 an operation declares itself. An operation whose path admission
+answers in another envelope than its service's `ErrorResponse` declares its own,
+with the shared headers (`components-common.yaml` of `artifactory` holds them).
+
 The bundler sorts paths and components, rejects duplicate paths, operation ids and
 component names, and refuses fragments with other top-level keys.
 
@@ -18,7 +30,8 @@ component names, and refuses fragments with other top-level keys.
 1. `make oracle-fetch` once (gitignored cache of JFrog's embedded definitions).
 2. `make scaffold FAMILY=<cache family> SERVICE=<service>` writes
    `paths-<family>.yaml` with the documented paths, parameters, schemas, enums and
-   status codes, every description set to `TODO(author)` and every operation and
+   status codes, every description and every operation's `x-idempotency`, `x-cost`
+   and `x-pagination` set to `TODO(author)`, and every operation and
    schema marked `x-draft: true`. Operations outside the service prefix are listed as
    skipped; scaffold them into the right service. Schema names that another family
    uses with a different shape arrive prefixed with the family name; rename to
@@ -30,7 +43,9 @@ component names, and refuses fragments with other top-level keys.
    `docs/research/14-data-model-inventory.md` for the facts and the page named in
    `x-oracle-source` for behaviour (read, never copy). Remove `x-draft` as each
    operation and schema is finished; `TestAccOpenAPIFieldDescriptions` then enforces the
-   conventions on it.
+   conventions on it. Pick each operation's classes by the rules in that document
+   (remove `x-pagination` from an operation that answers no collection);
+   `TestAccAPIPrinciples` fails a class still `TODO(author)` once `x-draft` is gone.
 5. `make parity` must show the family as matched, and `TestAccSpecParity` must pass;
    shrink `api/parity-baseline.json` with `make parity-baseline` and review the diff.
 6. `make verify-generate lint test` before opening the PR.

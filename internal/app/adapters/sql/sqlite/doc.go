@@ -62,5 +62,8 @@
 //     testdata/schema.golden.
 //   - replay_test.go: TestAccReplayProcessCrash kills a child process,
 //     TestAccReplayCrashHelper, after its write and before the write's replay
-//     receipt commits, and checks that both roll back.
+//     receipt commits, and checks that both roll back;
+//     TestAccKeyedReplayProcessCrash, with its child
+//     TestAccKeyedReplayCrashHelper, does the same under the shared replay
+//     of keyed operations, inside its effect.
 package sqlite

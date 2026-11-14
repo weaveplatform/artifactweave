@@ -39,7 +39,8 @@
 //     kernel does not declare.
 //   - The access records a test stores (User, Group, Permission, Token,
 //     Project, Role and the rest), the store ports a fake wraps (UserStore,
-//     PermissionStore, TokenStore, with TokenFilter and APIRestriction) and
+//     PermissionStore with PermissionQuery, TokenStore with TokenFilter,
+//     and APIRestriction) and
 //     the constants a test sets (UserDisabled, UserLocked and
 //     RoleCustomGlobal): aliases of access/core/model and access/core/port,
 //     which a test outside access may not import.

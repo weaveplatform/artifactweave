@@ -649,6 +649,17 @@ func (f failTrash) List(
 	return f.TrashStore.List(ctx, r, p, pg) //nolint:wrapcheck // test double
 }
 
+func (f failTrash) BelowByPath(
+	ctx context.Context,
+	dir string,
+	pg kernel.Page,
+) ([]model.TrashEntry, string, error) {
+	if err := f.fail["below"]; err != nil {
+		return nil, "", err
+	}
+	return f.TrashStore.BelowByPath(ctx, dir, pg) //nolint:wrapcheck // test double
+}
+
 func (f failTrash) Find(ctx context.Context, r, p string) ([]model.TrashEntry, error) {
 	if err := f.fail["find"]; err != nil {
 		return nil, err
@@ -752,7 +763,7 @@ func TestUnitStoreFailures(t *testing.T) {
 			return err
 		},
 		"children": func() error {
-			_, err := svc(map[string]error{"list": errBoom}).Children(ctx, "libs", nil)
+			_, err := svc(map[string]error{"below": errBoom}).Children(ctx, "libs", nil)
 			return err
 		},
 		"find": func() error {

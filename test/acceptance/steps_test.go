@@ -17,7 +17,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -72,6 +74,12 @@ type world struct {
 	dir string
 	// next holds headers for the next request only.
 	next map[string]string
+	// dropNext makes the transport lose the next request's answer, and
+	// dropped is the answer it lost.
+	dropNext bool
+	dropped  *droppedAnswer
+	// walked is the last list read by its next links.
+	walked *walk
 	// jfHome is the JFrog CLI's configuration for the scenario, so a
 	// server added by jf c add is there for the commands after it.
 	jfHome string
@@ -232,6 +240,21 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^the next request has idempotency key "([^"]*)"$`, func(key string) error {
 		return w.nextHeader("Idempotency-Key", strconv.Quote(key))
 	})
+	sc.Step(`^the transport drops the next response$`, func() { w.dropNext = true })
+	sc.Step(`^the client saw no response$`, w.sawNoResponse)
+	sc.Step(`^the response is the one the transport dropped$`, w.answeredAsDropped)
+	sc.Step(
+		`^I walk "([^"]*)" as "([^"]*)" with password "([^"]*)" by its next links$`,
+		w.walkNextLinks,
+	)
+	sc.Step(`^the walk read (\d+) pages$`, w.walkReadPages)
+	sc.Step(`^the walk visited each "([^"]*)" of "([^"]*)" exactly once$`, w.walkVisitedOnce)
+	sc.Step(`^the walk visited the "([^"]*)" values "([^"]*)"$`, w.walkVisitedValues)
+	sc.Step(
+		`^I GET "([^"]*)" as "([^"]*)" with password "([^"]*)" until its allowance is spent$`,
+		w.spendAllowance,
+	)
+	sc.Step(`^the response header "([^"]*)" is a number from (\d+) to (\d+)$`, w.headerNumberIn)
 	sc.Step(`^I keep an expiry one hour from now as "([^"]*)"$`, func(name string) {
 		if w.vars == nil {
 			w.vars = map[string]string{}
@@ -681,7 +704,17 @@ func (w *world) send(method, path, body string, prepare func(*http.Request)) err
 	}
 	w.next = nil
 	prepare(req)
-	resp, err := http.DefaultClient.Do(req)
+	client := http.DefaultClient
+	var lost droppedAnswer
+	if w.dropNext {
+		w.dropNext = false
+		client = &http.Client{Transport: dropTransport{kept: &lost}}
+	}
+	resp, err := client.Do(req)
+	if errors.Is(err, errDropped) {
+		w.status, w.header, w.body, w.dropped = 0, nil, nil, &lost
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -1169,5 +1202,237 @@ func (w *world) mintIDToken(audience, name string, body *godog.DocString) error 
 		w.vars = map[string]string{}
 	}
 	w.vars[name] = raw
+	return nil
+}
+
+// droppedAnswer is a response the test's transport received and the client
+// never saw.
+type droppedAnswer struct {
+	status int
+	header http.Header
+	body   []byte
+}
+
+// errDropped is what dropTransport returns in place of an answer.
+var errDropped = errors.New("the test's transport dropped the response")
+
+// dropTransport delivers a request and loses its answer, as a connection
+// that fails once the server has committed does. It reads the whole
+// response before it reports the loss, so the server has finished the
+// request, and keeps it for a retry to be compared with.
+type dropTransport struct{ kept *droppedAnswer }
+
+func (d dropTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	resp, err := http.DefaultTransport.RoundTrip(r)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	*d.kept = droppedAnswer{status: resp.StatusCode, header: resp.Header, body: body}
+	return nil, errDropped
+}
+
+func (w *world) sawNoResponse() error {
+	if w.dropped == nil {
+		return errors.New("the transport dropped no response")
+	}
+	if w.status != 0 || w.body != nil {
+		return fmt.Errorf("the client saw status %d: %s", w.status, w.body)
+	}
+	return nil
+}
+
+// answeredAsDropped compares the last answer with the one the transport
+// lost: a replay answers as the first request would have. Date, the request
+// ID and the rate headers belong to each request, so only the status, the
+// content type and the body are compared.
+func (w *world) answeredAsDropped() error {
+	if w.dropped == nil {
+		return errors.New("the transport dropped no response")
+	}
+	d := w.dropped
+	if w.status != d.status || !bytes.Equal(w.body, d.body) ||
+		w.header.Get("Content-Type") != d.header.Get("Content-Type") {
+		return fmt.Errorf("answer %d %q %q, the dropped one %d %q %q",
+			w.status, w.header.Get("Content-Type"), w.body,
+			d.status, d.header.Get("Content-Type"), d.body)
+	}
+	return nil
+}
+
+// walk is a list read page by page through its next links, and the caller
+// who read it.
+type walk struct {
+	user, password string
+	pages          [][]byte
+}
+
+// maxWalkPages ends a walk whose next links never stop.
+const maxWalkPages = 100
+
+// walkNextLinks reads path and then every page its Link rel="next" names,
+// until an answer has none.
+func (w *world) walkNextLinks(path, user, password string) error {
+	w.walked = &walk{user: user, password: password}
+	next := path
+	for range maxWalkPages {
+		if err := w.getAs(next, user, password); err != nil {
+			return err
+		}
+		if err := w.statusIs(http.StatusOK); err != nil {
+			return fmt.Errorf("page %d (%s): %w", len(w.walked.pages)+1, next, err)
+		}
+		w.walked.pages = append(w.walked.pages, w.body)
+		target, ok := nextLink(w.header.Values("Link"))
+		if !ok {
+			return nil
+		}
+		u, err := url.Parse(target)
+		if err != nil {
+			return fmt.Errorf("next link %q: %w", target, err)
+		}
+		next = u.RequestURI()
+	}
+	return fmt.Errorf("the walk did not end within %d pages", maxWalkPages)
+}
+
+// linkValue is one link of a Link field (RFC 8288): its target and its
+// parameters.
+var linkValue = regexp.MustCompile(`<([^>]*)>((?:\s*;\s*[^;,]*)*)`)
+
+// nextLink returns the target of the link whose rel names "next".
+func nextLink(fields []string) (string, bool) {
+	for _, f := range fields {
+		for _, m := range linkValue.FindAllStringSubmatch(f, -1) {
+			for p := range strings.SplitSeq(m[2], ";") {
+				name, value, _ := strings.Cut(strings.TrimSpace(p), "=")
+				if !strings.EqualFold(name, "rel") {
+					continue
+				}
+				if slices.Contains(strings.Fields(strings.Trim(value, `"`)), "next") {
+					return m[1], true
+				}
+			}
+		}
+	}
+	return "", false
+}
+
+func (w *world) walkReadPages(want int) error {
+	if w.walked == nil {
+		return errors.New("no list was walked")
+	}
+	if got := len(w.walked.pages); got != want {
+		return fmt.Errorf("the walk read %d pages, want %d", got, want)
+	}
+	return nil
+}
+
+// walkFields is field of every entry of every page, in the order read.
+func (w *world) walkFields(field string) ([]string, error) {
+	if w.walked == nil {
+		return nil, errors.New("no list was walked")
+	}
+	var out []string
+	for i, page := range w.walked.pages {
+		got, err := entryFields(page, field)
+		if err != nil {
+			return nil, fmt.Errorf("page %d: %w", i+1, err)
+		}
+		out = append(out, got...)
+	}
+	return out, nil
+}
+
+// entryFields is field of each entry of a JSON array.
+func entryFields(body []byte, field string) ([]string, error) {
+	var entries []map[string]any
+	if err := json.Unmarshal(body, &entries); err != nil {
+		return nil, fmt.Errorf("not a JSON array of objects: %w; body: %s", err, body)
+	}
+	out := make([]string, 0, len(entries))
+	for _, e := range entries {
+		v, ok := e[field]
+		if !ok {
+			return nil, fmt.Errorf("an entry has no %q: %v", field, e)
+		}
+		out = append(out, fmt.Sprint(v))
+	}
+	return out, nil
+}
+
+// walkVisitedOnce compares the walk with the whole list, read in one answer
+// by the same caller: the pages together must hold its entries in its order,
+// none left out and none twice.
+func (w *world) walkVisitedOnce(field, path string) error {
+	got, err := w.walkFields(field)
+	if err != nil {
+		return err
+	}
+	seen := map[string]bool{}
+	for _, v := range got {
+		if seen[v] {
+			return fmt.Errorf("the walk visited %q twice: %v", v, got)
+		}
+		seen[v] = true
+	}
+	if err := w.getAs(path, w.walked.user, w.walked.password); err != nil {
+		return err
+	}
+	if err := w.statusIs(http.StatusOK); err != nil {
+		return err
+	}
+	want, err := entryFields(w.body, field)
+	if err != nil {
+		return err
+	}
+	if !slices.Equal(got, want) {
+		return fmt.Errorf("the walk visited %v, the whole list is %v", got, want)
+	}
+	return nil
+}
+
+func (w *world) walkVisitedValues(field, list string) error {
+	got, err := w.walkFields(field)
+	if err != nil {
+		return err
+	}
+	if want := strings.Split(list, ","); !slices.Equal(got, want) {
+		return fmt.Errorf("the walk visited %v, want %v", got, want)
+	}
+	return nil
+}
+
+// maxSpend bounds spendAllowance: a scenario's limit is far lower, and a
+// fixed minute window can restart the count once while it runs.
+const maxSpend = 1000
+
+// spendAllowance repeats a GET as a user until the server refuses it with
+// 429, so the steps after it read the refusal.
+func (w *world) spendAllowance(path, user, password string) error {
+	for range maxSpend {
+		if err := w.getAs(path, user, password); err != nil {
+			return err
+		}
+		if w.status == http.StatusTooManyRequests {
+			return nil
+		}
+		if w.status != http.StatusOK {
+			return w.statusIs(http.StatusOK)
+		}
+	}
+	return fmt.Errorf("%d requests were all admitted", maxSpend)
+}
+
+func (w *world) headerNumberIn(name string, low, high int) error {
+	got := w.header.Get(name)
+	n, err := strconv.Atoi(got)
+	if err != nil || n < low || n > high {
+		return fmt.Errorf("header %s is %q, want a number from %d to %d", name, got, low, high)
+	}
 	return nil
 }

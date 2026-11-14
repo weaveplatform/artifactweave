@@ -65,6 +65,16 @@ func (p faultyPerms) ForPrincipal(
 	return p.PermissionStore.ForPrincipal(ctx, user, groups) //nolint:wrapcheck // test double
 }
 
+func (p faultyPerms) Page(
+	ctx context.Context,
+	q port.PermissionQuery,
+) ([]model.Permission, bool, error) {
+	if p.f.fail == "perms.page" {
+		return nil, false, errBoom
+	}
+	return p.PermissionStore.Page(ctx, q) //nolint:wrapcheck // test double
+}
+
 type faultyUsers struct {
 	port.UserStore
 	f *faulty
@@ -120,6 +130,7 @@ func TestUnitStoreFailures(t *testing.T) {
 		"perms.forprincipal": func() error { _, _, err := svc.Granting(ctx, []string{"bob"}, nil, false); return err },
 		"users.get":          func() error { _, _, err := svc.Granting(ctx, []string{"bob"}, nil, false); return err },
 		"groups.get":         func() error { _, _, err := svc.Granting(ctx, nil, []string{"devs"}, false); return err },
+		"perms.page":         func() error { _, _, err := svc.Page(ctx, "", 10, nil); return err },
 	} {
 		f.fail = op
 		if err := call(); !errors.Is(err, errBoom) {
@@ -129,6 +140,15 @@ func TestUnitStoreFailures(t *testing.T) {
 	f.fail = "users.get"
 	if _, err := svc.FoldUsers(ctx, []string{"bob"}); !errors.Is(err, errBoom) {
 		t.Errorf("folding users with a failing read: %v", err)
+	}
+	for op, call := range map[string]func() error{
+		"users.get":  func() error { _, err := svc.PrincipalsOf(ctx, []string{"bob"}, nil, true); return err },
+		"groups.get": func() error { _, err := svc.PrincipalsOf(ctx, nil, []string{"devs"}, false); return err },
+	} {
+		f.fail = op
+		if err := call(); !errors.Is(err, errBoom) {
+			t.Errorf("principals of with %s failing: %v", op, err)
+		}
 	}
 	f.fail = "perms.forprincipal"
 	if _, _, err := svc.Granting(ctx, nil, []string{"devs"}, false); !errors.Is(err, errBoom) {

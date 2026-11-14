@@ -72,6 +72,10 @@ paths:
       - releasebundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getallbundles.md
       x-unverified: true
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/release/bundles/source/{bundleName}/{bundleVersion}:
     delete:
       description: 'Deletes one version of a source release bundle: its signed manifest in the `releasebundles`
@@ -132,6 +136,11 @@ paths:
       tags:
       - releasebundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletereleasebundleversion.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:bundleName
+      - path:bundleVersion
+      x-cost: expensive
   /api/release/bundles/{bundleName}:
     get:
       description: Lists every version of one release bundle held on this instance, whether created here or received,
@@ -204,6 +213,10 @@ paths:
       - releasebundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getallbundleversions.md
       x-unverified: true
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/release/bundles/{bundleName}/{bundleVersion}:
     get:
       description: Returns one release bundle version. With `format=json`, or without `format`, the response is
@@ -318,6 +331,8 @@ paths:
       tags:
       - releasebundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundleversion.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/release/import:
     post:
       description: Imports a release bundle version from an exported archive, the air-gapped path between instances.
@@ -392,6 +407,11 @@ paths:
       tags:
       - releasebundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/importreleasebundleversion.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:archive
+      - query:file_name
+      x-cost: expensive
   /api/release/import/{name}/{version}/status:
     get:
       description: Reports the progress of an import started with the import operation, by bundle name and version.
@@ -471,6 +491,8 @@ paths:
       - releasebundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundleversionimportstatus.md
       x-unverified: true
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/bundle/retention/audit:
     get:
       description: 'Lists past retention operations on release bundles v1: deletions and keep or unkeep markings,
@@ -582,6 +604,13 @@ paths:
       tags:
       - releasebundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getretentionoperationshistory.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: offset
+      x-pagination-parameters:
+        position: offset
+        size: limit
+      x-pagination-next: link
   /api/v1/bundle/retention/config:
     get:
       description: Returns the release bundle v1 retention configuration.
@@ -636,6 +665,8 @@ paths:
       tags:
       - releasebundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getretentionpolicyconfiguration.md
+      x-idempotency: safe
+      x-cost: ordinary
     post:
       description: Updates the retention configuration. Only fields present in the body change. A field cannot be
         cleared, only overwritten with a new value. Administrators only.
@@ -698,6 +729,10 @@ paths:
       tags:
       - releasebundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setretentionpolicyconfiguration.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/v1/bundle/retention/config/enable:
     get:
       description: Reports whether retention is enabled. While it is disabled, keep markings are not enforced and
@@ -738,6 +773,8 @@ paths:
       tags:
       - releasebundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/querystatusofretentionservice.md
+      x-idempotency: safe
+      x-cost: ordinary
     post:
       description: Turns retention on or off. Turning it off also lifts keep protection. Administrators only.
       operationId: setRetentionPoliciesToEnabled
@@ -786,6 +823,10 @@ paths:
       tags:
       - releasebundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setretentionpoliciestoenabled.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/v1/bundle/retention/delete:
     post:
       description: Deletes the listed bundle versions and records each deletion in the retention history. While
@@ -863,6 +904,10 @@ paths:
       tags:
       - releasebundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletereleasebundles.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - 'body:'
+      x-cost: expensive
   /api/v1/bundle/retention/keep:
     post:
       description: Marks bundle versions to be kept indefinitely, or removes that marking. While retention is enabled,
@@ -951,6 +996,11 @@ paths:
       tags:
       - releasebundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/markreleasebundlestokeepordontkeep.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/keep
+      - body:/unkeep
+      x-cost: expensive
   /api/v1/bundle/retention/report:
     post:
       description: Lists the bundle versions one retention rule would delete, without deleting anything, so an administrator
@@ -1092,3 +1142,10 @@ paths:
       tags:
       - releasebundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getconfiguredretentionpolicieslist.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: offset
+      x-pagination-parameters:
+        position: offset
+        size: limit
+      x-pagination-next: link

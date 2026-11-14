@@ -174,3 +174,206 @@ func TestUnitBundleAll(t *testing.T) {
 		t.Fatal("expected error for a service without info.yaml")
 	}
 }
+
+const shared = `components:
+  responses:
+    TooManyRequests:
+      description: limited
+    ServiceUnavailable:
+      description: unavailable
+  headers:
+    RetryAfter:
+      description: wait
+      schema:
+        type: integer
+`
+
+// sharedService lays out a root holding the shared fragment and one service
+// directory, as api/src does, and returns the service directory.
+func sharedService(t *testing.T, sharedBody string, files map[string]string) string {
+	t.Helper()
+	root := t.TempDir()
+	if sharedBody != "" {
+		write(t, root, SharedFile, sharedBody)
+	}
+	svc := filepath.Join(root, "svc")
+	if err := os.MkdirAll(svc, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	write(t, svc, InfoFile, info)
+	for n, body := range files {
+		write(t, svc, n, body)
+	}
+	return svc
+}
+
+func statuses(t *testing.T, root *yaml.Node, path, method string) []string {
+	t.Helper()
+	resp := lookup(lookup(lookup(lookup(root, "paths"), path), method), "responses")
+	if resp == nil {
+		t.Fatalf("%s %s has no responses", method, path)
+	}
+	var out []string
+	for i := 0; i+1 < len(resp.Content); i += 2 {
+		out = append(out, resp.Content[i].Value)
+	}
+	return out
+}
+
+func TestUnitBundleSharedAndAdmission(t *testing.T) {
+	svc := sharedService(t, shared, map[string]string{
+		"paths-a.yaml": `paths:
+  /ordinary:
+    parameters:
+      - name: p
+        in: query
+        schema:
+          type: string
+    get:
+      operationId: ordinary
+      x-cost: ordinary
+      responses:
+        '200':
+          description: ok
+        '404':
+          description: missing
+        '500':
+          description: failed
+        default:
+          description: other
+  /unclassified:
+    post:
+      operationId: unclassified
+      responses:
+        '201':
+          description: created
+  /probe:
+    get:
+      operationId: probe
+      x-cost: exempt
+      responses:
+        '200':
+          description: ok
+        '503':
+          description: not ready
+  /own:
+    get:
+      operationId: own
+      x-cost: expensive
+      responses:
+        '429':
+          description: own envelope
+        '503':
+          description: own envelope
+  /noresponses:
+    get:
+      operationId: noresponses
+`,
+	})
+	out, err := Bundle(svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(out, &doc); err != nil {
+		t.Fatal(err)
+	}
+	root := doc.Content[0]
+	for path, want := range map[string]string{
+		"/ordinary":     "200,404,429,500,503,default",
+		"/unclassified": "201,429,503",
+		"/probe":        "200,503",
+		"/own":          "429,503",
+	} {
+		method := "get"
+		if path == "/unclassified" {
+			method = "post"
+		}
+		if got := strings.Join(statuses(t, root, path, method), ","); got != want {
+			t.Errorf("%s statuses %s, want %s", path, got, want)
+		}
+	}
+	resp := lookup(lookup(lookup(lookup(root, "paths"), "/ordinary"), "get"), "responses")
+	if ref := lookup(lookup(resp, "429"), "$ref"); ref == nil ||
+		ref.Value != "#/components/responses/TooManyRequests" {
+		t.Fatalf("429 is not the shared reference: %v", ref)
+	}
+	if desc := lookup(
+		lookup(lookup(lookup(lookup(root, "paths"), "/own"), "get"), "responses"),
+		"429",
+	); lookup(
+		desc,
+		"description",
+	).Value != "own envelope" {
+		t.Fatal("an operation's own 429 was replaced")
+	}
+	comps := lookup(root, "components")
+	if lookup(lookup(comps, "responses"), "TooManyRequests") == nil ||
+		lookup(lookup(comps, "headers"), "RetryAfter") == nil {
+		t.Fatal("shared components not merged")
+	}
+	if !strings.Contains(string(out), "'429':\n") ||
+		!strings.Contains(string(out), "$ref: '#/components/responses/ServiceUnavailable'") {
+		t.Fatalf("injected statuses not single-quoted like the fragments:\n%s", out)
+	}
+}
+
+func TestUnitBundleSharedPartial(t *testing.T) {
+	// A shared fragment without ServiceUnavailable adds only the 429: a bundle
+	// never references a component it does not hold.
+	svc := sharedService(
+		t,
+		"components:\n  responses:\n    TooManyRequests:\n      description: limited\n",
+		map[string]string{
+			"paths-a.yaml": "paths:\n  /x:\n    get:\n      operationId: x\n      responses:\n        '200':\n          description: ok\n",
+		},
+	)
+	out, err := Bundle(svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(out, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(statuses(t, doc.Content[0], "/x", "get"), ","); got != "200,429" {
+		t.Fatalf("statuses %s", got)
+	}
+}
+
+func TestUnitBundleWithoutShared(t *testing.T) {
+	svc := sharedService(t, "", map[string]string{
+		"paths-a.yaml": "paths:\n  /x:\n    get:\n      operationId: x\n      responses:\n        '200':\n          description: ok\n",
+	})
+	out, err := Bundle(svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(out), "429") {
+		t.Fatalf("injected without a shared fragment:\n%s", out)
+	}
+}
+
+func TestUnitBundleSharedErrors(t *testing.T) {
+	cases := map[string]struct {
+		shared string
+		files  map[string]string
+	}{
+		"paths in shared":   {"paths: {}\n", nil},
+		"unparsable shared": {"components: [\n", nil},
+		"service redeclares a shared component": {
+			shared,
+			map[string]string{
+				"components-common.yaml": "components:\n  headers:\n    RetryAfter:\n      description: again\n",
+			},
+		},
+		"shared not a mapping": {"- a\n", nil},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			if _, err := Bundle(sharedService(t, c.shared, c.files)); err == nil {
+				t.Fatal("expected an error")
+			}
+		})
+	}
+}

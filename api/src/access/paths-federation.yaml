@@ -189,6 +189,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallaccessfederations.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Registers a peer instance as a target of Access federation. From then on every create, update
         and delete of the selected identity entities on this instance is queued in the peer outbox and delivered
@@ -240,6 +244,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/registeraccessfederation.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/name
+      x-cost: expensive
   /api/v1/system/federation/validate_server:
     post:
       description: Checks, without registering anything, that the peer at url is reachable, is an instance of this
@@ -278,6 +286,8 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/validatefederationtarget.md
+      x-idempotency: safe
+      x-cost: expensive
   /api/v1/system/federation/{serverName}:
     delete:
       description: Removes a federation target and discards changes still queued for it. Entities already replicated
@@ -315,6 +325,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteaccessfederation.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:serverName
+      x-cost: expensive
     get:
       description: Returns one federation target by name. Administrators only.
       operationId: getAccessFederation
@@ -360,6 +374,8 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/getaccessfederation.md
+      x-idempotency: safe
+      x-cost: ordinary
     patch:
       description: Changes the replicated entity types, the filters or the active flag of a target. Fields that
         are omitted keep their values; name and url are immutable. Narrowing the entities or filters affects future
@@ -418,6 +434,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/updateaccessfederation.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:serverName
+      x-cost: expensive
   /api/v1/system/federation/{serverName}/full_broadcast:
     put:
       description: Sends the complete current set of selected identity entities to the target, after which the target
@@ -467,3 +487,6 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/fullbroadcastaccessfederation.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive

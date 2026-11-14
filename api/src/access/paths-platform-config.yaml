@@ -1104,6 +1104,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/putawsiamrole.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/username
+      x-cost: expensive
   /api/v1/aws/iam_role/{username}:
     delete:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -1148,6 +1152,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteawsiamrole.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:username
+      x-cost: expensive
     get:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: getAwsIamRole
@@ -1201,6 +1209,8 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getawsiamrole.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/cert/ca:
     get:
       description: Returns, as PEM text, the public certificate of the authority that signs the instance's internal
@@ -1224,6 +1234,8 @@ paths:
       tags:
       - certificates
       x-oracle-source: https://docs.jfrog.com/administration/reference/getcacertificate.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/cert/root:
     get:
       description: Returns the certificate whose key signs the instance's access tokens, so that other services
@@ -1256,6 +1268,8 @@ paths:
       tags:
       - certificates
       x-oracle-source: https://docs.jfrog.com/administration/reference/getrootcertificate.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/config/security/authentication/basic_authentication_enabled:
     get:
       description: Returns whether usernames and passwords are accepted over HTTP Basic. When the switch is off,
@@ -1289,6 +1303,8 @@ paths:
       tags:
       - config
       x-oracle-source: https://docs.jfrog.com/administration/reference/getbasicauthenticationstatus.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance,
         from the next request on. Returns 200 with no body. Requires a platform admin.
@@ -1332,6 +1348,10 @@ paths:
       tags:
       - config
       x-oracle-source: https://docs.jfrog.com/administration/reference/setbasicauthenticationstatus.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/v1/config/security/password_policy:
     patch:
       description: Merges the supplied fields into the password policy; omitted fields keep their current values.
@@ -1370,6 +1390,10 @@ paths:
       tags:
       - config
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatepasswordpolicy.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
     put:
       description: Replaces the whole password policy that internal users' passwords must satisfy. Every field not
         supplied returns to its default, so an empty object resets the policy. The policy applies when a password
@@ -1407,6 +1431,10 @@ paths:
       tags:
       - config
       x-oracle-source: https://docs.jfrog.com/administration/reference/createpasswordpolicy.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/v1/config/security/user_lock_policy:
     get:
       description: Returns the user lock policy. A setting never changed reports its default. Reads the same state
@@ -1436,6 +1464,8 @@ paths:
       tags:
       - config
       x-oracle-source: https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Replaces the user lock policy and returns what was stored. Send every field; an omitted field is
         stored as 0 or false, not as its default. To change one setting, read the policy and send it back with that
@@ -1477,6 +1507,10 @@ paths:
       tags:
       - config
       x-oracle-source: https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/v1/config/token/default_expiry:
     get:
       description: Returns the lifetime, in seconds, that POST /api/v1/tokens gives to tokens created without expires_in.
@@ -1510,6 +1544,8 @@ paths:
       tags:
       - config
       x-oracle-source: https://docs.jfrog.com/administration/reference/gettokendefaultexpiry.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Changes the lifetime given to access tokens created without expires_in. Tokens already issued
         keep their expiry. Returns 200 with no body. Requires a platform admin.
@@ -1547,6 +1583,10 @@ paths:
       tags:
       - config
       x-oracle-source: https://docs.jfrog.com/administration/reference/settokendefaultexpiry.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/v1/crowd:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -1582,6 +1622,8 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getcrowdconfiguration.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: upsertCrowdConfiguration
@@ -1629,6 +1671,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/upsertcrowdconfiguration.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/v1/httpsso:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -1664,6 +1710,8 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/gethttpssoconfiguration.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: upsertHttpSsoConfiguration
@@ -1711,6 +1759,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/upserthttpssoconfiguration.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/v1/ldap/groups:
     get:
       description: Returns every LDAP group synchronisation setting. Requires a platform admin.
@@ -1740,6 +1792,10 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallldapgroupsettings.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Defines how groups are read from the LDAP connection named in enabled_ldap and mapped to local
         groups. Answers 201 with the stored setting. Requires a platform admin.
@@ -1780,6 +1836,10 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/createldapgroupsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/name
+      x-cost: expensive
     put:
       description: Replaces the group setting whose name matches the body's name. Requires a platform admin.
       operationId: updateLdapGroupSettings
@@ -1819,6 +1879,10 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/updateldapgroupsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/name
+      x-cost: expensive
   /api/v1/ldap/groups/import:
     post:
       description: Creates local groups, or updates existing ones, for the listed LDAP groups through the given
@@ -1856,6 +1920,10 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/importldapgroups.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/import_groups
+      x-cost: expensive
   /api/v1/ldap/groups/search:
     post:
       description: Runs the group search described by the body against its LDAP connection and returns the groups
@@ -1902,6 +1970,10 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/searchldapgroups.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/ldap/groups/strategy:
     get:
       description: Returns the default filter and attribute names of one group mapping strategy, as a starting point
@@ -1937,6 +2009,8 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/getldapgroupmappingstrategy.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/ldap/groups/{name}:
     delete:
       description: Removes the group setting. Groups already imported through it remain as local groups. Returns
@@ -1974,6 +2048,10 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteldapgroupsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:name
+      x-cost: expensive
     get:
       description: Returns one LDAP group setting. Requires a platform admin.
       operationId: getLdapGroupSettingsByName
@@ -2013,6 +2091,8 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/getldapgroupsettingsbyname.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/ldap/groups/{name}/refresh:
     post:
       description: Re-reads the LDAP groups of the named setting. operation chooses whether to update the memberships
@@ -2081,6 +2161,11 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/refreshldapgroupsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:name
+      - query:username
+      x-cost: expensive
   /api/v1/ldap/settings:
     get:
       description: Returns every LDAP server connection that logins are checked against. Manager passwords are never
@@ -2111,6 +2196,10 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallldapsettings.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Adds an LDAP server that login attempts are checked against, in addition to internal users. Answers
         201 with the stored connection. Requires a platform admin.
@@ -2151,6 +2240,10 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/createldapsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/key
+      x-cost: expensive
     put:
       description: Replaces the connection whose key matches the body's key. Requires a platform admin.
       operationId: updateLdapSettings
@@ -2190,6 +2283,10 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/updateldapsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/key
+      x-cost: expensive
   /api/v1/ldap/settings/test:
     post:
       description: Binds to the server described by the body, without storing anything, and answers 204 when the
@@ -2228,6 +2325,8 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/testldapconnection.md
+      x-idempotency: safe
+      x-cost: expensive
   /api/v1/ldap/settings/{key}:
     delete:
       description: Removes the connection. Users created through it keep their local accounts but can no longer
@@ -2266,6 +2365,10 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteldapsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:key
+      x-cost: expensive
     get:
       description: Returns one LDAP connection without its manager password. Requires a platform admin.
       operationId: getLdapSettingsByKey
@@ -2305,6 +2408,8 @@ paths:
       tags:
       - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/getldapsettingsbykey.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/logshipping/config:
     post:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -2355,6 +2460,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/enablecloudlogcollection.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/v1/oidc:
     get:
       description: Returns every OpenID Connect provider whose ID tokens the token exchange (POST /api/v1/oidc/token)
@@ -2385,6 +2494,10 @@ paths:
       tags:
       - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/getalloidcconfigurations.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Registers an external identity provider, typically a CI system, whose signed ID tokens may be
         exchanged for access tokens. Answers 200 with the stored configuration. A duplicate name or a GitHub provider
@@ -2426,6 +2539,10 @@ paths:
       tags:
       - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/createoidcconfiguration.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/name
+      x-cost: expensive
   /api/v1/oidc/token:
     post:
       description: 'Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents
@@ -2466,6 +2583,9 @@ paths:
       tags:
       - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/oidctokenexchange.md
+      x-idempotency: none
+      x-idempotency-reason: secret-response
+      x-cost: expensive
   /api/v1/oidc/{name}:
     delete:
       description: Removes the provider and its identity mappings, so token exchanges that name it fail from then
@@ -2504,6 +2624,10 @@ paths:
       tags:
       - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteoidcconfiguration.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:name
+      x-cost: expensive
     get:
       description: Returns one provider configuration. Requires a platform admin.
       operationId: getOidcConfiguration
@@ -2543,6 +2667,8 @@ paths:
       tags:
       - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/getoidcconfiguration.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Replaces the named provider's configuration with the body. The path names the provider; a name
         in the body must match it. Requires a platform admin.
@@ -2590,6 +2716,10 @@ paths:
       tags:
       - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/updateoidcconfiguration.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:name
+      x-cost: expensive
   /api/v1/oidc/{provider_name}/identity_mappings:
     get:
       description: Returns the identity mappings of one provider, optionally only those of one project. Requires
@@ -2640,6 +2770,10 @@ paths:
       tags:
       - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/getoidcidentitymappings.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: 'Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange
         issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived
@@ -2689,6 +2823,11 @@ paths:
       tags:
       - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/createoidcidentitymapping.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:provider_name
+      - body:/name
+      x-cost: expensive
   /api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}:
     delete:
       description: Removes one identity mapping. Tokens already issued through it stay valid. Returns 204. Requires
@@ -2732,6 +2871,11 @@ paths:
       tags:
       - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteoidcidentitymapping.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:provider_name
+      - path:mapping_name
+      x-cost: expensive
     get:
       description: Returns one identity mapping of a provider. Requires a platform admin.
       operationId: getOidcIdentityMappingByName
@@ -2777,6 +2921,8 @@ paths:
       tags:
       - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/getoidcidentitymappingbyname.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Replaces the named mapping with the body. The mapping's project, which the project roles in
         token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping
@@ -2838,6 +2984,11 @@ paths:
       tags:
       - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/updateoidcidentitymapping.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:provider_name
+      - path:mapping_name
+      x-cost: expensive
   /api/v1/saml:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -2875,6 +3026,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallsamlsettings.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: createSamlSetting
@@ -2922,6 +3077,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/createsamlsetting.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/name
+      x-cost: expensive
   /api/v1/saml/general_settings:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -2957,6 +3116,8 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getsamlgeneralsettings.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: updateSamlGeneralSettings
@@ -3006,6 +3167,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatesamlgeneralsettings.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/v1/saml/{name}:
     delete:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3044,6 +3209,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletesamlsetting.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:name
+      x-cost: expensive
     get:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: getSamlSettingByName
@@ -3091,6 +3260,8 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getsamlsettingbyname.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: updateSamlSetting
@@ -3145,6 +3316,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatesamlsetting.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:name
+      x-cost: expensive
   /api/v1/scim/v2/Groups:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3195,6 +3370,13 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimgroups.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: offset
+      x-pagination-parameters:
+        position: startIndex
+        size: count
+      x-pagination-next: link
     post:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: createScimGroup
@@ -3242,6 +3424,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/createscimgroup.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/displayName
+      x-cost: expensive
   /api/v1/scim/v2/Groups/{groupName}:
     delete:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3280,6 +3466,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletescimgroup.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:groupName
+      x-cost: expensive
     get:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: getScimGroupByName
@@ -3326,6 +3516,8 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimgroupbyname.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     patch:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: patchScimGroup
@@ -3382,6 +3574,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/patchscimgroup.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:groupName
+      x-cost: expensive
     put:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: updateScimGroup
@@ -3436,6 +3632,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatescimgroup.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:groupName
+      x-cost: expensive
   /api/v1/scim/v2/ResourceTypes:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3465,6 +3665,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimresourcetypes.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/scim/v2/Schemas:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3494,6 +3698,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimschemas.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/scim/v2/Schemas/{schemaId}:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3536,6 +3744,8 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimschemabyid.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/scim/v2/ServiceProviderConfig:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3565,6 +3775,8 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimserviceproviderconfig.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/scim/v2/Users:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3615,6 +3827,13 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimusers.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: offset
+      x-pagination-parameters:
+        position: startIndex
+        size: count
+      x-pagination-next: link
     post:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: createScimUser
@@ -3662,6 +3881,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/createscimuser.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/userName
+      x-cost: expensive
   /api/v1/scim/v2/Users/{username}:
     delete:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3700,6 +3923,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletescimuser.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:username
+      x-cost: expensive
     get:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: getScimUserByUsername
@@ -3746,6 +3973,8 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimuserbyusername.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     patch:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: patchScimUser
@@ -3800,6 +4029,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/patchscimuser.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:username
+      x-cost: expensive
     put:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: updateScimUser
@@ -3854,6 +4087,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatescimuser.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:username
+      x-cost: expensive
   /api/v1/system/backup/export:
     post:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3885,6 +4122,9 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/exportaccessconfiguration.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/system/backup/import:
     post:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3922,6 +4162,10 @@ paths:
       - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/importaccessconfiguration.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/v1/vault/configs:
     get:
       description: Returns every HashiCorp Vault connection. Keypairs whose vaultKey names a connection read their
@@ -3952,6 +4196,10 @@ paths:
       tags:
       - vault
       x-oracle-source: https://docs.jfrog.com/administration/reference/getvaultconfigurations.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/vault/configs/test:
     post:
       description: Authenticates to the Vault server described by the body, without storing anything, and answers
@@ -4001,6 +4249,8 @@ paths:
       tags:
       - vault
       x-oracle-source: https://docs.jfrog.com/administration/reference/testvaultconfiguration.md
+      x-idempotency: safe
+      x-cost: expensive
   /api/v1/vault/configs/{vault_key}:
     delete:
       description: Removes the connection. Keypairs that name it can no longer sign until a connection with the
@@ -4038,6 +4288,10 @@ paths:
       tags:
       - vault
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletevaultconfiguration.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:vault_key
+      x-cost: expensive
     put:
       description: Stores the connection under vault_key, replacing any connection with that key, and returns it
         without secrets. Vault must be reached over TLS. A body that is not application/json answers 415. Requires
@@ -4093,3 +4347,7 @@ paths:
       tags:
       - vault
       x-oracle-source: https://docs.jfrog.com/administration/reference/setvaultconfiguration.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:vault_key
+      x-cost: expensive
