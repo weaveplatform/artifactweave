@@ -137,7 +137,8 @@ func TestAccRemoteColdChecksumAnswersFromFileInfo(t *testing.T) {
 							res := w.request(method, "/artifactory/remote/"+p+"."+alg, "reader", "")
 							if policy != repo.PassThru || !declares {
 								remoteStatus(t, res, http.StatusNotFound)
-								if method == http.MethodGet && res.Body.String() != checksumNotFound(p) {
+								if method == http.MethodGet &&
+									res.Body.String() != checksumNotFound(p) {
 									t.Fatal(method, alg, res.Body)
 								}
 								continue
@@ -300,7 +301,8 @@ func TestAccGenericRemoteChecksumNeedsTheFile(t *testing.T) {
 			t.Fatal("checksum request kept", p, err)
 		}
 	}
-	if w.up.Count(http.MethodGet, "/bare.bin") != 0 || w.up.Count(http.MethodGet, "/login.bin") != 0 {
+	if w.up.Count(http.MethodGet, "/bare.bin") != 0 ||
+		w.up.Count(http.MethodGet, "/login.bin") != 0 {
 		t.Fatal("checksum request asked for the file's body", w.up.Requests())
 	}
 }
@@ -328,7 +330,10 @@ func TestAccRemoteWarmChecksumUnchanged(t *testing.T) {
 			if tc.pt == repo.Opkg {
 				// The opkg route fetches a package its feed's index lists,
 				// so the upstream serves the index a local feed writes.
-				w.up.Set("/feed/Packages", fakeupstream.Resource{Body: opkgFeedIndex(t, w, tc.body)})
+				w.up.Set(
+					"/feed/Packages",
+					fakeupstream.Resource{Body: opkgFeedIndex(t, w, tc.body)},
+				)
 			}
 			remoteStatus(t, w.request(http.MethodGet, "/artifactory/remote/"+tc.path, "reader", ""),
 				http.StatusOK)
