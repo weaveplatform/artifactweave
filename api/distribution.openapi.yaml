@@ -68,6 +68,10 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/importreleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - query:file_name
+      x-cost: expensive
   /api/v1/distribution/edge_nodes:
     get:
       description: 'Lists the edges this instance can distribute to: the instances paired with it in the edge role, with the name and service id each declared at pairing.'
@@ -105,6 +109,10 @@ paths:
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionedgenodes.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/distribution/{release_bundle_name}/{release_bundle_version}:
     post:
       description: 'Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the peer protocol: each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be instances paired in the edge role. With `dry_run` the selected edges are returned and nothing is sent.'
@@ -152,6 +160,9 @@ paths:
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributereleasebundlev1version.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/distribution/{release_bundle_name}/{release_bundle_version}/abort:
     put:
       description: 'Stops the in-progress distribution of the version: transfers not yet finished are cancelled and the affected edges discard what they had partly received. Edges that already completed keep the version.'
@@ -190,6 +201,11 @@ paths:
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/abortreleasebundlev1distribution.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+        - path:release_bundle_version
+      x-cost: expensive
   /api/v1/distribution/{release_bundle_name}/{release_bundle_version}/delete:
     post:
       description: Removes a distributed version from the edges the rules select. Each edge deletes the version and the artifacts that no other version on that edge still needs. With `on_success=delete` the version is also deleted here once every selected edge has confirmed. With `dry_run` the selected edges are returned and nothing changes.
@@ -237,6 +253,9 @@ paths:
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletereleasebundlev1versionfromdistributionedges.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/dynamic/distribute:
     post:
       description: Creates a release bundle version from the spec with a generated name and version, signs it with the default GPG key and distributes it to the edges the rules select, all in one request. The rules and edge requirements are those of the ordinary distribute operation.
@@ -288,6 +307,9 @@ paths:
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributedynamicreleasebundlev1.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/export/release_bundle/{release_bundle_name}/{release_bundle_version}:
     delete:
       description: Deletes the exported zip of the version from the export directory. The version itself is untouched.
@@ -312,6 +334,11 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteexportedreleasebundlev1file.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+        - path:release_bundle_version
+      x-cost: expensive
     post:
       description: Starts an asynchronous export of a signed version to one zip archive holding the signed manifest, its signature and every artifact, for carrying to an instance with no network path to this one. Poll the status operation; the archive is written to the instance's export directory.
       operationId: exportReleaseBundleV1Version
@@ -347,6 +374,9 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/exportreleasebundlev1version.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/export/release_bundle/{release_bundle_name}/{release_bundle_version}/status:
     get:
       description: Reports how far the export of a version has got.
@@ -385,6 +415,8 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getexportedreleasebundlev1status.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/keys/pgp:
     get:
       description: Returns the alias and ASCII-armoured public part of the default GPG key, the key that signs release bundles. The private part is never returned.
@@ -410,6 +442,8 @@ paths:
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getgpgsigningkey.md
+      x-idempotency: safe
+      x-cost: ordinary
     post:
       description: Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store, the same store `/artifactory/api/security/keypair` manages, so a key added here is visible there and the reverse.
       operationId: setGpgSigningKey
@@ -447,6 +481,10 @@ paths:
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setgpgsigningkey.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/alias
+      x-cost: expensive
   /api/v1/keys/pgp/aliases:
     get:
       description: Lists the aliases of the configured GPG keys.
@@ -474,6 +512,10 @@ paths:
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getallgpgkeyaliases.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/keys/pgp/propagate:
     post:
       description: Sends one key (`alias`) or every key (`all=true`) to every edge peer, which adds it to the keys it trusts for verifying signatures. Only public parts leave this instance.
@@ -511,6 +553,9 @@ paths:
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/uploadandpropagategpgsigningkeysfordistribution.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/keys/pgp/{alias}:
     delete:
       description: Deletes the key pair. Versions already signed with it stay valid on edges that hold its public part; new versions cannot be signed with it.
@@ -545,6 +590,10 @@ paths:
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletegpgkeybyalias.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:alias
+      x-cost: expensive
     get:
       description: Returns the alias and public part of one key.
       operationId: getGpgPublicKeyByAlias
@@ -582,6 +631,8 @@ paths:
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getgpgpublickeybyalias.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Changes the alias of a key; the key material is unchanged.
       operationId: updateGpgKeyAlias
@@ -634,6 +685,12 @@ paths:
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updategpgkeyalias.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:alias
+        - body:/alias
+        - body:/new_alias
+      x-cost: expensive
   /api/v1/maintenance/distributeByLastDays:
     post:
       description: Redistributes to one edge every release bundle version distributed in a window of days ending on `date`, for example after the edge was rebuilt. The window length runs from 1 to the configured maximum, 7 by default. Administrators only.
@@ -678,6 +735,9 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributebylastdays.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/maintenance/execute/{actionType}:
     post:
       description: Runs a maintenance action using a token from the token operation, sent as the plain-text body. UNLOCK_STUCK releases every stuck distribution so it can be retried or cleaned up; STOP_ALL force-stops every in-progress distribution, ends every non-final tracker and empties the pending work queue. `dryRun` defaults to true and reports what would change without changing it. Administrators only.
@@ -741,6 +801,9 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/executemaintenanceaction.md
+      x-idempotency: none
+      x-idempotency-reason: protocol-reconciliation
+      x-cost: expensive
   /api/v1/maintenance/generate_token/{actionType}:
     get:
       description: Issues a single-use token for one maintenance action. The token expires after 3 minutes and must be sent as the body of the execute operation. Administrators only.
@@ -793,6 +856,9 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/generatemaintenanceexecutiontoken.md
+      x-idempotency: none
+      x-idempotency-reason: secret-response
+      x-cost: ordinary
   /api/v1/maintenance/stuck_distributions:
     get:
       description: Lists distributions stuck in a non-final state, for example after an edge disappeared mid-transfer. Unlock them with the UNLOCK_STUCK maintenance action. Administrators only.
@@ -826,6 +892,10 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getstuckdistributions.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/metrics:
     get:
       description: Returns the release bundle and distribution counters in OpenMetrics text, under `jfds_` metric names. Administrators only.
@@ -857,6 +927,8 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getopenmetricsfordistribution.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/release_bundle:
     get:
       description: Lists the release bundle v1 versions on this instance, one entry per version, newest first. Use `start_pos` to page.
@@ -902,6 +974,12 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getallbundles-1.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: offset
+      x-pagination-parameters:
+        position: start_pos
+      x-pagination-next: link
     post:
       description: 'Creates a release bundle version: an immutable manifest of the artifacts selected by the spec''s AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. The artifacts stay in their repositories.'
       operationId: createReleaseBundleV1Version
@@ -964,6 +1042,11 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createreleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/name
+        - body:/version
+      x-cost: expensive
   /api/v1/release_bundle/distribution:
     get:
       description: Lists the distribution trackers of every release bundle v1 version, newest first.
@@ -991,6 +1074,10 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetails.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/release_bundle/{release_bundle_name}:
     delete:
       description: Deletes every version of the named release bundle from this instance, with the same rules as deleting one version.
@@ -1025,6 +1112,10 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteallreleasebundlev1versions.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+      x-cost: expensive
     get:
       description: Lists every version of the named release bundle, newest first.
       operationId: getReleaseBundleV1VersionsByName
@@ -1077,6 +1168,12 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev1versionsbyname.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: offset
+      x-pagination-parameters:
+        position: start_pos
+      x-pagination-next: link
   /api/v1/release_bundle/{release_bundle_name}/LATEST:
     get:
       description: Returns the newest version of the named release bundle by creation time. A version literally named `LATEST` cannot be read through the version path for the same reason.
@@ -1110,6 +1207,8 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getlatestreleasebundlev1version.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/release_bundle/{release_bundle_name}/distribution:
     get:
       description: Lists the distribution trackers of every version of the named release bundle, newest first.
@@ -1139,6 +1238,10 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbyreleasebundlev1name.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}:
     delete:
       description: Deletes one version from this instance. The artifacts are not deleted; they stay in their repositories under their own retention. Copies already on edges are untouched; remove those with the edge delete operation first.
@@ -1174,6 +1277,11 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletereleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+        - path:release_bundle_version
+      x-cost: expensive
     get:
       description: Returns a version's details and artifact list. With `format=jws` or `format=jose` the signed manifest is returned instead, as the compact JWS string or the JOSE JSON serialisation, which is what edges verify; those formats need a signed version.
       operationId: getReleaseBundleV1VersionDetails
@@ -1240,6 +1348,8 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev1versiondetails.md
+      x-idempotency: safe
+      x-cost: ordinary
     head:
       description: Answers with the sha256 of the version's signed manifest in the X-Checksum-Sha256 header and no body. Edges and clients use it to compare versions without downloading them.
       operationId: getReleaseBundleV1VersionSha256
@@ -1266,6 +1376,8 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev1versionsha256.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Replaces the content of a version that has not been signed. The body has the same shape as for creation, and its name and version must match the path. Signed versions are immutable and answer 400.
       operationId: updateReleaseBundleV1Version
@@ -1317,6 +1429,11 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatereleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+        - path:release_bundle_version
+      x-cost: expensive
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/distribution:
     get:
       description: Lists the distribution trackers of one release bundle version, newest first.
@@ -1347,6 +1464,10 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbyreleasebundlev1version.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/distribution/{distribution_tracker}:
     get:
       description: Returns one tracker with the status of the transfer to each of its edges.
@@ -1376,6 +1497,8 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbyreleasebundlev1trackerid.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/sign:
     post:
       description: Signs an OPEN version with the default GPG key, or with the key whose passphrase is sent in X-GPG-PASSPHRASE, producing a JWS over the manifest, and records the manifest in the storing repository. A version must be signed before it can be distributed or exported and is immutable afterwards. Signing an already signed version is rejected with 400.
@@ -1434,6 +1557,11 @@ paths:
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/signreleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+        - path:release_bundle_version
+      x-cost: expensive
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/trigger_xray_scan:
     post:
       description: Not implemented; answers 501.
@@ -1476,6 +1604,9 @@ paths:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/triggerxrayscanreleasebundlev1version.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/security/permissions:
     get:
       description: Lists every destination permission. Administrators only.
@@ -1503,6 +1634,10 @@ paths:
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getalldistributionpermissions.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/security/permissions/{permission_name}:
     delete:
       description: Deletes one destination permission. Administrators only.
@@ -1537,6 +1672,10 @@ paths:
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletedistributionpermission.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:permission_name
+      x-cost: expensive
     get:
       description: Returns one destination permission. Administrators only.
       operationId: getDistributionPermissionByName
@@ -1574,6 +1713,8 @@ paths:
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionpermissionbyname.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Creates the destination permission, or replaces it when the name exists. A destination permission grants users and groups the right to distribute release bundles to, or delete them from, the edges its destinations match. Administrators only.
       operationId: setDistributionPermission
@@ -1624,6 +1765,10 @@ paths:
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setdistributionpermission.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:permission_name
+      x-cost: expensive
   /api/v1/security/token:
     get:
       description: Lists the tokens issued through the Distribution token operations. They are ordinary access tokens, so the Access token list shows them too. Administrators only.
@@ -1655,6 +1800,10 @@ paths:
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/gettokeninfos.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Issues or refreshes a token from a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. The tokens are ordinary access tokens.
       operationId: createOrRefreshToken
@@ -1733,6 +1882,9 @@ paths:
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createorrefreshtoken.md
+      x-idempotency: none
+      x-idempotency-reason: secret-response
+      x-cost: expensive
   /api/v1/security/token/revoke:
     post:
       description: Revokes a token given either its value (access or refresh token) or its id, in a form body, as in RFC 7009. Administrators only.
@@ -1787,6 +1939,11 @@ paths:
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/revoketoken.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/token
+        - body:/token_id
+      x-cost: expensive
   /api/v1/system/info:
     get:
       description: Returns the version, service id and health of the distribution service. `status` is UNSTABLE, with `message` naming the failing dependency, when the database or blob store is unavailable.
@@ -1812,6 +1969,8 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionsysteminfo.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/ping:
     get:
       description: Answers 200 with message OK when the instance's distribution features are usable, meaning the database and blob store are reachable. The distribution service is the instance itself. Anonymous callers may use it unless anonymous access is disabled.
@@ -1843,6 +2002,8 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributionping.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/settings:
     get:
       description: Returns the distribution settings. Administrators only.
@@ -1874,6 +2035,8 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionsystemsettings.md
+      x-idempotency: safe
+      x-cost: ordinary
     post:
       description: Replaces the distribution settings. Administrators only.
       operationId: updateDistributionSystemSettings
@@ -1907,6 +2070,10 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatedistributionsystemsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - route
+      x-cost: expensive
   /api/v1/system/support/bundle:
     post:
       description: 'Collects a support bundle under a generated id: logs for a date window, the configuration with every secret masked, system information and goroutine dumps, as selected. Administrators only.'
@@ -1957,6 +2124,9 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/createdistributionsupportbundle.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/system/support/bundle/{bundle_id}:
     delete:
       description: Deletes one support bundle. Administrators only.
@@ -2003,6 +2173,10 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletedistributionsupportbundle.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:bundle_id
+      x-cost: expensive
     get:
       description: Returns one support bundle's metadata. Administrators only.
       operationId: getSupportBundleInfo
@@ -2052,6 +2226,8 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/getdistributionsupportbundleinfo.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Collects a support bundle as the create operation does, under the id in the path.
       operationId: createSpecificSupportBundle
@@ -2114,6 +2290,10 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/createspecificdistributionsupportbundle.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:bundle_id
+      x-cost: expensive
   /api/v1/system/support/bundle/{bundle_id}/archive:
     get:
       description: Downloads one support bundle as a zip archive. Administrators only.
@@ -2165,6 +2345,8 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/downloaddistributionsupportbundle.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/support/bundles:
     get:
       description: Lists the support bundles on this instance. Administrators only.
@@ -2202,6 +2384,10 @@ paths:
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/listdistributionsupportbundles.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v2/distribution/abort/{release_bundle_name}/{release_bundle_version}:
     put:
       description: Not implemented; answers 501.
@@ -2249,6 +2435,13 @@ paths:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/abortreleasebundlev2distribution.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+        - path:release_bundle_version
+        - query:repository_key
+        - query:project
+      x-cost: expensive
   /api/v2/distribution/distribute/{release_bundle_name}/{release_bundle_version}:
     post:
       description: Not implemented; answers 501.
@@ -2311,6 +2504,9 @@ paths:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributereleasebundlev2version.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v2/distribution/key/propagate/{key_name}:
     post:
       description: Sends the named key's public part to every edge peer, which adds it to the keys it trusts for verifying release bundle signatures. Run it after adding or rotating the signing key and before distributing.
@@ -2349,6 +2545,9 @@ paths:
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/propagatepublicsigningkey.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v2/distribution/key/{key_name}:
     get:
       description: Returns the ASCII-armoured public part of the named key from the keypair store, as plain text.
@@ -2387,6 +2586,8 @@ paths:
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpublicsigningkeyfordistribution.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v2/distribution/remote_delete/{release_bundle_name}/{release_bundle_version}:
     post:
       description: Not implemented; answers 501.
@@ -2443,6 +2644,9 @@ paths:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/remotedeletereleasebundlev2distribution.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}:
     get:
       description: Not implemented; answers 501.
@@ -2488,6 +2692,10 @@ paths:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev2distributiontrackers.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}/{distribution_tracker}:
     get:
       description: Not implemented; answers 501.
@@ -2530,6 +2738,8 @@ paths:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbytrackerid.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}/{distribution_tracker}/priority:
     put:
       description: Not implemented; answers 501.
@@ -2591,6 +2801,12 @@ paths:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatereleasebundlev2distributionpriority.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+        - path:release_bundle_version
+        - path:distribution_tracker
+      x-cost: expensive
 components:
   headers:
     LinkNext:

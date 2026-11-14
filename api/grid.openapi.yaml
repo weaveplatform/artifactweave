@@ -88,6 +88,10 @@ paths:
       tags:
         - topology
       x-oracle-source: https://docs.jfrog.com/administration/reference/listjpds.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/topology:
     get:
       description: Returns every topology defined on this instance. Administrators only.
@@ -125,6 +129,10 @@ paths:
       tags:
         - topology
       x-oracle-source: https://docs.jfrog.com/administration/reference/listgridtopologies.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name by lowercasing it and replacing each run of characters other than letters and digits with a hyphen; the call answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
       operationId: createGridTopology
@@ -181,6 +189,10 @@ paths:
         - topology
       x-oracle-source: https://docs.jfrog.com/administration/reference/creategridtopology.md
       x-unverified: true
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/name
+      x-cost: expensive
   /api/v1/topology/{key}:
     delete:
       description: Removes a topology and the Access federation it configured between its sites. Identities already replicated stay on each site. Administrators only.
@@ -233,6 +245,10 @@ paths:
       tags:
         - topology
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletegridtopology.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:key
+      x-cost: expensive
     get:
       description: Returns one topology with the current state of each site. Administrators only.
       operationId: getGridTopology
@@ -282,6 +298,8 @@ paths:
       tags:
         - topology
       x-oracle-source: https://docs.jfrog.com/administration/reference/getgridtopology.md
+      x-idempotency: safe
+      x-cost: ordinary
     patch:
       description: 'Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Disconnected rather than failing the call. Administrators only.'
       operationId: updateGridTopology
@@ -344,6 +362,10 @@ paths:
       tags:
         - topology
       x-oracle-source: https://docs.jfrog.com/administration/reference/updategridtopology.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:key
+      x-cost: expensive
   /api/v1/topology/{key}/monitoring/entities:
     get:
       description: Lists entities of one type with their delivery state to each target in the topology, newest change first, one page at a time. Administrators only.
@@ -433,6 +455,12 @@ paths:
       tags:
         - topology
       x-oracle-source: https://docs.jfrog.com/administration/reference/getmonitoringentitylist.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: cursor
+      x-pagination-parameters:
+        position: page_token
+      x-pagination-next: body:/next_page_token
   /api/v1/topology/{key}/monitoring/entities/summary:
     get:
       description: Returns failure, in-progress and success counts per entity type across every target in the topology, optionally limited to a modification window. Administrators only.
@@ -510,6 +538,8 @@ paths:
       tags:
         - topology
       x-oracle-source: https://docs.jfrog.com/administration/reference/getmonitoringsummary.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/topology/{key}/monitoring/entities/{entity_type}/{entity_id}:
     get:
       description: Returns the delivery state of one entity to every target in the topology, including the last error for failed targets. Administrators only.
@@ -589,6 +619,8 @@ paths:
       tags:
         - topology
       x-oracle-source: https://docs.jfrog.com/administration/reference/getmonitoringentitydetail.md
+      x-idempotency: safe
+      x-cost: ordinary
 components:
   headers:
     LinkNext:

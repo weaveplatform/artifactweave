@@ -68920,48 +68920,16 @@ func (r ResumeNpmRepositoryMigrationResponse) ContentType() string {
 	return ""
 }
 
-// GetSystemLivenessResponse429Headers the declared response headers of an HTTP 429 response for GetSystemLiveness
-type GetSystemLivenessResponse429Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
-// GetSystemLivenessResponse503Headers the declared response headers of an HTTP 503 response for GetSystemLiveness
-type GetSystemLivenessResponse503Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
 type GetSystemLivenessResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *Probe
-	// JSON429 the response for an HTTP 429 `application/json` response
-	JSON429 *TooManyRequests
-	// JSON503 the response for an HTTP 503 `application/json` response
-	JSON503 *ServiceUnavailable
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *GetSystemLivenessResponse429Headers
-	// Headers503 the parsed response headers for an HTTP 503 response
-	Headers503 *GetSystemLivenessResponse503Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetSystemLivenessResponse) GetJSON200() *Probe {
 	return r.JSON200
-}
-
-// GetJSON429 returns the response for an HTTP 429 `application/json` response
-func (r GetSystemLivenessResponse) GetJSON429() *TooManyRequests {
-	return r.JSON429
-}
-
-// GetJSON503 returns the response for an HTTP 503 `application/json` response
-func (r GetSystemLivenessResponse) GetJSON503() *ServiceUnavailable {
-	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -68993,35 +68961,13 @@ func (r GetSystemLivenessResponse) ContentType() string {
 	return ""
 }
 
-// GetSystemReadinessResponse429Headers the declared response headers of an HTTP 429 response for GetSystemReadiness
-type GetSystemReadinessResponse429Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
-// GetSystemReadinessResponse503Headers the declared response headers of an HTTP 503 response for GetSystemReadiness
-type GetSystemReadinessResponse503Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
 type GetSystemReadinessResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *Probe
-	// JSON429 the response for an HTTP 429 `application/json` response
-	JSON429 *TooManyRequests
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
-	// JSON503 the response for an HTTP 503 `application/json` response
-	JSON503 *ServiceUnavailable
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *GetSystemReadinessResponse429Headers
-	// Headers503 the parsed response headers for an HTTP 503 response
-	Headers503 *GetSystemReadinessResponse503Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -69029,19 +68975,9 @@ func (r GetSystemReadinessResponse) GetJSON200() *Probe {
 	return r.JSON200
 }
 
-// GetJSON429 returns the response for an HTTP 429 `application/json` response
-func (r GetSystemReadinessResponse) GetJSON429() *TooManyRequests {
-	return r.JSON429
-}
-
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetSystemReadinessResponse) GetJSON500() *ErrorResponse {
 	return r.JSON500
-}
-
-// GetJSON503 returns the response for an HTTP 503 `application/json` response
-func (r GetSystemReadinessResponse) GetJSON503() *ServiceUnavailable {
-	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -113108,74 +113044,9 @@ func ParseGetSystemLivenessResponse(rsp *http.Response) (*GetSystemLivenessRespo
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON429 = &dest
-
 	case rsp.StatusCode == 500:
 		break // No content-type
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest ServiceUnavailable
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 429:
-		var headers GetSystemLivenessResponse429Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers429 = &headers
-	case rsp.StatusCode == 503:
-		var headers GetSystemLivenessResponse503Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers503 = &headers
 	}
 
 	return response, nil
@@ -113202,13 +113073,6 @@ func ParseGetSystemReadinessResponse(rsp *http.Response) (*GetSystemReadinessRes
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON429 = &dest
-
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -113216,64 +113080,6 @@ func ParseGetSystemReadinessResponse(rsp *http.Response) (*GetSystemReadinessRes
 		}
 		response.JSON500 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest ServiceUnavailable
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 429:
-		var headers GetSystemReadinessResponse429Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers429 = &headers
-	case rsp.StatusCode == 503:
-		var headers GetSystemReadinessResponse503Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers503 = &headers
 	}
 
 	return response, nil

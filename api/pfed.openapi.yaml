@@ -52,6 +52,10 @@ paths:
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/listfederations.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). The federation and its membership are recorded, but its entity types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead. Administrators only.
       operationId: createFederation
@@ -107,6 +111,10 @@ paths:
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/createfederation.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/name
+      x-cost: expensive
   /api/v1/federations/{id}:
     delete:
       description: Removes a federation. The follower instances stay registered and paired and can join another federation. Administrators only.
@@ -148,6 +156,10 @@ paths:
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletefederation.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:id
+      x-cost: expensive
     get:
       description: Returns one federation with its connection group and entity types. Administrators only.
       operationId: getFederation
@@ -192,6 +204,8 @@ paths:
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/getfederation.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/jpd:
     get:
       description: Returns every follower instance added to this controller. A follower is always a peer instance paired over the peer protocol. Administrators only.
@@ -232,6 +246,10 @@ paths:
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/listfollowerjpds.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol. The token is consumed; the resulting per-peer keys are sealed at rest. Administrators only.
       operationId: addFollowerJpd
@@ -287,6 +305,9 @@ paths:
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/addfollowerjpd.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/jpd/{id}:
     delete:
       description: Removes a follower from this controller and forgets its trust keys. It is also removed from every federation that listed it. Administrators only.
@@ -328,6 +349,10 @@ paths:
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletefollowerjpd.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:id
+      x-cost: expensive
     get:
       description: Returns the base URL of one follower. Administrators only.
       operationId: getFollowerJpd
@@ -372,6 +397,8 @@ paths:
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/getfollowerjpd.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Replaces a follower's URL and re-pairs with it using a fresh pairing token, for example after the follower moved or to rotate the trust keys. Federations that reference the follower keep working. Administrators only.
       operationId: updateFollowerJpd
@@ -425,6 +452,9 @@ paths:
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatefollowerjpd.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
 components:
   headers:
     LinkNext:

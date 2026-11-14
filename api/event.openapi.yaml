@@ -42,6 +42,10 @@ paths:
       tags:
         - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getwebhooksubscriptions.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
       operationId: createWebhookSubscription
@@ -85,6 +89,10 @@ paths:
       tags:
         - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/createwebhooksubscription.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/key
+      x-cost: expensive
   /api/v1/subscriptions/test:
     post:
       description: Builds a sample event for the body's domain and first event type and delivers it once through the body's handler, without storing anything. Useful to check a URL, secret or template before creating the subscription. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with x.
@@ -125,6 +133,9 @@ paths:
       tags:
         - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/testwebhooksubscription.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/subscriptions/{key}:
     delete:
       description: Deletes the subscription. Deliveries already in flight finish; no new ones start. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with d.
@@ -165,6 +176,10 @@ paths:
       tags:
         - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/deletewebhooksubscription.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:key
+      x-cost: expensive
     get:
       description: Returns one subscription with secrets redacted. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with r.
       operationId: getWebhookSubscription
@@ -208,6 +223,8 @@ paths:
       tags:
         - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getwebhooksubscription.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
       operationId: updateWebhookSubscription
@@ -260,6 +277,10 @@ paths:
       tags:
         - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/updatewebhooksubscription.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:key
+      x-cost: expensive
   /api/v1/troubleshooting:
     get:
       description: 'Returns delivery attempt records from a store that keeps the most recent 10,000; older ones are discarded. Three modes, chosen by the parameters: without start the connection stays open and streams each new record as it happens until the client disconnects; with start alone the stored records from that time are sent first and the stream then stays live; with start plus end or count the call returns the matching stored records and ends. start=0 begins at the oldest record held. subscription and target filter every mode. A record is kept for every failed attempt, and for every attempt of a subscription with debug set. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with r.'
@@ -393,6 +414,10 @@ paths:
       tags:
         - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/streamwebhooktroubleshooting.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
 components:
   headers:
     LinkNext:
