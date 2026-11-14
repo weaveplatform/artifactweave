@@ -71,3 +71,4 @@ Status values: Proposed, Accepted, Superseded.
 | 0042 | [Capability scope and supersession](0042-capability-scope-and-supersession.md) |
 | 0043 | [API retry safety and bounded execution](0043-api-reliability.md) |
 | 0044 | [Modular-monolith migration](0044-modular-monolith-migration.md) |
+| 0045 | [An LZMA2 decoder whose dictionary grows as it fills](0045-lzma2-growing-dictionary.md) |
