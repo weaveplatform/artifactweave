@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/apilimit"
+	"github.com/weaveplatform/artifactweave/internal/platform/gen/operations"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
@@ -22,13 +23,20 @@ import (
 // limitOptions are the values the request-limit middleware takes from the
 // router, which builds them from the code that owns each request kind.
 type limitOptions struct {
+	// Operations finds the spec operation a request addresses, whose x-cost
+	// is the class admission charges it under (limitOptions.cost).
+	Operations *operations.Index
 	// Health reports the probes, which pass every limit so that a busy
-	// server still answers its health checks.
+	// server still answers its health checks. Admission asks it only of a
+	// request no spec operation addresses, such as the router's own probes;
+	// a spec probe declares x-cost exempt.
 	Health func(*http.Request) bool
 	// Recovery reports the administrative recovery API's requests, which
 	// take the small reserved recovery lane (apilimit.Service.EnterRecovery)
 	// instead of the shared limits, so that an administrator can still reach
-	// it when those are exhausted.
+	// it when those are exhausted. Like Health, it decides only for a
+	// request no spec operation addresses; the spec's recovery operations
+	// declare x-cost recovery.
 	Recovery func(*http.Request) bool
 	// Limits is the request-limit service (RouterConfig.RequestLimits).
 	Limits *apilimit.Service
@@ -46,11 +54,11 @@ type requestLimiter struct {
 func (s requestLimiter) limitIngress(o limitOptions) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if o.Health(r) {
+			switch o.cost(r) {
+			case costExempt:
 				next.ServeHTTP(w, r)
 				return
-			}
-			if o.Recovery(r) {
+			case costRecovery:
 				release, decision, err := o.Limits.EnterRecovery(r.Context())
 				if decision.Policy != "" {
 					setLimitHeaders(w, decision)
@@ -92,7 +100,8 @@ func (s requestLimiter) limitIngress(o limitOptions) func(http.Handler) http.Han
 func (s requestLimiter) limitPrincipal(o limitOptions) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if o.Health(r) || o.Recovery(r) {
+			cost := o.cost(r)
+			if cost == costExempt || cost == costRecovery {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -101,7 +110,7 @@ func (s requestLimiter) limitPrincipal(o limitOptions) func(http.Handler) http.H
 			if authenticated && !p.Anonymous {
 				name = p.Name
 			}
-			scope := apilimit.Scope{Principal: name, Expensive: expensiveRequest(r)}
+			scope := apilimit.Scope{Principal: name, Expensive: cost == costExpensive}
 			if err := s.budgetResources(r, p, &scope); err != nil {
 				writeLimitError(w, r, err)
 				return
@@ -135,6 +144,18 @@ func (s requestLimiter) limitPrincipal(o limitOptions) func(http.Handler) http.H
 	}
 }
 
+// expensiveRequest is the path rule set that admitted every request before
+// the specs declared x-cost. Admission asks it only of a request no spec
+// operation addresses (limitOptions.cost): a hand-written alias, a native
+// protocol route, a deeper path a hand-written route's wildcard serves, and
+// a 404 or 405, a HEAD of a GET-only operation among them. The write rule,
+// the archive and vcs prefixes, the two suffixes and the storage list rule
+// still decide routes the router serves; the other prefixes and the three
+// exact paths now decide only requests no route serves. Those are kept so
+// that a 404 or 405 is charged to the allowance, and reports the rate
+// headers, it was before. TestAccAdmissionCostAgreesWithServedRoutes holds
+// the rules to the spec's class where a hand-written route serves a spec
+// operation under a pattern of its own.
 func expensiveRequest(r *http.Request) bool {
 	p := r.URL.Path
 	if r.Method != http.MethodGet && r.Method != http.MethodHead && strings.Contains(p, "/api/") {

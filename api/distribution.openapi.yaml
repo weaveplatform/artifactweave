@@ -60,10 +60,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Importing needs an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Import an exported release bundle v1 archive
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/importreleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - query:file_name
+      x-cost: expensive
   /api/v1/distribution/edge_nodes:
     get:
       description: 'Lists the edges this instance can distribute to: the instances paired with it in the edge role, with the name and service id each declared at pairing.'
@@ -93,10 +101,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List edge nodes
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionedgenodes.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/distribution/{release_bundle_name}/{release_bundle_version}:
     post:
       description: 'Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the peer protocol: each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be instances paired in the edge role. With `dry_run` the selected edges are returned and nothing is sent.'
@@ -136,10 +152,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller has no destination permission covering one of the selected edges.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Distribute a release bundle v1 version
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributereleasebundlev1version.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/distribution/{release_bundle_name}/{release_bundle_version}/abort:
     put:
       description: 'Stops the in-progress distribution of the version: transfers not yet finished are cancelled and the affected edges discard what they had partly received. Edges that already completed keep the version.'
@@ -170,10 +193,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Abort a release bundle v1 distribution
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/abortreleasebundlev1distribution.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+        - path:release_bundle_version
+      x-cost: expensive
   /api/v1/distribution/{release_bundle_name}/{release_bundle_version}/delete:
     post:
       description: Removes a distributed version from the edges the rules select. Each edge deletes the version and the artifacts that no other version on that edge still needs. With `on_success=delete` the version is also deleted here once every selected edge has confirmed. With `dry_run` the selected edges are returned and nothing changes.
@@ -213,10 +245,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller has no destination permission with `delete` covering one of the selected edges.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a release bundle v1 version from edges
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletereleasebundlev1versionfromdistributionedges.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/dynamic/distribute:
     post:
       description: Creates a release bundle version from the spec with a generated name and version, signs it with the default GPG key and distributes it to the edges the rules select, all in one request. The rules and edge requirements are those of the ordinary distribute operation.
@@ -260,10 +299,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create, sign and distribute a release bundle in one call
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributedynamicreleasebundlev1.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/export/release_bundle/{release_bundle_name}/{release_bundle_version}:
     delete:
       description: Deletes the exported zip of the version from the export directory. The version itself is untouched.
@@ -280,10 +326,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete an exported release bundle archive
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteexportedreleasebundlev1file.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+        - path:release_bundle_version
+      x-cost: expensive
     post:
       description: Starts an asynchronous export of a signed version to one zip archive holding the signed manifest, its signature and every artifact, for carrying to an instance with no network path to this one. Poll the status operation; the archive is written to the instance's export directory.
       operationId: exportReleaseBundleV1Version
@@ -311,10 +366,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Export a release bundle v1 version for air-gapped transfer
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/exportreleasebundlev1version.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/export/release_bundle/{release_bundle_name}/{release_bundle_version}/status:
     get:
       description: Reports how far the export of a version has got.
@@ -345,10 +407,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the export status of a release bundle v1 version
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getexportedreleasebundlev1status.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/keys/pgp:
     get:
       description: Returns the alias and ASCII-armoured public part of the default GPG key, the key that signs release bundles. The private part is never returned.
@@ -366,10 +434,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the default GPG signing key
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getgpgsigningkey.md
+      x-idempotency: safe
+      x-cost: ordinary
     post:
       description: Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store, the same store `/artifactory/api/security/keypair` manages, so a key added here is visible there and the reverse.
       operationId: setGpgSigningKey
@@ -399,10 +473,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Add a GPG signing key
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setgpgsigningkey.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/alias
+      x-cost: expensive
   /api/v1/keys/pgp/aliases:
     get:
       description: Lists the aliases of the configured GPG keys.
@@ -422,10 +504,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List GPG key aliases
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getallgpgkeyaliases.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/keys/pgp/propagate:
     post:
       description: Sends one key (`alias`) or every key (`all=true`) to every edge peer, which adds it to the keys it trusts for verifying signatures. Only public parts leave this instance.
@@ -455,10 +545,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Propagate GPG keys to edges
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/uploadandpropagategpgsigningkeysfordistribution.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/keys/pgp/{alias}:
     delete:
       description: Deletes the key pair. Versions already signed with it stay valid on edges that hold its public part; new versions cannot be signed with it.
@@ -485,10 +582,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a GPG key
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletegpgkeybyalias.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:alias
+      x-cost: expensive
     get:
       description: Returns the alias and public part of one key.
       operationId: getGpgPublicKeyByAlias
@@ -518,10 +623,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a GPG key by alias
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getgpgpublickeybyalias.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Changes the alias of a key; the key material is unchanged.
       operationId: updateGpgKeyAlias
@@ -566,10 +677,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Rename a GPG key
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updategpgkeyalias.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:alias
+        - body:/alias
+        - body:/new_alias
+      x-cost: expensive
   /api/v1/maintenance/distributeByLastDays:
     post:
       description: Redistributes to one edge every release bundle version distributed in a window of days ending on `date`, for example after the edge was rebuilt. The window length runs from 1 to the configured maximum, 7 by default. Administrators only.
@@ -606,10 +727,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Redistribute recent release bundles to an edge
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributebylastdays.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/maintenance/execute/{actionType}:
     post:
       description: Runs a maintenance action using a token from the token operation, sent as the plain-text body. UNLOCK_STUCK releases every stuck distribution so it can be retried or cleaned up; STOP_ALL force-stops every in-progress distribution, ends every non-final tracker and empties the pending work queue. `dryRun` defaults to true and reports what would change without changing it. Administrators only.
@@ -665,10 +793,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Run a maintenance action
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/executemaintenanceaction.md
+      x-idempotency: none
+      x-idempotency-reason: protocol-reconciliation
+      x-cost: expensive
   /api/v1/maintenance/generate_token/{actionType}:
     get:
       description: Issues a single-use token for one maintenance action. The token expires after 3 minutes and must be sent as the body of the execute operation. Administrators only.
@@ -713,10 +848,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a maintenance token
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/generatemaintenanceexecutiontoken.md
+      x-idempotency: none
+      x-idempotency-reason: secret-response
+      x-cost: ordinary
   /api/v1/maintenance/stuck_distributions:
     get:
       description: Lists distributions stuck in a non-final state, for example after an edge disappeared mid-transfer. Unlock them with the UNLOCK_STUCK maintenance action. Administrators only.
@@ -742,10 +884,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List stuck distributions
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getstuckdistributions.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/metrics:
     get:
       description: Returns the release bundle and distribution counters in OpenMetrics text, under `jfds_` metric names. Administrators only.
@@ -769,10 +919,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Reading metrics needs an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get distribution metrics
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getopenmetricsfordistribution.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/release_bundle:
     get:
       description: Lists the release bundle v1 versions on this instance, one entry per version, newest first. Use `start_pos` to page.
@@ -810,10 +966,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List release bundle v1 versions
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getallbundles-1.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: offset
+      x-pagination-parameters:
+        position: start_pos
+      x-pagination-next: link
     post:
       description: 'Creates a release bundle version: an immutable manifest of the artifacts selected by the spec''s AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. The artifacts stay in their repositories.'
       operationId: createReleaseBundleV1Version
@@ -868,10 +1034,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A version with this name and version already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a release bundle v1 version
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createreleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/name
+        - body:/version
+      x-cost: expensive
   /api/v1/release_bundle/distribution:
     get:
       description: Lists the distribution trackers of every release bundle v1 version, newest first.
@@ -891,10 +1066,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List distribution statuses
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetails.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/release_bundle/{release_bundle_name}:
     delete:
       description: Deletes every version of the named release bundle from this instance, with the same rules as deleting one version.
@@ -921,10 +1104,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete every version of a release bundle
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteallreleasebundlev1versions.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+      x-cost: expensive
     get:
       description: Lists every version of the named release bundle, newest first.
       operationId: getReleaseBundleV1VersionsByName
@@ -969,10 +1160,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No release bundle has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List the versions of one release bundle
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev1versionsbyname.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: offset
+      x-pagination-parameters:
+        position: start_pos
+      x-pagination-next: link
   /api/v1/release_bundle/{release_bundle_name}/LATEST:
     get:
       description: Returns the newest version of the named release bundle by creation time. A version literally named `LATEST` cannot be read through the version path for the same reason.
@@ -998,10 +1199,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No release bundle has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the latest version of a release bundle
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getlatestreleasebundlev1version.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/release_bundle/{release_bundle_name}/distribution:
     get:
       description: Lists the distribution trackers of every version of the named release bundle, newest first.
@@ -1023,10 +1230,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List distribution statuses of a release bundle
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbyreleasebundlev1name.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}:
     delete:
       description: Deletes one version from this instance. The artifacts are not deleted; they stay in their repositories under their own retention. Copies already on edges are untouched; remove those with the edge delete operation first.
@@ -1054,10 +1269,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a release bundle v1 version
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletereleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+        - path:release_bundle_version
+      x-cost: expensive
     get:
       description: Returns a version's details and artifact list. With `format=jws` or `format=jose` the signed manifest is returned instead, as the compact JWS string or the JOSE JSON serialisation, which is what edges verify; those formats need a signed version.
       operationId: getReleaseBundleV1VersionDetails
@@ -1116,10 +1340,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such version, or a signed form was requested for an OPEN version.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a release bundle v1 version
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev1versiondetails.md
+      x-idempotency: safe
+      x-cost: ordinary
     head:
       description: Answers with the sha256 of the version's signed manifest in the X-Checksum-Sha256 header and no body. Edges and clients use it to compare versions without downloading them.
       operationId: getReleaseBundleV1VersionSha256
@@ -1138,10 +1368,16 @@ paths:
           description: Credentials were missing or rejected.
         '404':
           description: No such version, or it is not signed yet.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the checksum of a release bundle v1 version
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev1versionsha256.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Replaces the content of a version that has not been signed. The body has the same shape as for creation, and its name and version must match the path. Signed versions are immutable and answer 400.
       operationId: updateReleaseBundleV1Version
@@ -1185,10 +1421,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Update an unsigned release bundle v1 version
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatereleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+        - path:release_bundle_version
+      x-cost: expensive
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/distribution:
     get:
       description: Lists the distribution trackers of one release bundle version, newest first.
@@ -1211,10 +1456,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List distribution statuses of a version
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbyreleasebundlev1version.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/distribution/{distribution_tracker}:
     get:
       description: Returns one tracker with the status of the transfer to each of its edges.
@@ -1236,10 +1489,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a distribution tracker
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbyreleasebundlev1trackerid.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/sign:
     post:
       description: Signs an OPEN version with the default GPG key, or with the key whose passphrase is sent in X-GPG-PASSPHRASE, producing a JWS over the manifest, and records the manifest in the storing repository. A version must be signed before it can be distributed or exported and is immutable afterwards. Signing an already signed version is rejected with 400.
@@ -1290,10 +1549,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Sign a release bundle v1 version
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/signreleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+        - path:release_bundle_version
+      x-cost: expensive
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/trigger_xray_scan:
     post:
       description: Not implemented; answers 501.
@@ -1321,17 +1589,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Scan a release bundle v1 version with Xray
       tags:
         - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/triggerxrayscanreleasebundlev1version.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/security/permissions:
     get:
       description: Lists every destination permission. Administrators only.
@@ -1351,10 +1626,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List destination permissions
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getalldistributionpermissions.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/security/permissions/{permission_name}:
     delete:
       description: Deletes one destination permission. Administrators only.
@@ -1381,10 +1664,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a destination permission
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletedistributionpermission.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:permission_name
+      x-cost: expensive
     get:
       description: Returns one destination permission. Administrators only.
       operationId: getDistributionPermissionByName
@@ -1414,10 +1705,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a destination permission
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionpermissionbyname.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Creates the destination permission, or replaces it when the name exists. A destination permission grants users and groups the right to distribute release bundles to, or delete them from, the edges its destinations match. Administrators only.
       operationId: setDistributionPermission
@@ -1460,10 +1757,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The body names a different permission than the path.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create or replace a destination permission
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setdistributionpermission.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:permission_name
+      x-cost: expensive
   /api/v1/security/token:
     get:
       description: Lists the tokens issued through the Distribution token operations. They are ordinary access tokens, so the Access token list shows them too. Administrators only.
@@ -1487,10 +1792,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Listing tokens needs an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List tokens
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/gettokeninfos.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Issues or refreshes a token from a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. The tokens are ordinary access tokens.
       operationId: createOrRefreshToken
@@ -1561,10 +1874,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A non-administrator asked for admin scope or another user's token.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create or refresh a token
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createorrefreshtoken.md
+      x-idempotency: none
+      x-idempotency-reason: secret-response
+      x-cost: expensive
   /api/v1/security/token/revoke:
     post:
       description: Revokes a token given either its value (access or refresh token) or its id, in a form body, as in RFC 7009. Administrators only.
@@ -1611,10 +1931,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No token with that id.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Revoke a token
       tags:
         - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/revoketoken.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/token
+        - body:/token_id
+      x-cost: expensive
   /api/v1/system/info:
     get:
       description: Returns the version, service id and health of the distribution service. `status` is UNSTABLE, with `message` naming the failing dependency, when the database or blob store is unavailable.
@@ -1632,10 +1961,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get distribution system information
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionsysteminfo.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/ping:
     get:
       description: Answers 200 with message OK when the instance's distribution features are usable, meaning the database and blob store are reachable. The distribution service is the instance itself. Anonymous callers may use it unless anonymous access is disabled.
@@ -1653,16 +1988,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Credentials were missing or rejected.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A dependency is unavailable; the message names it.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Ping the distribution service
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributionping.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/settings:
     get:
       description: Returns the distribution settings. Administrators only.
@@ -1686,10 +2027,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get distribution settings
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionsystemsettings.md
+      x-idempotency: safe
+      x-cost: ordinary
     post:
       description: Replaces the distribution settings. Administrators only.
       operationId: updateDistributionSystemSettings
@@ -1715,10 +2062,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Update distribution settings
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatedistributionsystemsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - route
+      x-cost: expensive
   /api/v1/system/support/bundle:
     post:
       description: 'Collects a support bundle under a generated id: logs for a date window, the configuration with every secret masked, system information and goroutine dumps, as selected. Administrators only.'
@@ -1755,16 +2110,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An internal error; the body explains it.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a support bundle
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/createdistributionsupportbundle.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/system/support/bundle/{bundle_id}:
     delete:
       description: Deletes one support bundle. Administrators only.
@@ -1797,16 +2159,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An internal error; the body explains it.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a support bundle
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletedistributionsupportbundle.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:bundle_id
+      x-cost: expensive
     get:
       description: Returns one support bundle's metadata. Administrators only.
       operationId: getSupportBundleInfo
@@ -1842,16 +2212,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An internal error; the body explains it.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a support bundle
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/getdistributionsupportbundleinfo.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Collects a support bundle as the create operation does, under the id in the path.
       operationId: createSpecificSupportBundle
@@ -1900,16 +2276,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An internal error; the body explains it.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a support bundle with a given id
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/createspecificdistributionsupportbundle.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:bundle_id
+      x-cost: expensive
   /api/v1/system/support/bundle/{bundle_id}/archive:
     get:
       description: Downloads one support bundle as a zip archive. Administrators only.
@@ -1947,16 +2331,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An internal error; the body explains it.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Download a support bundle
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/downloaddistributionsupportbundle.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/support/bundles:
     get:
       description: Lists the support bundles on this instance. Administrators only.
@@ -1980,16 +2370,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An internal error; the body explains it.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List support bundles
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/listdistributionsupportbundles.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v2/distribution/abort/{release_bundle_name}/{release_bundle_version}:
     put:
       description: Not implemented; answers 501.
@@ -2022,17 +2420,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Abort a Release Bundle v2 distribution
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/abortreleasebundlev2distribution.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+        - path:release_bundle_version
+        - query:repository_key
+        - query:project
+      x-cost: expensive
   /api/v2/distribution/distribute/{release_bundle_name}/{release_bundle_version}:
     post:
       description: Not implemented; answers 501.
@@ -2080,17 +2489,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The request conflicts with the current state.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Distribute a Release Bundle v2 version
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributereleasebundlev2version.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v2/distribution/key/propagate/{key_name}:
     post:
       description: Sends the named key's public part to every edge peer, which adds it to the keys it trusts for verifying release bundle signatures. Run it after adding or rotating the signing key and before distributing.
@@ -2121,10 +2537,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Propagating keys needs an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Propagate a signing key to edges
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/propagatepublicsigningkey.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v2/distribution/key/{key_name}:
     get:
       description: Returns the ASCII-armoured public part of the named key from the keypair store, as plain text.
@@ -2155,10 +2578,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Reading signing keys needs an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a signing key's public part
       tags:
         - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpublicsigningkeyfordistribution.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v2/distribution/remote_delete/{release_bundle_name}/{release_bundle_version}:
     post:
       description: Not implemented; answers 501.
@@ -2200,17 +2629,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a Release Bundle v2 version from edges
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/remotedeletereleasebundlev2distribution.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}:
     get:
       description: Not implemented; answers 501.
@@ -2241,17 +2677,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List Release Bundle v2 distribution trackers
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev2distributiontrackers.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}/{distribution_tracker}:
     get:
       description: Not implemented; answers 501.
@@ -2279,17 +2723,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs. Distribution administration needs an administrator; distributing and deleting need a destination permission covering every selected edge.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a Release Bundle v2 distribution tracker
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbytrackerid.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}/{distribution_tracker}/priority:
     put:
       description: Not implemented; answers 501.
@@ -2336,19 +2786,66 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Change the priority of a Release Bundle v2 distribution
       tags:
         - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatereleasebundlev2distributionpriority.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:release_bundle_name
+        - path:release_bundle_version
+        - path:distribution_tracker
+      x-cost: expensive
 components:
+  headers:
+    LinkNext:
+      description: >-
+        The next page, as `<target>; rel="next"` (RFC 8288): the path and query the client sent, every parameter kept and only the position changed. Sent only while more items remain, so its absence marks the last page. Declared only by the operations that send it.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RateLimit:
+      description: >-
+        The caller's remaining allowance under the policy admission evaluated, in RateLimit draft-11 syntax, for example `"api";r=5999;t=42`: the policy, the requests left and the seconds until its window resets. Also sent on every other response after admission, whatever its status, and on every response under the `recovery` policy, though no other response declares it. Not sent on health probes, on a refusal reached before any allowance was evaluated, or on an authentication 401 or a restriction 403.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RateLimitPolicy:
+      description: >-
+        The policy admission evaluated, in RateLimit draft-11 syntax, for example `"api";q=6000;w=60`: the policy name (`api`, `expensive`, `authentication` or `recovery`), its quota and its window in seconds. Sent wherever `RateLimit` is.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RetryAfter:
+      description: >-
+        Seconds to wait before retrying, at least 1: the rest of the blocked window for a rate refusal, otherwise 1. Also sent on an operation's own 503 that reports a transient condition; a 503 that reports configuration or a size bound carries none.
+      required: true
+      x-artifactweave-extension: true
+      schema:
+        type: integer
+        minimum: 1
   parameters:
+    IdempotencyKey:
+      description: >-
+        Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, a retry with the same key, credential, canonical resource and identical body bytes does not repeat the operation's effect: it answers the original success status, with the body built from the committed result after the current credential and permissions are checked again. Reuse with different bytes, or with a changed parameter that alters the effect, returns 422. A resource deleted since answers 404, one moved out of the request's scope 409. Only a success is kept, so a retry after a failure runs the operation again. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window. An operation that does not declare this parameter answers a key with 400.
+      in: header
+      name: Idempotency-Key
+      x-artifactweave-extension: true
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 130
     distributionTrackerPath:
       description: Required path parameter. Numeric id of a distribution tracker, as returned in `id` by a distribute or delete call.
       in: path
@@ -2383,6 +2880,37 @@ components:
       name: repository_key
       schema:
         type: string
+  responses:
+    ServiceUnavailable:
+      description: >-
+        A dependency of the request is briefly unavailable: admission or restriction storage, or, for a retry with an `Idempotency-Key`, the first request still running when the retry's wait budget ran out. Wait for `Retry-After` before retrying. `RateLimit` and `RateLimit-Policy` are present when the answer follows admission, as a keyed retry's does.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: >-
+        A request limit refused the request: a rate allowance or a concurrency permit. Wait for `Retry-After` before retrying. `RateLimit` and `RateLimit-Policy` report the allowance; they are absent when the process's concurrency permits refused the request before any allowance was evaluated.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
     DeleteReleaseBundleRequest:
       description: Which edges should remove a distributed version.

@@ -36,3 +36,30 @@ func TestAccReplayCrashHelper(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	appstoretest.ReplayCrashChild(t, s)
 }
+
+func TestAccKeyedReplayProcessCrash(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "keyed-crash.db")
+	s, err := sqlite.Open(t.Context(), path, sqlite.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	appstoretest.KeyedReplayCrash(t, s, []string{"ARTIFACTWEAVE_KEYED_REPLAY_CRASH_SQLITE=" + path})
+}
+
+func TestAccKeyedReplayCrashHelper(t *testing.T) {
+	path := os.Getenv("ARTIFACTWEAVE_KEYED_REPLAY_CRASH_SQLITE")
+	if path == "" {
+		t.Skip("subprocess helper")
+	}
+	s, err := sqlite.Open(
+		t.Context(),
+		path,
+		sqlite.Options{Options: appsql.Options{SkipMigrate: true}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	appstoretest.KeyedReplayCrashChild(t, s)
+}

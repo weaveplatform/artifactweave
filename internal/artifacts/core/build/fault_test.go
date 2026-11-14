@@ -147,6 +147,27 @@ func (f faultyBuilds) Promotions(ctx context.Context, id int64) ([]model.BuildPr
 	return f.BuildStore.Promotions(ctx, id)
 }
 
+func (f faultyBuilds) PutReport(ctx context.Context, r model.BuildReport) (int64, error) {
+	if f.fail == "putreport" {
+		return 0, errBoom
+	}
+	return f.BuildStore.PutReport(ctx, r)
+}
+
+func (f faultyBuilds) ReportForUpdate(ctx context.Context, id int64) (model.BuildReport, error) {
+	if f.fail == "report" {
+		return model.BuildReport{}, errBoom
+	}
+	return f.BuildStore.ReportForUpdate(ctx, id)
+}
+
+func (f faultyBuilds) PruneReports(ctx context.Context, now time.Time, limit int) (int64, error) {
+	if f.fail == "prunereports" {
+		return 0, errBoom
+	}
+	return f.BuildStore.PruneReports(ctx, now, limit)
+}
+
 type faultyItems struct {
 	port.ItemStore
 	fail string

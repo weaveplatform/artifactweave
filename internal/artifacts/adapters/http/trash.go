@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -372,7 +373,7 @@ func (s ArtifactoryAPI) trashStorage(w http.ResponseWriter, r *http.Request) {
 		svc: s.trashService(st), dir: dir, sees: sees,
 		base: baseurl.From(ctx) + storagePrefix + trash.Repository,
 	}
-	n, children, err := v.target(ctx)
+	n, err := v.target(ctx)
 	switch {
 	case errors.Is(err, kernel.ErrNotFound):
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
@@ -387,7 +388,23 @@ func (s ArtifactoryAPI) trashStorage(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
-	media, body, err := v.view(ctx, mode, n, children, q)
+	// The file list and a folder's info are written as they are read, as
+	// a repository's are.
+	if mode == "list" || mode == "" && n.Folder {
+		var l *httpkit.ListStream
+		if mode == "list" {
+			l, err = v.list(ctx, n, q)
+		} else {
+			l, err = v.folderInfo(ctx)
+		}
+		if err != nil {
+			httpkit.WriteErr(w, r, s.ItemError(ctx, "trash "+mode, err))
+			return
+		}
+		_ = l.Write(w)
+		return
+	}
+	media, body, err := v.view(ctx, mode, n, q)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "trash "+mode, err))
 		return
@@ -414,49 +431,61 @@ func (v trashView) uri(p string) string {
 	return v.base + "/" + httpkit.EscapePath(p)
 }
 
-// target finds what the trash can holds at the path, with what it holds
-// directly below: the root, which is always there, a trashed item, or a
-// folder holding what the caller sees was trashed below it. Anything else is
-// kernel.ErrNotFound.
-func (v trashView) target(ctx context.Context) (trash.Node, []trash.Node, error) {
+// target finds what the trash can holds at the path: the root, which is
+// always there, a trashed item, or a folder holding what the caller sees
+// was trashed below it. Anything else is kernel.ErrNotFound. Whether the
+// caller sees anything below the path is asked of the first entries there,
+// not of the whole tree.
+//
+// The root's is asked too, though the root is always there: the collected
+// read this replaced read the trash for every path, so a failing store
+// failed every view, and still does.
+func (v trashView) target(ctx context.Context) (trash.Node, error) {
 	n := trash.Node{Path: v.dir, Folder: true}
-	children, err := v.svc.Below(ctx, v.dir, false, v.sees)
+	holds, err := v.svc.Holds(ctx, v.dir, v.sees)
 	if err != nil {
-		return n, nil, err //nolint:wrapcheck // the trash service wraps its own
+		return n, err //nolint:wrapcheck // the trash service wraps its own
 	}
 	key, rest := cutRepoPath(v.dir)
+	if key == "" {
+		return n, nil
+	}
 	if rest == "" {
-		if key != "" && len(children) == 0 {
-			return n, nil, kernel.ErrNotFound
+		if !holds {
+			return n, kernel.ErrNotFound
 		}
-		return n, children, nil
+		return n, nil
 	}
 	e, err := v.svc.Find(ctx, key, rest)
 	switch {
-	case errors.Is(err, kernel.ErrNotFound) && len(children) == 0:
-		return n, nil, kernel.ErrNotFound
+	case errors.Is(err, kernel.ErrNotFound) && !holds:
+		return n, kernel.ErrNotFound
 	case errors.Is(err, kernel.ErrNotFound):
 	case err != nil:
-		return n, nil, err //nolint:wrapcheck // as above
+		return n, err //nolint:wrapcheck // as above
 	// A file trashed where a folder later held trashed items gives way to
 	// the folder, as in Below.
-	case len(children) == 0 || e.Record.Item.Folder:
+	case !holds || e.Record.Item.Folder:
 		n.Entry, n.Folder = &e, e.Record.Item.Folder
 	}
-	return n, children, nil
+	return n, nil
 }
 
-// view renders the view mode selects, as getStorage does for a repository.
+// nodes are the trash can's tree below the path, direct children or (deep)
+// every descendant, read a store page at a time in Below's order.
+func (v trashView) nodes(deep bool) *kernel.Pages[trash.Node] {
+	return kernel.NewPages(v.svc.Walk(v.dir, deep, v.sees).Page, kernel.MaxLimit)
+}
+
+// view renders the view mode selects, as getStorage does for a repository,
+// but for the file list and a folder's info, which trashStorage streams.
 func (v trashView) view(
 	ctx context.Context,
 	mode string,
 	n trash.Node,
-	children []trash.Node,
 	q url.Values,
 ) (string, any, error) {
 	switch mode {
-	case "list":
-		return v.list(ctx, n, q)
 	case "properties":
 		return v.properties(n, q.Get("properties"))
 	case "stats":
@@ -472,8 +501,7 @@ func (v trashView) view(
 			trash.Repository,
 		)
 	}
-	media, body := v.info(n, children)
-	return media, body, nil
+	return mediaFileInfo, trashFileInfo(v.uri(v.dir), v.dir, *n.Entry), nil
 }
 
 // trashItem is how a node of the trash can's tree shows in a view: the
@@ -489,40 +517,63 @@ func trashItem(n trash.Node) model.Item {
 	return it
 }
 
-// info is the item info view: a trashed file's FileInfo, or a folder's
-// children.
-func (v trashView) info(n trash.Node, children []trash.Node) (string, any) {
-	if !n.Folder {
-		return mediaFileInfo, trashFileInfo(v.uri(v.dir), v.dir, *n.Entry)
-	}
-	list := make([]map[string]any, 0, len(children))
-	for _, c := range children {
-		list = append(list, map[string]any{"uri": "/" + path.Base(c.Path), "folder": c.Folder})
-	}
-	return mediaFolderInfo, map[string]any{
-		"repo": trash.Repository, "path": "/" + v.dir, "children": list, "uri": v.uri(v.dir),
-	}
+// folderInfo is a trash can folder's FolderInfo, its children written a
+// store page at a time (decision 0043, "Streaming complete lists").
+func (v trashView) folderInfo(ctx context.Context) (*httpkit.ListStream, error) {
+	// A document of strings and an empty array, which always splits.
+	env, _ := httpkit.EnvelopeOf(map[string]any{
+		"repo": trash.Repository, "path": "/" + v.dir, "children": []map[string]any{},
+		"uri": v.uri(v.dir),
+	}, "children")
+	//nolint:wrapcheck // the trash service's error, which the handler maps
+	return httpkit.StreamList(ctx, v.nodes(false),
+		func(c trash.Node) (map[string]any, bool, error) {
+			return map[string]any{"uri": "/" + path.Base(c.Path), "folder": c.Folder}, true, nil
+		},
+		httpkit.ListOptions{ContentType: mediaFolderInfo, Envelope: env})
 }
 
 // list is the FileList view of a trash can folder, with the parameters it
-// takes on any other repository.
-func (v trashView) list(ctx context.Context, n trash.Node, q url.Values) (string, any, error) {
+// takes on any other repository, written a store page at a time. The
+// tree's nodes come in path order, which is their entries' uri order, the
+// order render sorts by.
+func (v trashView) list(
+	ctx context.Context,
+	n trash.Node,
+	q url.Values,
+) (*httpkit.ListStream, error) {
 	if !n.Folder {
-		return "", nil, httpkit.BadRequestf("/%s is a file; list needs a folder", v.dir)
+		return nil, httpkit.BadRequestf("/%s is a file; list needs a folder", v.dir)
 	}
 	l, err := parseListing(q)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
-	nodes, err := v.svc.Below(ctx, v.dir, l.isDeep, v.sees)
-	if err != nil {
-		return "", nil, err //nolint:wrapcheck // the trash service wraps its own
+	// A constant document, which always splits.
+	env, _ := httpkit.EnvelopeOf(map[string]any{
+		"uri": v.uri(v.dir), "created": httpkit.FormatTime(time.Now()),
+		"files": []map[string]any{},
+	}, "files")
+	walk, root := v.svc.Walk(v.dir, l.isDeep, v.sees), l.shouldIncludeRootPath
+	read := func(ctx context.Context, p kernel.Page) ([]trash.Node, string, error) {
+		nodes, next, err := walk.Page(ctx, p)
+		if root {
+			// The folder itself, at "/", sorts before every entry below it;
+			// a node with no path stands for it.
+			nodes, root = append([]trash.Node{{}}, nodes...), false
+		}
+		return nodes, next, err //nolint:wrapcheck // the trash service wraps its own
 	}
-	items := make([]listed, 0, len(nodes))
-	for _, c := range nodes {
-		items = append(items, listed{path: c.Path, item: trashItem(c)})
-	}
-	return mediaFileList, l.render(v.uri(v.dir), v.dir, trashItem(n), items), nil
+	//nolint:wrapcheck // the trash service's error, which the handler maps
+	return httpkit.StreamList(ctx, kernel.NewPages(read, kernel.MaxLimit),
+		func(c trash.Node) (map[string]any, bool, error) {
+			if c.Path == "" {
+				return l.rootEntry(trashItem(n)), true, nil
+			}
+			m, ok := l.entry(v.dir, listed{path: c.Path, item: trashItem(c)})
+			return m, ok, nil
+		},
+		httpkit.ListOptions{ContentType: mediaFileList, Envelope: env})
 }
 
 // properties is the properties view of a trashed item: its own properties
@@ -563,13 +614,21 @@ func (v trashView) stats(n trash.Node) (string, any, error) {
 func (v trashView) lastModified(ctx context.Context, n trash.Node) (string, any, error) {
 	newest, at := trashItem(n), v.dir
 	if n.Folder {
-		nodes, err := v.svc.Below(ctx, v.dir, true, v.sees)
-		if err != nil {
-			return "", nil, err //nolint:wrapcheck // the trash service wraps its own
-		}
-		for _, c := range nodes {
-			if it := trashItem(c); it.Modified.After(newest.Modified) {
-				newest, at = it, c.Path
+		// The walk meets the nodes in Below's order, so a tie goes to the
+		// node Below listed first, as it did.
+		pages := v.nodes(true)
+		for {
+			nodes, ok, err := pages.Next(ctx)
+			if err != nil {
+				return "", nil, err //nolint:wrapcheck // the trash service wraps its own
+			}
+			if !ok {
+				break
+			}
+			for _, c := range nodes {
+				if it := trashItem(c); it.Modified.After(newest.Modified) {
+					newest, at = it, c.Path
+				}
 			}
 		}
 		if newest.Modified.IsZero() {
