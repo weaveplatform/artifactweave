@@ -69,6 +69,46 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
       description: The repository, image or path named in the request does not exist or is not visible to the caller.
+    ArtifactorySearchesApiRegistryBadRequest:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegistryErrorResponse'
+      description: The request is malformed, for example an image name outside the registry's name grammar
+        (NAME_INVALID). The body is a registry error.
+    ArtifactorySearchesApiRegistryForbidden:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegistryErrorResponse'
+      description: The caller may not read the image (UNAUTHORIZED, the code the registry sends for a permission
+        refusal), or the caller's API access is restricted (DENIED). The body is a registry error.
+    ArtifactorySearchesApiRegistryInternalServerError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegistryErrorResponse'
+      description: The listing failed inside the server (INTERNAL_ERROR). The body is a registry error.
+    ArtifactorySearchesApiRegistryMethodNotAllowed:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegistryErrorResponse'
+      description: The repository is a remote or virtual repository (UNSUPPORTED). The body is a registry error.
+    ArtifactorySearchesApiRegistryNotFound:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegistryErrorResponse'
+      description: The repository does not exist or is not a Docker, OCI or Helm OCI repository, or the image is
+        unknown (NAME_UNKNOWN, naming them in detail.name). The body is a registry error.
+    ArtifactorySearchesApiRegistryUnauthorized:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegistryErrorResponse'
+      description: Credentials were missing or rejected while anonymous access is off (UNAUTHORIZED); the response
+        carries the registry's authentication challenge. The body is a registry error.
     ArtifactorySearchesApiUnauthorized:
       content:
         application/json:
@@ -473,20 +513,19 @@ paths:
                 type: string
           description: The image names, possibly a page of them.
         '400':
-          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryBadRequest'
         '401':
-          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryUnauthorized'
         '403':
-          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryForbidden'
         '404':
-          $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryNotFound'
         '405':
-          description: The repository is a remote or virtual repository; the body is a registry error with the code
-            UNSUPPORTED.
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryMethodNotAllowed'
         '429':
           $ref: '#/components/responses/RegistryTooManyRequests'
         '500':
-          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryInternalServerError'
         '503':
           $ref: '#/components/responses/RegistryServiceUnavailable'
       tags:
@@ -623,20 +662,19 @@ paths:
                 type: string
           description: The tags, possibly a page of them.
         '400':
-          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryBadRequest'
         '401':
-          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryUnauthorized'
         '403':
-          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryForbidden'
         '404':
-          $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryNotFound'
         '405':
-          description: The repository is a remote or virtual repository; the body is a registry error with the code
-            UNSUPPORTED.
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryMethodNotAllowed'
         '429':
           $ref: '#/components/responses/RegistryTooManyRequests'
         '500':
-          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+          $ref: '#/components/responses/ArtifactorySearchesApiRegistryInternalServerError'
         '503':
           $ref: '#/components/responses/RegistryServiceUnavailable'
       tags:

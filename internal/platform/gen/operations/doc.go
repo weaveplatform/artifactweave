@@ -12,8 +12,8 @@
 // type and the Index, are hand-written, and make generate leaves them alone.
 // The Idempotency-Key gate and the shared replay's strict middleware
 // (IDEM-01, #1406) read it at run time for the operations that accept a key,
-// and admission (RATE-01, #1407) takes each request's cost class from it
-// (decision 0043).
+// and admission (internal/app, limits_cost.go) takes each request's cost
+// class from it (RATE-01, #1407; decision 0043).
 //
 // # Inputs
 //
@@ -44,8 +44,8 @@
 //     same method and operationId, and every row of an operation not marked
 //     handwritten is registered by its generated server. A hand-written
 //     operation keeps its spec pattern; where its hand-written route uses
-//     another, admission's test over every served operation (RATE-01)
-//     checks that the two agree.
+//     another, TestAccAdmissionCostAgreesWithServedRoutes (internal/app)
+//     checks that the two admit its requests under one class.
 //   - A pattern is the spec's server URL, the BaseURL router.go mounts each
 //     generated server under, followed by the spec path.
 //   - A class is the spec's text as written: one of decision 0043's values,
@@ -63,8 +63,8 @@
 //
 // # Status
 //
-// Implemented #1405 (CON-02): the table and the Index. RATE-01 and IDEM-01
-// wire them into admission and the key gate.
+// Implemented #1405 (CON-02): the table and the Index. Read at run time by
+// admission (RATE-01, #1407) and the key gate (IDEM-01, #1406).
 //
 // # Testing
 //

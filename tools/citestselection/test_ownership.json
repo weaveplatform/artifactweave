@@ -99,12 +99,15 @@
       "api_restrictions_parts_test.go",
       "bootstrap_test.go",
       "builds_status_test.go",
+      "docker_list_errors_test.go",
       "error_profiles_p8_test.go",
       "fixtures_test.go",
       "format_tables_test.go",
       "hash_test.go",
       "helm_fixture_test.go",
       "keyed_test.go",
+      "limits_cost_test.go",
+      "limits_operations_test.go",
       "limits_test.go",
       "matrix_pkgtest_test.go",
       "matrix_reindex_test.go",
@@ -299,6 +302,7 @@
       "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "docker": [
+      "internal/app/docker_list_errors_test.go",
       "internal/app/registry_shared_test.go",
       "test/server/artifacts/protocol_download_policy_test.go"
     ],

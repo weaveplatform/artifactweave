@@ -90,11 +90,14 @@ set out. This section is the author's checklist; the decision holds the reasons.
     `#/components/parameters/IdempotencyKey`. No operation declares
     `Idempotency-Key` itself.
 - **`x-cost`**: `ordinary`, `expensive`, `exempt` or `recovery`, the class the
-  boundary admits the operation's method and path under today
-  (`expensiveRequest`, `HealthRequest` and `APIRecoveryRequest` in `internal/app`
-  and the modules' HTTP adapters), stubs included. An `ordinary` operation lists in
-  `x-cost-expensive-query` the query parameters whose presence makes it expensive
-  (`list` on the storage paths).
+  boundary admits the operation's method and path under, stubs included.
+  Admission reads it from the generated operation table
+  (`internal/platform/gen/operations`), so the spec is the one place an
+  operation's class is set; the path rules (`expensiveRequest`, `HealthRequest`
+  and `APIRecoveryRequest` in `internal/app` and the modules' HTTP adapters)
+  decide only for a request no spec operation addresses. An `ordinary` operation
+  lists in `x-cost-expensive-query` the query parameters whose presence makes it
+  expensive (`list` on the storage paths).
 - **`x-pagination`** on every operation that answers a collection: `cursor`,
   `offset`, `page`, `native` or `complete`. `x-pagination-parameters` maps
   `position` and `size` to the operation's own parameter names, with a `position`

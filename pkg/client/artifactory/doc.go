@@ -43,4 +43,7 @@
 //   - ExampleClient_AppendBuildWithBody: a retry that protects only build
 //     append. The client does not infer retry safety from an HTTP method or
 //     retry every failed write (decision 0043).
+//   - ExampleClientWithResponses_GetSystemVersionWithResponse_rateLimited:
+//     reading a typed 429's Retry-After, RateLimit and RateLimit-Policy,
+//     which every operation admission charges declares (decision 0043).
 package artifactory
