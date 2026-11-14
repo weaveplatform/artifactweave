@@ -100,6 +100,8 @@ earlier request. See the [generated-client retry example](retrying.md).
 | --- | --- |
 | Access v2 users/groups | Default/max 1000; explicit 1 to 1000. Existing base64 name cursor; ascending/descending strict continuation. `ListSummaries`/`ListNames` apply filters and permission-derived grant checks in SQL, select only needed columns and fetch LIMIT+1. Name indexes support keysets; substring and grant filters can still examine additional candidates. |
 | Restriction audit | Default 100/max 1000; descending unique sequence, optional exact-user filter; new cursor binds filter and administrator. SQL `id < cursor ORDER BY id DESC LIMIT ?` with a user/sequence index. Current administration is rechecked each page; no snapshot guarantee. |
+| Access v2 permissions | Default 100/max 99999; the cursor is the previous page's last name in the clear, and a page starts strictly after it. `PermissionStore.Page` seeks on the name primary key and fetches LIMIT+1; a user or group filter is a subquery on `permission_grants`' principal index, so a filtered page reads the filter principals' grant rows and the page's documents, never every permission (#1408). [Handler](../../../internal/access/adapters/http/permissions.go), [service](../../../internal/access/core/permission/page.go), [SQL](../../../internal/access/adapters/sql/permission_page.go). |
+| Get Repositories with `limit` | The class, package type and project filters and the caller's visibility (`Decider.VisibleRepos`, the sets `IsRepoVisible` admits) go into the SQL WHERE clause. A COUNT answers `X-Total-Count`, and the window is read by key with LIMIT+1, which decides the `Link: <...>; rel="next"` header. Count and window are two statements, so a concurrent write can make them disagree by one. Without `limit` the whole visible filtered list comes back from one store query, as before (#1408). [Handler](../../../internal/artifacts/adapters/http/repositories.go), [SQL](../../../internal/artifacts/adapters/sql/repo_page.go), [visibility](../../../internal/access/core/authz/authz.go). |
 | Legacy users/groups, tokens, permissions, projects, roles/settings | Preserve their existing arrays/envelopes and declared pagination. Several handlers/services collect store pages. Do not equate a bounded store Page with bounded total response memory. [Identity service](../../../internal/access/core/identity/identity.go), [SQL identity](../../../internal/access/adapters/sql/identity.go), [SQL projects and roles](../../../internal/access/adapters/sql/projects.go). |
 | Repository lists/configurations | Complete legacy arrays with current visibility filtering; batch repository requests retain the existing 100-item cap. `Repos.List` returns the selected collection; no client cursor is introduced. [Handlers](../../../internal/artifacts/adapters/http/repositories.go), [repository service](../../../internal/artifacts/core/repos/repos.go), [SQL](../../../internal/artifacts/adapters/sql/content.go). |
 | Build names/numbers/runs | Complete legacy collections remain; service collection can outgrow an individual store page. Current build/artifact grants determine visible results. [Build service](../../../internal/artifacts/core/build/build.go), [SQL build queries](../../../internal/artifacts/adapters/sql/builds.go). |
@@ -115,6 +117,19 @@ filters, reverse order, deleted cursor rows and changing permissions. See
 not a snapshot: later inserts may appear, earlier inserts are not revisited and
 newly denied/deleted rows disappear. Filtered keysets are not universally constant
 time; only the tested indexed continuation is claimed.
+
+The lists paged in the store by #1408 have their own 5000-row tests on SQLite
+and PostgreSQL, which log timings and plans: the first and a late window of
+Get Repositories as an administrator and as a partial reader
+([repo_page_test.go](../../../internal/artifacts/adapters/sql/repo_page_test.go)),
+and the first and a late page of the Access v2 permissions (every one and one
+user's), the group names and the restriction audit
+([list_pages_test.go](../../../internal/access/adapters/sql/list_pages_test.go)).
+A late unfiltered page seeks through the primary key. Server tests follow each
+list's next pointer from the first page to the last and check that every item
+is visited once
+([repositories_walk_test.go](../../../test/server/artifacts/repositories_walk_test.go),
+[permissions_walk_test.go](../../../test/server/access/permissions_walk_test.go)).
 
 ## Native protocols
 

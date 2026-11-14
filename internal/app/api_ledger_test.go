@@ -203,6 +203,7 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 		out,
 		func(a, b apiReviewOperation) int { return strings.Compare(a.Route, b.Route) },
 	)
+	apiReviewPagedInStore(t, out)
 	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
 		t.Fatal(err)
@@ -628,6 +629,14 @@ func apiReviewPersistence(path string) (string, string, []string) {
 			"internal/access/adapters/storetest/api_restriction.go",
 		}
 	}
+	if path == "/access/api/v2/permissions" {
+		return "permission-pages", "GET: default100/max99999, name keyset strictly after the bare-name cursor, principal filter as an indexed grant subquery, LIMIT+1; other methods singular mutations", []string{
+			"internal/access/adapters/http/permissions.go",
+			"internal/access/core/permission/page.go",
+			"internal/access/adapters/sql/permission_page.go",
+			"internal/access/adapters/storetest/permission_page.go",
+		}
+	}
 	if path == "/access/api/v2/users" || path == "/access/api/v2/groups" {
 		return "identity-pages", "GET: default/max1000, indexed name keyset both directions, SQL filters and LIMIT+1; other methods singular mutations; existing name cursor retained", []string{
 			"internal/access/adapters/http/access_identity.go",
@@ -652,6 +661,14 @@ func apiReviewPersistence(path string) (string, string, []string) {
 			"internal/artifacts/core/build/build.go",
 			"internal/artifacts/adapters/sql/builds.go",
 			"internal/app/builds_status_test.go",
+		}
+	}
+	if path == "/artifactory/api/repositories" {
+		return "repository-pages", "with limit: class, package type, project and the caller's visibility in SQL, COUNT for X-Total-Count, window by key with LIMIT+1 for the Link next; without limit the whole visible filtered list in one store query", []string{
+			"internal/artifacts/adapters/http/repositories.go",
+			"internal/artifacts/adapters/sql/repo_page.go",
+			"internal/artifacts/adapters/storetest/repo_page.go",
+			"internal/access/core/authz/authz.go",
 		}
 	}
 	if strings.HasPrefix(path, "/artifactory/api/repositories") ||
@@ -854,5 +871,21 @@ func TestUnitAPIReviewDerivesFromClasses(t *testing.T) {
 	c = &apiReviewClasses{pagination: "native"}
 	if got := c.pagingText(); got != "native" {
 		t.Errorf("native without companions: %q", got)
+	}
+}
+
+// apiReviewPagedInStore fails when a served operation that declares a
+// cursor, offset or page class still collects its list before slicing it:
+// each pages in its store (#1408), so a new one that collects is a
+// regression the ledger would otherwise record without complaint.
+func apiReviewPagedInStore(t *testing.T, out []apiReviewOperation) {
+	t.Helper()
+	for _, e := range out {
+		paged := strings.HasPrefix(e.Pagination, "cursor") ||
+			strings.HasPrefix(e.Pagination, "offset") ||
+			strings.HasPrefix(e.Pagination, "page")
+		if e.State == "implemented" && paged && strings.Contains(e.Pagination, "collect") {
+			t.Errorf("%s declares a paging class but collects its list: %s", e.Route, e.Pagination)
+		}
 	}
 }

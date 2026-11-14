@@ -3685,8 +3685,8 @@
       "baseurl.From",
       "c.reader",
       "c.svc.FoldUsers",
-      "c.svc.Granting",
-      "c.svc.List",
+      "c.svc.Page",
+      "c.svc.PrincipalsOf",
       "httpkit.BadRequestf",
       "model.PermissionToAccess",
       "pr.Narrow",
@@ -3694,7 +3694,7 @@
       "s.errOf",
       "url.PathEscape"
     ],
-    "review_family": "identity",
+    "review_family": "permission-pages",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
@@ -3702,14 +3702,12 @@
       "query cursor: Optional query parameter. The cursor from the previous page; omitted starts at the first page.",
       "query limit: Optional query parameter. Maximum number of permissions in the page, between 1 and 99999. Omitted uses the server default page size."
     ],
-    "pagination_execution": "cursor (position cursor, size limit, next body:/cursor); identity: legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service",
+    "pagination_execution": "cursor (position cursor, size limit, next body:/cursor); permission-pages: GET: default100/max99999, name keyset strictly after the bare-name cursor, principal filter as an indexed grant subquery, LIMIT+1; other methods singular mutations",
     "evidence": [
-      "internal/access/adapters/http/access_identity.go",
-      "internal/access/adapters/http/tokens.go",
-      "internal/access/core/identity/identity.go",
-      "internal/access/core/token/token.go",
-      "internal/access/adapters/sql/identity.go",
-      "internal/access/adapters/sql/projects.go",
+      "internal/access/adapters/http/permissions.go",
+      "internal/access/core/permission/page.go",
+      "internal/access/adapters/sql/permission_page.go",
+      "internal/access/adapters/storetest/permission_page.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/app/limits.go"
     ]
@@ -7198,19 +7196,20 @@
     "handler": "internal/artifacts/adapters/http/repositories.go: ArtifactoryAPI.GetRepositoriesByTypeAndProject",
     "direct_calls": [
       "baseurl.From",
+      "httpkit.RawSearchQuery",
       "page.of",
       "repo.Class",
       "repo.PackageTypeName",
+      "repo.PackageTypesNamed",
       "s.InternalError",
       "s.content",
-      "s.readerFor",
+      "s.visibleTo",
       "st.Repos",
-      "st.Repos().List",
-      "strings.EqualFold",
+      "st.Repos().Page",
       "strings.ToLower",
       "strings.ToUpper"
     ],
-    "review_family": "repository",
+    "review_family": "repository-pages",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
@@ -7222,11 +7221,12 @@
       "200 application/json[]",
       "200 application/vnd.org.jfrog.artifactory.repositories.RepositoryDetailsList+json[]"
     ],
-    "pagination_execution": "offset (position offset, size limit, next link); repository: legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
+    "pagination_execution": "offset (position offset, size limit, next link); repository-pages: with limit: class, package type, project and the caller's visibility in SQL, COUNT for X-Total-Count, window by key with LIMIT+1 for the Link next; without limit the whole visible filtered list in one store query",
     "evidence": [
       "internal/artifacts/adapters/http/repositories.go",
-      "internal/artifacts/core/repos/repos.go",
-      "internal/artifacts/adapters/sql/content.go",
+      "internal/artifacts/adapters/sql/repo_page.go",
+      "internal/artifacts/adapters/storetest/repo_page.go",
+      "internal/access/core/authz/authz.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/app/limits.go"
     ]
@@ -14801,18 +14801,16 @@
       "s.caller",
       "s.errOf"
     ],
-    "review_family": "identity",
+    "review_family": "permission-pages",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "natural on body:/name: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "pagination_execution": "not a collection",
     "evidence": [
-      "internal/access/adapters/http/access_identity.go",
-      "internal/access/adapters/http/tokens.go",
-      "internal/access/core/identity/identity.go",
-      "internal/access/core/token/token.go",
-      "internal/access/adapters/sql/identity.go",
-      "internal/access/adapters/sql/projects.go",
+      "internal/access/adapters/http/permissions.go",
+      "internal/access/core/permission/page.go",
+      "internal/access/adapters/sql/permission_page.go",
+      "internal/access/adapters/storetest/permission_page.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/app/limits.go"
     ]
