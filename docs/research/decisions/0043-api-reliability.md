@@ -8,6 +8,8 @@ Amended by [#1401](https://github.com/weaveplatform/artifactweave/issues/1401)
 (2026-11-12) with the rules every operation follows, under the API principles
 baseline [#1395](https://github.com/weaveplatform/artifactweave/issues/1395):
 see [Rules for every operation](#rules-for-every-operation).
+[#1405](https://github.com/weaveplatform/artifactweave/issues/1405) to
+[#1412](https://github.com/weaveplatform/artifactweave/issues/1412) implement them.
 This decision describes artifactweave's implementation. It is not a live JFrog
 compatibility capture. Header support, rejection statuses and the Access page
 cap need confirmation under [#216/P19](https://github.com/weaveplatform/artifactweave/issues/216).
@@ -42,9 +44,12 @@ describes how the operation answers now; a 501 stub declares the class it is mea
 to have once served, except where that would change how it is admitted today (see
 [Cost classes](#cost-classes-and-how-admission-finds-them)). The rules below hold
 the server, the generated code and the [operation ledger](../api-reliability/README.md)
-to those classes. Where served behavior does not yet meet a rule (only build
-append accepts a key; several lists are still collected before they are sliced),
-the ledger records the gap.
+to those classes. Served behavior follows them: build append, build delete in both
+forms and build promotion accept a key and replay it; admission takes each
+request's cost class from the operation table; Get Repositories with `limit` and
+the Access v2 permissions list page in the store and point to the next page; and
+`complete` lists are written from store pages. Where a served list still collects
+before it writes, the ledger says why ([Paging](#paging-classes-and-the-next-pointer)).
 
 JFrog's contract comes first. On an operation JFrog defines, every documented
 parameter, body and status stays. The rules add only optional extensions that
@@ -345,7 +350,10 @@ has no per-minute window to report.
 writes (the rest of the window for a rate refusal, 1 otherwise) and on the replay's
 503. An operation's own 503 that reports a transient condition carries it too. A 503
 that reports configuration, such as a missing signing key, or a size bound is not a
-hint to retry.
+hint to retry. Two handler 503s that report a transient condition, a deploy whose
+content garbage collection removed and a remote fetch that a configuration change
+superseded, carry none ([#1415](https://github.com/weaveplatform/artifactweave/issues/1415),
+open).
 
 In the specs, the shared 429 response declares `Retry-After` as required and
 `RateLimit` and `RateLimit-Policy` as optional (absent on the permit refusal). The
@@ -408,11 +416,22 @@ not a position either.
   permission targets). The store applies the order, the caller's visibility and
   `OFFSET` and `LIMIT`, and reads one row past the page to know whether a next
   pointer is due, plus a count where the contract needs one.
-- **`native` lists are classified, not rewritten.** Their bytes stay; their paging
-  moves into the store behind the same bytes.
-- **No list is collected and then sliced.** `cursor`, `offset` and `page` page in
-  the store; `complete` answers, and `native` ones the protocol leaves unbounded,
-  stream from store pages.
+- **`native` lists are classified, not rewritten.** Their bytes stay. Where their
+  paging has moved into the store behind the same bytes, the research section's
+  [native table](../api-reliability/README.md#native-protocols) says how far: npm
+  and NuGet search still count `from`, `skip` and `totalHits` over every earlier
+  candidate ([#1425](https://github.com/weaveplatform/artifactweave/issues/1425),
+  open), and the Ansible, Chef and Puppet lists still read every version name to
+  count and order a page ([#1426](https://github.com/weaveplatform/artifactweave/issues/1426),
+  open).
+- **No list is collected and then sliced.** `cursor`, `offset` and `page` lists page
+  in the store, and `complete` lists stream from store pages
+  ([Streaming complete lists](#streaming-complete-lists)). A served `complete` list
+  that still collects has its reason in the ledger's `pagination_execution` (for
+  example administrator configuration the store reads whole, a list bounded by
+  configuration or by the request, or one that a merge, sort or deduplication
+  needs whole), and `TestAccAPIReliabilityLedger` fails one that collects without
+  a reason.
 
 ### Streaming complete lists
 
@@ -707,24 +726,40 @@ capacity planning; there is no automatic evidence deletion.
   rate/concurrency capacity is exhausted. Gherkin scenarios exercise the real
   binary, its configuration, rate metadata and restriction/recovery lifecycle.
 
-The rules for every operation need these checks as well:
+These checks hold the rules for every operation:
 
-- a guard over the seven bundled specs that fails when an operation lacks a class,
-  a `natural` lacks its identifiers, a `none` lacks a listed reason, an operation
-  that is not `exempt` lacks its 429, its 503 or their headers, a collection lacks
-  `x-pagination`, a `cursor` lacks a next pointer, an operation declares
-  `IdempotencyKey` without being `key`, or a served operation's `x-cost` disagrees
-  with the admission it receives, each rule with a fixture that breaks it;
-- for every served operation, with a budget of one, a second call answers 429 with
-  `Retry-After`, `RateLimit` and `RateLimit-Policy`, and an `exempt` probe is
-  never refused;
-- for every keyed operation, a retry after a lost response performs one effect and
-  answers as the first request did, and a changed body answers 422;
-- following the next pointers of every paged list from its first page visits every
-  item the caller may see exactly once, for an administrator, a partial reader and
-  anonymous;
-- a streamed list whose store fails after the first page ends in a body no JSON
-  parser accepts.
+- `TestAccAPIPrinciples`, a guard over the seven bundled specs, fails when an
+  operation lacks a class, a `natural` lacks its identifiers, a `none` lacks a
+  listed reason, an operation that is not `exempt` lacks its 429, its 503 or their
+  headers, a collection lacks `x-pagination`, a `cursor` lacks a next pointer, an
+  operation declares `IdempotencyKey` without being `key`, or a served operation's
+  `x-cost` disagrees with the admission it receives; `TestUnitAPIPrinciplesFixtures`
+  breaks each rule with a fixture.
+- `TestAccAPILimitEveryOperation`: for every operation, with a budget of one, a
+  second call answers 429 with `Retry-After`, `RateLimit` and `RateLimit-Policy`;
+  `TestAccAPILimitEveryOperationUnavailable` shows every charged operation's 503
+  with `Retry-After: 1` while the budget store fails, and
+  `TestAccAPILimitExemptProbes` shows an `exempt` probe is never refused.
+- `TestAccKeyedOperationsReplayOnce`, on SQLite and PostgreSQL: for every keyed
+  operation, a retry performs one effect and answers as the first request did, and
+  a changed body answers 422; `TestAccAppendReplayDurability` loses the TCP
+  response after commit.
+- `TestAccRepositoriesWalkVisitsEachOnce` and
+  `TestAccAccessPermissionsWalkVisitsEachOnce`: following the next pointers of each
+  paged list from its first page visits every item the caller may see exactly
+  once, for an administrator, a partial reader and anonymous where the list
+  answers them.
+- `TestAccStreamedListStoreFaults`: a streamed list whose store fails after the
+  first page ends in a body no JSON parser accepts.
+- The Gherkin scenario
+  [api_principles.feature](../../../test/acceptance/features/api_principles.feature)
+  shows the three principles together through the built binary: a keyed build
+  delete whose answer the test's transport drops, retried with the same key for one
+  effect and the same answer; the same key with another body refused with 422; a
+  partial reader's walk of Get Repositories by its `Link` that visits each visible
+  repository once; and that reader driven past a configured allowance to a 429
+  with the three headers. The acceptance job runs it on SQLite; it passes on
+  PostgreSQL too when the binary's environment names that driver.
 
 The [operation ledger and source review](../api-reliability/README.md) cover all
 seven specs and native aliases. The [generated-client retry example](../api-reliability/retrying.md)
