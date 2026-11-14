@@ -553,6 +553,7 @@ func (s RPMAPI) CalculateYumRepositoryMetadata(
 		if err := signVirtualRPM(ctx, s.Access.Keys, c, meta.Files); err != nil {
 			return nil, s.InternalError(ctx, "RPM virtual metadata signing", err)
 		}
+		// [I] The archived sample answers a local calculation only (#216).
 		return artgen.CalculateYumRepositoryMetadata200TextResponse(
 			fmt.Sprintf("YUM metadata for virtual repository %s was calculated.", c.Key)), nil
 	}

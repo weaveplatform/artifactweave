@@ -392,7 +392,186 @@ func TestUnitCocoaPodsReindex(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantText(t, w.do("POST", "/artifactory/api/cocoapods/pods-local/reindex", "admin", ""),
-		"Reindex of CocoaPods repo pods-local was scheduled to run.")
+		"Reindexing of CocoaPods repository pods-local was scheduled to run.")
+}
+
+// reindexAs7x is one reindex operation as 7.x's reference gives it (#1480):
+// its path for a key, whether it needs an administrator rather than Manage,
+// its answer for a key, and, by query, whether it runs before it answers.
+type reindexAs7x struct {
+	t         repo.PackageType
+	path      func(key string) string
+	adminOnly bool
+	answer    func(key string) string
+	runsFirst map[string]bool
+}
+
+// reindexesAs7x are the operations whose caller, timing or answer #1480
+// set from the archived and current 7.x reference pages.
+var reindexesAs7x = []reindexAs7x{
+	{
+		t:         repo.Alpine,
+		path:      func(k string) string { return "/artifactory/api/alpine/" + k + "/reindex" },
+		answer:    func(k string) string { return "Reindexing of Alpine repository " + k + " was scheduled to run." },
+		runsFirst: map[string]bool{"": false},
+	},
+	{
+		t:         repo.Bower,
+		path:      func(k string) string { return "/artifactory/api/bower/" + k + "/reindex" },
+		answer:    func(k string) string { return "Bower index for refresh for " + k + " has been accepted" },
+		runsFirst: map[string]bool{"": false},
+	},
+	{
+		t:         repo.Cargo,
+		path:      func(k string) string { return "/artifactory/api/cargo/" + k + "/reindex" },
+		adminOnly: true,
+		answer: func(k string) string {
+			return "Recalculating index for Cargo repository " + k + " scheduled to run."
+		},
+		runsFirst: map[string]bool{"": true, "?async=false": true, "?async=true": false},
+	},
+	{
+		t:         repo.CocoaPods,
+		path:      func(k string) string { return "/artifactory/api/cocoapods/" + k + "/reindex" },
+		adminOnly: true,
+		answer: func(k string) string {
+			return "Reindexing of CocoaPods repository " + k + " was scheduled to run."
+		},
+		runsFirst: map[string]bool{"": false},
+	},
+	{
+		t:         repo.Conda,
+		path:      func(k string) string { return "/artifactory/api/conda/" + k + "/reindex" },
+		adminOnly: true,
+		answer: func(k string) string {
+			return "Recalculating index for Conda repository " + k + " scheduled to run."
+		},
+		runsFirst: map[string]bool{"": true, "?async=false": true, "?async=true": false},
+	},
+	{
+		t:    repo.Cran,
+		path: func(k string) string { return "/artifactory/api/cran/reindex/" + k },
+		answer: func(k string) string {
+			return "Recalculating index for CRAN repository " + k + " scheduled to run."
+		},
+		runsFirst: map[string]bool{"": true, "?async=false": true, "?async=true": false},
+	},
+	{
+		t:    repo.Debian,
+		path: func(k string) string { return "/artifactory/api/deb/reindex/" + k },
+		answer: func(k string) string {
+			return "Recalculating index for Debian repository " + k + " scheduled to run."
+		},
+		runsFirst: map[string]bool{"": true, "?async=0": true, "?async=1": false},
+	},
+	{
+		t:         repo.Gems,
+		path:      func(k string) string { return "/artifactory/api/gems/" + k + "/reindex" },
+		answer:    func(string) string { return "OK" },
+		runsFirst: map[string]bool{"": true},
+	},
+	{
+		t:    repo.Opkg,
+		path: func(k string) string { return "/artifactory/api/opkg/reindex/" + k },
+		answer: func(k string) string {
+			return "Recalculating index for Opkg repository " + k + " scheduled to run."
+		},
+		runsFirst: map[string]bool{"": true, "?async=0": true, "?async=1": false},
+	},
+	{
+		t:         repo.Pub,
+		path:      func(k string) string { return "/artifactory/api/pub/" + k + "/reindex" },
+		adminOnly: true,
+		answer:    func(k string) string { return "Reindex of pub repo " + k + " was scheduled to run." },
+		runsFirst: map[string]bool{"": false, "?async=false": true, "?async=true": false},
+	},
+	{
+		t:         repo.Swift,
+		path:      func(k string) string { return "/artifactory/api/swift/" + k + "/reindex" },
+		adminOnly: true,
+		answer: func(k string) string {
+			return "Reindexing of Swift repository " + k + " was scheduled to run."
+		},
+		runsFirst: map[string]bool{"": false},
+	},
+	{
+		t:    repo.RPM,
+		path: func(k string) string { return "/artifactory/api/yum/" + k },
+		answer: func(k string) string {
+			return "YUM metadata calculation for repository '" + k + "' accepted."
+		},
+		runsFirst: map[string]bool{"": true, "?async=0": true, "?async=1": false},
+	},
+}
+
+// Each reindex operation answers its 7.x reference's text, to an
+// administrator, and to a caller holding Manage alone unless it needs an
+// administrator, who then gets 403. It runs before it answers, or queues
+// the work, as its reference's timing says; the queue then runs it.
+func TestAccReindexAnswersAs7xDoes(t *testing.T) {
+	ctx := context.Background()
+	f := &reindexRecorder{}
+	types := make([]repo.PackageType, 0, len(reindexesAs7x))
+	for _, r := range reindexesAs7x {
+		types = append(types, r.t)
+	}
+	w, q := reindexWorld(t, func(pt repo.PackageType) format.Handler {
+		if slices.Contains(types, pt) {
+			return f
+		}
+		return ecosystem.For(pt)
+	}, true)
+	targets := map[string]accesstest.Target{}
+	for _, r := range reindexesAs7x {
+		c := repo.Config{Key: string(r.t) + "-7x", Class: repo.Local, PackageType: r.t}
+		if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+		targets[c.Key] = accesstest.Target{Include: []string{"**"}}
+	}
+	if err := w.db.Permissions().Create(ctx, accesstest.Permission{
+		Name: "manage-7x",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"deployer": api.ActionManage}},
+			Targets: targets,
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const forbidden = `{"errors":[{"message":"Forbidden","status":403}]}` + "\n"
+	for _, r := range reindexesAs7x {
+		key := string(r.t) + "-7x"
+		for query, first := range r.runsFirst {
+			for _, as := range []string{"admin", "deployer"} {
+				rec := w.do("POST", r.path(key)+query, as, "")
+				if as == "deployer" && r.adminOnly {
+					if rec.Code != http.StatusForbidden || rec.Body.String() != forbidden {
+						t.Errorf("%s%s as a manager: %d %q, want 403 %q",
+							r.path(key), query, rec.Code, rec.Body, forbidden)
+					}
+					if got := f.take(); len(got) != 0 {
+						t.Errorf("%s%s: a refused reindex rebuilt %v", r.path(key), query, got)
+					}
+					continue
+				}
+				wantText(t, rec, r.answer(key))
+				got := f.take()
+				if !first {
+					if len(got) != 0 {
+						t.Errorf("%s%s as %s: rebuilt %v before the queue ran",
+							r.path(key), query, as, got)
+					}
+					if err := q.EnsureFresh(ctx, format.KindReindex, key); err != nil {
+						t.Fatal(err)
+					}
+					got = f.take()
+				}
+				if !slices.Equal(got, []string{key}) {
+					t.Errorf("%s%s as %s: rebuilt %v, want [%s]", r.path(key), query, as, got, key)
+				}
+			}
+		}
+	}
 }
 
 func TestAccDebianReindex(t *testing.T) {
@@ -404,7 +583,7 @@ func TestAccDebianReindex(t *testing.T) {
 		t.Fatal(err)
 	}
 	const path = "/artifactory/api/deb/reindex/debian-local"
-	const answer = "Debian repository debian-local metadata recalculation accepted"
+	const answer = "Recalculating index for Debian repository debian-local scheduled to run."
 
 	wantText(t, w.do("POST", path, "admin", ""), answer)
 	if got := f.take(); !slices.Equal(got, []string{c.Key}) {

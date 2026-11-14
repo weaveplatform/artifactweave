@@ -234,7 +234,7 @@ Feature: Debian repositories deliver signed apt metadata and real packages
     Then the response status is 200
     When I POST "/artifactory/api/deb/reindex/deb-source?writeProps=0" as admin
     Then the response status is 200
-    And the response body contains "metadata recalculation accepted"
+    And the response body is "Recalculating index for Debian repository deb-source scheduled to run."
     When I GET "/artifactory/deb-source/dists/stable/main/source/Sources" as admin
     Then the response status is 200
     Given the apt source repository is "deb-source"
