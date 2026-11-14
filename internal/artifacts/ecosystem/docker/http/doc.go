@@ -126,7 +126,17 @@
 //   - A blob or manifest pull, local or remote, GET or HEAD, answers
 //     If-None-Match and If-Modified-Since with 304, and ignores If-Match,
 //     If-Unmodified-Since, Range and If-Range (pullRequest), as 7.x's
-//     download does: it never answers 412 or 206 (#1337, #1437).
+//     download does: it never answers 412 or 206 (#1337, #1437). It decides
+//     them by that download's rule, one If-None-Match line at a time
+//     against the file's SHA-1, so "*" and a list on one line never match
+//     (pkgroute.FileNotModified; notModified for a local manifest and a
+//     blob the registry streams itself, #1483), before any redirect.
+//   - A remote repository's tags list keeps its upstream's list decoded,
+//     sorted and without repeats, by the cached document's SHA-256, within
+//     remoteTagsBudget (tagCache); a later page reads none of the document,
+//     and every page checks Read only on the tags from last to the one
+//     after it, with the answers of the whole list filtered and cut
+//     (#1423).
 //   - A remote repository's failure to fetch, its upstream's 401, 403, 429
 //     or 5xx or an upstream that is unreachable, unusable or slow, answers
 //     its status and message in Artifactory's envelope, under no registry
@@ -217,6 +227,14 @@
 //     a blob served from a copy the patterns accept, mounts from a refusing
 //     source and catalogs the patterns filter; a format's refusals of writes,
 //     which keep their status; and a remote listing's final fence.
+//   - remote_tags_test.go: every page of a remote tags list, for callers
+//     refused none, all or some tags, byte for byte as the whole list
+//     filtered and cut (paginateHeaders, the reference); a later page that
+//     reads none of the document and checks only its own tags and the next;
+//     documents that do not decode or carry no SHA-256; the cache's
+//     eviction.
+//   - stream_none_match_test.go: a blob the registry streams itself
+//     answering If-None-Match and If-Modified-Since by 7.x's rule.
 //   - remote_error_test.go: the envelope and code of each failure a remote
 //     read answers, and kernel's shared errors left unchanged.
 //   - refusal_test.go: 7.x's refusal message for each kind and method, the

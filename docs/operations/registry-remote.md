@@ -63,6 +63,9 @@ tag listing, with at most 128 upstream pages. Index traversal allows eight level
 64 children per index and 256 fetched child references per traversal. Descriptor
 lists are bounded to 4096 entries and 16 URLs per descriptor. Oversized graphs and
 unsafe pagination links fail without publishing the parent representation.
+Each server keeps the tag listings it has read decoded in memory, at most 64 MiB
+of them, the least recently read dropped first, so the later pages of a listing
+do not decode it again.
 
 `test/acceptance/features/registry_remote.feature` exercises pinned native Linux
 crane, ORAS and Helm against a real artifactweave upstream and remote, including

@@ -3,6 +3,8 @@ package dockerhttp
 import (
 	"net/http"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
 )
 
@@ -27,6 +29,39 @@ func pullRequest(r *http.Request) *http.Request {
 	return out
 }
 
+// notModified answers a pull of the stored file it, a local manifest or a
+// blob the registry streams itself, with 304 when the request's
+// If-None-Match or If-Modified-Since finds it unchanged, and reports
+// whether it did. 7.x answers a pull's conditional request as its file
+// download does (ignoredOnPull), which compares one If-None-Match line at a
+// time, less a W/ prefix and every quote, with the file's SHA-1, or with
+// its MD5 when X-Artifactory-If-None-Match-MD5 asks, and reads
+// If-Modified-Since only without If-None-Match
+// (DownloadServiceImpl.isNotModified, 7.161.26; pkgroute.FileNotModified).
+// So neither "*" nor a list of tags on one line matches, and a second line
+// does: http.ServeContent, which decided these before #1483, matched the
+// first two and read only the first line. The 304 is the one ServeContent
+// wrote: the headers already set, less the body's, and Last-Modified only
+// beside no ETag (pkgroute.WriteNotModified). A local blob through the
+// server's download (Options.ServeBlob) and a remote blob or manifest
+// (pkgroute.ServeStream) are decided by the same rule.
+func notModified(w http.ResponseWriter, r *http.Request, it model.Item) bool {
+	if !pkgroute.FileNotModified(r, []string{it.Actual.SHA1}, it.Actual.MD5, it.Modified) {
+		return false
+	}
+	if !it.Modified.IsZero() {
+		w.Header().Set("Last-Modified", it.Modified.UTC().Format(http.TimeFormat))
+	}
+	pkgroute.WriteNotModified(w)
+	return true
+}
+
+// withoutValidators is r without the headers notModified decides, once it
+// has decided them.
+func withoutValidators(r *http.Request) *http.Request {
+	return pkgroute.WithoutHeaders(r, "If-None-Match", "If-Modified-Since")
+}
+
 // ignoredOnPull are the request headers a pull ignores.
 //
 // Range and If-Range: the answer is 200 with the whole content and still
@@ -49,11 +84,13 @@ func pullRequest(r *http.Request) *http.Request {
 // If-Match and If-Unmodified-Since. A local blob ignored both through the
 // item kit's download already (#1314); a manifest, which the registry
 // serves itself, and a remote blob or manifest, served from the remote's
-// stream, answer as it does (#1437). No capture shows a manifest's or a
-// remote's answer to either [I]. Neither specification asks a registry to
-// evaluate them on a pull: the Docker Registry HTTP API asks a blob GET for
-// caching validators, and the OCI distribution specification names
-// conditional requests only for a client's push of a referrers tag.
+// stream, answer as it does (#1437), and decide If-None-Match and
+// If-Modified-Since by its rule too (notModified, #1469, #1483). No capture
+// shows a manifest's or a remote's answer to either [I]. Neither
+// specification asks a registry to evaluate them on a pull: the Docker
+// Registry HTTP API asks a blob GET for caching validators, and the OCI
+// distribution specification names conditional requests only for a
+// client's push of a referrers tag.
 var ignoredOnPull = []string{"Range", "If-Range", "If-Match", "If-Unmodified-Since"}
 
 // setFileHeaders sets the headers 7.x sends on a blob or manifest through

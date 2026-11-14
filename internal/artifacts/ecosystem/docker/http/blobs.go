@@ -114,7 +114,8 @@ func (g *Registry) findBlob(ctx context.Context, q Request, hex string) (model.I
 
 // streamBlob serves a blob's content from the blob store, conditional
 // requests included: the registry's own download, for a server that sets
-// no Options.ServeBlob.
+// no Options.ServeBlob. It answers If-None-Match and If-Modified-Since as
+// the server's download does (notModified), and sends no ETag, as before.
 func (g *Registry) streamBlob(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -128,7 +129,10 @@ func (g *Registry) streamBlob(
 	}
 	defer func() { _ = content.Close() }()
 	w.Header().Set("Content-Type", "application/octet-stream")
-	http.ServeContent(w, r, "", it.Modified, content)
+	if notModified(w, r, it) {
+		return
+	}
+	http.ServeContent(w, withoutValidators(r), "", it.Modified, content)
 }
 
 // deleteBlob refuses: a blob lives as long as the manifests that reference

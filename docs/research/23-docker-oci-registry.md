@@ -402,6 +402,38 @@ behaviour below is documented or seen in its clients; where neither shows it, th
 - **[D]** Schema-1 images carried `docker.imageId`, `docker.size`, `docker.tag.name`,
   `docker.tag.content` and `docker.repoName` under a V1 layout (`.images`, `repositories`).
 
+### 5.2.1 `artifactory.content-type` on registry reads
+
+Read for [#1396](https://github.com/weaveplatform/artifactweave/issues/1396) on 2026-11-14.
+The item route types a file by this property (#1380); the question is whether the registry
+does.
+
+- **[S]** 7.161.26's OSS sources hold the Docker add-on's manifest response,
+  `DockerManifestResponse`: "When going through the DownloadService the download traffic is
+  counted", and its `setContentType` is empty, "we set the content type later on in the flow
+  (after the schema conversion if needed)". The type the download would send, which
+  `DbStoringRepoMixin.getInfo` takes from the property, never reaches a manifest's answer;
+  the add-on, which is not in those sources, sets its own.
+- **[S]** The same sources' `AbstractMetadataProviderTest` gives a `docker-local` and an
+  `oci-local` `manifest.json` the property, equal to `docker.manifest.type`, beside the five
+  properties of section 5.2. A comment on
+  [RTFACT-26059](https://jfrog.atlassian.net/browse/RTFACT-26059) (7.19.4) reports changing
+  that property on a local `manifest.json` to a list of manifest types ending in `*`, which
+  made a pull through Nexus work, so a pushed manifest carries it on 7.x and the registry
+  reads it somewhere. artifactweave does not set it on a push.
+- **[S]** A blob `GET` on 7.55.8 sends the headers `RequestResponseHelper` writes for a
+  download (`ETag`, the `X-Checksum-*` headers, `Accept-Ranges`, `X-Artifactory-Filename`)
+  and `Content-Disposition: attachment; filename="sha256__<hex>"`, the form
+  `JerseyArtifactoryResponse` writes and `HttpArtifactoryResponse`, which adds `filename*`,
+  does not ([RTFACT-29977](https://jfrog.atlassian.net/browse/RTFACT-29977)). Through that
+  response the download's type, the property's included, is the answer's, unless the add-on
+  sets another after it. Its `Content-Type` was `application/octet-stream`, the path's type,
+  on a blob without the property.
+- **[I]** No source shows a blob or a manifest that carries the property read through the
+  registry. artifactweave keeps the blob's `application/octet-stream` and the manifest's
+  pushed media type (`TestAccRegistryBlobIgnoresContentTypeProperty`,
+  `TestAccRegistryManifestIgnoresContentTypeProperty`), section 10.
+
 ### 5.3 Deleting and retention
 
 - **[D]** "the Docker client does not support DELETE commands"; images are deleted through
@@ -579,6 +611,9 @@ These go to the live-capture list ([#216](https://github.com/weaveplatform/artif
 18. Whether a multi-architecture promotion into an image that holds some of the list's
     platforms copies the rest, and whether a move then removes the source's copy of a
     platform the target already held (section 7).
+19. Whether a blob's `GET` and `HEAD` through the registry send the type its
+    `artifactory.content-type` property names, and whether a manifest's property changes
+    the `Content-Type` or the `Accept` match of its read (section 5.2.1).
 
 ## 11. Versions at the research baseline
 

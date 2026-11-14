@@ -10,8 +10,11 @@ import (
 // TestAccRegistryBlobIgnoresContentTypeProperty: a layer whose stored
 // files carry artifactory.content-type downloads through the registry,
 // GET and HEAD, with the type it has without the property. The item route
-// applies the property (#1380); 7.x's Docker API is not in its OSS
-// sources, and JFrog's docs do not say it reads the property.
+// applies the property (#1380). 7.x's Docker API is not in its OSS
+// sources; its blob GET sends the headers its download writes through a
+// JerseyArtifactoryResponse (RTFACT-29977, 7.55.8), whose type would be
+// the property's unless the API sets its own after it, and no source shows
+// a blob with the property, so the path's type is kept [I] (#1396).
 func TestAccRegistryBlobIgnoresContentTypeProperty(t *testing.T) {
 	const layer = "a layer"
 	w := dockerLocalWorld(t, layer, registryManifest("content type"))

@@ -114,6 +114,9 @@ type Registry struct {
 	uploads          *registry.Service
 	serveBlob        func(http.ResponseWriter, *http.Request, repo.Config, model.Item)
 	redirectManifest func(http.ResponseWriter, *http.Request, repo.Config, model.Item, string) bool
+	// tagLists keeps remote tags lists decoded, so that a later page of a
+	// list reads only its own tags (remoteTagList); nil keeps none.
+	tagLists *tagCache
 }
 
 type endpointKey struct {
@@ -126,7 +129,7 @@ func New(o Options) *Registry {
 	g := &Registry{
 		sources: o.Sources, authenticated: o.Authenticated,
 		store: o.Store, fault: o.Fault, tokens: o.Tokens, identity: o.Identity,
-		endpoints: map[endpointKey]Endpoint{},
+		endpoints: map[endpointKey]Endpoint{}, tagLists: newTagCache(remoteTagsBudget),
 	}
 	if o.SubdomainMatch {
 		g.parent = baseHost(o.BaseURL)

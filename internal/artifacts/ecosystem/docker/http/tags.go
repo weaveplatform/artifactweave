@@ -180,38 +180,6 @@ func (g *Registry) served(r *http.Request) ([]repo.Config, error) {
 	}), nil
 }
 
-// paginateHeaders returns the page of names, ordered as layout.Compare
-// orders them, that the request's n and last select: the names after last,
-// at most n of them. When more follow it sets the Link header to the next
-// page, in the form the client addressed. n of zero gives an empty page
-// without a Link (end-8b). An n that is no count is ignored, as if absent:
-// the specification's error codes have none for it. A remote repository's
-// tags list pages its upstream's one listing with it; local listings read
-// their pages from the store (readPage), with the same answers.
-func paginateHeaders(header http.Header, r *http.Request, names []string) []string {
-	if names == nil {
-		// An empty list is [] in JSON, never null.
-		names = []string{}
-	}
-	values := r.URL.Query()
-	if last := values.Get("last"); last != "" {
-		i, _ := slices.BinarySearchFunc(names, last, layout.Compare)
-		if i < len(names) && names[i] == last {
-			i++
-		}
-		names = names[i:]
-	}
-	n, err := strconv.Atoi(values.Get("n"))
-	if err != nil || n < 0 || n >= len(names) {
-		return names
-	}
-	page := names[:n]
-	if n > 0 {
-		header.Set("Link", nextLink(r, n, page[n-1]))
-	}
-	return page
-}
-
 // nextLink is the Link to the page of n names after last.
 func nextLink(r *http.Request, n int, last string) string {
 	next := url.Values{"n": {strconv.Itoa(n)}, "last": {last}}
