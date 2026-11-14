@@ -20,6 +20,55 @@ type RepoFilter struct {
 	ProjectKey  string
 }
 
+// RepoSet is a set of repositories: every one, or those of the listed
+// classes together with those of the listed keys. The zero RepoSet holds
+// none.
+type RepoSet struct {
+	Every   bool
+	Classes []repo.Class
+	Keys    []string
+}
+
+// RepoListing asks RepoStore.Page for a window of the repository list
+// ordered by key. Visible narrows it to the repositories every one of its
+// sets holds, which is how a caller's visibility reaches the query; no set
+// lists every repository.
+type RepoListing struct {
+	Class      repo.Class
+	ProjectKey string
+	// PackageTypes, when not nil, lists only repositories of one of them.
+	PackageTypes []repo.PackageType
+	Visible      []RepoSet
+	// Limit caps the window, and 0 lists every matching repository. Offset
+	// skips that many matching repositories before a capped window; it
+	// needs a Limit, as Get Repositories' offset does.
+	Offset, Limit int
+	// After, when set, starts the list after the repository of that key:
+	// the keyset continuation of a caller that walks the whole list a
+	// window at a time (#1409). A repository created or removed during the
+	// walk shifts no later window, as an Offset would.
+	After string
+	// Count asks for Total, the number of matching repositories on every
+	// page together.
+	Count bool
+}
+
+// RepoSummary is the part of a repository's configuration a list shows.
+type RepoSummary struct {
+	Key         string
+	Class       repo.Class
+	PackageType repo.PackageType
+	Description string
+}
+
+// RepoPage is one window of a RepoListing: its repositories, whether more
+// match after them, and the total when the listing asked for a count.
+type RepoPage struct {
+	Repos []RepoSummary
+	More  bool
+	Total int
+}
+
 // RepoStore persists repository configurations. Remote passwords and sensitive
 // HTTP header values are sealed outside their documents; the virtual member
 // list and the key pair references are mirrored into tables so Including and
@@ -37,6 +86,11 @@ type RepoStore interface {
 	// List returns every matching repository ordered by key. Artifactory
 	// lists repositories unpaged, so this does too.
 	List(ctx context.Context, f RepoFilter) ([]repo.Config, error)
+	// Page returns one window of the repositories l matches, ordered by key:
+	// the filters, the visibility, OFFSET and LIMIT apply in the store, which
+	// reads one repository past the window to tell whether more follow, and
+	// counts the matches only when l asks. It reads no secret.
+	Page(ctx context.Context, l RepoListing) (RepoPage, error)
 	// Including returns the keys of the virtual repositories that list key
 	// as a member, ordered.
 	Including(ctx context.Context, key string) ([]string, error)
@@ -107,6 +161,14 @@ type ItemStore interface {
 	) ([]model.Item, string, error)
 	// Descendants lists every item below folder, ordered by (path, name).
 	Descendants(
+		ctx context.Context, repoKey string, cached bool, folder string, p kernel.Page,
+	) ([]model.Item, string, error)
+	// DescendantsByFullPath lists every item below folder, ordered by full
+	// path byte by byte: the order of the storage API's file list, which
+	// sorts its entries by their uri, so that list can be written a page at
+	// a time (#1409). Children's name order is the same order one level
+	// down.
+	DescendantsByFullPath(
 		ctx context.Context, repoKey string, cached bool, folder string, p kernel.Page,
 	) ([]model.Item, string, error)
 	// Delete removes the item at fullPath and, for a folder, everything below
@@ -278,6 +340,16 @@ type TrashStore interface {
 	List(
 		ctx context.Context,
 		repoKey, prefix string,
+		p kernel.Page,
+	) ([]model.TrashEntry, string, error)
+	// BelowByPath lists the entries below dir in the trash can's tree:
+	// every entry for "", else those whose TrashPath starts with dir and a
+	// slash. They are ordered by TrashPath byte by byte, then by ID, the
+	// order the storage API's views of the trash can list its tree in, so
+	// those views read it a page at a time (#1409).
+	BelowByPath(
+		ctx context.Context,
+		dir string,
 		p kernel.Page,
 	) ([]model.TrashEntry, string, error)
 	// Delete removes an entry.

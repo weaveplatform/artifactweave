@@ -1023,6 +1023,10 @@ paths:
       summary: List global environments
       tags:
       - environments
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Creates an environment and returns it with status 201. Names are case-insensitive and at most 32
         characters; a name that differs from an existing one only by case answers 409. At most 10 global
@@ -1071,6 +1075,10 @@ paths:
       summary: Create a global environment
       tags:
       - environments
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/name
+      x-cost: expensive
   /api/v1/environments/{environmentName}:
     delete:
       description: Removes an environment. DEV and PROD cannot be deleted, nor can an environment that repositories
@@ -1102,6 +1110,10 @@ paths:
       summary: Delete a global environment
       tags:
       - environments
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:environmentName
+      x-cost: expensive
   /api/v1/environments/{environmentName}/rename:
     post:
       description: Renames the environment and updates every repository and role that references it. The built-in
@@ -1150,6 +1162,11 @@ paths:
       summary: Rename a global environment
       tags:
       - environments
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:environmentName
+      - body:/new_name
+      x-cost: expensive
   /api/v1/projects/{projectKey}/environments:
     get:
       description: Returns the environments defined inside one project, which project roles and project repositories
@@ -1188,6 +1205,10 @@ paths:
       summary: List a project's environments
       tags:
       - environments
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Creates an environment scoped to the project and returns it with status 201. A project may hold
         at most ten environments by default. The name must not collide with a global environment. Requires a platform
@@ -1242,6 +1263,11 @@ paths:
       summary: Create a project environment
       tags:
       - environments
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:projectKey
+      - body:/name
+      x-cost: expensive
   /api/v1/projects/{projectKey}/environments/{environmentName}:
     delete:
       description: Removes a project environment that no repository in the project still uses. Requires a platform
@@ -1274,6 +1300,11 @@ paths:
       summary: Delete a project environment
       tags:
       - environments
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:projectKey
+      - path:environmentName
+      x-cost: expensive
   /api/v1/projects/{projectKey}/environments/{environmentName}/rename:
     post:
       description: Renames a project environment and updates the project's repositories and roles that reference
@@ -1323,6 +1354,12 @@ paths:
       summary: Rename a project environment
       tags:
       - environments
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:projectKey
+      - path:environmentName
+      - body:/new_name
+      x-cost: expensive
   /api/v1/roles:
     get:
       description: 'Returns every global role: the built-in ADMIN and PREDEFINED roles and the CUSTOM_GLOBAL roles
@@ -1353,6 +1390,10 @@ paths:
       summary: List global roles
       tags:
       - roles
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201
         with {"code":"OK","message":"Role '<name>' created"}. Admin only. An existing name answers 409.
@@ -1398,6 +1439,10 @@ paths:
       summary: Create a global role
       tags:
       - roles
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/name
+      x-cost: expensive
   /api/v1/roles/{role}:
     delete:
       description: Removes a CUSTOM_GLOBAL role and every assignment of it. Built-in roles answer 400. Admin only.
@@ -1435,6 +1480,10 @@ paths:
       summary: Delete a global role
       tags:
       - roles
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:role
+      x-cost: expensive
     get:
       description: Returns one global role by name. Admin only.
       operationId: getGlobalRole
@@ -1468,6 +1517,8 @@ paths:
       summary: Get a global role
       tags:
       - roles
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Replaces the description, environments and actions of a CUSTOM_GLOBAL role, or the environments
         and actions of a PREDEFINED one. The name in the body must equal the path name and the type must stay the
@@ -1512,6 +1563,10 @@ paths:
       summary: Replace a global role
       tags:
       - roles
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:role
+      x-cost: expensive
   /api/v1/service_trust/pairing/{useCase}:
     post:
       description: Issues a single-use pairing token on this instance so that another instance of this server can
@@ -1578,6 +1633,9 @@ paths:
       summary: Create a pairing token
       tags:
       - tokens
+      x-idempotency: none
+      x-idempotency-reason: secret-response
+      x-cost: expensive
   /api/v1/tokens:
     get:
       description: A platform admin sees every token; any other caller sees only tokens whose subject is their own
@@ -1614,6 +1672,10 @@ paths:
       summary: List access tokens
       tags:
       - tokens
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: With grant_type client_credentials (the default) mints a new access token for username, or for the
         caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token
@@ -1668,6 +1730,9 @@ paths:
       summary: Create or refresh an access token
       tags:
       - tokens
+      x-idempotency: none
+      x-idempotency-reason: secret-response
+      x-cost: expensive
   /api/v1/tokens/revoke:
     delete:
       description: Revokes the token whose JWT or reference token is given in the body and returns its id. A token
@@ -1727,6 +1792,10 @@ paths:
       summary: Revoke a token by its value
       tags:
       - tokens
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/token
+      x-cost: expensive
   /api/v1/tokens/{tokenId}:
     delete:
       description: Revokes the token with this id; me revokes the caller's own token. A token is revocable on the
@@ -1765,6 +1834,10 @@ paths:
       summary: Revoke a token by id
       tags:
       - tokens
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:tokenId
+      x-cost: expensive
     get:
       description: Returns the metadata of one token. The id me stands for the token used to authenticate the call. A
         non-admin may only read their own tokens.
@@ -1799,6 +1872,8 @@ paths:
       summary: Get a token's metadata
       tags:
       - tokens
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v2/groups:
     get:
       description: Returns one record per group as a cursor-paginated page. Requires a platform admin or the system:identities:r
@@ -1879,6 +1954,13 @@ paths:
       summary: List groups
       tags:
       - groups
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: cursor
+      x-pagination-parameters:
+        position: cursor
+        size: limit
+      x-pagination-next: body:/cursor
     post:
       description: 'Creates a group and returns its details with status 201. members and import_from_ldap_group_setting
         are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import
@@ -1932,6 +2014,10 @@ paths:
       summary: Create a group
       tags:
       - groups
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/name
+      x-cost: expensive
   /api/v2/groups/{name}:
     delete:
       description: Removes the group, its memberships and its entries in permission targets. The built-in readers
@@ -1964,6 +2050,10 @@ paths:
       summary: Delete a group
       tags:
       - groups
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:name
+      x-cost: expensive
     get:
       description: Returns the group including its member usernames. Requires a platform admin or the system:identities:r
         scope.
@@ -2004,6 +2094,8 @@ paths:
       summary: Get a group
       tags:
       - groups
+      x-idempotency: safe
+      x-cost: ordinary
     patch:
       description: Partial update of the group's attributes. Omitted fields keep their values. The name, realm,
         realm_attributes and members cannot be changed here; members go through the members sub-resource. The body
@@ -2052,6 +2144,10 @@ paths:
       summary: Update a group
       tags:
       - groups
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:name
+      x-cost: expensive
     put:
       description: 'Creates the group when no group has this name, and answers 201; otherwise replaces it and answers
         200. The body is the create body, whose name may be empty or left out, which takes the name in the path;
@@ -2111,6 +2207,10 @@ paths:
       tags:
       - groups
       x-oracle-source: https://docs.jfrog.com/administration/reference/replacegroup.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:name
+      x-cost: expensive
   /api/v2/groups/{name}/members:
     patch:
       description: Applies the add list then the remove list to the group's members and returns the resulting full
@@ -2178,6 +2278,12 @@ paths:
       summary: Add or remove members
       tags:
       - groups
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:name
+      - body:/add
+      - body:/remove
+      x-cost: expensive
   /api/v2/permissions:
     get:
       description: Returns permissions as a cursor-paginated page. Without filters the page holds name and uri per
@@ -2276,6 +2382,13 @@ paths:
       summary: List permissions
       tags:
       - permissions
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: cursor
+      x-pagination-parameters:
+        position: cursor
+        size: limit
+      x-pagination-next: body:/cursor
     post:
       description: Creates a permission in the Access v2 model and returns it with status 201. The
         /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the
@@ -2324,6 +2437,10 @@ paths:
       summary: Create a permission
       tags:
       - permissions
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/name
+      x-cost: expensive
   /api/v2/permissions/{permissionName}:
     delete:
       description: Removes the permission and every grant it carried. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.
@@ -2360,6 +2477,10 @@ paths:
       summary: Delete a permission
       tags:
       - permissions
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:permissionName
+      x-cost: expensive
     get:
       description: Returns the full permission document. Requires a platform admin, a Manage Resources holder, the system:permissions:r scope,
         or MANAGE on every resource of the permission.
@@ -2400,6 +2521,8 @@ paths:
       summary: Get a permission
       tags:
       - permissions
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v2/permissions/{permissionName}/{resourceType}:
     delete:
       description: Removes the section for the resource type; the permission itself stays, even when it ends up
@@ -2438,6 +2561,11 @@ paths:
       summary: Delete one resource section
       tags:
       - permissions
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:permissionName
+      - path:resourceType
+      x-cost: expensive
     get:
       description: Returns the actions and targets of a single resource type within the permission. A permission
         that has no section for the type answers 404. Requires a platform admin or a Manage Resources holder.
@@ -2479,6 +2607,8 @@ paths:
       summary: Get one resource section of a permission
       tags:
       - permissions
+      x-idempotency: safe
+      x-cost: ordinary
     patch:
       description: 'Merges the body into the existing section: principals and targets present in the body replace
         their stored counterparts, others stay. To remove a principal or target use PUT with the full section.
@@ -2528,6 +2658,11 @@ paths:
       summary: Merge into one resource section
       tags:
       - permissions
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:permissionName
+      - path:resourceType
+      x-cost: expensive
     put:
       description: Replaces the whole actions and targets section for the resource type, creating the section when
         the permission did not have one. Grants and targets not in the body are dropped. Requires a platform admin or a Manage Resources holder.
@@ -2576,6 +2711,11 @@ paths:
       summary: Replace one resource section
       tags:
       - permissions
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:permissionName
+      - path:resourceType
+      x-cost: expensive
   /api/v2/users:
     get:
       description: Returns one record per user, newest first unless descendingOrder is false, as a cursor-paginated
@@ -2677,6 +2817,13 @@ paths:
       summary: List users
       tags:
       - users
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: cursor
+      x-pagination-parameters:
+        position: cursor
+        size: limit
+      x-pagination-next: body:/cursor
     post:
       description: Creates an internal user and returns its details with status 201. The same internal user record
         backs the /artifactory/api/security/users endpoint. Admin only. A username that already exists answers 409.
@@ -2724,6 +2871,10 @@ paths:
       summary: Create a user
       tags:
       - users
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/username
+      x-cost: expensive
   /api/v2/users/expire_password_for_all_users:
     post:
       description: Marks every internal user's password as expired so each user must set a new one at next login.
@@ -2752,6 +2903,10 @@ paths:
       summary: Expire every internal password
       tags:
       - users
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/v2/users/unexpire_password_for_all_users:
     post:
       description: 'Reverses expire_password_for_all_users: every internal password becomes valid again without
@@ -2780,6 +2935,10 @@ paths:
       summary: Clear the expired flag on every password
       tags:
       - users
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/v2/users/{username}:
     delete:
       description: Removes the user, its group memberships, its tokens and its entries in permission targets. The
@@ -2811,6 +2970,10 @@ paths:
       summary: Delete a user
       tags:
       - users
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:username
+      x-cost: expensive
     get:
       description: Returns the stored user record. Requires a platform admin or the system:identities:r scope; a
         user may always read their own record.
@@ -2851,6 +3014,8 @@ paths:
       summary: Get a user
       tags:
       - users
+      x-idempotency: safe
+      x-cost: ordinary
     patch:
       description: 'Partial update: only the fields present in the body change, omitted fields keep their stored
         values, and the username cannot be changed. Group membership is not updated here; use the groups sub-resource.
@@ -2901,6 +3066,10 @@ paths:
       summary: Update a user
       tags:
       - users
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:username
+      x-cost: expensive
   /api/v2/users/{username}/groups:
     patch:
       description: Applies the add list then the remove list to the user's memberships and returns the resulting
@@ -2975,6 +3144,12 @@ paths:
       summary: Add or remove group memberships
       tags:
       - users
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:username
+      - body:/add
+      - body:/remove
+      x-cost: expensive
   /api/v2/users/{username}/password:
     put:
       description: Replaces the user's internal password. A platform admin may set any user's password; any user
@@ -3030,6 +3205,10 @@ paths:
       summary: Set a user's password
       tags:
       - users
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:username
+      x-cost: expensive
   /api/v2/users/{username}/password/expire:
     post:
       description: Marks the user's password as expired so they must change it at next login. Admin only. Answers
@@ -3061,6 +3240,10 @@ paths:
       summary: Expire a user's password
       tags:
       - users
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:username
+      x-cost: expensive
   /api/v2/users/{username}/unlock:
     post:
       description: Clears the lock that the user lock policy applied after too many failed logins and resets the
@@ -3092,3 +3275,7 @@ paths:
       summary: Unlock a user
       tags:
       - users
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:username
+      x-cost: expensive

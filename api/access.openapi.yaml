@@ -58,18 +58,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A resource with that name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: AWS IAM role mapping is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Assign an AWS IAM role (not supported)
       tags:
         - aws
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/putawsiamrole.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/username
+      x-cost: expensive
   /api/v1/aws/iam_role/{username}:
     delete:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -102,18 +110,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: AWS IAM role mapping is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Remove a user's AWS IAM role (not supported)
       tags:
         - aws
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteawsiamrole.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:username
+      x-cost: expensive
     get:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: getAwsIamRole
@@ -155,18 +171,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: AWS IAM role mapping is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a user's AWS IAM role (not supported)
       tags:
         - aws
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getawsiamrole.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/cert/ca:
     get:
       description: Returns, as PEM text, the public certificate of the authority that signs the instance's internal service certificates. The server generates the authority on first start and keeps its key sealed (decision 0017). Requires a platform admin.
@@ -184,10 +206,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No valid credentials.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the CA certificate
       tags:
         - certificates
       x-oracle-source: https://docs.jfrog.com/administration/reference/getcacertificate.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/cert/root:
     get:
       description: Returns the certificate whose key signs the instance's access tokens, so that other services can verify them. By default the body is the base64 certificate on one line; with formatted=true it is a PEM block with header, footer and line breaks. Any authenticated caller may read it.
@@ -213,10 +241,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No valid credentials.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the root certificate
       tags:
         - certificates
       x-oracle-source: https://docs.jfrog.com/administration/reference/getrootcertificate.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/config/security/authentication/basic_authentication_enabled:
     get:
       description: Returns whether usernames and passwords are accepted over HTTP Basic. When the switch is off, only access tokens and reference tokens authenticate (decision 0005). Requires a platform admin.
@@ -244,10 +278,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the basic authentication switch
       tags:
         - config
       x-oracle-source: https://docs.jfrog.com/administration/reference/getbasicauthenticationstatus.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance, from the next request on. Returns 200 with no body. Requires a platform admin.
       operationId: setBasicAuthenticationStatus
@@ -285,10 +325,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Set the basic authentication switch
       tags:
         - config
       x-oracle-source: https://docs.jfrog.com/administration/reference/setbasicauthenticationstatus.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - route
+      x-cost: expensive
   /api/v1/config/security/password_policy:
     patch:
       description: Merges the supplied fields into the password policy; omitted fields keep their current values. The policy applies when a password is set or changed, not to existing passwords. Returns 204 with no body. Requires a platform admin.
@@ -321,10 +369,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Update the password policy
       tags:
         - config
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatepasswordpolicy.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - route
+      x-cost: expensive
     put:
       description: Replaces the whole password policy that internal users' passwords must satisfy. Every field not supplied returns to its default, so an empty object resets the policy. The policy applies when a password is set or changed, not to existing passwords. Returns 204 with no body. Requires a platform admin.
       operationId: createPasswordPolicy
@@ -356,10 +412,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace the password policy
       tags:
         - config
       x-oracle-source: https://docs.jfrog.com/administration/reference/createpasswordpolicy.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - route
+      x-cost: expensive
   /api/v1/config/security/user_lock_policy:
     get:
       description: Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and GET /artifactory/api/security/configuration/passwordExpirationPolicy. Requires a platform admin.
@@ -383,10 +447,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the user lock policy
       tags:
         - config
       x-oracle-source: https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
       operationId: configureAccessUserLockPolicy
@@ -422,10 +492,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace the user lock policy
       tags:
         - config
       x-oracle-source: https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - route
+      x-cost: expensive
   /api/v1/config/token/default_expiry:
     get:
       description: Returns the lifetime, in seconds, that POST /api/v1/tokens gives to tokens created without expires_in. Requires a platform admin.
@@ -453,10 +531,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the default token lifetime
       tags:
         - config
       x-oracle-source: https://docs.jfrog.com/administration/reference/gettokendefaultexpiry.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Changes the lifetime given to access tokens created without expires_in. Tokens already issued keep their expiry. Returns 200 with no body. Requires a platform admin.
       operationId: setTokenDefaultExpiry
@@ -488,10 +572,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Set the default token lifetime
       tags:
         - config
       x-oracle-source: https://docs.jfrog.com/administration/reference/settokendefaultexpiry.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - route
+      x-cost: expensive
   /api/v1/crowd:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -515,18 +607,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: Atlassian Crowd integration is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the Crowd configuration (not supported)
       tags:
         - crowd
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getcrowdconfiguration.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: upsertCrowdConfiguration
@@ -562,18 +660,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: Atlassian Crowd integration is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Set the Crowd configuration (not supported)
       tags:
         - crowd
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/upsertcrowdconfiguration.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - route
+      x-cost: expensive
   /api/v1/environments:
     get:
       description: Returns every global environment, including the built-in DEV and PROD. Every repository belongs to exactly one environment (DEV by default). Admin only.
@@ -600,9 +706,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List global environments
       tags:
         - environments
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. At most 10 global environments may exist by default, DEV and PROD among them; once that many exist, another answers 400. Admin only.
       operationId: createGlobalEnvironment
@@ -644,9 +758,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An environment with this name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a global environment
       tags:
         - environments
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/name
+      x-cost: expensive
   /api/v1/environments/{environmentName}:
     delete:
       description: Removes an environment. DEV and PROD cannot be deleted, nor can an environment that repositories or global roles still name; both answer 400. Admin only. Answers 204 with no body.
@@ -674,9 +796,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No environment with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a global environment
       tags:
         - environments
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:environmentName
+      x-cost: expensive
   /api/v1/environments/{environmentName}/rename:
     post:
       description: Renames the environment and updates every repository and role that references it. The built-in DEV and PROD cannot be renamed. Admin only. Answers 200 with the environment under its new name.
@@ -721,9 +851,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No environment with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Rename a global environment
       tags:
         - environments
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:environmentName
+        - body:/new_name
+      x-cost: expensive
   /api/v1/httpsso:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -747,18 +886,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: HTTP single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the HTTP single sign-on configuration (not supported)
       tags:
         - httpsso
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/gethttpssoconfiguration.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: upsertHttpSsoConfiguration
@@ -794,18 +939,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: HTTP single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Set the HTTP single sign-on configuration (not supported)
       tags:
         - httpsso
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/upserthttpssoconfiguration.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - route
+      x-cost: expensive
   /api/v1/ldap/groups:
     get:
       description: Returns every LDAP group synchronisation setting. Requires a platform admin.
@@ -831,10 +984,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List LDAP group settings
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallldapgroupsettings.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Defines how groups are read from the LDAP connection named in enabled_ldap and mapped to local groups. Answers 201 with the stored setting. Requires a platform admin.
       operationId: createLdapGroupSettings
@@ -870,10 +1031,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create an LDAP group setting
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/createldapgroupsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/name
+      x-cost: expensive
     put:
       description: Replaces the group setting whose name matches the body's name. Requires a platform admin.
       operationId: updateLdapGroupSettings
@@ -909,10 +1078,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace an LDAP group setting
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/updateldapgroupsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/name
+      x-cost: expensive
   /api/v1/ldap/groups/import:
     post:
       description: Creates local groups, or updates existing ones, for the listed LDAP groups through the given group setting, so that permissions can be granted to them. Returns 204. Requires a platform admin.
@@ -945,10 +1122,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Import LDAP groups
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/importldapgroups.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/import_groups
+      x-cost: expensive
   /api/v1/ldap/groups/search:
     post:
       description: Runs the group search described by the body against its LDAP connection and returns the groups found, each with its distinguished name and local status. With username, returns only that user's groups. Nothing is stored. Requires a platform admin.
@@ -988,10 +1173,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Search LDAP groups
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/searchldapgroups.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/ldap/groups/strategy:
     get:
       description: Returns the default filter and attribute names of one group mapping strategy, as a starting point for a new group setting. Requires a platform admin.
@@ -1022,10 +1215,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a group mapping strategy
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/getldapgroupmappingstrategy.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/ldap/groups/{name}:
     delete:
       description: Removes the group setting. Groups already imported through it remain as local groups. Returns 204. Requires a platform admin.
@@ -1058,10 +1257,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No group setting has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete an LDAP group setting
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteldapgroupsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:name
+      x-cost: expensive
     get:
       description: Returns one LDAP group setting. Requires a platform admin.
       operationId: getLdapGroupSettingsByName
@@ -1097,10 +1304,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No group setting has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get an LDAP group setting
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/getldapgroupsettingsbyname.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/ldap/groups/{name}/refresh:
     post:
       description: Re-reads the LDAP groups of the named setting. operation chooses whether to update the memberships of groups already imported, import the groups not yet present, or both. With username, only that user's memberships are refreshed. Returns a plain-text summary that includes the number of groups imported. Requires a platform admin.
@@ -1160,10 +1373,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No group setting has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Refresh LDAP groups
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/refreshldapgroupsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:name
+        - query:username
+      x-cost: expensive
   /api/v1/ldap/settings:
     get:
       description: Returns every LDAP server connection that logins are checked against. Manager passwords are never returned. Requires a platform admin.
@@ -1189,10 +1411,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List LDAP connections
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallldapsettings.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Adds an LDAP server that login attempts are checked against, in addition to internal users. Answers 201 with the stored connection. Requires a platform admin.
       operationId: createLdapSettings
@@ -1228,10 +1458,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create an LDAP connection
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/createldapsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/key
+      x-cost: expensive
     put:
       description: Replaces the connection whose key matches the body's key. Requires a platform admin.
       operationId: updateLdapSettings
@@ -1267,10 +1505,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace an LDAP connection
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/updateldapsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/key
+      x-cost: expensive
   /api/v1/ldap/settings/test:
     post:
       description: Binds to the server described by the body, without storing anything, and answers 204 when the bind and any configured search succeed. A failing test answers 400 with the server's error. Requires a platform admin.
@@ -1303,10 +1549,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Test an LDAP connection
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/testldapconnection.md
+      x-idempotency: safe
+      x-cost: expensive
   /api/v1/ldap/settings/{key}:
     delete:
       description: Removes the connection. Users created through it keep their local accounts but can no longer log in through it, and group settings that name it in enabled_ldap stop synchronising. Returns 204. Requires a platform admin.
@@ -1339,10 +1591,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No connection has that key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete an LDAP connection
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteldapsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:key
+      x-cost: expensive
     get:
       description: Returns one LDAP connection without its manager password. Requires a platform admin.
       operationId: getLdapSettingsByKey
@@ -1378,10 +1638,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No connection has that key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get an LDAP connection
       tags:
         - ldap
       x-oracle-source: https://docs.jfrog.com/administration/reference/getldapsettingsbykey.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/logshipping/config:
     post:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -1420,18 +1686,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: Cloud log collection is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Switch cloud log collection (not supported)
       tags:
         - logshipping
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/enablecloudlogcollection.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - route
+      x-cost: expensive
   /api/v1/oidc:
     get:
       description: Returns every OpenID Connect provider whose ID tokens the token exchange (POST /api/v1/oidc/token) trusts. Requires a platform admin.
@@ -1457,10 +1731,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List OIDC providers
       tags:
         - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/getalloidcconfigurations.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200 with the stored configuration. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
       operationId: createOidcConfiguration
@@ -1496,10 +1778,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create an OIDC provider
       tags:
         - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/createoidcconfiguration.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/name
+      x-cost: expensive
   /api/v1/oidc/token:
     post:
       description: 'Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider''s identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed, when no mapping matches, or when the matching mapping''s patterns do not accept the token''s claims, and 401 when the subject token does not verify.'
@@ -1530,10 +1820,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The subject token does not verify against the provider.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Exchange an ID token for an access token
       tags:
         - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/oidctokenexchange.md
+      x-idempotency: none
+      x-idempotency-reason: secret-response
+      x-cost: expensive
   /api/v1/oidc/{name}:
     delete:
       description: Removes the provider and its identity mappings, so token exchanges that name it fail from then on. Tokens already issued through it stay valid until they expire or are revoked. Returns 204. Requires a platform admin.
@@ -1566,10 +1863,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No provider has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete an OIDC provider
       tags:
         - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteoidcconfiguration.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:name
+      x-cost: expensive
     get:
       description: Returns one provider configuration. Requires a platform admin.
       operationId: getOidcConfiguration
@@ -1605,10 +1910,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No provider has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get an OIDC provider
       tags:
         - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/getoidcconfiguration.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Replaces the named provider's configuration with the body. The path names the provider; a name in the body must match it. Requires a platform admin.
       operationId: updateOidcConfiguration
@@ -1651,10 +1962,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace an OIDC provider
       tags:
         - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/updateoidcconfiguration.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:name
+      x-cost: expensive
   /api/v1/oidc/{provider_name}/identity_mappings:
     get:
       description: Returns the identity mappings of one provider, optionally only those of one project. Requires a platform admin.
@@ -1699,10 +2018,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No provider has that name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List identity mappings
       tags:
         - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/getoidcidentitymappings.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: 'Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. A scope that names project roles in more than one project is refused with 400. Requires a platform admin.'
       operationId: createOidcIdentityMapping
@@ -1745,10 +2072,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create an identity mapping
       tags:
         - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/createoidcidentitymapping.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:provider_name
+        - body:/name
+      x-cost: expensive
   /api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}:
     delete:
       description: Removes one identity mapping. Tokens already issued through it stay valid. Returns 204. Requires a platform admin.
@@ -1787,10 +2123,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The provider or the mapping does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete an identity mapping
       tags:
         - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteoidcidentitymapping.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:provider_name
+        - path:mapping_name
+      x-cost: expensive
     get:
       description: Returns one identity mapping of a provider. Requires a platform admin.
       operationId: getOidcIdentityMappingByName
@@ -1832,10 +2177,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The provider or the mapping does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get an identity mapping
       tags:
         - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/getoidcidentitymappingbyname.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400, as is a scope that names project roles in more than one project. Requires a platform admin.
       operationId: updateOidcIdentityMapping
@@ -1890,10 +2241,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The provider or the mapping does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace an identity mapping
       tags:
         - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/updateoidcidentitymapping.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:provider_name
+        - path:mapping_name
+      x-cost: expensive
   /api/v1/projects:
     get:
       description: >-
@@ -1921,10 +2281,18 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The caller lacks the privilege this operation needs (see the description).
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectslist.md
       summary: List projects
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: >-
         Creates a project with no members, the predefined roles and no repositories. The key is immutable afterwards. Requires a platform admin.
@@ -1969,10 +2337,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A project with this key or display name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/createproject.md
       summary: Create a project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/project_key
+      x-cost: expensive
   /api/v1/projects/_/attach/repositories/{repoName}:
     delete:
       description: >-
@@ -2008,11 +2384,19 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: >-
         https://docs.jfrog.com/projects/reference/unassignprojectfromrepository.md
       summary: Unassign a repository from its project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:repoName
+      x-cost: expensive
   /api/v1/projects/_/attach/repositories/{repoName}/{targetProjectKey}:
     put:
       description: >-
@@ -2068,10 +2452,19 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/attachrepositorytoproject.md
       summary: Assign a repository to a project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:repoName
+        - path:targetProjectKey
+      x-cost: expensive
   /api/v1/projects/_/repositories/{repoName}:
     get:
       description: >-
@@ -2139,10 +2532,16 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectrepositorystatus.md
       summary: Get a repository's project status
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/projects/_/share/repositories/{repoName}:
     delete:
       description: >-
@@ -2178,11 +2577,19 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: >-
         https://docs.jfrog.com/projects/reference/unsharerepositorywithallprojects.md
       summary: Stop sharing a repository with every project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:repoName
+      x-cost: expensive
     put:
       description: >-
         Lets members of every project use the local or remote repository according to their roles in their own project. The owning project is unchanged. Requires a platform admin.
@@ -2224,11 +2631,19 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: >-
         https://docs.jfrog.com/projects/reference/sharerepositorywithallprojects.md
       summary: Share a repository with every project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:repoName
+      x-cost: expensive
   /api/v1/projects/_/share/repositories/{repoName}/{targetProjectKey}:
     delete:
       description: Removes the share with the target project. Requires a platform admin.
@@ -2270,11 +2685,20 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: >-
         https://docs.jfrog.com/projects/reference/unsharerepositorywithtargetproject.md
       summary: Stop sharing a repository with one project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:repoName
+        - path:targetProjectKey
+      x-cost: expensive
     put:
       description: >-
         Lets members of the target project use the local or remote repository according to their roles there, read-only when readOnly is true. Requires a platform admin.
@@ -2329,11 +2753,20 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: >-
         https://docs.jfrog.com/projects/reference/sharerepositorywithtargetproject.md
       summary: Share a repository with one project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:repoName
+        - path:targetProjectKey
+      x-cost: expensive
   /api/v1/projects/{projectKey}:
     delete:
       description: >-
@@ -2369,10 +2802,18 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/deleteproject.md
       summary: Delete a project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+      x-cost: expensive
     get:
       description: >-
         Returns one project. Requires a platform admin or an admin of the project.
@@ -2411,10 +2852,16 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getproject.md
       summary: Get a project
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: >-
         Changes the project's display name, description, quota and admin privileges. The key cannot change. Lowering the quota below current usage is accepted and blocks further deployments until usage drops (unless soft_limit is true). Requires a platform admin.
@@ -2467,10 +2914,18 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/updateproject.md
       summary: Update a project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+      x-cost: expensive
   /api/v1/projects/{projectKey}/environments:
     get:
       description: Returns the environments defined inside one project, which project roles and project repositories may reference in addition to the global ones. Requires a platform admin or an admin of the project.
@@ -2505,9 +2960,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No project with this key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List a project's environments
       tags:
         - environments
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Creates an environment scoped to the project and returns it with status 201. A project may hold at most ten environments by default. The name must not collide with a global environment. Requires a platform admin or an admin of the project.
       operationId: createProjectEnvironment
@@ -2557,9 +3020,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: An environment with this name already exists in the project or globally.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a project environment
       tags:
         - environments
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - body:/name
+      x-cost: expensive
   /api/v1/projects/{projectKey}/environments/{environmentName}:
     delete:
       description: Removes a project environment that no repository in the project still uses. Requires a platform admin or an admin of the project. Answers 204 with no body.
@@ -2588,9 +3060,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such project or environment.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a project environment
       tags:
         - environments
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - path:environmentName
+      x-cost: expensive
   /api/v1/projects/{projectKey}/environments/{environmentName}/rename:
     post:
       description: Renames a project environment and updates the project's repositories and roles that reference it. Requires a platform admin or an admin of the project.
@@ -2636,9 +3117,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such project or environment.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Rename a project environment
       tags:
         - environments
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - path:environmentName
+        - body:/new_name
+      x-cost: expensive
   /api/v1/projects/{projectKey}/groups:
     get:
       description: >-
@@ -2684,10 +3175,18 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectgroups.md
       summary: List project groups
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/projects/{projectKey}/groups/{group}:
     delete:
       description: >-
@@ -2729,10 +3228,19 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/deleteprojectgroup.md
       summary: Remove a group from a project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - path:group
+      x-cost: expensive
     get:
       description: >-
         Returns one group's roles in the project. Requires a platform admin, or a project admin of this project with the manage_members privilege.
@@ -2776,10 +3284,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The project does not exist or the group holds no role in it.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectgroup.md
       summary: Get a project group
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: >-
         Adds the group to the project with the given roles, or replaces the roles of a member group. The group must exist; every role must exist in the project. Requires a platform admin, or a project admin of this project with the manage_members privilege.
@@ -2838,10 +3352,19 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/updateprojectgroup.md
       summary: Add a group to a project or set its roles
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - path:group
+      x-cost: expensive
   /api/v1/projects/{projectKey}/roles:
     get:
       description: >-
@@ -2883,10 +3406,18 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectroles.md
       summary: List project roles
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: >-
         Defines a CUSTOM role in the project. Unknown actions and unknown environments are rejected with 400; a name already used in the project is rejected with 400. Requires a platform admin, or a project admin of this project with the manage_members privilege.
@@ -2939,10 +3470,19 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/createprojectrole.md
       summary: Create a custom project role
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - body:/name
+      x-cost: expensive
   /api/v1/projects/{projectKey}/roles/{role}:
     delete:
       description: >-
@@ -2984,10 +3524,19 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/deleteprojectrole.md
       summary: Delete a custom project role
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - path:role
+      x-cost: expensive
     get:
       description: >-
         Returns one role usable in the project. Requires a platform admin or an admin of the project.
@@ -3032,10 +3581,16 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectrole.md
       summary: Get a project role
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: >-
         Replaces the role's description, environments and actions. Only CUSTOM roles can be changed; members holding the role get the new actions at once. Requires a platform admin, or a project admin of this project with the manage_members privilege.
@@ -3094,10 +3649,19 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/updateprojectrole.md
       summary: Replace a custom project role
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - path:role
+      x-cost: expensive
   /api/v1/projects/{projectKey}/users:
     get:
       description: >-
@@ -3143,10 +3707,18 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectusers.md
       summary: List project users
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/projects/{projectKey}/users/{user}:
     delete:
       description: >-
@@ -3188,10 +3760,19 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/deleteprojectuser.md
       summary: Remove a user from a project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - path:user
+      x-cost: expensive
     get:
       description: >-
         Returns one user's roles in the project. Requires a platform admin, or a project admin of this project with the manage_members privilege.
@@ -3235,10 +3816,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The project does not exist or the user holds no role in it.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectuser.md
       summary: Get a project user
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: >-
         Adds the user to the project with the given roles, or replaces the roles of an existing member. The user must exist; every role must exist in the project. Requires a platform admin, or a project admin of this project with the manage_members privilege.
@@ -3297,10 +3884,19 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: >-
             The project, member, role or repository named in the path does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/addorupdateprojectuser.md
       summary: Add a user to a project or set their roles
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - path:user
+      x-cost: expensive
   /api/v1/roles:
     get:
       description: 'Returns every global role: the built-in ADMIN and PREDEFINED roles and the CUSTOM_GLOBAL roles created through this API. Admin only.'
@@ -3327,9 +3923,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List global roles
       tags:
         - roles
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}. Admin only. An existing name answers 409.
       operationId: createGlobalRole
@@ -3371,9 +3975,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A role with this name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a global role
       tags:
         - roles
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/name
+      x-cost: expensive
   /api/v1/roles/{role}:
     delete:
       description: Removes a CUSTOM_GLOBAL role and every assignment of it. Built-in roles answer 400. Admin only. Answers 204 with no body.
@@ -3407,9 +4019,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No role with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a global role
       tags:
         - roles
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:role
+      x-cost: expensive
     get:
       description: Returns one global role by name. Admin only.
       operationId: getGlobalRole
@@ -3440,9 +4060,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No role with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a global role
       tags:
         - roles
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Replaces the description, environments and actions of a CUSTOM_GLOBAL role, or the environments and actions of a PREDEFINED one. The name in the body must equal the path name and the type must stay the same; the ADMIN role cannot be changed. Each of these answers 400. Admin only. Answers 200 with no body.
       operationId: updateGlobalRole
@@ -3482,9 +4108,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No role with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace a global role
       tags:
         - roles
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:role
+      x-cost: expensive
   /api/v1/saml:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3510,18 +4144,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SAML single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List SAML settings (not supported)
       tags:
         - saml
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallsamlsettings.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: createSamlSetting
@@ -3557,18 +4199,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SAML single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a SAML setting (not supported)
       tags:
         - saml
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/createsamlsetting.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/name
+      x-cost: expensive
   /api/v1/saml/general_settings:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3592,18 +4242,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SAML single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the SAML switch (not supported)
       tags:
         - saml
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getsamlgeneralsettings.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: updateSamlGeneralSettings
@@ -3641,18 +4297,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SAML single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Set the SAML switch (not supported)
       tags:
         - saml
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatesamlgeneralsettings.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - route
+      x-cost: expensive
   /api/v1/saml/{name}:
     delete:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3679,18 +4343,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SAML single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a SAML setting (not supported)
       tags:
         - saml
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletesamlsetting.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:name
+      x-cost: expensive
     get:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: getSamlSettingByName
@@ -3726,18 +4398,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SAML single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a SAML setting (not supported)
       tags:
         - saml
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getsamlsettingbyname.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: updateSamlSetting
@@ -3780,18 +4458,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SAML single sign-on is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace a SAML setting (not supported)
       tags:
         - saml
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatesamlsetting.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:name
+      x-cost: expensive
   /api/v1/scim/v2/Groups:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3830,18 +4516,29 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No valid credentials.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List SCIM groups (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimgroups.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: offset
+      x-pagination-parameters:
+        position: startIndex
+        size: count
+      x-pagination-next: link
     post:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: createScimGroup
@@ -3877,18 +4574,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A resource with that name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a SCIM group (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/createscimgroup.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/displayName
+      x-cost: expensive
   /api/v1/scim/v2/Groups/{groupName}:
     delete:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -3915,18 +4620,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a SCIM group (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletescimgroup.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:groupName
+      x-cost: expensive
     get:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: getScimGroupByName
@@ -3961,18 +4674,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a SCIM group (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimgroupbyname.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     patch:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: patchScimGroup
@@ -4017,18 +4736,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Patch a SCIM group (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/patchscimgroup.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:groupName
+      x-cost: expensive
     put:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: updateScimGroup
@@ -4071,18 +4798,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace a SCIM group (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatescimgroup.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:groupName
+      x-cost: expensive
   /api/v1/scim/v2/ResourceTypes:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -4100,18 +4835,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No valid credentials.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List SCIM resource types (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimresourcetypes.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/scim/v2/Schemas:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -4129,18 +4872,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No valid credentials.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List SCIM schemas (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimschemas.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/scim/v2/Schemas/{schemaId}:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -4171,18 +4922,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a SCIM schema (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimschemabyid.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/scim/v2/ServiceProviderConfig:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -4200,18 +4957,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No valid credentials.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the SCIM service provider configuration (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimserviceproviderconfig.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/scim/v2/Users:
     get:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -4250,18 +5013,29 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No valid credentials.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List SCIM users (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimusers.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: offset
+      x-pagination-parameters:
+        position: startIndex
+        size: count
+      x-pagination-next: link
     post:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: createScimUser
@@ -4297,18 +5071,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A resource with that name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a SCIM user (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/createscimuser.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/userName
+      x-cost: expensive
   /api/v1/scim/v2/Users/{username}:
     delete:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -4335,18 +5117,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a SCIM user (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletescimuser.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:username
+      x-cost: expensive
     get:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: getScimUserByUsername
@@ -4381,18 +5171,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a SCIM user (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimuserbyusername.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     patch:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: patchScimUser
@@ -4435,18 +5231,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Patch a SCIM user (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/patchscimuser.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:username
+      x-cost: expensive
     put:
       description: Not implemented; answers 501 in the Access error envelope.
       operationId: updateScimUser
@@ -4489,18 +5293,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The named resource does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: SCIM provisioning is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace a SCIM user (not supported)
       tags:
         - scim
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatescimuser.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:username
+      x-cost: expensive
   /api/v1/service_trust/pairing/{useCase}:
     post:
       description: Issues a single-use pairing token on this instance so that another instance of this server can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (configurable). Only the platform-federation use case is supported; mission-control and bridge answer 501. The peer must be another instance of this server. Administrators only.
@@ -4548,15 +5360,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unknown use case.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The use case is mission-control or bridge, which are not implemented.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a pairing token
       tags:
         - tokens
+      x-idempotency: none
+      x-idempotency-reason: secret-response
+      x-cost: expensive
   /api/v1/system/backup/export:
     post:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -4576,18 +5395,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: Access backup export and import is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Export the Access configuration (not supported)
       tags:
         - backup
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/exportaccessconfiguration.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/system/backup/import:
     post:
       description: Not implemented; answers 501 in the Access error envelope.
@@ -4613,18 +5439,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Always returned: Access backup export and import is not implemented.'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Import the Access configuration (not supported)
       tags:
         - backup
         - stub
       x-oracle-source: https://docs.jfrog.com/administration/reference/importaccessconfiguration.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+        - route
+      x-cost: expensive
   /api/v1/system/federation:
     get:
       description: Returns every Access federation target registered on this instance, active or paused. Administrators only. A target is always another instance of this server; no other kind of federation peer is supported (decision 0025).
@@ -4648,10 +5482,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List federation targets
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallaccessfederations.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Registers a peer instance as a target of Access federation. From then on every create, update and delete of the selected identity entities on this instance is queued in the peer outbox and delivered to the target in order, with retries, over the peer protocol (decision 0021); changes made on the target are not sent back unless the target also registers this instance. Registration requires an existing pairing with the peer. A full broadcast runs once after registration so the target starts from this instance's current state. Administrators only.
       operationId: registerAccessFederation
@@ -4693,10 +5535,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A target with this name already exists and force_override was not set.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Register a federation target
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/registeraccessfederation.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/name
+      x-cost: expensive
   /api/v1/system/federation/validate_server:
     post:
       description: Checks, without registering anything, that the peer at url is reachable, is an instance of this server speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
@@ -4729,10 +5579,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not an administrator.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Validate a candidate federation target
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/validatefederationtarget.md
+      x-idempotency: safe
+      x-cost: expensive
   /api/v1/system/federation/{serverName}:
     delete:
       description: Removes a federation target and discards changes still queued for it. Entities already replicated to the peer stay there; the peer's pairing with this instance is not revoked. Administrators only.
@@ -4765,10 +5621,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No target has this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Unregister a federation target
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteaccessfederation.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:serverName
+      x-cost: expensive
     get:
       description: Returns one federation target by name. Administrators only.
       operationId: getAccessFederation
@@ -4810,10 +5674,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No target has this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a federation target
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/getaccessfederation.md
+      x-idempotency: safe
+      x-cost: ordinary
     patch:
       description: Changes the replicated entity types, the filters or the active flag of a target. Fields that are omitted keep their values; name and url are immutable. Narrowing the entities or filters affects future changes only; nothing already replicated is removed from the peer. Accepts plain JSON or a JSON merge patch with the same fields. Administrators only.
       operationId: updateAccessFederation
@@ -4865,10 +5735,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No target has this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Update a federation target
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/updateaccessfederation.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:serverName
+      x-cost: expensive
   /api/v1/system/federation/{serverName}/full_broadcast:
     put:
       description: Sends the complete current set of selected identity entities to the target, after which the target matches this instance for those entities (the full-sync fallback of decision 0021). Use it after a long outage or when the incremental outbox was discarded. The broadcast runs in the background; at most one runs per target. Administrators only.
@@ -4911,10 +5789,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No target has this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Run a full broadcast to a target
       tags:
         - federation
       x-oracle-source: https://docs.jfrog.com/administration/reference/fullbroadcastaccessfederation.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/system/liveness:
     get:
       operationId: accessLiveness
@@ -4930,6 +5815,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccessProbe"
+      x-idempotency: safe
+      x-cost: exempt
   /api/v1/system/ping:
     get:
       operationId: accessPing
@@ -4954,6 +5841,8 @@ paths:
               schema:
                 type: string
                 example: The database is not available
+      x-idempotency: safe
+      x-cost: exempt
   /api/v1/system/readiness:
     get:
       operationId: accessReadiness
@@ -4976,6 +5865,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+      x-idempotency: safe
+      x-cost: exempt
   /api/v1/system/version:
     get:
       operationId: getAccessVersion
@@ -4990,6 +5881,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccessVersion"
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/tokens:
     get:
       description: A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens and tokens that are not revocable are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.
@@ -5019,9 +5916,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller's token does not permit listing.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List access tokens
       tags:
         - tokens
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
       operationId: createToken
@@ -5060,9 +5965,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'The requested token details are forbidden: the caller may not mint a token with this username or scope, or a non-admin asked for expires_in 0, a token that never expires.'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create or refresh an access token
       tags:
         - tokens
+      x-idempotency: none
+      x-idempotency-reason: secret-response
+      x-cost: expensive
   /api/v1/tokens/revoke:
     delete:
       description: Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable when it never expires, its lifetime is at least the revocable threshold (21600 seconds), or it was created with force_revocable or refreshable; any other token answers 404, as an unknown one does. Admin only.
@@ -5114,9 +6026,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The value does not correspond to a known, unexpired, revocable token, answered with the message `Token not found or not revocable`.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Revoke a token by its value
       tags:
         - tokens
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/token
+      x-cost: expensive
   /api/v1/tokens/{tokenId}:
     delete:
       description: Revokes the token with this id; me revokes the caller's own token. A token is revocable on the same terms as for revocation by value; any other token answers 400. A non-admin may only revoke their own tokens. Answers 200 with no body.
@@ -5150,9 +6070,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such token.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Revoke a token by id
       tags:
         - tokens
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:tokenId
+      x-cost: expensive
     get:
       description: Returns the metadata of one token. The id me stands for the token used to authenticate the call. A non-admin may only read their own tokens.
       operationId: getTokenById
@@ -5183,9 +6111,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such token, or it has expired or been revoked.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a token's metadata
       tags:
         - tokens
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/vault/configs:
     get:
       description: Returns every HashiCorp Vault connection. Keypairs whose vaultKey names a connection read their private key from Vault instead of the database. Secrets are never returned. Requires a platform admin.
@@ -5211,10 +6145,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List Vault connections
       tags:
         - vault
       x-oracle-source: https://docs.jfrog.com/administration/reference/getvaultconfigurations.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/vault/configs/test:
     post:
       description: Authenticates to the Vault server described by the body, without storing anything, and answers 204 on success. Requires a platform admin.
@@ -5253,16 +6195,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The body is not application/json.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The test could not be completed.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Test a Vault connection
       tags:
         - vault
       x-oracle-source: https://docs.jfrog.com/administration/reference/testvaultconfiguration.md
+      x-idempotency: safe
+      x-cost: expensive
   /api/v1/vault/configs/{vault_key}:
     delete:
       description: Removes the connection. Keypairs that name it can no longer sign until a connection with the same key is stored again. Returns 204. Requires a platform admin.
@@ -5295,10 +6243,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No connection has that key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a Vault connection
       tags:
         - vault
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletevaultconfiguration.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:vault_key
+      x-cost: expensive
     put:
       description: Stores the connection under vault_key, replacing any connection with that key, and returns it without secrets. Vault must be reached over TLS. A body that is not application/json answers 415. Requires a platform admin.
       operationId: setVaultConfiguration
@@ -5347,10 +6303,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The body is not application/json.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create or replace a Vault connection
       tags:
         - vault
       x-oracle-source: https://docs.jfrog.com/administration/reference/setvaultconfiguration.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:vault_key
+      x-cost: expensive
   /api/v2/groups:
     get:
       description: Returns one record per group as a cursor-paginated page. Requires a platform admin or the system:identities:r scope. Filters combine with AND.
@@ -5425,9 +6389,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is neither an admin nor holds system:identities:r.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List groups
       tags:
         - groups
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: cursor
+      x-pagination-parameters:
+        position: cursor
+        size: limit
+      x-pagination-next: body:/cursor
     post:
       description: 'Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.'
       operationId: createGroup
@@ -5475,9 +6450,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A group with this name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a group
       tags:
         - groups
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/name
+      x-cost: expensive
   /api/v2/groups/{name}:
     delete:
       description: Removes the group, its memberships and its entries in permission targets. The built-in readers group can be deleted; a group that is the sole admin grant for the last admin cannot. Admin only. Answers 204 with no body.
@@ -5505,9 +6488,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No group with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a group
       tags:
         - groups
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:name
+      x-cost: expensive
     get:
       description: Returns the group including its member usernames. Requires a platform admin or the system:identities:r scope.
       operationId: getGroupDetails
@@ -5544,9 +6535,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No group with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a group
       tags:
         - groups
+      x-idempotency: safe
+      x-cost: ordinary
     patch:
       description: Partial update of the group's attributes. Omitted fields keep their values. The name, realm, realm_attributes and members cannot be changed here; members go through the members sub-resource. The body may be empty, which changes nothing and returns the current group. Admin only.
       operationId: updateGroup
@@ -5590,9 +6587,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No group with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Update a group
       tags:
         - groups
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:name
+      x-cost: expensive
     put:
       description: 'Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.'
       operationId: replaceGroup
@@ -5642,10 +6647,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A user in members does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create or replace a group
       tags:
         - groups
       x-oracle-source: https://docs.jfrog.com/administration/reference/replacegroup.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:name
+      x-cost: expensive
   /api/v2/groups/{name}/members:
     patch:
       description: Applies the add list then the remove list to the group's members and returns the resulting full member list. Unknown usernames in add answer 404; names already present or already absent are ignored. Admin only.
@@ -5708,9 +6721,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No group with this name, or a username in add does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Add or remove members
       tags:
         - groups
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:name
+        - body:/add
+        - body:/remove
+      x-cost: expensive
   /api/v2/permissions:
     get:
       description: Returns permissions as a cursor-paginated page. Without filters the page holds name and uri per permission. With user or group filters it holds only permissions that grant something to those principals, and expand=true then returns the full PermissionDetails instead of the name and uri pair. Requires a platform admin, a holder of the Manage Resources role or the system:permissions:r scope.
@@ -5795,9 +6818,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A filtered user or group does not exist.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List permissions
       tags:
         - permissions
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: cursor
+      x-pagination-parameters:
+        position: cursor
+        size: limit
+      x-pagination-next: body:/cursor
     post:
       description: Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Requires a platform admin or a Manage Resources holder. An existing name answers 409.
       operationId: createPermission
@@ -5839,9 +6873,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A permission with this name already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a permission
       tags:
         - permissions
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/name
+      x-cost: expensive
   /api/v2/permissions/{permissionName}:
     delete:
       description: Removes the permission and every grant it carried. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.
@@ -5875,9 +6917,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No permission with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a permission
       tags:
         - permissions
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:permissionName
+      x-cost: expensive
     get:
       description: Returns the full permission document. Requires a platform admin, a Manage Resources holder, the system:permissions:r scope, or MANAGE on every resource of the permission.
       operationId: getPermissionDetails
@@ -5914,9 +6964,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No permission with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a permission
       tags:
         - permissions
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v2/permissions/{permissionName}/{resourceType}:
     delete:
       description: Removes the section for the resource type; the permission itself stays, even when it ends up with no sections. Requires a platform admin or a Manage Resources holder. Answers 204 with no body.
@@ -5951,9 +7007,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such permission, or it has no section for this resource type.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete one resource section
       tags:
         - permissions
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:permissionName
+        - path:resourceType
+      x-cost: expensive
     get:
       description: Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin or a Manage Resources holder.
       operationId: getPermissionResource
@@ -5991,9 +7056,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such permission, or it has no section for this resource type.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get one resource section of a permission
       tags:
         - permissions
+      x-idempotency: safe
+      x-cost: ordinary
     patch:
       description: 'Merges the body into the existing section: principals and targets present in the body replace their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Requires a platform admin or a Manage Resources holder.'
       operationId: updatePermissionResource
@@ -6038,9 +7109,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No such permission, or it has no section for this resource type.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Merge into one resource section
       tags:
         - permissions
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:permissionName
+        - path:resourceType
+      x-cost: expensive
     put:
       description: Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Requires a platform admin or a Manage Resources holder.
       operationId: replacePermissionResource
@@ -6085,9 +7165,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No permission with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace one resource section
       tags:
         - permissions
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:permissionName
+        - path:resourceType
+      x-cost: expensive
   /api/v2/projects:
     get:
       description: >-
@@ -6165,10 +7254,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No global role exists with this name.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       tags:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectsforrole.md
       summary: List projects that use a global role
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: cursor
+      x-pagination-parameters:
+        position: cursor
+        size: limit
+      x-pagination-next: body:/cursor
   /api/v2/users:
     get:
       description: Returns one record per user, newest first unless descendingOrder is false, as a cursor-paginated page. Requires a platform admin or a token carrying the system:identities:r scope. Every query parameter is a filter; filters combine with AND.
@@ -6257,9 +7357,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is neither an admin nor holds system:identities:r.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List users
       tags:
         - users
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: cursor
+      x-pagination-parameters:
+        position: cursor
+        size: limit
+      x-pagination-next: body:/cursor
     post:
       description: Creates an internal user and returns its details with status 201. The same internal user record backs the /artifactory/api/security/users endpoint. Admin only. A username that already exists answers 409.
       operationId: createUser
@@ -6301,9 +7412,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: A user with this username already exists.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a user
       tags:
         - users
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/username
+      x-cost: expensive
   /api/v2/users/expire_password_for_all_users:
     post:
       description: Marks every internal user's password as expired so each user must set a new one at next login. Users with internal_password_disabled are unaffected. Admin only. Responds with a plain text confirmation.
@@ -6328,9 +7447,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Expire every internal password
       tags:
         - users
+      x-idempotency: natural
+      x-idempotency-natural:
+        - route
+      x-cost: expensive
   /api/v2/users/unexpire_password_for_all_users:
     post:
       description: 'Reverses expire_password_for_all_users: every internal password becomes valid again without the user changing it. Admin only. Responds with a plain text confirmation.'
@@ -6355,9 +7482,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Clear the expired flag on every password
       tags:
         - users
+      x-idempotency: natural
+      x-idempotency-natural:
+        - route
+      x-cost: expensive
   /api/v2/users/{username}:
     delete:
       description: Removes the user, its group memberships, its tokens and its entries in permission targets. The built-in admin and anonymous users cannot be deleted. Admin only. Answers 204 with no body.
@@ -6385,9 +7520,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No user with this username.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a user
       tags:
         - users
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:username
+      x-cost: expensive
     get:
       description: Returns the stored user record. Requires a platform admin or the system:identities:r scope; a user may always read their own record.
       operationId: getUserDetails
@@ -6424,9 +7567,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No user with this username.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a user
       tags:
         - users
+      x-idempotency: safe
+      x-cost: ordinary
     patch:
       description: 'Partial update: only the fields present in the body change, omitted fields keep their stored values, and the username cannot be changed. Group membership is not updated here; use the groups sub-resource. Setting internal_password_disabled to false on a user that has no password requires a password in the same request. Admin only.'
       operationId: updateUser
@@ -6470,9 +7619,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No user with this username.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Update a user
       tags:
         - users
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:username
+      x-cost: expensive
   /api/v2/users/{username}/groups:
     patch:
       description: Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. Admin only.
@@ -6541,9 +7698,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No user with this username.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Add or remove group memberships
       tags:
         - users
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:username
+        - body:/add
+        - body:/remove
+      x-cost: expensive
   /api/v2/users/{username}/password:
     put:
       description: Replaces the user's internal password. A platform admin may set any user's password; any user may set their own. The new value must satisfy the password policy and, when the policy forbids reuse, differ from the current one. Answers 204 with no body.
@@ -6593,9 +7760,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No user with this username.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Set a user's password
       tags:
         - users
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:username
+      x-cost: expensive
   /api/v2/users/{username}/password/expire:
     post:
       description: Marks the user's password as expired so they must change it at next login. Admin only. Answers 204 with no body.
@@ -6623,9 +7798,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No user with this username.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Expire a user's password
       tags:
         - users
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:username
+      x-cost: expensive
   /api/v2/users/{username}/unlock:
     post:
       description: Clears the lock that the user lock policy applied after too many failed logins and resets the failure counter. Unlocking an unlocked user succeeds. Admin only. Answers 204 with no body.
@@ -6653,11 +7836,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No user with this username.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Unlock a user
       tags:
         - users
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:username
+      x-cost: expensive
 components:
+  headers:
+    LinkNext:
+      description: >-
+        The next page, as `<target>; rel="next"` (RFC 8288): the path and query the client sent, every parameter kept and only the position changed. Sent only while more items remain, so its absence marks the last page. Declared only by the operations that send it.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RateLimit:
+      description: >-
+        The caller's remaining allowance under the policy admission evaluated, in RateLimit draft-11 syntax, for example `"api";r=5999;t=42`: the policy, the requests left and the seconds until its window resets. Also sent on every other response after admission, whatever its status, and on every response under the `recovery` policy, though no other response declares it. Not sent on health probes, on a refusal reached before any allowance was evaluated, or on an authentication 401 or a restriction 403.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RateLimitPolicy:
+      description: >-
+        The policy admission evaluated, in RateLimit draft-11 syntax, for example `"api";q=6000;w=60`: the policy name (`api`, `expensive`, `authentication` or `recovery`), its quota and its window in seconds. Sent wherever `RateLimit` is.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RetryAfter:
+      description: >-
+        Seconds to wait before retrying, at least 1: the rest of the blocked window for a rate refusal, otherwise 1. Also sent on an operation's own 503 that reports a transient condition; a 503 that reports configuration or a size bound carries none.
+      required: true
+      x-artifactweave-extension: true
+      schema:
+        type: integer
+        minimum: 1
   parameters:
+    IdempotencyKey:
+      description: >-
+        Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, a retry with the same key, credential, canonical resource and identical body bytes does not repeat the operation's effect: it answers the original success status, with the body built from the committed result after the current credential and permissions are checked again. Reuse with different bytes, or with a changed parameter that alters the effect, returns 422. A resource deleted since answers 404, one moved out of the request's scope 409. Only a success is kept, so a retry after a failure runs the operation again. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window. An operation that does not declare this parameter answers a key with 400.
+      in: header
+      name: Idempotency-Key
+      x-artifactweave-extension: true
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 130
     environmentName:
       description: Required path parameter. The environment name, matched case-insensitively.
       in: path
@@ -6718,6 +7946,37 @@ components:
       required: true
       schema:
         type: string
+  responses:
+    ServiceUnavailable:
+      description: >-
+        A dependency of the request is briefly unavailable: admission or restriction storage, or, for a retry with an `Idempotency-Key`, the first request still running when the retry's wait budget ran out. Wait for `Retry-After` before retrying. `RateLimit` and `RateLimit-Policy` are present when the answer follows admission, as a keyed retry's does.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: >-
+        A request limit refused the request: a rate allowance or a concurrency permit. Wait for `Retry-After` before retrying. `RateLimit` and `RateLimit-Policy` report the allowance; they are absent when the process's concurrency permits refused the request before any allowance was evaluated.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
     AccessProbe:
       type: object

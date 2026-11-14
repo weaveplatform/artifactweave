@@ -36,7 +36,9 @@
 // # Outputs
 //
 //   - SearchRun, from NewSearch, whose Collect returns the hits a search's
-//     criteria find that the caller may read, in item order, up to a limit.
+//     criteria find that the caller may read, in item order, up to a limit,
+//     and whose Pages walks the same hits a batch at a time for a search
+//     answer written as it is read.
 //   - The criteria the searches build: RepoScope, Files, All and Within.
 //   - LayoutScope and its Find, which return LayoutHit values with their
 //     coordinates; ModuleVersions, which returns VersionEntry values.

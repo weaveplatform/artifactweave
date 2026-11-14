@@ -86,6 +86,10 @@ paths:
       tags:
       - collection
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteredundantrecordstotrashcandirectories.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/system/storage/gc:
     post:
       description: Deletes trash can items whose retention has expired, while the trash can is enabled, and
@@ -111,6 +115,10 @@ paths:
       tags:
       - collection
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/rungarbagecollection.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/trash/clean/{repoPath}:
     delete:
       description: Removes one trashed item, or a whole trashed folder, so it can no longer be restored.
@@ -145,6 +153,10 @@ paths:
       tags:
       - collection
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteitemfromtrashcan.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoPath
+      x-cost: expensive
   /api/trash/empty:
     post:
       description: Permanently removes every trashed item. Admin only. Answers 202 because the deletion
@@ -169,6 +181,10 @@ paths:
       tags:
       - collection
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/emptytrashcan.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/trash/restore/{fromPath}:
     post:
       description: Moves a trashed item or folder back into a repository. The destination may differ from
@@ -237,3 +253,8 @@ paths:
       tags:
       - collection
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/restoreitemfromtrashcan.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:fromPath
+      - query:to
+      x-cost: expensive
