@@ -150,7 +150,7 @@ func wantAnswer(
 
 var (
 	authRequired   = legacyError(http.StatusUnauthorized, "Authentication is required") + "\n"
-	badCredentials = legacyError(http.StatusUnauthorized, "Bad credentials") + "\n"
+	badCredentials = legacyError(http.StatusUnauthorized, "Bad Credentials") + "\n"
 )
 
 // TestAccIgnoredBasicIsAnonymous reads a file that anonymous may read with

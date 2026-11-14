@@ -47,8 +47,10 @@
 //     after a blank one) is read first and alone, whatever the
 //     Authorization header says, as 7.x's props filter reads it. A refused
 //     key that is not blank answers 403, as does a NuGet client's refused
-//     password, both with the Basic challenge, as 7.x's entry point
-//     answers them. An Authorization value 7.x reads no credential from,
+//     password, a locked account, an expired password and a suspended
+//     login, each with the Basic challenge, as 7.x's entry point answers
+//     them; the entry point's answers to its UI's requests carry no
+//     challenge. An Authorization value 7.x reads no credential from,
 //     such as "Basic Og==", "Bearer" without a token or another scheme,
 //     counts as no credential at all, as do a blank X-JFrog-Art-Api and
 //     Basic credentials naming the anonymous user while anonymous access
