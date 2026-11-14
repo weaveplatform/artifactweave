@@ -540,14 +540,57 @@ digest, as #1321 asks of every CI download:
 |---|---|---|
 | MinIO | `cgr.dev/chainguard/minio` | `docker.io/chainguard/minio`, Chainguard's copy |
 | fake-gcs-server | `fsouza/fake-gcs-server` (Docker Hub) | `mirror.gcr.io/fsouza/fake-gcs-server`, Google's cache of Docker Hub |
-| Azurite | `mcr.microsoft.com/azure-storage/azurite` | none yet |
+| Azurite | `mcr.microsoft.com/azure-storage/azurite` | `ghcr.io/weaveplatform/artifactweave-emulators/azurite`, the project's own copy |
 
 A pull by digest is checked against that digest, so both sources give the same bytes. When
 every source fails, the start fails with each registry's error, and the next start tries
-again. Azurite has no public copy anywhere, so a run that needs it still fails when MCR does
-not answer. On a digest bump, check that each second source serves the new digest, for
-example with `docker buildx imagetools inspect`: mirror.gcr.io holds only the images it has
-cached.
+again. On a digest bump, check that MinIO's and fake-gcs-server's second sources serve the
+new digest, for example with `docker buildx imagetools inspect`: mirror.gcr.io holds only
+the images it has cached.
+
+### Azurite's copy
+
+Microsoft publishes Azurite only on MCR, and no public registry held a copy (checked
+2026-11-13), so the project keeps its own
+([#1463](https://github.com/weaveplatform/artifactweave/issues/1463)).
+`.github/workflows/emulator-copy.yml` reads the image, `azuriteDigest`, `azuriteCopy` and
+`azuriteCopyTag` from `pkg/containertest/emulators.go` and runs on every pull request and
+push to main that changes that file, and by hand (`workflow_dispatch`).
+
+- It copies the image with `crane copy` by digest, which writes each manifest's bytes as
+  fetched, so the copy keeps the index digest. A `docker pull`, `tag` and `push` would push
+  one platform's manifest under a new digest.
+- It skips the copy when the tag already serves the digest, and fails when the tag serves
+  another digest: on a bump, move `azuriteCopyTag` with `azuriteDigest`.
+- It pushes with the job's `GITHUB_TOKEN` and `packages: write`, never a personal
+  credential. A fork's pull request has a read-only token, so its run is skipped and the
+  push to main after the merge makes the copy.
+- It then checks that the copy can be pulled anonymously, as CI pulls it, and reports a
+  refusal as a warning and in the run's summary.
+
+GHCR gives a newly pushed container package private visibility. GitHub's Actions guide says
+a package a workflow publishes with `GITHUB_TOKEN` inherits the visibility of the workflow's
+repository
+([Publishing and installing a package with GitHub Actions](https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions)),
+but the Container registry guide says "When you first publish a package, the default
+visibility is private"
+([Configuring a package's access control and visibility](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility)),
+and an organisation must allow public packages under Settings, Packages, "Package
+creation". This organisation already holds public packages, `ghcr.io/weaveplatform/artifactweave`
+among them, so it has allowed them. If the first run's summary reports a refusal, an
+organisation owner or the package's admin makes the package public once:
+
+1. Open <https://github.com/orgs/weaveplatform/packages/container/package/artifactweave-emulators%2Fazurite>.
+2. Choose **Package settings**.
+3. Under **Danger Zone**, choose **Change visibility**, then **Public**, type the package
+   name `artifactweave-emulators/azurite` and confirm. A public package cannot be made
+   private again.
+4. Rerun the workflow (`workflow_dispatch`); its last step then reports that an anonymous
+   pull resolves the digest.
+
+Until the copy can be pulled anonymously, `TestAccAzuriteStartsFromItsCopy` in
+`pkg/containertest` skips and says so. Once it can, the test starts Azurite with its first
+source replaced by an unresolvable `mcr.invalid` host, so the copy is the only source.
 
 ## Package clients in acceptance
 
