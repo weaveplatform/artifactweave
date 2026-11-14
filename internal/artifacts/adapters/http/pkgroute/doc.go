@@ -119,6 +119,11 @@
 //     period, never the upstream's 502. A read with a format hint keeps the
 //     adapter's stricter check and its 502
 //     (https://github.com/weaveplatform/artifactweave/issues/1392).
+//   - Resource never carries the client's Accept: no header of a client's
+//     request reaches the upstream or the cache identity, as 7.x's
+//     HttpRepo.whiteListHeaders sends none, and an adapter whose upstream
+//     negotiates sets its own
+//     (https://github.com/weaveplatform/artifactweave/issues/1390).
 //   - ServeStream answers If-Match and If-Unmodified-Since never, as 7.x's
 //     download reads neither, on every stream. A stream with a SHA-1, a
 //     file, answers If-None-Match and If-Modified-Since as that download's

@@ -56,6 +56,9 @@
 //     still refreshes mutable metadata under a zero retrieval cache
 //     period. The test repoints the remote world's repository at each
 //     package type in turn.
+//   - remote_accept_test.go: a remote read sends the upstream no Accept of
+//     the client's, and one cached file serves clients that accept other
+//     types (#1390).
 //
 // # References
 //

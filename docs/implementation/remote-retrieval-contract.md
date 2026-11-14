@@ -115,6 +115,12 @@ A cache/flight identity includes incarnation, source generation, normalized logi
 path, representation/media variant and upstream query identity. Sensitive query values
 use an opaque keyed fingerprint; do not place them in observable keys. HTTP and JSON
 PyPI indexes, NuGet resource versions and OCI manifest Accept variants cannot collide.
+Those Accept values are the adapter's own. A client's `Accept` never reaches the
+upstream or the cache identity, so one cached file serves every client whatever it
+accepts: 7.161.26's `HttpRepo.whiteListHeaders` sends upstream only the headers an
+internal request delegates, never a client's, and `RemoteRepoBase.internalGetInfo`
+looks a cached file up by its path ([#1390](https://github.com/weaveplatform/artifactweave/issues/1390)).
+The client's `Accept` is read only as the requested types of the MIME check.
 Configured credentials, TLS/proxy authority, custom headers/cookies and source endpoints
 belong to the generation, not a global client pool. Caller Authorization is never part
 of an upstream request. Stateful upstream responses that vary by unmodeled headers or

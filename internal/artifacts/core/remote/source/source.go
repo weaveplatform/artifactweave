@@ -152,9 +152,14 @@ type Resource struct {
 	PostBody []byte
 	// Transient forbids persistent caching of a Git LFS batch response, whose
 	// upstream transfer actions may carry expiring URLs or credentials.
-	Transient       bool
-	Query           string
-	Variant         string
+	Transient bool
+	Query     string
+	Variant   string
+	// Accept is the adapter's own Accept for the upstream request, such as
+	// the registry's manifest types or npm's abbreviated packument, and part
+	// of the cache identity. It is never the client's header: 7.161.26's
+	// HttpRepo.whiteListHeaders sends upstream no header of a client's
+	// request, and keeps one cached file per path (#1390).
 	Accept          string
 	Range           string
 	IfRange         string

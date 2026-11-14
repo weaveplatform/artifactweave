@@ -156,6 +156,11 @@ func (k *Kit) read(
 // Resource builds an artifact request with an explicit escaped upstream path.
 // Conditions belong to the downstream representation: a policy backend must
 // not use these as upstream validators without a matching stored representation.
+// The client's Accept is left out: 7.161.26's HttpRepo.whiteListHeaders
+// sends upstream only the headers an internal request delegates, never a
+// client's, and the cache keeps one file per path whatever the next
+// client accepts (https://github.com/weaveplatform/artifactweave/issues/1390).
+// An adapter whose upstream negotiates by Accept sets its own value.
 func Resource(r *http.Request, path, escaped string) source.Resource {
 	return source.Resource{
 		Kind:        source.ResourceKindArtifact,
@@ -163,7 +168,6 @@ func Resource(r *http.Request, path, escaped string) source.Resource {
 		EscapedPath: escaped,
 		Method:      r.Method,
 		Query:       r.URL.RawQuery,
-		Accept:      r.Header.Get("Accept"),
 		Range:       r.Header.Get("Range"),
 		IfRange:     r.Header.Get("If-Range"),
 		IfNoneMatch: r.Header.Get(

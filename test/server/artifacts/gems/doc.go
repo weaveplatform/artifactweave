@@ -25,6 +25,9 @@
 //     indexes and gems (issues 1237 and 1251), and, in
 //     gems_virtual_download_test.go, a virtual gem download that asks each
 //     member for the gem's own path.
+//   - TestAccRemoteGemSendsNoClientAccept, in gems_remote_accept_test.go: a
+//     remote gem is fetched without the client's Accept and its cached copy
+//     serves a client that accepts another type (issue 1390).
 //   - TestAccRubyClientsInstallPinnedRake runs the gem and Bundler clients
 //     when they are installed, and skips otherwise.
 //
