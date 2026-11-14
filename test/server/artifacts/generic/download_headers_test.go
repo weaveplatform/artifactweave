@@ -1,7 +1,8 @@
 package generic_test
 
-// This file holds the download header suites of #1266 and #1267: a box's
-// media type, and a file's ETag and the conditional requests that echo it,
+// This file holds the download header suites of #1266, #1267 and #1396: a
+// box's media type, by its path or by its artifactory.content-type
+// property, and a file's ETag and the conditional requests that echo it,
 // on the item route and on the Vagrant box file route, which serves the
 // item download (Kit.ServeItem).
 
@@ -107,6 +108,37 @@ func TestAccBoxDownloadsAsAVagrantBox(t *testing.T) {
 		}
 		if err := json.Unmarshal(rec.Body.Bytes(), &info); err != nil || info.MimeType != want {
 			t.Errorf("%s: mimeType %q (%v), want %q", path, info.MimeType, err, want)
+		}
+	}
+}
+
+// TestAccBoxRouteTypedByContentTypeProperty: a box whose
+// artifactory.content-type property is set downloads with the property's
+// type on the box file route, GET and HEAD, as on the item route. 7.37.15
+// answered that route in its download service's form (RTFACT-27264), and
+// that service types the file by the property (DbStoringRepoMixin,
+// 7.161.26); the route sent the path's type (#1396).
+func TestAccBoxRouteTypedByContentTypeProperty(t *testing.T) {
+	w, data, _ := downloadWorld(t)
+	const custom = "text/x-custom"
+	harness.WantStatus(t, w.Do(http.MethodPut,
+		"/artifactory/api/storage/boxes/acme/focal-1.0.box?properties=artifactory.content-type="+
+			"text%2Fx-custom", "admin", ""), http.StatusNoContent)
+	for _, path := range []string{
+		"/artifactory/boxes/acme/focal-1.0.box",
+		"/artifactory/api/vagrant/boxes/acme/focal-1.0.box",
+	} {
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			rec := w.Do(method, path, "reader", "")
+			harness.WantStatus(t, rec, http.StatusOK)
+			want := string(data)
+			if method == http.MethodHead {
+				want = ""
+			}
+			if got := rec.Header().Get("Content-Type"); got != custom || rec.Body.String() != want {
+				t.Errorf("%s %s: Content-Type %q, body of %d bytes; want %q, %d bytes",
+					method, path, got, rec.Body.Len(), custom, len(want))
+			}
 		}
 	}
 }

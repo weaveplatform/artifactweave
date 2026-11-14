@@ -3,6 +3,7 @@ package artifactshttp
 import (
 	"net/http"
 	"net/url"
+	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
@@ -53,7 +54,12 @@ func (s ArtifactoryAPI) ProtocolOptions() pkgroute.Options {
 		Items: func() *item.Service { return s.Items(s.cfg.Store) },
 		ServeItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, it model.Item) {
 			p, _ := kernel.FromContext(r.Context())
-			s.ServeFile(w, r, s.cfg.Store, itemkit.Found{Repo: c, Item: it}, p)
+			f := itemkit.Found{Repo: c, Item: it}
+			if typedByProperty(c.PackageType) {
+				s.ServeItemFile(w, r, s.cfg.Store, f, p)
+				return
+			}
+			s.ServeFile(w, r, s.cfg.Store, f, p)
 		},
 		DeployItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, rest string) {
 			s.deployEscapedItem(w, r, url.PathEscape(c.Key)+"/"+rest)
@@ -64,6 +70,25 @@ func (s ArtifactoryAPI) ProtocolOptions() pkgroute.Options {
 		},
 		Fault: func(r *http.Request, err error) { httpkit.NoteCause(r.Context(), err) },
 	}
+}
+
+// typedByProperty is whether t's native API types a stored file it
+// serves by the file's artifactory.content-type property, as the item
+// route does. 7.x's package handlers download a stored file through
+// PackageArtifactServiceImpl, which hands the request to
+// DownloadServiceImpl.process with a JerseyArtifactoryResponse, so the
+// answer carries the type DbStoringRepoMixin.setMimeType gives the
+// resource from the property (7.161.26). Which handlers use that service
+// is not in the OSS sources. These formats' native downloads were
+// captured answering in that response's form, X-Artifactory-Filename and
+// a Content-Disposition without filename*: PyPI on 7.113.0
+// (pypa/pip#13396), Conda on 7.33.12 (mamba-org/mamba#2105), Vagrant on
+// 7.37.15 (RTFACT-27264) and RubyGems on 7.41.13 (RTFACT-27459). The
+// other formats keep the path's type until a source shows theirs [I]
+// (#1396); Hugging Face's resolve answered 7.117.12 with headers of its
+// own, none of that response's (RTFACT-31280).
+func typedByProperty(t repo.PackageType) bool {
+	return slices.Contains([]repo.PackageType{repo.PyPI, repo.Conda, repo.Vagrant, repo.Gems}, t)
 }
 
 // Protocols returns the package protocols with routers of their own, which
