@@ -45,6 +45,10 @@ type apiReviewOperation struct {
 	Collections  []string `json:"response_collections,omitempty"`
 	Pagination   string   `json:"pagination_execution"`
 	Evidence     []string `json:"evidence"`
+	// classes is set for a spec operation, and apiReviewDerive takes retry,
+	// admission and pagination_execution from it; a hand-written alias has
+	// none and keeps the route heuristics.
+	classes *apiReviewClasses
 }
 
 type apiReviewHandler struct {
@@ -67,6 +71,7 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 					Spec:        spec,
 					OperationID: op.OperationID,
 					Contract:    op.Description,
+					classes:     apiReviewClassesOf(item, op),
 				}
 				handwritten, _ := op.Extensions["x-handwritten"].(bool)
 				h, hasHandler := handlers[strings.TrimSuffix(spec, ".openapi.yaml")+":"+strings.ToLower(op.OperationID)]
@@ -451,6 +456,165 @@ func apiReviewPolicy(e *apiReviewOperation) {
 			"internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501",
 		}
 	}
+	apiReviewDerive(e)
+}
+
+// apiReviewClasses are the classes decision 0043 has a spec operation
+// declare, read as the guard reads them. A class the operation does not
+// declare yet, or still holds as TODO(author), is empty.
+type apiReviewClasses struct {
+	idempotency, reason, cost, pagination string
+	natural, expensiveQuery              []string
+	position, size, next                 string
+	// keyAccepted: the operation references the shared IdempotencyKey, so
+	// the server honors a key there; a key elsewhere answers 400.
+	keyAccepted bool
+}
+
+func apiReviewClassesOf(item *openapi3.PathItem, op *openapi3.Operation) *apiReviewClasses {
+	value := func(name string, allowed []string) string {
+		v, _ := op.Extensions[name].(string)
+		if slices.Contains(allowed, v) {
+			return v
+		}
+		return ""
+	}
+	c := &apiReviewClasses{
+		idempotency: value("x-idempotency", idempotencyClasses),
+		reason:      value("x-idempotency-reason", idempotencyReasons),
+		cost:        value("x-cost", costClasses),
+		pagination:  value("x-pagination", paginationClasses),
+	}
+	c.natural, _ = stringList(op.Extensions["x-idempotency-natural"])
+	c.expensiveQuery, _ = stringList(op.Extensions["x-cost-expensive-query"])
+	c.next, _ = op.Extensions["x-pagination-next"].(string)
+	if m, ok := op.Extensions["x-pagination-parameters"].(map[string]any); ok {
+		c.position, _ = m["position"].(string)
+		c.size, _ = m["size"].(string)
+	}
+	for _, p := range append(append(openapi3.Parameters{}, item.Parameters...), op.Parameters...) {
+		if p.Ref == sharedIdempotencyKey {
+			c.keyAccepted = true
+		}
+	}
+	return c
+}
+
+// The ledger's reading of each idempotency reason (decision 0043,
+// "Idempotency classes"): what a client does instead of retrying.
+var apiReviewNoneRetry = map[string]string{
+	"secret-response":         "the answer carries a credential no replay stores; never blindly repeat; list credentials and revoke any not received",
+	"protocol-reconciliation": "reconcile through the protocol's own identifiers and status operations; its clients send no key",
+	"external-effect":         "the effect reaches another service, peer, upstream or the file system and cannot roll back; reconcile before repeating",
+	"read-or-write":           "retry proven reads only; reconcile writes",
+}
+
+// apiReviewDerive takes retry, admission and pagination_execution from the
+// operation's declared classes, class by class, in place of the route
+// heuristics apiReviewPolicy applied, so the ledger states what the spec
+// declares and admission, the key gate and paging will read. A class not
+// declared yet leaves its heuristic as it was. The persistence family's
+// execution text stays beside a collection's class, since the class says
+// how the wire pages, not how the store executes it.
+func apiReviewDerive(e *apiReviewOperation) {
+	c := e.classes
+	if c == nil {
+		return
+	}
+	stub := strings.HasPrefix(e.State, "stub:")
+	if text := c.admissionText(); text != "" {
+		// A stub is admitted like any operation before it answers 501.
+		e.Admission = text
+	}
+	if class := c.retryClass(); class != "" {
+		if stub {
+			e.Retry += "; intended " + class
+		} else {
+			e.Retry = class + ": " + c.retryText()
+		}
+	}
+	switch {
+	case stub && c.pagination != "":
+		e.Pagination += "; declared " + c.pagination
+	case stub:
+	case c.pagination != "":
+		e.Pagination = c.pagingText() + "; " + e.Family + ": " + e.Pagination
+	case c.idempotency != "" || c.cost != "":
+		// A classified operation without x-pagination is not a collection
+		// (the guard holds the ones a schema shows).
+		e.Pagination = "not a collection"
+	}
+}
+
+func (c *apiReviewClasses) admissionText() string {
+	switch c.cost {
+	case "exempt":
+		return "exempt: health exemption, no admission"
+	case "recovery":
+		return "recovery: administrator recovery reserve: 2 concurrent and 60/min per process; 5s deadline"
+	case "":
+		return ""
+	}
+	text := c.cost + ": shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue"
+	if c.cost == "expensive" {
+		text += "; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline"
+	}
+	for _, q := range c.expensiveQuery {
+		text += "; ?" + q + " additionally selects expensive policy"
+	}
+	return text
+}
+
+// retryClass names the idempotency class with what qualifies it: a natural
+// operation's identifiers or a none operation's reason.
+func (c *apiReviewClasses) retryClass() string {
+	switch {
+	case c.idempotency == "natural" && len(c.natural) > 0:
+		return "natural on " + strings.Join(c.natural, ", ")
+	case c.idempotency == "none" && c.reason != "":
+		return "none (" + c.reason + ")"
+	}
+	return c.idempotency
+}
+
+func (c *apiReviewClasses) retryText() string {
+	switch c.idempotency {
+	case "safe":
+		return "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key"
+	case "natural":
+		return "repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key"
+	case "key":
+		if c.keyAccepted {
+			return "optional quoted Idempotency-Key: same credential/resource/body replays the committed effect under current authorization for 24h; a duplicate in flight waits up to 30s, then 503 Retry-After; without a key every call repeats the effect"
+		}
+		return "Idempotency-Key not accepted yet and answers 400; reconcile ambiguous completion before retrying"
+	}
+	if text := apiReviewNoneRetry[c.reason]; text != "" {
+		return "no retry protection; " + text
+	}
+	return "no retry protection; reconcile before retrying"
+}
+
+// pagingText names the paging class with its position, size and next
+// pointer as declared.
+func (c *apiReviewClasses) pagingText() string {
+	if c.pagination == "complete" {
+		return "complete: the whole collection in one answer"
+	}
+	var parts []string
+	if c.position != "" {
+		parts = append(parts, "position "+c.position)
+	}
+	if c.size != "" {
+		parts = append(parts, "size "+c.size)
+	}
+	if c.next != "" {
+		parts = append(parts, "next "+c.next)
+	}
+	if len(parts) == 0 {
+		return c.pagination
+	}
+	return c.pagination + " (" + strings.Join(parts, ", ") + ")"
 }
 
 func apiReviewPersistence(path string) (string, string, []string) {
@@ -522,5 +686,112 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		"internal/artifacts/adapters/http/storage.go",
 		"internal/artifacts/adapters/sql/content_items.go",
 		"internal/access/adapters/sql/projects.go",
+	}
+}
+
+// TestUnitAPIReviewDerivesFromClasses: over the guard's valid fixture,
+// every classified operation's retry, admission and pagination_execution
+// come from its classes, a stub keeps its 501 advice and names its intended
+// classes, and an operation still holding TODO(author) keeps the route
+// heuristics.
+func TestUnitAPIReviewDerivesFromClasses(t *testing.T) {
+	doc := principleFixtureDoc(t, validPaths)
+	server := doc.Servers[0].URL
+	entry := func(method, path, state string) apiReviewOperation {
+		t.Helper()
+		item := doc.Paths.Value(path)
+		if item == nil || item.GetOperation(method) == nil {
+			t.Fatalf("no fixture operation %s %s", method, path)
+		}
+		e := apiReviewOperation{
+			Route: method + " " + server + path, State: state,
+			classes: apiReviewClassesOf(item, item.GetOperation(method)),
+		}
+		apiReviewPolicy(&e)
+		return e
+	}
+	heuristic := func(method, path, state string) apiReviewOperation {
+		e := apiReviewOperation{Route: method + " " + server + path, State: state}
+		apiReviewPolicy(&e)
+		return e
+	}
+	type want struct{ retry, admission, pagination string }
+	ordinary := "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue"
+	expensive := "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline"
+	_, searchFamily, _ := apiReviewPersistence(server + "/api/search/cursor")
+	_, storageFamily, _ := apiReviewPersistence(server + "/api/storage/{repoKey}")
+	cases := []struct {
+		method, path, state string
+		want                want
+	}{
+		{"GET", "/api/system/ping", "implemented", want{
+			"safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+			"exempt: health exemption, no admission", "not a collection",
+		}},
+		{"GET", "/api/artifactweave/api-restrictions/{user}", "implemented", want{
+			admission: "recovery: administrator recovery reserve: 2 concurrent and 60/min per process; 5s deadline",
+		}},
+		{"PUT", "/api/repositories/{repoKey}", "implemented", want{
+			retry: "natural on path:repoKey, body:/rclass, header:Content-Type: repeating the identical request converges on one state, " +
+				"though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
+			admission: expensive,
+		}},
+		{"POST", "/api/build/append/{buildName}", "implemented", want{
+			retry: "key: optional quoted Idempotency-Key: same credential/resource/body replays the committed effect under current " +
+				"authorization for 24h; a duplicate in flight waits up to 30s, then 503 Retry-After; without a key every call repeats the effect",
+		}},
+		{"POST", "/api/security/token", "implemented", want{
+			retry: "none (secret-response): no retry protection; the answer carries a credential no replay stores; never blindly " +
+				"repeat; list credentials and revoke any not received",
+		}},
+		{"GET", "/api/storage/{repoKey}", "implemented", want{
+			admission:  ordinary + "; ?list additionally selects expensive policy",
+			pagination: "complete: the whole collection in one answer; content-and-configuration: " + storageFamily,
+		}},
+		{"GET", "/api/search/cursor", "implemented", want{
+			pagination: "cursor (position cursor, next link); search: " + searchFamily,
+		}},
+		{"GET", "/api/search/offset", "implemented", want{
+			pagination: "offset (position offset, size limit, next body:/next); search: " + searchFamily,
+		}},
+		{"DELETE", "/api/repositories/{repoKey}", "stub: 501", want{
+			retry:      "501 is not transient; do not retry until support changes; intended natural on route",
+			admission:  expensive,
+			pagination: "schema-only; no collection query executes",
+		}},
+		{"GET", "/api/search/cursor", "stub: 501", want{
+			pagination: "schema-only; no collection query executes; declared cursor",
+		}},
+	}
+	for _, c := range cases {
+		got := entry(c.method, c.path, c.state)
+		for field, pair := range map[string][2]string{
+			"retry":      {got.Retry, c.want.retry},
+			"admission":  {got.Admission, c.want.admission},
+			"pagination": {got.Pagination, c.want.pagination},
+		} {
+			if pair[1] != "" && pair[0] != pair[1] {
+				t.Errorf("%s %s (%s) %s:\n got %q\nwant %q", c.method, c.path, c.state, field, pair[0], pair[1])
+			}
+		}
+	}
+	// TODO(author) on a draft is no class yet: every heuristic stays.
+	got, was := entry("GET", "/api/scaffolded", "stub: 501"), heuristic("GET", "/api/scaffolded", "stub: 501")
+	if got.Retry != was.Retry || got.Admission != was.Admission || got.Pagination != was.Pagination {
+		t.Errorf("an unclassified operation changed: got %+v, heuristics %+v", got, was)
+	}
+	// A key operation that does not reference the shared parameter accepts
+	// no key yet, and a none without a listed reason still advises.
+	c := &apiReviewClasses{idempotency: "key"}
+	if got := c.retryText(); !strings.Contains(got, "not accepted yet") {
+		t.Errorf("key without the parameter: %q", got)
+	}
+	c = &apiReviewClasses{idempotency: "none"}
+	if got := c.retryClass() + ": " + c.retryText(); got != "none: no retry protection; reconcile before retrying" {
+		t.Errorf("none without a reason: %q", got)
+	}
+	c = &apiReviewClasses{pagination: "native"}
+	if got := c.pagingText(); got != "native" {
+		t.Errorf("native without companions: %q", got)
 	}
 }
