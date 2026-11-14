@@ -200,26 +200,23 @@ func (s SecurityAPI) GetPermissionTargets(
 	if err != nil {
 		return nil, err
 	}
-	ps, err := c.svc.List(ctx)
+	base := baseurl.From(ctx) + permV1Path
+	l, err := httpkit.StreamList(ctx, c.svc.Pages(),
+		func(p model.Permission) (artgen.PermissionTargetListItem, bool, error) {
+			return listItem(base, p), true, nil
+		}, httpkit.ListOptions{})
 	if err != nil {
 		return nil, s.permissionError(ctx, "list permissions", err)
 	}
-	return artgen.GetPermissionTargets200JSONResponse(listItems(ctx, permV1Path, ps)), nil
+	return streamed{l}, nil
 }
 
-func listItems(
-	ctx context.Context,
-	path string,
-	ps []model.Permission,
-) []artgen.PermissionTargetListItem {
-	base := baseurl.From(ctx) + path
-	out := make([]artgen.PermissionTargetListItem, 0, len(ps))
-	for _, p := range ps {
-		out = append(out, artgen.PermissionTargetListItem{
-			Name: strPtr(p.Name), Uri: strPtr(base + nameSegment(p.Name)),
-		})
+// listItem is a permission's entry in a name listing, its detail URL under
+// base.
+func listItem(base string, p model.Permission) artgen.PermissionTargetListItem {
+	return artgen.PermissionTargetListItem{
+		Name: strPtr(p.Name), Uri: strPtr(base + nameSegment(p.Name)),
 	}
-	return out
 }
 
 // GetPermissionTargetDetails returns the v1 view: the repository section
@@ -332,12 +329,15 @@ func (s SecurityAPI) GetPermissionTargetsV2(
 	if err != nil {
 		return nil, err
 	}
-	ps, err := c.svc.List(ctx)
+	base := baseurl.From(ctx) + permV2Path
+	l, err := httpkit.StreamList(ctx, c.svc.Pages(),
+		func(p model.Permission) (artgen.PermissionTargetListItem, bool, error) {
+			return listItem(base, p), c.manages(p), nil
+		}, httpkit.ListOptions{})
 	if err != nil {
 		return nil, s.permissionError(ctx, "list permissions", err)
 	}
-	ps = slices.DeleteFunc(ps, func(p model.Permission) bool { return !c.manages(p) })
-	return artgen.GetPermissionTargetsV2200JSONResponse(listItems(ctx, permV2Path, ps)), nil
+	return streamed{l}, nil
 }
 
 // v2Views renders the permissions the v2 form can express. One whose

@@ -369,42 +369,41 @@ func legacyScope(s string) string {
 	return strings.Join(parts, " ")
 }
 
-// visible lists the tokens the caller may see: every token for an
-// administrator, their own otherwise. Expired tokens are omitted, and so are
-// non-revocable ones, which Artifactory keeps no record of (see #79); a
-// refreshable token is revocable, and so listed.
-func (t tokenAPI) visible(ctx context.Context) ([]model.Token, *token.Service, error) {
-	svc, err := t.service()
+// visible walks the tokens the caller may see, a store page at a time:
+// every token for an administrator, their own otherwise. keep leaves out
+// expired tokens, and non-revocable ones, which Artifactory keeps no record
+// of (see #79); a refreshable token is revocable, and so listed.
+func (t tokenAPI) visible(ctx context.Context) (
+	pages *kernel.Pages[model.Token],
+	keep func(model.Token) bool,
+	svc *token.Service,
+	err error,
+) {
+	svc, err = t.service()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("tokens: %w", err)
+		return nil, nil, nil, fmt.Errorf("tokens: %w", err)
 	}
 	var filter port.TokenFilter
 	if !p.Admin {
 		filter.Subject = subjectOf(svc, p.Name)
 	}
+	// One instant for the whole list, as when it was read whole.
 	now := time.Now()
-	var out []model.Token
-	page := kernel.Page{Limit: 500}
-	for {
-		recs, next, err := t.deps.Store.Tokens().List(ctx, filter, page)
-		if err != nil {
-			return nil, nil, t.internalError(ctx, "list tokens", err)
-		}
-		for _, r := range recs {
-			if r.Revocable && !r.Expired(now) {
-				out = append(out, r)
-			}
-		}
-		if next == "" {
-			return out, svc, nil
-		}
-		page.After = next
-	}
+	pages = kernel.NewPages(
+		func(ctx context.Context, page kernel.Page) ([]model.Token, string, error) {
+			return t.deps.Store.Tokens().List(ctx, filter, page)
+		},
+		tokenPage,
+	)
+	return pages, func(r model.Token) bool { return r.Revocable && !r.Expired(now) }, svc, nil
 }
+
+// tokenPage is how many token records a listing reads per store call.
+const tokenPage = 500
 
 // own resolves a token id the caller may act on: me is the caller's own
 // token; another user's token is 403 unless the caller is an administrator;
@@ -505,18 +504,26 @@ func (s AccessService) GetTokens(
 	ctx context.Context,
 	req accessgen.GetTokensRequestObject,
 ) (accessgen.GetTokensResponseObject, error) {
-	recs, svc, err := s.tokenAPI().visible(ctx)
+	pages, keep, svc, err := s.tokenAPI().visible(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := accessgen.GetTokens200JSONResponse{Tokens: make([]accessgen.TokenDetails, 0, len(recs))}
-	for _, r := range recs {
-		if req.Params.Scope != nil && !hasScope(r.Scope, *req.Params.Scope) {
-			continue
-		}
-		out.Tokens = append(out.Tokens, tokenDetails(svc, r))
+	env, err := httpkit.EnvelopeOf(
+		accessgen.GetTokens200JSONResponse{Tokens: []accessgen.TokenDetails{}}, "tokens")
+	if err != nil {
+		return nil, s.internalError(ctx, "list tokens", err)
 	}
-	return out, nil
+	l, err := httpkit.StreamList(ctx, pages,
+		func(r model.Token) (accessgen.TokenDetails, bool, error) {
+			if !keep(r) || req.Params.Scope != nil && !hasScope(r.Scope, *req.Params.Scope) {
+				return accessgen.TokenDetails{}, false, nil
+			}
+			return tokenDetails(svc, r), true, nil
+		}, httpkit.ListOptions{Envelope: env})
+	if err != nil {
+		return nil, s.internalError(ctx, "list tokens", err)
+	}
+	return streamed{l}, nil
 }
 
 // hasScope reports whether sc is want, whole or as one of its
@@ -682,19 +689,30 @@ func (s SecurityAPI) GetLegacyTokens(
 	if _, err := kernel.RequireAdmin(ctx); err != nil {
 		return nil, fmt.Errorf("tokens: %w", err)
 	}
-	recs, svc, err := tokenAPI(s).visible(ctx)
+	pages, keep, svc, err := tokenAPI(s).visible(ctx)
 	if err != nil {
 		return nil, err
 	}
-	list := make([]artgen.LegacyTokenDetails, 0, len(recs))
-	for _, r := range recs {
-		d := tokenDetails(svc, r)
-		list = append(list, artgen.LegacyTokenDetails{
-			TokenId: &d.TokenId, Subject: &d.Subject, Issuer: &d.Issuer,
-			IssuedAt: &d.IssuedAt, Expiry: d.Expiry, Refreshable: &d.Refreshable,
-		})
+	env, err := httpkit.EnvelopeOf(
+		artgen.GetLegacyTokens200JSONResponse{Tokens: &[]artgen.LegacyTokenDetails{}}, "tokens")
+	if err != nil {
+		return nil, s.internalError(ctx, "list tokens", err)
 	}
-	return artgen.GetLegacyTokens200JSONResponse{Tokens: &list}, nil
+	l, err := httpkit.StreamList(ctx, pages,
+		func(r model.Token) (artgen.LegacyTokenDetails, bool, error) {
+			if !keep(r) {
+				return artgen.LegacyTokenDetails{}, false, nil
+			}
+			d := tokenDetails(svc, r)
+			return artgen.LegacyTokenDetails{
+				TokenId: &d.TokenId, Subject: &d.Subject, Issuer: &d.Issuer,
+				IssuedAt: &d.IssuedAt, Expiry: d.Expiry, Refreshable: &d.Refreshable,
+			}, true, nil
+		}, httpkit.ListOptions{Envelope: env})
+	if err != nil {
+		return nil, s.internalError(ctx, "list tokens", err)
+	}
+	return streamed{l}, nil
 }
 
 // createLegacyToken is POST /api/security/token: the form-encoded create or

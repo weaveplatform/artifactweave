@@ -39,6 +39,9 @@ type UserStore interface {
 	Unlock(ctx context.Context, names ...string) error
 	// Locked returns the names of locked users, ordered.
 	Locked(ctx context.Context) ([]string, error)
+	// LockedPage pages the names of locked users in Locked's order, so a
+	// caller can write the list as it reads it. The cursor is the last name.
+	LockedPage(ctx context.Context, p kernel.Page) ([]string, string, error)
 }
 
 // GroupStore persists groups.

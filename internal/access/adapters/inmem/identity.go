@@ -238,6 +238,26 @@ func (us users) Locked(ctx context.Context) ([]string, error) {
 	return out, err
 }
 
+// LockedPage is Locked a keyset page at a time, in the same name order.
+func (us users) LockedPage(ctx context.Context, p kernel.Page) ([]string, string, error) {
+	var (
+		out  []string
+		next string
+	)
+	err := us.s.Do(ctx, func() error {
+		var names []string
+		for _, u := range us.s.usersT().All(nil, compareByKey(userName)) {
+			if u.Status == model.UserLocked {
+				names = append(names, u.Name)
+			}
+		}
+		var err error
+		out, next, err = memtx.Paginate(names, p, false, func(n string) []any { return []any{n} })
+		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+	})
+	return out, next, err
+}
+
 // --- Groups ----------------------------------------------------------------
 
 type groups struct{ s *Store }
