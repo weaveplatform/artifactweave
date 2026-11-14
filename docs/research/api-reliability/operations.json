@@ -7214,15 +7214,14 @@
       "httpkit.RawSearchQuery",
       "page.of",
       "repo.Class",
-      "repo.PackageTypeName",
       "repo.PackageTypesNamed",
       "s.InternalError",
       "s.content",
+      "s.streamRepositories",
       "s.visibleTo",
       "st.Repos",
       "st.Repos().Page",
-      "strings.ToLower",
-      "strings.ToUpper"
+      "strings.ToLower"
     ],
     "review_family": "repository-pages",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
@@ -7236,9 +7235,10 @@
       "200 application/json[]",
       "200 application/vnd.org.jfrog.artifactory.repositories.RepositoryDetailsList+json[]"
     ],
-    "pagination_execution": "offset (position offset, size limit, next link); repository-pages: with limit: class, package type, project and the caller's visibility in SQL, COUNT for X-Total-Count, window by key with LIMIT+1 for the Link next; without limit the whole visible filtered list in one store query",
+    "pagination_execution": "offset (position offset, size limit, next link); repository-pages: with limit: class, package type, project and the caller's visibility in SQL, COUNT for X-Total-Count, window by key with LIMIT+1 for the Link next; without limit the whole visible filtered list streamed from windows by key as they are read",
     "evidence": [
       "internal/artifacts/adapters/http/repositories.go",
+      "internal/platform/httpkit/stream.go",
       "internal/artifacts/adapters/sql/repo_page.go",
       "internal/artifacts/adapters/storetest/repo_page.go",
       "internal/access/core/authz/authz.go",
@@ -7553,7 +7553,7 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.ArtifactSearchResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -7590,7 +7590,7 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.BadChecksumSearchResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -7630,7 +7630,7 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.ChecksumSearchResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -7672,7 +7672,7 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.ArtifactCreationResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -7715,7 +7715,7 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.ArtifactResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -7738,9 +7738,11 @@
       "expression.DocumentItem",
       "expression.MatchString",
       "httpkit.BadRequestf",
+      "httpkit.StreamList",
+      "kernel.NewPages",
       "r.Capped",
       "r.st.Builds",
-      "r.st.Builds().FindDependencies",
+      "r.st.Builds().DependencyPage",
       "s.InternalError",
       "s.newSearch",
       "strings.ToLower",
@@ -7754,14 +7756,15 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.DependencyBuilds+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: builds are named once each across their runs, and the store's dependency lookup is unpaged; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
       "internal/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0012-search-and-aql.md",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -7804,7 +7807,7 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.GavcSearchResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: local hits merge with an upstream's answer, deduplicated by path, and the result limit applies after the merge; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: local hits merge with an upstream's answer, deduplicated by path, and the result limit applies after the merge; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -7909,7 +7912,7 @@
       "200 application/json.files[]",
       "200 application/vnd.org.jfrog.artifactory.search.PatternResultFileSet+json.files[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -7946,7 +7949,7 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.MetadataSearchResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -7984,7 +7987,7 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.ArtifactUsageResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -8023,7 +8026,7 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.ArtifactVersionsResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: versions are ordered newest first in Mercury order, known only once every version is read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: versions are ordered newest first in Mercury order, known only once every version is read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -8829,7 +8832,7 @@
       "200 application/vnd.org.jfrog.artifactory.storage.FileList+json.files[]",
       "200 application/vnd.org.jfrog.artifactory.storage.FolderInfo+json.children[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: a file list merges a virtual repository's members, deduplicated by path, and is sorted by relative uri once read; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "complete: the whole collection in one answer, a repository's file list streamed from store pages as they are read, its trees' full path walks merged; folder information's children and the trash can's file list are collected before they are written; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
       "internal/app/router.go",
       "internal/artifacts/adapters/http/items.go",
@@ -8837,7 +8840,8 @@
       "internal/artifacts/adapters/sql/content_items.go",
       "internal/access/adapters/sql/projects.go",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -10482,7 +10486,7 @@
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
+    "pagination_execution": "AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -17679,7 +17683,7 @@
     "response_collections": [
       "200 application/json.results[]"
     ],
-    "pagination_execution": "native (next none); search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
+    "pagination_execution": "native (next none); search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -17723,7 +17727,7 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.BuildArtifactsSearchResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: the files of one build run, which that run's record names; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: the files of one build run, which that run's record names; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",

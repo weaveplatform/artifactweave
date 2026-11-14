@@ -561,12 +561,29 @@ func apiReviewDerive(e *apiReviewOperation) {
 // from store pages as it reads them: it hands the pages to
 // httpkit.StreamList (decision 0043, "Streaming complete lists").
 func apiReviewStreams(e *apiReviewOperation) bool {
-	return slices.Contains(e.Calls, "httpkit.StreamList")
+	_, handwritten := apiReviewHandwrittenStreams[e.Route]
+	return handwritten || slices.Contains(e.Calls, "httpkit.StreamList")
+}
+
+// apiReviewHandwrittenStreams are the handwritten routes that write their
+// complete list with httpkit.StreamList: the function that does, which
+// apiReviewCheckComplete holds to that call, since the ledger records no
+// calls for a handwritten route, and what of the answer streams.
+var apiReviewHandwrittenStreams = map[string]struct{ source, text string }{
+	"GET /artifactory/api/storage/{repoKey}/{itemPath}": {
+		source: "internal/artifacts/adapters/http/storage.go: storageView.list",
+		text: "a repository's file list streamed from store pages as they are read, its trees' " +
+			"full path walks merged; folder information's children and the trash can's file " +
+			"list are collected before they are written",
+	},
 }
 
 // apiReviewCompleteText says how a served complete operation executes:
 // streamed, or collected for the reason apiReviewCollected records.
 func apiReviewCompleteText(e *apiReviewOperation) string {
+	if h, ok := apiReviewHandwrittenStreams[e.Route]; ok {
+		return h.text
+	}
 	if apiReviewStreams(e) {
 		return "streamed from store pages as they are read"
 	}
@@ -588,11 +605,9 @@ var apiReviewCollected = map[string]string{
 	"GET /access/api/v1/roles":                                  "administrator-defined roles, which the store reads whole",
 	"GET /artifactory/api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo}": "the files of one build run, which that run's record names",
 	"GET /artifactory/api/repositories/configurations":                                 "repository configurations, bounded by configuration and grouped by class",
-	"GET /artifactory/api/search/dependency":                                           "builds are named once each across their runs, and the store's dependency lookup is unpaged",
 	"GET /artifactory/api/search/gavc":                                                 "local hits merge with an upstream's answer, deduplicated by path, and the result limit applies after the merge",
 	"GET /artifactory/api/search/versions":                                             "versions are ordered newest first in Mercury order, known only once every version is read",
 	"GET /artifactory/api/security/keypair":                                            "administrator key pairs, which the store reads whole",
-	"GET /artifactory/api/storage/{repoKey}/{itemPath}":                                "a file list merges a virtual repository's members, deduplicated by path, and is sorted by relative uri once read",
 	"GET /artifactory/api/system/security/certificates":                                "administrator certificates, which the store reads whole",
 	"GET /artifactory/api/v2/repositories/batch":                                       "bounded by the repository names the request lists",
 	"GET /artifactory/api/v2/security/permissions/groups/{groupName}":                  "the permissions naming one principal, which authorization reads whole for every request that principal makes",
@@ -632,6 +647,39 @@ func apiReviewCheckComplete(t *testing.T, ops []apiReviewOperation) {
 			t.Errorf("apiReviewCollected names %s, which serves no collected complete list", route)
 		}
 	}
+	for route, h := range apiReviewHandwrittenStreams {
+		if !apiReviewCallsStreamList(t, h.source) {
+			t.Errorf("%s: %s no longer calls httpkit.StreamList", route, h.source)
+		}
+	}
+}
+
+// apiReviewCallsStreamList reports whether the method source names, as
+// "file: Receiver.Method", calls httpkit.StreamList.
+func apiReviewCallsStreamList(t *testing.T, source string) bool {
+	t.Helper()
+	file, method, _ := strings.Cut(source, ": ")
+	receiver, name, _ := strings.Cut(method, ".")
+	f, err := parser.ParseFile(token.NewFileSet(), filepath.Join(repopath.Root(t), file), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := false
+	for _, decl := range f.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Recv == nil || fn.Body == nil || fn.Name.Name != name ||
+			apiReviewExpr(fn.Recv.List[0].Type) != receiver {
+			continue
+		}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			if sel, ok := n.(*ast.SelectorExpr); ok &&
+				apiReviewExpr(sel.X)+"."+sel.Sel.Name == "httpkit.StreamList" {
+				calls = true
+			}
+			return true
+		})
+	}
+	return calls
 }
 
 func (c *apiReviewClasses) admissionText() string {
@@ -748,8 +796,9 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		}
 	}
 	if path == "/artifactory/api/repositories" {
-		return "repository-pages", "with limit: class, package type, project and the caller's visibility in SQL, COUNT for X-Total-Count, window by key with LIMIT+1 for the Link next; without limit the whole visible filtered list in one store query", []string{
+		return "repository-pages", "with limit: class, package type, project and the caller's visibility in SQL, COUNT for X-Total-Count, window by key with LIMIT+1 for the Link next; without limit the whole visible filtered list streamed from windows by key as they are read", []string{
 			"internal/artifacts/adapters/http/repositories.go",
+			"internal/platform/httpkit/stream.go",
 			"internal/artifacts/adapters/sql/repo_page.go",
 			"internal/artifacts/adapters/storetest/repo_page.go",
 			"internal/access/core/authz/authz.go",
@@ -765,7 +814,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	}
 	if strings.HasPrefix(path, "/artifactory/api/search/") ||
 		strings.HasPrefix(path, "/artifactory/api/versions/") {
-		return "search", "AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise", []string{
+		return "search", "AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise", []string{
 			"internal/artifacts/adapters/http/searches.go",
 			"internal/artifacts/adapters/http/aql.go",
 			"internal/artifacts/adapters/sql/content_items.go",

@@ -157,6 +157,10 @@ func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 	if f := req.Params.PackageType; f != nil {
 		l.PackageTypes = repo.PackageTypesNamed(string(*f))
 	}
+	base := baseurl.From(ctx)
+	if !page.paged {
+		return s.streamRepositories(ctx, st, l, base)
+	}
 	got, err := st.Repos().Page(ctx, l)
 	if err != nil {
 		return nil, s.InternalError(ctx, "list repositories", err)
@@ -165,19 +169,82 @@ func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 	if page.query == "" {
 		page.query = repositoriesQuery(req.Params)
 	}
-	base := baseurl.From(ctx)
 	for _, c := range got.Repos {
-		body, e := appendZero(out.Body)
-		out.Body = body
-		e.Key, e.Type = c.Key, strings.ToUpper(string(c.Class))
-		e.PackageType = repo.PackageTypeName(string(c.PackageType))
-		e.Url = base + "/artifactory/" + c.Key
-		if c.Description != "" {
-			d := c.Description
-			e.Description = &d
-		}
+		out.Body = append(out.Body, repoEntry(base, c))
 	}
 	return page.of(ctx, out, got), nil
+}
+
+// repoListEntry is an entry of Get Repositories' list. The generated body's
+// element is an unnamed struct; this alias spells that type, so the paged
+// list appends to the body and the streamed list encodes the same type,
+// and a change to the generated element stops the build.
+//
+//nolint:revive,tagliatelle // the generated element's field names and JSON keys
+type repoListEntry = struct {
+	Description *string `json:"description,omitempty"`
+	Key         string  `json:"key"`
+	PackageType string  `json:"packageType"`
+	Type        string  `json:"type"`
+	Url         string  `json:"url"`
+}
+
+// repoEntry is the list entry of the repository c summarises.
+func repoEntry(base string, c port.RepoSummary) repoListEntry {
+	e := repoListEntry{
+		Key: c.Key, Type: strings.ToUpper(string(c.Class)),
+		PackageType: repo.PackageTypeName(string(c.PackageType)),
+		Url:         base + "/artifactory/" + c.Key,
+	}
+	if c.Description != "" {
+		d := c.Description
+		e.Description = &d
+	}
+	return e
+}
+
+// streamRepositories answers the list without limit, which is whole, from
+// windows of the store's key order as they are read (decision 0043,
+// "Streaming complete lists"): each window continues after the last key
+// of the one before, so a repository created or removed meanwhile shifts
+// nothing. Without limit the answer has no paging header and no Link.
+func (s ArtifactoryAPI) streamRepositories(
+	ctx context.Context,
+	st Store,
+	l port.RepoListing,
+	base string,
+) (artgen.GetRepositoriesByTypeAndProjectResponseObject, error) {
+	// The cursor kernel.Pages hands back is the last key read, as this walk
+	// alone reads it.
+	pages := kernel.NewPages(
+		func(ctx context.Context, p kernel.Page) ([]port.RepoSummary, string, error) {
+			w := l
+			w.Limit, w.After = p.Limit, p.After
+			got, err := st.Repos().Page(ctx, w)
+			if err != nil {
+				return nil, "", s.InternalError(ctx, "list repositories", err)
+			}
+			if !got.More {
+				return got.Repos, "", nil
+			}
+			return got.Repos, got.Repos[len(got.Repos)-1].Key, nil
+		},
+		maxRepoPage,
+	)
+	media := "application/json"
+	if httpkit.Accepts(ctx, mediaDetails) {
+		media = mediaDetails
+	}
+	list, err := httpkit.StreamList(
+		ctx,
+		pages,
+		func(c port.RepoSummary) (repoListEntry, bool, error) { return repoEntry(base, c), true, nil },
+		httpkit.ListOptions{ContentType: media},
+	)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // InternalError's answer
+	}
+	return streamed{list}, nil
 }
 
 // visibleTo returns the repositories the caller sees in a listing, as the
@@ -350,14 +417,6 @@ func (s ArtifactoryAPI) GetAllRepositoryConfigurations(
 		), nil
 	}
 	return out, nil
-}
-
-// appendZero appends a zero element to s and returns s and that element,
-// for the generated list bodies, whose element type has no name.
-func appendZero[E any](s []E) ([]E, *E) {
-	var zero E
-	s = append(s, zero)
-	return s, &s[len(s)-1]
 }
 
 // orEmpty returns s, or an empty slice for nil.
