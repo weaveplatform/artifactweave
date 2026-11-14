@@ -6146,7 +6146,7 @@ type Sha256ChecksumRequest struct {
 	RepoKey string `json:"repoKey"`
 }
 
-// SharedRemoteRepositoryConfiguration Sanitised view of a remote repository returned by the deprecated shared configuration endpoint: credentials and proxy settings are removed.
+// SharedRemoteRepositoryConfiguration Sanitised view of a remote repository returned by the deprecated shared configuration endpoint: the username, password, proxy, local address and property sets are removed, and signedUrlTtl, dockerApiVersion, blockPushingSchema1, maxUniqueTags, archiveBrowsingEnabled, ddebSupported, propagateQueryParams, retrieveSha256FromServer and customHttpHeaders carry their defaults when unset. A caller other than an administrator sees only the key, class, package type, description, URL, layouts and patterns.
 type SharedRemoteRepositoryConfiguration struct {
 	// Key Optional within this object. The repository key.
 	Key *string `json:"key,omitempty"`
@@ -10934,7 +10934,7 @@ type ClientInterface interface {
 
 	// GetRepositoryConfiguration Read a repository configuration
 	//
-	// Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
+	// Returns the stored configuration with defaults filled in. Admins receive every field of the repository's class, whatever its package type, each a setting of another package type giving its default; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. A stored remote password is left out and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
 	//
 	// Corresponds with GET /api/repositories/{repoKey} (the `GetRepositoryConfiguration` operationId).
 	GetRepositoryConfiguration(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -12512,7 +12512,7 @@ type ClientInterface interface {
 
 	// GetBatchOfRepositoriesByName Read several repository configurations
 	//
-	// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field; other callers receive the public subset. At most 100 names per call.
+	// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field of each repository's class, as the ordinary read gives them; other callers receive the public subset. At most 100 names per call.
 	//
 	// Corresponds with GET /api/v2/repositories/batch (the `GetBatchOfRepositoriesByName` operationId).
 	GetBatchOfRepositoriesByName(ctx context.Context, params *GetBatchOfRepositoriesByNameParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -12627,7 +12627,7 @@ type ClientInterface interface {
 
 	// GetRepositoryConfigurationV2 Read a repository configuration (package-type view)
 	//
-	// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
+	// Like the ordinary read but returns only the fields that apply to the repository's package type and class, so a generic repository has no Maven or Docker fields in the response and a virtual repository no blackedOut or cdnRedirect. checksumPolicyType, handleReleases and handleSnapshots apply to maven, gradle, ivy and sbt repositories only, and maxUniqueSnapshots to local and federated maven, gradle, ivy, sbt and nuget repositories and to maven and vcs remotes. Access rules are the same as the ordinary read.
 	//
 	// Corresponds with GET /api/v2/repositories/{repoKey} (the `GetRepositoryConfigurationV2` operationId).
 	GetRepositoryConfigurationV2(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -16278,7 +16278,7 @@ func (c *Client) DeleteRepository(ctx context.Context, repoKey RepoKey, reqEdito
 
 // GetRepositoryConfiguration Read a repository configuration
 //
-// Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
+// Returns the stored configuration with defaults filled in. Admins receive every field of the repository's class, whatever its package type, each a setting of another package type giving its default; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. A stored remote password is left out and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
 //
 // Corresponds with GET /api/repositories/{repoKey} (the `GetRepositoryConfiguration` operationId).
 func (c *Client) GetRepositoryConfiguration(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -19765,7 +19765,7 @@ func (c *Client) DeleteRepositories(ctx context.Context, body DeleteRepositories
 
 // GetBatchOfRepositoriesByName Read several repository configurations
 //
-// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field; other callers receive the public subset. At most 100 names per call.
+// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field of each repository's class, as the ordinary read gives them; other callers receive the public subset. At most 100 names per call.
 //
 // Corresponds with GET /api/v2/repositories/batch (the `GetBatchOfRepositoriesByName` operationId).
 func (c *Client) GetBatchOfRepositoriesByName(ctx context.Context, params *GetBatchOfRepositoriesByNameParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -20010,7 +20010,7 @@ func (c *Client) CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactory
 
 // GetRepositoryConfigurationV2 Read a repository configuration (package-type view)
 //
-// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
+// Like the ordinary read but returns only the fields that apply to the repository's package type and class, so a generic repository has no Maven or Docker fields in the response and a virtual repository no blackedOut or cdnRedirect. checksumPolicyType, handleReleases and handleSnapshots apply to maven, gradle, ivy and sbt repositories only, and maxUniqueSnapshots to local and federated maven, gradle, ivy, sbt and nuget repositories and to maven and vcs remotes. Access rules are the same as the ordinary read.
 //
 // Corresponds with GET /api/v2/repositories/{repoKey} (the `GetRepositoryConfigurationV2` operationId).
 func (c *Client) GetRepositoryConfigurationV2(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -38324,7 +38324,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetRepositoryConfigurationWithResponse Read a repository configuration
 	//
-	// Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
+	// Returns the stored configuration with defaults filled in. Admins receive every field of the repository's class, whatever its package type, each a setting of another package type giving its default; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. A stored remote password is left out and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -40112,7 +40112,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetBatchOfRepositoriesByNameWithResponse Read several repository configurations
 	//
-	// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field; other callers receive the public subset. At most 100 names per call.
+	// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field of each repository's class, as the ordinary read gives them; other callers receive the public subset. At most 100 names per call.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -40229,7 +40229,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetRepositoryConfigurationV2WithResponse Read a repository configuration (package-type view)
 	//
-	// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
+	// Like the ordinary read but returns only the fields that apply to the repository's package type and class, so a generic repository has no Maven or Docker fields in the response and a virtual repository no blackedOut or cdnRedirect. checksumPolicyType, handleReleases and handleSnapshots apply to maven, gradle, ivy and sbt repositories only, and maxUniqueSnapshots to local and federated maven, gradle, ivy, sbt and nuget repositories and to maven and vcs remotes. Access rules are the same as the ordinary read.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -65629,7 +65629,7 @@ func (c *ClientWithResponses) DeleteRepositoryWithResponse(ctx context.Context, 
 
 // GetRepositoryConfigurationWithResponse Read a repository configuration
 //
-// Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
+// Returns the stored configuration with defaults filled in. Admins receive every field of the repository's class, whatever its package type, each a setting of another package type giving its default; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. A stored remote password is left out and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -68575,7 +68575,7 @@ func (c *ClientWithResponses) DeleteRepositoriesWithResponse(ctx context.Context
 
 // GetBatchOfRepositoriesByNameWithResponse Read several repository configurations
 //
-// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field; other callers receive the public subset. At most 100 names per call.
+// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field of each repository's class, as the ordinary read gives them; other callers receive the public subset. At most 100 names per call.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -68770,7 +68770,7 @@ func (c *ClientWithResponses) CreateMultipleRepositoriesWithApplicationVndOrgJfr
 
 // GetRepositoryConfigurationV2WithResponse Read a repository configuration (package-type view)
 //
-// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
+// Like the ordinary read but returns only the fields that apply to the repository's package type and class, so a generic repository has no Maven or Docker fields in the response and a virtual repository no blackedOut or cdnRedirect. checksumPolicyType, handleReleases and handleSnapshots apply to maven, gradle, ivy and sbt repositories only, and maxUniqueSnapshots to local and federated maven, gradle, ivy, sbt and nuget repositories and to maven and vcs remotes. Access rules are the same as the ordinary read.
 //
 // Returns a wrapper object for the known response body format(s).
 //

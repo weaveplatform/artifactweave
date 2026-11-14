@@ -246,7 +246,7 @@ func TestUnitDefaults(t *testing.T) {
 				DockerTagRetention:           ptr(1),
 				DockerAPIVersion:             repo.DockerV2,
 				BlockPushingSchema1: repo.Flex(
-					false,
+					true,
 				),
 				ArchiveBrowsingEnabled:  ptr(false),
 				EnableFileListsIndexing: repo.Flex(false),

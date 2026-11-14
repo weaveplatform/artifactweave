@@ -479,10 +479,11 @@ var sharedFields = []string{
 }
 
 // GetRemoteRepositoryConfiguration returns a remote repository's
-// configuration, secrets masked: all of it to an administrator, the
-// sharedFields subset to another signed-in user when the repository shares
-// its configuration, and nothing to an anonymous caller. A key that is
-// missing or names another class answers 404.
+// configuration as 7.x's masked remote descriptor holds it (repo.Shared):
+// all of it to an administrator, the sharedFields subset to another
+// signed-in user when the repository shares its configuration, and nothing
+// to an anonymous caller. A key that is missing or names another class
+// answers 404.
 func (s ArtifactoryAPI) GetRemoteRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.GetRemoteRepositoryConfigurationRequestObject,
@@ -509,7 +510,7 @@ func (s ArtifactoryAPI) GetRemoteRepositoryConfiguration(
 	case !p.Admin && (c.ShareConfiguration == nil || !*c.ShareConfiguration):
 		return nil, httpkit.Denied(p)
 	}
-	doc, err := json.Marshal(repo.Masked(c))
+	doc, err := json.Marshal(repo.Shared(c))
 	if err != nil {
 		return nil, s.InternalError(ctx, "encode repository", err)
 	}

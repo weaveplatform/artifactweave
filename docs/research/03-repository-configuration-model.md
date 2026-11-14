@@ -526,15 +526,17 @@ timestamped Maven snapshot does not.
 | `includesPattern` | `**/*` | An empty string also means everything. |
 | `excludesPattern` | `""` | |
 | `repoLayoutRef` | `sbt-default` for `sbt`, `ivy-default` for `ivy`, `maven-2-default` for every other type | Applied when a create leaves it out ([#396](https://github.com/weaveplatform/artifactweave/issues/396)). `sbt-default` "is automatically applied when creating a repository without specifying a layout" ([D] [sbt-repositories](https://docs.jfrog.com/artifactory/docs/sbt-repositories.md), updated 2026-01-05); "Gradle repositories use the `maven-2-default` repository layout" ([D] [gradle-repositories](https://docs.jfrog.com/artifactory/docs/gradle-repositories.md), updated 2026-10-18); `maven-2-default` is the JSON page's default and the layout of the `genericLocalV2` sample. JFrog has no Ivy page; `ivy-default` is the provider map's layout for Ivy, by analogy with sbt **[I]**. The provider sends its map's layout for every type, so a repository it creates has that layout instead. |
-| `blackedOut` | `false` | |
+| `blackedOut` | `false` | A virtual repository's reads leave it out, with `xrayIndex`, `xrayDataTtl`, `downloadRedirect` and `cdnRedirect`, whatever was stored, as 7.161.26's `VirtualRepositoryConfigurationImpl` has none of them; the v2 read leaves `cdnRedirect` out of a remote's too, as its annotation names local and federated repositories alone ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493), [#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). |
 | `xrayIndex` | `false` | Persisted and echoed; no scanner behind it. |
 | `propertySets` | `[]` | Names of property sets. An administrator's read of a local, remote or federated repository sends none as `[]` ([D] the `genericLocalV2` sample and the [getallrepositoryconfigurations](https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md) sample). |
-| `priorityResolution` | `false` | |
+| `priorityResolution` | `false` | 7.161.26's `RepositoryConfigurationBase` holds it for every class, so the v1 read of a virtual repository gives it too, `false` when unset; the v2 read keeps it for a local, remote or federated repository, as its annotation names them ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493), [#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). |
 | `downloadRedirect` | `false` | |
 | `cdnRedirect` | `false` | JFrog Cloud Enterprise+ only. |
-| `primaryKeyPairRef`, `secondaryKeyPairRef` | | Signing key pairs (Helm, Debian, Terraform providers, and npm's ECDSA package signing, [research 25](25-npm.md#5-storage-layout-and-properties)). |
+| `primaryKeyPairRef`, `secondaryKeyPairRef` | | Signing key pairs (Helm, Debian, Terraform providers, and npm's ECDSA package signing, [research 25](25-npm.md#5-storage-layout-and-properties)). The v2 read keeps them for Alpine, RPM, Debian and Opkg repositories alone, the types 7.161.26's annotation names ([#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). |
 | `signedUrlTtl` | `90` | Read-only in responses. An administrator's v1, v2 and batch reads and the configurations list send `90` when it was never set, the default of 7.161.26's `RepositoryConfigurationBase`, which marks it type-specific for every type; the configurations list's sample and a Maven local repository's v1 read (RTFACT-31100) show it ([D] [getallrepositoryconfigurations](https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md), [#1479](https://github.com/weaveplatform/artifactweave/issues/1479)). |
-| `xrayDataTtl` | | Read-only in responses. |
+| `xrayDataTtl` | `90` | Read-only in responses. The v1 read of a local, federated or remote repository gives `90` when it was never set, the `DEFAULT_DATA_TTL` of 7.161.26's `LocalRepositoryConfigurationImpl` and `HttpRepositoryConfigurationImpl`, as the Docker, npm and Maven local reads show ([J] RTFACT-29415, RTFACT-30672, RTFACT-31100); a virtual repository's model has none ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493)). |
+| `dockerApiVersion`, `blockPushingSchema1`, `dockerProjectId` | `V2`, `true`, `""` | 7.161.26's `RepositoryConfigurationBase` holds the three for every class, and only a Docker, OCI or Helm OCI repository's configuration sets them. The v1 read of any other repository gives `V2`, `true` and `""` whatever was sent. A Docker, OCI or Helm OCI repository's gives what it stored, `V2` and `true` when unset and `blockPushingSchema1` always `true` on a virtual repository, whose descriptor has none, and leaves `dockerProjectId` out when it has none, as the Docker local read does ([J] RTFACT-29415; the npm and Maven local reads give `""`, RTFACT-30672, RTFACT-31100). The v2 read keeps `dockerApiVersion` for a Docker, OCI or Helm OCI repository, `blockPushingSchema1` for one that is not virtual and `dockerProjectId` for a remote one ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493), [#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). |
+| `enableNormalizedVersion`, `mlRepoLayout` | `false` | NuGet and Hugging Face ML settings, accepted and stored only. Both are on 7.161.26's `RepositoryConfigurationBase`, so the v1 read of every class gives them, `false` but for a NuGet repository's `enableNormalizedVersion` and a Hugging Face ML repository's `mlRepoLayout`. RTFACT-31100 shows `enableNormalizedVersion` as `false` on a Maven local repository; `mlRepoLayout` is newer than every dump found, so that the v1 read writes it is **[I]**. The v2 read keeps `enableNormalizedVersion` for NuGet and `mlRepoLayout` for a local or remote Hugging Face ML repository ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493), [#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). |
 | `enableBowerSupport`, `enableChefSupport`, `enableCocoaPodsSupport`, `enableComposerSupport`, `enableConanSupport`, `enableDebianSupport`, `enableDistRepoSupport`, `enableDockerSupport`, `enableGemsSupport`, `enableGitLfsSupport`, `enableNpmSupport`, `enableNuGetSupport`, `enablePuppetSupport`, `enablePypiSupport`, `enableVagrantSupport` | from the package type | Legacy type flags, never stored: see "Legacy type flags". |
 
 ### Legacy type flags
@@ -638,20 +640,22 @@ of its own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 | `suppressPomConsistencyChecks` | `false` for `maven`; `true` for `gradle`, `ivy` and `sbt` | As the Terraform provider and the UI set them; 6.20's descriptor defaults to `true` and its REST model to `false` ([research 27](27-maven.md#6-pom-consistency-checks)). |
 | `maxUniqueTags` | `0` | Docker; 0 means unlimited. |
 | `dockerTagRetention` | `1` | Docker; number of tags kept per image when `maxUniqueTags` applies. |
-| `dockerApiVersion` | `V2` | |
-| `blockPushingSchema1` | `false` | Docker. |
+| `dockerApiVersion` | `V2` | See "Common fields". |
+| `blockPushingSchema1` | `true` | Docker. The default of 7.161.26's descriptor (`RealRepoDescriptor`) and read model (`RepositoryConfigurationBase`), and what the Docker, npm and Maven local reads show ([J] RTFACT-29415, RTFACT-30672, RTFACT-31100). The provider's local Docker resource sends `true` unless told otherwise and its remote Docker resource `false`, so only a create that leaves it out takes the default. Schema 1 manifests are refused whatever it says (DV-034); its reads are under "Common fields" ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493)). |
 | `archiveBrowsingEnabled` | `false` | |
-| `enableFileListsIndexing` | `false` | |
+| `enableFileListsIndexing` | `false` | RPM: whether the metadata calculation also indexes the `filelists.xml` file ([D] [rpm-repositories](https://docs.jfrog.com/artifactory/docs/rpm-repositories.md)). Accepted and stored only, as artifactweave's repodata has no `filelists.xml`. The v1 read of any other type gives `false` whatever was sent, as 7.161.26's `LocalRepositoryConfigurationImpl` takes it from an RPM repository's configuration alone; the v2 read keeps it for a local or federated RPM repository ([#1353](https://github.com/weaveplatform/artifactweave/issues/1353), [#1493](https://github.com/weaveplatform/artifactweave/issues/1493)). |
 | `optionalIndexCompressionFormats` | `[]` | Debian, implemented with [#1274](https://github.com/weaveplatform/artifactweave/issues/1274): the forms besides plain and gzip (`bz2`, `lzma`, `xz`) each Packages index is written in from the next index rebuild, and the Release lists ([D] [debian-repositories](https://docs.jfrog.com/artifactory/docs/debian-repositories.md), Optional Index Compression Formats). Other values add nothing **[I]**. |
 | `debianTrivialLayout` | `false` | Debian, implemented in P9c ([#758](https://github.com/weaveplatform/artifactweave/issues/758)): the deprecated trivial layout takes no source packages, so a `.dsc` deploy answers 400, and no virtual repository may include the repository ([D] debian-repositories). A Debian repository's read gives `false` when it was never set, as the provider's sample reads do ([#1372](https://github.com/weaveplatform/artifactweave/issues/1372)). The v1 read of a repository of any other type gives it and `ddebSupported` as `false`, whatever was sent, as only a Debian repository's configuration sets them (`LocalRepositoryConfigurationImpl.setDebianConfigIfNeeded`, 7.161.26; [#1479](https://github.com/weaveplatform/artifactweave/issues/1479)). |
-| `calculateYumMetadata`, `yumRootDepth` | | Accepted and persisted; RPM metadata behavior is planned in P29. |
+| `calculateYumMetadata`, `yumRootDepth` | `false`, `0` | RPM, implemented in P9c ([#759](https://github.com/weaveplatform/artifactweave/issues/759)). With `calculateYumMetadata` on, a deploy or delete of a package in a local or federated repository, a move or copy included, queues the repodata rebuild ("When set, RPM metadata calculation is automatically triggered", [D] rpm-repositories); with it off, the repodata is rebuilt only when a metadata calculation is requested. `yumRootDepth` is the folder depth at which `repodata/` is written, `0` at the repository's root, and a virtual repository reads its own to find the metadata root of a package it serves. The v1 read of a local or federated repository of any other type gives `false` and `0` whatever was sent; the v2 read keeps both for a local or federated RPM repository ([#1353](https://github.com/weaveplatform/artifactweave/issues/1353), [#1493](https://github.com/weaveplatform/artifactweave/issues/1493)). |
 | `ddebSupported` | `false` | Debian, implemented in P9c ([#758](https://github.com/weaveplatform/artifactweave/issues/758)): `.ddeb` debug packages are admitted and indexed only when it is true ("Enable indexing with debug symbols (.ddeb)", [D] debian-repositories). A key the clients send ("Keys known only from the Terraform provider"). A Debian repository's read gives `false` when it was never set, as RTFACT-30304 and the provider's sample reads show ([#1372](https://github.com/weaveplatform/artifactweave/issues/1372)). |
-| `yumGroupFileNames`, `cargoAnonymousAccess`, `cargoInternalIndex` | | RPM and Cargo keys the clients send ("Keys known only from the Terraform provider"); accepted and persisted. |
+| `yumGroupFileNames` | | An RPM key the clients send ("Keys known only from the Terraform provider"): the group files the metadata calculation lists. Accepted and stored only, as artifactweave's repodata lists no group file. The v1 read of a local or federated repository of any other type leaves it out whatever was sent; the v2 read keeps it for a local or federated RPM repository ([#1353](https://github.com/weaveplatform/artifactweave/issues/1353), [#1493](https://github.com/weaveplatform/artifactweave/issues/1493)). |
+| `cargoAnonymousAccess`, `cargoInternalIndex` | `false`, `true` | Cargo keys the clients send ("Keys known only from the Terraform provider"); accepted and persisted. 7.161.26's local, remote and virtual models hold both, taken from a Cargo repository's configuration, so the v1 read of any other type gives `false` and `true` whatever was sent, and a Cargo repository's the same when unset (`isCargoInternalIndex`; the Maven local read of 7.104.10 gave `cargoInternalIndex` as `false`, RTFACT-31100, so `true` is **[I]**). The v2 read keeps both for a Cargo repository ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493), [#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). |
+| `enableComposerV1Indexing` | `false` | Composer; accepted and stored only. The Docker, npm and Maven local reads show it as `false` ([J] RTFACT-29415, RTFACT-30672, RTFACT-31100), and 7.161.26's `LocalRepositoryConfigurationImpl` takes it from a Composer repository's configuration alone, so the v1 read of a local or federated repository of any other type gives `false`; the v2 read keeps it for a local or federated Composer repository ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493)). |
 | `enableConanSupport` | | A legacy type flag the Conan provider resource sends: true in the v1 read of every Conan repository, of every class, and false for every other type, whatever was sent; the v2 read and the configurations list leave it out ([J] RTFACT-16458, RTFACT-31100; "Legacy type flags", [#1440](https://github.com/weaveplatform/artifactweave/issues/1440)). |
-| `terraformType` | | `MODULE` or `PROVIDER`. Local and federated repositories. No default: the provider's two resources always send it, and a repository without it serves neither Terraform registry ([decision 0040](decisions/0040-terraform.md#terraformtype)). |
-| `encryptStates` | `true` | `terraformbackend`: seals state files under the master key. Replication between instances needs it `false` (7.77, [D] terraform-opentofu-and-terraform-backend-repositories); a change applies to later writes ([decision 0041](decisions/0041-terraform-backend.md)). 7.x's v1 read sends it for other local types too ([J] RTFACT-31100). |
+| `terraformType` | | `MODULE` or `PROVIDER`. Local and federated repositories. No default: the provider's two resources always send it, and a repository without it serves neither Terraform registry ([decision 0040](decisions/0040-terraform.md#terraformtype)). The v1 read of a local or federated repository of any other type gives `MODULE`, whatever was sent, as 7.161.26's `LocalRepositoryConfigurationImpl` defaults it and takes it from a Terraform repository's configuration alone; the v2 read keeps it for a local or federated Terraform repository ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493), [#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). |
+| `encryptStates` | `true` | `terraformbackend`: seals state files under the master key. Replication between instances needs it `false` (7.77, [D] terraform-opentofu-and-terraform-backend-repositories); a change applies to later writes ([decision 0041](decisions/0041-terraform-backend.md)). 7.x's v1 read sends it as `true` for every other local or federated type, whatever was sent ([J] RTFACT-31100), and the v2 read keeps it for a Terraform backend repository alone, as its annotation names it ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493), [#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). |
 | `forceNugetAuthentication`, `forceP2Authentication`, `forceConanAuthentication` | `false` | Each is kept only by a repository of its own type, NuGet, P2 or Conan. The v1 read of any other type gives all three as `false`, whatever was sent, as 7.161.26's `setPackageTypeConfig` sets each for its own type alone; the v2 read keeps each for its own type, as its `@IncludeTypeSpecific` marks it ([#1479](https://github.com/weaveplatform/artifactweave/issues/1479)). |
-| `forceMetadataNameVersion`, `forceNonDuplicateChart` | `false` | Helm Enforce Layout, 7.104.2+ (the provider gates them at 7.104.0); local and federated `helm` repositories. Set only when the repository is created: "Enforcement is set only upon repository creation" ([D] [kubernetes-helm-chart-repositories](https://docs.jfrog.com/artifactory/docs/kubernetes-helm-chart-repositories.md)), and the provider refuses a change. The configuration XSD has a global pair under `repositoriesGeneralConfig.helm` too ([research 30 section 4](30-helm.md#4-enforce-layout)). |
+| `forceMetadataNameVersion`, `forceNonDuplicateChart` | `false` | Helm Enforce Layout, 7.104.2+ (the provider gates them at 7.104.0); local and federated `helm` repositories. Set only when the repository is created: "Enforcement is set only upon repository creation" ([D] [kubernetes-helm-chart-repositories](https://docs.jfrog.com/artifactory/docs/kubernetes-helm-chart-repositories.md)), and the provider refuses a change. The configuration XSD has a global pair under `repositoriesGeneralConfig.helm` too ([research 30 section 4](30-helm.md#4-enforce-layout)). Both are on 7.161.26's `RepositoryConfigurationBase`, so the v1 read of every other repository gives them as `false`, whatever was sent, as RTFACT-31100 shows on a Maven local repository; the v2 read keeps them for a local Helm repository alone, as their annotation names it, and leaves them out of a federated one's ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493), [#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). |
 
 ## Remote fields
 
@@ -665,7 +669,7 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 | Field | Default | Notes |
 |---|---|---|
 | `url` | | Mandatory. |
-| `username`, `password` | | Password is a sealed value and is masked on read. |
+| `username`, `password` | | Password is a sealed value and is left out of every read, so that a client that writes a read back keeps it. An administrator's v1 read gives `username` as `""` when unset and, for a remote with no password, `password` as `""`, as `HttpRepositoryConfigurationImpl` holds both and the provider's sample reads show ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493)). What 7.x's read of a remote with a password sends is **[I]**. |
 | `proxy`, `disableProxy` | `""`, `false` | Named proxy from the descriptor. |
 | `remoteRepoLayoutRef` | `""` | Layout of the upstream when it differs. |
 | `remoteRepoChecksumPolicyType` | `generate-if-absent` | |
@@ -674,7 +678,7 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 | `offline` | `false` | Serve from cache only. |
 | `storeArtifactsLocally` | `true` | `false` streams through without caching. |
 | `socketTimeoutMillis` | `15000` | |
-| `localAddress` | | Outbound bind address. |
+| `localAddress` | `""` | Outbound bind address. An administrator's v1 read gives `""` when unset, as `HttpRepositoryConfigurationImpl` holds it ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493)). |
 | `retrievalCachePeriodSecs` | `7200`; `21600` for `docker`, `oci`, `helmoci` | How long non-unique metadata is served from cache. At least 30, and at least 14,400 for a NuGet remote that proxies `community.chocolatey.org` ([D] [remote-repositories](https://docs.jfrog.com/artifactory/docs/remote-repositories.md), updated 2026-10-19). Smart remote repositories are exempt from the 30 ([D] [SaaS 7.144.2](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71442-saas) notice). SaaS enforces the 30 from [7.173.4](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71734-saas), and the 14,400 from [SaaS 7.153.2](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71532-saas) and [self-managed 7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed). `pkg/repo.Validate` refuses a smaller value with 400 on create and on every update, since the page keeps an existing shorter period only "until you edit" the repository ([#396](https://github.com/weaveplatform/artifactweave/issues/396)). A smart remote is one with `contentSynchronisation.enabled`, which the provider describes as proxying "a local or remote repository from another instance of Artifactory" ([S] provider 12.11.14 `remote.go`). **[I]** Whether self-managed 7.161.32 enforces the 30 (its notes do not list it), the 400 message, whether a host under `chocolatey.org` other than `community.chocolatey.org` counts, and whether an update that leaves an existing shorter period alone is refused. |
 | `missedRetrievalCachePeriodSecs` | `1800`; `600` for `go` | Negative cache. |
 | `metadataRetrievalTimeoutSecs` | `60` | |
@@ -691,17 +695,18 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 | `clientTlsCertificate` | `""` | Alias of a stored client certificate. |
 | `listRemoteFolderItems` | `false` | Documented as a string, accepted in either spelling and written as a boolean; see "Typing traps". |
 | `queryParams` | `""` | Appended to upstream requests. |
-| `propagateQueryParams`, `retrieveSha256FromServer` | | Generic remotes; keys the clients send, accepted and persisted. |
-| `curated`, `passThrough` | | Curation flags the provider sends on its AI Editor Extensions, Conan, Conda, Debian, Docker, Gems, Go, Gradle, Hugging Face, Maven, npm, NuGet and PyPI remotes; accepted and persisted, with no curation behind them. |
+| `propagateQueryParams`, `retrieveSha256FromServer` | `false` | Keys the clients send on generic remotes, accepted and persisted. 7.161.26's `HttpRepositoryConfigurationImpl` holds both for every remote, so the v1 read of every remote gives them, `false` when unset, and the v2 read keeps them for every remote ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493), [#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). |
+| `archiveBrowsingEnabled`, `sendContext`, `maxUniqueTags` | `false`, `false`, `0` | Accepted and stored only on a remote. `HttpRepositoryConfigurationImpl` holds the three for every remote, so the v1 read gives them, the defaults when unset; the v2 read keeps `archiveBrowsingEnabled` and `sendContext` and leaves `maxUniqueTags` out, as its annotation names local and federated Docker, OCI and Helm OCI repositories alone ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493), [#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). |
+| `curated`, `passThrough` | | Curation flags the provider sends on its AI Editor Extensions, Conan, Conda, Debian, Docker, Gems, Go, Gradle, Hugging Face, Maven, npm, NuGet and PyPI remotes; accepted and persisted, with no curation behind them. The v1 read of every remote gives both, `false` when unset (`HttpRepositoryConfigurationImpl`, [#1493](https://github.com/weaveplatform/artifactweave/issues/1493)). |
 | `cargoAnonymousAccess`, `cargoInternalIndex` | | Cargo remotes, as on local repositories. |
 | `podsSpecsRepoUrl` | | CocoaPods remotes; `cocoaPods.cocoaPodsSpecsRepoUrl` in the YAML form. |
 | `hexPublicKey` | | Hex remotes: the upstream registry's public key. |
 | `ddebSupported`, `debianTrivialLayout` | `false` | Debian remotes ([#1372](https://github.com/weaveplatform/artifactweave/issues/1372)). JFrog's remote repositories page lists "Enable indexing with debug symbols (.ddeb)" among the additional settings of a Debian remote ([D] [remote-repositories](https://docs.jfrog.com/artifactory/docs/remote-repositories.md)), RTFACT-30304 shows `"ddebSupported" : false` in a Debian remote's configuration, and the provider's sample read of a Debian remote (`samples/repository_remote/debian.json`) gives both `false`. Accepted and persisted, and read as `false` when never set; the v2 read leaves `debianTrivialLayout` out. `ddebSupported` changes nothing a remote serves: it caches every `.ddeb` its upstream serves ([#1352](https://github.com/weaveplatform/artifactweave/issues/1352)) and builds no index of its own **[I]**. A virtual repository refuses a remote member whose `debianTrivialLayout` is true, as it does a local one. A remote of any other type reads both as `false`, whatever was sent ("Local fields", [#1479](https://github.com/weaveplatform/artifactweave/issues/1479)). |
 | `disableUrlNormalization` | `false` | |
-| `customHttpHeaders` | `[]` | `[{"name","value","sensitive"}]`; generic remotes need 7.146. |
+| `customHttpHeaders` | `[]` | `[{"name","value","sensitive"}]`; generic remotes need 7.146. An administrator's v1 read lists none as `[]` (`setCustomHttpHeadersFromRepoConfig`, [#1493](https://github.com/weaveplatform/artifactweave/issues/1493)). |
 | `externalDependenciesEnabled`, `externalDependenciesPatterns` | `false`, `[]` | Docker foreign layers; npm, Go and Bower external dependencies. |
-| `contentSynchronisation` | | `{"enabled","statistics":{"enabled"},"properties":{"enabled"},"source":{"originAbsenceDetection"}}` for smart remotes. |
-| `blockPushingSchema1` | `false` | Docker. |
+| `contentSynchronisation` | | `{"enabled","statistics":{"enabled"},"properties":{"enabled"},"source":{"originAbsenceDetection"}}` for smart remotes. The v1 read gives the descriptor's default, every switch off, when it was never set, as every remote sample read of the provider does ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493)). |
+| `blockPushingSchema1` | `true` | Docker, as on a local repository. |
 | `forceNugetAuthentication`, `forceP2Authentication`, `forceConanAuthentication` | `false` | As on a local repository: each is kept only by a remote of its own type, and the v1 read gives the others `false` ([#1479](https://github.com/weaveplatform/artifactweave/issues/1479)). |
 | `pyPIRegistryUrl` | `https://pypi.org` | Note the capitalisation. |
 | `pyPIRepositorySuffix` | `simple` | |
@@ -711,8 +716,8 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 | `symbolServerUrl` | | NuGet symbols. |
 | `chartsBaseUrl` | | Helm; nested under `helm:` in the YAML form. |
 | `terraformRegistryUrl`, `terraformProvidersUrl` | `https://registry.terraform.io`, `https://releases.hashicorp.com` | Applied to `terraform` remotes ([S] provider 12.11.14 `resource_artifactory_remote_terraform_repository.go` defaults). |
-| `vcsType`, `vcsGitProvider`, `vcsGitDownloadUrl` | `GIT`, `GITHUB`, `""` | Go VCS remotes; planned in P28 with P9/P10 transport and P33 VCS integration. |
-| `dockerProjectId` | | Google Artifact Registry upstreams. |
+| `vcsType`, `vcsGitProvider`, `vcsGitDownloadUrl` | `GIT`, `GITHUB`, `""` | Go VCS remotes; planned in P28 with P9/P10 transport and P33 VCS integration. The defaults apply to Go, VCS, Bower, CocoaPods, Composer and Terraform remotes, as the provider's sample reads of each give them (`samples/repository_remote`); the v2 read keeps the three for the Go, VCS, Bower, CocoaPods and Composer remotes 7.161.26's annotation names ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493), [#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). |
+| `dockerProjectId` | | Google Artifact Registry upstreams; its reads are under "Common fields". |
 | `bowerRegistryUrl`, `gitRegistryUrl`, `composerRegistryUrl` | `https://registry.bower.io`, `https://github.com/rust-lang/crates.io-index`, `https://packagist.org` | Accepted and persisted; native Bower, Cargo and Composer support is planned in P30. Defaults from [configuration-json-files](https://docs.jfrog.com/integrations/docs/configuration-json-files.md) [D], applied to `bower`, `cargo` and `composer` remotes respectively; `gitRegistryUrl` is Cargo's index (jfrog-client-go puts it on Cargo remotes only). The page lists the three among every remote's fields; that Artifactory fills them only for their own type is **[I]**. |
 
 ## Virtual fields
@@ -723,7 +728,8 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 | `defaultDeploymentRepo` | | Receives writes. |
 | `artifactoryRequestsCanRetrieveRemoteArtifacts` | `false` | |
 | `virtualRetrievalCachePeriodSecs` | `7200` | Cache period for merged metadata; in YAML it is `virtualCacheConfig.virtualRetrievalCachePeriodSecs`. "The default is 7200 seconds" ([D] [virtual-repositories](https://docs.jfrog.com/artifactory/docs/virtual-repositories.md)). npm virtual repositories moved from 600 to 7200 in [SaaS 7.165.0](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71650-saas); the YAML sample still shows 600. |
-| `keyPair` | | Signing key for merged metadata. |
+| `keyPair` | `""` | Signing key for merged metadata. An administrator's v1 read gives `""` when unset; the v2 read keeps it for Maven, Gradle, Ivy, SBT and P2 virtual repositories, the types 7.161.26's annotation names ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493), [#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). |
+| `cachingLocalForeignLayersEnabled` | `false` | Docker, OCI and Helm OCI; accepted and stored only. 7.161.26's `VirtualRepositoryConfigurationImpl` takes it from a Docker, OCI or Helm OCI virtual repository's configuration, so the v1 read of any other gives `false` whatever was sent; the v2 read keeps it for those three types. A virtual repository's v1 read also gives `blockPushingSchema1` as `true` and the Cargo settings ("Local fields"), `cargoInternalIndex` always `true` ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493), [#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). |
 | `pomRepositoryReferencesCleanupPolicy` | `discard_active_reference` | |
 | `forceMavenAuthentication`, `forceNugetAuthentication`, `forceP2Authentication`, `forceConanAuthentication` | `false` | `forceMavenAuthentication` acts on a Maven virtual repository alone ([per-ecosystem summary](#per-ecosystem-summary)). The other three sit on 7.161.26's `RepositoryConfigurationBase`, which the virtual class's model extends too, and follow the local rule: each is kept only by a repository of its own type, and the v1 read gives the others `false` **[I]** (no dump of a virtual repository's read was found, [#1479](https://github.com/weaveplatform/artifactweave/issues/1479)). |
 | `externalDependenciesEnabled`, `externalDependenciesPatterns`, `externalDependenciesRemoteRepo` | `false`, `[]`, `""` | npm, Go, Bower. |
@@ -740,7 +746,9 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 
 Everything a local repository has, `terraformType` included, plus `members`, an array of
 `{"url","enabled"}` where `enabled` is a boolean (default `true`; documented as a string, see
-below) and `url` may be derived from the base URL and the key, and `proxy` and `disableProxy`.
+below) and `url` may be derived from the base URL and the key, and `proxy` and `disableProxy`,
+which the v1 read gives as `false` when unset, as 7.161.26's
+`FederatedRepositoryConfigurationImpl` defaults it ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493)).
 The provider's federated Terraform resource sends `terraformType` with `rclass` federated
 ([S] provider 12.11.14 [`resource_artifactory_federated_terraform_repository.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/federated/resource_artifactory_federated_terraform_repository.go)).
 
@@ -873,29 +881,30 @@ virtualRepositories:
 
 | Ecosystem | Local | Remote | Virtual |
 |---|---|---|---|
-| docker, oci, helmoci | `dockerApiVersion`, `maxUniqueTags`, `dockerTagRetention`, `blockPushingSchema1` | `enableTokenAuthentication`, `externalDependenciesEnabled`, `externalDependenciesPatterns`, `blockPushingSchema1`, `retrievalCachePeriodSecs` 21600, `dockerProjectId` | `resolveDockerTagsByTimestamp`, `dockerApiVersion` |
+| docker, oci, helmoci | `dockerApiVersion`, `maxUniqueTags`, `dockerTagRetention`, `blockPushingSchema1` | `enableTokenAuthentication`, `externalDependenciesEnabled`, `externalDependenciesPatterns`, `blockPushingSchema1`, `retrievalCachePeriodSecs` 21600, `dockerProjectId` | `resolveDockerTagsByTimestamp`, `dockerApiVersion`, `cachingLocalForeignLayersEnabled` |
 | nimmodel | — | Default URL `https://api.ngc.nvidia.com` **[D]**, blank username and personal key password **[D]**, Bearer default **[I]**; remote only | — |
-| npm | `checksumPolicyType`, `handleReleases`, `handleSnapshots` (local and federated) | | `externalDependenciesEnabled`, `externalDependenciesPatterns`, `externalDependenciesRemoteRepo`, `virtualRetrievalCachePeriodSecs` |
+| npm | `checksumPolicyType`, `handleReleases`, `handleSnapshots` (local and federated; acted on, but the v2 read leaves them out) | | `externalDependenciesEnabled`, `externalDependenciesPatterns`, `externalDependenciesRemoteRepo`, `virtualRetrievalCachePeriodSecs` |
 | maven, gradle, ivy, sbt | `handleReleases`, `handleSnapshots`, `snapshotVersionBehavior`, `checksumPolicyType`, `maxUniqueSnapshots`, `suppressPomConsistencyChecks` | same plus `remoteRepoChecksumPolicyType`, `fetchJarsEagerly`, `fetchSourcesEagerly`, `rejectInvalidJars`, `listRemoteFolderItems` | `pomRepositoryReferencesCleanupPolicy`, `keyPair`, `forceMavenAuthentication` (stored only on gradle, ivy and sbt) |
 | pypi | none: enforce layout, name normalisation, the JSON index and PEP 658 are global in 7.x ([research 28](28-pypi.md#12-repository-configuration-and-the-terraform-provider)) | `pyPIRegistryUrl`, `pyPIRepositorySuffix` | |
-| nuget | `forceNugetAuthentication`, `maxUniqueSnapshots` | `feedContextPath`, `downloadContextPath`, `v3FeedUrl`, `symbolServerUrl`, `forceNugetAuthentication` | `forceNugetAuthentication` |
-| go | | `vcsGitProvider`, `vcsGitDownloadUrl`, `missedRetrievalCachePeriodSecs` 600 | `externalDependenciesEnabled`, `externalDependenciesPatterns` |
-| helm | `forceMetadataNameVersion`, `forceNonDuplicateChart` | `chartsBaseUrl`, `externalDependenciesEnabled`, `externalDependenciesPatterns` | `virtualRetrievalCachePeriodSecs`, `useNamespaces` |
+| nuget | `forceNugetAuthentication`, `maxUniqueSnapshots`, `enableNormalizedVersion` | `feedContextPath`, `downloadContextPath`, `v3FeedUrl`, `symbolServerUrl`, `forceNugetAuthentication`, `enableNormalizedVersion` | `forceNugetAuthentication`, `enableNormalizedVersion` |
+| go | | `vcsType`, `vcsGitProvider`, `vcsGitDownloadUrl`, `missedRetrievalCachePeriodSecs` 600 | `externalDependenciesEnabled`, `externalDependenciesPatterns` |
+| helm | `forceMetadataNameVersion`, `forceNonDuplicateChart` (the v2 read keeps them on local repositories alone) | `chartsBaseUrl`, `externalDependenciesEnabled`, `externalDependenciesPatterns` | `virtualRetrievalCachePeriodSecs`, `useNamespaces` |
 | terraform | `terraformType` | `terraformRegistryUrl`, `terraformProvidersUrl` | |
-| generic | | `propagateQueryParams`, `retrieveSha256FromServer` | |
-| cargo | `cargoAnonymousAccess`, `cargoInternalIndex` | `gitRegistryUrl`, `cargoAnonymousAccess`, `cargoInternalIndex` | |
+| terraformbackend | `encryptStates` | | |
+| huggingfaceml | `mlRepoLayout` | `mlRepoLayout` | |
+| composer | `enableComposerV1Indexing` | `composerRegistryUrl`, `vcsType`, `vcsGitProvider`, `vcsGitDownloadUrl` | |
+| cargo | `cargoAnonymousAccess`, `cargoInternalIndex` | `gitRegistryUrl`, `cargoAnonymousAccess`, `cargoInternalIndex` | `cargoAnonymousAccess`, `cargoInternalIndex` |
 | rpm | `calculateYumMetadata`, `yumRootDepth`, `enableFileListsIndexing`, `yumGroupFileNames` | | |
 | debian | `debianTrivialLayout`, `optionalIndexCompressionFormats`, `ddebSupported` | `ddebSupported` (stored only) | `debianDefaultArchitectures`, `optionalIndexCompressionFormats`, `ddebSupported` (stored only) |
 | conan | `forceConanAuthentication` | `forceConanAuthentication` | `forceConanAuthentication` |
 | p2 | | `forceP2Authentication`, stored only | `p2Urls`, `forceP2Authentication` |
-| cocoapods | | `podsSpecsRepoUrl` | |
+| cocoapods | | `podsSpecsRepoUrl`, `vcsType`, `vcsGitProvider`, `vcsGitDownloadUrl` | |
 | hex | | `hexPublicKey` | |
-| bower, composer | | `bowerRegistryUrl`, `composerRegistryUrl` | |
+| bower | | `bowerRegistryUrl`, `vcsType`, `vcsGitProvider`, `vcsGitDownloadUrl` | `externalDependenciesEnabled`, `externalDependenciesPatterns`, `externalDependenciesRemoteRepo` |
 
-`pkg/repo.Relevant` keeps these groups for their package types and drops them for the others
-(the v2 read and the configurations list, "Field sets of the reads"). A field several
-ecosystems share, such as `curated`, `passThrough` or the `externalDependencies` fields, is
-kept for every type. `maxUniqueSnapshots` belongs to NuGet as well as the Maven family: JFrog
+`pkg/repo.Relevant` keeps each field for the package types and classes 7.161.26's annotation
+names (the v2 read and the configurations list, "Field sets of the reads"; "The v2 read and
+7.161.26's annotations"). `maxUniqueSnapshots` belongs to NuGet as well as the Maven family: JFrog
 lists NuGet among the types it supports ([KB]
 [000005403](https://jfrog.com/help/r/artifactory-how-does-the-max-unique-snapshots-parameter-work-in-artifactory/package-types-supported-for-max-unique-snapshots)),
 the UI offers it on NuGet local repositories and the Terraform provider sends it
@@ -908,9 +917,11 @@ A local or federated npm repository applies the checksum policy and the release 
 snapshot handling to what is published to it ([KB] 000006800; [J]
 [RTFACT-14280](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-14280), the checksum policy
 for npm publishes, Done; [#481](https://github.com/weaveplatform/artifactweave/pull/481) for
-the npm format), so its v2 read keeps `checksumPolicyType`, `handleReleases` and
-`handleSnapshots`; an npm remote or virtual repository's does not
-([#457](https://github.com/weaveplatform/artifactweave/issues/457)).
+the npm format). That settles what the repository does, not what its v2 read writes: 7.161.26
+marks `checksumPolicyType`, `handleReleases` and `handleSnapshots` for the Maven family
+alone, so the v2 read leaves them out of an npm repository's, as it does an npm remote or
+virtual repository's ([#457](https://github.com/weaveplatform/artifactweave/issues/457),
+[#1494](https://github.com/weaveplatform/artifactweave/issues/1494)).
 A Debian repository's v2 read keeps `ddebSupported` whatever its class, and
 `debianTrivialLayout` only for a local or federated repository, as 7.161.26's
 `RepositoryConfigurationBase` marks them `@IncludeTypeSpecific(packageType = Debian)` and
@@ -964,13 +975,13 @@ Each read of a repository's configuration sends one of these field sets:
 
 | Read | Caller | Fields |
 |---|---|---|
-| `GET /api/repositories/{key}` | an administrator | every stored field, with the remote password and sensitive header values masked (`pkg/repo.Masked`); no `environments`, no `propertySets` (except on a virtual repository) and a virtual repository's no `repositories` as `[]`; and the fields 7.x's read model gives every repository (`pkg/repo.Full`): the fifteen legacy type flags ("Legacy type flags"), `forceNugetAuthentication`, `forceP2Authentication`, `forceConanAuthentication`, `ddebSupported` and `debianTrivialLayout` as `false` unless the repository's own type sets them, and `signedUrlTtl` as `90` when unset ([#1479](https://github.com/weaveplatform/artifactweave/issues/1479)) |
+| `GET /api/repositories/{key}` | an administrator | every field of 7.161.26's read model of the repository's class, whatever its package type (`pkg/repo.Full`): every stored field, with the remote password left out and sensitive header values masked (`pkg/repo.Masked`); no `environments`, no `propertySets` (except on a virtual repository) and a virtual repository's no `repositories` as `[]`; the fifteen legacy type flags ("Legacy type flags"); each field the model takes from the configuration of some package types alone, with its default for every other type whatever was stored, such as `forceNugetAuthentication`, `ddebSupported`, `calculateYumMetadata` and `terraformType`; and the model's defaults for the rest when unset, such as `signedUrlTtl` `90`, `xrayDataTtl` `90` and `blockPushingSchema1` `true` ("Common fields", "Local fields", "Remote fields", "Virtual fields"). A virtual repository's leaves out `blackedOut`, `xrayIndex`, `xrayDataTtl`, `downloadRedirect` and `cdnRedirect`, which its model does not have ([#1479](https://github.com/weaveplatform/artifactweave/issues/1479), [#1493](https://github.com/weaveplatform/artifactweave/issues/1493)) |
 | `GET /api/repositories/{key}` | anyone else who can read the repository | `key`, `rclass`, `packageType`, `description`, `notes` as `""`, `repoLayoutRef`, `includesPattern` and `excludesPattern` (`pkg/repo.Public`) |
-| `GET /api/v2/repositories/{key}` | as above | the same set, without the fields of other package types (`pkg/repo.Relevant`, "Per-ecosystem summary") |
+| `GET /api/v2/repositories/{key}` | as above | the same set, keeping each field only for the package types and classes 7.161.26's annotation names (`pkg/repo.Relevant`, "The v2 read and 7.161.26's annotations") |
 | `GET /api/v2/repositories/batch` | as above | each named repository as `GET /api/repositories/{key}` gives it to the caller, so an administrator gets every field ([#492](https://github.com/weaveplatform/artifactweave/issues/492)) |
 | `GET /api/repositories/configurations` | administrators only | each repository as the v2 read gives it to an administrator, grouped by class ([#457](https://github.com/weaveplatform/artifactweave/issues/457)) |
 | `GET /api/repositories` | anyone, for the repositories they can see | `key`, `type` (the class upper case), `packageType` (the listing name, "Package type names in listings"), `url`, and `description` when it is not empty |
-| `GET /api/repositories/{key}/configuration` | an administrator, or an authenticated user for a remote with `shareConfiguration` | for an administrator, every stored field with the secrets masked (`pkg/repo.Masked`), without the legacy type flags, which 7.x's remote repository descriptor does not have, or the other fields `pkg/repo.Full` adds; for anyone else `key`, `rclass`, `packageType`, `description`, `url`, `repoLayoutRef`, `remoteRepoLayoutRef`, `includesPattern` and `excludesPattern` |
+| `GET /api/repositories/{key}/configuration` | an administrator, or an authenticated user for a remote with `shareConfiguration` | for an administrator, the remote repository descriptor 7.161.26 answers with, masked as its `maskData` masks it (`pkg/repo.Shared`): every stored field without the username, password, proxy, local address and property sets, with sensitive header values masked, and the descriptor's defaults when unset (`signedUrlTtl` `90`, `dockerApiVersion` `V2`, `blockPushingSchema1` `true`, `maxUniqueTags` `0`, `archiveBrowsingEnabled`, `ddebSupported`, `propagateQueryParams` and `retrieveSha256FromServer` `false`, `customHttpHeaders` `[]`); none of the legacy type flags or the other fields `pkg/repo.Full` adds, which the descriptor does not have (`RepoConfigurationResource.getRemoteDescriptor`, [#1493](https://github.com/weaveplatform/artifactweave/issues/1493)). The descriptor's own JSON shape, with its `@class`, `type` and nested objects, is not mirrored **[I]**. For anyone else `key`, `rclass`, `packageType`, `description`, `url`, `repoLayoutRef`, `remoteRepoLayoutRef`, `includesPattern` and `excludesPattern` |
 
 The configurations list follows JFrog's sample of a generic local repository on that endpoint,
 which has the v2 read's fields and no `checksumPolicyType`, `handleReleases` or other Maven field
@@ -997,41 +1008,44 @@ types' fields, is **[I]**.
 7.x's v2 read and configurations list write a field only when the class that holds it marks it
 `@IncludeTypeSpecific` for the repository's package type and class (`TypeSpecificFilter`,
 which a `@Provider` in 7.161.26's `web/rest` installs; the repositories handlers that call
-it are closed source, so that these reads use it is **[I]**). `pkg/repo.Relevant` was compared
-with every annotation of `RepositoryConfigurationBase`, `LocalRepositoryConfigurationImpl`,
-`HttpRepositoryConfigurationImpl` and `VirtualRepositoryConfigurationImpl`
-(`FederatedRepositoryConfigurationImpl` adds only `members`) ([#1479](https://github.com/weaveplatform/artifactweave/issues/1479)).
-They agree on the legacy type flags, none kept; `signedUrlTtl`, kept for every type; the
-Debian fields; `forceNugetAuthentication`, `forceP2Authentication` and
-`forceConanAuthentication`, each kept for its own type on every class; the Docker, RPM,
-Cargo, NuGet remote and Helm local fields; and `maxUniqueSnapshots` on local repositories.
-artifactweave's v2 read differs from the annotations in these, which no JFrog client reads,
-as jfrog-client-go and the Terraform provider read the v1 read only. Each is **[I]** until a
-7.x capture settles it ([#216](https://github.com/weaveplatform/artifactweave/issues/216)):
-- npm: a local or federated npm repository keeps `checksumPolicyType`, `handleReleases` and
-  `handleSnapshots` ("Per-ecosystem summary"); 7.161.26 marks them for the Maven family
-  alone.
-- `maxUniqueSnapshots` on a remote: kept for the Maven family and NuGet; 7.161.26 marks it
-  for Maven and VCS remotes.
-- `forceMavenAuthentication`: kept for Gradle, Ivy and SBT virtual repositories too; 7.161.26
-  marks it for Maven.
-- Fields artifactweave keeps for every type that 7.161.26 marks for some types or classes:
-  `enableTokenAuthentication` (Docker remotes), `primaryKeyPairRef` and
-  `secondaryKeyPairRef` (Alpine, RPM, Debian and Opkg), `externalDependenciesEnabled`,
-  `externalDependenciesPatterns` and `externalDependenciesRemoteRepo` (the types each class's
-  annotation names), `virtualRetrievalCachePeriodSecs` and `keyPair` on a virtual
-  repository (the types its annotation names), and `useNamespaces` (Helm virtual
-  repositories).
-- Fields artifactweave keeps for one type that 7.161.26 marks for others or for no type:
-  `propagateQueryParams` and `retrieveSha256FromServer` (generic here, every remote type
-  there); the VCS fields (Go, VCS and Bower here; CocoaPods and Composer remotes there too);
-  `terraformType` and `encryptStates` (Terraform and Terraform backend here; `terraformType`
-  for Terraform and `encryptStates` for Terraform backend there); and
-  `forceMetadataNameVersion` and `forceNonDuplicateChart` (every Helm class here, Helm local
-  there, without federated).
-- On a virtual repository, artifactweave sends `priorityResolution`, `blackedOut`,
-  `xrayIndex`, `downloadRedirect` and `cdnRedirect`, which 7.161.26's virtual model does not
-  mark; a remote's `cdnRedirect` likewise.
+it are closed source, so that these reads use it is **[I]**). `pkg/repo.Relevant` keeps each
+field under the rules of its annotations on `RepositoryConfigurationBase`,
+`LocalRepositoryConfigurationImpl`, `HttpRepositoryConfigurationImpl`,
+`VirtualRepositoryConfigurationImpl` and `FederatedRepositoryConfigurationImpl`, one rule per
+annotation (`pkg/repo` `v2Fields`, [#1494](https://github.com/weaveplatform/artifactweave/issues/1494)). JFrog's samples of a generic local
+repository's v2 read and configurations list entry have the fields these rules keep. A field
+the model marks for every type and class (`key`, `rclass`, `packageType`, `description`,
+`notes`, the patterns, `repoLayoutRef`, `signedUrlTtl`, `projectKey`, `environments`) is kept
+for every repository, and a remote's own fields for every remote unless an annotation names
+some types. The legacy type flags, which the model does not mark, are never kept. Among the
+rules:
+- `checksumPolicyType`, `handleReleases` and `handleSnapshots` for the Maven family alone, so
+  not for npm, though a local or federated npm repository applies them ("Per-ecosystem
+  summary").
+- `maxUniqueSnapshots` for local and federated Maven family and NuGet repositories and for
+  Maven and VCS remotes; `forceMavenAuthentication` for a Maven virtual repository.
+- `enableTokenAuthentication` for Docker, OCI and Helm OCI remotes; `primaryKeyPairRef` and
+  `secondaryKeyPairRef` for Alpine, RPM, Debian and Opkg; `keyPair` for Maven family and P2
+  virtual repositories; `useNamespaces` for Helm virtual repositories.
+- `externalDependenciesEnabled` and `externalDependenciesPatterns` for the remotes and
+  virtual repositories of the types each annotation names, `externalDependenciesRemoteRepo`
+  for Bower, Go and npm virtual repositories, and `virtualRetrievalCachePeriodSecs` for
+  Chef, Conda, CRAN, Conan, Debian, Helm, npm and RPM virtual repositories.
+- `propagateQueryParams` and `retrieveSha256FromServer` for every remote; the VCS fields for
+  VCS, Bower, Go, CocoaPods and Composer remotes; `terraformType` for Terraform and
+  `encryptStates` for Terraform backend; `forceMetadataNameVersion` and
+  `forceNonDuplicateChart` for local Helm repositories, without federated.
+- `blackedOut`, `xrayIndex`, `xrayDataTtl`, `propertySets`, `priorityResolution`,
+  `downloadRedirect` and `proxy` for local, remote and federated repositories, and
+  `cdnRedirect` for local and federated ones.
+
+`p2ChildOrigins` has no 7.x counterpart and is kept where it acts, on a P2 repository. Some
+fields artifactweave acts on are left out of the v2 read with the annotation: a virtual RPM
+repository's `yumRootDepth`; `primaryKeyPairRef` on npm, Terraform, Nix and Hex
+repositories, which sign with it; and `keyPair` on Alpine, Debian, RPM, Opkg and Hex virtual
+repositories. That 7.x's v2 read leaves each out is **[I]** until a 7.x capture settles it
+([#216](https://github.com/weaveplatform/artifactweave/issues/216)). No JFrog client reads
+these two endpoints: jfrog-client-go and the Terraform provider read the v1 read only.
 
 ## Artifactory 7.x check
 
@@ -1058,8 +1072,8 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   `forceMetadataNameVersion` ([D] [getrepositoryconfigurationv2](https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md),
   sample `genericLocalV2`; the [getallrepositoryconfigurations](https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md)
   sample of a generic local repository has no `checksumPolicyType` either). `pkg/repo.Relevant`
-  keeps `checksumPolicyType` for the Maven family and local and federated npm repositories, and
-  `forceMetadataNameVersion` for Helm.
+  keeps `checksumPolicyType` for the Maven family and `forceMetadataNameVersion` for a local
+  Helm repository, as 7.161.26's annotations do ([#1494](https://github.com/weaveplatform/artifactweave/issues/1494)).
 
 **Changed or added in 7.x:**
 - **A key may start with a digit** from 7.53.1 (RTFACT-27514), though the class pages still
@@ -1120,9 +1134,10 @@ Settled since the audit:
   lets the build-info repository be updated through the repositories API and the descriptor;
   what 7.x answers to an update whose body key differs from the path's only in case; and the
   support bundle key, which the delete page's example spells `JFrog-Support-Bundles`.
-- From #457, on [#216](https://github.com/weaveplatform/artifactweave/issues/216): that a
-  NuGet repository's v2 read keeps `maxUniqueSnapshots`, and that a local or federated npm
-  repository's keeps `checksumPolicyType`, `handleReleases` and `handleSnapshots`.
+- From #457 and #1494, on [#216](https://github.com/weaveplatform/artifactweave/issues/216):
+  that a local or federated npm repository's v2 read leaves out `checksumPolicyType`,
+  `handleReleases` and `handleSnapshots`, as the annotations say, though the repository
+  applies them.
 - From #492, on [#216](https://github.com/weaveplatform/artifactweave/issues/216): what 7.x
   answers to an update whose `rclass` or `packageType` differs from the stored value only in
   case; whether the batch read's entries carry the v1 or the v2 read's fields ("Field sets of
@@ -1133,8 +1148,18 @@ Settled since the audit:
   virtual repository's v1 read carries the legacy type flags and the force and Debian flags,
   as its model does; that the v2 read, the batch read and the configurations list are
   written through `TypeSpecificFilter`; what 7.x answers to a create whose only legacy flag
-  is `enableDistRepoSupport`; and the differences "The v2 read and 7.161.26's annotations"
-  lists.
+  is `enableDistRepoSupport`; and the fields "The v2 read and 7.161.26's annotations" lists
+  as left out though artifactweave acts on them.
+- From #1493, on [#216](https://github.com/weaveplatform/artifactweave/issues/216): that a
+  remote, virtual or federated repository's v1 read carries every field of its model, as the
+  local dumps show for a local one; that it writes `mlRepoLayout`; `cargoInternalIndex` as
+  `true` when unset, where the Maven local read of 7.104.10 gave `false`; what the read of a
+  remote with a password sends; the model fields artifactweave does not hold
+  (`gitLabResolveSubgroups`, `podsForceModifyIndex`, `authUrl` and the other types' registry
+  URLs on a remote, `vcsType` on remotes of other types, `gridTopologyId`,
+  `federationOnGrid`); and the shared remote configuration's descriptor shape, its answer to
+  a caller other than an administrator, and what it answers for a remote that does not
+  share its configuration.
 - The v2 read's other fields per package type. The `genericLocalV2` sample also lacks
   `priorityResolution` and `environments`, which artifactweave's v2 read still sends for
   every type: the sample may predate both fields, and the configurations sample of the same

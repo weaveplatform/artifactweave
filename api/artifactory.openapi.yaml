@@ -9220,7 +9220,10 @@ paths:
         - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleterepository.md
     get:
-      description: Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
+      # 7.161.26's read models (LocalRepositoryConfigurationImpl, HttpRepositoryConfigurationImpl,
+      # VirtualRepositoryConfigurationImpl) hold every field of their class whatever the package type,
+      # as the v1 reads of RTFACT-29415, RTFACT-30672 and RTFACT-31100 show.
+      description: Returns the stored configuration with defaults filled in. Admins receive every field of the repository's class, whatever its package type, each a setting of another package type giving its default; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. A stored remote password is left out and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
       operationId: getRepositoryConfiguration
       parameters:
         - $ref: '#/components/parameters/repoKey'
@@ -15532,7 +15535,7 @@ paths:
         - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleterepositories.md
     get:
-      description: Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field; other callers receive the public subset. At most 100 names per call.
+      description: Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field of each repository's class, as the ordinary read gives them; other callers receive the public subset. At most 100 names per call.
       operationId: getBatchOfRepositoriesByName
       parameters:
         - description: Required query parameter. Repository keys to return, comma-separated or repeated. At most 100.
@@ -15713,7 +15716,9 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createmultiplerepositories.md
   /api/v2/repositories/{repoKey}:
     get:
-      description: Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
+      # 7.161.26's IncludeTypeSpecific annotations on the read models, which TypeSpecificFilter applies,
+      # name the package types and classes each field is written for.
+      description: Like the ordinary read but returns only the fields that apply to the repository's package type and class, so a generic repository has no Maven or Docker fields in the response and a virtual repository no blackedOut or cdnRedirect. checksumPolicyType, handleReleases and handleSnapshots apply to maven, gradle, ivy and sbt repositories only, and maxUniqueSnapshots to local and federated maven, gradle, ivy, sbt and nuget repositories and to maven and vcs remotes. Access rules are the same as the ordinary read.
       operationId: getRepositoryConfigurationV2
       parameters:
         - $ref: '#/components/parameters/repoKey'
@@ -20875,16 +20880,20 @@ components:
           description: Optional within this object. When true the repository refuses every download and deploy. Defaults to false.
           type: boolean
         blockPushingSchema1:
-          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected. Defaults to false; schema 1 manifests are rejected regardless of this setting. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
+          # 7.161.26's descriptor (RealRepoDescriptor) and read model (RepositoryConfigurationBase) default
+          # it to true, and the v1 reads of RTFACT-29415, RTFACT-30672 and RTFACT-31100 show true.
+          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected. Defaults to true; schema 1 manifests are rejected regardless of this setting. A docker, oci or helmoci repository's v1 read gives what it set, and any other repository's true whatever was sent; the v2 read leaves it out but for a docker, oci or helmoci repository. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         calculateYumMetadata:
-          description: Optional within this object. When true RPM metadata is regenerated automatically on deploy. Defaults to false. Stored only; not implemented for RPM.
+          # JFrog's RPM guide: "When set, RPM metadata calculation is automatically triggered" by a
+          # deploy, a delete, a move or a copy of a package.
+          description: Optional within this object. When true a deploy or delete of a package in an rpm repository, a move or copy included, queues a rebuild of its repodata metadata; when false the repodata is rebuilt only when a metadata calculation is requested. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
         cargoAnonymousAccess:
-          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Native sparse reads still require the repository's permission grants.
+          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Native sparse reads still require the repository's permission grants. The v1 read gives false when unset, and for a repository of another type whatever was sent.
           type: boolean
         cargoInternalIndex:
-          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. The native Cargo protocol serves a sparse HTTP index.
+          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. The native Cargo protocol serves a sparse HTTP index. The v1 read gives true when unset, and for a repository of another type whatever was sent.
           type: boolean
         cdnRedirect:
           description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never redirected to a CDN. Defaults to false. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
@@ -20914,6 +20923,9 @@ components:
           enum:
             - V2
           type: string
+        dockerProjectId:
+          description: Optional within this object. A docker, oci or helmoci remote repository's upstream project id; stored only. A docker, oci or helmoci repository's v1 read gives what it set and leaves it out when unset; any other repository's gives an empty string whatever was sent. The v2 read leaves it out.
+          type: string
         dockerTagRetention:
           description: Optional within this object. Number of unique tags to keep per Docker image when maxUniqueTags is applied. Defaults to 1.
           type: integer
@@ -20932,6 +20944,9 @@ components:
         enableComposerSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a composer repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
+        enableComposerV1Indexing:
+          description: Optional within this object. Whether a composer repository also indexes its packages for Composer 1 clients. Stored only. Defaults to false. The v1 read of a repository of another type gives false whatever was sent; the v2 read keeps it for a composer repository only.
+          type: boolean
         enableConanSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic; this flag gives conan, where 7.x's own order gives conda by a slip. The v1 read gives it true for a conan repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
@@ -20945,13 +20960,18 @@ components:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a docker, oci or helmoci repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
         enableFileListsIndexing:
-          description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
+          # JFrog's RPM guide: "When set, RPM metadata calculation will also include indexing the
+          # filelists.xml metadata file."
+          description: Optional within this object. Whether an rpm repository's metadata calculation also writes the filelists.xml index. Stored only; the repodata never has filelists.xml. Defaults to false. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableGemsSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a gems repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
         enableGitLfsSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a gitlfs repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableNormalizedVersion:
+          description: Optional within this object. Whether a nuget repository normalises package versions. Stored only. Defaults to false. The v1 read of a repository of another type gives false whatever was sent; the v2 read keeps it for a nuget repository only.
           type: boolean
         enableNpmSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for an npm repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
@@ -20969,7 +20989,7 @@ components:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a vagrant repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
         encryptStates:
-          description: Optional within this object. Stored only, with no default. The terraformbackend package type, which seals states while it is true, is local only.
+          description: Optional within this object. Stored only. The terraformbackend package type, which seals states while it is true, is local only. The v1 read gives true whatever was sent, as 7.x's read model of a federated repository holds it; the v2 read leaves it out.
           type: boolean
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD. Mandatory when projectKey is set; a repository may belong to several environments. An administrator's read lists none as an empty array rather than leaving the field out.
@@ -21028,6 +21048,9 @@ components:
               - url
             type: object
           type: array
+        mlRepoLayout:
+          description: Optional within this object. Whether a huggingfaceml repository uses the machine learning repository layout. Stored only. Defaults to false. The v1 read of a repository of another type gives false whatever was sent; the v2 read leaves it out.
+          type: boolean
         notes:
           description: Optional within this object. Free text for operators. Not interpreted by the server. Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows an empty string.
           type: string
@@ -21087,23 +21110,25 @@ components:
           description: Optional within this object. When true a POM whose coordinates disagree with its deploy path is accepted instead of rejected. Defaults to false.
           type: boolean
         terraformType:
-          description: Optional within this object. Whether a Terraform repository serves MODULE or PROVIDER registry endpoints. Local and federated repositories only. The server accepts module and provider in any letter case and echoes upper case; any other value is rejected with 400. Once set it cannot change or be removed, and an update that tries is rejected with 400. An update may set it on a repository that has none, which queues a reindex of the repository.
+          description: Optional within this object. Whether a Terraform repository serves MODULE or PROVIDER registry endpoints. Local and federated repositories only. The server accepts module and provider in any letter case and echoes upper case; any other value is rejected with 400. Once set it cannot change or be removed, and an update that tries is rejected with 400. An update may set it on a repository that has none, which queues a reindex of the repository. The v1 read of a repository of another type gives MODULE whatever was sent, and the v2 read leaves it out.
           enum:
             - MODULE
             - PROVIDER
           type: string
         xrayDataTtl:
-          description: Optional within this object. Read only. Days that Xray retains scan data. Returned only; it has no effect.
+          description: Optional within this object. Read only. Days that Xray retains scan data. Returned only; it has no effect. Reads give 90 when it was never set.
           readOnly: true
           type: integer
         xrayIndex:
           description: Optional within this object. Whether Xray should index this repository. The flag is stored and echoed, but no scan runs. Defaults to false.
           type: boolean
         yumGroupFileNames:
-          description: Optional within this object. Comma-separated names of the XML files that define an rpm repository's package groups. Stored only.
+          description: Optional within this object. Comma-separated names of the XML files that define an rpm repository's package groups. Stored only; the repodata lists no group file. The v1 read of a repository of another type leaves it out.
           type: string
         yumRootDepth:
-          description: Optional within this object. Folder depth below which RPM metadata is calculated. Stored only.
+          # JFrog's RPM guide, "RPM Metadata Folder Depth": the level of directory under which RPMs are
+          # searched for and the repodata directory saved; 0, the default, is the repository's root.
+          description: Optional within this object. Folder depth at which an rpm repository writes its repodata metadata, each folder at that depth indexing the packages below it. 0, the default, writes one repodata at the repository's root; 1 writes one in each top-level folder, and a package less deep than the depth is in no index. The v1 read of a repository of another type gives 0 whatever was sent.
           type: integer
       required:
         - key
@@ -21736,16 +21761,20 @@ components:
           description: Optional within this object. When true the repository refuses every download and deploy. Defaults to false.
           type: boolean
         blockPushingSchema1:
-          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected. Defaults to false; schema 1 manifests are rejected regardless of this setting. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
+          # 7.161.26's descriptor (RealRepoDescriptor) and read model (RepositoryConfigurationBase) default
+          # it to true, and the v1 reads of RTFACT-29415, RTFACT-30672 and RTFACT-31100 show true.
+          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected. Defaults to true; schema 1 manifests are rejected regardless of this setting. A docker, oci or helmoci repository's v1 read gives what it set, and any other repository's true whatever was sent; the v2 read leaves it out but for a docker, oci or helmoci repository. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         calculateYumMetadata:
-          description: Optional within this object. When true RPM metadata is regenerated automatically on deploy. Defaults to false. Stored only; not implemented for RPM.
+          # JFrog's RPM guide: "When set, RPM metadata calculation is automatically triggered" by a
+          # deploy, a delete, a move or a copy of a package.
+          description: Optional within this object. When true a deploy or delete of a package in an rpm repository, a move or copy included, queues a rebuild of its repodata metadata; when false the repodata is rebuilt only when a metadata calculation is requested. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
         cargoAnonymousAccess:
-          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Native sparse reads still require the repository's permission grants.
+          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Native sparse reads still require the repository's permission grants. The v1 read gives false when unset, and for a repository of another type whatever was sent.
           type: boolean
         cargoInternalIndex:
-          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. The native Cargo protocol serves a sparse HTTP index.
+          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. The native Cargo protocol serves a sparse HTTP index. The v1 read gives true when unset, and for a repository of another type whatever was sent.
           type: boolean
         cdnRedirect:
           description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never redirected to a CDN. Defaults to false. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
@@ -21800,6 +21829,9 @@ components:
           enum:
             - V2
           type: string
+        dockerProjectId:
+          description: Optional within this object. A docker, oci or helmoci remote repository's upstream project id; stored only. A docker, oci or helmoci repository's v1 read gives what it set and leaves it out when unset; any other repository's gives an empty string whatever was sent. The v2 read leaves it out.
+          type: string
         dockerTagRetention:
           description: Optional within this object. Number of unique tags to keep per Docker image when maxUniqueTags is applied. Defaults to 1.
           type: integer
@@ -21818,6 +21850,9 @@ components:
         enableComposerSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a composer repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
+        enableComposerV1Indexing:
+          description: Optional within this object. Whether a composer repository also indexes its packages for Composer 1 clients. Stored only. Defaults to false. The v1 read of a repository of another type gives false whatever was sent; the v2 read keeps it for a composer repository only.
+          type: boolean
         enableConanSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic; this flag gives conan, where 7.x's own order gives conda by a slip. The v1 read gives it true for a conan repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
@@ -21831,13 +21866,18 @@ components:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a docker, oci or helmoci repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
         enableFileListsIndexing:
-          description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
+          # JFrog's RPM guide: "When set, RPM metadata calculation will also include indexing the
+          # filelists.xml metadata file."
+          description: Optional within this object. Whether an rpm repository's metadata calculation also writes the filelists.xml index. Stored only; the repodata never has filelists.xml. Defaults to false. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableGemsSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a gems repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
         enableGitLfsSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a gitlfs repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableNormalizedVersion:
+          description: Optional within this object. Whether a nuget repository normalises package versions. Stored only. Defaults to false. The v1 read of a repository of another type gives false whatever was sent; the v2 read keeps it for a nuget repository only.
           type: boolean
         enableNpmSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for an npm repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
@@ -21855,7 +21895,7 @@ components:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a vagrant repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
         encryptStates:
-          description: Optional within this object. For a terraformbackend repository, whether each Terraform state written while it is true is sealed under the master key before it is stored; a stored state keeps the form it was written in, so a change applies to later writes, and the item download serves a sealed state as stored. Defaults to true on a local repository of any package type and is returned for each; other package types store it only.
+          description: Optional within this object. For a terraformbackend repository, whether each Terraform state written while it is true is sealed under the master key before it is stored; a stored state keeps the form it was written in, so a change applies to later writes, and the item download serves a sealed state as stored. Defaults to true on a local repository of any package type. The v1 read gives a terraformbackend repository what it set and any other true whatever was sent; the v2 read leaves it out but for a terraformbackend repository.
           type: boolean
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD. Mandatory when projectKey is set; a repository may belong to several environments. An administrator's read lists none as an empty array rather than leaving the field out.
@@ -21899,6 +21939,9 @@ components:
         maxUniqueTags:
           description: Optional within this object. Maximum tags kept per Docker image; older tags are deleted when a push exceeds it. 0 (the default) keeps everything.
           type: integer
+        mlRepoLayout:
+          description: Optional within this object. Whether a huggingfaceml repository uses the machine learning repository layout. Stored only. Defaults to false. The v1 read of a repository of another type gives false whatever was sent; the v2 read keeps it for a huggingfaceml repository only.
+          type: boolean
         notes:
           description: Optional within this object. Free text for operators. Not interpreted by the server. Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows an empty string.
           type: string
@@ -21955,23 +21998,25 @@ components:
           description: Optional within this object. When true a POM whose coordinates disagree with its deploy path is accepted instead of rejected. Defaults to false.
           type: boolean
         terraformType:
-          description: Optional within this object. Whether a Terraform repository serves MODULE or PROVIDER registry endpoints. Local and federated repositories only. The server accepts module and provider in any letter case and echoes upper case; any other value is rejected with 400. Once set it cannot change or be removed, and an update that tries is rejected with 400. An update may set it on a repository that has none, which queues a reindex of the repository.
+          description: Optional within this object. Whether a Terraform repository serves MODULE or PROVIDER registry endpoints. Local and federated repositories only. The server accepts module and provider in any letter case and echoes upper case; any other value is rejected with 400. Once set it cannot change or be removed, and an update that tries is rejected with 400. An update may set it on a repository that has none, which queues a reindex of the repository. The v1 read of a repository of another type gives MODULE whatever was sent, and the v2 read leaves it out.
           enum:
             - MODULE
             - PROVIDER
           type: string
         xrayDataTtl:
-          description: Optional within this object. Read only. Days that Xray retains scan data. Returned only; it has no effect.
+          description: Optional within this object. Read only. Days that Xray retains scan data. Returned only; it has no effect. Reads give 90 when it was never set.
           readOnly: true
           type: integer
         xrayIndex:
           description: Optional within this object. Whether Xray should index this repository. The flag is stored and echoed, but no scan runs. Defaults to false.
           type: boolean
         yumGroupFileNames:
-          description: Optional within this object. Comma-separated names of the XML files that define an rpm repository's package groups. Stored only.
+          description: Optional within this object. Comma-separated names of the XML files that define an rpm repository's package groups. Stored only; the repodata lists no group file. The v1 read of a repository of another type leaves it out.
           type: string
         yumRootDepth:
-          description: Optional within this object. Folder depth below which RPM metadata is calculated. Stored only.
+          # JFrog's RPM guide, "RPM Metadata Folder Depth": the level of directory under which RPMs are
+          # searched for and the repodata directory saved; 0, the default, is the repository's root.
+          description: Optional within this object. Folder depth at which an rpm repository writes its repodata metadata, each folder at that depth indexing the packages below it. 0, the default, writes one repodata at the repository's root; 1 writes one in each top-level folder, and a package less deep than the depth is in no index. The v1 read of a repository of another type gives 0 whatever was sent.
           type: integer
       required:
         - key
@@ -23358,6 +23403,9 @@ components:
         allowAnyHostAuth:
           description: Optional within this object. When true credentials are sent to any host the upstream redirects to, not only the configured one. Defaults to false.
           type: boolean
+        archiveBrowsingEnabled:
+          description: Optional within this object. Stored only on a remote repository. Reads give false when it was never set.
+          type: boolean
         assumedOfflinePeriodSecs:
           description: Optional within this object. Seconds the upstream is assumed offline after a connection failure, during which only the cache is served. Defaults to 300.
           type: integer
@@ -23368,7 +23416,9 @@ components:
           description: Optional within this object. When true a response whose Content-Type disagrees with the extension is rejected. Defaults to true.
           type: boolean
         blockPushingSchema1:
-          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected. Defaults to false; schema 1 manifests are rejected regardless of this setting. Rendered as a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on input.
+          # 7.161.26's descriptor (RealRepoDescriptor) and read model (RepositoryConfigurationBase) default
+          # it to true, and the v1 reads of RTFACT-29415, RTFACT-30672 and RTFACT-31100 show true.
+          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected. Defaults to true; schema 1 manifests are rejected regardless of this setting. A docker, oci or helmoci repository's v1 read gives what it set, and any other repository's true whatever was sent; the v2 read leaves it out but for a docker, oci or helmoci repository. Rendered as a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         bowerRegistryUrl:
           description: Optional within this object. Upstream Bower registry URL. Defaults to https://registry.bower.io on a bower repository. Stored only; Bower is not served.
@@ -23377,10 +23427,10 @@ components:
           description: Optional within this object. When true the server skips the HEAD probe before fetching and issues GET directly. Defaults to false.
           type: boolean
         cargoAnonymousAccess:
-          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Native sparse reads still require the repository's permission grants.
+          description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Native sparse reads still require the repository's permission grants. The v1 read gives false when unset, and for a repository of another type whatever was sent.
           type: boolean
         cargoInternalIndex:
-          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. The native Cargo protocol serves a sparse HTTP index.
+          description: Optional within this object. When true a cargo repository serves a sparse index instead of a git index. The native Cargo protocol serves a sparse HTTP index. The v1 read gives true when unset, and for a repository of another type whatever was sent.
           type: boolean
         cdnRedirect:
           description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never redirected to a CDN. Defaults to false. Rendered as a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on input.
@@ -23426,7 +23476,7 @@ components:
           description: Optional within this object. Whether the repository is protected by the curation service. Stored and echoed; no curation runs.
           type: boolean
         customHttpHeaders:
-          description: Optional within this object. Headers added to every upstream request. Each entry has name, value and sensitive; sensitive values are masked on read.
+          description: Optional within this object. Headers added to every upstream request. Each entry has name, value and sensitive; sensitive values are masked on read. An administrator's v1 read lists none as an empty array.
           items:
             properties:
               name:
@@ -23463,8 +23513,11 @@ components:
         disableUrlNormalization:
           description: Optional within this object. When true the upstream path is sent exactly as requested without normalising duplicate slashes or dot segments. Defaults to false.
           type: boolean
+        dockerApiVersion:
+          description: Optional within this object. Docker registry API version served. Only V2 is accepted. The v1 read gives V2 when unset, and for a repository that is not docker, oci or helmoci whatever was sent.
+          type: string
         dockerProjectId:
-          description: Optional within this object. Google Artifact Registry project id used when the upstream is Google. Stored only.
+          description: Optional within this object. Google Artifact Registry project id used when the upstream is Google. Stored only. A docker, oci or helmoci repository's v1 read gives what it set and leaves it out when unset; any other repository's gives an empty string whatever was sent. The v2 read keeps it for a docker, oci or helmoci repository only.
           type: string
         downloadContextPath:
           description: Optional within this object. Path of NuGet package downloads below the upstream URL. Defaults to api/v2/package.
@@ -23504,6 +23557,9 @@ components:
           type: boolean
         enableGitLfsSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a gitlfs repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableNormalizedVersion:
+          description: Optional within this object. Whether a nuget repository normalises package versions. Stored only. Defaults to false. The v1 read of a repository of another type gives false whatever was sent; the v2 read keeps it for a nuget repository only.
           type: boolean
         enableNpmSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for an npm repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
@@ -23553,6 +23609,12 @@ components:
         forceConanAuthentication:
           description: Optional within this object. Conan repositories only. When true every anonymous request to the repository's Conan API, /artifactory/api/conan/<key>/..., answers 401 "Authentication is required" with the Basic challenge before it is served, whatever the anonymous user may read, so that a Conan client sends its credentials. The item paths, /artifactory/<key>/..., are not affected. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
+        forceMetadataNameVersion:
+          description: Optional within this object. Stored only; the chart name and version check applies to local and federated helm repositories. The v1 read gives false whatever was sent, and the v2 read leaves it out.
+          type: boolean
+        forceNonDuplicateChart:
+          description: Optional within this object. Stored only; the duplicate chart check applies to local and federated helm repositories. The v1 read gives false whatever was sent, and the v2 read leaves it out.
+          type: boolean
         forceNugetAuthentication:
           description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an anonymous 200. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
@@ -23584,10 +23646,13 @@ components:
           description: Optional within this object. When true folder listings include items that exist upstream but are not cached. Defaults to false. Rendered as a JSON boolean; the server also accepts the strings "true" and "false" on input.
           type: boolean
         localAddress:
-          description: Optional within this object. Local network interface address to bind outbound connections to. Empty means any.
+          description: Optional within this object. Local network interface address to bind outbound connections to. Empty means any. An administrator's v1 read gives an empty string when unset.
           type: string
         maxUniqueSnapshots:
           description: Optional within this object. Maximum unique snapshot builds kept per Maven artifact and classifier. A deploy marks the artifact, and a cleanup that runs every five minutes by default deletes its oldest builds over the limit. 0 (the default) keeps everything; a limit of 1 keeps 2.
+          type: integer
+        maxUniqueTags:
+          description: Optional within this object. Stored only on a remote repository. The v1 read gives 0 when unset; the v2 read leaves it out.
           type: integer
         metadataRetrievalTimeoutSecs:
           description: Optional within this object. Seconds to wait for metadata from the upstream before giving up. Defaults to 60.
@@ -23598,6 +23663,9 @@ components:
         missedRetrievalCachePeriodSecs:
           description: Optional within this object. Seconds a failed lookup is remembered so repeated requests for a missing item do not hit the upstream. Defaults to 1800, and to 600 for go.
           type: integer
+        mlRepoLayout:
+          description: Optional within this object. Whether a huggingfaceml repository uses the machine learning repository layout. Stored only. Defaults to false. The v1 read of a repository of another type gives false whatever was sent; the v2 read keeps it for a huggingfaceml repository only.
+          type: boolean
         notes:
           description: Optional within this object. Free text for operators. Not interpreted by the server. Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows an empty string.
           type: string
@@ -23619,7 +23687,7 @@ components:
           description: Optional within this object. Whether the curation service audits the repository's downloads without blocking them. Stored and echoed; no curation runs.
           type: boolean
         password:
-          description: 'Optional within this object. Password or token for upstream authentication. Write only: reads return a masked value, and an omitted field on update keeps the stored secret.'
+          description: 'Optional within this object. Password or token for upstream authentication. Write only: reads leave a stored password out, and an omitted field on update keeps the stored secret. An administrator''s v1 read of a remote repository without one gives an empty string.'
           type: string
         podsSpecsRepoUrl:
           description: Optional within this object. Legacy Git specs repository URL. New CocoaPods repositories use the CDN URL.
@@ -23678,6 +23746,9 @@ components:
         retrieveSha256FromServer:
           description: Optional within this object. When true a generic repository asks the upstream for the SHA-256 of an item it has not cached. Stored only.
           type: boolean
+        sendContext:
+          description: Optional within this object. A remote repository setting that is stored and echoed; nothing acts on it. Reads give false when it was never set.
+          type: boolean
         shareConfiguration:
           description: Optional within this object. When true the sanitised configuration is exposed through the deprecated shared configuration endpoint. Defaults to false.
           type: boolean
@@ -23714,7 +23785,7 @@ components:
           format: uri
           type: string
         username:
-          description: Optional within this object. Username for upstream authentication. Sent with password as HTTP Basic unless enableTokenAuthentication applies.
+          description: Optional within this object. Username for upstream authentication. Sent with password as HTTP Basic unless enableTokenAuthentication applies. An administrator's v1 read gives an empty string when unset.
           type: string
         v3FeedUrl:
           description: Optional within this object. URL of the upstream NuGet v3 service index. Defaults to https://api.nuget.org/v3/index.json.
@@ -23740,7 +23811,7 @@ components:
             - GIT
           type: string
         xrayDataTtl:
-          description: Optional within this object. Read only. Days that Xray retains scan data. Returned only; it has no effect.
+          description: Optional within this object. Read only. Days that Xray retains scan data. Returned only; it has no effect. Reads give 90 when it was never set.
           readOnly: true
           type: integer
         xrayIndex:
@@ -24226,7 +24297,7 @@ components:
       type: object
     SharedRemoteRepositoryConfiguration:
       additionalProperties: true
-      description: 'Sanitised view of a remote repository returned by the deprecated shared configuration endpoint: credentials and proxy settings are removed.'
+      description: 'Sanitised view of a remote repository returned by the deprecated shared configuration endpoint: the username, password, proxy, local address and property sets are removed, and signedUrlTtl, dockerApiVersion, blockPushingSchema1, maxUniqueTags, archiveBrowsingEnabled, ddebSupported, propagateQueryParams, retrieveSha256FromServer and customHttpHeaders carry their defaults when unset. A caller other than an administrator sees only the key, class, package type, description, URL, layouts and patterns.'
       properties:
         key:
           description: Optional within this object. The repository key.
@@ -24901,6 +24972,18 @@ components:
         artifactoryRequestsCanRetrieveRemoteArtifacts:
           description: Optional within this object. When true requests that originate from a smart remote repository on another server may trigger remote fetches through this virtual repository. Defaults to false.
           type: boolean
+        blockPushingSchema1:
+          description: Optional within this object. Stored only; schema 1 manifests are rejected on every push. The v1 read gives true whatever was sent, and the v2 read leaves it out.
+          type: boolean
+        cachingLocalForeignLayersEnabled:
+          description: Optional within this object. Whether a docker, oci or helmoci virtual repository caches foreign layers locally. Stored only. Defaults to false. The v1 read of a repository of another type gives false whatever was sent; the v2 read keeps it for a docker, oci or helmoci repository only.
+          type: boolean
+        cargoAnonymousAccess:
+          description: Optional within this object. Stored only on a virtual repository. The v1 read gives false when unset, and for a repository of another type whatever was sent; the v2 read keeps it for a cargo repository only.
+          type: boolean
+        cargoInternalIndex:
+          description: Optional within this object. Read only. The v1 read gives true; the v2 read keeps it for a cargo repository only.
+          type: boolean
         ddebSupported:
           # 7.161.26's RepositoryConfigurationBase, every class's configuration model, holds it with the
           # default false and marks it @IncludeTypeSpecific for every Debian repository.
@@ -24926,6 +25009,9 @@ components:
           description: Optional within this object. Docker registry API version served. Only V2 is accepted.
           enum:
             - V2
+          type: string
+        dockerProjectId:
+          description: Optional within this object. Stored only. A docker, oci or helmoci repository's v1 read gives what it set and leaves it out when unset; any other repository's gives an empty string whatever was sent. The v2 read leaves it out.
           type: string
         enableBowerSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a bower repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
@@ -24956,6 +25042,9 @@ components:
           type: boolean
         enableGitLfsSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a gitlfs repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableNormalizedVersion:
+          description: Optional within this object. Whether a nuget repository normalises package versions. Stored only. Defaults to false. The v1 read of a repository of another type gives false whatever was sent; the v2 read keeps it for a nuget repository only.
           type: boolean
         enableNpmSupport:
           description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for an npm repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
@@ -24999,6 +25088,12 @@ components:
         forceMavenAuthentication:
           description: Optional within this object. Maven repositories only. When true every request without credentials to the repository's item paths, /artifactory/<key>/..., whatever its method or query, ?trace included, answers 401 "Unauthorized" with the Basic challenge before anything is read, whatever the anonymous user may read and whether anonymous access is on or off, so that a Maven client sends its credentials. While anonymous access is on, the anonymous user's Basic credentials and a Bearer token that does not verify count as none. Only the repository a request names counts, so a read through another virtual repository that has this one as a member is not asked, and the package API routes under /artifactory/api/ are not affected. A Gradle, Ivy or SBT virtual repository stores the flag with no effect. Defaults to false.
           type: boolean
+        forceMetadataNameVersion:
+          description: Optional within this object. Stored only; the chart name and version check applies to local and federated helm repositories. The v1 read gives false whatever was sent, and the v2 read leaves it out.
+          type: boolean
+        forceNonDuplicateChart:
+          description: Optional within this object. Stored only; the duplicate chart check applies to local and federated helm repositories. The v1 read gives false whatever was sent, and the v2 read leaves it out.
+          type: boolean
         forceNugetAuthentication:
           description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an anonymous 200. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
@@ -25015,8 +25110,11 @@ components:
           description: 'Required within this object. The repository key, unique without regard to case. At most 64 characters, 58 on a remote repository and 63 on a local or federated repository of package type `docker`, `oci` or `helmoci`. It contains no white space and none of `! @ # $ % ^ & * ( ) + = { } [ ] : ; < > , / ? ~ | \ "` or a backtick. It is not one of `.`, `..`, `&`, `jfrog-usage-logs`, `jfrog-billing-logs`, `jfrog-logs`, `artifactory-build-info`, `artifactory-pipe-info`, `auto-trashcan`, `jfrog-support-bundle`, `_intransit`, `artifactory-edge-uploads` or `release-bundles` in any case, does not start with `jfrog-system-reserved` or `jfrog-artifactory-system` in any case, and does not end in `-cache`, the suffix that names a remote repository''s cache. A `docker`, `oci` or `helmoci` key has no upper case letters and no underscore. On create the key in the URL path wins over the body; after creation it is immutable, letter case included. Repositories created inside a project are prefixed with the project key followed by a hyphen.'
           type: string
         keyPair:
-          description: Optional within this object. Name of the key pair used to sign aggregated metadata where the format needs it.
+          description: Optional within this object. Name of the key pair used to sign aggregated metadata where the format needs it. An administrator's v1 read gives an empty string when unset; the v2 read keeps it for a maven, gradle, ivy, sbt or p2 repository only.
           type: string
+        mlRepoLayout:
+          description: Optional within this object. Whether a huggingfaceml repository uses the machine learning repository layout. Stored only. Defaults to false. The v1 read of a repository of another type gives false whatever was sent; the v2 read leaves it out.
+          type: boolean
         notes:
           description: Optional within this object. Free text for operators. Not interpreted by the server. Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows an empty string.
           type: string
@@ -25045,6 +25143,9 @@ components:
         primaryKeyPairRef:
           description: Optional within this object. Name of the key pair used to sign metadata for formats that need it (Debian, RPM, Alpine, Terraform providers). Must name an existing key pair.
           type: string
+        priorityResolution:
+          description: Optional within this object. Stored only; a virtual repository is never a member whose order this sets. The v1 read gives false when unset, and the v2 read leaves it out.
+          type: boolean
         projectKey:
           description: Optional within this object. Key of the project that owns the repository. In a project, missing environments become DEV (decision 0013). The repository key is not checked for the project prefix. Changing it moves the repository between projects.
           type: string

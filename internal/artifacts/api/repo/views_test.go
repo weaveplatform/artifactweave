@@ -103,8 +103,11 @@ func TestUnitRelevant(t *testing.T) {
 }
 
 // The fields the clients send that only one ecosystem has stay in that
-// ecosystem's v2 read; the curation flags, which several have, stay in
-// every read (#396).
+// ecosystem's v2 read of a remote repository, as 7.161.26's annotations
+// name them; the query, checksum and curation flags, which it marks for
+// every remote, stay in every remote's read (#396, #1494). yumGroupFileNames
+// is a local and federated field and p2Urls a virtual one, so no remote's
+// read keeps either.
 func TestUnitRelevantKeepsEachEcosystemsClientFields(t *testing.T) {
 	all := repo.Config{
 		Key: "r", Class: repo.Remote, URL: "https://x",
@@ -130,6 +133,8 @@ func TestUnitRelevantKeepsEachEcosystemsClientFields(t *testing.T) {
 			"curation":  c.Curated != nil && c.PassThrough != nil,
 		}
 	}
+	everyRemote := []string{"generic", "curation"}
+	noRemote := []string{"rpm", "p2"}
 	for _, pt := range []repo.PackageType{
 		repo.Generic, repo.Cargo, repo.RPM, repo.Debian, repo.Conan, repo.P2, repo.CocoaPods,
 		repo.Hex, repo.Docker,
@@ -137,7 +142,9 @@ func TestUnitRelevantKeepsEachEcosystemsClientFields(t *testing.T) {
 		c := all
 		c.PackageType = pt
 		for group, ok := range kept(repo.Relevant(c)) {
-			if want := group == string(pt) || group == "curation"; ok != want {
+			want := (group == string(pt) || slices.Contains(everyRemote, group)) &&
+				!slices.Contains(noRemote, group)
+			if ok != want {
 				t.Errorf("%s: %s fields kept %v, want %v", pt, group, ok, want)
 			}
 		}
@@ -146,9 +153,9 @@ func TestUnitRelevantKeepsEachEcosystemsClientFields(t *testing.T) {
 
 // The configurations list's entry for a generic local repository has the
 // fields of JFrog's sample (getallrepositoryconfigurations.md), but for
-// xrayDataTtl and a project key, which the sample's repository has and this
-// one does not (#457). signedUrlTtl is 90 when unset, as in the sample
-// (#1479).
+// a project key, which the sample's repository has and this one does not
+// (#457). signedUrlTtl and xrayDataTtl are 90 when unset, as in the sample
+// (#1479, #1494).
 func TestUnitConfigurationsEntryMatchesTheDocumentedSample(t *testing.T) {
 	sample := []string{
 		"key", "packageType", "description", "notes", "includesPattern", "excludesPattern",
@@ -171,8 +178,7 @@ func TestUnitConfigurationsEntryMatchesTheDocumentedSample(t *testing.T) {
 		}
 	}
 	for _, field := range sample {
-		if _, ok := got[field]; !ok &&
-			!slices.Contains([]string{"xrayDataTtl", "projectKey"}, field) {
+		if _, ok := got[field]; !ok && field != "projectKey" {
 			t.Errorf("%s is missing", field)
 		}
 	}
@@ -197,17 +203,21 @@ func TestUnitRelevantKeepsMaxUniqueSnapshotsForNuGet(t *testing.T) {
 	}
 }
 
-// A local or federated npm repository applies the checksum policy and the
-// release and snapshot handling, so its v2 read keeps them; an npm remote
-// or virtual one, and a generic one, do not (#457, #481).
-func TestUnitRelevantKeepsTheDeployPolicyForHostedNpm(t *testing.T) {
+// The v2 read keeps the checksum policy and the release and snapshot
+// handling for the Maven family alone, as 7.161.26's annotations name it,
+// though a local or federated npm repository applies them too (#481): the
+// sources that show npm applying them ([KB] 000006800, RTFACT-14280) say
+// nothing of the v2 read, and its v1 read carries them (#1494).
+func TestUnitRelevantKeepsTheDeployPolicyForTheMavenFamily(t *testing.T) {
 	for _, tc := range []struct {
 		class repo.Class
 		pt    repo.PackageType
 		kept  bool
 	}{
-		{repo.Local, repo.NPM, true},
-		{repo.Federated, repo.NPM, true},
+		{repo.Local, repo.NPM, false},
+		{repo.Federated, repo.NPM, false},
+		{repo.Local, repo.Gradle, true},
+		{repo.Federated, repo.SBT, true},
 		{repo.Remote, repo.NPM, false},
 		{repo.Virtual, repo.NPM, false},
 		{repo.Local, repo.Generic, false},
@@ -219,8 +229,10 @@ func TestUnitRelevantKeepsTheDeployPolicyForHostedNpm(t *testing.T) {
 			HandleReleases:     ptr(true), HandleSnapshots: ptr(false),
 		}
 		got := repo.Relevant(c)
-		kept := got.ChecksumPolicyType != "" && got.HandleReleases != nil &&
-			got.HandleSnapshots != nil
+		// A remote's checksum policy is remoteRepoChecksumPolicyType, so
+		// its read never keeps checksumPolicyType.
+		policy := got.ChecksumPolicyType != "" || tc.class == repo.Remote
+		kept := policy && got.HandleReleases != nil && got.HandleSnapshots != nil
 		gone := got.ChecksumPolicyType == "" && got.HandleReleases == nil &&
 			got.HandleSnapshots == nil
 		if (tc.kept && !kept) || (!tc.kept && !gone) {
@@ -261,10 +273,11 @@ func TestUnitEnvironmentsRenderAsAnEmptyListOnlyInMasked(t *testing.T) {
 
 // The v2 read of a generic local repository with every default is JFrog's
 // genericLocalV2 sample (getrepositoryconfigurationv2.md), plus environments,
-// priorityResolution and signedUrlTtl, which that sample predates and which
-// stay until a 7.x capture shows otherwise (#216). The configurations
-// list's newer sample of the same kind of repository has all three, as
-// 7.161.26's @IncludeTypeSpecific marks them for every type (#1479).
+// priorityResolution, signedUrlTtl and xrayDataTtl, which that sample
+// predates and which stay until a 7.x capture shows otherwise (#216). The
+// configurations list's newer sample of the same kind of repository has all
+// four, as 7.161.26's @IncludeTypeSpecific marks them for every type or for
+// local, federated and remote repositories (#1479, #1494).
 func TestUnitGenericLocalV2MatchesTheDocumentedSample(t *testing.T) {
 	c := repo.Defaults(&repo.Config{Key: "generic-local", Class: repo.Local})
 	out, err := json.Marshal(repo.Relevant(repo.Full(*c)))
@@ -281,7 +294,7 @@ func TestUnitGenericLocalV2MatchesTheDocumentedSample(t *testing.T) {
 		"repoLayoutRef": "maven-2-default", "blackedOut": false, "propertySets": []any{},
 		"archiveBrowsingEnabled": false, "downloadRedirect": false, "xrayIndex": false,
 		"cdnRedirect": false, "environments": []any{}, "priorityResolution": false,
-		"signedUrlTtl": float64(90),
+		"signedUrlTtl": float64(90), "xrayDataTtl": float64(90),
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatalf("v2 generic local (-want +got):\n%s", diff)

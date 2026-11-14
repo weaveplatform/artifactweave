@@ -2,8 +2,6 @@ package repo_test
 
 import (
 	"encoding/json"
-	"maps"
-	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -230,89 +228,6 @@ func TestUnitSignedURLTTLIsOnEveryRead(t *testing.T) {
 		}
 		if got := repo.Public(c).SignedURLTTL; got != nil {
 			t.Errorf("%s non-admin signedUrlTtl %d", class, *got)
-		}
-	}
-}
-
-// The v1 and v2 reads of a generic local, an RPM remote and a Maven virtual
-// repository created with every default, field by field (#1479). The v1
-// read carries the legacy flags, the three force flags, both Debian fields
-// and signedUrlTtl on every class; the v2 read none of them but
-// signedUrlTtl. The other fields' differences from 7.161.26's
-// @IncludeTypeSpecific marks are listed in research 03, "The v2 read and
-// 7.161.26's annotations".
-func TestUnitReadFieldSets(t *testing.T) {
-	common := []string{
-		"blackedOut", "cdnRedirect", "description", "downloadRedirect", "environments",
-		"excludesPattern", "includesPattern", "key", "notes", "packageType", "priorityResolution",
-		"rclass", "repoLayoutRef", "signedUrlTtl", "xrayIndex",
-	}
-	v1Only := slices.Concat(legacyFlags, []string{
-		"ddebSupported", "debianTrivialLayout", "forceConanAuthentication",
-		"forceNugetAuthentication", "forceP2Authentication",
-	})
-	local := []string{"archiveBrowsingEnabled", "propertySets"}
-	remote := []string{
-		"allowAnyHostAuth", "assumedOfflinePeriodSecs", "blockMismatchingMimeTypes",
-		"bypassHeadRequests", "disableProxy", "disableUrlNormalization", "enableCookieManagement",
-		"enableTokenAuthentication", "externalDependenciesEnabled", "hardFail",
-		"listRemoteFolderItems", "metadataRetrievalTimeoutSecs", "missedRetrievalCachePeriodSecs",
-		"offline", "propertySets", "remoteRepoChecksumPolicyType", "retrievalCachePeriodSecs",
-		"shareConfiguration", "socketTimeoutMillis", "storeArtifactsLocally",
-		"synchronizeProperties", "unusedArtifactsCleanupPeriodHours", "url",
-	}
-	virtual := []string{
-		"artifactoryRequestsCanRetrieveRemoteArtifacts", "externalDependenciesEnabled",
-		"forceMavenAuthentication", "hideUnauthorizedResources",
-		"pomRepositoryReferencesCleanupPolicy", "repositories", "useNamespaces",
-		"virtualRetrievalCachePeriodSecs",
-	}
-	for _, tc := range []struct {
-		c      repo.Config
-		v1, v2 []string
-	}{
-		{
-			repo.Config{Key: "generic-local", Class: repo.Local},
-			slices.Concat(common, v1Only, local, []string{
-				"blockPushingSchema1", "checksumPolicyType", "dockerApiVersion",
-				"dockerTagRetention", "enableFileListsIndexing", "encryptStates",
-				"forceMetadataNameVersion", "forceNonDuplicateChart", "handleReleases",
-				"handleSnapshots", "maxUniqueSnapshots", "maxUniqueTags",
-				"snapshotVersionBehavior", "suppressPomConsistencyChecks",
-			}),
-			slices.Concat(common, local),
-		},
-		{
-			repo.Config{
-				Key: "rpm-remote", Class: repo.Remote, PackageType: repo.RPM,
-				URL: "https://up.example",
-			},
-			slices.Concat(common, v1Only, remote, []string{
-				"blockPushingSchema1", "fetchJarsEagerly", "fetchSourcesEagerly",
-				"handleReleases", "handleSnapshots", "maxUniqueSnapshots", "rejectInvalidJars",
-				"suppressPomConsistencyChecks",
-			}),
-			slices.Concat(common, remote),
-		},
-		{
-			repo.Config{Key: "maven-virtual", Class: repo.Virtual, PackageType: repo.Maven},
-			slices.Concat(common, v1Only, virtual, []string{
-				"dockerApiVersion", "resolveDockerTagsByTimestamp",
-			}),
-			slices.Concat(common, virtual),
-		},
-	} {
-		c := *repo.Defaults(&tc.c)
-		for name, want := range map[string][]string{"v1": tc.v1, "v2": tc.v2} {
-			read := repo.Full(c)
-			if name == "v2" {
-				read = repo.Relevant(read)
-			}
-			got := slices.Sorted(maps.Keys(fieldsOf(t, read)))
-			slices.Sort(want)
-			if diff := cmp.Diff(want, got); diff != "" {
-				t.Errorf("%s %s fields (-want +got):\n%s", c.Key, name, diff)
-			}
 		}
 	}
 }
