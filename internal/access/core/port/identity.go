@@ -86,6 +86,27 @@ type PermissionStore interface {
 	// WithTarget returns the permissions naming target (a repository key, a
 	// build repository, or an ANY target) in any resource, ordered by name.
 	WithTarget(ctx context.Context, target string) ([]model.Permission, error)
+	// Page returns, ordered by name, up to q.Limit permissions named after
+	// q.After, and whether more follow: the store reads one past the page.
+	// Unlike List it neither encodes its position nor caps Limit, because
+	// Access v2's cursor is a bare permission name and its limit reaches
+	// 99,999 (getpermissions).
+	Page(ctx context.Context, q PermissionQuery) ([]model.Permission, bool, error)
+}
+
+// PermissionQuery asks PermissionStore.Page for one page of permissions.
+type PermissionQuery struct {
+	// After is the name the page starts after; "" starts at the first.
+	After string
+	// Limit is the page's size, at least 1.
+	Limit int
+	// Granting, when set, keeps only the permissions that grant some action
+	// to one of Users or one of Groups, as ForPrincipal does for one user.
+	Granting bool
+	// Users and Groups are the principals Granting matches, by their
+	// stored names: a user's folded name, a group's exact one.
+	Users  []string
+	Groups []string
 }
 
 // DigestKind selects which token digest ByDigest matches.
