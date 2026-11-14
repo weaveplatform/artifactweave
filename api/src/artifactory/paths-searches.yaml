@@ -747,9 +747,6 @@ paths:
       x-idempotency-reason: read-or-write
       x-cost: expensive
       x-pagination: native
-      x-pagination-parameters:
-        position: .offset()
-        size: .limit()
       x-pagination-next: none
   /api/search/archive:
     get:
