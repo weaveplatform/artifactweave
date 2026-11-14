@@ -95,7 +95,12 @@
 //     and the module list the releases of its page's modules (#1404). So
 //     only those are checked against their archives: a release whose index
 //     entry or archive no longer matches fails a page that holds it and no
-//     other, and one deleted after the count leaves the page short. A
+//     other, and one deleted after the count leaves the page short. For a
+//     caller who may read every path of the module's folder, or of the
+//     repository for the whole-repository lists, the package index counts
+//     and pages them in the list's order (model.CompareForge) and answers
+//     the 503 caps from a tally, so no version name past the page is read
+//     (#1426); anyone else's lists filter every name by read permission. A
 //     remote's or virtual repository's list still collects every release
 //     to merge its upstream's pages or its members' lists, within the
 //     bounds above.
@@ -226,7 +231,8 @@
 //   - paging_test.go: the one-module list's and the module search's pages,
 //     links, limits and refusals, and exclude_fields.
 //   - store_page_test.go: the local lists' pages read without reading the
-//     releases outside them, and the checks a page makes.
+//     releases outside them, or for a caller who may read the whole
+//     repository any name outside them, and the checks a page makes.
 //   - record_test.go: a hosted release's and module's exact records on
 //     every route that answers them, directly and through a virtual
 //     repository, and a remote's relayed fields and their defaults.

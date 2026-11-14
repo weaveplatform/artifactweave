@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/mod/semver"
+
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 )
 
@@ -59,6 +61,10 @@ func ComparatorFor(t repo.PackageType) VersionComparator {
 		return StringComparator(CompareNuGet)
 	case repo.Docker, repo.OCI, repo.HelmOCI:
 		return CreatedOrder{}
+	case repo.Puppet, repo.Chef:
+		return StringComparator(CompareForge)
+	case repo.Ansible:
+		return StringComparator(CompareGalaxy)
 	case repo.Maven, repo.Gradle, repo.Ivy, repo.SBT:
 		// Artifactory's metadata, [RELEASE] and versions searches order
 		// these by Mercury (decision 0036), so the index does too.
@@ -235,6 +241,46 @@ func compareIdentifier(x, y string, foldCase bool) int {
 	default:
 		return strings.Compare(x, y)
 	}
+}
+
+// --- Puppet, Chef and Ansible lists ------------------------------------------------
+
+// CompareForge orders Puppet module and Chef cookbook versions as their
+// lists order them newest first, reversed, so that a list reads the
+// package's versions from its highest OrderKey down as one seek of the
+// index (#1426). The lists compare golang.org/x/mod/semver's way, "v"
+// prefixed, which sorts an invalid version below every valid one and ties
+// invalid versions, and versions that differ only in build metadata; they
+// then put the tied versions in byte order. Each tie is reversed here, so
+// no two versions of a package share an OrderKey and the reversed order
+// is the lists' own.
+func CompareForge(a, b string) int {
+	if c := semver.Compare("v"+a, "v"+b); c != 0 {
+		return c
+	}
+	return strings.Compare(b, a)
+}
+
+// CompareGalaxy orders Ansible collection versions as their version list
+// orders them newest first, reversed (#1426). The list compares as
+// CompareForge does, and left its ties, versions that differ only in build
+// metadata, where an unstable sort left them: for twelve versions or fewer
+// that was the order of its input, the index's earlier Maven order, then
+// byte order, which this pins for every list. An invalid version, which no
+// Ansible deploy admits, ties the others in byte order alone, as Maven's
+// order is not consistent over such strings. Each tie is reversed here, as
+// CompareForge reverses its own.
+func CompareGalaxy(a, b string) int {
+	if c := semver.Compare("v"+a, "v"+b); c != 0 {
+		return c
+	}
+	// b ties a, so it is valid when a is.
+	if semver.IsValid("v" + a) {
+		if c := CompareMaven(b, a); c != 0 {
+			return c
+		}
+	}
+	return strings.Compare(b, a)
 }
 
 // --- PEP 440 (PyPI) ------------------------------------------------------------

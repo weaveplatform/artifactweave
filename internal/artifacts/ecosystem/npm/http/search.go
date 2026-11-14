@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
@@ -94,12 +95,18 @@ type searchPackage struct {
 // access module evaluates in Go, and latest and the text are what the
 // caller may read of each package, so no query can count from exactly.
 // The scan stops once it has from+size, and holds one page of candidates.
+// A search without text by a caller who may read the whole repository is
+// the exception, which searchAll pages in the store.
 func (h handler) search(w http.ResponseWriter, r *http.Request) {
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
 		h.remoteSearch(w, r)
 		return
 	}
 	q := parseSearch(r.URL.Query())
+	if len(q.terms) == 0 && h.k.CanAll(r, "", api.ActionRead) {
+		h.searchAll(w, r, q)
+		return
+	}
 	key := pkgroute.RequestFrom(r).Repo.Key
 	answer := searchAnswer{Objects: []searchObject{}}
 	skip := q.from
@@ -133,6 +140,44 @@ func (h handler) search(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		page = kernel.Page{After: next, Limit: batch(skip, q.size-len(answer.Objects), page.Limit)}
+	}
+	writeJSON(w, http.StatusOK, jsonType, answer)
+}
+
+// searchAll is search without text for a caller who may read every path of
+// the repository (#1425). Every package with a version is listed then: the
+// caller may read each version, latest resolves among them whatever the
+// tags say (Settings.Latest), and no term can fail. So from is the store's
+// offset into the packages with a version, by name, and the page is read
+// alone, searchPage packages at a time, which bounds each read of their
+// versions as search's batches bound it. Its answer is the one search
+// gives that caller; only a version whose stored metadata does not decode
+// differs, which no write leaves: search fails on it wherever it lies,
+// and searchAll only on the page.
+func (h handler) searchAll(w http.ResponseWriter, r *http.Request, q searchQuery) {
+	all := port.PackageRange{RepoKey: pkgroute.RequestFrom(r).Repo.Key}
+	answer := searchAnswer{Objects: []searchObject{}}
+	for at, left := q.from, q.size; left > 0; {
+		n := min(left, searchPage)
+		found, read, err := port.CandidatesAt(r.Context(), h.k.DB().Packages(), all, at, n)
+		if err != nil {
+			h.k.Error(w, r, fmt.Errorf("npm: search %s: %w", all.RepoKey, err))
+			return
+		}
+		for _, c := range found {
+			hit, ok, err := h.searched(r, c, nil)
+			if err != nil {
+				h.k.Error(w, r, err)
+				return
+			}
+			if ok {
+				answer.Objects = append(answer.Objects, searchObject{Package: hit})
+			}
+		}
+		if read < n {
+			break
+		}
+		at, left = at+n, left-n
 	}
 	writeJSON(w, http.StatusOK, jsonType, answer)
 }

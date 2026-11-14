@@ -16,10 +16,14 @@ import (
 )
 
 // pageStore counts the package index reads that return whole version
-// records, and can delete versions as one is read.
+// records, and those of names: every version name of a cookbook, a tally
+// of the repository's, a count and a page of its cookbooks, and a
+// cookbook's highest version. It can delete versions as one is read.
 type pageStore struct {
 	pkgroute.Store
-	versions, version int
+	versions, version                 int
+	nameLists, tallies, counts, pages int
+	highest                           int
 	// drop maps a version, as name@version, to the versions of the
 	// cookbook that are deleted just before it is read, as if they were
 	// deleted between a catalog's count and its page.
@@ -48,6 +52,44 @@ func (p pagePackages) Find(ctx context.Context, key, name string) (artmodel.Pack
 func (p pagePackages) Versions(ctx context.Context, id int64) ([]artmodel.PackageVersion, error) {
 	p.s.versions++
 	return p.PackageStore.Versions(ctx, id)
+}
+
+func (p pagePackages) VersionNames(ctx context.Context, id int64) ([]string, error) {
+	p.s.nameLists++
+	return p.PackageStore.VersionNames(ctx, id)
+}
+
+func (p pagePackages) TallyVersions(
+	ctx context.Context,
+	key string,
+	limit int,
+) (port.VersionTally, error) {
+	p.s.tallies++
+	return p.PackageStore.TallyVersions(ctx, key, limit)
+}
+
+func (p pagePackages) CountPackages(ctx context.Context, r port.PackageRange) (int, error) {
+	p.s.counts++
+	return p.PackageStore.CountPackages(ctx, r)
+}
+
+func (p pagePackages) PackagesAt(
+	ctx context.Context,
+	r port.PackageRange,
+	offset, limit int,
+) ([]artmodel.Package, error) {
+	p.s.pages++
+	return p.PackageStore.PackagesAt(ctx, r, offset, limit)
+}
+
+func (p pagePackages) VersionNamesAt(
+	ctx context.Context,
+	id int64,
+	newestFirst bool,
+	offset, limit int,
+) ([]string, error) {
+	p.s.highest++
+	return p.PackageStore.VersionNamesAt(ctx, id, newestFirst, offset, limit)
 }
 
 func (p pagePackages) Version(
@@ -125,7 +167,10 @@ func wantCatalog(t *testing.T, f *fixture, path, user, want string) {
 // of each cookbook on its page (#1404): every cookbook is counted from its
 // versions' names, so the total is the whole catalog's, and the page lists
 // the description and maintainer of each of its cookbooks' highest
-// version the caller may read, as it did when it read every version.
+// version the caller may read, as it did when it read every version. For a
+// caller who may read the whole repository the store tallies, counts and
+// pages the cookbooks and reads each page cookbook's highest version name
+// (#1426); anyone else has every name read.
 func TestUnitHostedCatalogReadsOnlyItsPage(t *testing.T) {
 	f, s := pagedCatalog(t)
 	for _, tc := range []struct {
@@ -137,14 +182,15 @@ func TestUnitHostedCatalogReadsOnlyItsPage(t *testing.T) {
 		{"/api/v1/cookbooks?start=10", 10, []string{"cb10", "cb11"}},
 		{"/api/v1/cookbooks?start=12&items=5", 12, nil},
 	} {
-		s.versions, s.version = 0, 0
 		var cookbooks [][2]string
 		for _, name := range tc.want {
 			cookbooks = append(cookbooks, [2]string{name, "1.10.0"})
 		}
+		s.versions, s.version, s.nameLists, s.tallies, s.counts, s.pages, s.highest = 0, 0, 0, 0, 0, 0, 0
 		wantCatalog(t, f, tc.path, "admin", catalogJSON(t, tc.start, 12, cookbooks...))
-		if s.versions != 0 || s.version != len(tc.want) {
-			t.Fatalf("%s read %d version lists and %d versions", tc.path, s.versions, s.version)
+		if s.versions != 0 || s.version != len(tc.want) || s.nameLists != 0 || s.tallies != 1 ||
+			s.counts != 1 || s.pages != 1 || s.highest != len(tc.want) {
+			t.Fatalf("%s read %+v", tc.path, *s)
 		}
 	}
 	// Read permission decides which cookbooks are counted and which
@@ -195,9 +241,14 @@ func TestUnitHostedCatalogPageChecks(t *testing.T) {
 	if s.versions != 2 {
 		t.Fatalf("the cookbooks whose highest version went read %d version lists", s.versions)
 	}
-	// A cookbook with no version left, or deleted after its name was
-	// listed, is no longer counted.
-	s.lost = "cb07"
+	// A cookbook with no version left is no longer counted, nor, for a
+	// caller whose permission names paths, one deleted after its name was
+	// listed. A caller who may read the whole repository has the catalog
+	// counted in the store, which never lists a deleted cookbook's name.
 	wantCatalog(t, f, "/api/v1/cookbooks?start=1&items=1", "admin",
+		catalogJSON(t, 1, 11, [2]string{"cb01", "1.10.0"}))
+	grant(t, f, map[string]accesstest.Target{f.c.Key: {Include: []string{"cb*/**"}}})
+	s.lost = "cb07"
+	wantCatalog(t, f, "/api/v1/cookbooks?start=1&items=1", "reader",
 		catalogJSON(t, 1, 10, [2]string{"cb01", "1.10.0"}))
 }

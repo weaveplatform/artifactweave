@@ -199,7 +199,14 @@
 //     its names come from package_versions_order in its own order, with no
 //     sort, and a late page row is one seek on package_versions_version,
 //     whose query plans it logs), each on SQLite in memory and in a file and
-//     on PostgreSQL (#1404).
+//     on PostgreSQL (#1404), and TestAccPackagePagesContract
+//     (adapters/storetest.RunPackagePages, the list paging contract).
+//   - package_page_test.go: TestAccPackagePagesAtScale (5,000 packages,
+//     5,000 releases across 1,000 modules and a module of 5,000 versions:
+//     each count, tally and late page walks packages_name or
+//     package_versions_order in its own order, sorting at most one module's
+//     versions or a short prefix's names, with timings and plans logged, on
+//     SQLite in memory and in a file and on PostgreSQL; #1425, #1426).
 //
 // They open SQLite over the artifacts registration alone (store_test.go),
 // which migrates the stream and runs the header backfill as the metadata

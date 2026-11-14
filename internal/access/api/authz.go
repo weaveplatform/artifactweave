@@ -60,6 +60,17 @@ type Decider interface {
 	// AllowsFolder is Allows for the folder at path, which also counts as
 	// permitted when a permitted path lies below it.
 	AllowsFolder(rt ResourceType, repo Repo, path string, want Actions) bool
+	// AllowsAll reports whether the subject holds every action in want on
+	// every path below folder in repo ("" for every path of the
+	// repository), whatever paths the repository holds, so that a list
+	// may count and page in the store what lies there rather than asking
+	// Allows of each path. True means Allows and AllowsFolder are true for
+	// each such path. False says nothing about any one path, which Allows
+	// then decides: it holds when some permission, and the token scope
+	// that narrows it, cover the folder whole, and may be false for
+	// grants that only together cover it. Asking for no action is
+	// refused.
+	AllowsAll(rt ResourceType, repo Repo, folder string, want Actions) bool
 	// System reports whether the subject may use a system capability, an
 	// area such as "info" or "metrics", with the actions in want: an
 	// administrator may, anyone else only through a token's system scope

@@ -619,6 +619,54 @@ func (f faultPackages) List(
 	return f.PackageStore.List(ctx, key, p)
 }
 
+// TallyVersions, CountPackages, PackagesAt and VersionNamesAt, a whole
+// reader's catalog's reads of what List and VersionNames read, fail as
+// they fail, and count the versions VersionNames lists.
+func (f faultPackages) TallyVersions(
+	ctx context.Context,
+	key string,
+	limit int,
+) (port.VersionTally, error) {
+	if f.f.list || f.f.versions {
+		return port.VersionTally{}, context.Canceled
+	}
+	t, err := f.PackageStore.TallyVersions(ctx, key, limit)
+	if f.f.huge {
+		t.Versions, t.MostVersions = t.Packages*4097, 4097
+	}
+	return t, err
+}
+
+func (f faultPackages) CountPackages(ctx context.Context, r port.PackageRange) (int, error) {
+	if f.f.list {
+		return 0, context.Canceled
+	}
+	return f.PackageStore.CountPackages(ctx, r)
+}
+
+func (f faultPackages) PackagesAt(
+	ctx context.Context,
+	r port.PackageRange,
+	offset, limit int,
+) ([]artmodel.Package, error) {
+	if f.f.list {
+		return nil, context.Canceled
+	}
+	return f.PackageStore.PackagesAt(ctx, r, offset, limit)
+}
+
+func (f faultPackages) VersionNamesAt(
+	ctx context.Context,
+	id int64,
+	newestFirst bool,
+	offset, limit int,
+) ([]string, error) {
+	if f.f.versions {
+		return nil, context.Canceled
+	}
+	return f.PackageStore.VersionNamesAt(ctx, id, newestFirst, offset, limit)
+}
+
 type faultItems struct {
 	port.ItemStore
 	f *faultStore
@@ -654,17 +702,22 @@ func TestAccBrokenStoredIndexNeverAdvertisesCookbook(t *testing.T) {
 		tune   func(*faultStore)
 		path   string
 		status int
+		// lister alone, whose permission names the cookbook's folder, so
+		// that its catalog reads each cookbook by name: a caller who may
+		// read the whole repository has the catalog counted and paged in
+		// the store.
+		listerOnly bool
 	}{
-		{"find", func(f *faultStore) { f.find = true }, "/api/v1/cookbooks/widget", 500},
-		{"versions", func(f *faultStore) { f.versions = true }, "/api/v1/cookbooks/widget/versions/latest", 500},
-		{"items", func(f *faultStore) { f.items = true }, "/api/v1/cookbooks/widget", 502},
-		{"version limit", func(f *faultStore) { f.huge = true }, "/api/v1/cookbooks/widget", 503},
-		{"catalog", func(f *faultStore) { f.list = true }, "/api/v1/cookbooks", 500},
-		{"catalog find", func(f *faultStore) { f.find = true }, "/api/v1/cookbooks", 500},
-		{"catalog versions", func(f *faultStore) { f.versions = true }, "/api/v1/cookbooks", 500},
-		{"catalog version", func(f *faultStore) { f.version = true }, "/api/v1/cookbooks", 500},
-		{"catalog items", func(f *faultStore) { f.items = true }, "/api/v1/cookbooks", 502},
-		{"catalog version limit", func(f *faultStore) { f.huge = true }, "/api/v1/cookbooks", 503},
+		{"find", func(f *faultStore) { f.find = true }, "/api/v1/cookbooks/widget", 500, false},
+		{"versions", func(f *faultStore) { f.versions = true }, "/api/v1/cookbooks/widget/versions/latest", 500, false},
+		{"items", func(f *faultStore) { f.items = true }, "/api/v1/cookbooks/widget", 502, false},
+		{"version limit", func(f *faultStore) { f.huge = true }, "/api/v1/cookbooks/widget", 503, false},
+		{"catalog", func(f *faultStore) { f.list = true }, "/api/v1/cookbooks", 500, false},
+		{"catalog find", func(f *faultStore) { f.find = true }, "/api/v1/cookbooks", 500, true},
+		{"catalog versions", func(f *faultStore) { f.versions = true }, "/api/v1/cookbooks", 500, false},
+		{"catalog version", func(f *faultStore) { f.version = true }, "/api/v1/cookbooks", 500, false},
+		{"catalog items", func(f *faultStore) { f.items = true }, "/api/v1/cookbooks", 502, false},
+		{"catalog version limit", func(f *faultStore) { f.huge = true }, "/api/v1/cookbooks", 503, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var faults *faultStore
@@ -675,10 +728,16 @@ func TestAccBrokenStoredIndexNeverAdvertisesCookbook(t *testing.T) {
 				func(s pkgroute.Store) pkgroute.Store { faults = &faultStore{Store: s}; return faults },
 			)
 			f.deploy(f.c, "widget", "1.0.0", archive(t, "widget", "1.0.0"))
+			grant(t, f, map[string]accesstest.Target{f.c.Key: {Include: []string{"widget/**"}}})
 			tc.tune(faults)
-			got := f.do("GET", base+tc.path, "admin")
-			if got.Code != tc.status {
-				t.Fatal(got.Code, got.Body.String())
+			users := []string{"admin", "reader"}
+			if tc.listerOnly {
+				users = users[1:]
+			}
+			for _, user := range users {
+				if got := f.do("GET", base+tc.path, user); got.Code != tc.status {
+					t.Fatal(user, got.Code, got.Body.String())
+				}
 			}
 		})
 	}

@@ -20,7 +20,7 @@ func RunVersionNames(t *testing.T, newStore Factory) {
 		ensure := func(name string) model.Package {
 			t.Helper()
 			return storekit.Get[model.Package](t)(s.Ensure(ctx, model.Package{
-				RepoKey: "puppet-local", Type: repo.Puppet, Name: name,
+				RepoKey: "generic-local", Type: repo.Generic, Name: name,
 			}))
 		}
 		pkg, other := ensure("acme-widget"), ensure("acme-other")
@@ -31,8 +31,10 @@ func RunVersionNames(t *testing.T, newStore Factory) {
 			}))
 		}
 		names := storekit.Get[[]string](t)
-		// "1.0" and "1.0.0" compare equal and share an order key, so the
-		// version string orders them, as it orders Versions'.
+		// Maven's order, the default comparator's: "1.0" and "1.0.0"
+		// compare equal and share an order key, so the version string
+		// orders them, as it orders Versions'. RunPackagePages covers the
+		// keys of the types whose lists page in the store.
 		for _, v := range []string{"1.10.0", "1.0.0", "2.0.0-rc.1", "1.0", "1.2.0", "2.0.0"} {
 			put(pkg, v)
 		}

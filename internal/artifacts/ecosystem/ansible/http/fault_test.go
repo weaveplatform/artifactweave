@@ -64,12 +64,32 @@ func (s failingPackages) Versions(ctx context.Context, id int64) ([]model.Packag
 }
 
 // VersionNames and Version fail as Versions does: a version list reads the
-// names, and then its page's versions one at a time.
+// names, and then its page's versions one at a time. A whole reader's list
+// counts and pages the names in the store, which fails as VersionNames.
 func (s failingPackages) VersionNames(ctx context.Context, id int64) ([]string, error) {
 	if s.stage == "versions" {
 		return nil, errStore
 	}
 	return s.PackageStore.VersionNames(ctx, id)
+}
+
+func (s failingPackages) CountVersions(ctx context.Context, id int64) (int, error) {
+	if s.stage == "versions" {
+		return 0, errStore
+	}
+	return s.PackageStore.CountVersions(ctx, id)
+}
+
+func (s failingPackages) VersionNamesAt(
+	ctx context.Context,
+	id int64,
+	newestFirst bool,
+	offset, limit int,
+) ([]string, error) {
+	if s.stage == "page" {
+		return nil, errStore
+	}
+	return s.PackageStore.VersionNamesAt(ctx, id, newestFirst, offset, limit)
 }
 
 func (s failingPackages) Version(

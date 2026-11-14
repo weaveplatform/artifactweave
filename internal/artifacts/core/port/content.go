@@ -406,4 +406,5 @@ type PackageStore interface {
 	RecordVersionDownload(ctx context.Context, versionID int64, at time.Time) error
 
 	PackageVersionNames
+	PackagePages
 }

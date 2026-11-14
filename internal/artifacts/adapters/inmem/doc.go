@@ -100,7 +100,11 @@
 // (adapters/storetest.RunDockerPages), whose order the in-memory reader
 // gives as the SQL adapter's indexes do. puppet_page_test.go:
 // TestUnitVersionNamesContract runs adapters/storetest.RunVersionNames, the
-// contract of the package store's VersionNames (#1404). repo_page_test.go:
+// contract of the package store's VersionNames (#1404), and
+// TestUnitPackagePagesContract runs adapters/storetest.RunPackagePages, the
+// contract of its list paging (#1425, #1426), which package_page.go answers
+// by sorting the map's packages and versions in the SQL indexes' orders.
+// repo_page_test.go:
 // TestUnitRepoPagesContract runs adapters/storetest.RunRepoPages, the
 // contract of the repository window Get Repositories reads (#1408).
 package inmem
