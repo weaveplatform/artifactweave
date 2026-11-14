@@ -214,6 +214,17 @@ func (f faultyTrash) List(
 	return f.TrashStore.List(ctx, repoKey, prefix, p) //nolint:wrapcheck // test double
 }
 
+func (f faultyTrash) BelowByPath(
+	ctx context.Context,
+	dir string,
+	p kernel.Page,
+) ([]artmodel.TrashEntry, string, error) {
+	if f.fails("below") {
+		return nil, "", errBoom
+	}
+	return f.TrashStore.BelowByPath(ctx, dir, p) //nolint:wrapcheck // test double
+}
+
 func (f faultyTrash) Find(
 	ctx context.Context,
 	repoKey, full string,
@@ -242,7 +253,7 @@ func TestAccTrashStorageReadFailure(t *testing.T) {
 	// reads it again.
 	for view, reads := range map[string]int{"": 1, "?list": 2, "?lastModified": 2} {
 		for n := 1; n <= reads; n++ {
-			fail["list"] = n
+			fail["below"] = n
 			wantStatus(t, w.do("GET", trashURL+view, "admin", ""), http.StatusInternalServerError)
 		}
 	}
