@@ -11,9 +11,6 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
-
-	accesshttp "github.com/weaveplatform/artifactweave/internal/access/adapters/http"
-	configurationhttp "github.com/weaveplatform/artifactweave/internal/configuration/adapters/http"
 )
 
 // The rules of decision 0043, "Rules for every operation", as the guard
@@ -130,19 +127,13 @@ func (o principleOp) examplePath() string {
 
 var pathParameterRE = regexp.MustCompile(`\{[^{}]+\}`)
 
-// admissionClass is the x-cost the boundary admits a request under today:
-// the order limitIngress and limitPrincipal test the request kinds in.
+// admissionClass is the x-cost the boundary admits a request under, as
+// limitIngress and limitPrincipal decide it: the class of the spec
+// operation the request addresses, or the path rules' class for a request
+// none addresses, as a fixture's is.
 func admissionClass(method, path string, query url.Values) string {
 	r := &http.Request{Method: method, URL: &url.URL{Path: path, RawQuery: query.Encode()}}
-	switch {
-	case configurationhttp.HealthRequest(r):
-		return "exempt"
-	case accesshttp.APIRecoveryRequest(r):
-		return "recovery"
-	case expensiveRequest(r):
-		return "expensive"
-	}
-	return "ordinary"
+	return newLimitOptions(nil).cost(r)
 }
 
 // checkAPIPrinciples applies every rule to every operation of doc, the
@@ -345,9 +336,11 @@ func undeclarableHeader(name string) bool {
 }
 
 // checkCost holds x-cost and x-cost-expensive-query to the admission the
-// boundary gives the operation's method and path today, which is what
-// RATE-01 will read from the spec instead, so a difference would change an
-// answer. It returns the declared class.
+// boundary gives the operation's method and an example path. Admission
+// reads a bundled operation's class from the generated table, so there a
+// difference means the table is stale or the example path reaches another
+// operation; a fixture's operation, which no table row holds, is held to
+// the path rules. It returns the declared class.
 func checkCost(o principleOp, report reportFunc) string {
 	cost := classValue(o, "x-cost", costClasses, true, report)
 	raw, hasQuery := o.op.Extensions["x-cost-expensive-query"]

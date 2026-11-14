@@ -80,6 +80,12 @@
 //     principal limits charge the caller after (decision 0043). The forced
 //     authentication goes just before authentication, where 7.x's filter
 //     sits, so it answers the same whether anonymous access is on or off.
+//   - Both request limits admit a request under the x-cost class of the spec
+//     operation it addresses, which limits_cost.go finds in the generated
+//     operation table before routing, so the specs are the one place a
+//     class is set. Only a request no spec operation addresses (an alias, a
+//     native protocol route, a 404 or a 405) takes the class the path rules
+//     give it: the probes, the recovery API and expensiveRequest.
 //   - Hand-written routes are mounted before the generated strict servers,
 //     and the 501 stubs of hand-written operations last, so each
 //     hand-written route claims the pattern its spec derives instead of the
@@ -144,8 +150,9 @@
 // status tables (status_test.go and status_<x>_test.go), the route and
 // principal matrices (matrix_test.go), the spec checks (spec_test.go,
 // spec_contract_test.go), the 501 stubs (stub_test.go), the error profiles
-// (error_profiles_p8_test.go), the request limits (limits_test.go), the
-// API reliability ledger (api_ledger_test.go, which make api-ledger runs to
+// (error_profiles_p8_test.go), the request limits (limits_test.go; the
+// classes admission takes from the table, limits_cost_test.go), the API
+// reliability ledger (api_ledger_test.go, which make api-ledger runs to
 // regenerate docs/research/api-reliability/operations.json) and decision
 // 0043's operation rules (api_principles_test.go, whose rules are checked
 // against the admission and error profiles here, with a fixture per rule in

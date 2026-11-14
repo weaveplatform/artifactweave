@@ -10,9 +10,9 @@
 // operations.gen.go, the Table, from api/*.openapi.yaml after oapi-codegen
 // has generated the servers. This doc.go and operation.go, the Operation
 // type and the Index, are hand-written, and make generate leaves them alone.
-// Nothing reads the table at run time yet: admission (RATE-01, #1407) will
-// take each request's cost class from it, and the Idempotency-Key gate
-// (IDEM-01, #1406) the operations that accept a key (decision 0043).
+// Admission (internal/app, limits_cost.go) takes each request's cost class
+// from it (RATE-01, #1407), and the Idempotency-Key gate (IDEM-01, #1406)
+// will take the operations that accept a key (decision 0043).
 //
 // # Inputs
 //
@@ -43,8 +43,8 @@
 //     same method and operationId, and every row of an operation not marked
 //     handwritten is registered by its generated server. A hand-written
 //     operation keeps its spec pattern; where its hand-written route uses
-//     another, admission's test over every served operation (RATE-01)
-//     checks that the two agree.
+//     another, TestAccAdmissionCostAgreesWithServedRoutes (internal/app)
+//     checks that the two admit its requests under one class.
 //   - A pattern is the spec's server URL, the BaseURL router.go mounts each
 //     generated server under, followed by the spec path.
 //   - A class is the spec's text as written: one of decision 0043's values,
@@ -62,8 +62,8 @@
 //
 // # Status
 //
-// Implemented #1405 (CON-02): the table and the Index. RATE-01 and IDEM-01
-// wire them into admission and the key gate.
+// Implemented #1405 (CON-02): the table and the Index. RATE-01 (#1407)
+// wires them into admission; IDEM-01 wires them into the key gate.
 //
 // # Testing
 //

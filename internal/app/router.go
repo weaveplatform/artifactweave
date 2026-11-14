@@ -755,13 +755,15 @@ func newAuthnOptions(
 }
 
 // newLimitOptions returns the request-limit middleware's options as the
-// router composes them: the probes (configurationhttp.HealthRequest) and
-// the recovery API (APIRecoveryRequest) pass the shared limits.
+// router composes them: the spec operations' cost classes, and the probes
+// (configurationhttp.HealthRequest) and the recovery API
+// (APIRecoveryRequest) for requests no spec operation addresses.
 func newLimitOptions(limits *apilimit.Service) limitOptions {
 	return limitOptions{
-		Health:   configurationhttp.HealthRequest,
-		Recovery: accesshttp.APIRecoveryRequest,
-		Limits:   limits,
+		Operations: costOperations(),
+		Health:     configurationhttp.HealthRequest,
+		Recovery:   accesshttp.APIRecoveryRequest,
+		Limits:     limits,
 	}
 }
 

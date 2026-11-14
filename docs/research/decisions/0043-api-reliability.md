@@ -263,9 +263,10 @@ reload for each keyed operation; most actions are natural, so few need one.
 `ordinary` operation expensive. Today that is `list` on the storage paths (the file
 list, `GET /artifactory/api/storage/{repoKey}/{itemPath}?list`).
 
-Every operation, stubs included, declares the class it is admitted under today, as
-`expensiveRequest`, `HealthRequest` and `APIRecoveryRequest` decide for its method
-and path. So taking the class from the spec changes no policy name and no limit.
+Every operation, stubs included, declares the class it was admitted under before
+admission read the spec, as `expensiveRequest`, `HealthRequest` and
+`APIRecoveryRequest` decided for its method and path. So taking the class from the
+spec changes no policy name and no limit for any operation's own path.
 Moving an operation to another class later changes its answers and needs its own
 decision.
 
@@ -278,7 +279,15 @@ escaped path the router uses. A request that no spec pattern matches (hand-writt
 aliases, native protocol routes and unknown paths) falls back to path rules that
 `expensiveRequest` keeps for those alone. Where a hand-written route serves a spec
 operation under another pattern, the two must agree, and a test over every served
-operation checks that they do.
+operation checks that they do. The hand-written item operations are looked up under
+the pattern the router serves them with, whose repository key never matches `api`,
+so an unknown two-segment API path such as `PUT /artifactory/api/foo` is no deploy
+and keeps the path rules' class. One answer moved with the lookup: a request that
+an operation addresses by name, whose last segment is a name that happens to be
+`reindex` or `move-archives` (`GET /artifactory/api/repositories/reindex`), takes
+the operation's `ordinary` class, where the path suffix rule made it `expensive`.
+Its status and body are unchanged; its `RateLimit-Policy` names `api` instead of
+`expensive`.
 
 Charging the expensive lane after routing was rejected:
 
@@ -297,7 +306,8 @@ Charging the expensive lane after routing was rejected:
 - The key gate runs before routing and before authentication, and reads the same
   table.
 
-The cost is one more radix-tree lookup per request and a tree built at start-up.
+The cost is a radix-tree lookup in each of the two admission steps, ingress and
+principal, and a tree built once per process.
 
 ### Rate headers and Retry-After
 
@@ -579,11 +589,11 @@ this is not a claim that every child resource has been individually charged.
 
 Management mutations, search, build operations, archive/import/export, VCS, trash,
 legacy full repository/identity collections, reindex and deep file lists receive
-the expensive classification. Today `expensiveRequest` in `internal/app/limits.go`
-decides it from the method and path; under
-[Cost classes](#cost-classes-and-how-admission-finds-them) each specified
-operation declares it as `x-cost`, and the path rules remain only for routes
-without a spec operation. They have
+the expensive classification. Each specified operation declares it as `x-cost`,
+which admission reads from the generated operation table
+([Cost classes](#cost-classes-and-how-admission-finds-them));
+`expensiveRequest` in `internal/app/limits.go` decides it from the method and path
+only for a request no spec operation addresses. They have
 shared limits of 6000 requests per minute globally and 600 per principal, plus
 32 concurrent requests per process and 16 per principal. These defaults allow
 normal provider provisioning batches, including Terraform's ten concurrent
