@@ -3,9 +3,11 @@ package middleware
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -67,4 +69,53 @@ func TestUnitRecoverPanicReraisesAbort(t *testing.T) {
 		}
 	}()
 	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+}
+
+// TestUnitAccessLogLogsAnAbortedResponse: a handler that aborts a response
+// it has begun still gets its line, at ERROR with the cause it noted, and
+// the abort reaches net/http; any other panic passes through unlogged for
+// RecoverPanic, and runtime.Goexit is left to run.
+func TestUnitAccessLogLogsAnAbortedResponse(t *testing.T) {
+	var buf bytes.Buffer
+	log := AccessLog(slog.New(slog.NewJSONHandler(&buf, nil)), plainPath)
+	serve := func(h http.HandlerFunc) (rec any) {
+		defer func() { rec = recover() }()
+		log(h).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/list", nil))
+		return nil
+	}
+	rec := serve(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("[1,"))
+		httpkit.NoteCause(r.Context(), errors.New("store: page 2 failed"))
+		panic(http.ErrAbortHandler)
+	})
+	if rec != http.ErrAbortHandler { //nolint:errorlint // the very value net/http compares
+		t.Fatalf("recovered %v, want http.ErrAbortHandler", rec)
+	}
+	line := buf.String()
+	for _, want := range []string{
+		`"level":"ERROR"`, `"status":200`, `"bytes":3`, `"aborted":true`,
+		`"error":"store: page 2 failed"`,
+	} {
+		if !strings.Contains(line, want) {
+			t.Fatalf("log line %s lacks %s", line, want)
+		}
+	}
+	buf.Reset()
+	if rec := serve(func(http.ResponseWriter, *http.Request) { panic("bug") }); rec != "bug" {
+		t.Fatalf("recovered %v, want the handler's panic", rec)
+	}
+	if buf.Len() != 0 {
+		t.Fatalf("a panic that is not an abort was logged: %s", buf.String())
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		serve(func(http.ResponseWriter, *http.Request) { runtime.Goexit() })
+		t.Error("runtime.Goexit was stopped")
+	}()
+	<-done
+	if buf.Len() != 0 {
+		t.Fatalf("runtime.Goexit was logged: %s", buf.String())
+	}
 }

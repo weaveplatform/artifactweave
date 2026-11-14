@@ -34,6 +34,10 @@ paths:
       tags:
       - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionedgenodes.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/distribution/{release_bundle_name}/{release_bundle_version}:
     post:
       description: 'Sends a signed version to the edges the distribution rules select and returns a tracker. The
@@ -81,6 +85,9 @@ paths:
       tags:
       - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributereleasebundlev1version.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/distribution/{release_bundle_name}/{release_bundle_version}/abort:
     put:
       description: 'Stops the in-progress distribution of the version: transfers not yet finished are cancelled
@@ -117,6 +124,11 @@ paths:
       tags:
       - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/abortreleasebundlev1distribution.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:release_bundle_name
+      - path:release_bundle_version
+      x-cost: expensive
   /api/v1/distribution/{release_bundle_name}/{release_bundle_version}/delete:
     post:
       description: Removes a distributed version from the edges the rules select. Each edge deletes the version
@@ -163,6 +175,9 @@ paths:
       tags:
       - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletereleasebundlev1versionfromdistributionedges.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/dynamic/distribute:
     post:
       description: Creates a release bundle version from the spec with a generated name and version, signs it with
@@ -214,6 +229,9 @@ paths:
       tags:
       - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributedynamicreleasebundlev1.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v2/distribution/abort/{release_bundle_name}/{release_bundle_version}:
     put:
       description: Not implemented; answers 501.
@@ -258,6 +276,13 @@ paths:
       - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/abortreleasebundlev2distribution.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:release_bundle_name
+      - path:release_bundle_version
+      - query:repository_key
+      - query:project
+      x-cost: expensive
   /api/v2/distribution/distribute/{release_bundle_name}/{release_bundle_version}:
     post:
       description: Not implemented; answers 501.
@@ -317,6 +342,9 @@ paths:
       - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributereleasebundlev2version.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v2/distribution/remote_delete/{release_bundle_name}/{release_bundle_version}:
     post:
       description: Not implemented; answers 501.
@@ -370,6 +398,9 @@ paths:
       - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/remotedeletereleasebundlev2distribution.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}:
     get:
       description: Not implemented; answers 501.
@@ -412,6 +443,10 @@ paths:
       - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev2distributiontrackers.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}/{distribution_tracker}:
     get:
       description: Not implemented; answers 501.
@@ -451,6 +486,8 @@ paths:
       - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbytrackerid.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}/{distribution_tracker}/priority:
     put:
       description: Not implemented; answers 501.
@@ -509,3 +546,9 @@ paths:
       - distribution
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatereleasebundlev2distributionpriority.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:release_bundle_name
+      - path:release_bundle_version
+      - path:distribution_tracker
+      x-cost: expensive

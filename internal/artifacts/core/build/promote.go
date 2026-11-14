@@ -69,6 +69,19 @@ type PromotionResult struct {
 // as Artifactory reports it. ErrNotFound when there is no such run,
 // ErrNoTarget when the target does not exist.
 func (s *Service) Promote(ctx context.Context, p Promotion, a Access) (PromotionResult, error) {
+	return s.promoteThen(ctx, p, a, nil)
+}
+
+// promoteThen is Promote, which runs then, when it is not nil, with the
+// promoted run's ID and the report once a promotion that is not dry has
+// done its work without aborting, in the promotion's own transaction, so
+// that what then stores commits or rolls back with the promotion.
+func (s *Service) promoteThen(
+	ctx context.Context,
+	p Promotion,
+	a Access,
+	then func(ctx context.Context, run int64, msgs []item.Message) error,
+) (PromotionResult, error) {
 	b, err := s.Store.Builds().Get(ctx, ProjectKey(p.ProjectKey), p.Name, p.Number, time.Time{})
 	if err != nil {
 		return PromotionResult{}, fmt.Errorf("build: get run: %w", err)
@@ -92,6 +105,9 @@ func (s *Service) Promote(ctx context.Context, p Promotion, a Access) (Promotion
 			}
 			if pr.aborted() {
 				return errAborted
+			}
+			if then != nil {
+				return then(ctx, b.ID, pr.msgs)
 			}
 			return nil
 		})

@@ -24,7 +24,9 @@
 //     and ErrStore, which marks the store's own failure beside the driver's
 //     error rather than a verdict on the record.
 //   - Keyset paging: Page with Normalize and Key, DefaultLimit, MaxLimit,
-//     Cursor and Trim.
+//     Cursor and Trim; PageFunc, a store list with its other arguments
+//     bound, and Pages, from NewPages, which walks its pages in order for a
+//     list written as it is read.
 //   - Clone, the deep copy a store hands out so that no caller shares stored
 //     state, and Normalise, the value every backend reads back.
 //   - Checksums, the hex digests of an item's content.
@@ -127,8 +129,10 @@
 //     work items hold an internal credential reference, never a password or
 //     bearer token.
 //   - Decision 0043: docs/research/decisions/0043-api-reliability.md: the
-//     replay scope is a SHA-256 digest of the credential reference, and
-//     "Temporary restrictions and administrative recovery".
+//     replay scope is a SHA-256 digest of the credential reference,
+//     "Temporary restrictions and administrative recovery", and "Streaming
+//     complete lists", which Pages serves.
+//   - https://github.com/weaveplatform/artifactweave/issues/1409 (Pages).
 //   - Research 05: docs/research/05-platform-identity-and-security-apis.md,
 //     "Scope grammar".
 //   - Plan: docs/implementation/plan.md#p9d-modular-monolith-migration, epic
@@ -150,6 +154,8 @@
 //
 //   - TestUnitPage, TestUnitTrim: limits, cursor decoding and the cursor of
 //     the next page.
+//   - TestUnitPages: a walk passes each page's cursor to the next read,
+//     stops after the last page, and stays where it was when a read fails.
 //   - TestUnitCloneAndNormalise: copies share no memory with their input,
 //     and normalised times and durations have the precision of the SQL
 //     columns.

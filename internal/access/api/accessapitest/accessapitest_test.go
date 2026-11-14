@@ -50,6 +50,18 @@ func TestUnitDecider(t *testing.T) {
 			got,
 		)
 	}
+	// VisibleRepos falls back as IsRepoVisible does, and its function
+	// overrides Admin.
+	if (&accessapitest.Decider{}).VisibleRepos().Has(libs) || !admin.VisibleRepos().Has(libs) {
+		t.Error("VisibleRepos without its function does not follow Admin")
+	}
+	only := accessapi.RepoVisibility{{Keys: []string{"ext-local"}}}
+	narrowed := &accessapitest.Decider{
+		Admin: true, VisibleReposFunc: func() accessapi.RepoVisibility { return only },
+	}
+	if got := narrowed.VisibleRepos(); !reflect.DeepEqual(got, only) {
+		t.Errorf("VisibleRepos with its function = %v, want %v", got, only)
+	}
 	groups := admin.Groups()
 	groups[0] = "changed"
 	if g := admin.Groups(); !reflect.DeepEqual(g, []string{"admins"}) {

@@ -1569,14 +1569,15 @@ type faultyBuildSearch struct {
 	fail string
 }
 
-func (f faultyBuildSearch) FindDependencies(
+func (f faultyBuildSearch) DependencyPage(
 	ctx context.Context,
 	c kernel.Checksums,
-) ([]artmodel.BuildFileRef, error) {
+	p kernel.Page,
+) ([]artmodel.BuildFileRef, string, error) {
 	if f.fail == "dependencies" {
-		return nil, errBoom
+		return nil, "", errBoom
 	}
-	return f.BuildStore.FindDependencies(ctx, c)
+	return f.BuildStore.DependencyPage(ctx, c, p)
 }
 
 func (f faultyBuildSearch) Runs(

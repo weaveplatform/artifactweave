@@ -14,11 +14,13 @@ type Factory func(t *testing.T) port.Store
 // concern, each on a store of its own: Blobs, ColdBlobs, BlobDeletion,
 // ColdBlobDeletion, BlobTiersSeparate, Replicas, ReplicaTiersSeparate, Repos,
 // Items, ItemCreate, ColonPaths, ItemProperties, RepositoryRoot, ItemStats,
-// ItemSearch, LongPropertyValues, LongPropertyKeys, Trash, Packages,
+// ItemSearch, ItemsByFullPath, LongPropertyValues, LongPropertyKeys, Trash,
+// TrashByPath, Packages,
 // GitLFSLocks, BowerRegistrations, RemoteCache, RemoteCacheFences,
 // RemoteCacheAtomic, RemoteCacheEvict, RemoteCacheConcurrent,
 // RemoteCacheUsage, RemoteSmartState, ArchivedItems, Builds, BuildRuns,
-// BuildDeletes, BuildRename, BuildPromotions, BuildFiles and BuildRetention.
+// BuildDeletes, BuildRename, BuildPromotions, BuildFiles, BuildRetention and
+// BuildReports.
 func Run(t *testing.T, newStore Factory) {
 	t.Helper()
 	runBlobs(t, newStore)
