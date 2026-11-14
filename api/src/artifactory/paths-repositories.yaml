@@ -2308,6 +2308,13 @@ paths:
       tags:
       - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrepositoriesbytypeandproject.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: offset
+      x-pagination-parameters:
+        position: offset
+        size: limit
+      x-pagination-next: link
   /api/repositories/configurations:
     get:
       description: Returns the configuration of every repository grouped by class, each with the fields that apply
@@ -2426,6 +2433,10 @@ paths:
       tags:
       - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/repositories/existence:
     get:
       description: Reports whether at least one repository of the given classes exists, optionally within one project.
@@ -2502,6 +2513,8 @@ paths:
       tags:
       - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/checkifrepositoryexists.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/repositories/{remoteRepoName}/configuration:
     get:
       deprecated: true
@@ -2554,6 +2567,8 @@ paths:
       tags:
       - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getremoterepositoryconfiguration.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/repositories/{repoKey}:
     delete:
       description: 'Removes the configuration and every item in the repository. While the trash can is enabled
@@ -2632,6 +2647,10 @@ paths:
       tags:
       - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleterepository.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      x-cost: expensive
     get:
       description: Returns the stored configuration with defaults filled in. Admins receive every field; other
         callers that can read the repository receive the public subset (key, rclass, packageType, description, layout
@@ -2687,6 +2706,8 @@ paths:
       tags:
       - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md
+      x-idempotency: safe
+      x-cost: ordinary
     post:
       description: 'Merges the body into the stored configuration: fields present are replaced, fields absent keep their
         value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a
@@ -2760,6 +2781,10 @@ paths:
       tags:
       - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updaterepositoryconfiguration.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      x-cost: expensive
     put:
       description: 'Creates a repository with the configuration in the body. The key in the path wins over the body.
         Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by
@@ -2826,6 +2851,10 @@ paths:
       tags:
       - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createrepository.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      x-cost: expensive
   /api/v2/repositories/batch:
     delete:
       description: 'Deletes each listed repository independently and reports per key. The HTTP status summarises
@@ -2906,6 +2935,10 @@ paths:
       tags:
       - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleterepositories.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - 'body:'
+      x-cost: expensive
     get:
       description: Returns the configurations of the named repositories as a map keyed by repository key. Keys that
         do not exist are omitted. Admins receive every field; other callers receive the public subset. At most 100
@@ -2960,6 +2993,10 @@ paths:
       tags:
       - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: 'Applies one update per configuration in the body, with the same merge rules as the single update.
         Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is
@@ -3027,6 +3064,10 @@ paths:
       tags:
       - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatemultiplerepositories.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - 'body:'
+      x-cost: expensive
     put:
       description: 'Creates every configuration in the body in one request, mixed classes and package types allowed.
         Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created.
@@ -3093,6 +3134,10 @@ paths:
       tags:
       - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createmultiplerepositories.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - 'body:'
+      x-cost: expensive
   /api/v2/repositories/{repoKey}:
     get:
       description: Like the ordinary read but returns only the fields that apply to the repository's package type,
@@ -3149,3 +3194,5 @@ paths:
       tags:
       - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md
+      x-idempotency: safe
+      x-cost: ordinary

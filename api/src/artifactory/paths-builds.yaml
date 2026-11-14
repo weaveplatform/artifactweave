@@ -601,6 +601,10 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getallbuilds.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
     put:
       description: Stores one run's build-info document. The artifacts in modules[].artifacts are not checked
         against stored files. Promotion and the build artifacts search later find each one as an item holding its
@@ -654,6 +658,13 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/uploadbuild.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - query:project
+      - body:/name
+      - body:/number
+      - body:/started
+      x-cost: expensive
   /api/build/append/{buildName}/{buildNumber}:
     post:
       description: Adds modules to an existing run and stores the extended document. Needs deploy and delete permission
@@ -752,6 +763,8 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/appendbuild.md
+      x-idempotency: key
+      x-cost: expensive
   /api/build/delete:
     post:
       description: Deletes runs of one build, selected by number or all at once, optionally with their artifacts.
@@ -782,6 +795,8 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/deletebuildsmultiple.md
+      x-idempotency: key
+      x-cost: expensive
   /api/build/promote/{buildName}/{buildNumber}:
     post:
       description: Records a status change for the latest run of a build number and optionally moves or copies
@@ -849,6 +864,8 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/promotebuild.md
+      x-idempotency: key
+      x-cost: expensive
   /api/build/rename/{buildName}:
     post:
       description: Renames every run of a build. Needs deploy and delete permission on the build.
@@ -899,6 +916,12 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/renamebuild.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:buildName
+      - query:to
+      - query:project
+      x-cost: expensive
   /api/build/retention/{buildName}:
     post:
       description: Discards the runs of a build that the settings do not keep, with their documents and, when asked,
@@ -954,6 +977,11 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/controlbuildretention.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:buildName
+      - query:project
+      x-cost: expensive
   /api/build/{buildName}:
     delete:
       description: Deletes the listed runs of a build, or every run, optionally with their artifacts. Needs delete
@@ -1016,6 +1044,8 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/deletebuilds.md
+      x-idempotency: key
+      x-cost: expensive
     get:
       description: Lists the runs of one build. Needs read permission on the build.
       operationId: getBuildRuns
@@ -1053,6 +1083,10 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getbuildruns.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/build/{buildName}/{buildNumber}:
     get:
       description: Returns one run's build-info document. Needs read permission on the build.
@@ -1125,6 +1159,8 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getbuildinfo.md
+      x-idempotency: safe
+      x-cost: expensive
   /api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo}:
     get:
       description: Lists where each artifact of a run is stored. Needs read permission on the build.
@@ -1176,6 +1212,10 @@ paths:
       tags:
       - builds
       x-unverified: true
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/docker/{repo-key}/v2/promote:
     post:
       description: Promotes a Docker or OCI image from a local or federated repository to another local or federated
@@ -1240,3 +1280,12 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/promotedockerimage.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repo-key
+      - body:/dockerRepository
+      - body:/tag
+      - body:/targetRepo
+      - body:/targetDockerRepository
+      - body:/targetTag
+      x-cost: expensive

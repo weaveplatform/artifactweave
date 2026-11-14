@@ -326,6 +326,10 @@ paths:
       tags:
       - system
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/paths
+      x-cost: expensive
   /api/system:
     get:
       description: 'A plain text dump of runtime facts: build version and revision, Go runtime, operating system,
@@ -347,6 +351,8 @@ paths:
       summary: System information
       tags:
       - system
+      x-idempotency: safe
+      x-cost: ordinary
   /api/system/configuration:
     get:
       description: Not implemented; answers 501.
@@ -369,6 +375,8 @@ paths:
       - handwritten
       x-handwritten: true
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     patch:
       description: 'The configuration-as-code entry point (decision 0009). The body is a YAML document in the descriptor
         format with any of the top-level sections `localRepositories`, `remoteRepositories`, `virtualRepositories`,
@@ -423,6 +431,10 @@ paths:
       - system
       - handwritten
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
     post:
       description: Not implemented; answers 501. The YAML PATCH form covers every managed section.
       operationId: saveSystemConfiguration
@@ -449,6 +461,10 @@ paths:
       - handwritten
       x-handwritten: true
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/system/configuration/baseUrl:
     put:
       description: 'Not implemented; answers 501. It would set the urlBase section of the descriptor: the scheme,
@@ -484,6 +500,10 @@ paths:
       - handwritten
       x-handwritten: true
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/system/configuration/reverseProxy/nginx:
     get:
       description: 'Renders an nginx server block from the stored reverse proxy configuration: the server name,
@@ -508,6 +528,8 @@ paths:
       summary: Generate an nginx snippet
       tags:
       - system
+      x-idempotency: safe
+      x-cost: ordinary
   /api/system/configuration/webServer:
     get:
       description: Returns the reverse proxy settings. Without stored settings, the response describes this server.
@@ -533,6 +555,8 @@ paths:
       summary: Read the reverse proxy configuration
       tags:
       - system
+      x-idempotency: safe
+      x-cost: ordinary
     post:
       description: Creates or replaces the single reverse proxy configuration. The document is stored as the reverseProxies
         section of the descriptor and drives the nginx snippet and the Docker access method. Either sslPort or httpsPort
@@ -561,6 +585,10 @@ paths:
       summary: Store the reverse proxy configuration
       tags:
       - system
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/system/license:
     get:
       description: Returns the licence details of this server, which has no licence tiers. Admin only.
@@ -585,6 +613,8 @@ paths:
       summary: Licence information
       tags:
       - system
+      x-idempotency: safe
+      x-cost: ordinary
     post:
       description: Accepts a licence key. The server has no licences; it validates that the body is a JSON object,
         stores nothing and answers 200. Admin only.
@@ -618,6 +648,10 @@ paths:
       summary: Install a licence key
       tags:
       - system
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/system/licenses:
     delete:
       description: Removes the licences whose hashes are listed. The server holds none, so it answers 200 with a
@@ -647,6 +681,10 @@ paths:
       summary: Remove node licences
       tags:
       - system
+      x-idempotency: natural
+      x-idempotency-natural:
+      - query:licenseHash
+      x-cost: expensive
     get:
       description: Lists one licence per node. This instance is a single process and returns a one-element list
         describing itself. Admin or a token scoped system:info/licenses:r.
@@ -674,6 +712,10 @@ paths:
       summary: List node licences
       tags:
       - system
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Accepts one licence key object, or an array of them, and reports a status per key. Nothing is stored,
         and every key is reported as installed. Admin only.
@@ -707,6 +749,10 @@ paths:
       summary: Install node licences
       tags:
       - system
+      x-idempotency: natural
+      x-idempotency-natural:
+      - 'body:'
+      x-cost: expensive
   /api/system/migration/sha2/start:
     post:
       description: Not implemented; answers 501. The server records SHA-256 for every binary on write.
@@ -761,6 +807,10 @@ paths:
       tags:
       - system
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/system/migration/sha2/stop:
     post:
       description: Not implemented; answers 501.
@@ -789,6 +839,10 @@ paths:
       tags:
       - system
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/system/ping:
     get:
       description: Returns the plain text OK while the database and the binary store answer. Answers without credentials.
@@ -814,6 +868,8 @@ paths:
       - system
       - handwritten
       x-handwritten: true
+      x-idempotency: safe
+      x-cost: exempt
   /api/system/support/bundle:
     post:
       description: Not implemented; answers 501. A support bundle would package logs, configuration and thread dumps.
@@ -846,6 +902,8 @@ paths:
       tags:
       - system
       x-tier: stub
+      x-idempotency: key
+      x-cost: expensive
   /api/system/support/bundle/{bundleId}:
     delete:
       description: Not implemented; answers 501.
@@ -865,6 +923,10 @@ paths:
       tags:
       - system
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:bundleId
+      x-cost: expensive
     get:
       description: Not implemented; answers 501.
       operationId: getSupportBundleMetadata
@@ -887,6 +949,8 @@ paths:
       tags:
       - system
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
   /api/system/support/bundle/{bundleId}/archive:
     get:
       description: Not implemented; answers 501.
@@ -914,6 +978,8 @@ paths:
       tags:
       - system
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
   /api/system/support/bundles:
     get:
       description: Not implemented; answers 501.
@@ -933,6 +999,10 @@ paths:
       tags:
       - system
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/system/usage:
     post:
       description: Accepts a usage report body of up to 1 MiB and discards it.
@@ -947,6 +1017,10 @@ paths:
       - system
       - handwritten
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/system/verifyconnection:
     post:
       description: Performs a GET against the given endpoint from the server, using the global proxy settings and
@@ -997,6 +1071,8 @@ paths:
       summary: Verify an outbound connection
       tags:
       - system
+      x-idempotency: safe
+      x-cost: expensive
   /api/system/version:
     get:
       description: Reports the compatibility version in version, the server build in revision, and the installed
@@ -1027,6 +1103,8 @@ paths:
       summary: Compatibility version
       tags:
       - system
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/liveness:
     get:
       description: Returns OK while the process serves requests. It probes no store. Answers without credentials.
@@ -1043,6 +1121,8 @@ paths:
       summary: Liveness probe
       tags:
       - system
+      x-idempotency: safe
+      x-cost: exempt
   /api/v1/system/readiness:
     get:
       description: Returns OK while the database and the binary store answer. Answers without credentials.
@@ -1064,3 +1144,5 @@ paths:
       summary: Readiness probe
       tags:
       - system
+      x-idempotency: safe
+      x-cost: exempt
