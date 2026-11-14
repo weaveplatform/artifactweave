@@ -1,0 +1,6 @@
+# What Conan 1.66.0, patch-ng 1.17.4 and pluginbase 1.0.1 build with. They
+# publish only sdists, with a setup.py and no pyproject.toml, so pip builds
+# them with setuptools' legacy backend, whose one requirement is setuptools.
+# The Conan step installs this file into the Conan 1 venv first and builds
+# them there with --no-build-isolation (quality-gate.yml says why).
+setuptools

@@ -114,6 +114,7 @@ func TestUnitRelevantKeepsEachEcosystemsClientFields(t *testing.T) {
 		DdebSupported: ptr(true), EnableConanSupport: ptr(true),
 		P2URLs: []string{"https://p2"}, PodsSpecsRepoURL: "https://specs",
 		HexPublicKey: "key", Curated: ptr(true), PassThrough: ptr(false),
+		ForceConanAuthentication: ptr(true),
 	}
 	kept := func(c repo.Config) map[string]bool {
 		return map[string]bool{
@@ -122,7 +123,7 @@ func TestUnitRelevantKeepsEachEcosystemsClientFields(t *testing.T) {
 				c.GitRegistryURL != "",
 			"rpm":       c.YumGroupFileNames != "",
 			"debian":    c.DdebSupported != nil,
-			"conan":     c.EnableConanSupport != nil,
+			"conan":     c.ForceConanAuthentication != nil,
 			"p2":        c.P2URLs != nil,
 			"cocoapods": c.PodsSpecsRepoURL != "",
 			"hex":       c.HexPublicKey != "",

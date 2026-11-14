@@ -74,10 +74,16 @@ var ReindexOps = map[repo.PackageType]ReindexOp{
 		Refused: "Repository '%s' is not a local pub repository",
 		Answer:  "Reindex of pub repo %s was scheduled to run.",
 	},
+	// "Requires a valid admin user" and the sample answer, which is that of
+	// the default, synchronous call: the archived 7.x reference
+	// (jfrog-rest-apis/calculate-conan-repository-metadata, copies of
+	// 2023-06-04 to 2026-01-13). The current page, of 2026-11-12, states
+	// neither. The answer is the same when async is true [I] (#216).
 	repo.Conan: {
-		Classes: Hosted,
-		Refused: "Repository '%s' is not a local Conan repository",
-		Answer:  "Reindex of Conan repo %s was scheduled to run.",
+		IsAdminOnly: true,
+		Classes:     Hosted,
+		Refused:     "Repository '%s' is not a local Conan repository",
+		Answer:      "Recalculating index for Conan repository %s scheduled to run.",
 	},
 	repo.Cran: {
 		Classes: []repo.Class{repo.Local},

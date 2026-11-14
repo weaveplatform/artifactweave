@@ -115,7 +115,9 @@ components:
             repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableConanSupport:
-          description: Optional within this object. Stored only and returned as it was sent; it changes no answer.
+          description: Optional within this object. Accepted and changes no answer. The v1 read reports it true for
+            a Conan repository whatever was sent, as 7.x derives it from the package type; the v2 read and the
+            configurations list leave it out.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a
@@ -445,7 +447,9 @@ components:
             repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableConanSupport:
-          description: Optional within this object. Stored only and returned as it was sent; it changes no answer.
+          description: Optional within this object. Accepted and changes no answer. The v1 read reports it true for
+            a Conan repository whatever was sent, as 7.x derives it from the package type; the v2 read and the
+            configurations list leave it out.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a
@@ -985,6 +989,11 @@ components:
             them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on remote
             repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
+        enableConanSupport:
+          description: Optional within this object. Accepted and changes no answer. The v1 read reports it true for
+            a Conan repository whatever was sent, as 7.x derives it from the package type; the v2 read and the
+            configurations list leave it out.
+          type: boolean
         enableCookieManagement:
           description: Optional within this object. When true upstream cookies are stored and replayed. Defaults
             to false.
@@ -1464,6 +1473,11 @@ components:
           enum:
           - V2
           type: string
+        enableConanSupport:
+          description: Optional within this object. Accepted and changes no answer. The v1 read reports it true for
+            a Conan repository whatever was sent, as 7.x derives it from the package type; the v2 read and the
+            configurations list leave it out.
+          type: boolean
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.
             Mandatory when projectKey is set; a repository may belong to several environments. An administrator's read

@@ -73,7 +73,12 @@ It builds no sdist (`--only-binary=:all:`), except PyYAML in the Ansible image,
 whose build requirements are hashed in a file of their own
 (`--build-constraint`). To move a pin, edit the `.in` file and run
 `pip-lock.sh`; the `tools/depsync` tests fail while a `.txt` file lags its `.in`
-file. The CI-installed Hugging Face clients work the same way.
+file. The CI-installed Hugging Face and Conan clients work the same way. Conan
+1.66.0 and two of its dependencies publish only sdists, and the pip of the
+job's Python 3.12 venv has no `--build-constraint`, so the Conan step installs
+the setuptools that builds them from a hashed file of its own first and builds
+them with `--no-build-isolation`
+([#1455](https://github.com/weaveplatform/artifactweave/issues/1455)).
 
 | Dockerfile | Download | First source | Second source |
 |---|---|---|---|

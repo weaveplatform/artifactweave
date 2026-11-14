@@ -192,9 +192,9 @@ paths:
       x-tier: native
   /api/conan/{repoKey}/reindex:
     post:
-      description: Queues a rebuild of the package index of a local or federated Conan repository from its
-        completed recipe and package revisions, and returns once the work is queued. Requires Manage on the
-        repository; other package types and classes are rejected with 400.
+      description: Rebuilds the package index of a local or federated Conan repository from its completed
+        recipe and package revisions. Waits for the work to finish unless async is true. Requires an
+        administrator; other package types and classes are rejected with 400.
       operationId: calculateConanRepositoryMetadata
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -206,21 +206,22 @@ paths:
           description: Key of the repository to act on. The repository's package type must match this
             operation's ecosystem; a mismatch is rejected with 400.
           type: string
-      - description: Optional query parameter. Accepted with either value; the work is always queued and the
-          response returns once it is queued.
+      - description: Optional query parameter. When true the server queues the work and returns at once; when
+          false or omitted the response waits for the work to finish.
         in: query
         name: async
         schema:
-          description: Accepted with either value; the work is always queued.
+          description: When true the server queues the work and returns at once; when false or omitted the
+            response waits for the work to finish.
           type: boolean
       responses:
         '200':
           content:
             text/plain:
               schema:
-                description: Plain-text acknowledgement of the queued reindex.
+                description: Plain-text acknowledgement of the reindex.
                 type: string
-          description: The Conan reindex was scheduled.
+          description: The Conan reindex ran, or was scheduled when async is true.
         '401':
           content:
             application/json:
@@ -232,8 +233,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs; the body carries the error
-            envelope.
+          description: The caller is not an administrator; the body carries the error envelope.
         '500':
           content:
             application/json:

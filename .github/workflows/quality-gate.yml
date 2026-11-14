@@ -838,6 +838,17 @@ jobs:
         with:
           python-version: '3.12'
 
+      # The two clients and their dependencies come from the hashed files
+      # that test/acceptance/clients/pip-lock.sh writes, first from PyPI and
+      # then from TUNA's mirror of PyPI, as the Hugging Face step does, so one
+      # PyPI fault does not fail the job and the mirror can serve only PyPI's
+      # bytes (#1321, #1455). Conan 1.66.0, patch-ng 1.17.4 and pluginbase
+      # 1.0.1 publish only sdists. The venv's pip is Python 3.12's bundled
+      # 25.0.1, which installs an isolated build's setuptools without hash
+      # checks and has no --build-constraint (pip 25.3 added it), so the
+      # Conan 1 venv installs setuptools from its own hashed file first and
+      # builds them with it, --no-build-isolation. bash -e does not stop on a
+      # loop whose last pip failed, hence each exit.
       - name: Pinned Conan clients
         env:
           CONAN2_VERSION: '2.34.0'
@@ -845,17 +856,20 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/conan2"
           python3 -m venv "$RUNNER_TEMP/conan1"
-          mkdir -p "$RUNNER_TEMP/conan-clients"
-          "$RUNNER_TEMP/conan2/bin/pip" download --no-deps --only-binary=:all: \
-            -d "$RUNNER_TEMP/conan-clients" "conan==$CONAN2_VERSION"
-          "$RUNNER_TEMP/conan1/bin/pip" download --no-deps --no-binary=:all: \
-            -d "$RUNNER_TEMP/conan-clients" "conan==$CONAN1_VERSION"
-          echo '4e268bb9ad38614141c7274a769c7226122e3660e4d5eb545a0c7f7170b53272  '"$RUNNER_TEMP/conan-clients/conan-$CONAN2_VERSION-py3-none-any.whl" | sha256sum -c -
-          echo '04d2ad0f6ec6f055d95fa0a157b55fdea9328ae67f51b11e7d26e9d9d2f76ab9  '"$RUNNER_TEMP/conan-clients/conan-$CONAN1_VERSION.tar.gz" | sha256sum -c -
-          "$RUNNER_TEMP/conan2/bin/pip" install --disable-pip-version-check "$RUNNER_TEMP/conan-clients/conan-$CONAN2_VERSION-py3-none-any.whl"
-          "$RUNNER_TEMP/conan1/bin/pip" install --disable-pip-version-check "$RUNNER_TEMP/conan-clients/conan-$CONAN1_VERSION.tar.gz"
-          "$RUNNER_TEMP/conan2/bin/conan" --version
-          "$RUNNER_TEMP/conan1/bin/conan" --version
+          for index in https://pypi.org/simple https://pypi.tuna.tsinghua.edu.cn/simple; do
+            "$RUNNER_TEMP/conan2/bin/pip" install --no-cache-dir --require-hashes --only-binary=:all: \
+              --index-url "$index" -r test/acceptance/clients/conan2.requirements.txt && break
+          done || exit 1
+          for index in https://pypi.org/simple https://pypi.tuna.tsinghua.edu.cn/simple; do
+            "$RUNNER_TEMP/conan1/bin/pip" install --no-cache-dir --require-hashes --only-binary=:all: \
+              --index-url "$index" -r test/acceptance/clients/conan1.build-requirements.txt && break
+          done || exit 1
+          for index in https://pypi.org/simple https://pypi.tuna.tsinghua.edu.cn/simple; do
+            "$RUNNER_TEMP/conan1/bin/pip" install --no-cache-dir --require-hashes --no-build-isolation \
+              --index-url "$index" -r test/acceptance/clients/conan1.requirements.txt && break
+          done || exit 1
+          "$RUNNER_TEMP/conan2/bin/conan" --version | grep -Fx "Conan version $CONAN2_VERSION"
+          "$RUNNER_TEMP/conan1/bin/conan" --version | grep -Fx "Conan version $CONAN1_VERSION"
 
       - name: Conan 1 and 2 native protocol acceptance (coverage)
         env:
