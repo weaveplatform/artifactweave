@@ -132,15 +132,18 @@
 //     serves under its own type, keeps its MediaType
 //     (https://github.com/weaveplatform/artifactweave/issues/1477).
 //   - ServeStream answers If-Match and If-Unmodified-Since never, as 7.x's
-//     download reads neither, on every stream. A stream with a SHA-1, a
-//     file, answers If-None-Match and If-Modified-Since as that download's
-//     isNotModified does (FileNotModified), and a range past its end with
-//     416 and Content-Range alone; a document a protocol builds per request
-//     keeps http.ServeContent's answers to both
+//     download reads neither, on every stream. A stream that names its path
+//     or has a SHA-1, a file, answers If-None-Match and If-Modified-Since as
+//     that download's isNotModified does (FileNotModified), and a range past
+//     its end with 416 and Content-Range alone; a document a protocol builds
+//     per request keeps http.ServeContent's answers to both
 //     (https://github.com/weaveplatform/artifactweave/issues/1468,
 //     https://github.com/weaveplatform/artifactweave/issues/1469). A file's
 //     ETag is its bare SHA-1, never the upstream's, unless the route chose
-//     its own (https://github.com/weaveplatform/artifactweave/issues/1484).
+//     its own; a file without a SHA-1 sends none, and only
+//     If-Modified-Since finds it unchanged
+//     (https://github.com/weaveplatform/artifactweave/issues/1484,
+//     https://github.com/weaveplatform/artifactweave/issues/1487).
 //   - SourceError answers a failure of the server's own storage while it
 //     keeps a remote file (format.ErrStorageFault) as the router's
 //     internal fault, 500

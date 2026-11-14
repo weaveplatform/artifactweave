@@ -31,7 +31,10 @@
 //     its kept copy answers (issue 1477).
 //   - TestAccNPMRemoteTarballETagIsItsSHA1 and TestAccNPMRemoteKeysETagIsItsSHA1
 //     fail while a remote tarball or keys document answers with its
-//     upstream's ETag instead of its SHA-1, or matches it (issue 1484).
+//     upstream's ETag instead of its SHA-1, or matches it (issue 1484);
+//     TestAccNPMRemoteTarballHeadWithoutChecksumIsMatchedByDate while a
+//     tarball HEAD answered from the upstream's HEAD without a checksum is
+//     matched by Go's rules against the upstream's ETag (issue 1487).
 //
 // # References
 //

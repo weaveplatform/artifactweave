@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 )
@@ -78,6 +79,33 @@ func TestUnitServeStreamSendsAFilesSHA1AsItsETag(t *testing.T) {
 				w.Header().Get("ETag") != streamSHA1 {
 				t.Errorf("%s (seekable %v): %d %q ETag %q, want %d %q and the bare SHA-1",
 					c.label, seekable, w.Code, w.Body, w.Header().Get("ETag"), c.status, c.body)
+			}
+		}
+	}
+}
+
+// A file stream without a SHA-1, such as a HEAD answered from an upstream's
+// HEAD that declares none, sends no ETag and answers If-None-Match with
+// 200, "*" and a list included, and If-Modified-Since by its date alone,
+// whatever its length. 7.161.26's DownloadServiceImpl.isNotModified matches
+// If-None-Match only against the SHA-1 (#1487).
+func TestUnitServeStreamMatchesAFileWithoutSHA1ByDateAlone(t *testing.T) {
+	after := streamModified.Add(time.Hour).Format(http.TimeFormat)
+	before := streamModified.Add(-time.Hour).Format(http.TimeFormat)
+	cases := []etagCase{
+		{"*", [][2]string{{"If-None-Match", "*"}}, http.StatusOK, ""},
+		{"list", [][2]string{{"If-None-Match", `"x", "0123"`}}, http.StatusOK, ""},
+		{"after", [][2]string{{"If-Modified-Since", after}}, http.StatusNotModified, ""},
+		{"before", [][2]string{{"If-Modified-Since", before}}, http.StatusOK, ""},
+	}
+	for _, size := range []int64{10, -1} {
+		for _, seekable := range []bool{true, false} {
+			for _, c := range cases {
+				w := serveFileStream(t, http.MethodHead, seekable, false, size, c)
+				if w.Code != c.status || w.Header().Get("ETag") != "" {
+					t.Errorf("%s (size %d, seekable %v): %d ETag %q, want %d and none", c.label,
+						size, seekable, w.Code, w.Header().Get("ETag"), c.status)
+				}
 			}
 		}
 	}

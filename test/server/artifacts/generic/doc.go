@@ -65,7 +65,9 @@
 //     its path, as its kept copy does, never the upstream's label (#1477).
 //   - remote_etag_test.go: a remote file, on a remote that stores it and
 //     one that does not, and a Maven metadata document, answer with their
-//     SHA-1 as ETag, matched alone, never the upstream's (#1484).
+//     SHA-1 as ETag, matched alone, never the upstream's (#1484); a HEAD
+//     answered from an upstream's HEAD without a checksum sends no ETag
+//     and is matched by its date alone (#1487).
 //
 // # References
 //

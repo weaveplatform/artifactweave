@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
@@ -49,6 +50,69 @@ func TestAccNPMRemoteTarballETagIsItsSHA1(t *testing.T) {
 					http.StatusNotModified)
 			}
 		})
+	}
+}
+
+// TestAccNPMRemoteTarballHeadWithoutChecksumIsMatchedByDate: on a remote
+// that stores nothing, a tarball HEAD answered from the upstream's HEAD,
+// which sends an ETag and no checksum, answers 200 with no ETag to
+// If-None-Match "*", the upstream's ETag and a list on one line, and 304
+// to an If-Modified-Since after the upstream's Last-Modified, with or
+// without a length. 7.161.26's DownloadServiceImpl.isNotModified matches
+// If-None-Match only against the SHA-1, which such a resource lacks; the
+// tarball route answered by http.ServeContent against the upstream's ETag
+// (#1487).
+func TestAccNPMRemoteTarballHeadWithoutChecksumIsMatchedByDate(t *testing.T) {
+	w, tarballs := remoteTarballWorld(t, false, "application/octet-stream")
+	modified := time.Unix(1700000000, 0).UTC()
+	after := modified.Add(time.Hour).Format(http.TimeFormat)
+	upstreamTag := fmt.Sprintf(`"%x"`, sha256.Sum256(tarballs["1.0.1"]))
+	cases := []struct {
+		label   string
+		headers []string
+		length  bool
+		want    int
+	}{
+		{"If-None-Match *", []string{"If-None-Match", "*"}, true, http.StatusOK},
+		{"If-None-Match upstream", []string{"If-None-Match", upstreamTag}, true, http.StatusOK},
+		{
+			"If-None-Match list",
+			[]string{"If-None-Match", `"x", ` + upstreamTag},
+			true,
+			http.StatusOK,
+		},
+		{
+			"If-Modified-Since after",
+			[]string{"If-Modified-Since", after},
+			true,
+			http.StatusNotModified,
+		},
+		{
+			"If-Modified-Since after, no length",
+			[]string{"If-Modified-Since", after},
+			false,
+			http.StatusNotModified,
+		},
+	}
+	for _, c := range cases {
+		header := http.Header{"Content-Type": {"application/octet-stream"}}
+		if !c.length {
+			// http.ServeContent, which answers the fake upstream's HEAD,
+			// sends no Content-Length beside a Content-Encoding.
+			header["Content-Encoding"] = []string{"identity"}
+		}
+		w.Upstream.Set("/pkg/-/pkg-1.0.1.tgz", fakeupstream.Resource{
+			Body: tarballs["1.0.1"], Modified: modified, Header: header,
+		})
+		rec := w.Request(http.MethodHead, "/artifactory/api/npm/remote/pkg/-/pkg-1.0.1.tgz",
+			"reader", "", c.headers...)
+		if rec.Code != c.want || rec.Header().Get("ETag") != "" {
+			t.Errorf("%s: %d, ETag %q; want %d and no ETag", c.label, rec.Code,
+				rec.Header().Get("ETag"), c.want)
+		}
+	}
+	if got := w.Upstream.Count(http.MethodGet, "/pkg/-/pkg-1.0.1.tgz"); got != 0 {
+		t.Fatalf("a HEAD downloaded the tarball: %v", w.Upstream.Requests())
 	}
 }
 

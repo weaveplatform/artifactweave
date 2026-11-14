@@ -1,9 +1,9 @@
 package generic_test
 
-// This file holds the remote validator suite of #1484: a remote file
-// answers with its SHA-1 as its ETag, never the upstream's, and is matched
-// against that alone, whether the upstream's answer or the cached copy
-// serves it.
+// This file holds the remote validator suite of #1484 and #1487: a remote
+// file answers with its SHA-1 as its ETag, never the upstream's, and is
+// matched against that alone, whether the upstream's answer or the cached
+// copy serves it.
 
 import (
 	"crypto/sha1" //nolint:gosec // the file's SHA-1, as 7.x sends it
@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
@@ -56,6 +57,74 @@ func TestAccGenericRemoteFileETagIsItsSHA1(t *testing.T) {
 					http.StatusNotModified)
 			}
 		})
+	}
+}
+
+// TestAccGenericRemoteHeadWithoutChecksumIsMatchedByDate: a HEAD that a
+// remote storing nothing answers from its upstream's HEAD, which sends an
+// ETag and no checksum, answers If-None-Match as 7.x's download does with
+// no SHA-1 to match, 200 for "*", the upstream's ETag and a list on one
+// line, and an If-Modified-Since after the upstream's Last-Modified with
+// 304 whether or not the upstream sends a length. 7.161.26's
+// DownloadServiceImpl.isNotModified matches If-None-Match only against the
+// SHA-1, which such a resource lacks, and otherwise compares
+// If-Modified-Since with its last-modified time; the stream was answered
+// by http.ServeContent against the upstream's ETag, and without a length
+// evaluated nothing.
+func TestAccGenericRemoteHeadWithoutChecksumIsMatchedByDate(t *testing.T) {
+	modified := time.Unix(1700000000, 0).UTC()
+	after := modified.Add(time.Hour).Format(http.TimeFormat)
+	upstreamTag := fmt.Sprintf(`"%x"`, sha256.Sum256([]byte(coldJar)))
+	w := newRemoteWorld(t)
+	w.c.StoreArtifactsLocally = new(false)
+	w.update()
+	cases := []struct {
+		label   string
+		headers []string
+		length  bool
+		want    int
+	}{
+		{"If-None-Match *", []string{"If-None-Match", "*"}, true, http.StatusOK},
+		{"If-None-Match upstream", []string{"If-None-Match", upstreamTag}, true, http.StatusOK},
+		{
+			"If-None-Match list",
+			[]string{"If-None-Match", `"x", ` + upstreamTag},
+			true,
+			http.StatusOK,
+		},
+		{
+			"If-Modified-Since after",
+			[]string{"If-Modified-Since", after},
+			true,
+			http.StatusNotModified,
+		},
+		{
+			"If-Modified-Since after, no length",
+			[]string{"If-Modified-Since", after},
+			false,
+			http.StatusNotModified,
+		},
+	}
+	for i, c := range cases {
+		file := "/nochecksum/file-" + strconv.Itoa(i) + ".jar"
+		resource := fakeupstream.Resource{
+			Body: []byte(coldJar), Modified: modified,
+			Header: http.Header{"Content-Type": {javaArchive}},
+		}
+		if !c.length {
+			// http.ServeContent, which answers the fake upstream's HEAD,
+			// sends no Content-Length beside a Content-Encoding.
+			resource.Header["Content-Encoding"] = []string{"identity"}
+		}
+		w.up.Set(file, resource)
+		rec := w.request(http.MethodHead, "/artifactory/remote"+file, "reader", "", c.headers...)
+		if rec.Code != c.want || rec.Header().Get("ETag") != "" {
+			t.Errorf("%s: %d, ETag %q; want %d and no ETag", c.label, rec.Code,
+				rec.Header().Get("ETag"), c.want)
+		}
+	}
+	if got := w.up.Count(http.MethodGet, "/nochecksum/file-0.jar"); got != 0 {
+		t.Fatalf("the HEAD downloaded the file: %v", w.up.Requests())
 	}
 }
 

@@ -232,7 +232,11 @@ whether the upstream's answer or the cached copy serves it, and `If-None-Match` 
 matched against that SHA-1 alone: the upstream's `ETag` stays in the cache entry for the
 remote's own conditional request and never reaches a client, as 7.161.26's
 `RequestResponseHelper.setBasicHeaders` sets every downloaded resource's ETag to its
-SHA-1 ([#1484](https://github.com/weaveplatform/artifactweave/issues/1484)). A route
+SHA-1 ([#1484](https://github.com/weaveplatform/artifactweave/issues/1484)). A file an
+upstream's HEAD answers without a SHA-1 sends no ETag; `If-None-Match` then matches
+nothing, `*` and a list included, and only `If-Modified-Since` finds it unchanged, as
+`DownloadServiceImpl.isNotModified` reads them, whether or not the upstream sent a
+length ([#1487](https://github.com/weaveplatform/artifactweave/issues/1487)). A route
 that chooses its own validator, as the registry does for a manifest, keeps it.
 
 `storeArtifactsLocally=false` is a repository setting, and treated as nonpersistent. An
