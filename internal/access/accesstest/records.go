@@ -44,6 +44,9 @@ type (
 	UserStore = port.UserStore
 	// PermissionStore stores permissions.
 	PermissionStore = port.PermissionStore
+	// PermissionQuery asks PermissionStore.Page for one page of
+	// permissions.
+	PermissionQuery = port.PermissionQuery
 	// TokenStore stores token records.
 	TokenStore = port.TokenStore
 	// TokenFilter narrows TokenStore's listings.

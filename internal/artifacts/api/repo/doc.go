@@ -48,8 +48,9 @@
 //     read model gives every repository; and Relevant, the shape of the v2
 //     read and of the configurations list.
 //   - Package-type names: AllowedPackageTypes per class, AcceptsMember for
-//     virtual members, PackageTypeName as listings spell a type and
-//     PackageTypeDisplayName as the storage summary does.
+//     virtual members, PackageTypeName as listings spell a type,
+//     PackageTypesNamed as a listing's filter names stored types (#1408)
+//     and PackageTypeDisplayName as the storage summary does.
 //   - RepoPatterns, which PatternsOf compiles from a Config: a repository's
 //     include and exclude patterns, matched with kernel/antpath. AQL,
 //     listings, searches and the generic and Maven formats check paths with
@@ -132,7 +133,7 @@
 //     TestUnitCreateTakesItsTypeFromTheLegacyFlags: the fields Full derives
 //     and the type a create takes from the legacy flags (#1479).
 //   - TestUnitAllowedPackageTypes, TestUnitPackageTypeName,
-//     TestUnitPackageTypeDisplayName and
+//     TestUnitPackageTypesNamed, TestUnitPackageTypeDisplayName and
 //     TestUnitEveryAcceptedTypeHasAListingName: the package-type names.
 //   - TestUnitRepoPatterns: includes, excludes and folders that lead to
 //     included content.

@@ -57,6 +57,10 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/importreleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - query:file_name
+      x-cost: expensive
   /api/v1/export/release_bundle/{release_bundle_name}/{release_bundle_version}:
     delete:
       description: Deletes the exported zip of the version from the export directory. The version itself is untouched.
@@ -77,6 +81,11 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteexportedreleasebundlev1file.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:release_bundle_name
+      - path:release_bundle_version
+      x-cost: expensive
     post:
       description: Starts an asynchronous export of a signed version to one zip archive holding the signed manifest,
         its signature and every artifact, for carrying to an instance with no network path to this one. Poll the
@@ -111,6 +120,9 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/exportreleasebundlev1version.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/export/release_bundle/{release_bundle_name}/{release_bundle_version}/status:
     get:
       description: Reports how far the export of a version has got.
@@ -145,6 +157,8 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getexportedreleasebundlev1status.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/release_bundle:
     get:
       description: Lists the release bundle v1 versions on this instance, one entry per version, newest first. Use
@@ -187,6 +201,12 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getallbundles-1.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: offset
+      x-pagination-parameters:
+        position: start_pos
+      x-pagination-next: link
     post:
       description: 'Creates a release bundle version: an immutable manifest of the artifacts selected by the spec''s
         AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds.
@@ -251,6 +271,11 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createreleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/name
+      - body:/version
+      x-cost: expensive
   /api/v1/release_bundle/distribution:
     get:
       description: Lists the distribution trackers of every release bundle v1 version, newest first.
@@ -274,6 +299,10 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetails.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/release_bundle/{release_bundle_name}:
     delete:
       description: Deletes every version of the named release bundle from this instance, with the same rules as
@@ -306,6 +335,10 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteallreleasebundlev1versions.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:release_bundle_name
+      x-cost: expensive
     get:
       description: Lists every version of the named release bundle, newest first.
       operationId: getReleaseBundleV1VersionsByName
@@ -354,6 +387,12 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev1versionsbyname.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: offset
+      x-pagination-parameters:
+        position: start_pos
+      x-pagination-next: link
   /api/v1/release_bundle/{release_bundle_name}/LATEST:
     get:
       description: Returns the newest version of the named release bundle by creation time. A version literally
@@ -384,6 +423,8 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getlatestreleasebundlev1version.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/release_bundle/{release_bundle_name}/distribution:
     get:
       description: Lists the distribution trackers of every version of the named release bundle, newest first.
@@ -409,6 +450,10 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbyreleasebundlev1name.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}:
     delete:
       description: Deletes one version from this instance. The artifacts are not deleted; they stay in their repositories
@@ -443,6 +488,11 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletereleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:release_bundle_name
+      - path:release_bundle_version
+      x-cost: expensive
     get:
       description: Returns a version's details and artifact list. With `format=jws` or `format=jose` the signed
         manifest is returned instead, as the compact JWS string or the JOSE JSON serialisation, which is what edges
@@ -508,6 +558,8 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev1versiondetails.md
+      x-idempotency: safe
+      x-cost: ordinary
     head:
       description: Answers with the sha256 of the version's signed manifest in the X-Checksum-Sha256 header and
         no body. Edges and clients use it to compare versions without downloading them.
@@ -531,6 +583,8 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev1versionsha256.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Replaces the content of a version that has not been signed. The body has the same shape as for
         creation, and its name and version must match the path. Signed versions are immutable and answer 400.
@@ -580,6 +634,11 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatereleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:release_bundle_name
+      - path:release_bundle_version
+      x-cost: expensive
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/distribution:
     get:
       description: Lists the distribution trackers of one release bundle version, newest first.
@@ -606,6 +665,10 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbyreleasebundlev1version.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/distribution/{distribution_tracker}:
     get:
       description: Returns one tracker with the status of the transfer to each of its edges.
@@ -631,6 +694,8 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbyreleasebundlev1trackerid.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/sign:
     post:
       description: Signs an OPEN version with the default GPG key, or with the key whose passphrase is sent in X-GPG-PASSPHRASE,
@@ -690,6 +755,11 @@ paths:
       tags:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/signreleasebundlev1version.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:release_bundle_name
+      - path:release_bundle_version
+      x-cost: expensive
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/trigger_xray_scan:
     post:
       description: Not implemented; answers 501.
@@ -729,3 +799,6 @@ paths:
       - release-bundles
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/triggerxrayscanreleasebundlev1version.md
       x-tier: stub
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive

@@ -8,6 +8,8 @@ Amended by [#1401](https://github.com/weaveplatform/artifactweave/issues/1401)
 (2026-11-12) with the rules every operation follows, under the API principles
 baseline [#1395](https://github.com/weaveplatform/artifactweave/issues/1395):
 see [Rules for every operation](#rules-for-every-operation).
+[#1405](https://github.com/weaveplatform/artifactweave/issues/1405) to
+[#1412](https://github.com/weaveplatform/artifactweave/issues/1412) implement them.
 This decision describes artifactweave's implementation. It is not a live JFrog
 compatibility capture. Header support, rejection statuses and the Access page
 cap need confirmation under [#216/P19](https://github.com/weaveplatform/artifactweave/issues/216).
@@ -42,9 +44,12 @@ describes how the operation answers now; a 501 stub declares the class it is mea
 to have once served, except where that would change how it is admitted today (see
 [Cost classes](#cost-classes-and-how-admission-finds-them)). The rules below hold
 the server, the generated code and the [operation ledger](../api-reliability/README.md)
-to those classes. Where served behavior does not yet meet a rule (only build
-append accepts a key; several lists are still collected before they are sliced),
-the ledger records the gap.
+to those classes. Served behavior follows them: build append, build delete in both
+forms and build promotion accept a key and replay it; admission takes each
+request's cost class from the operation table; Get Repositories with `limit` and
+the Access v2 permissions list page in the store and point to the next page; and
+`complete` lists are written from store pages. Where a served list still collects
+before it writes, the ledger says why ([Paging](#paging-classes-and-the-next-pointer)).
 
 JFrog's contract comes first. On an operation JFrog defines, every documented
 parameter, body and status stays. The rules add only optional extensions that
@@ -146,9 +151,10 @@ authentication, admission and routing, as it does today. That covers `safe`,
 yet, hand-written aliases and native protocol routes, unknown paths, and 501 stubs:
 a stub sent a key answers 400, not 501. Two or more `Idempotency-Key` fields answer
 400 too. The 400 uses the path's error envelope, is not charged to any allowance
-and carries no rate header. Its message names build append today; once other
-operations accept a key it names the rule instead, which changes only answers to
-requests that use the extension. Reasons:
+and carries no rate header. Its message named build append while append was the
+only keyed operation; since delete and promotion accept a key too (#1410) it names
+the rule instead, which changed only answers to requests that use the extension.
+Reasons:
 
 - It is today's answer, so no request changes.
 - The draft says a client cannot assume that a server honors a key it sends
@@ -263,9 +269,10 @@ reload for each keyed operation; most actions are natural, so few need one.
 `ordinary` operation expensive. Today that is `list` on the storage paths (the file
 list, `GET /artifactory/api/storage/{repoKey}/{itemPath}?list`).
 
-Every operation, stubs included, declares the class it is admitted under today, as
-`expensiveRequest`, `HealthRequest` and `APIRecoveryRequest` decide for its method
-and path. So taking the class from the spec changes no policy name and no limit.
+Every operation, stubs included, declares the class it was admitted under before
+admission read the spec, as `expensiveRequest`, `HealthRequest` and
+`APIRecoveryRequest` decided for its method and path. So taking the class from the
+spec changes no policy name and no limit for any operation's own path.
 Moving an operation to another class later changes its answers and needs its own
 decision.
 
@@ -278,7 +285,15 @@ escaped path the router uses. A request that no spec pattern matches (hand-writt
 aliases, native protocol routes and unknown paths) falls back to path rules that
 `expensiveRequest` keeps for those alone. Where a hand-written route serves a spec
 operation under another pattern, the two must agree, and a test over every served
-operation checks that they do.
+operation checks that they do. The hand-written item operations are looked up under
+the pattern the router serves them with, whose repository key never matches `api`,
+so an unknown two-segment API path such as `PUT /artifactory/api/foo` is no deploy
+and keeps the path rules' class. One answer moved with the lookup: a request that
+an operation addresses by name, whose last segment is a name that happens to be
+`reindex` or `move-archives` (`GET /artifactory/api/repositories/reindex`), takes
+the operation's `ordinary` class, where the path suffix rule made it `expensive`.
+Its status and body are unchanged; its `RateLimit-Policy` names `api` instead of
+`expensive`.
 
 Charging the expensive lane after routing was rejected:
 
@@ -297,7 +312,8 @@ Charging the expensive lane after routing was rejected:
 - The key gate runs before routing and before authentication, and reads the same
   table.
 
-The cost is one more radix-tree lookup per request and a tree built at start-up.
+The cost is a radix-tree lookup in each of the two admission steps, ingress and
+principal, and a tree built once per process.
 
 ### Rate headers and Retry-After
 
@@ -334,7 +350,10 @@ has no per-minute window to report.
 writes (the rest of the window for a rate refusal, 1 otherwise) and on the replay's
 503. An operation's own 503 that reports a transient condition carries it too. A 503
 that reports configuration, such as a missing signing key, or a size bound is not a
-hint to retry.
+hint to retry. Two handler 503s that report a transient condition, a deploy whose
+content garbage collection removed and a remote fetch that a configuration change
+superseded, carry none ([#1415](https://github.com/weaveplatform/artifactweave/issues/1415),
+open).
 
 In the specs, the shared 429 response declares `Retry-After` as required and
 `RateLimit` and `RateLimit-Policy` as optional (absent on the permit refusal). The
@@ -397,11 +416,22 @@ not a position either.
   permission targets). The store applies the order, the caller's visibility and
   `OFFSET` and `LIMIT`, and reads one row past the page to know whether a next
   pointer is due, plus a count where the contract needs one.
-- **`native` lists are classified, not rewritten.** Their bytes stay; their paging
-  moves into the store behind the same bytes.
-- **No list is collected and then sliced.** `cursor`, `offset` and `page` page in
-  the store; `complete` answers, and `native` ones the protocol leaves unbounded,
-  stream from store pages.
+- **`native` lists are classified, not rewritten.** Their bytes stay. Where their
+  paging has moved into the store behind the same bytes, the research section's
+  [native table](../api-reliability/README.md#native-protocols) says how far: npm
+  and NuGet search still count `from`, `skip` and `totalHits` over every earlier
+  candidate ([#1425](https://github.com/weaveplatform/artifactweave/issues/1425),
+  open), and the Ansible, Chef and Puppet lists still read every version name to
+  count and order a page ([#1426](https://github.com/weaveplatform/artifactweave/issues/1426),
+  open).
+- **No list is collected and then sliced.** `cursor`, `offset` and `page` lists page
+  in the store, and `complete` lists stream from store pages
+  ([Streaming complete lists](#streaming-complete-lists)). A served `complete` list
+  that still collects has its reason in the ledger's `pagination_execution` (for
+  example administrator configuration the store reads whole, a list bounded by
+  configuration or by the request, or one that a merge, sort or deduplication
+  needs whole), and `TestAccAPIReliabilityLedger` fails one that collects without
+  a reason.
 
 ### Streaming complete lists
 
@@ -469,9 +499,9 @@ it is.
 ## Optional protected build append
 
 `POST /artifactory/api/build/append/{buildName}/{buildNumber}` is the first
-operation declared `key` and, today, the only one that declares `IdempotencyKey`;
-the [replay](#replay-for-keyed-operations) for every keyed operation follows its
-design. The key is optional. Unkeyed append retains its append-on-every-call
+operation declared `key` and the first to declare `IdempotencyKey`, before build
+delete and promotion (#1410); the [replay](#replay-for-keyed-operations) for every
+keyed operation follows its design. The key is optional. Unkeyed append retains its append-on-every-call
 behavior. The header value is quoted and contains 1–128 ASCII letters, digits,
 `.`, `_`, `:` or `-`; a quoted UUID is recommended. Multiple header values,
 malformed keys, and keys on operations that do not declare the parameter return 400
@@ -579,11 +609,11 @@ this is not a claim that every child resource has been individually charged.
 
 Management mutations, search, build operations, archive/import/export, VCS, trash,
 legacy full repository/identity collections, reindex and deep file lists receive
-the expensive classification. Today `expensiveRequest` in `internal/app/limits.go`
-decides it from the method and path; under
-[Cost classes](#cost-classes-and-how-admission-finds-them) each specified
-operation declares it as `x-cost`, and the path rules remain only for routes
-without a spec operation. They have
+the expensive classification. Each specified operation declares it as `x-cost`,
+which admission reads from the generated operation table
+([Cost classes](#cost-classes-and-how-admission-finds-them));
+`expensiveRequest` in `internal/app/limits.go` decides it from the method and path
+only for a request no spec operation addresses. They have
 shared limits of 6000 requests per minute globally and 600 per principal, plus
 32 concurrent requests per process and 16 per principal. These defaults allow
 normal provider provisioning batches, including Terraform's ten concurrent
@@ -696,24 +726,40 @@ capacity planning; there is no automatic evidence deletion.
   rate/concurrency capacity is exhausted. Gherkin scenarios exercise the real
   binary, its configuration, rate metadata and restriction/recovery lifecycle.
 
-The rules for every operation need these checks as well:
+These checks hold the rules for every operation:
 
-- a guard over the seven bundled specs that fails when an operation lacks a class,
-  a `natural` lacks its identifiers, a `none` lacks a listed reason, an operation
-  that is not `exempt` lacks its 429, its 503 or their headers, a collection lacks
-  `x-pagination`, a `cursor` lacks a next pointer, an operation declares
-  `IdempotencyKey` without being `key`, or a served operation's `x-cost` disagrees
-  with the admission it receives, each rule with a fixture that breaks it;
-- for every served operation, with a budget of one, a second call answers 429 with
-  `Retry-After`, `RateLimit` and `RateLimit-Policy`, and an `exempt` probe is
-  never refused;
-- for every keyed operation, a retry after a lost response performs one effect and
-  answers as the first request did, and a changed body answers 422;
-- following the next pointers of every paged list from its first page visits every
-  item the caller may see exactly once, for an administrator, a partial reader and
-  anonymous;
-- a streamed list whose store fails after the first page ends in a body no JSON
-  parser accepts.
+- `TestAccAPIPrinciples`, a guard over the seven bundled specs, fails when an
+  operation lacks a class, a `natural` lacks its identifiers, a `none` lacks a
+  listed reason, an operation that is not `exempt` lacks its 429, its 503 or their
+  headers, a collection lacks `x-pagination`, a `cursor` lacks a next pointer, an
+  operation declares `IdempotencyKey` without being `key`, or a served operation's
+  `x-cost` disagrees with the admission it receives; `TestUnitAPIPrinciplesFixtures`
+  breaks each rule with a fixture.
+- `TestAccAPILimitEveryOperation`: for every operation, with a budget of one, a
+  second call answers 429 with `Retry-After`, `RateLimit` and `RateLimit-Policy`;
+  `TestAccAPILimitEveryOperationUnavailable` shows every charged operation's 503
+  with `Retry-After: 1` while the budget store fails, and
+  `TestAccAPILimitExemptProbes` shows an `exempt` probe is never refused.
+- `TestAccKeyedOperationsReplayOnce`, on SQLite and PostgreSQL: for every keyed
+  operation, a retry performs one effect and answers as the first request did, and
+  a changed body answers 422; `TestAccAppendReplayDurability` loses the TCP
+  response after commit.
+- `TestAccRepositoriesWalkVisitsEachOnce` and
+  `TestAccAccessPermissionsWalkVisitsEachOnce`: following the next pointers of each
+  paged list from its first page visits every item the caller may see exactly
+  once, for an administrator, a partial reader and anonymous where the list
+  answers them.
+- `TestAccStreamedListStoreFaults`: a streamed list whose store fails after the
+  first page ends in a body no JSON parser accepts.
+- The Gherkin scenario
+  [api_principles.feature](../../../test/acceptance/features/api_principles.feature)
+  shows the three principles together through the built binary: a keyed build
+  delete whose answer the test's transport drops, retried with the same key for one
+  effect and the same answer; the same key with another body refused with 422; a
+  partial reader's walk of Get Repositories by its `Link` that visits each visible
+  repository once; and that reader driven past a configured allowance to a 429
+  with the three headers. The acceptance job runs it on SQLite; it passes on
+  PostgreSQL too when the binary's environment names that driver.
 
 The [operation ledger and source review](../api-reliability/README.md) cover all
 seven specs and native aliases. The [generated-client retry example](../api-reliability/retrying.md)

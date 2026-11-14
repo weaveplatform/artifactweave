@@ -21,6 +21,8 @@ paths:
       tags:
       - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getgpgsigningkey.md
+      x-idempotency: safe
+      x-cost: ordinary
     post:
       description: Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in
         the instance's keypair store, the same store `/artifactory/api/security/keypair` manages, so a key added
@@ -56,6 +58,10 @@ paths:
       tags:
       - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setgpgsigningkey.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/alias
+      x-cost: expensive
   /api/v1/keys/pgp/aliases:
     get:
       description: Lists the aliases of the configured GPG keys.
@@ -79,6 +85,10 @@ paths:
       tags:
       - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getallgpgkeyaliases.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/keys/pgp/propagate:
     post:
       description: Sends one key (`alias`) or every key (`all=true`) to every edge peer, which adds it to the keys
@@ -113,6 +123,9 @@ paths:
       tags:
       - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/uploadandpropagategpgsigningkeysfordistribution.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/keys/pgp/{alias}:
     delete:
       description: Deletes the key pair. Versions already signed with it stay valid on edges that hold its public
@@ -144,6 +157,10 @@ paths:
       tags:
       - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletegpgkeybyalias.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:alias
+      x-cost: expensive
     get:
       description: Returns the alias and public part of one key.
       operationId: getGpgPublicKeyByAlias
@@ -177,6 +194,8 @@ paths:
       tags:
       - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getgpgpublickeybyalias.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Changes the alias of a key; the key material is unchanged.
       operationId: updateGpgKeyAlias
@@ -225,6 +244,12 @@ paths:
       tags:
       - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updategpgkeyalias.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:alias
+      - body:/alias
+      - body:/new_alias
+      x-cost: expensive
   /api/v2/distribution/key/propagate/{key_name}:
     post:
       description: Sends the named key's public part to every edge peer, which adds it to the keys it trusts for
@@ -260,6 +285,9 @@ paths:
       tags:
       - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/propagatepublicsigningkey.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v2/distribution/key/{key_name}:
     get:
       description: Returns the ASCII-armoured public part of the named key from the keypair store, as plain text.
@@ -294,3 +322,5 @@ paths:
       tags:
       - signing-keys
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpublicsigningkeyfordistribution.md
+      x-idempotency: safe
+      x-cost: ordinary
