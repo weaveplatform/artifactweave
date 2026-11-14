@@ -163,7 +163,7 @@ func (o *Oracle) add(doc map[string]any, family, source string) {
 		shared := r.params(pi["parameters"])
 		for method, opv := range pi {
 			op, ok := opv.(map[string]any)
-			if !ok || !isMethod(method) {
+			if !ok || !isMethod(method) || extension(op) {
 				continue
 			}
 			rec := Operation{
@@ -183,6 +183,9 @@ func (o *Oracle) add(doc map[string]any, family, source string) {
 			if resps, ok := op["responses"].(map[string]any); ok {
 				for code, rv := range resps {
 					resp, _ := r.deref(rv).(map[string]any)
+					if extension(resp) {
+						continue
+					}
 					_, props := r.content(resp["content"])
 					rec.Responses[code] = props
 				}
@@ -343,7 +346,7 @@ func (r resolver) params(v any) []Param {
 	var out []Param
 	for _, pv := range list {
 		pm, ok := r.deref(pv).(map[string]any)
-		if !ok {
+		if !ok || extension(pm) {
 			continue
 		}
 		p := Param{}
@@ -357,6 +360,18 @@ func (r resolver) params(v any) []Param {
 		out = append(out, p)
 	}
 	return out
+}
+
+// extension reports an operation, parameter or response marked
+// x-artifactweave-extension: an optional addition JFrog's clients never send
+// or can ignore (#1395), such as the shared 429 and 503 every admitted
+// operation declares. The comparison leaves it out, so declaring one never
+// moves the parity baseline: a status JFrog documents and we only add as
+// an extension stays reported as missing, and its envelope is never
+// compared with JFrog's.
+func extension(m map[string]any) bool {
+	v, _ := m["x-artifactweave-extension"].(bool)
+	return v
 }
 
 func mergeParams(shared, own []Param) []Param {

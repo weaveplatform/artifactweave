@@ -45,6 +45,10 @@ type apiReviewOperation struct {
 	Collections  []string `json:"response_collections,omitempty"`
 	Pagination   string   `json:"pagination_execution"`
 	Evidence     []string `json:"evidence"`
+	// classes is set for a spec operation, and apiReviewDerive takes retry,
+	// admission and pagination_execution from it; a hand-written alias has
+	// none and keeps the route heuristics.
+	classes *apiReviewClasses
 }
 
 type apiReviewHandler struct {
@@ -67,6 +71,7 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 					Spec:        spec,
 					OperationID: op.OperationID,
 					Contract:    op.Description,
+					classes:     apiReviewClassesOf(item, op),
 				}
 				handwritten, _ := op.Extensions["x-handwritten"].(bool)
 				h, hasHandler := handlers[strings.TrimSuffix(spec, ".openapi.yaml")+":"+strings.ToLower(op.OperationID)]
@@ -110,16 +115,7 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 					)
 				}
 				for _, p := range append(append(openapi3.Parameters{}, item.Parameters...), op.Parameters...) {
-					name := strings.ToLower(p.Value.Name)
-					if strings.Contains(name, "page") || strings.Contains(name, "cursor") ||
-						strings.Contains(name, "offset") ||
-						name == "limit" ||
-						name == "start_pos" ||
-						name == "num_of_rows" ||
-						name == "n" ||
-						name == "last" ||
-						name == "$skip" ||
-						name == "$top" {
+					if pageControl(p.Value.Name) {
 						e.PageControls = append(
 							e.PageControls,
 							p.Value.In+" "+p.Value.Name+": "+p.Value.Description,
@@ -203,10 +199,12 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 		apiReviewPolicy(&e)
 		out = append(out, e)
 	}
+	apiReviewCheckComplete(t, out)
 	slices.SortFunc(
 		out,
 		func(a, b apiReviewOperation) int { return strings.Compare(a.Route, b.Route) },
 	)
+	apiReviewPagedInStore(t, out)
 	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
 		t.Fatal(err)
@@ -250,6 +248,19 @@ func apiReviewPartial(op *openapi3.Operation) bool {
 }
 
 func sortedReview(in []string) []string { sort.Strings(in); return slices.Compact(in) }
+
+// pageControl reports a parameter that pages a list by its name: the
+// ledger records it, and the principles guard takes an operation with one
+// that answers an array for a collection.
+func pageControl(name string) bool {
+	name = strings.ToLower(name)
+	return strings.Contains(name, "page") || strings.Contains(name, "cursor") ||
+		strings.Contains(name, "offset") ||
+		slices.Contains(
+			[]string{"limit", "start_pos", "num_of_rows", "n", "last", "$skip", "$top"},
+			name,
+		)
+}
 
 func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	t.Helper()
@@ -450,6 +461,308 @@ func apiReviewPolicy(e *apiReviewOperation) {
 			"internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501",
 		}
 	}
+	apiReviewDerive(e)
+}
+
+// apiReviewClasses are the classes decision 0043 has a spec operation
+// declare, read as the guard reads them. A class the operation does not
+// declare yet, or still holds as TODO(author), is empty.
+type apiReviewClasses struct {
+	idempotency, reason, cost, pagination string
+	natural, expensiveQuery               []string
+	position, size, next                  string
+	// keyAccepted: the operation references the shared IdempotencyKey, so
+	// the server honors a key there; a key elsewhere answers 400.
+	keyAccepted bool
+}
+
+func apiReviewClassesOf(item *openapi3.PathItem, op *openapi3.Operation) *apiReviewClasses {
+	value := func(name string, allowed []string) string {
+		v, _ := op.Extensions[name].(string)
+		if slices.Contains(allowed, v) {
+			return v
+		}
+		return ""
+	}
+	c := &apiReviewClasses{
+		idempotency: value("x-idempotency", idempotencyClasses),
+		reason:      value("x-idempotency-reason", idempotencyReasons),
+		cost:        value("x-cost", costClasses),
+		pagination:  value("x-pagination", paginationClasses),
+	}
+	c.natural, _ = stringList(op.Extensions["x-idempotency-natural"])
+	c.expensiveQuery, _ = stringList(op.Extensions["x-cost-expensive-query"])
+	c.next, _ = op.Extensions["x-pagination-next"].(string)
+	if m, ok := op.Extensions["x-pagination-parameters"].(map[string]any); ok {
+		c.position, _ = m["position"].(string)
+		c.size, _ = m["size"].(string)
+	}
+	for _, p := range append(append(openapi3.Parameters{}, item.Parameters...), op.Parameters...) {
+		if p.Ref == sharedIdempotencyKey {
+			c.keyAccepted = true
+		}
+	}
+	return c
+}
+
+// The ledger's reading of each idempotency reason (decision 0043,
+// "Idempotency classes"): what a client does instead of retrying.
+var apiReviewNoneRetry = map[string]string{
+	"secret-response":         "the answer carries a credential no replay stores; never blindly repeat; list credentials and revoke any not received",
+	"protocol-reconciliation": "reconcile through the protocol's own identifiers and status operations; its clients send no key",
+	"external-effect":         "the effect reaches another service, peer, upstream or the file system and cannot roll back; reconcile before repeating",
+	"read-or-write":           "retry proven reads only; reconcile writes",
+}
+
+// apiReviewDerive takes retry, admission and pagination_execution from the
+// operation's declared classes, class by class, in place of the route
+// heuristics apiReviewPolicy applied, so the ledger states what the spec
+// declares and admission, the key gate and paging will read. A class not
+// declared yet leaves its heuristic as it was. The persistence family's
+// execution text stays beside a collection's class, since the class says
+// how the wire pages, not how the store executes it.
+func apiReviewDerive(e *apiReviewOperation) {
+	c := e.classes
+	if c == nil {
+		return
+	}
+	stub := strings.HasPrefix(e.State, "stub:")
+	if text := c.admissionText(); text != "" {
+		// A stub is admitted like any operation before it answers 501.
+		e.Admission = text
+	}
+	if class := c.retryClass(); class != "" {
+		if stub {
+			e.Retry += "; intended " + class
+		} else {
+			e.Retry = class + ": " + c.retryText()
+		}
+	}
+	switch {
+	case stub && c.pagination != "":
+		e.Pagination += "; declared " + c.pagination
+	case stub:
+	case c.pagination == "complete":
+		e.Pagination = c.pagingText() + ", " + apiReviewCompleteText(e) + "; " +
+			e.Family + ": " + e.Pagination
+		if apiReviewStreams(e) {
+			e.Evidence = append(e.Evidence, "internal/platform/httpkit/stream.go")
+		}
+	case c.pagination != "":
+		e.Pagination = c.pagingText() + "; " + e.Family + ": " + e.Pagination
+	case c.idempotency != "" || c.cost != "":
+		// A classified operation without x-pagination is not a collection
+		// (the guard holds the ones a schema shows).
+		e.Pagination = "not a collection"
+	}
+}
+
+// apiReviewStreams reports an operation whose handler writes its list
+// from store pages as it reads them: it hands the pages to
+// httpkit.StreamList (decision 0043, "Streaming complete lists").
+func apiReviewStreams(e *apiReviewOperation) bool {
+	_, handwritten := apiReviewHandwrittenStreams[e.Route]
+	return handwritten || slices.Contains(e.Calls, "httpkit.StreamList")
+}
+
+// apiReviewHandwrittenStreams are the handwritten routes that write their
+// complete lists with httpkit.StreamList: the functions that do, which
+// apiReviewCheckComplete holds to that call, since the ledger records no
+// calls for a handwritten route, and how the answer streams.
+var apiReviewHandwrittenStreams = map[string]struct {
+	sources []string
+	text    string
+}{
+	"GET /artifactory/api/storage/{repoKey}/{itemPath}": {
+		sources: []string{
+			"internal/artifacts/adapters/http/storage.go: storageView.list",
+			"internal/artifacts/adapters/http/storage.go: storageView.folderInfo",
+			"internal/artifacts/adapters/http/trash.go: trashView.list",
+			"internal/artifacts/adapters/http/trash.go: trashView.folderInfo",
+		},
+		text: "every list streamed from store pages as they are read: a repository's file " +
+			"list merges its trees' full path walks, folder information walks each tree's " +
+			"children in name order in turn, the trash can's file list and folder " +
+			"information walk its tree in path order, and a folder's last modified item " +
+			"is folded over the walk of what lies below it",
+	},
+}
+
+// apiReviewCompleteText says how a served complete operation executes:
+// streamed, or collected for the reason apiReviewCollected records.
+func apiReviewCompleteText(e *apiReviewOperation) string {
+	if h, ok := apiReviewHandwrittenStreams[e.Route]; ok {
+		return h.text
+	}
+	if apiReviewStreams(e) {
+		return "streamed from store pages as they are read"
+	}
+	if reason := apiReviewCollected[e.Route]; reason != "" {
+		return "collected before it is written: " + reason
+	}
+	return "collected before it is written"
+}
+
+// apiReviewCollected are the served complete operations that still build
+// their whole answer before writing it (#1409), each with why: the list is
+// bounded by configuration or by the request, or the answer's order or
+// content is known only once every element is read, so writing it as it
+// is read would change the bytes.
+var apiReviewCollected = map[string]string{
+	"GET /access/api/v1/environments":                           "administrator-defined environments, which the store reads whole",
+	"GET /access/api/v1/oidc":                                   "administrator OIDC configurations, which the store reads whole",
+	"GET /access/api/v1/oidc/{provider_name}/identity_mappings": "one provider's identity mappings, administrator configuration the store reads whole",
+	"GET /access/api/v1/roles":                                  "administrator-defined roles, which the store reads whole",
+	"GET /artifactory/api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo}": "the files of one build run, which that run's record names",
+	"GET /artifactory/api/repositories/configurations":                                 "repository configurations, bounded by configuration and grouped by class",
+	"GET /artifactory/api/search/gavc":                                                 "local hits merge with an upstream's answer, deduplicated by path, and the result limit applies after the merge",
+	"GET /artifactory/api/search/versions":                                             "versions are ordered newest first in Mercury order, known only once every version is read",
+	"GET /artifactory/api/security/keypair":                                            "administrator key pairs, which the store reads whole",
+	"GET /artifactory/api/system/security/certificates":                                "administrator certificates, which the store reads whole",
+	"GET /artifactory/api/v2/repositories/batch":                                       "bounded by the repository names the request lists",
+	"GET /artifactory/api/v2/security/permissions/groups/{groupName}":                  "the permissions naming one principal, which authorization reads whole for every request that principal makes",
+	"GET /artifactory/api/v2/security/permissions/users/{userName}":                    "the permissions naming one principal, which authorization reads whole for every request that principal makes",
+	"GET /artifactory/api/vcs/branches/{repoKey}/{userOrg}/{repo}":                     "the Git host's reference listing, read whole within the configured reference caps",
+	"GET /artifactory/api/vcs/tags/{repoKey}/{userOrg}/{repo}":                         "the Git host's reference listing, read whole within the configured reference caps",
+	"POST /artifactory/api/docker/{repo-key}/v2/parentManifests":                       "manifest lists are grouped by digest with every tag holding them, known only once every tag of the image is read",
+	"POST /artifactory/api/search/buildArtifacts":                                      "the files of one build run, which that run's record names",
+}
+
+// apiReviewCheckComplete holds every served complete operation to the
+// rule #1409 settles: it streams from store pages, or apiReviewCollected
+// says why it does not. A reason left for an operation that streams, or
+// that no longer serves a complete list, is stale and fails too.
+func apiReviewCheckComplete(t *testing.T, ops []apiReviewOperation) {
+	t.Helper()
+	collected := map[string]bool{}
+	for i := range ops {
+		e := &ops[i]
+		if e.classes == nil || e.classes.pagination != "complete" ||
+			strings.HasPrefix(e.State, "stub:") {
+			continue
+		}
+		_, reason := apiReviewCollected[e.Route]
+		switch streams := apiReviewStreams(e); {
+		case streams && reason:
+			t.Errorf("%s streams its complete list; drop it from apiReviewCollected", e.Route)
+		case !streams && !reason:
+			t.Errorf("%s collects its complete list: stream it with httpkit.StreamList "+
+				"or record why in apiReviewCollected", e.Route)
+		case !streams:
+			collected[e.Route] = true
+		}
+	}
+	for route := range apiReviewCollected {
+		if !collected[route] {
+			t.Errorf("apiReviewCollected names %s, which serves no collected complete list", route)
+		}
+	}
+	for route, h := range apiReviewHandwrittenStreams {
+		for _, source := range h.sources {
+			if !apiReviewCallsStreamList(t, source) {
+				t.Errorf("%s: %s no longer calls httpkit.StreamList", route, source)
+			}
+		}
+	}
+}
+
+// apiReviewCallsStreamList reports whether the method source names, as
+// "file: Receiver.Method", calls httpkit.StreamList.
+func apiReviewCallsStreamList(t *testing.T, source string) bool {
+	t.Helper()
+	file, method, _ := strings.Cut(source, ": ")
+	receiver, name, _ := strings.Cut(method, ".")
+	f, err := parser.ParseFile(token.NewFileSet(), filepath.Join(repopath.Root(t), file), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := false
+	for _, decl := range f.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Recv == nil || fn.Body == nil || fn.Name.Name != name ||
+			apiReviewExpr(fn.Recv.List[0].Type) != receiver {
+			continue
+		}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			if sel, ok := n.(*ast.SelectorExpr); ok &&
+				apiReviewExpr(sel.X)+"."+sel.Sel.Name == "httpkit.StreamList" {
+				calls = true
+			}
+			return true
+		})
+	}
+	return calls
+}
+
+func (c *apiReviewClasses) admissionText() string {
+	switch c.cost {
+	case "exempt":
+		return "exempt: health exemption, no admission"
+	case "recovery":
+		return "recovery: administrator recovery reserve: 2 concurrent and 60/min per process; 5s deadline"
+	case "":
+		return ""
+	}
+	text := c.cost + ": shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue"
+	if c.cost == "expensive" {
+		text += "; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline"
+	}
+	for _, q := range c.expensiveQuery {
+		text += "; ?" + q + " additionally selects expensive policy"
+	}
+	return text
+}
+
+// retryClass names the idempotency class with what qualifies it: a natural
+// operation's identifiers or a none operation's reason.
+func (c *apiReviewClasses) retryClass() string {
+	switch {
+	case c.idempotency == "natural" && len(c.natural) > 0:
+		return "natural on " + strings.Join(c.natural, ", ")
+	case c.idempotency == "none" && c.reason != "":
+		return "none (" + c.reason + ")"
+	}
+	return c.idempotency
+}
+
+func (c *apiReviewClasses) retryText() string {
+	switch c.idempotency {
+	case "safe":
+		return "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key"
+	case "natural":
+		return "repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key"
+	case "key":
+		if c.keyAccepted {
+			return "optional quoted Idempotency-Key: same credential/resource/body replays the committed effect under current authorization for 24h; a duplicate in flight waits up to 30s, then 503 Retry-After; without a key every call repeats the effect"
+		}
+		return "Idempotency-Key not accepted yet and answers 400; reconcile ambiguous completion before retrying"
+	}
+	if text := apiReviewNoneRetry[c.reason]; text != "" {
+		return "no retry protection; " + text
+	}
+	return "no retry protection; reconcile before retrying"
+}
+
+// pagingText names the paging class with its position, size and next
+// pointer as declared.
+func (c *apiReviewClasses) pagingText() string {
+	if c.pagination == "complete" {
+		return "complete: the whole collection in one answer"
+	}
+	var parts []string
+	if c.position != "" {
+		parts = append(parts, "position "+c.position)
+	}
+	if c.size != "" {
+		parts = append(parts, "size "+c.size)
+	}
+	if c.next != "" {
+		parts = append(parts, "next "+c.next)
+	}
+	if len(parts) == 0 {
+		return c.pagination
+	}
+	return c.pagination + " (" + strings.Join(parts, ", ") + ")"
 }
 
 func apiReviewPersistence(path string) (string, string, []string) {
@@ -458,6 +771,14 @@ func apiReviewPersistence(path string) (string, string, []string) {
 			"internal/access/adapters/http/api_restrictions.go",
 			"internal/access/adapters/sql/api_restriction.go",
 			"internal/access/adapters/storetest/api_restriction.go",
+		}
+	}
+	if path == "/access/api/v2/permissions" {
+		return "permission-pages", "GET: default100/max99999, name keyset strictly after the bare-name cursor, principal filter as an indexed grant subquery, LIMIT+1; other methods singular mutations", []string{
+			"internal/access/adapters/http/permissions.go",
+			"internal/access/core/permission/page.go",
+			"internal/access/adapters/sql/permission_page.go",
+			"internal/access/adapters/storetest/permission_page.go",
 		}
 	}
 	if path == "/access/api/v2/users" || path == "/access/api/v2/groups" {
@@ -469,7 +790,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	}
 	if strings.HasPrefix(path, "/access/") ||
 		strings.HasPrefix(path, "/artifactory/api/security/") {
-		return "identity", "legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service", []string{
+		return "identity", "legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants", []string{
 			"internal/access/adapters/http/access_identity.go",
 			"internal/access/adapters/http/tokens.go",
 			"internal/access/core/identity/identity.go",
@@ -479,11 +800,20 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		}
 	}
 	if strings.HasPrefix(path, "/artifactory/api/build") {
-		return "build", "build names/numbers/runs retain complete legacy collections; store keysets may be collected; append/replay and run detail are singular", []string{
+		return "build", "build names and numbers retain complete legacy collections, written from store keyset pages; a run's files collect from that run; append/replay and run detail are singular", []string{
 			"internal/artifacts/adapters/http/builds.go",
 			"internal/artifacts/core/build/build.go",
 			"internal/artifacts/adapters/sql/builds.go",
 			"internal/app/builds_status_test.go",
+		}
+	}
+	if path == "/artifactory/api/repositories" {
+		return "repository-pages", "with limit: class, package type, project and the caller's visibility in SQL, COUNT for X-Total-Count, window by key with LIMIT+1 for the Link next; without limit the whole visible filtered list streamed from windows by key as they are read", []string{
+			"internal/artifacts/adapters/http/repositories.go",
+			"internal/platform/httpkit/stream.go",
+			"internal/artifacts/adapters/sql/repo_page.go",
+			"internal/artifacts/adapters/storetest/repo_page.go",
+			"internal/access/core/authz/authz.go",
 		}
 	}
 	if strings.HasPrefix(path, "/artifactory/api/repositories") ||
@@ -496,7 +826,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	}
 	if strings.HasPrefix(path, "/artifactory/api/search/") ||
 		strings.HasPrefix(path, "/artifactory/api/versions/") {
-		return "search", "AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise", []string{
+		return "search", "AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items and the dependency search write authorized results from batches as they are read, while gavc, versions and build artifacts searches collect; no new keyset promise", []string{
 			"internal/artifacts/adapters/http/searches.go",
 			"internal/artifacts/adapters/http/aql.go",
 			"internal/artifacts/adapters/sql/content_items.go",
@@ -521,5 +851,205 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		"internal/artifacts/adapters/http/storage.go",
 		"internal/artifacts/adapters/sql/content_items.go",
 		"internal/access/adapters/sql/projects.go",
+	}
+}
+
+// TestUnitAPIReviewDerivesFromClasses: over the guard's valid fixture,
+// every classified operation's retry, admission and pagination_execution
+// come from its classes, a stub keeps its 501 advice and names its intended
+// classes, and an operation still holding TODO(author) keeps the route
+// heuristics.
+func TestUnitAPIReviewDerivesFromClasses(t *testing.T) {
+	doc := principleFixtureDoc(t, validPaths)
+	server := doc.Servers[0].URL
+	entry := func(method, path, state string) apiReviewOperation {
+		t.Helper()
+		item := doc.Paths.Value(path)
+		if item == nil || item.GetOperation(method) == nil {
+			t.Fatalf("no fixture operation %s %s", method, path)
+		}
+		e := apiReviewOperation{
+			Route: method + " " + server + path, State: state,
+			classes: apiReviewClassesOf(item, item.GetOperation(method)),
+		}
+		apiReviewPolicy(&e)
+		return e
+	}
+	heuristic := func(method, path, state string) apiReviewOperation {
+		e := apiReviewOperation{Route: method + " " + server + path, State: state}
+		apiReviewPolicy(&e)
+		return e
+	}
+	type want struct{ retry, admission, pagination string }
+	ordinary := "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue"
+	expensive := "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline"
+	_, searchFamily, _ := apiReviewPersistence(server + "/api/search/cursor")
+	_, storageFamily, _ := apiReviewPersistence(server + "/api/storage/{repoKey}")
+	cases := []struct {
+		method, path, state string
+		want                want
+	}{
+		{
+			"GET",
+			"/api/system/ping",
+			"implemented",
+			want{
+				"safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+				"exempt: health exemption, no admission",
+				"not a collection",
+			},
+		},
+		{
+			"GET",
+			"/api/artifactweave/api-restrictions/{user}",
+			"implemented",
+			want{
+				admission: "recovery: administrator recovery reserve: 2 concurrent and 60/min per process; 5s deadline",
+			},
+		},
+		{
+			"PUT",
+			"/api/repositories/{repoKey}",
+			"implemented",
+			want{
+				retry: "natural on path:repoKey, body:/rclass, header:Content-Type: repeating the identical request converges on one state, " +
+					"though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
+				admission: expensive,
+			},
+		},
+		{
+			"POST",
+			"/api/build/append/{buildName}",
+			"implemented",
+			want{
+				retry: "key: optional quoted Idempotency-Key: same credential/resource/body replays the committed effect under current " +
+					"authorization for 24h; a duplicate in flight waits up to 30s, then 503 Retry-After; without a key every call repeats the effect",
+			},
+		},
+		{
+			"POST",
+			"/api/security/token",
+			"implemented",
+			want{
+				retry: "none (secret-response): no retry protection; the answer carries a credential no replay stores; never blindly " +
+					"repeat; list credentials and revoke any not received",
+			},
+		},
+		{
+			"GET",
+			"/api/storage/{repoKey}",
+			"implemented",
+			want{
+				admission: ordinary + "; ?list additionally selects expensive policy",
+				pagination: "complete: the whole collection in one answer, collected before it is written; " +
+					"content-and-configuration: " + storageFamily,
+			},
+		},
+		{"GET", "/api/search/cursor", "implemented", want{
+			pagination: "cursor (position cursor, next link); search: " + searchFamily,
+		}},
+		{
+			"GET",
+			"/api/search/offset",
+			"implemented",
+			want{
+				pagination: "offset (position offset, size limit, next body:/next); search: " + searchFamily,
+			},
+		},
+		{
+			"DELETE",
+			"/api/repositories/{repoKey}",
+			"stub: 501",
+			want{
+				retry:      "501 is not transient; do not retry until support changes; intended natural on route",
+				admission:  expensive,
+				pagination: "schema-only; no collection query executes",
+			},
+		},
+		{"GET", "/api/search/cursor", "stub: 501", want{
+			pagination: "schema-only; no collection query executes; declared cursor",
+		}},
+	}
+	for _, c := range cases {
+		got := entry(c.method, c.path, c.state)
+		for field, pair := range map[string][2]string{
+			"retry":      {got.Retry, c.want.retry},
+			"admission":  {got.Admission, c.want.admission},
+			"pagination": {got.Pagination, c.want.pagination},
+		} {
+			if pair[1] != "" && pair[0] != pair[1] {
+				t.Errorf(
+					"%s %s (%s) %s:\n got %q\nwant %q",
+					c.method,
+					c.path,
+					c.state,
+					field,
+					pair[0],
+					pair[1],
+				)
+			}
+		}
+	}
+	// A complete list whose handler hands its pages to httpkit.StreamList
+	// is streamed, and says so.
+	item := doc.Paths.Value("/api/storage/{repoKey}")
+	streamed := apiReviewOperation{
+		Route: "GET " + server + "/api/storage/{repoKey}", State: "implemented",
+		Calls:   []string{"httpkit.StreamList"},
+		classes: apiReviewClassesOf(item, item.Get),
+	}
+	apiReviewPolicy(&streamed)
+	if want := "complete: the whole collection in one answer, streamed from store pages as they are read; " +
+		"content-and-configuration: " + storageFamily; streamed.Pagination != want ||
+		!slices.Contains(streamed.Evidence, "internal/platform/httpkit/stream.go") {
+		t.Errorf(
+			"a streamed complete list: got %q, evidence %v",
+			streamed.Pagination,
+			streamed.Evidence,
+		)
+	}
+	// TODO(author) on a draft is no class yet: every heuristic stays.
+	got, was := entry(
+		"GET",
+		"/api/scaffolded",
+		"stub: 501",
+	), heuristic(
+		"GET",
+		"/api/scaffolded",
+		"stub: 501",
+	)
+	if got.Retry != was.Retry || got.Admission != was.Admission ||
+		got.Pagination != was.Pagination {
+		t.Errorf("an unclassified operation changed: got %+v, heuristics %+v", got, was)
+	}
+	// A key operation that does not reference the shared parameter accepts
+	// no key yet, and a none without a listed reason still advises.
+	c := &apiReviewClasses{idempotency: "key"}
+	if got := c.retryText(); !strings.Contains(got, "not accepted yet") {
+		t.Errorf("key without the parameter: %q", got)
+	}
+	c = &apiReviewClasses{idempotency: "none"}
+	if got := c.retryClass() + ": " + c.retryText(); got != "none: no retry protection; reconcile before retrying" {
+		t.Errorf("none without a reason: %q", got)
+	}
+	c = &apiReviewClasses{pagination: "native"}
+	if got := c.pagingText(); got != "native" {
+		t.Errorf("native without companions: %q", got)
+	}
+}
+
+// apiReviewPagedInStore fails when a served operation that declares a
+// cursor, offset or page class still collects its list before slicing it:
+// each pages in its store (#1408), so a new one that collects is a
+// regression the ledger would otherwise record without complaint.
+func apiReviewPagedInStore(t *testing.T, out []apiReviewOperation) {
+	t.Helper()
+	for _, e := range out {
+		paged := strings.HasPrefix(e.Pagination, "cursor") ||
+			strings.HasPrefix(e.Pagination, "offset") ||
+			strings.HasPrefix(e.Pagination, "page")
+		if e.State == "implemented" && paged && strings.Contains(e.Pagination, "collect") {
+			t.Errorf("%s declares a paging class but collects its list: %s", e.Route, e.Pagination)
+		}
 	}
 }

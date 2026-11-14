@@ -69,7 +69,7 @@
 //     the request ID, panic recovery, the access log, the base URL, the
 //     Smart Remote trace, the Docker API version header and registry
 //     challenge, content type normalisation, collection slashes, plus as
-//     space, the idempotent routes, the API recovery context and the xz
+//     space, the Idempotency-Key gate, the API recovery context and the xz
 //     request holder (xzRequests, so a request's xz readers are one holder
 //     of the dictionary budget); then, each
 //     only when configured, the ingress request limits, the forced
@@ -80,6 +80,12 @@
 //     principal limits charge the caller after (decision 0043). The forced
 //     authentication goes just before authentication, where 7.x's filter
 //     sits, so it answers the same whether anonymous access is on or off.
+//   - Both request limits admit a request under the x-cost class of the spec
+//     operation it addresses, which limits_cost.go finds in the generated
+//     operation table before routing, so the specs are the one place a
+//     class is set. Only a request no spec operation addresses (an alias, a
+//     native protocol route, a 404 or a 405) takes the class the path rules
+//     give it: the probes, the recovery API and expensiveRequest.
 //   - Hand-written routes are mounted before the generated strict servers,
 //     and the 501 stubs of hand-written operations last, so each
 //     hand-written route claims the pattern its spec derives instead of the
@@ -125,7 +131,9 @@
 // the runtime and serverlog.go the HTTP server's error log. TST-07 exported
 // the runtime and moved the remote suites to test/server/artifacts. WEB-22
 // brought the router here: router.go builds it and limits.go holds the
-// request limits.
+// request limits. IDEM-01 added keyed.go, the shared replay that wraps every
+// generated server's keyed operations, with each module's bindings, and the
+// Idempotency-Key gate over the operation table.
 //
 // # Testing
 //
@@ -144,8 +152,15 @@
 // status tables (status_test.go and status_<x>_test.go), the route and
 // principal matrices (matrix_test.go), the spec checks (spec_test.go,
 // spec_contract_test.go), the 501 stubs (stub_test.go), the error profiles
-// (error_profiles_p8_test.go), the request limits (limits_test.go) and the
-// API reliability ledger (api_ledger_test.go, which make api-ledger runs to
-// regenerate docs/research/api-reliability/operations.json). They must not
-// import the harness, which imports app.
+// (error_profiles_p8_test.go), the request limits (limits_test.go; the
+// classes admission takes from the table, limits_cost_test.go; every spec
+// operation's 429 and 503, limits_operations_test.go), the Docker list
+// errors' registry envelope (docker_list_errors_test.go), the keyed
+// operations' bindings and key gate (keyed_test.go), the API reliability
+// ledger (api_ledger_test.go, which make api-ledger runs to
+// regenerate docs/research/api-reliability/operations.json) and decision
+// 0043's operation rules (api_principles_test.go, whose rules are checked
+// against the admission and error profiles here, with a fixture per rule in
+// api_principles_fixtures_test.go). They must not import the harness, which
+// imports app.
 package app

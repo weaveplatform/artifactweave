@@ -1,4 +1,5 @@
-# Shared schemas: the error envelope and the system documents.
+# Shared schemas: the error envelope and the system documents, and the 429
+# and 503 of the operations whose admission errors use another envelope.
 components:
   schemas:
     SystemVersion:
@@ -71,3 +72,134 @@ components:
               message:
                 type: string
                 description: Required within this object. Human readable explanation.
+    RegistryErrorResponse:
+      type: object
+      description: The registry error envelope of the OCI distribution specification, which a registry client reads.
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          description: >-
+            Required within this object. One entry per error.
+          items:
+            type: object
+            required: [code, message]
+            properties:
+              code:
+                type: string
+                description: Required within this object. The specification's code, such as TOOMANYREQUESTS.
+              message:
+                type: string
+                description: Required within this object. Human readable explanation.
+              detail:
+                description: Optional within this object. Unstructured detail about the error.
+  # Admission answers the retention, import and export, and registry paths in
+  # their own envelopes (errorProfileRules in internal/app/router.go), so their
+  # operations declare these instead of the shared TooManyRequests and
+  # ServiceUnavailable, with the same shared headers (decision 0043).
+  responses:
+    AdminLegacyTooManyRequests:
+      description: >-
+        A request limit refused the request: a rate allowance or a concurrency permit; the body
+        carries the import and export error body. Wait for `Retry-After` before retrying.
+        `RateLimit` and `RateLimit-Policy` report the allowance; they are absent when the
+        process's concurrency permits refused the request before any allowance was evaluated.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminLegacyErrorResponse'
+    AdminLegacyServiceUnavailable:
+      description: >-
+        Admission or restriction storage is briefly unavailable; the body carries the import and
+        export error body. Wait for `Retry-After` before retrying. `RateLimit` and
+        `RateLimit-Policy` are present when the answer follows admission.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminLegacyErrorResponse'
+    ColdStorageTooManyRequests:
+      description: >-
+        A request limit refused the request: a rate allowance or a concurrency permit; the body
+        carries the cold storage error body. Wait for `Retry-After` before retrying. `RateLimit`
+        and `RateLimit-Policy` report the allowance; they are absent when the process's
+        concurrency permits refused the request before any allowance was evaluated.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ColdStorageErrorResponse'
+    ColdStorageServiceUnavailable:
+      description: >-
+        Admission or restriction storage is briefly unavailable; the body carries the cold
+        storage error body. Wait for `Retry-After` before retrying. `RateLimit` and
+        `RateLimit-Policy` are present when the answer follows admission.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ColdStorageErrorResponse'
+    RegistryTooManyRequests:
+      description: >-
+        A request limit refused the request: a rate allowance or a concurrency permit; the body
+        carries the registry error envelope. Wait for `Retry-After` before retrying. `RateLimit`
+        and `RateLimit-Policy` report the allowance; they are absent when the process's
+        concurrency permits refused the request before any allowance was evaluated.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegistryErrorResponse'
+    RegistryServiceUnavailable:
+      description: >-
+        Admission or restriction storage is briefly unavailable; the body carries the registry
+        error envelope. Wait for `Retry-After` before retrying. `RateLimit` and
+        `RateLimit-Policy` are present when the answer follows admission.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegistryErrorResponse'

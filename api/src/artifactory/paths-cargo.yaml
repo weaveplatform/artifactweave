@@ -19,6 +19,8 @@ paths:
       x-handwritten: true
       x-native-protocol: true
       x-tier: native
+      x-idempotency: safe
+      x-cost: ordinary
   /api/cargo/{repoKey}/index/{indexPath}:
     get:
       operationId: getCargoSparseIndex
@@ -44,6 +46,8 @@ paths:
       x-handwritten: true
       x-native-protocol: true
       x-tier: native
+      x-idempotency: safe
+      x-cost: ordinary
   /api/cargo/{repoKey}/api/v1/crates/new:
     put:
       operationId: publishCargoCrate
@@ -69,6 +73,11 @@ paths:
       x-handwritten: true
       x-native-protocol: true
       x-tier: native
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - body:archive
+      x-cost: expensive
   /api/cargo/{repoKey}/api/v1/crates/{crateName}/{version}/download:
     get:
       operationId: downloadCargoCrate
@@ -99,6 +108,8 @@ paths:
       x-handwritten: true
       x-native-protocol: true
       x-tier: native
+      x-idempotency: safe
+      x-cost: ordinary
   /api/cargo/{repoKey}/api/v1/crates/{crateName}:
     get:
       operationId: getCargoCrateVersions
@@ -124,6 +135,10 @@ paths:
       x-handwritten: true
       x-native-protocol: true
       x-tier: native
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: native
+      x-pagination-next: none
   /api/cargo/{repoKey}/api/v1/crates/{crateName}/{version}/yank:
     delete:
       operationId: yankCargoCrate
@@ -154,6 +169,12 @@ paths:
       x-handwritten: true
       x-native-protocol: true
       x-tier: native
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - path:crateName
+      - path:version
+      x-cost: expensive
   /api/cargo/{repoKey}/api/v1/crates/{crateName}/{version}/unyank:
     put:
       operationId: unyankCargoCrate
@@ -184,3 +205,9 @@ paths:
       x-handwritten: true
       x-native-protocol: true
       x-tier: native
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - path:crateName
+      - path:version
+      x-cost: expensive
