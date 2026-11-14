@@ -367,6 +367,36 @@ func TestUnitParseDownloadRedirectSpellings(t *testing.T) {
 	}
 }
 
+// TestUnitParseLegacyTypeFlags refuses the legacy enable<Type>Support flags
+// the repositories API took with #1479, as 7.161.26's repository descriptor
+// and XSD have none of them, and still takes enableConanSupport, which it
+// took before.
+func TestUnitParseLegacyTypeFlags(t *testing.T) {
+	for _, name := range []string{
+		"enableBowerSupport", "enableChefSupport", "enableCocoaPodsSupport",
+		"enableComposerSupport", "enableDebianSupport", "enableDistRepoSupport",
+		"enableDockerSupport", "enableGemsSupport", "enableGitLfsSupport", "enableNpmSupport",
+		"enableNuGetSupport", "enablePuppetSupport", "enablePypiSupport",
+		"enableVagrantSupport",
+	} {
+		doc := "localRepositories:\n  x:\n    type: npm\n    " + name + ": true\n"
+		_, err := Parse([]byte(doc), noEnv)
+		if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "unknown field "+name) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	p, err := Parse(
+		[]byte("localRepositories:\n  c:\n    type: conan\n    enableConanSupport: true\n"),
+		noEnv,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := field(t, p.Repos[0], "enableConanSupport"); got != true {
+		t.Errorf("enableConanSupport %v", got)
+	}
+}
+
 // TestUnitParseNullOnlyOnStrings follows JFrog's rule that a repository field may
 // be null only when it holds a string, and never type.
 func TestUnitParseNullOnlyOnStrings(t *testing.T) {

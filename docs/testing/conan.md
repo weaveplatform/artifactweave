@@ -38,8 +38,10 @@ answers `Recalculating index for Conan repository <repo-key> scheduled to run.`
 A repository with `forceConanAuthentication` answers a request without
 credentials 401 with the Basic challenge, so the client sends the credentials it
 holds. A Conan repository's v1 read reports `enableConanSupport: true` whatever
-the create sent, because 7.x derives the flag from the package type; the v2 read
-and the configurations list leave the key out.
+the create sent, because 7.x derives the flag from the package type, and every
+other type's reports it false; the v2 read and the configurations list leave the
+key out. A create without `packageType` that sends `enableConanSupport: true`
+makes a Conan repository ([research 03](../research/03-repository-configuration-model.md#legacy-type-flags)).
 
 Remote repositories use the shared source service for upstream access and
 cache policy. Metadata is bounded and validated before disclosure; downloadable

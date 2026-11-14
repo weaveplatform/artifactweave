@@ -8,13 +8,16 @@ import (
 
 // TestUnitDebianSettingsReads (#1372): a Debian repository of any class
 // that never set ddebSupported or debianTrivialLayout reads them as false
-// (Masked, the v1 read), as 7.161.26's RepositoryConfigurationBase defaults
+// (Full, the v1 read), as 7.161.26's RepositoryConfigurationBase defaults
 // them, RTFACT-30304 shows for a Debian remote and the Terraform provider's
 // sample reads give, and keeps a value it set. The v2 read (Relevant)
 // keeps ddebSupported for every Debian class and debianTrivialLayout for a
 // local or federated one only, as that model's @IncludeTypeSpecific marks
-// them. A repository of another package type reads them as stored in v1
-// and not at all in v2.
+// them. A repository of another package type reads both as false in v1,
+// whatever was stored, as only a Debian repository's configuration sets
+// them in 7.x (LocalRepositoryConfigurationImpl.setDebianConfigIfNeeded,
+// 7.161.26) and the provider's sample reads of generic and RPM
+// repositories give false (#1479), and not at all in v2.
 func TestUnitDebianSettingsReads(t *testing.T) {
 	read := func(b *bool) string {
 		switch {
@@ -45,14 +48,18 @@ func TestUnitDebianSettingsReads(t *testing.T) {
 		},
 		{
 			repo.Config{Class: repo.Remote, PackageType: repo.RPM, DdebSupported: ptr(true)},
-			"true", "unset", "unset", "unset",
+			"false", "false", "unset", "unset",
 		},
-		{repo.Config{Class: repo.Local, PackageType: repo.Generic}, "unset", "unset", "unset", "unset"},
+		{repo.Config{Class: repo.Local, PackageType: repo.Generic}, "false", "false", "unset", "unset"},
+		{
+			repo.Config{Class: repo.Virtual, PackageType: repo.Maven, DebianTrivialLayout: ptr(true)},
+			"false", "false", "unset", "unset",
+		},
 	} {
 		if tc.c.PackageType == "" {
 			tc.c.PackageType = repo.Debian
 		}
-		v1 := repo.Masked(tc.c)
+		v1 := repo.Full(tc.c)
 		v2 := repo.Relevant(v1)
 		if got := [4]string{
 			read(v1.DdebSupported), read(v1.DebianTrivialLayout),

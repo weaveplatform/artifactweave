@@ -36,13 +36,17 @@
 //     a ValidationError, a list of FieldError; ValidateUpdate returns a
 //     CreationOnlyError. Both wrap ErrInvalid. A malformed flexible boolean
 //     fails with ErrNotBoolean.
-//   - Defaults: Defaults fills what Artifactory fills on create, and
-//     DefaultLayout gives the layout the JFrog Terraform provider assigns.
+//   - Defaults: Defaults fills what Artifactory fills on create, the
+//     package type of a create that sends none included, which it takes
+//     from the legacy enable<Type>Support flags; DefaultLayout gives the
+//     layout the JFrog Terraform provider assigns.
 //   - Views: Public, the subset a reader who is not an administrator gets;
 //     Masked, the configuration without its secrets, as every reader gets
 //     it, with RestoreSecrets keeping a sensitive header's stored value on
-//     write-back; and Relevant, the shape of the v2 read and of the
-//     configurations list.
+//     write-back; Full, an administrator's v1 read: Masked with the legacy
+//     type flags, force flags, Debian flags and signedUrlTtl that 7.x's
+//     read model gives every repository; and Relevant, the shape of the v2
+//     read and of the configurations list.
 //   - Package-type names: AllowedPackageTypes per class, AcceptsMember for
 //     virtual members, PackageTypeName as listings spell a type and
 //     PackageTypeDisplayName as the storage summary does.
@@ -122,7 +126,11 @@
 //   - TestUnitPublic, TestUnitMaskedAndRestoreSecrets and the
 //     TestUnitRelevant family: the views. The two
 //     *MatchesTheDocumentedSample tests compare them with JFrog's documented
-//     samples.
+//     samples, and TestUnitReadFieldSets lists the v1 and v2 reads' fields.
+//   - TestUnitFullCarriesEveryLegacyFlag, TestUnitForceFlagsOnEveryClass,
+//     TestUnitSignedURLTTLIsOnEveryRead and
+//     TestUnitCreateTakesItsTypeFromTheLegacyFlags: the fields Full derives
+//     and the type a create takes from the legacy flags (#1479).
 //   - TestUnitAllowedPackageTypes, TestUnitPackageTypeName,
 //     TestUnitPackageTypeDisplayName and
 //     TestUnitEveryAcceptedTypeHasAListingName: the package-type names.

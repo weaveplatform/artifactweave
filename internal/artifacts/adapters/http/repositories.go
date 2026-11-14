@@ -261,8 +261,9 @@ func (s ArtifactoryAPI) GetAllRepositoryConfigurations(
 			continue
 		}
 		// Each entry has the v2 read's shape: JFrog's sample of a generic
-		// local repository here lacks the Maven fields, as that read's does.
-		c = repo.Relevant(repo.Masked(c))
+		// local repository here lacks the Maven fields, as that read's does,
+		// and has signedUrlTtl (repo.Full).
+		c = repo.Relevant(repo.Full(c))
 		switch c.Class {
 		case repo.Local:
 			out.LOCAL = append(out.LOCAL, c)

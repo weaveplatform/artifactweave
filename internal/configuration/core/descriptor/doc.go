@@ -85,8 +85,8 @@
 // # Testing
 //
 //   - parse_test.go: the documented keys and spellings, JFrog's example, the
-//     count of values, nulls only on strings, and the refused sections and
-//     errors.
+//     count of values, nulls only on strings, the legacy type flags only
+//     the repositories API takes, and the refused sections and errors.
 //   - apply_test.go: creates, updates, deletes and second applies that
 //     change nothing; the dry run; refusals and store errors that write
 //     nothing; the deleted repository's trash entry; virtual members,

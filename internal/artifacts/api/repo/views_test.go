@@ -145,9 +145,10 @@ func TestUnitRelevantKeepsEachEcosystemsClientFields(t *testing.T) {
 }
 
 // The configurations list's entry for a generic local repository has the
-// fields of JFrog's sample (getallrepositoryconfigurations.md), but for the
-// read-only TTLs and a project key, which the sample's repository has and
-// this one does not (#457).
+// fields of JFrog's sample (getallrepositoryconfigurations.md), but for
+// xrayDataTtl and a project key, which the sample's repository has and this
+// one does not (#457). signedUrlTtl is 90 when unset, as in the sample
+// (#1479).
 func TestUnitConfigurationsEntryMatchesTheDocumentedSample(t *testing.T) {
 	sample := []string{
 		"key", "packageType", "description", "notes", "includesPattern", "excludesPattern",
@@ -156,7 +157,7 @@ func TestUnitConfigurationsEntryMatchesTheDocumentedSample(t *testing.T) {
 		"cdnRedirect", "xrayIndex", "rclass",
 	}
 	c := repo.Defaults(&repo.Config{Key: "example-repo-local", Class: repo.Local})
-	out, err := json.Marshal(repo.Relevant(repo.Masked(*c)))
+	out, err := json.Marshal(repo.Relevant(repo.Full(*c)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +172,7 @@ func TestUnitConfigurationsEntryMatchesTheDocumentedSample(t *testing.T) {
 	}
 	for _, field := range sample {
 		if _, ok := got[field]; !ok &&
-			!slices.Contains([]string{"signedUrlTtl", "xrayDataTtl", "projectKey"}, field) {
+			!slices.Contains([]string{"xrayDataTtl", "projectKey"}, field) {
 			t.Errorf("%s is missing", field)
 		}
 	}
@@ -259,12 +260,14 @@ func TestUnitEnvironmentsRenderAsAnEmptyListOnlyInMasked(t *testing.T) {
 }
 
 // The v2 read of a generic local repository with every default is JFrog's
-// genericLocalV2 sample (getrepositoryconfigurationv2.md), plus environments
-// and priorityResolution, which that sample predates and which stay until a
-// 7.x capture shows otherwise (#216).
+// genericLocalV2 sample (getrepositoryconfigurationv2.md), plus environments,
+// priorityResolution and signedUrlTtl, which that sample predates and which
+// stay until a 7.x capture shows otherwise (#216). The configurations
+// list's newer sample of the same kind of repository has all three, as
+// 7.161.26's @IncludeTypeSpecific marks them for every type (#1479).
 func TestUnitGenericLocalV2MatchesTheDocumentedSample(t *testing.T) {
 	c := repo.Defaults(&repo.Config{Key: "generic-local", Class: repo.Local})
-	out, err := json.Marshal(repo.Relevant(repo.Masked(*c)))
+	out, err := json.Marshal(repo.Relevant(repo.Full(*c)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,6 +281,7 @@ func TestUnitGenericLocalV2MatchesTheDocumentedSample(t *testing.T) {
 		"repoLayoutRef": "maven-2-default", "blackedOut": false, "propertySets": []any{},
 		"archiveBrowsingEnabled": false, "downloadRedirect": false, "xrayIndex": false,
 		"cdnRedirect": false, "environments": []any{}, "priorityResolution": false,
+		"signedUrlTtl": float64(90),
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatalf("v2 generic local (-want +got):\n%s", diff)

@@ -1127,3 +1127,202 @@ func TestAccRepositoriesWithoutStore(t *testing.T) {
 func artgenAllConfigs() artgen.GetAllRepositoryConfigurationsRequestObject {
 	return artgen.GetAllRepositoryConfigurationsRequestObject{}
 }
+
+// legacyTypeFlags are the legacy enable<Type>Support flags 7.x's v1 read
+// carries on every repository.
+var legacyTypeFlags = []string{
+	"enableBowerSupport", "enableChefSupport", "enableCocoaPodsSupport", "enableComposerSupport",
+	"enableConanSupport", "enableDebianSupport", "enableDistRepoSupport", "enableDockerSupport",
+	"enableGemsSupport", "enableGitLfsSupport", "enableNpmSupport", "enableNuGetSupport",
+	"enablePuppetSupport", "enablePypiSupport", "enableVagrantSupport",
+}
+
+// The v1 read of a local, remote, virtual and federated repository carries
+// every legacy flag, true for its own type and false for the rest whatever
+// the create sent, the three force flags false and both Debian fields
+// false, as 7.x's dumps of Docker, npm and Maven local repositories show
+// (RTFACT-29415, RTFACT-30672, RTFACT-31100) and 7.161.26's
+// RepositoryConfigurationBase holds for every class. An administrator's
+// batch read carries the same fields. The v2 read and the configurations
+// list carry no legacy flag and no Debian field, and the shared remote
+// configuration, which 7.x answers with its remote repository descriptor,
+// no legacy flag. Every read an administrator gets carries signedUrlTtl
+// 90 (#1479).
+func TestAccLegacyTypeFlagsInTheV1Read(t *testing.T) {
+	w := newRepoWorld(t)
+	shared := map[repo.Class]string{
+		repo.Local: "", repo.Remote: `,"url":"https://up.example","shareConfiguration":true`,
+		repo.Virtual: "", repo.Federated: "",
+	}
+	for _, tc := range []struct {
+		pt  string
+		own string
+	}{{"npm", "enableNpmSupport"}, {"docker", "enableDockerSupport"}, {"conan", "enableConanSupport"}} {
+		for class, extra := range shared {
+			key := tc.pt + "-" + string(class)
+			body := `{"rclass":"` + string(class) + `","packageType":"` + tc.pt +
+				`","enableChefSupport":true,"enableNpmSupport":false` + extra + `}`
+			if rec := w.do(
+				"PUT",
+				"/artifactory/api/repositories/"+key,
+				"admin",
+				body,
+			); rec.Code != 200 {
+				t.Fatalf("create %s: %d %s", key, rec.Code, rec.Body)
+			}
+			var v1, v2 map[string]any
+			jsonBody(t, w.do("GET", "/artifactory/api/repositories/"+key, "admin", ""), &v1)
+			jsonBody(t, w.do("GET", "/artifactory/api/v2/repositories/"+key, "admin", ""), &v2)
+			var batch map[string]map[string]any
+			jsonBody(
+				t,
+				w.do("GET", "/artifactory/api/v2/repositories/batch?names="+key, "admin", ""),
+				&batch,
+			)
+			for _, f := range legacyTypeFlags {
+				if v1[f] != (f == tc.own) || batch[key][f] != (f == tc.own) {
+					t.Errorf(
+						"%s %s: v1 %v, batch %v, want %v",
+						key,
+						f,
+						v1[f],
+						batch[key][f],
+						f == tc.own,
+					)
+				}
+				if v, ok := v2[f]; ok {
+					t.Errorf("%s v2 %s %v, want none", key, f, v)
+				}
+			}
+			for _, f := range []string{
+				"forceNugetAuthentication", "forceP2Authentication", "forceConanAuthentication",
+				"ddebSupported", "debianTrivialLayout",
+			} {
+				if v1[f] != false {
+					t.Errorf("%s v1 %s %v, want false", key, f, v1[f])
+				}
+			}
+			for _, f := range []string{"ddebSupported", "debianTrivialLayout"} {
+				if v, ok := v2[f]; ok {
+					t.Errorf("%s v2 %s %v, want none", key, f, v)
+				}
+			}
+			if v1["signedUrlTtl"] != float64(90) || v2["signedUrlTtl"] != float64(90) {
+				t.Errorf(
+					"%s signedUrlTtl v1 %v v2 %v, want 90",
+					key,
+					v1["signedUrlTtl"],
+					v2["signedUrlTtl"],
+				)
+			}
+			if class == repo.Remote {
+				var cfg map[string]any
+				jsonBody(
+					t,
+					w.do("GET", "/artifactory/api/repositories/"+key+"/configuration", "admin", ""),
+					&cfg,
+				)
+				for _, f := range legacyTypeFlags {
+					if v, ok := cfg[f]; ok {
+						t.Errorf("%s shared configuration %s %v, want none", key, f, v)
+					}
+				}
+			}
+		}
+	}
+	var groups map[string][]map[string]any
+	jsonBody(t, w.do("GET", "/artifactory/api/repositories/configurations", "admin", ""), &groups)
+	for class, list := range groups {
+		for _, c := range list {
+			for _, f := range slices.Concat(legacyTypeFlags, []string{"ddebSupported", "debianTrivialLayout"}) {
+				if v, ok := c[f]; ok {
+					t.Errorf("configurations %s %v: %s %v, want none", class, c["key"], f, v)
+				}
+			}
+			if c["signedUrlTtl"] != float64(90) {
+				t.Errorf(
+					"configurations %s %v: signedUrlTtl %v, want 90",
+					class,
+					c["key"],
+					c["signedUrlTtl"],
+				)
+			}
+		}
+	}
+}
+
+// A Conan and a P2 virtual repository are created with forceConanAuthentication
+// and forceP2Authentication false, as local and remote repositories are, so
+// both reads carry them; 7.161.26 marks each @IncludeTypeSpecific for its
+// type and no class (#1479).
+func TestAccVirtualForceFlags(t *testing.T) {
+	w := newRepoWorld(t)
+	for pt, flag := range map[string]string{
+		"conan": "forceConanAuthentication", "p2": "forceP2Authentication",
+	} {
+		key := pt + "-virtual"
+		if rec := w.do("PUT", "/artifactory/api/repositories/"+key, "admin",
+			`{"rclass":"virtual","packageType":"`+pt+`"}`); rec.Code != 200 {
+			t.Fatalf("create %s: %d %s", key, rec.Code, rec.Body)
+		}
+		stored := w.stored(key)
+		if stored.ForceConanAuthentication == nil || stored.ForceP2Authentication == nil {
+			t.Errorf("%s stored without a force flag: %+v", key, stored)
+		}
+		var v2 map[string]any
+		jsonBody(t, w.do("GET", "/artifactory/api/v2/repositories/"+key, "admin", ""), &v2)
+		if v, ok := v2[flag]; !ok || v != false {
+			t.Errorf("%s v2 %s %v (present %v), want false", key, flag, v, ok)
+		}
+	}
+}
+
+// A create without packageType takes the type of the first legacy flag sent
+// true, in 7.161.26's getPackageType order, and enableConanSupport gives
+// Conan, the intended type, where 7.161.26 gives Conda. enableDistRepoSupport
+// gives the distribution type, which no class accepts. No flag, or none
+// true, gives generic (#1479).
+func TestAccCreateWithoutPackageTypeUsesTheLegacyFlags(t *testing.T) {
+	w := newRepoWorld(t)
+	for key, tc := range map[string]struct {
+		body string
+		want repo.PackageType
+	}{
+		"by-nuget":  {`{"rclass":"local","enableNuGetSupport":true}`, repo.NuGet},
+		"by-gems":   {`{"rclass":"local","enableGemsSupport":true}`, repo.Gems},
+		"by-npm":    {`{"rclass":"local","enableNpmSupport":true}`, repo.NPM},
+		"by-docker": {`{"rclass":"local","enableDockerSupport":true}`, repo.Docker},
+		"by-conan":  {`{"rclass":"local","enableConanSupport":true}`, repo.Conan},
+		"by-chef":   {`{"rclass":"local","enableChefSupport":true}`, repo.Chef},
+		"by-pypi-remote": {
+			`{"rclass":"remote","url":"https://up.example","enablePypiSupport":true}`, repo.PyPI,
+		},
+		"first-wins": {
+			`{"rclass":"local","enableChefSupport":true,"enableConanSupport":true,"enableGemsSupport":true}`,
+			repo.Gems,
+		},
+		"conan-before-chef": {`{"rclass":"local","enableChefSupport":true,"enableConanSupport":true}`, repo.Conan},
+		"none-true":         {`{"rclass":"local","enableNpmSupport":false}`, repo.Generic},
+		"type-wins":         {`{"rclass":"local","packageType":"maven","enableNpmSupport":true}`, repo.Maven},
+	} {
+		if rec := w.do(
+			"PUT",
+			"/artifactory/api/repositories/"+key,
+			"admin",
+			tc.body,
+		); rec.Code != 200 {
+			t.Errorf("create %s: %d %s", key, rec.Code, rec.Body)
+			continue
+		}
+		var v1 map[string]any
+		jsonBody(t, w.do("GET", "/artifactory/api/repositories/"+key, "admin", ""), &v1)
+		if v1["packageType"] != string(tc.want) {
+			t.Errorf("%s: packageType %v, want %s", key, v1["packageType"], tc.want)
+		}
+	}
+	rec := w.do("PUT", "/artifactory/api/repositories/by-dist", "admin",
+		`{"rclass":"local","enableDistRepoSupport":true}`)
+	if rec.Code != 400 || !strings.Contains(rec.Body.String(), `\"distribution\" is not allowed`) {
+		t.Errorf("distribution create %d %s", rec.Code, rec.Body)
+	}
+}

@@ -7244,7 +7244,7 @@
       "httpkit.Accepts",
       "httpkit.AdminOnly",
       "packageTypes.has",
-      "repo.Masked",
+      "repo.Full",
       "repo.Relevant",
       "s.InternalError",
       "s.content",

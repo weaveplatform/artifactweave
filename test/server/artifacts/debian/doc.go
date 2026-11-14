@@ -56,7 +56,7 @@
 //   - debian_repository_config_test.go: ddebSupported taken by a Debian
 //     remote, and ddebSupported and debianTrivialLayout read as false by a
 //     Debian local, federated or remote repository that never set them
-//     (#1372).
+//     (#1372), and by an RPM remote whatever it sent (#1479).
 //   - debian_metadata_validation_test.go: a package with an empty
 //     Maintainer marked malformed with debian.metadata_validation on and
 //     indexed with it off, and an unreadable one marked either way (#1374).

@@ -20896,12 +20896,12 @@ components:
         ddebSupported:
           # JFrog's Debian guide: "Enable indexing with debug symbols (.ddeb)". RTFACT-30304 and the
           # Terraform provider's sample reads give false for a repository that never set it.
-          description: Optional within this object. When true a Debian repository accepts debug symbol packages (.ddeb), checks them and lists them in its Packages indexes as it does a .deb; when false or unset a .ddeb deploy answers 400. A Debian repository's configuration reads false when unset.
+          description: Optional within this object. When true a Debian repository accepts debug symbol packages (.ddeb), checks them and lists them in its Packages indexes as it does a .deb; when false or unset a .ddeb deploy answers 400. A Debian repository's v1 read gives false when unset, and any other repository's false whatever was sent; the v2 read leaves it out but for a Debian repository.
           type: boolean
         debianTrivialLayout:
           # JFrog's Debian guide: the trivial layout does not support source packages, and a
           # virtual repository includes only repositories with the automatic layout.
-          description: Optional within this object. When true the Debian repository uses the deprecated trivial layout, which takes no source packages, so a .dsc deploy answers 400, and which no virtual repository may include. A Debian repository's configuration reads false when unset.
+          description: Optional within this object. When true the Debian repository uses the deprecated trivial layout, which takes no source packages, so a .dsc deploy answers 400, and which no virtual repository may include. A Debian repository's v1 read gives false when unset, and any other repository's false whatever was sent; the v2 read leaves it out but for a Debian repository.
           type: boolean
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server. Reads carry it, as an empty string when unset.
@@ -20920,11 +20920,53 @@ components:
         downloadRedirect:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
+        enableBowerSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a bower repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableChefSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a chef repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableCocoaPodsSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a cocoapods repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableComposerSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a composer repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
         enableConanSupport:
-          description: Optional within this object. Accepted and changes no answer. The v1 read reports it true for a Conan repository whatever was sent, as 7.x derives it from the package type; the v2 read and the configurations list leave it out.
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic; this flag gives conan, where 7.x's own order gives conda by a slip. The v1 read gives it true for a conan repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableDebianSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a debian repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableDistRepoSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic; this flag gives distribution, which no class accepts, so that create answers 400. The v1 read gives it false, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableDockerSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a docker, oci or helmoci repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
+          type: boolean
+        enableGemsSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a gems repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableGitLfsSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a gitlfs repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableNpmSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for an npm repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableNuGetSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a nuget repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enablePuppetSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a puppet repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enablePypiSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a pypi repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableVagrantSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a vagrant repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
         encryptStates:
           description: Optional within this object. Stored only, with no default. The terraformbackend package type, which seals states while it is true, is local only.
@@ -20939,7 +20981,7 @@ components:
           description: Optional within this object. Comma-separated Ant-style patterns; matching paths are rejected on deploy and hidden on read. Defaults to the empty string, which excludes nothing.
           type: string
         forceConanAuthentication:
-          description: Optional within this object. Conan repositories only. When true every anonymous request to the repository's Conan API, /artifactory/api/conan/<key>/..., answers 401 "Authentication is required" with the Basic challenge before it is served, whatever the anonymous user may read, so that a Conan client sends its credentials. The item paths, /artifactory/<key>/..., are not affected. Defaults to false.
+          description: Optional within this object. Conan repositories only. When true every anonymous request to the repository's Conan API, /artifactory/api/conan/<key>/..., answers 401 "Authentication is required" with the Basic challenge before it is served, whatever the anonymous user may read, so that a Conan client sends its credentials. The item paths, /artifactory/<key>/..., are not affected. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
         forceMetadataNameVersion:
           description: Optional within this object. Helm repositories only. When true a chart archive (a file ending `.tgz` or `.tar.gz`) that is deployed, copied or moved here is refused with 403 unless its Chart.yaml can be read and names a chart and a version, the version is SemVer 2.0.0, and the file is named `<name>-<version>` with its extension. Set only when the repository is created; an update that changes it answers 400. Defaults to false.
@@ -20948,10 +20990,10 @@ components:
           description: Optional within this object. Helm repositories only. When true a chart archive that is deployed, copied or moved here is refused with 403 when a chart at another path of the repository has the same Chart.yaml name and version; a deploy to the same path replaces the chart. Set only when the repository is created; an update that changes it answers 400. Defaults to false.
           type: boolean
         forceNugetAuthentication:
-          description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an anonymous 200. Defaults to false.
+          description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an anonymous 200. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
         forceP2Authentication:
-          description: Optional within this object. Stored only; 7.x offers Force Authentication on P2 virtual repositories, and a federated repository's flag changes no answer. Defaults to false.
+          description: Optional within this object. Stored only; 7.x offers Force Authentication on P2 virtual repositories, and a federated repository's flag changes no answer. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
         handleReleases:
           description: Optional within this object. Whether release versions may be deployed to a Maven-family or npm repository. Defaults to true.
@@ -21031,7 +21073,7 @@ components:
           description: Optional within this object. Name of a second signing key pair, used while rotating the primary. Must name an existing key pair, a GPG pair on a Terraform repository whose terraformType is PROVIDER.
           type: string
         signedUrlTtl:
-          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued for this repository. The configured value cannot be changed through this API.
+          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued for this repository. The configured value cannot be changed through this API. Reads give 90 when it was never set.
           readOnly: true
           type: integer
         snapshotVersionBehavior:
@@ -21743,12 +21785,12 @@ components:
         ddebSupported:
           # JFrog's Debian guide: "Enable indexing with debug symbols (.ddeb)". RTFACT-30304 and the
           # Terraform provider's sample reads give false for a repository that never set it.
-          description: Optional within this object. When true a Debian repository accepts debug symbol packages (.ddeb), checks them and lists them in its Packages indexes as it does a .deb; when false or unset a .ddeb deploy answers 400. A Debian repository's configuration reads false when unset.
+          description: Optional within this object. When true a Debian repository accepts debug symbol packages (.ddeb), checks them and lists them in its Packages indexes as it does a .deb; when false or unset a .ddeb deploy answers 400. A Debian repository's v1 read gives false when unset, and any other repository's false whatever was sent; the v2 read leaves it out but for a Debian repository.
           type: boolean
         debianTrivialLayout:
           # JFrog's Debian guide: the trivial layout does not support source packages, and a
           # virtual repository includes only repositories with the automatic layout.
-          description: Optional within this object. When true the Debian repository uses the deprecated trivial layout, which takes no source packages, so a .dsc deploy answers 400, and which no virtual repository may include. A Debian repository's configuration reads false when unset.
+          description: Optional within this object. When true the Debian repository uses the deprecated trivial layout, which takes no source packages, so a .dsc deploy answers 400, and which no virtual repository may include. A Debian repository's v1 read gives false when unset, and any other repository's false whatever was sent; the v2 read leaves it out but for a Debian repository.
           type: boolean
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server. Reads carry it, as an empty string when unset.
@@ -21764,11 +21806,53 @@ components:
         downloadRedirect:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
+        enableBowerSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a bower repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableChefSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a chef repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableCocoaPodsSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a cocoapods repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableComposerSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a composer repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
         enableConanSupport:
-          description: Optional within this object. Accepted and changes no answer. The v1 read reports it true for a Conan repository whatever was sent, as 7.x derives it from the package type; the v2 read and the configurations list leave it out.
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic; this flag gives conan, where 7.x's own order gives conda by a slip. The v1 read gives it true for a conan repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableDebianSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a debian repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableDistRepoSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic; this flag gives distribution, which no class accepts, so that create answers 400. The v1 read gives it false, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableDockerSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a docker, oci or helmoci repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
+          type: boolean
+        enableGemsSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a gems repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableGitLfsSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a gitlfs repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableNpmSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for an npm repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableNuGetSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a nuget repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enablePuppetSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a puppet repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enablePypiSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a pypi repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableVagrantSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a vagrant repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
         encryptStates:
           description: Optional within this object. For a terraformbackend repository, whether each Terraform state written while it is true is sealed under the master key before it is stored; a stored state keeps the form it was written in, so a change applies to later writes, and the item download serves a sealed state as stored. Defaults to true on a local repository of any package type and is returned for each; other package types store it only.
@@ -21783,7 +21867,7 @@ components:
           description: Optional within this object. Comma-separated Ant-style patterns; matching paths are rejected on deploy and hidden on read. Defaults to the empty string, which excludes nothing.
           type: string
         forceConanAuthentication:
-          description: Optional within this object. Conan repositories only. When true every anonymous request to the repository's Conan API, /artifactory/api/conan/<key>/..., answers 401 "Authentication is required" with the Basic challenge before it is served, whatever the anonymous user may read, so that a Conan client sends its credentials. The item paths, /artifactory/<key>/..., are not affected. Defaults to false.
+          description: Optional within this object. Conan repositories only. When true every anonymous request to the repository's Conan API, /artifactory/api/conan/<key>/..., answers 401 "Authentication is required" with the Basic challenge before it is served, whatever the anonymous user may read, so that a Conan client sends its credentials. The item paths, /artifactory/<key>/..., are not affected. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
         forceMetadataNameVersion:
           description: Optional within this object. Helm repositories only. When true a chart archive (a file ending `.tgz` or `.tar.gz`) that is deployed, copied or moved here is refused with 403 unless its Chart.yaml can be read and names a chart and a version, the version is SemVer 2.0.0, and the file is named `<name>-<version>` with its extension. Set only when the repository is created; an update that changes it answers 400. Defaults to false.
@@ -21792,10 +21876,10 @@ components:
           description: Optional within this object. Helm repositories only. When true a chart archive that is deployed, copied or moved here is refused with 403 when a chart at another path of the repository has the same Chart.yaml name and version; a deploy to the same path replaces the chart. Set only when the repository is created; an update that changes it answers 400. Defaults to false.
           type: boolean
         forceNugetAuthentication:
-          description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an anonymous 200. Defaults to false.
+          description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an anonymous 200. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
         forceP2Authentication:
-          description: Optional within this object. Stored only; 7.x offers Force Authentication on P2 virtual repositories, and a local repository's flag changes no answer. Defaults to false.
+          description: Optional within this object. Stored only; 7.x offers Force Authentication on P2 virtual repositories, and a local repository's flag changes no answer. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
         handleReleases:
           description: Optional within this object. Whether release versions may be deployed to a Maven-family or npm repository. Defaults to true.
@@ -21857,7 +21941,7 @@ components:
           description: Optional within this object. Name of a second signing key pair, used while rotating the primary. Must name an existing key pair, a GPG pair on a Terraform repository whose terraformType is PROVIDER.
           type: string
         signedUrlTtl:
-          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued for this repository. The configured value cannot be changed through this API.
+          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued for this repository. The configured value cannot be changed through this API. Reads give 90 when it was never set.
           readOnly: true
           type: integer
         snapshotVersionBehavior:
@@ -23362,13 +23446,13 @@ components:
         ddebSupported:
           # JFrog's Remote Repositories page, "Additional Settings for Debian Remote Repositories":
           # "Enable indexing with debug symbols (.ddeb)". RTFACT-30304 reads it false on a Debian remote.
-          description: Optional within this object. Whether a Debian remote repository indexes debug symbol packages (.ddeb). Stored only. A remote caches and serves every .ddeb its upstream serves, whatever this says, and builds no index of its own. A Debian repository's configuration reads false when unset.
+          description: Optional within this object. Whether a Debian remote repository indexes debug symbol packages (.ddeb). Stored only. A remote caches and serves every .ddeb its upstream serves, whatever this says, and builds no index of its own. A Debian repository's v1 read gives false when unset, and any other repository's false whatever was sent; the v2 read leaves it out but for a Debian repository.
           type: boolean
         debianTrivialLayout:
           # The Terraform provider's sample read of a Debian remote (samples/repository_remote/debian.json)
           # gives "debianTrivialLayout": false; 7.161.26's RepositoryConfigurationBase marks it
           # @IncludeTypeSpecific for Debian local and federated repositories only.
-          description: Optional within this object. When true no virtual repository may include the Debian remote repository. A Debian repository's configuration reads false when unset; the v2 read of a remote leaves it out.
+          description: Optional within this object. When true no virtual repository may include the Debian remote repository. A Debian repository's v1 read gives false when unset, and any other repository's false whatever was sent; the v2 read of a remote leaves it out.
           type: boolean
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server. Reads carry it, as an empty string when unset.
@@ -23388,14 +23472,56 @@ components:
         downloadRedirect:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
+        enableBowerSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a bower repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableChefSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a chef repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableCocoaPodsSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a cocoapods repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableComposerSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a composer repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
         enableConanSupport:
-          description: Optional within this object. Accepted and changes no answer. The v1 read reports it true for a Conan repository whatever was sent, as 7.x derives it from the package type; the v2 read and the configurations list leave it out.
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic; this flag gives conan, where 7.x's own order gives conda by a slip. The v1 read gives it true for a conan repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
         enableCookieManagement:
           description: Optional within this object. When true upstream cookies are stored and replayed. Defaults to false.
           type: boolean
+        enableDebianSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a debian repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableDistRepoSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic; this flag gives distribution, which no class accepts, so that create answers 400. The v1 read gives it false, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableDockerSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a docker, oci or helmoci repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableGemsSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a gems repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableGitLfsSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a gitlfs repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableNpmSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for an npm repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableNuGetSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a nuget repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enablePuppetSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a puppet repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enablePypiSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a pypi repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
         enableTokenAuthentication:
           description: Optional within this object. When true the Docker token flow is used against the upstream; required for Docker Hub. Defaults to false.
+          type: boolean
+        enableVagrantSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a vagrant repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD. Mandatory when projectKey is set; a repository may belong to several environments. An administrator's read lists none as an empty array rather than leaving the field out.
@@ -23425,13 +23551,13 @@ components:
           description: Optional within this object. When true a Maven sources JAR is fetched together with the main artifact. Defaults to false.
           type: boolean
         forceConanAuthentication:
-          description: Optional within this object. Conan repositories only. When true every anonymous request to the repository's Conan API, /artifactory/api/conan/<key>/..., answers 401 "Authentication is required" with the Basic challenge before it is served, whatever the anonymous user may read, so that a Conan client sends its credentials. The item paths, /artifactory/<key>/..., are not affected. Defaults to false.
+          description: Optional within this object. Conan repositories only. When true every anonymous request to the repository's Conan API, /artifactory/api/conan/<key>/..., answers 401 "Authentication is required" with the Basic challenge before it is served, whatever the anonymous user may read, so that a Conan client sends its credentials. The item paths, /artifactory/<key>/..., are not affected. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
         forceNugetAuthentication:
-          description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an anonymous 200. Defaults to false.
+          description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an anonymous 200. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
         forceP2Authentication:
-          description: Optional within this object. Stored only; 7.x offers Force Authentication on P2 virtual repositories, and a remote repository's flag changes no answer. Defaults to false.
+          description: Optional within this object. Stored only; 7.x offers Force Authentication on P2 virtual repositories, and a remote repository's flag changes no answer. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
         gitRegistryUrl:
           description: Optional within this object. Git index of the upstream Cargo registry. Defaults to https://github.com/rust-lang/crates.io-index on a cargo repository. Stored only.
@@ -23556,7 +23682,7 @@ components:
           description: Optional within this object. When true the sanitised configuration is exposed through the deprecated shared configuration endpoint. Defaults to false.
           type: boolean
         signedUrlTtl:
-          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued for this repository. The configured value cannot be changed through this API.
+          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued for this repository. The configured value cannot be changed through this API. Reads give 90 when it was never set.
           readOnly: true
           type: integer
         socketTimeoutMillis:
@@ -24778,7 +24904,7 @@ components:
         ddebSupported:
           # 7.161.26's RepositoryConfigurationBase, every class's configuration model, holds it with the
           # default false and marks it @IncludeTypeSpecific for every Debian repository.
-          description: Optional within this object. Stored only. A virtual Debian repository indexes no package itself. A Debian repository's configuration reads false when unset.
+          description: Optional within this object. Stored only. A virtual Debian repository indexes no package itself. A Debian repository's v1 read gives false when unset, and any other repository's false whatever was sent; the v2 read leaves it out but for a Debian repository.
           type: boolean
         debianDefaultArchitectures:
           description: Optional within this object. Comma-separated architectures used when generating aggregated Debian metadata. Stored only.
@@ -24788,7 +24914,7 @@ components:
           # automatic layout, so the trivial layout is not one a virtual repository has. 7.161.26's
           # RepositoryConfigurationBase marks it @IncludeTypeSpecific for Debian local and federated
           # repositories only.
-          description: Optional within this object. Stored only. A virtual Debian repository has no trivial layout of its own; it refuses a member whose debianTrivialLayout is true. A Debian repository's configuration reads false when unset; the v2 read of a virtual repository leaves it out.
+          description: Optional within this object. Stored only. A virtual Debian repository has no trivial layout of its own; it refuses a member whose debianTrivialLayout is true. A Debian repository's v1 read gives false when unset, and any other repository's false whatever was sent; the v2 read of a virtual repository leaves it out.
           type: boolean
         defaultDeploymentRepo:
           description: Optional within this object. Key of the member that receives uploads sent to the virtual repository. Must be one of repositories and must not be a remote.
@@ -24801,8 +24927,50 @@ components:
           enum:
             - V2
           type: string
+        enableBowerSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a bower repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableChefSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a chef repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableCocoaPodsSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a cocoapods repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableComposerSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a composer repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
         enableConanSupport:
-          description: Optional within this object. Accepted and changes no answer. The v1 read reports it true for a Conan repository whatever was sent, as 7.x derives it from the package type; the v2 read and the configurations list leave it out.
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic; this flag gives conan, where 7.x's own order gives conda by a slip. The v1 read gives it true for a conan repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableDebianSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a debian repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableDistRepoSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic; this flag gives distribution, which no class accepts, so that create answers 400. The v1 read gives it false, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableDockerSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a docker, oci or helmoci repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableGemsSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a gems repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableGitLfsSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a gitlfs repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableNpmSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for an npm repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableNuGetSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a nuget repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enablePuppetSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a puppet repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enablePypiSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a pypi repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
+          type: boolean
+        enableVagrantSupport:
+          description: Optional within this object. A legacy package type flag, not stored. A create that sends no packageType takes the type of the first such flag sent true, in the order NuGet, Gems, npm, Bower, CocoaPods, Debian, Distribution, PyPI, Puppet, Docker, Vagrant, GitLFS, Composer, Conan, Chef, else generic. The v1 read gives it true for a vagrant repository and false for any other, whatever was sent; the v2 read and the configurations list leave it out.
           type: boolean
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD. Mandatory when projectKey is set; a repository may belong to several environments. An administrator's read lists none as an empty array rather than leaving the field out.
@@ -24825,14 +24993,17 @@ components:
         externalDependenciesRemoteRepo:
           description: Optional within this object. Key of the remote repository through which external dependencies are fetched.
           type: string
+        forceConanAuthentication:
+          description: Optional within this object. Conan repositories only. When true every anonymous request to the repository's Conan API, /artifactory/api/conan/<key>/..., answers 401 "Authentication is required" with the Basic challenge before it is served, whatever the anonymous user may read, so that a Conan client sends its credentials. The item paths, /artifactory/<key>/..., are not affected. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
+          type: boolean
         forceMavenAuthentication:
           description: Optional within this object. Maven repositories only. When true every request without credentials to the repository's item paths, /artifactory/<key>/..., whatever its method or query, ?trace included, answers 401 "Unauthorized" with the Basic challenge before anything is read, whatever the anonymous user may read and whether anonymous access is on or off, so that a Maven client sends its credentials. While anonymous access is on, the anonymous user's Basic credentials and a Bearer token that does not verify count as none. Only the repository a request names counts, so a read through another virtual repository that has this one as a member is not asked, and the package API routes under /artifactory/api/ are not affected. A Gradle, Ivy or SBT virtual repository stores the flag with no effect. Defaults to false.
           type: boolean
         forceNugetAuthentication:
-          description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an anonymous 200. Defaults to false.
+          description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an anonymous 200. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
         forceP2Authentication:
-          description: Optional within this object. P2 repositories only. When true every request without credentials to the repository's item paths, /artifactory/<key>/..., its members' files under <member key>/ included, whatever its method or query, ?trace included, answers 401 "Unauthorized" with the Basic challenge before any member is listed or read, whatever the anonymous user may read and whether anonymous access is on or off, so that an Eclipse client sends its credentials. While anonymous access is on, the anonymous user's Basic credentials and a Bearer token that does not verify count as none. A nested P2 virtual member's own flag does not apply to reads through this repository. Off when absent.
+          description: Optional within this object. P2 repositories only. When true every request without credentials to the repository's item paths, /artifactory/<key>/..., its members' files under <member key>/ included, whatever its method or query, ?trace included, answers 401 "Unauthorized" with the Basic challenge before any member is listed or read, whatever the anonymous user may read and whether anonymous access is on or off, so that an Eclipse client sends its credentials. While anonymous access is on, the anonymous user's Basic credentials and a Bearer token that does not verify count as none. A nested P2 virtual member's own flag does not apply to reads through this repository. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
         hideUnauthorizedResources:
           description: Optional within this object. When true items in members the caller may not read are omitted from listings instead of producing 403. Defaults to false.
@@ -24897,6 +25068,10 @@ components:
         secondaryKeyPairRef:
           description: Optional within this object. Name of a second signing key pair, used while rotating the primary. Must name an existing key pair.
           type: string
+        signedUrlTtl:
+          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued for this repository. The configured value cannot be changed through this API. Reads give 90 when it was never set.
+          readOnly: true
+          type: integer
         useNamespaces:
           description: Optional within this object. When true Helm charts are addressed as member/chart so charts with the same name in different members stay distinct. Defaults to false.
           type: boolean
