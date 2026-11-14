@@ -15,6 +15,25 @@ import (
 // InfoFile holds the document head: openapi, info, servers, tags, security.
 const InfoFile = "info.yaml"
 
+// SharedFile is the components fragment that sits beside the service
+// directories, not in one, and that every service's bundle merges
+// (decision 0043, "Where the declarations live").
+const SharedFile = "components-shared.yaml"
+
+// The shared responses the bundle adds to every admitted operation, and the
+// x-cost value that marks an operation admission never sees.
+const (
+	TooManyRequests    = "TooManyRequests"
+	ServiceUnavailable = "ServiceUnavailable"
+	costExempt         = "exempt"
+)
+
+// operationMethods are the keys of a path item that hold an operation.
+var operationMethods = map[string]bool{
+	"get": true, "put": true, "post": true, "delete": true,
+	"options": true, "head": true, "patch": true, "trace": true,
+}
+
 var (
 	errNoInfo        = errors.New("openapibundle: info.yaml is required")
 	errNotMapping    = errors.New("openapibundle: top level is not a mapping")
@@ -25,11 +44,15 @@ var (
 		"openapibundle: info.yaml may only hold openapi, info, servers, tags, security, externalDocs",
 	)
 	errFragmentKeys = errors.New("openapibundle: fragments may only hold paths and components")
+	errSharedKeys   = errors.New("openapibundle: " + SharedFile + " may only hold components")
 )
 
 // Bundle reads srcDir and returns the merged document as YAML. Keys inside
 // paths and each components section are sorted so the output is stable
-// regardless of which fragment a path came from.
+// regardless of which fragment a path came from. When the directory above
+// srcDir holds SharedFile, its components are merged too, and every
+// operation whose x-cost is not exempt gains the shared 429 and 503 it does
+// not declare itself.
 func Bundle(srcDir string) ([]byte, error) {
 	info, err := readNode(filepath.Join(srcDir, InfoFile))
 	if err != nil {
@@ -83,6 +106,10 @@ func Bundle(srcDir string) ([]byte, error) {
 			}
 		}
 	}
+	if err := mergeShared(comps, filepath.Join(filepath.Dir(filepath.Clean(srcDir)), SharedFile)); err != nil {
+		return nil, err
+	}
+	injectAdmission(paths, comps["responses"])
 	sortMapping(paths)
 	doc := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 	for _, k := range []string{"openapi", "info", "servers", "tags", "security", "externalDocs"} {
@@ -216,6 +243,87 @@ func mergeComponents(dst map[string]*yaml.Node, src *yaml.Node, frag string) err
 		}
 	}
 	return nil
+}
+
+// mergeShared merges the shared fragment at path, when there is one, as one
+// more components fragment: a service that declares one of its components
+// again fails the bundle, as two of its own fragments would.
+func mergeShared(comps map[string]*yaml.Node, path string) error {
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	frag, err := readNode(path)
+	if err != nil {
+		return err
+	}
+	for i := 0; i+1 < len(frag.Content); i += 2 {
+		if key := frag.Content[i].Value; key != "components" {
+			return fmt.Errorf("%w: found %q", errSharedKeys, key)
+		}
+		if err := mergeComponents(comps, frag.Content[i+1], SharedFile); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// injectAdmission gives every operation whose x-cost is not exempt the
+// shared 429 and 503 it does not declare itself. An operation without x-cost
+// is admitted today, so it counts as not exempt. An operation's own 429 or
+// 503 stays: it is declared because admission answers its path in another
+// envelope, or because the status also reports a condition of its own.
+// Nothing is added when the shared fragment lacks the response, so a bundle
+// never references a component it does not hold.
+func injectAdmission(paths, responses *yaml.Node) {
+	type shared struct{ status, ref string }
+	var add []shared
+	for _, s := range []shared{{"429", TooManyRequests}, {"503", ServiceUnavailable}} {
+		if lookup(responses, s.ref) != nil {
+			add = append(add, shared{s.status, "#/components/responses/" + s.ref})
+		}
+	}
+	for i := 1; i < len(paths.Content); i += 2 {
+		item := paths.Content[i]
+		for j := 0; j+1 < len(item.Content); j += 2 {
+			if !operationMethods[item.Content[j].Value] {
+				continue
+			}
+			op := item.Content[j+1]
+			if cost := lookup(op, "x-cost"); cost != nil && cost.Value == costExempt {
+				continue
+			}
+			resp := lookup(op, "responses")
+			if resp == nil || resp.Kind != yaml.MappingNode {
+				continue
+			}
+			for _, s := range add {
+				if lookup(resp, s.status) == nil {
+					insertStatus(resp, s.status, s.ref)
+				}
+			}
+		}
+	}
+}
+
+// insertStatus adds status, referencing ref, before the first response that
+// sorts after it, so the bundle lists an operation's statuses in order
+// wherever its fragment did. Range keys such as 4XX sort after their codes
+// and default after every status.
+func insertStatus(resp *yaml.Node, status, ref string) {
+	key := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: status, Style: yaml.SingleQuotedStyle}
+	val := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{
+		scalar("$ref"),
+		{Kind: yaml.ScalarNode, Tag: "!!str", Value: ref, Style: yaml.SingleQuotedStyle},
+	}}
+	at := len(resp.Content)
+	for i := 0; i+1 < len(resp.Content); i += 2 {
+		k := resp.Content[i].Value
+		if k == "default" || len(k) == len(status) && k > status {
+			at = i
+			break
+		}
+	}
+	resp.Content = append(resp.Content[:at], append([]*yaml.Node{key, val}, resp.Content[at:]...)...)
 }
 
 func lookup(m *yaml.Node, key string) *yaml.Node {

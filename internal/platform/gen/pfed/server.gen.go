@@ -149,8 +149,17 @@ type UpdateJpdRequest struct {
 // FederationId defines model for FederationId.
 type FederationId = string
 
+// IdempotencyKey defines model for IdempotencyKey.
+type IdempotencyKey = string
+
 // JpdId defines model for JpdId.
 type JpdId = string
+
+// ServiceUnavailable The flat error envelope used by /pfed.
+type ServiceUnavailable = ErrorResponse
+
+// TooManyRequests The flat error envelope used by /pfed.
+type TooManyRequests = ErrorResponse
 
 // CreateFederationJSONRequestBody defines body for CreateFederation for application/json ContentType.
 type CreateFederationJSONRequestBody = CreateFederationRequest
@@ -589,6 +598,28 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	return r
 }
 
+type ServiceUnavailableResponseHeaders struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+type ServiceUnavailableJSONResponse struct {
+	Body ErrorResponse
+
+	Headers ServiceUnavailableResponseHeaders
+}
+
+type TooManyRequestsResponseHeaders struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+type TooManyRequestsJSONResponse struct {
+	Body ErrorResponse
+
+	Headers TooManyRequestsResponseHeaders
+}
+
 type ListFederationsRequestObject struct {
 }
 
@@ -638,6 +669,27 @@ func (response ListFederations403JSONResponse) VisitListFederationsResponse(w ht
 	return err
 }
 
+type ListFederations429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response ListFederations429JSONResponse) VisitListFederationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListFederations500JSONResponse ErrorResponse
 
 func (response ListFederations500JSONResponse) VisitListFederationsResponse(w http.ResponseWriter) error {
@@ -648,6 +700,27 @@ func (response ListFederations500JSONResponse) VisitListFederationsResponse(w ht
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListFederations503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response ListFederations503JSONResponse) VisitListFederationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -730,6 +803,27 @@ func (response CreateFederation409JSONResponse) VisitCreateFederationResponse(w 
 	return err
 }
 
+type CreateFederation429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response CreateFederation429JSONResponse) VisitCreateFederationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type CreateFederation500JSONResponse ErrorResponse
 
 func (response CreateFederation500JSONResponse) VisitCreateFederationResponse(w http.ResponseWriter) error {
@@ -740,6 +834,27 @@ func (response CreateFederation500JSONResponse) VisitCreateFederationResponse(w 
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateFederation503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response CreateFederation503JSONResponse) VisitCreateFederationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -802,6 +917,27 @@ func (response DeleteFederation404JSONResponse) VisitDeleteFederationResponse(w 
 	return err
 }
 
+type DeleteFederation429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response DeleteFederation429JSONResponse) VisitDeleteFederationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteFederation500JSONResponse ErrorResponse
 
 func (response DeleteFederation500JSONResponse) VisitDeleteFederationResponse(w http.ResponseWriter) error {
@@ -812,6 +948,27 @@ func (response DeleteFederation500JSONResponse) VisitDeleteFederationResponse(w 
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFederation503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response DeleteFederation503JSONResponse) VisitDeleteFederationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -880,6 +1037,27 @@ func (response GetFederation404JSONResponse) VisitGetFederationResponse(w http.R
 	return err
 }
 
+type GetFederation429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response GetFederation429JSONResponse) VisitGetFederationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetFederation500JSONResponse ErrorResponse
 
 func (response GetFederation500JSONResponse) VisitGetFederationResponse(w http.ResponseWriter) error {
@@ -890,6 +1068,27 @@ func (response GetFederation500JSONResponse) VisitGetFederationResponse(w http.R
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFederation503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response GetFederation503JSONResponse) VisitGetFederationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -943,6 +1142,27 @@ func (response ListFollowerJpds403JSONResponse) VisitListFollowerJpdsResponse(w 
 	return err
 }
 
+type ListFollowerJpds429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response ListFollowerJpds429JSONResponse) VisitListFollowerJpdsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListFollowerJpds500JSONResponse ErrorResponse
 
 func (response ListFollowerJpds500JSONResponse) VisitListFollowerJpdsResponse(w http.ResponseWriter) error {
@@ -953,6 +1173,27 @@ func (response ListFollowerJpds500JSONResponse) VisitListFollowerJpdsResponse(w 
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListFollowerJpds503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response ListFollowerJpds503JSONResponse) VisitListFollowerJpdsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1035,6 +1276,27 @@ func (response AddFollowerJpd409JSONResponse) VisitAddFollowerJpdResponse(w http
 	return err
 }
 
+type AddFollowerJpd429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response AddFollowerJpd429JSONResponse) VisitAddFollowerJpdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type AddFollowerJpd500JSONResponse ErrorResponse
 
 func (response AddFollowerJpd500JSONResponse) VisitAddFollowerJpdResponse(w http.ResponseWriter) error {
@@ -1045,6 +1307,27 @@ func (response AddFollowerJpd500JSONResponse) VisitAddFollowerJpdResponse(w http
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddFollowerJpd503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response AddFollowerJpd503JSONResponse) VisitAddFollowerJpdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1107,6 +1390,27 @@ func (response DeleteFollowerJpd404JSONResponse) VisitDeleteFollowerJpdResponse(
 	return err
 }
 
+type DeleteFollowerJpd429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response DeleteFollowerJpd429JSONResponse) VisitDeleteFollowerJpdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteFollowerJpd500JSONResponse ErrorResponse
 
 func (response DeleteFollowerJpd500JSONResponse) VisitDeleteFollowerJpdResponse(w http.ResponseWriter) error {
@@ -1117,6 +1421,27 @@ func (response DeleteFollowerJpd500JSONResponse) VisitDeleteFollowerJpdResponse(
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFollowerJpd503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response DeleteFollowerJpd503JSONResponse) VisitDeleteFollowerJpdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1185,6 +1510,27 @@ func (response GetFollowerJpd404JSONResponse) VisitGetFollowerJpdResponse(w http
 	return err
 }
 
+type GetFollowerJpd429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response GetFollowerJpd429JSONResponse) VisitGetFollowerJpdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetFollowerJpd500JSONResponse ErrorResponse
 
 func (response GetFollowerJpd500JSONResponse) VisitGetFollowerJpdResponse(w http.ResponseWriter) error {
@@ -1195,6 +1541,27 @@ func (response GetFollowerJpd500JSONResponse) VisitGetFollowerJpdResponse(w http
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFollowerJpd503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response GetFollowerJpd503JSONResponse) VisitGetFollowerJpdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1272,6 +1639,27 @@ func (response UpdateFollowerJpd404JSONResponse) VisitUpdateFollowerJpdResponse(
 	return err
 }
 
+type UpdateFollowerJpd429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response UpdateFollowerJpd429JSONResponse) VisitUpdateFollowerJpdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type UpdateFollowerJpd500JSONResponse ErrorResponse
 
 func (response UpdateFollowerJpd500JSONResponse) VisitUpdateFollowerJpdResponse(w http.ResponseWriter) error {
@@ -1282,6 +1670,27 @@ func (response UpdateFollowerJpd500JSONResponse) VisitUpdateFollowerJpdResponse(
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateFollowerJpd503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response UpdateFollowerJpd503JSONResponse) VisitUpdateFollowerJpdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1608,55 +2017,76 @@ func (sh *strictHandler) UpdateFollowerJpd(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"pihr3hSJS5RxjEn3n1z4Z9dGOIcyu/18+78BAA==",
+	"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",
+	"/u36/wYA",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -19,17 +19,27 @@
 //     Other files in the directory are not read.
 //   - For BundleAll, the root that holds one such directory per service, so
 //     adding a service is adding a directory.
+//   - SharedFile, api/src/components-shared.yaml, beside the service
+//     directories: components only, which every service's bundle merges
+//     (decision 0043, "Where the declarations live"). It is a file, not a
+//     directory, so BundleAll never bundles it as a service.
+//   - Each operation's x-cost, which decides whether admission sees it.
 //
 // # Outputs
 //
 //   - Bundle: the merged document as YAML, headed by a comment that says it
-//     is generated from the fragments and is not to be edited.
+//     is generated from the fragments and is not to be edited. It holds the
+//     shared components, and every operation whose x-cost is not exempt
+//     (one without x-cost included) answers '429' with the shared
+//     TooManyRequests and '503' with the shared ServiceUnavailable unless it
+//     declares that status itself.
 //   - BundleAll: api/<service>.openapi.yaml for each service directory, and
 //     the services written, sorted.
 //   - An error for a missing info.yaml, a key that info.yaml or a fragment
 //     may not hold, a fragment that does not parse or is not a mapping, and
 //     a path, operationId or component that a second fragment declares
-//     again.
+//     again, the shared fragment's included, and a shared fragment that
+//     holds anything but components.
 //
 // # Invariants
 //
@@ -42,11 +52,19 @@
 //   - A second declaration of a path, operationId or component fails the
 //     bundle rather than replacing the first, so two families cannot
 //     silently claim the same route or schema.
+//   - An operation's own 429 or 503 is never replaced: it is declared
+//     because admission answers its path in another envelope, or because
+//     the status also reports a condition of the operation's own. No
+//     header, IdempotencyKey or LinkNext is added to any operation; one
+//     references them itself once the server honours them. Nothing is
+//     injected that the shared fragment does not declare.
 //
 // # References
 //
 //   - Decision 0002:
 //     docs/research/decisions/0002-spec-first-flat-crud-handwritten-item-paths.md.
+//   - Decision 0043, "Where the declarations live":
+//     docs/research/decisions/0043-api-reliability.md.
 //   - docs/implementation/api-description-conventions.md.
 //   - Plan: docs/implementation/plan.md#p1-data-model-and-api-schemas, task
 //     3, and #p1b-enterprise-products-specs-and-model, task 1.
@@ -57,7 +75,7 @@
 // # Status
 //
 // Implemented P1 (the fragment bundler) and P1b (any number of services).
-// Moved here in P9d.
+// Moved here in P9d. The shared fragment and the admission statuses: #1405.
 //
 // # Testing
 //
@@ -69,6 +87,16 @@
 //   - TestUnitBundleAll: every service directory is bundled and listed; a
 //     missing source, an unwritable output and a service without info.yaml
 //     fail.
+//   - TestUnitBundleSharedAndAdmission: the shared components are merged;
+//     an ordinary and an unclassified operation gain the 429 and 503 in
+//     status order; an exempt probe and an operation's own 429 and 503 are
+//     left alone.
+//   - TestUnitBundleSharedPartial and TestUnitBundleWithoutShared: only the
+//     shared responses that exist are injected; without the fragment
+//     nothing is.
+//   - TestUnitBundleSharedErrors: a shared fragment with paths, one that
+//     does not parse or is not a mapping, and a service that redeclares a
+//     shared component fail.
 //
 // make verify-generate checks the committed bundles against their fragments.
 package openapibundle

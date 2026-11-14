@@ -431,10 +431,14 @@ paths:
           $ref: '#/components/responses/AdminLegacyUnauthorized'
         '403':
           $ref: '#/components/responses/AdminLegacyForbidden'
+        '429':
+          $ref: '#/components/responses/AdminLegacyTooManyRequests'
         '500':
           $ref: '#/components/responses/AdminLegacyInternalServerError'
         '501':
           $ref: '#/components/responses/AdminLegacyNotImplemented'
+        '503':
+          $ref: '#/components/responses/AdminLegacyServiceUnavailable'
       summary: Export a repository (not supported)
       tags:
       - system
@@ -508,10 +512,14 @@ paths:
           $ref: '#/components/responses/AdminLegacyUnauthorized'
         '403':
           $ref: '#/components/responses/AdminLegacyForbidden'
+        '429':
+          $ref: '#/components/responses/AdminLegacyTooManyRequests'
         '500':
           $ref: '#/components/responses/AdminLegacyInternalServerError'
         '501':
           $ref: '#/components/responses/AdminLegacyNotImplemented'
+        '503':
+          $ref: '#/components/responses/AdminLegacyServiceUnavailable'
       summary: Export settings example (not supported)
       tags:
       - system
@@ -544,10 +552,14 @@ paths:
           $ref: '#/components/responses/AdminLegacyUnauthorized'
         '403':
           $ref: '#/components/responses/AdminLegacyForbidden'
+        '429':
+          $ref: '#/components/responses/AdminLegacyTooManyRequests'
         '500':
           $ref: '#/components/responses/AdminLegacyInternalServerError'
         '501':
           $ref: '#/components/responses/AdminLegacyNotImplemented'
+        '503':
+          $ref: '#/components/responses/AdminLegacyServiceUnavailable'
       summary: Export the system (not supported)
       tags:
       - system
@@ -607,10 +619,14 @@ paths:
           $ref: '#/components/responses/AdminLegacyUnauthorized'
         '403':
           $ref: '#/components/responses/AdminLegacyForbidden'
+        '429':
+          $ref: '#/components/responses/AdminLegacyTooManyRequests'
         '500':
           $ref: '#/components/responses/AdminLegacyInternalServerError'
         '501':
           $ref: '#/components/responses/AdminLegacyNotImplemented'
+        '503':
+          $ref: '#/components/responses/AdminLegacyServiceUnavailable'
       summary: Import repository content (not supported)
       tags:
       - system
@@ -640,10 +656,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The Accept header names a media type the server cannot produce.
+        '429':
+          $ref: '#/components/responses/AdminLegacyTooManyRequests'
         '500':
           $ref: '#/components/responses/AdminLegacyInternalServerError'
         '501':
           $ref: '#/components/responses/AdminLegacyNotImplemented'
+        '503':
+          $ref: '#/components/responses/AdminLegacyServiceUnavailable'
       summary: Import settings example (not supported)
       tags:
       - system
@@ -682,10 +702,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The request media type is not one the server accepts.
+        '429':
+          $ref: '#/components/responses/AdminLegacyTooManyRequests'
         '500':
           $ref: '#/components/responses/AdminLegacyInternalServerError'
         '501':
           $ref: '#/components/responses/AdminLegacyNotImplemented'
+        '503':
+          $ref: '#/components/responses/AdminLegacyServiceUnavailable'
       summary: Import the system (not supported)
       tags:
       - system

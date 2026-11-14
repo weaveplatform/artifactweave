@@ -660,22 +660,7 @@ paths:
         on the build.
       operationId: appendBuild
       parameters:
-      - description: >-
-          Optional header parameter. A quoted
-          ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for
-          example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, retries
-          with the same credential, canonical resource and identical body bytes
-          return 204 without appending again. Reuse with different bytes returns
-          422. Replays remain bound to the original run and require current
-          permission. Concurrent requests wait up to 30 seconds; 503 with
-          Retry-After means retry the same key within its retention window.
-        in: header
-        name: Idempotency-Key
-        x-artifactweave-extension: true
-        schema:
-          type: string
-          minLength: 3
-          maxLength: 130
+      - $ref: '#/components/parameters/IdempotencyKey'
       - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped
           as %2F and is matched as a single path segment.
         in: path
@@ -742,13 +727,6 @@ paths:
           description: The original protected build run has moved to another resource.
         '422':
           description: This unexpired key was used with different request bytes.
-        '503':
-          description: Protected execution exceeded its wait budget. Retry with the same key.
-          headers:
-            Retry-After:
-              schema:
-                type: integer
-              description: Minimum delay in seconds before retrying.
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/appendbuild.md
