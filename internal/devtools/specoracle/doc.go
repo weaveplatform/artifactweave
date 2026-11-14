@@ -53,6 +53,11 @@
 //   - The comparison covers only what a client observes on the wire, never
 //     descriptions, and both sides pass through one normaliser, so a second
 //     parser cannot skew it.
+//   - An operation, parameter or response marked
+//     x-artifactweave-extension: true is left out on both sides: an
+//     optional extension JFrog's clients never send or can ignore (#1395),
+//     such as the shared 429 and 503 every admitted operation declares, so
+//     declaring one never moves the baseline.
 //   - One bad page never hides the rest: Fetch records a page that fails or
 //     has no block in the manifest, and Load records a block that does not
 //     parse in the oracle's Errors.
@@ -104,6 +109,8 @@
 //     normaliser, a broken block becomes a parse error while a spec that
 //     cannot be read fails, two pages that document one route merge, and
 //     the report, summary and text agree.
+//   - TestUnitLoadOursSkipsExtensions: an operation, a parameter and a
+//     response marked as an extension are not compared.
 //   - TestUnitBaselineRoundTrip: a written baseline reads back, Diff splits
 //     regressions from improvements, and an absent file reads as empty.
 //   - TestUnitBuildInventory, TestUnitManifestSourcesDegrades,

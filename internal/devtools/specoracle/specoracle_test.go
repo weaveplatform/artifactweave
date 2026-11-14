@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -679,4 +680,83 @@ func keys(m map[string]Operation) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// TestUnitLoadOursSkipsExtensions: an operation, a parameter and a response
+// marked x-artifactweave-extension are left out of the comparison, so the
+// shared 429 and 503 and the Idempotency-Key never move the baseline.
+func TestUnitLoadOursSkipsExtensions(t *testing.T) {
+	spec := `openapi: 3.0.3
+servers:
+  - url: /artifactory
+paths:
+  /api/build/append/{name}:
+    post:
+      operationId: appendBuild
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: project
+          in: query
+      responses:
+        '204':
+          description: done
+        '400':
+          description: bad
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/artifactweave/api-restrictions/{user}:
+    get:
+      operationId: GetAPIRestriction
+      x-artifactweave-extension: true
+      responses:
+        '200':
+          description: ok
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      x-artifactweave-extension: true
+  responses:
+    TooManyRequests:
+      description: limited
+      x-artifactweave-extension: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              errors:
+                type: array
+`
+	path := filepath.Join(t.TempDir(), "artifactory.openapi.yaml")
+	if err := os.WriteFile(path, []byte(spec), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ours, err := LoadOurs(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff([]string{"POST /artifactory/api/build/append/{}"}, keys(ours.Ops)); diff != "" {
+		t.Fatal(diff)
+	}
+	op := ours.Ops["POST /artifactory/api/build/append/{}"]
+	if diff := cmp.Diff([]Param{{Name: "project", In: "query"}}, op.Params); diff != "" {
+		t.Fatal(diff)
+	}
+	codes := make([]string, 0, len(op.Responses))
+	for c := range op.Responses {
+		codes = append(codes, c)
+	}
+	sort.Strings(codes)
+	if diff := cmp.Diff([]string{"204", "400"}, codes); diff != "" {
+		t.Fatal(diff)
+	}
 }
