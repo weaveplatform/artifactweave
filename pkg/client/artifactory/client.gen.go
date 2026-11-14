@@ -6161,15 +6161,8 @@ type Sha256ChecksumRequest struct {
 	RepoKey string `json:"repoKey"`
 }
 
-// SharedRemoteRepositoryConfiguration Sanitised view of a remote repository returned by the deprecated shared configuration endpoint: credentials and proxy settings are removed.
-type SharedRemoteRepositoryConfiguration struct {
-	// Key Optional within this object. The repository key.
-	Key *string `json:"key,omitempty"`
-
-	// Url Optional within this object. The upstream URL.
-	Url                  *string                `json:"url,omitempty"`
-	AdditionalProperties map[string]interface{} `json:"-"`
-}
+// SharedRemoteRepositoryConfiguration The shared configuration of a remote repository, as a remote repository descriptor; the username, password, proxy, local address and property sets are left out, and so is every unset string.
+type SharedRemoteRepositoryConfiguration = repo.RemoteDescriptor
 
 // SmartArchivingPolicy A package-level archiving policy. Each run moves the selected package versions from the hot blob store to the cold tier and leaves a tombstone in the hot index so search and restore still find them. The cold store is a second blob store configured on the same instance, for example an S3 bucket with an archive storage class.
 type SmartArchivingPolicy struct {
@@ -8943,89 +8936,6 @@ func (a PuppetManifest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
-// Getter for additional properties for SharedRemoteRepositoryConfiguration. Returns the specified
-// element and whether it was found
-func (a SharedRemoteRepositoryConfiguration) Get(fieldName string) (value interface{}, found bool) {
-	if a.AdditionalProperties != nil {
-		value, found = a.AdditionalProperties[fieldName]
-	}
-	return
-}
-
-// Setter for additional properties for SharedRemoteRepositoryConfiguration
-func (a *SharedRemoteRepositoryConfiguration) Set(fieldName string, value interface{}) {
-	if a.AdditionalProperties == nil {
-		a.AdditionalProperties = make(map[string]interface{})
-	}
-	a.AdditionalProperties[fieldName] = value
-}
-
-// Override default JSON handling for SharedRemoteRepositoryConfiguration to handle AdditionalProperties
-func (a *SharedRemoteRepositoryConfiguration) UnmarshalJSON(b []byte) error {
-	object := make(map[string]json.RawMessage)
-	err := json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["key"]; found {
-		err = json.Unmarshal(raw, &a.Key)
-		if err != nil {
-			return fmt.Errorf("error reading 'key': %w", err)
-		}
-		delete(object, "key")
-	}
-
-	if raw, found := object["url"]; found {
-		err = json.Unmarshal(raw, &a.Url)
-		if err != nil {
-			return fmt.Errorf("error reading 'url': %w", err)
-		}
-		delete(object, "url")
-	}
-
-	if len(object) != 0 {
-		a.AdditionalProperties = make(map[string]interface{})
-		for fieldName, fieldBuf := range object {
-			var fieldVal interface{}
-			err := json.Unmarshal(fieldBuf, &fieldVal)
-			if err != nil {
-				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
-			}
-			a.AdditionalProperties[fieldName] = fieldVal
-		}
-	}
-	return nil
-}
-
-// Override default JSON handling for SharedRemoteRepositoryConfiguration to handle AdditionalProperties
-func (a SharedRemoteRepositoryConfiguration) MarshalJSON() ([]byte, error) {
-	var err error
-	object := make(map[string]json.RawMessage)
-
-	if a.Key != nil {
-		object["key"], err = json.Marshal(a.Key)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'key': %w", err)
-		}
-	}
-
-	if a.Url != nil {
-		object["url"], err = json.Marshal(a.Url)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'url': %w", err)
-		}
-	}
-
-	for fieldName, field := range a.AdditionalProperties {
-		object[fieldName], err = json.Marshal(field)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
-		}
-	}
-	return json.Marshal(object)
-}
-
 // AsRemoveRepositorySuccessReport returns the union data inside the RepoBulkRemovalReport_Reports_Item as a RemoveRepositorySuccessReport
 func (t RepoBulkRemovalReport_Reports_Item) AsRemoveRepositorySuccessReport() (RemoveRepositorySuccessReport, error) {
 	var body RemoveRepositorySuccessReport
@@ -10990,7 +10900,7 @@ type ClientInterface interface {
 
 	// GetRemoteRepositoryConfiguration Shared remote repository configuration (deprecated)
 	//
-	// Returns the sanitised configuration of a remote repository that has shareConfiguration enabled. Deprecated in favour of the ordinary read. Non-admin callers get the sanitised view only.
+	// Returns the shared configuration of a remote repository whose shareConfiguration is on, to any signed-in caller, administrator or not. Deprecated in favour of the ordinary read.
 	//
 	// Corresponds with GET /api/repositories/{remoteRepoName}/configuration (the `GetRemoteRepositoryConfiguration` operationId).
 	//
@@ -11006,7 +10916,7 @@ type ClientInterface interface {
 
 	// GetRepositoryConfiguration Read a repository configuration
 	//
-	// Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
+	// Returns the stored configuration with defaults filled in. Admins receive every field of the repository's class, whatever its package type, each a setting of another package type giving its default; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. A stored remote password is left out and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
 	//
 	// Corresponds with GET /api/repositories/{repoKey} (the `GetRepositoryConfiguration` operationId).
 	GetRepositoryConfiguration(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -12584,7 +12494,7 @@ type ClientInterface interface {
 
 	// GetBatchOfRepositoriesByName Read several repository configurations
 	//
-	// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field; other callers receive the public subset. At most 100 names per call.
+	// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field of each repository's class, as the ordinary read gives them; other callers receive the public subset. At most 100 names per call.
 	//
 	// Corresponds with GET /api/v2/repositories/batch (the `GetBatchOfRepositoriesByName` operationId).
 	GetBatchOfRepositoriesByName(ctx context.Context, params *GetBatchOfRepositoriesByNameParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -12699,7 +12609,7 @@ type ClientInterface interface {
 
 	// GetRepositoryConfigurationV2 Read a repository configuration (package-type view)
 	//
-	// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
+	// Like the ordinary read but returns only the fields that apply to the repository's package type and class, so a generic repository has no Maven or Docker fields in the response and a virtual repository no blackedOut or cdnRedirect. checksumPolicyType, handleReleases and handleSnapshots apply to maven, gradle, ivy and sbt repositories only, and maxUniqueSnapshots to local and federated maven, gradle, ivy, sbt and nuget repositories and to maven and vcs remotes. Access rules are the same as the ordinary read.
 	//
 	// Corresponds with GET /api/v2/repositories/{repoKey} (the `GetRepositoryConfigurationV2` operationId).
 	GetRepositoryConfigurationV2(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -16315,7 +16225,7 @@ func (c *Client) CheckIfRepositoryExists(ctx context.Context, params *CheckIfRep
 
 // GetRemoteRepositoryConfiguration Shared remote repository configuration (deprecated)
 //
-// Returns the sanitised configuration of a remote repository that has shareConfiguration enabled. Deprecated in favour of the ordinary read. Non-admin callers get the sanitised view only.
+// Returns the shared configuration of a remote repository whose shareConfiguration is on, to any signed-in caller, administrator or not. Deprecated in favour of the ordinary read.
 //
 // Corresponds with GET /api/repositories/{remoteRepoName}/configuration (the `GetRemoteRepositoryConfiguration` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -16350,7 +16260,7 @@ func (c *Client) DeleteRepository(ctx context.Context, repoKey RepoKey, reqEdito
 
 // GetRepositoryConfiguration Read a repository configuration
 //
-// Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
+// Returns the stored configuration with defaults filled in. Admins receive every field of the repository's class, whatever its package type, each a setting of another package type giving its default; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. A stored remote password is left out and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
 //
 // Corresponds with GET /api/repositories/{repoKey} (the `GetRepositoryConfiguration` operationId).
 func (c *Client) GetRepositoryConfiguration(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -19837,7 +19747,7 @@ func (c *Client) DeleteRepositories(ctx context.Context, body DeleteRepositories
 
 // GetBatchOfRepositoriesByName Read several repository configurations
 //
-// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field; other callers receive the public subset. At most 100 names per call.
+// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field of each repository's class, as the ordinary read gives them; other callers receive the public subset. At most 100 names per call.
 //
 // Corresponds with GET /api/v2/repositories/batch (the `GetBatchOfRepositoriesByName` operationId).
 func (c *Client) GetBatchOfRepositoriesByName(ctx context.Context, params *GetBatchOfRepositoriesByNameParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -20082,7 +19992,7 @@ func (c *Client) CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactory
 
 // GetRepositoryConfigurationV2 Read a repository configuration (package-type view)
 //
-// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
+// Like the ordinary read but returns only the fields that apply to the repository's package type and class, so a generic repository has no Maven or Docker fields in the response and a virtual repository no blackedOut or cdnRedirect. checksumPolicyType, handleReleases and handleSnapshots apply to maven, gradle, ivy and sbt repositories only, and maxUniqueSnapshots to local and federated maven, gradle, ivy, sbt and nuget repositories and to maven and vcs remotes. Access rules are the same as the ordinary read.
 //
 // Corresponds with GET /api/v2/repositories/{repoKey} (the `GetRepositoryConfigurationV2` operationId).
 func (c *Client) GetRepositoryConfigurationV2(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -38421,7 +38331,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetRemoteRepositoryConfigurationWithResponse Shared remote repository configuration (deprecated)
 	//
-	// Returns the sanitised configuration of a remote repository that has shareConfiguration enabled. Deprecated in favour of the ordinary read. Non-admin callers get the sanitised view only.
+	// Returns the shared configuration of a remote repository whose shareConfiguration is on, to any signed-in caller, administrator or not. Deprecated in favour of the ordinary read.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38441,7 +38351,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetRepositoryConfigurationWithResponse Read a repository configuration
 	//
-	// Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
+	// Returns the stored configuration with defaults filled in. Admins receive every field of the repository's class, whatever its package type, each a setting of another package type giving its default; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. A stored remote password is left out and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -40229,7 +40139,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetBatchOfRepositoriesByNameWithResponse Read several repository configurations
 	//
-	// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field; other callers receive the public subset. At most 100 names per call.
+	// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field of each repository's class, as the ordinary read gives them; other callers receive the public subset. At most 100 names per call.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -40346,7 +40256,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetRepositoryConfigurationV2WithResponse Read a repository configuration (package-type view)
 	//
-	// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
+	// Like the ordinary read but returns only the fields that apply to the repository's package type and class, so a generic repository has no Maven or Docker fields in the response and a virtual repository no blackedOut or cdnRedirect. checksumPolicyType, handleReleases and handleSnapshots apply to maven, gradle, ivy and sbt repositories only, and maxUniqueSnapshots to local and federated maven, gradle, ivy, sbt and nuget repositories and to maven and vcs remotes. Access rules are the same as the ordinary read.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -55188,6 +55098,9 @@ type GetRepositoriesByTypeAndProjectResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]struct {
+		// Configuration Optional within this object. The URL of the shared configuration, for a remote repository whose shareConfiguration is on only.
+		Configuration *string `json:"configuration,omitempty"`
+
 		// Description Optional within this object. The repository description, when set.
 		Description *string `json:"description,omitempty"`
 
@@ -55200,11 +55113,14 @@ type GetRepositoriesByTypeAndProjectResponse struct {
 		// Type Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.
 		Type string `json:"type"`
 
-		// Url Required within this object. Absolute URL of the repository root on this server, built from the resolved base URL.
+		// Url Required within this object. The upstream URL of a remote repository, without a user name and password written into it; for every other repository the absolute URL of the repository root on this server, built from the resolved base URL.
 		Url string `json:"url"`
 	}
 	// ApplicationvndOrgJfrogArtifactoryRepositoriesRepositoryDetailsListJSON200 the response for an HTTP 200 `application/vnd.org.jfrog.artifactory.repositories.RepositoryDetailsList+json` response
 	ApplicationvndOrgJfrogArtifactoryRepositoriesRepositoryDetailsListJSON200 *[]struct {
+		// Configuration Optional within this object. The URL of the shared configuration, for a remote repository whose shareConfiguration is on only.
+		Configuration *string `json:"configuration,omitempty"`
+
 		// Description Optional within this object. The repository description, when set.
 		Description *string `json:"description,omitempty"`
 
@@ -55217,7 +55133,7 @@ type GetRepositoriesByTypeAndProjectResponse struct {
 		// Type Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.
 		Type string `json:"type"`
 
-		// Url Required within this object. Absolute URL of the repository root on this server, built from the resolved base URL.
+		// Url Required within this object. The upstream URL of a remote repository, without a user name and password written into it; for every other repository the absolute URL of the repository root on this server, built from the resolved base URL.
 		Url string `json:"url"`
 	}
 	// JSON400 the response for an HTTP 400 `application/json` response
@@ -55242,6 +55158,9 @@ type GetRepositoriesByTypeAndProjectResponse struct {
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetRepositoriesByTypeAndProjectResponse) GetJSON200() *[]struct {
+	// Configuration Optional within this object. The URL of the shared configuration, for a remote repository whose shareConfiguration is on only.
+	Configuration *string `json:"configuration,omitempty"`
+
 	// Description Optional within this object. The repository description, when set.
 	Description *string `json:"description,omitempty"`
 
@@ -55254,7 +55173,7 @@ func (r GetRepositoriesByTypeAndProjectResponse) GetJSON200() *[]struct {
 	// Type Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.
 	Type string `json:"type"`
 
-	// Url Required within this object. Absolute URL of the repository root on this server, built from the resolved base URL.
+	// Url Required within this object. The upstream URL of a remote repository, without a user name and password written into it; for every other repository the absolute URL of the repository root on this server, built from the resolved base URL.
 	Url string `json:"url"`
 } {
 	return r.JSON200
@@ -55262,6 +55181,9 @@ func (r GetRepositoriesByTypeAndProjectResponse) GetJSON200() *[]struct {
 
 // GetApplicationvndOrgJfrogArtifactoryRepositoriesRepositoryDetailsListJSON200 returns the response for an HTTP 200 `application/vnd.org.jfrog.artifactory.repositories.RepositoryDetailsList+json` response
 func (r GetRepositoriesByTypeAndProjectResponse) GetApplicationvndOrgJfrogArtifactoryRepositoriesRepositoryDetailsListJSON200() *[]struct {
+	// Configuration Optional within this object. The URL of the shared configuration, for a remote repository whose shareConfiguration is on only.
+	Configuration *string `json:"configuration,omitempty"`
+
 	// Description Optional within this object. The repository description, when set.
 	Description *string `json:"description,omitempty"`
 
@@ -55274,7 +55196,7 @@ func (r GetRepositoriesByTypeAndProjectResponse) GetApplicationvndOrgJfrogArtifa
 	// Type Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.
 	Type string `json:"type"`
 
-	// Url Required within this object. Absolute URL of the repository root on this server, built from the resolved base URL.
+	// Url Required within this object. The upstream URL of a remote repository, without a user name and password written into it; for every other repository the absolute URL of the repository root on this server, built from the resolved base URL.
 	Url string `json:"url"`
 } {
 	return r.ApplicationvndOrgJfrogArtifactoryRepositoriesRepositoryDetailsListJSON200
@@ -55635,8 +55557,6 @@ type GetRemoteRepositoryConfigurationResponse struct {
 	ApplicationvndOrgJfrogArtifactoryRepositoriesSharedRemoteRepositoryConfigurationJSON200 *SharedRemoteRepositoryConfiguration
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
-	// JSON403 the response for an HTTP 403 `application/json` response
-	JSON403 *ErrorResponse
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *ErrorResponse
 	// JSON429 the response for an HTTP 429 `application/json` response
@@ -55664,11 +55584,6 @@ func (r GetRemoteRepositoryConfigurationResponse) GetApplicationvndOrgJfrogArtif
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
 func (r GetRemoteRepositoryConfigurationResponse) GetJSON401() *ErrorResponse {
 	return r.JSON401
-}
-
-// GetJSON403 returns the response for an HTTP 403 `application/json` response
-func (r GetRemoteRepositoryConfigurationResponse) GetJSON403() *ErrorResponse {
-	return r.JSON403
 }
 
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
@@ -76083,7 +75998,7 @@ func (c *ClientWithResponses) CheckIfRepositoryExistsWithResponse(ctx context.Co
 
 // GetRemoteRepositoryConfigurationWithResponse Shared remote repository configuration (deprecated)
 //
-// Returns the sanitised configuration of a remote repository that has shareConfiguration enabled. Deprecated in favour of the ordinary read. Non-admin callers get the sanitised view only.
+// Returns the shared configuration of a remote repository whose shareConfiguration is on, to any signed-in caller, administrator or not. Deprecated in favour of the ordinary read.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -76115,7 +76030,7 @@ func (c *ClientWithResponses) DeleteRepositoryWithResponse(ctx context.Context, 
 
 // GetRepositoryConfigurationWithResponse Read a repository configuration
 //
-// Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
+// Returns the stored configuration with defaults filled in. Admins receive every field of the repository's class, whatever its package type, each a setting of another package type giving its default; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. A stored remote password is left out and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -79061,7 +78976,7 @@ func (c *ClientWithResponses) DeleteRepositoriesWithResponse(ctx context.Context
 
 // GetBatchOfRepositoriesByNameWithResponse Read several repository configurations
 //
-// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field; other callers receive the public subset. At most 100 names per call.
+// Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field of each repository's class, as the ordinary read gives them; other callers receive the public subset. At most 100 names per call.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -79256,7 +79171,7 @@ func (c *ClientWithResponses) CreateMultipleRepositoriesWithApplicationVndOrgJfr
 
 // GetRepositoryConfigurationV2WithResponse Read a repository configuration (package-type view)
 //
-// Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.
+// Like the ordinary read but returns only the fields that apply to the repository's package type and class, so a generic repository has no Maven or Docker fields in the response and a virtual repository no blackedOut or cdnRedirect. checksumPolicyType, handleReleases and handleSnapshots apply to maven, gradle, ivy and sbt repositories only, and maxUniqueSnapshots to local and federated maven, gradle, ivy, sbt and nuget repositories and to maven and vcs remotes. Access rules are the same as the ordinary read.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -96714,6 +96629,9 @@ func ParseGetRepositoriesByTypeAndProjectResponse(rsp *http.Response) (*GetRepos
 	switch {
 	case rsp.Header.Get("Content-Type") == "application/json" && rsp.StatusCode == 200:
 		var dest []struct {
+			// Configuration Optional within this object. The URL of the shared configuration, for a remote repository whose shareConfiguration is on only.
+			Configuration *string `json:"configuration,omitempty"`
+
 			// Description Optional within this object. The repository description, when set.
 			Description *string `json:"description,omitempty"`
 
@@ -96726,7 +96644,7 @@ func ParseGetRepositoriesByTypeAndProjectResponse(rsp *http.Response) (*GetRepos
 			// Type Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.
 			Type string `json:"type"`
 
-			// Url Required within this object. Absolute URL of the repository root on this server, built from the resolved base URL.
+			// Url Required within this object. The upstream URL of a remote repository, without a user name and password written into it; for every other repository the absolute URL of the repository root on this server, built from the resolved base URL.
 			Url string `json:"url"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -96736,6 +96654,9 @@ func ParseGetRepositoriesByTypeAndProjectResponse(rsp *http.Response) (*GetRepos
 
 	case rsp.Header.Get("Content-Type") == "application/vnd.org.jfrog.artifactory.repositories.RepositoryDetailsList+json" && rsp.StatusCode == 200:
 		var dest []struct {
+			// Configuration Optional within this object. The URL of the shared configuration, for a remote repository whose shareConfiguration is on only.
+			Configuration *string `json:"configuration,omitempty"`
+
 			// Description Optional within this object. The repository description, when set.
 			Description *string `json:"description,omitempty"`
 
@@ -96748,7 +96669,7 @@ func ParseGetRepositoriesByTypeAndProjectResponse(rsp *http.Response) (*GetRepos
 			// Type Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.
 			Type string `json:"type"`
 
-			// Url Required within this object. Absolute URL of the repository root on this server, built from the resolved base URL.
+			// Url Required within this object. The upstream URL of a remote repository, without a user name and password written into it; for every other repository the absolute URL of the repository root on this server, built from the resolved base URL.
 			Url string `json:"url"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -97189,13 +97110,6 @@ func ParseGetRemoteRepositoryConfigurationResponse(rsp *http.Response) (*GetRemo
 			return nil, err
 		}
 		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest ErrorResponse

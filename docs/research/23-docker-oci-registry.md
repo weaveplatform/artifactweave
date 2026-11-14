@@ -178,8 +178,13 @@ behaviour below is documented or seen in its clients; where neither shows it, th
 - **[D]** Docker deprecated pushing and pulling image manifest v2 schema 1 in 19.03,
   disabled it by default in 26.0 and removed it in 28.2, which refuses to pull such an
   image. Its replacements are schema 2 and the OCI image specification.
-- **[D]** Artifactory's repository configuration has `blockPushingSchema1`, documented as
-  `false` by default (research 03). A captured repository showed it `true`.
+- **[S]** Artifactory's repository configuration has `blockPushingSchema1`, `true` by
+  default in 7.161.26's descriptor (`RealRepoDescriptor`) and read model
+  (`RepositoryConfigurationBase`); the v1 reads of Docker, npm and Maven local repositories
+  show it `true` ([J] RTFACT-29415, RTFACT-30672, RTFACT-31100), as did a captured
+  repository. JFrog's JSON page documents it as `false`. artifactweave defaults it to `true`
+  ([research 03](03-repository-configuration-model.md#local-fields),
+  [#1493](https://github.com/weaveplatform/artifactweave/issues/1493)).
 
 ## 2. Routing and access methods
 

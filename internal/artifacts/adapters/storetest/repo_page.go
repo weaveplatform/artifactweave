@@ -22,10 +22,21 @@ func RunRepoPages(t *testing.T, newStore Factory) {
 // repoPageWorld is stored in reverse key order, so a store that answered in
 // insertion order would fail every case.
 var repoPageWorld = []repo.Config{
-	{Key: "f-local", Class: repo.Local, PackageType: repo.Docker, Description: "images"},
+	{
+		Key: "f-local", Class: repo.Local, PackageType: repo.Docker, Description: "images",
+		ShareConfiguration: new(true),
+	},
 	{Key: "e-local", Class: repo.Local, PackageType: repo.RPM},
 	{Key: "d-virtual", Class: repo.Virtual, PackageType: repo.NPM, ProjectKey: "p"},
-	{Key: "c-remote", Class: repo.Remote, PackageType: repo.Maven, URL: "https://repo.example/m2"},
+	{
+		Key:                "c-remote",
+		Class:              repo.Remote,
+		PackageType:        repo.Maven,
+		URL:                "https://repo.example/m2",
+		ShareConfiguration: new(true),
+		Username:           "u",
+		Password:           "p",
+	},
 	{Key: "b-fed", Class: repo.Federated, PackageType: repo.Maven, ProjectKey: "p"},
 	{Key: "a-local", Class: repo.Local, PackageType: repo.Generic, Description: "first"},
 }
@@ -108,13 +119,17 @@ func testRepoPages(t *testing.T, r port.RepoStore) {
 		storekit.Same(t, c.name, fmt.Sprint(c.want.keys, c.want.more, c.want.total),
 			fmt.Sprint(keys, got.More, got.Total))
 	}
-	// A summary carries what the list shows, and never the remote's URL or
-	// any other part of its configuration.
+	// A summary carries what the list shows: a remote's upstream URL and
+	// whether it shares its configuration, which no other class has, and
+	// nothing else of a configuration.
 	got := storekit.Get[port.RepoPage](t)(r.Page(ctx, port.RepoListing{Limit: 6}))
 	storekit.Same(t, "summaries", []port.RepoSummary{
 		{Key: "a-local", Class: repo.Local, PackageType: repo.Generic, Description: "first"},
 		{Key: "b-fed", Class: repo.Federated, PackageType: repo.Maven},
-		{Key: "c-remote", Class: repo.Remote, PackageType: repo.Maven},
+		{
+			Key: "c-remote", Class: repo.Remote, PackageType: repo.Maven,
+			URL: "https://repo.example/m2", Shared: true,
+		},
 		{Key: "d-virtual", Class: repo.Virtual, PackageType: repo.NPM},
 		{Key: "e-local", Class: repo.Local, PackageType: repo.RPM},
 		{Key: "f-local", Class: repo.Local, PackageType: repo.Docker, Description: "images"},

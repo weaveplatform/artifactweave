@@ -103,6 +103,9 @@
       "missing response 200 property upstreamProjectKey",
       "missing response 200 property upstreamRepoKey"
     ],
+    "GET /artifactory/api/repositories/{}/configuration": [
+      "missing response 403"
+    ],
     "GET /artifactory/api/v2/repositories/batch": [
       "missing response 200 property *.projectScopedReadUpstream",
       "missing response 200 property *.upstreamProjectKey",

@@ -31,6 +31,10 @@ const (
 	// never set (Full), the default of 7.161.26's RepositoryConfigurationBase
 	// and RepoBaseDescriptor.
 	DefaultSignedURLTTL = 90
+	// DefaultXrayDataTTL is what a read gives xrayDataTtl when it was never
+	// set (Full): DEFAULT_DATA_TTL of 7.161.26's read model, and 90 in every
+	// local dump and remote sample read.
+	DefaultXrayDataTTL = 90
 )
 
 // Minimums of a remote repository's retrievalCachePeriodSecs. JFrog's
@@ -91,7 +95,12 @@ func localDefaults(c *Config) {
 	if c.DockerAPIVersion == "" {
 		c.DockerAPIVersion = DockerV2
 	}
-	setFlex(&c.BlockPushingSchema1, false)
+	// 7.161.26's descriptor (RealRepoDescriptor) and read model
+	// (RepositoryConfigurationBase) both default it to true, and the v1
+	// reads of Docker, npm and Maven local repositories show true
+	// (RTFACT-29415, RTFACT-30672, RTFACT-31100). No push answer depends on
+	// it: every schema 1 manifest is refused (DV-034).
+	setFlex(&c.BlockPushingSchema1, true)
 	setBool(&c.ArchiveBrowsingEnabled, false)
 	setFlex(&c.EnableFileListsIndexing, false)
 	setBool(&c.ForceNugetAuthentication, false)
@@ -154,7 +163,9 @@ func remoteDefaults(c *Config) {
 	setFlex(&c.ListRemoteFolderItems, false)
 	setBool(&c.DisableURLNormalization, false)
 	setBool(&c.ExternalDependenciesEnabled, false)
-	setFlex(&c.BlockPushingSchema1, false)
+	// As for a local repository (localDefaults); every remote sample read
+	// of the Terraform provider gives true.
+	setFlex(&c.BlockPushingSchema1, true)
 	setBool(&c.ForceNugetAuthentication, false)
 	setBool(&c.ForceP2Authentication, false)
 	setBool(&c.ForceConanAuthentication, false)
@@ -166,11 +177,6 @@ func remoteDefaults(c *Config) {
 		setString(&c.FeedContextPath, DefaultFeedContextPath)
 		setString(&c.DownloadContextPath, DefaultDownloadContextPath)
 		setStr(&c.V3FeedURL, DefaultV3FeedURL)
-	case Go, VCS:
-		setStr(&c.VCSType, DefaultVCSType)
-		if c.VCSGitProvider == "" {
-			c.VCSGitProvider = GitHub
-		}
 	case Bower:
 		setStr(&c.BowerRegistryURL, DefaultBowerRegistryURL)
 	case Cargo:
@@ -183,6 +189,19 @@ func remoteDefaults(c *Config) {
 	case NIMModel:
 		if c.URL == "" {
 			c.URL = DefaultNIMModelURL
+		}
+	}
+	// The Terraform provider's sample reads of Bower, CocoaPods, Composer,
+	// Go, Terraform and VCS remotes (samples/repository_remote) give each
+	// vcsType GIT and vcsGitProvider GITHUB, the Terraform one though the
+	// provider sends neither for it; no other remote's sample has them. A
+	// Bower remote fetches from GitHub alike with the provider unset or
+	// GITHUB.
+	switch c.PackageType {
+	case Go, VCS, Bower, CocoaPods, Composer, Terraform:
+		setStr(&c.VCSType, DefaultVCSType)
+		if c.VCSGitProvider == "" {
+			c.VCSGitProvider = GitHub
 		}
 	}
 }

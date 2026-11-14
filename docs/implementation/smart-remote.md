@@ -20,7 +20,10 @@ cross-vendor qualification; P19/#216 owns the unresolved current-version observa
 
 The configured repository URL determines one service root and repository key. Discovery
 GETs `/api/system/version`, then `/api/repositories/{key}`; a 403 may fall back to
-`/api/repositories/{key}/configuration`. Parsed documents are bounded to 1 MiB and must
+`/api/repositories/{key}/configuration`. That answer is a remote repository descriptor,
+which has no `rclass` and whose `type` is the package type; 7.161.26 answers it for a
+remote repository only (`RepoConfigurationResource.getRemoteDescriptor`), so a peer
+that answers it is a remote. Parsed documents are bounded to 1 MiB and must
 be JSON objects. Only the sanitized version, repository class/key, service root and
 validation time persist, bound to current source and resolved credential revision.
 Cached discovery honors metadata TTL; private/no-store discovery is not retained.

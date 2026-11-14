@@ -156,11 +156,11 @@ Projections:
 
 | Projection | Operation | Shape |
 |---|---|---|
-| Details list item | `GET /api/repositories` | `{key, type (upper-case class incl. DISTRIBUTION), description, url, packageType}`; the `url` is derived from the base URL |
+| Details list item | `GET /api/repositories` | `{key, type (upper-case class incl. DISTRIBUTION), description, url, configuration, packageType}`; the `url` is derived from the base URL, but for a remote, whose `url` is its upstream URL; `configuration` is the shared configuration's URL, for a remote that shares it only |
 | Grouped configurations | `GET /api/repositories/configurations` | `{LOCAL[], REMOTE[], VIRTUAL[], FEDERATED[], RELEASE_BUNDLE[]}` of full configurations |
 | Batch read | `GET /api/v2/repositories/batch?names=` | map of key to full configuration |
 | Existence | `GET /api/repositories/existence` | `{exists, matchingRepoTypes[], projectKey}` |
-| Shared remote config (deprecated) | `GET /api/repositories/{key}/configuration` | `{key, url}` |
+| Shared remote config (deprecated) | `GET /api/repositories/{key}/configuration` | the masked remote repository descriptor: `{@class, key, type, url, ...}` with nested `xray`, `downloadRedirect`, `cdnRedirect`, `contentSynchronisation`, `customHttpHeader[]` and per-type objects ([03](03-repository-configuration-model.md), "Field sets of the reads") |
 | Bulk removal report | `DELETE /api/v2/repositories/batch` | `{statusMessage, reports[{repoKey, statusMsg, deletedArtifactsCount, success, deleteArtifactsFailureCount, errors[{status, message}]}]}` |
 | Removal reports | `DELETE /api/repositories/{key}` | `RemoveRepositorySuccessReport` / `RemoveRepositoryFailureReport` (untyped in the oracle) across 200/202/207/400/403/404/409/424/500 |
 
