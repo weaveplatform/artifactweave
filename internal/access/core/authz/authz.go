@@ -248,6 +248,43 @@ func (d *Decider) AllowsFolder(
 	return want != 0 && d.Actions(rt, repo, path, true).Has(want)
 }
 
+// AllowsAll reports whether the subject holds every action in want on
+// every path below folder (accessapi.Decider.AllowsAll). It takes the
+// actions of each rule whose include patterns match every path below the
+// folder and none of whose exclude patterns can match one, and narrows them
+// by the token scope's entries that cover the folder the same way, so each
+// action it counts holds at each path below the folder, as Actions would
+// find it there.
+func (d *Decider) AllowsAll(
+	rt accessapi.ResourceType,
+	repo accessapi.Repo,
+	folder string,
+	want accessapi.Actions,
+) bool {
+	if want == 0 {
+		return false
+	}
+	var have accessapi.Actions
+	if d.hasEveryAction {
+		have = allActions
+	} else {
+		for _, r := range d.rules[rt] {
+			if covers(r.target, repo) && r.allowsAll(folder) {
+				have |= r.actions
+			}
+		}
+	}
+	switch {
+	case rt == accessapi.ResourceArtifact && d.filter != nil:
+		have &= scopeActionsAll(d.filter, repo, folder)
+	case rt == accessapi.ResourceBuild && d.builds != nil:
+		have &= scopeActionsAll(d.builds, repo, folder)
+	case rt != accessapi.ResourceArtifact && !d.hasAppliedPermissions:
+		have = 0
+	}
+	return have.Has(want)
+}
+
 // RepoConfig reports whether a token scope lets the subject read a
 // repository's configuration. Without a scope, or with applied permissions
 // and no repo entries, the permissions alone decide; repo entries
@@ -342,6 +379,23 @@ func (r rule) allows(path string, folder bool) bool {
 	}
 	for _, in := range r.include {
 		if in.Match(path) || (folder && in.MatchBelow(path)) {
+			return true
+		}
+	}
+	return false
+}
+
+// allowsAll reports whether r allows every path below folder: one of its
+// include patterns matches each, and none of its exclude patterns can
+// match one.
+func (r rule) allowsAll(folder string) bool {
+	for _, x := range r.exclude {
+		if x.MatchBelow(folder) {
+			return false
+		}
+	}
+	for _, in := range r.include {
+		if in.MatchAllBelow(folder) {
 			return true
 		}
 	}
@@ -539,6 +593,28 @@ func scopeActions(
 			if !p.Match(path) && (!folder || !p.MatchBelow(path)) {
 				continue
 			}
+		}
+		a |= toActions(e.Actions)
+	}
+	return a
+}
+
+// scopeActionsAll is what a token's artifact or build entries allow at
+// every path below folder in repo: the actions of each entry for the
+// repository whose path, if it has one, matches every such path.
+func scopeActionsAll(
+	entries []kernel.ScopeEntry,
+	repo accessapi.Repo,
+	folder string,
+) accessapi.Actions {
+	key, _ := artrepo.ResolveKey(repo.Key)
+	var a accessapi.Actions
+	for _, e := range entries {
+		if e.Target != "*" && e.Target != key {
+			continue
+		}
+		if e.Path != "" && !antpath.CompilePattern(e.Path).MatchAllBelow(folder) {
+			continue
 		}
 		a |= toActions(e.Actions)
 	}

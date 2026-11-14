@@ -96,6 +96,48 @@ func TestUnitDecider(t *testing.T) {
 	}
 }
 
+// AllowsAll is Admin's only for an administrator whose Allows and
+// AllowsFolder no function narrows, else AllowsAllFunc's when it is set,
+// and false for a question that asks for no action.
+func TestUnitDeciderAllowsAll(t *testing.T) {
+	all := func(d *accessapitest.Decider, want accessapi.Actions) bool {
+		return d.AllowsAll(accessapi.ResourceArtifact, libs, "a", want)
+	}
+	narrowed := func(accessapi.ResourceType, accessapi.Repo, string, accessapi.Actions) bool {
+		return true
+	}
+	for _, c := range []struct {
+		what string
+		d    *accessapitest.Decider
+		want bool
+	}{
+		{"zero", &accessapitest.Decider{}, false},
+		{"administrator", &accessapitest.Decider{Admin: true}, true},
+		{"narrowed Allows", &accessapitest.Decider{Admin: true, AllowsFunc: narrowed}, false},
+		{"narrowed AllowsFolder", &accessapitest.Decider{Admin: true, AllowsFolderFunc: narrowed}, false},
+	} {
+		if got := all(c.d, accessapi.ActionRead); got != c.want {
+			t.Errorf("%s: AllowsAll = %v, want %v", c.what, got, c.want)
+		}
+		if all(c.d, 0) {
+			t.Errorf("%s: AllowsAll of no action allowed", c.what)
+		}
+	}
+	var asked []string
+	scripted := &accessapitest.Decider{
+		AllowsAllFunc: func(rt accessapi.ResourceType, r accessapi.Repo, f string, a accessapi.Actions) bool {
+			asked = append(asked, fmt.Sprintf("all %s %s %s %d", rt, r.Key, f, a))
+			return true
+		},
+	}
+	if !all(scripted, accessapi.ActionWrite) || all(scripted, 0) {
+		t.Error("AllowsAllFunc does not answer")
+	}
+	if want := []string{fmt.Sprintf("all artifact libs-local a %d", accessapi.ActionWrite)}; !reflect.DeepEqual(asked, want) {
+		t.Errorf("questions asked = %q, want %q", asked, want)
+	}
+}
+
 func TestUnitAuthenticator(t *testing.T) {
 	ctx := t.Context()
 	ann := kernel.Principal{Name: "ann", Groups: []string{"readers"}}

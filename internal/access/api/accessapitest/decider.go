@@ -14,8 +14,9 @@ var _ accessapi.Decider = (*Decider)(nil)
 // repository and allowed nothing. A question whose function field is nil is
 // answered with Admin, so an administrator is allowed whatever no function
 // narrows, as the evaluator allows an administrator whose token scope does
-// not narrow it. Allows and AllowsFolder refuse a question that asks for no
-// action before they consult a field, as every Decider does.
+// not narrow it; AllowsAll is the exception, as its comment says. Allows,
+// AllowsFolder and AllowsAll refuse a question that asks for no action
+// before they consult a field, as every Decider does.
 //
 // Use a *Decider: a Decider value holds functions, and an interface holding
 // such a value panics when compared, as tests compare the decider a context
@@ -42,6 +43,14 @@ type Decider struct {
 		rt accessapi.ResourceType,
 		repo accessapi.Repo,
 		path string,
+		want accessapi.Actions,
+	) bool
+	// AllowsAllFunc answers AllowsAll for a question that asks for some
+	// action.
+	AllowsAllFunc func(
+		rt accessapi.ResourceType,
+		repo accessapi.Repo,
+		folder string,
 		want accessapi.Actions,
 	) bool
 	// SystemFunc answers System.
@@ -98,6 +107,28 @@ func (d *Decider) AllowsFolder(
 		return d.AllowsFolderFunc(rt, repo, path, want)
 	default:
 		return d.Admin
+	}
+}
+
+// AllowsAll refuses a question that asks for no action, and answers any
+// other with AllowsAllFunc. When it is nil, it answers true only for an
+// administrator whose Allows and AllowsFolder no function narrows: a fake
+// that narrows them without saying what it allows as a whole is taken to
+// narrow every folder, so a list asks it path by path, as it would ask an
+// evaluator whose permissions name paths.
+func (d *Decider) AllowsAll(
+	rt accessapi.ResourceType,
+	repo accessapi.Repo,
+	folder string,
+	want accessapi.Actions,
+) bool {
+	switch {
+	case want == 0:
+		return false
+	case d.AllowsAllFunc != nil:
+		return d.AllowsAllFunc(rt, repo, folder, want)
+	default:
+		return d.Admin && d.AllowsFunc == nil && d.AllowsFolderFunc == nil
 	}
 }
 
