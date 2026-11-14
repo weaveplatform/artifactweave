@@ -15434,7 +15434,7 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "calculateCargoRepositoryMetadata",
     "state": "implemented",
-    "contract": "Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. Requires an administrator. Answers \"Recalculating index for Cargo repository \u003crepoKey\u003e scheduled to run.\"",
+    "contract": "Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. On a remote repository, named by its key or its cache's, expires the cached upstream config.json before it answers, so that the next read fetches it again. Requires an administrator. Answers \"Recalculating index for Cargo repository \u003crepoKey\u003e scheduled to run.\"",
     "handler": "internal/artifacts/adapters/http/reindex.go: ArtifactoryAPI.CalculateCargoRepositoryMetadata",
     "direct_calls": [
       "artgen.CalculateCargoRepositoryMetadata200TextResponse",
@@ -17261,8 +17261,8 @@
     "route": "POST /artifactory/api/pub/{repoKey}/reindex",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "calculatePubRepositoryMetadata",
-    "state": "implemented",
-    "contract": "Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator.",
+    "state": "partial: handler enforces the contract's limitations",
+    "contract": "Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator. Reindexing a remote repository or its cache is not implemented and answers 501.",
     "handler": "internal/artifacts/adapters/http/reindex.go: ArtifactoryAPI.CalculatePubRepositoryMetadata",
     "direct_calls": [
       "artgen.CalculatePubRepositoryMetadata200TextResponse",
