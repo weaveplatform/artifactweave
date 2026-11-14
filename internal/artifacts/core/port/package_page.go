@@ -49,8 +49,11 @@ func CandidatesAt(
 	offset, limit int,
 ) ([]SearchCandidate, int, error) {
 	packages, err := s.PackagesAt(ctx, r, offset, limit)
-	if err != nil || len(packages) == 0 {
-		return nil, 0, err
+	if err != nil {
+		return nil, 0, err //nolint:wrapcheck // the store's error names the read and the repository
+	}
+	if len(packages) == 0 {
+		return nil, 0, nil
 	}
 	found, err := s.Candidates(ctx, packages)
 	return found, len(packages), err

@@ -29,7 +29,7 @@ func RunPackagePages(t *testing.T, newStore Factory) {
 func listOrderKeys(t *testing.T, newStore Factory) {
 	ctx := t.Context()
 	s := newStore(t).Packages()
-	rnd := rand.New(rand.NewPCG(1426, 1))
+	rnd := rand.New(rand.NewPCG(1426, 1)) //nolint:gosec // test data, not a secret
 	names := storekit.Get[[]string](t)
 	for _, c := range []struct {
 		pt repo.PackageType
@@ -263,8 +263,9 @@ func tallyAndReleases(t *testing.T, newStore Factory) {
 		tally(s.TallyVersions(ctx, "absent", 10)))
 	releases := func(offset, limit int) []string {
 		t.Helper()
-		var out []string
-		for _, r := range storekit.Get[[]port.ReleaseName](t)(s.ReleasesAt(ctx, "forge", offset, limit)) {
+		page := storekit.Get[[]port.ReleaseName](t)(s.ReleasesAt(ctx, "forge", offset, limit))
+		out := make([]string, 0, len(page))
+		for _, r := range page {
 			out = append(out, r.Package+"@"+r.Version)
 		}
 		return out

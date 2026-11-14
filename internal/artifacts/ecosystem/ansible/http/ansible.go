@@ -304,7 +304,7 @@ func (h handler) localVersionList(r *http.Request, ns, name string) (versionList
 			if err != nil {
 				return nil, fmt.Errorf("ansible: versions: %w", err)
 			}
-			return h.pageStored(r.WithContext(ctx), ns, name, p.ID, page)
+			return h.pageStored(ctx, r, ns, name, p.ID, page)
 		}
 		return list, nil
 	}
@@ -318,17 +318,18 @@ func (h handler) localVersionList(r *http.Request, ns, name string) (versionList
 	listed := slices.SortedFunc(slices.Values(indexed), newestFirst)
 	list.count = len(listed)
 	list.page = func(ctx context.Context, start, end int) ([]string, error) {
-		return h.pageStored(r.WithContext(ctx), ns, name, p.ID, listed[start:end])
+		return h.pageStored(ctx, r, ns, name, p.ID, listed[start:end])
 	}
 	return list, nil
 }
 
 // pageStored returns the versions of page, a page of collection ns.name's
-// version list, whose collections are stored, in page's order. It reads
-// and checks them against their collections (localRelease) from the
-// newest page's end, the index's order, in which localVersions checks
-// them.
+// version list, whose collections are stored, in page's order, reading
+// them under ctx, the page read's own. It reads and checks them against
+// their collections (localRelease) from the page's oldest end, the index's
+// order, in which localVersions checks them.
 func (h handler) pageStored(
+	ctx context.Context,
 	r *http.Request,
 	ns, name string,
 	packageID int64,
@@ -336,14 +337,14 @@ func (h handler) pageStored(
 ) ([]string, error) {
 	stored := make(map[string]bool, len(page))
 	for _, version := range slices.Backward(page) {
-		v, err := h.k.DB().Packages().Version(r.Context(), packageID, version)
+		v, err := h.k.DB().Packages().Version(ctx, packageID, version)
 		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
 			return nil, fmt.Errorf("ansible: versions: %w", err)
 		}
-		if _, stored[version], err = h.localRelease(r, ns, name, v); err != nil {
+		if _, stored[version], err = h.localRelease(r.WithContext(ctx), ns, name, v); err != nil {
 			return nil, err
 		}
 	}
