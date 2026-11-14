@@ -36,7 +36,10 @@
 //   - AccessLog writes one line per request with its method, redacted path,
 //     status, bytes, duration and request ID; a request that authenticated
 //     names its user, never the credential, and one whose handler noted a
-//     cause logs at ERROR with it.
+//     cause logs at ERROR with it. A response its handler aborted with
+//     http.ErrAbortHandler, as a streamed list does when its store fails
+//     after the first byte, is logged too, at ERROR with "aborted":true,
+//     before the panic goes on to net/http.
 //   - A panic answers 500 "internal error" in the request's profile and is
 //     logged; http.ErrAbortHandler is re-raised, as net/http expects.
 //   - A body over BodyLimit's limit answers 413 with BodyTooLarge's text,
@@ -69,9 +72,10 @@
 // # Testing
 //
 // middleware_test.go checks request ID reuse and minting, the access log's
-// fields, level and cause, panic recovery in two envelopes, the body limit
-// with declared and undeclared lengths, content-type normalisation and the
-// binding errors, each with its hooks passed explicitly. The router's guards
+// fields, level and cause, the line of an aborted response, panic recovery
+// in two envelopes, the body limit with declared and undeclared lengths,
+// content-type normalisation and the binding errors, each with its hooks
+// passed explicitly. The router's guards
 // in app hold TestAccStrictBindingErrorThroughRouter, which builds the router,
 // and TestAccRegistryKeepsContentType, which checks its Docker keep predicate.
 package middleware

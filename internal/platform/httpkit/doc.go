@@ -35,6 +35,10 @@
 //   - Error profiles: ProfileRule, ProfileFor, ErrorProfiles, ErrorProfile
 //     and WithProfileRules.
 //   - Writing: WriteErr, WriteJSON, EscapePath and FormatTime.
+//   - Streamed lists: StreamList reads a list's first store page and
+//     returns a ListStream, whose Write sends the list page by page;
+//     ListOptions name its content type and Envelope, which ArrayEnvelope
+//     and EnvelopeOf build.
 //   - Callers: AdminOnly, Principal, Denied and BadRequestf, over the
 //     kernel's principal helpers.
 //   - Routes: ChiPatterns and NotAPI. Pointers: Deref, DerefSlice and
@@ -55,6 +59,14 @@
 //     (kernel.ErrUnauthenticated, kernel.ErrForbidden), which carry their
 //     status; AdminOnly wraps them as "repositories: %w", text clients
 //     have always seen.
+//   - A streamed list's bytes are those WriteJSON would send for the
+//     collected list: the same element encoding, envelope and trailing
+//     newline. It reads its first page before writing, so a store failure
+//     there answers as a collected list's would. A failure after the first
+//     byte aborts the response with http.ErrAbortHandler and notes the
+//     cause, and the closing bracket is never written, so no client takes
+//     a cut list for a whole one (decision 0043, "Streaming complete
+//     lists").
 //   - It imports no module, as the platform layer must not.
 //
 // # References
@@ -66,13 +78,17 @@
 //   - Decision 0016: docs/research/decisions/0016-observability-and-health.md
 //     (request IDs, and the access log line that names the user, never the
 //     credential).
+//   - Decision 0043: docs/research/decisions/0043-api-reliability.md
+//     ("Streaming complete lists").
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
 //     ("Dependency rules": the platform imports no module).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     lines 158 to 163 (platform/httpkit and its middleware) and lines 40 and
 //     41 (dependency rule 4).
-//   - https://github.com/weaveplatform/artifactweave/issues/1069 and
-//     https://github.com/weaveplatform/artifactweave/issues/1071
+//   - https://github.com/weaveplatform/artifactweave/issues/1069,
+//     https://github.com/weaveplatform/artifactweave/issues/1071 and
+//     https://github.com/weaveplatform/artifactweave/issues/1409 (streamed
+//     lists)
 //
 // # Status
 //
@@ -81,7 +97,7 @@
 // user slots and the property search's raw query in later phases. P9d
 // (WEB-03) moved them here and turned the server's error-profile switch into
 // ordered rules carried on the request context; WEB-07 added the caller
-// checks.
+// checks. PAGE-02 (#1409) added the streamed lists.
 //
 // # Testing
 //
@@ -91,4 +107,8 @@
 // here cover the branches those suites do not reach: rule order and the
 // default, a request without rules, the context values on a bare context, the
 // pointers' nil cases, the route patterns and each caller check's answers.
+// stream_test.go holds a streamed list to the bytes WriteJSON sends for the
+// same list, empty, short and over several pages, filtered and enveloped,
+// and covers a failure before the first byte, after it, an expired
+// deadline between pages and a failed write.
 package httpkit
