@@ -105,6 +105,7 @@
       "hash_test.go",
       "helm_fixture_test.go",
       "limits_cost_test.go",
+      "limits_operations_test.go",
       "limits_test.go",
       "matrix_pkgtest_test.go",
       "matrix_reindex_test.go",

@@ -151,8 +151,9 @@
 // principal matrices (matrix_test.go), the spec checks (spec_test.go,
 // spec_contract_test.go), the 501 stubs (stub_test.go), the error profiles
 // (error_profiles_p8_test.go), the request limits (limits_test.go; the
-// classes admission takes from the table, limits_cost_test.go), the API
-// reliability ledger (api_ledger_test.go, which make api-ledger runs to
+// classes admission takes from the table, limits_cost_test.go; every spec
+// operation's 429 and 503, limits_operations_test.go), the API reliability
+// ledger (api_ledger_test.go, which make api-ledger runs to
 // regenerate docs/research/api-reliability/operations.json) and decision
 // 0043's operation rules (api_principles_test.go, whose rules are checked
 // against the admission and error profiles here, with a fixture per rule in
