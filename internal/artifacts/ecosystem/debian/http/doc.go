@@ -284,10 +284,14 @@
 //     declares; the snapshot answers 403, or 401 to an anonymous caller, at
 //     once and through the work queue, also where patterns reject the
 //     index, and the target gets no snapshot.
+//   - served_copy_fault_test.go: a remote index, and a virtual's index read
+//     from a remote member, whose served copy fails to read answers 500
+//     (#1488).
 //
-// debian_index_test.go, debian_index_query_test.go, debian_virtual_test.go
-// and debian_virtual_files_test.go serve their item GETs through the kit
-// with TryDebianItem as the only overlay (overlay_fixture_test.go).
+// debian_index_test.go, debian_index_query_test.go, debian_virtual_test.go,
+// debian_virtual_files_test.go and served_copy_fault_test.go serve their
+// item GETs through the kit with TryDebianItem as the only overlay
+// (overlay_fixture_test.go).
 //
 // The route suite test/server/artifacts/debian checks the snapshot reads'
 // guards and a remote's relay of upstream files through the router, and

@@ -79,11 +79,19 @@ func validateSearchMetadata(_ context.Context, r io.ReadSeeker, size int64) erro
 
 func decodeRemoteDocument(r io.Reader) (remoteDocument, error) {
 	raw, err := io.ReadAll(io.LimitReader(r, remoteMetadataLimit+1))
+	if err != nil {
+		return nil, remoteProtocolError()
+	}
+	return parseRemoteDocument(raw)
+}
+
+// parseRemoteDocument is raw, read up to remoteMetadataLimit+1 bytes, as a
+// document, or the route's 502 when it is over the limit or no JSON object.
+func parseRemoteDocument(raw []byte) (remoteDocument, error) {
 	var doc remoteDocument
 	// Unmarshal consumes the complete representation, rejecting trailing JSON or
 	// junk before raw-cache publication, not only while serving the first caller.
-	if err != nil || len(raw) > remoteMetadataLimit || json.Unmarshal(raw, &doc) != nil ||
-		doc == nil {
+	if len(raw) > remoteMetadataLimit || json.Unmarshal(raw, &doc) != nil || doc == nil {
 		return nil, remoteProtocolError()
 	}
 	return doc, nil

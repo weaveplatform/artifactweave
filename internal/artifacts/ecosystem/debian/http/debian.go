@@ -170,6 +170,11 @@ func (s DebianAPI) serveDebianIndex(
 		case result.Stream != nil:
 			defer func() { _ = result.Stream.Body.Close() }()
 			body, err = io.ReadAll(io.LimitReader(result.Stream.Body, debianIndexLimit+1))
+			if err != nil {
+				// The stream is the server's copy, cached or spooled: a
+				// storage fault (#1488).
+				err = pkgroute.ServedReadFault(ctx, err)
+			}
 		case result.Item != nil:
 			body, err = s.readDebianBlob(ctx, result.Item.Actual.SHA256)
 		default:

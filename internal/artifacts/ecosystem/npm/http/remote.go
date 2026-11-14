@@ -132,7 +132,7 @@ func (h handler) upstreamPackage(
 	if err != nil {
 		return nil, result, fmt.Errorf("npm metadata: %w", err)
 	}
-	doc, err := readRemoteDocument(result)
+	doc, err := readRemoteDocument(r.Context(), result)
 	if err != nil {
 		return nil, result, err
 	}
@@ -143,12 +143,20 @@ func (h handler) upstreamPackage(
 	return doc, result, nil
 }
 
-func readRemoteDocument(result source.Result) (remoteDocument, error) {
+func readRemoteDocument(ctx context.Context, result source.Result) (remoteDocument, error) {
 	if result.Stream == nil {
 		return nil, remoteProtocolError()
 	}
 	defer result.Stream.Body.Close()
-	return decodeRemoteDocument(result.Stream.Body)
+	// The stream is the server's copy, cached or spooled, so a failed read
+	// of it is a storage fault, 500, where a copy that reads but does not
+	// parse keeps the route's 502 (#1488).
+	raw, err := pkgroute.ReadServed(ctx, result.Stream.Body, remoteMetadataLimit,
+		remoteProtocolError())
+	if err != nil {
+		return nil, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
+	}
+	return parseRemoteDocument(raw)
 }
 
 func (h handler) rewriteVersions(
@@ -298,7 +306,7 @@ func (h handler) remoteSearch(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	doc, err := readRemoteDocument(result)
+	doc, err := readRemoteDocument(r.Context(), result)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return

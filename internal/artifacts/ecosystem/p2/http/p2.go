@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/maven"
@@ -157,20 +158,30 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 	if !s.RemoteDeliveryAllowed(w, r, result, p.Anonymous) {
 		return
 	}
+	// Either copy is the server's, the cached archive or the spool file of
+	// a repository that keeps none, so a failed read of it is a storage
+	// fault, 500; an archive that reads but is over its limit or not one
+	// keeps the 502 (#1488).
 	var site []byte
 	switch {
 	case result.Stream != nil:
 		defer func() { _ = result.Stream.Body.Close() }()
-		site, err = io.ReadAll(io.LimitReader(result.Stream.Body, p2.MaxArtifact+1))
+		site, err = pkgroute.ReadServed(r.Context(), result.Stream.Body, p2.MaxArtifact,
+			source.ErrInvalidResult)
 	case result.Item != nil:
 		var reader io.ReadCloser
 		reader, _, err = s.Blobs.Open(r.Context(), result.Item.Actual.SHA256)
 		if err == nil {
 			defer func() { _ = reader.Close() }()
-			site, err = io.ReadAll(io.LimitReader(reader, p2.MaxArtifact+1))
+			site, err = pkgroute.ReadServed(r.Context(), reader, p2.MaxArtifact,
+				source.ErrInvalidResult)
 		}
 	default:
 		err = source.ErrInvalidResult
+	}
+	if errors.Is(err, format.ErrStorageFault) {
+		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "P2 archive", err))
+		return
 	}
 	if err != nil || len(site) > p2.MaxArtifact {
 		httpkit.WriteErr(w, r, pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))

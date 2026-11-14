@@ -154,7 +154,8 @@
 //     server's cached file or spool file, marks a failed read the same way
 //     (ReadServed, ServedReadFault), and keeps its own 502 for a copy that
 //     reads but does not parse or is over its limit
-//     (https://github.com/weaveplatform/artifactweave/issues/1462).
+//     (https://github.com/weaveplatform/artifactweave/issues/1462,
+//     https://github.com/weaveplatform/artifactweave/issues/1488).
 //
 // # References
 //

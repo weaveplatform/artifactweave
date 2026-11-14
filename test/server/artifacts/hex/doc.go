@@ -39,6 +39,9 @@
 //   - remote_hook_fault_test.go: a remote tarball whose publication meets
 //     a statement the runtime's SQLite database refuses, under Hex's
 //     Deployed hook, answers 500 and caches nothing (issue 1470).
+//   - served_copy_fault_test.go: a remote tarball, and the registry
+//     resource read for it, whose served copy, a stream or a cached item,
+//     fails to read answers 500, logged once (issue 1488).
 //
 // # References
 //

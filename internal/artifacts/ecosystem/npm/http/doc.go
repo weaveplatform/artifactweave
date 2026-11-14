@@ -141,4 +141,7 @@
 //   - operations_test.go: NPMAPI's operations without the router, with no
 //     store, no caller and a store that fails under them; fixture_test.go
 //     holds their fixtures.
+//   - served_copy_fault_test.go: a cached package document whose copy the
+//     server fails to read answers 500, logged once, and stays cached
+//     (#1488).
 package npmhttp
