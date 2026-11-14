@@ -26,6 +26,9 @@
 //   - TestAccNPMRemoteTarballMIMERefusal fails while an upstream tarball
 //     whose label the remote's block list refuses answers other than 7.x's
 //     409, remembered, without asking the upstream again (issue 1392).
+//   - TestAccNPMRemoteTarballTypedByPath fails while a tarball of a remote
+//     that stores nothing answers its upstream's label instead of the type
+//     its kept copy answers (issue 1477).
 //
 // # References
 //

@@ -252,12 +252,25 @@ type Representation struct {
 	// OriginalChecksums retain upstream declarations for Maven pass-through;
 	// Checksums always describe the computed bytes.
 	OriginalChecksums kernel.Checksums
-	MediaType         string
-	Size              int64
-	ETag              string
-	Modified          time.Time
-	Checksums         kernel.Checksums
-	ContentRange      string
+	// MediaType is the upstream's label on a stream the remote policy
+	// returns, which the MIME check and the registry's manifest
+	// negotiation read; a route serving a remote file answers the type of
+	// Path instead (pkgroute.ServeStream).
+	MediaType    string
+	Size         int64
+	ETag         string
+	Modified     time.Time
+	Checksums    kernel.Checksums
+	ContentRange string
+	// Path, when set, is the repository path of the remote file these bytes
+	// are, the upstream's or its cached copy: the item route sets it on
+	// every stream it serves, and the package route kit on an artifact read
+	// (pkgroute.Kit.Read). The stream is then answered with the type of its
+	// path, as 7.161.26's RemoteRepoResource.getMimeType types a remote file
+	// and a kept copy is typed (#1477). Empty for a document a protocol
+	// builds per request and for raw metadata a protocol serves under its
+	// own type.
+	Path string
 }
 
 // Stream is an unpersisted representation (including storeArtifactsLocally=false).

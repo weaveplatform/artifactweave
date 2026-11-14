@@ -216,6 +216,17 @@ Range request with storage enabled fetches a complete 200 into the ordinary inge
 path, then serves the requested range; an upstream 206 is never labeled complete. A
 no-store range may relay a validated 206 without durable caching ([#621](https://github.com/weaveplatform/artifactweave/issues/621)).
 
+A remote file served from a stream, the upstream's on a remote that stores nothing
+(R13) or a document the cache keeps without an item, such as a `maven-metadata.xml`,
+answers a GET and a HEAD with the type of its path, as its kept copy does, never the
+upstream's label: 7.161.26 serves a remote that stores nothing from the
+`RemoteRepoResource`, whose `getMimeType` is `NamingUtils.getMimeType` of its path, and a
+cached file from the `FileResource`, typed by its path when it carries no content-type
+property, and `RequestResponseHelper` sends that type. The upstream's `Content-Type`
+serves only the MIME check and an adapter's own negotiation, such as Docker's; a format
+route that builds its document per request keeps the type it sets
+([#1477](https://github.com/weaveplatform/artifactweave/issues/1477)).
+
 `storeArtifactsLocally=false` is a repository setting, and treated as nonpersistent. An
 upstream `Cache-Control: no-store` is not: the remote keeps that answer like any other,
 under the repository's retrieval cache period, and serves it offline and as failure-time

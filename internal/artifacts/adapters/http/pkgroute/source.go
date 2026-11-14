@@ -14,6 +14,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -135,6 +136,11 @@ func (k *Kit) read(
 		}
 		if err != nil {
 			return source.Result{}, fmt.Errorf("read source: %w", err)
+		}
+		if result.Stream != nil && resource.Kind == source.ResourceKindArtifact {
+			// An artifact's stream is the remote file itself, which
+			// ServeStream answers as the copy kept of it would be.
+			result.Stream.Path = resource.Path
 		}
 		return result, nil
 	}
@@ -269,7 +275,16 @@ func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error
 		r = WithoutRange(r)
 	}
 	h := w.Header()
-	if s.MediaType != "" {
+	switch {
+	case s.Path != "":
+		// A remote file is typed by its path, the upstream's label
+		// whatever it says, as a kept copy is (ServeFile): 7.161.26's
+		// RemoteRepoResource.getMimeType is NamingUtils.getMimeType of the
+		// path, and RequestResponseHelper sends it on a GET and a HEAD. The
+		// label serves only the MIME check
+		// (https://github.com/weaveplatform/artifactweave/issues/1477).
+		h.Set("Content-Type", item.MimeType(s.Path))
+	case s.MediaType != "":
 		h.Set("Content-Type", s.MediaType)
 	}
 	if s.ETag != "" {

@@ -124,6 +124,13 @@
 //     HttpRepo.whiteListHeaders sends none, and an adapter whose upstream
 //     negotiates sets its own
 //     (https://github.com/weaveplatform/artifactweave/issues/1390).
+//   - ServeStream answers a stream that names its repository path, the
+//     remote file an artifact read returns or the item route serves, with
+//     the type of that path, as the file's kept copy answers, and never the
+//     upstream's label, as 7.161.26's RemoteRepoResource.getMimeType does; a
+//     stream without one, a document a protocol builds or raw metadata it
+//     serves under its own type, keeps its MediaType
+//     (https://github.com/weaveplatform/artifactweave/issues/1477).
 //   - ServeStream answers If-Match and If-Unmodified-Since never, as 7.x's
 //     download reads neither, on every stream. A stream with a SHA-1, a
 //     file, answers If-None-Match and If-Modified-Since as that download's

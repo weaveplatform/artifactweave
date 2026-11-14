@@ -59,6 +59,10 @@
 //   - remote_accept_test.go: a remote read sends the upstream no Accept of
 //     the client's, and one cached file serves clients that accept other
 //     types (#1390).
+//   - remote_path_type_test.go: a remote file served from a stream, the
+//     upstream's on a remote that stores nothing or a Maven metadata
+//     document the cache keeps without an item, answers with the type of
+//     its path, as its kept copy does, never the upstream's label (#1477).
 //
 // # References
 //

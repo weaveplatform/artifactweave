@@ -55,8 +55,5 @@ func (s *remoteSession) symbol(w http.ResponseWriter, path string) {
 		s.h.k.Error(w, s.r, err)
 		return
 	}
-	if result.Stream != nil {
-		result.Stream.MediaType = "application/octet-stream"
-	}
 	s.h.k.ServeResult(w, s.r, result)
 }
