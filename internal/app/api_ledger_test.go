@@ -110,16 +110,7 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 					)
 				}
 				for _, p := range append(append(openapi3.Parameters{}, item.Parameters...), op.Parameters...) {
-					name := strings.ToLower(p.Value.Name)
-					if strings.Contains(name, "page") || strings.Contains(name, "cursor") ||
-						strings.Contains(name, "offset") ||
-						name == "limit" ||
-						name == "start_pos" ||
-						name == "num_of_rows" ||
-						name == "n" ||
-						name == "last" ||
-						name == "$skip" ||
-						name == "$top" {
+					if pageControl(p.Value.Name) {
 						e.PageControls = append(
 							e.PageControls,
 							p.Value.In+" "+p.Value.Name+": "+p.Value.Description,
@@ -250,6 +241,16 @@ func apiReviewPartial(op *openapi3.Operation) bool {
 }
 
 func sortedReview(in []string) []string { sort.Strings(in); return slices.Compact(in) }
+
+// pageControl reports a parameter that pages a list by its name: the
+// ledger records it, and the principles guard takes an operation with one
+// that answers an array for a collection.
+func pageControl(name string) bool {
+	name = strings.ToLower(name)
+	return strings.Contains(name, "page") || strings.Contains(name, "cursor") ||
+		strings.Contains(name, "offset") ||
+		slices.Contains([]string{"limit", "start_pos", "num_of_rows", "n", "last", "$skip", "$top"}, name)
+}
 
 func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	t.Helper()
