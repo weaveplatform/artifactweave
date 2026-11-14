@@ -40,9 +40,12 @@ distinct descriptor spelling; the [mapped discovery guide](mapped-remote-discove
 explains descriptor aliases, coordinate preservation and layout-edit fences.
 Equivalent layouts preserve metadata paths. A translation that cannot preserve all
 coordinates, including metadata with no representable target layout, fails with 400
-before upstream I/O. Native Gradle, Ivy and SBT qualification has the explicit owners
-listed below; the server layout tests cover direct Gradle/Ivy/SBT paths and a Gradle to
-Maven-2 translation.
+before upstream I/O, as does a layout that is not defined. A layout the database fails
+to read is the server's storage fault: 500 "internal error" [I], logged once, before
+upstream I/O, as [#1470](https://github.com/weaveplatform/artifactweave/issues/1470) answers
+the store's failures under a remote read. Native Gradle, Ivy and SBT qualification
+has the explicit owners listed below; the server layout tests cover direct
+Gradle/Ivy/SBT paths and a Gradle to Maven-2 translation.
 
 The `{repo}-cache` view performs no upstream I/O. Raw XML is available there after
 fetching, independently of the requesting client's Accept header. The normal shared

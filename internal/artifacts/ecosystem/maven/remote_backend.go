@@ -72,7 +72,7 @@ func (m *MavenBackend) Read(
 func (m *MavenBackend) prepare(ctx context.Context, q source.Request) (source.Request, error) {
 	local, err := m.Policy.Items.Layout(ctx, cmp.Or(q.Repo.RepoLayoutRef, repo.LayoutMaven2))
 	if err != nil {
-		return q, source.ErrInvalidRequest
+		return q, layoutReadFault(ctx, err)
 	}
 	r := &q.Resource
 	validationLayout, validationPath := local, r.Path
@@ -88,7 +88,7 @@ func (m *MavenBackend) prepare(ctx context.Context, q source.Request) (source.Re
 	if q.Repo.RemoteRepoLayoutRef != "" && q.Repo.RemoteRepoLayoutRef != q.Repo.RepoLayoutRef {
 		upstream, err := m.Policy.Items.Layout(ctx, q.Repo.RemoteRepoLayoutRef)
 		if err != nil {
-			return q, source.ErrInvalidRequest
+			return q, layoutReadFault(ctx, err)
 		}
 		// A checksum file is the file it names, mapped, with its extension,
 		// as 7.161.26's HttpRepo.downloadResource translates the path it
@@ -129,6 +129,20 @@ func (m *MavenBackend) prepare(ctx context.Context, q source.Request) (source.Re
 		return nil
 	}
 	return q, nil
+}
+
+// layoutReadFault is err, a failed read of the layout a remote read maps
+// its path through, as the read answers it. A statement the store failed
+// to run (kernel.ErrStore) is the server's storage fault, which the routes
+// answer 500 "internal error" and log once, as #1470 answers the store's
+// failures under a remote read; 7.x's answer to a failure of its own
+// database is not documented [I]. A layout that is not defined, or does not
+// compile, refuses the read as an invalid request, 400.
+func layoutReadFault(ctx context.Context, err error) error {
+	if errors.Is(err, kernel.ErrStore) {
+		return fmt.Errorf("maven layout: %w", item.MarkStorageFault(ctx, err, err))
+	}
+	return source.ErrInvalidRequest
 }
 
 // Equivalent layout definitions preserve metadata paths; otherwise metadata has
