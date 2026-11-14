@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
@@ -30,8 +31,17 @@ type ReindexOp struct {
 	// package type, answers 400 with refused, a format taking the key.
 	Classes, later []repo.Class
 	Refused        string
-	// Answer is the 200's text, a format taking the key.
+	// Answer is the 200's text, a format taking the key, or the text
+	// itself when it names no repository, as RubyGems' OK.
 	Answer string
+}
+
+// Text is op's answer for the repository key.
+func (op ReindexOp) Text(key string) string {
+	if !strings.Contains(op.Answer, "%s") {
+		return op.Answer
+	}
+	return fmt.Sprintf(op.Answer, key)
 }
 
 // Hosted are the classes whose own items a reindex reads. A federated
@@ -41,8 +51,10 @@ var Hosted = []repo.Class{repo.Local, repo.Federated}
 
 // ReindexOps are the operations by package type, each from 7.x's REST
 // reference: the archived pages for the permission, the classes and the
-// answer, and the current ones for the classes. [I] The order of the checks
-// and the text of each refusal are inferred (#216).
+// answer, and the current ones for the classes and the timing. Where the
+// two disagree the current page wins. An archived sample answers one call,
+// with or without async; the other's answer is the same [I]. [I] The order
+// of the checks and the text of each refusal are inferred (#216).
 var ReindexOps = map[repo.PackageType]ReindexOp{
 	repo.Chef: {
 		Classes: Hosted,
@@ -54,74 +66,115 @@ var ReindexOps = map[repo.PackageType]ReindexOp{
 		Refused: "Repository '%s' is not a hosted Puppet repository",
 		Answer:  "Reindex of Puppet repo %s completed.",
 	},
+	// Manage ("From version 4.8 only requires the set of permissions
+	// assumed by Manage") and the sample answer: the archived
+	// jfrog-rest-apis/calculate-bower-index (copy of 2025-10-17).
 	repo.Bower: {
 		Classes: Hosted,
 		Refused: "Repository '%s' is not a local bower repository",
-		Answer:  "Reindex of bower repo %s was scheduled to run.",
+		Answer:  "Bower index for refresh for %s has been accepted",
 	},
+	// "Requires a valid admin user" and the sample answer, to a call
+	// without async: the archived
+	// jfrog-rest-apis/calculate-cargo-repository-metadata (copy of
+	// 2026-01-18). The current page states neither.
 	repo.Cargo: {
-		Classes: Hosted,
-		Refused: "Repository '%s' is not a local cargo repository",
-		Answer:  "Reindex of cargo repo %s was scheduled to run.",
+		IsAdminOnly: true,
+		Classes:     Hosted,
+		Refused:     "Repository '%s' is not a local cargo repository",
+		Answer:      "Recalculating index for Cargo repository %s scheduled to run.",
 	},
+	// "Requires a valid admin user" and the sample answer: the archived
+	// jfrog-rest-apis/calculate-cocoapods-index (copy of 2026-02-07). The
+	// sample's request names cocoapods-local and its answer cocoa-local;
+	// the answer names the repository asked for [I].
 	repo.CocoaPods: {
-		Classes: Hosted,
-		Refused: "Repository '%s' is not a local CocoaPods repository",
-		Answer:  "Reindex of CocoaPods repo %s was scheduled to run.",
+		IsAdminOnly: true,
+		Classes:     Hosted,
+		Refused:     "Repository '%s' is not a local CocoaPods repository",
+		Answer:      "Reindexing of CocoaPods repository %s was scheduled to run.",
 	},
+	// "Requires a valid admin user": the archived
+	// jfrog-rest-apis/calculate-pub-repository-metadata (copy of
+	// 2026-02-09), whose sample shows no answer, so the text is ours [I].
 	repo.Pub: {
-		Classes: Hosted,
-		Refused: "Repository '%s' is not a local pub repository",
-		Answer:  "Reindex of pub repo %s was scheduled to run.",
+		IsAdminOnly: true,
+		Classes:     Hosted,
+		Refused:     "Repository '%s' is not a local pub repository",
+		Answer:      "Reindex of pub repo %s was scheduled to run.",
 	},
 	// "Requires a valid admin user" and the sample answer, which is that of
 	// the default, synchronous call: the archived 7.x reference
 	// (jfrog-rest-apis/calculate-conan-repository-metadata, copies of
 	// 2023-06-04 to 2026-01-13). The current page, of 2026-11-12, states
-	// neither. The answer is the same when async is true [I] (#216).
+	// neither.
 	repo.Conan: {
 		IsAdminOnly: true,
 		Classes:     Hosted,
 		Refused:     "Repository '%s' is not a local Conan repository",
 		Answer:      "Recalculating index for Conan repository %s scheduled to run.",
 	},
+	// Manage and the sample answer, with its closing full stop: the archived
+	// jfrog-rest-apis/calculate-cran-repository-metadata (copy of
+	// 2026-03-13), as the REST reference of 2023 printed it too.
 	repo.Cran: {
 		Classes: []repo.Class{repo.Local},
 		Refused: "Repository '%s' is not a local CRAN repository",
-		Answer:  "Recalculating index for CRAN repository %s scheduled to run",
+		Answer:  "Recalculating index for CRAN repository %s scheduled to run.",
 	},
+	// "A valid admin user or a user with Manage permissions" and the sample
+	// answer: the archived jfrog-rest-apis/calculate-alpine-repository-metadata
+	// (copy of 2025-12-15). The sample has two spaces after "of", where the
+	// other "Reindexing of" answers have one; one is kept [I].
 	repo.Alpine: {
 		Classes: Hosted,
 		Refused: "Repository '%s' is not a local alpine repository",
-		Answer:  "Reindex of alpine repo %s was scheduled to run.",
+		Answer:  "Reindexing of Alpine repository %s was scheduled to run.",
 	},
+	// "Manage, Delete/ Overwrite, Deploy/ Cache, Annotate, Read", the set
+	// Manage assumes, and the sample answer: the archived
+	// jfrog-rest-apis/calculate-rubygems-index (copy of 2025-11-07).
 	repo.Gems: {
 		Classes: Hosted,
 		Refused: "Repository '%s' is not a local RubyGems repository",
-		Answer:  "Reindex of RubyGems repo %s was scheduled to run.",
+		Answer:  "OK",
 	},
-	// Local Debian metadata calculation is synchronous unless async=true;
-	// writeProps=0 has its own work kind so it cannot annotate packages.
+	// Manage and the sample answer, to a call without async: the archived
+	// jfrog-rest-apis/calculate-debian-repository-metadata (copy of
+	// 2026-01-18). Local metadata calculation is synchronous unless
+	// async=true; writeProps=0 has its own work kind so it cannot annotate
+	// packages.
 	repo.Debian: {
 		Classes: []repo.Class{repo.Local},
 		Refused: "Repository '%s' is not a local Debian repository",
-		Answer:  "Debian repository %s metadata recalculation accepted",
+		Answer:  "Recalculating index for Debian repository %s scheduled to run.",
 	},
+	// Manage and the sample answer, to a local call with async=1: the
+	// archived jfrog-rest-apis/calculate-yum-repository-metadata (copy of
+	// 2025-11-08).
 	repo.RPM: {
 		Classes: []repo.Class{repo.Local, repo.Federated, repo.Virtual},
 		later:   []repo.Class{repo.Remote},
 		Refused: "Repository '%s' is not a local RPM repository",
-		Answer:  "Reindex of RPM repo %s was scheduled to run.",
+		Answer:  "YUM metadata calculation for repository '%s' accepted.",
 	},
+	// Manage and the sample answer, to a call without async: the archived
+	// jfrog-rest-apis/calculate-opkg-repository-metadata (copy of
+	// 2026-02-15).
 	repo.Opkg: {
 		Classes: Hosted,
 		Refused: "Repository '%s' is not a local opkg repository",
-		Answer:  "Reindex of opkg repo %s was scheduled to run.",
+		Answer:  "Recalculating index for Opkg repository %s scheduled to run.",
 	},
+	// "Requires a valid admin user" and the sample answer, to a call
+	// without async: the archived
+	// jfrog-rest-apis/calculate-conda-repository-metadata (copy of
+	// 2025-11-18). The current page states neither.
 	repo.Conda: {
-		Classes: Hosted,
-		Refused: "Repository '%s' is not a local conda repository",
-		Answer:  "Conda repository %s metadata recalculation accepted",
+		IsAdminOnly: true,
+		Classes:     Hosted,
+		Refused:     "Repository '%s' is not a local conda repository",
+		Answer:      "Recalculating index for Conda repository %s scheduled to run.",
 	},
 	// Manage, local repositories only, scheduled, and 7.x's answer word for
 	// word (decision 0034; KB 000005641). Federated ones answer 400, as #293
@@ -157,10 +210,13 @@ var ReindexOps = map[repo.PackageType]ReindexOp{
 		Refused: "Repository '%s' is not a local helm repository",
 		Answer:  "Reindex of helm repo %s was scheduled to run.",
 	},
+	// "Requires a valid admin user" and the sample answer: the archived
+	// jfrog-rest-apis/calculate-swift-index (copy of 2025-12-17).
 	repo.Swift: {
-		Classes: Hosted,
-		Refused: "Repository '%s' is not a local swift repository",
-		Answer:  "Reindex of swift repo %s was scheduled to run.",
+		IsAdminOnly: true,
+		Classes:     Hosted,
+		Refused:     "Repository '%s' is not a local swift repository",
+		Answer:      "Reindexing of Swift repository %s was scheduled to run.",
 	},
 	// "Requires a valid admin user", a local repository (the Terraform
 	// page: "re-indexing of a local Terraform repository"), and the sample
@@ -233,7 +289,7 @@ func (s *Kit) ReindexAs(
 			return "", s.ItemError(ctx, "reindex", err)
 		}
 	}
-	return fmt.Sprintf(op.Answer, key), nil
+	return op.Text(key), nil
 }
 
 // OperationRepo resolves the repository a JFrog operation of package type

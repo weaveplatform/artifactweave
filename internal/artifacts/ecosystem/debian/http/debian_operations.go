@@ -2,7 +2,6 @@ package debianhttp
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
@@ -49,5 +48,5 @@ func (s DebianAPI) CalculateDebianRepositoryMetadata(
 		}
 	}
 	return artgen.CalculateDebianRepositoryMetadata200TextResponse(
-		fmt.Sprintf(itemkit.ReindexOps[repo.Debian].Answer, c.Key)), nil
+		itemkit.ReindexOps[repo.Debian].Text(c.Key)), nil
 }

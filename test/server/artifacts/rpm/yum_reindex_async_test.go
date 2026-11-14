@@ -57,7 +57,7 @@ func TestAccYumReindexAsync(t *testing.T) {
 				rec := w.do(http.MethodPost, "/artifactory/api/yum/"+key+tc.query, "admin", "")
 				if rec.Code != http.StatusOK ||
 					rec.Body.String() != fmt.Sprintf(
-						"Reindex of RPM repo %s was scheduled to run.",
+						"YUM metadata calculation for repository '%s' accepted.",
 						key,
 					) ||
 					!strings.HasPrefix(rec.Header().Get("Content-Type"), "text/plain") {
