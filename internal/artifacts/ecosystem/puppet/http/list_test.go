@@ -485,6 +485,56 @@ func (p listPackages) VersionNames(ctx context.Context, id int64) ([]string, err
 	return p.PackageStore.VersionNames(ctx, id)
 }
 
+// TallyVersions, CountPackages, PackagesAt and ReleasesAt, a whole reader's
+// reads of what List and VersionNames read, fail as they fail and count the
+// modules and releases they list.
+func (p listPackages) TallyVersions(
+	ctx context.Context,
+	key string,
+	limit int,
+) (port.VersionTally, error) {
+	switch {
+	case p.s.list || p.s.names:
+		return port.VersionTally{}, context.Canceled
+	case p.s.many:
+		// List's 4,097 modules hold no version.
+		return port.VersionTally{Packages: min(limit, 4097)}, nil
+	case p.s.huge:
+		n := min(limit, 17)
+		return port.VersionTally{Packages: n, Versions: n * 4096, MostVersions: 4096}, nil
+	}
+	return p.PackageStore.TallyVersions(ctx, key, limit)
+}
+
+func (p listPackages) CountPackages(ctx context.Context, r port.PackageRange) (int, error) {
+	if p.s.list {
+		return 0, context.Canceled
+	}
+	return p.PackageStore.CountPackages(ctx, r)
+}
+
+func (p listPackages) PackagesAt(
+	ctx context.Context,
+	r port.PackageRange,
+	offset, limit int,
+) ([]artmodel.Package, error) {
+	if p.s.list {
+		return nil, context.Canceled
+	}
+	return p.PackageStore.PackagesAt(ctx, r, offset, limit)
+}
+
+func (p listPackages) ReleasesAt(
+	ctx context.Context,
+	key string,
+	offset, limit int,
+) ([]port.ReleaseName, error) {
+	if p.s.list {
+		return nil, context.Canceled
+	}
+	return p.PackageStore.ReleasesAt(ctx, key, offset, limit)
+}
+
 func (p listPackages) Version(
 	ctx context.Context,
 	id int64,
@@ -526,7 +576,10 @@ func (i listItems) Get(
 // A list fails rather than advertise what the index cannot back: a store
 // fault answers 500, an index entry or archive that does not match 502,
 // and an index beyond the bounds 503. A release or module deleted between
-// the count and the page leaves the page short.
+// the count and the page leaves the page short. A caller who may read the
+// whole repository, whose lists are counted and paged in the store, gets
+// the answer of one who may read every module through a pattern, whose
+// lists are counted in Go (#1426).
 func TestUnitHostedListsStoreFailures(t *testing.T) {
 	for _, tc := range []struct {
 		name, route string
@@ -560,8 +613,11 @@ func TestUnitHostedListsStoreFailures(t *testing.T) {
 			f := newFixtureStore(t, repo.Local, nil,
 				func(st pkgroute.Store) pkgroute.Store { s = &listStore{Store: st}; return s })
 			f.deployList(f.c)
+			f.grantRead("lister", "lister", f.c.Key, "acme-*/**")
 			tc.tune(s)
-			wantError(t, f.do("GET", base+tc.route, "admin"), tc.status, tc.message)
+			for _, user := range []string{"admin", "lister"} {
+				wantError(t, f.do("GET", base+tc.route, user), tc.status, tc.message)
+			}
 		})
 	}
 	var s *listStore

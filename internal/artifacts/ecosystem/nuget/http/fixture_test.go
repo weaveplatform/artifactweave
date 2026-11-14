@@ -437,6 +437,45 @@ func (p failingPackages) SearchNuGet(
 	return found, next, err //nolint:wrapcheck // a test's pass-through
 }
 
+// CountPackages and PackagesAt, a whole reader's reads of the packages,
+// fail as List does, and Candidates, its read of their versions, as
+// Versions does.
+func (p failingPackages) CountPackages(ctx context.Context, r port.PackageRange) (int, error) {
+	if p.failing == "list" {
+		return 0, errBroken
+	}
+	return p.PackageStore.CountPackages(ctx, r) //nolint:wrapcheck // a test's pass-through
+}
+
+func (p failingPackages) PackagesAt(
+	ctx context.Context,
+	r port.PackageRange,
+	offset, limit int,
+) ([]artmodel.Package, error) {
+	if p.failing == "list" {
+		return nil, errBroken
+	}
+	return p.PackageStore.PackagesAt(ctx, r, offset, limit) //nolint:wrapcheck // a test's pass-through
+}
+
+func (p failingPackages) Candidates(
+	ctx context.Context,
+	packages []artmodel.Package,
+) ([]port.SearchCandidate, error) {
+	if p.failing == "versions" {
+		return nil, errBroken
+	}
+	found, err := p.PackageStore.Candidates(ctx, packages)
+	if p.failing == "metadata" {
+		for _, c := range found {
+			for i := range c.Versions {
+				c.Versions[i].Metadata = []byte("{")
+			}
+		}
+	}
+	return found, err //nolint:wrapcheck // a test's pass-through
+}
+
 func (p failingPackages) Versions(
 	ctx context.Context,
 	id int64,

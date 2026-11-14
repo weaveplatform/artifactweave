@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	cheffmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/chef"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -286,8 +287,39 @@ type cookbook struct {
 // archive as hosted does. A cookbook whose highest version was deleted
 // after the count is read whole (hosted), and one with no version left
 // leaves the page short. A search still reads every cookbook, whose
-// description and maintainer it searches.
+// description and maintainer it searches. A caller who may read every
+// path of a repository that is not blacked out is listed every cookbook
+// with a version, so the store counts and pages them (wholeCatalog).
 func (h handler) hostedCatalog(r *http.Request, start, limit int) ([]entry, int, error) {
+	page, total, err := h.catalogPage(r, start, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := []entry{}
+	for _, c := range page {
+		rel, ok, err := h.latestRelease(r, c)
+		if err != nil {
+			return nil, 0, err
+		}
+		if ok {
+			m := rel.meta.Manifest
+			out = append(
+				out,
+				entry{name: c.name, description: m.Description, maintainer: m.Maintainer},
+			)
+		}
+	}
+	return out, total, nil
+}
+
+// catalogPage returns the cookbooks on the page at start of limit of the
+// hosted catalog, each with its highest version the caller may list, and
+// how many the catalog lists.
+func (h handler) catalogPage(r *http.Request, start, limit int) ([]cookbook, int, error) {
+	if h.k.CanAll(r, "", api.ActionRead) &&
+		generic.CheckBlackedOut(pkgroute.RequestFrom(r).Repo, "") == nil {
+		return h.wholeCatalog(r, start, limit)
+	}
 	names, err := h.names(r, false)
 	if err != nil {
 		return nil, 0, err
@@ -305,21 +337,53 @@ func (h handler) hostedCatalog(r *http.Request, start, limit int) ([]entry, int,
 			listed = append(listed, c)
 		}
 	}
-	out := []entry{}
-	for _, c := range listed[min(start, len(listed)):min(start+limit, len(listed))] {
-		rel, ok, err := h.latestRelease(r, c)
+	return listed[min(start, len(listed)):min(start+limit, len(listed))], len(listed), nil
+}
+
+// wholeCatalog is catalogPage for a caller who may read every path of a
+// repository that is not blacked out, to whom latest lists every version
+// (#1426). It answers the 503s catalogPage answers from a tally of the
+// index: names reads every cookbook's name and answers "cookbook catalog
+// exceeds limit" past maxVersions of them, before latest reads any
+// version, and latest then answers "Chef releases exceed limit" at the
+// first cookbook of more than maxVersions. The store counts the cookbooks
+// with a version and reads the page's, and each one's highest version is
+// the first of the index's from the highest OrderKey down
+// (model.CompareForge, newestFirst).
+func (h handler) wholeCatalog(r *http.Request, start, limit int) ([]cookbook, int, error) {
+	ctx := r.Context()
+	st := h.k.DB().Packages()
+	all := port.PackageRange{RepoKey: pkgroute.RequestFrom(r).Repo.Key}
+	t, err := st.TallyVersions(ctx, all.RepoKey, maxVersions+1)
+	if err != nil {
+		return nil, 0, fmt.Errorf("chef: catalog: %w", err)
+	}
+	switch {
+	case t.Packages > maxVersions:
+		return nil, 0, apierror.New(503, "cookbook catalog exceeds limit")
+	case t.MostVersions > maxVersions:
+		return nil, 0, apierror.New(503, "Chef releases exceed limit")
+	}
+	total, err := st.CountPackages(ctx, all)
+	if err != nil {
+		return nil, 0, fmt.Errorf("chef: catalog: %w", err)
+	}
+	packages, err := st.PackagesAt(ctx, all, start, limit)
+	if err != nil {
+		return nil, 0, fmt.Errorf("chef: catalog: %w", err)
+	}
+	page := make([]cookbook, 0, len(packages))
+	for _, p := range packages {
+		newest, err := st.VersionNamesAt(ctx, p.ID, true, 0, 1)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, fmt.Errorf("chef: package versions: %w", err)
 		}
-		if ok {
-			m := rel.meta.Manifest
-			out = append(
-				out,
-				entry{name: c.name, description: m.Description, maintainer: m.Maintainer},
-			)
+		// None left only once deleted since the count: the page is short.
+		if len(newest) == 1 {
+			page = append(page, cookbook{id: p.ID, name: p.Name, latest: newest[0]})
 		}
 	}
-	return out, len(listed), nil
+	return page, total, nil
 }
 
 // latest returns cookbook name's highest version that hosted lists, from

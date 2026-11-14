@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	puppetfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/puppet"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -196,25 +197,14 @@ func (h handler) listReleases(w http.ResponseWriter, r *http.Request, q url.Valu
 	if !ok {
 		return
 	}
-	modules, total, err := h.catalog(r)
+	page, total, err := h.releaseNames(r, offset, limit)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
-	type entry struct {
-		id            int64
-		name, version string
-	}
-	all := make([]entry, 0, total)
-	for _, m := range modules {
-		for _, v := range m.versions {
-			all = append(all, entry{m.id, m.name, v})
-		}
-	}
-	start, end := window(offset, limit, len(all))
 	out := []releaseRecord{}
-	for _, e := range all[start:end] {
-		v, err := h.k.DB().Packages().Version(r.Context(), e.id, e.version)
+	for _, e := range page {
+		v, err := h.k.DB().Packages().Version(r.Context(), e.PackageID, e.Version)
 		if errors.Is(err, kernel.ErrNotFound) {
 			// Deleted since the list was counted: the page is one short
 			// rather than failing.
@@ -224,7 +214,7 @@ func (h handler) listReleases(w http.ResponseWriter, r *http.Request, q url.Valu
 			h.k.Error(w, r, fmt.Errorf("puppet: package version: %w", err))
 			return
 		}
-		rel, err := h.stored(r, e.name, v)
+		rel, err := h.stored(r, e.Package, v)
 		if err != nil {
 			h.k.Error(w, r, err)
 			return
@@ -234,7 +224,40 @@ func (h handler) listReleases(w http.ResponseWriter, r *http.Request, q url.Valu
 	writeJSON(w, r, http.StatusOK, struct {
 		Pagination listPage        `json:"pagination"`
 		Results    []releaseRecord `json:"results"`
-	}{newListPage("/v3/releases", "", limit, offset, len(all)), out})
+	}{newListPage("/v3/releases", "", limit, offset, total), out})
+}
+
+// releaseNames returns the releases on the page at offset of limit of the
+// whole-repository release list, and how many the list holds. A caller
+// who may read every path of the repository is answered from the store's
+// count and page (wholeTally, ReleasesAt), in the order catalog lists them,
+// as the index holds each module's versions newest first by OrderKey
+// (model.CompareForge); anyone else from catalog (#1426).
+func (h handler) releaseNames(r *http.Request, offset, limit int) ([]port.ReleaseName, int, error) {
+	if h.k.CanAll(r, "", api.ActionRead) {
+		t, err := h.wholeTally(r)
+		if err != nil {
+			return nil, 0, err
+		}
+		key := pkgroute.RequestFrom(r).Repo.Key
+		page, err := h.k.DB().Packages().ReleasesAt(r.Context(), key, offset, limit)
+		if err != nil {
+			return nil, 0, fmt.Errorf("puppet: list releases: %w", err)
+		}
+		return page, t.Versions, nil
+	}
+	modules, total, err := h.catalog(r)
+	if err != nil {
+		return nil, 0, err
+	}
+	all := make([]port.ReleaseName, 0, total)
+	for _, m := range modules {
+		for _, v := range m.versions {
+			all = append(all, port.ReleaseName{PackageID: m.id, Package: m.name, Version: v})
+		}
+	}
+	start, end := window(offset, limit, len(all))
+	return all[start:end], len(all), nil
 }
 
 // listModules answers v3/modules without query: every module of the
@@ -246,15 +269,14 @@ func (h handler) listModules(w http.ResponseWriter, r *http.Request, q url.Value
 	if !ok {
 		return
 	}
-	modules, _, err := h.catalog(r)
+	page, total, err := h.moduleNames(r, offset, limit)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
-	start, end := window(offset, limit, len(modules))
 	out := []moduleRecord{}
-	for _, m := range modules[start:end] {
-		releases, err := h.hosted(r, m.name)
+	for _, name := range page {
+		releases, err := h.hosted(r, name)
 		if err != nil {
 			h.k.Error(w, r, err)
 			return
@@ -268,7 +290,83 @@ func (h handler) listModules(w http.ResponseWriter, r *http.Request, q url.Value
 	writeJSON(w, r, http.StatusOK, struct {
 		Pagination listPage       `json:"pagination"`
 		Results    []moduleRecord `json:"results"`
-	}{newListPage("/v3/modules", "", limit, offset, len(modules)), out})
+	}{newListPage("/v3/modules", "", limit, offset, total), out})
+}
+
+// moduleNames returns the names of the modules on the page at offset of
+// limit of the whole-repository module list, and how many it holds: from
+// the store's count and page of the modules with a version for a caller
+// who may read every path of the repository, as releaseNames, and from
+// catalog for anyone else.
+func (h handler) moduleNames(r *http.Request, offset, limit int) ([]string, int, error) {
+	if h.k.CanAll(r, "", api.ActionRead) {
+		if _, err := h.wholeTally(r); err != nil {
+			return nil, 0, err
+		}
+		ctx := r.Context()
+		st := h.k.DB().Packages()
+		modules := port.PackageRange{RepoKey: pkgroute.RequestFrom(r).Repo.Key}
+		total, err := st.CountPackages(ctx, modules)
+		if err != nil {
+			return nil, 0, fmt.Errorf("puppet: list modules: %w", err)
+		}
+		page, err := st.PackagesAt(ctx, modules, offset, limit)
+		if err != nil {
+			return nil, 0, fmt.Errorf("puppet: list modules: %w", err)
+		}
+		names := make([]string, 0, len(page))
+		for _, p := range page {
+			names = append(names, p.Name)
+		}
+		return names, total, nil
+	}
+	modules, _, err := h.catalog(r)
+	if err != nil {
+		return nil, 0, err
+	}
+	start, end := window(offset, limit, len(modules))
+	names := make([]string, 0, end-start)
+	for _, m := range modules[start:end] {
+		names = append(names, m.name)
+	}
+	return names, len(modules), nil
+}
+
+// wholeTally answers the 503s catalog answers, for a caller who may read
+// every path of the repository, from the store's tallies rather than every
+// version name, and returns the tally of every module. catalog reads the
+// modules kernel.MaxLimit at a time by name and the versions of each in
+// turn: it answers "Puppet releases exceed limit" at the first module of
+// more than maxVersions or that takes the releases past maxListed, and
+// "Puppet modules exceed limit" once a read takes the modules past
+// maxVersions, before it reads that read's versions. So with more than
+// maxVersions modules the releases' caps apply to the reads before, the
+// first 4,000 modules; with fewer, to every one.
+func (h handler) wholeTally(r *http.Request) (port.VersionTally, error) {
+	ctx := r.Context()
+	key := pkgroute.RequestFrom(r).Repo.Key
+	st := h.k.DB().Packages()
+	over := func(t port.VersionTally) error {
+		if t.MostVersions > maxVersions || t.Versions > maxListed {
+			return apierror.New(http.StatusServiceUnavailable, "Puppet releases exceed limit")
+		}
+		return nil
+	}
+	t, err := st.TallyVersions(ctx, key, maxVersions+1)
+	if err != nil {
+		return t, fmt.Errorf("puppet: list modules: %w", err)
+	}
+	if t.Packages <= maxVersions {
+		return t, over(t)
+	}
+	first, err := st.TallyVersions(ctx, key, maxVersions/kernel.MaxLimit*kernel.MaxLimit)
+	if err != nil {
+		return t, fmt.Errorf("puppet: list modules: %w", err)
+	}
+	if err := over(first); err != nil {
+		return t, err
+	}
+	return t, apierror.New(http.StatusServiceUnavailable, "Puppet modules exceed limit")
 }
 
 // listed is a module of a whole-repository list with the versions of it

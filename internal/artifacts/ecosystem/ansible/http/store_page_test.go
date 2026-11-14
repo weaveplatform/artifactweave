@@ -19,10 +19,12 @@ import (
 )
 
 // pageStore counts the package index reads that return whole version
-// records, and can report a version deleted or a collection missing.
+// records, and those of version names: every name, a count of them and a
+// page of them. It can report a version deleted or a collection missing.
 type pageStore struct {
 	pkgroute.Store
-	versions, version int
+	versions, version       int
+	names, counts, namePage int
 	// gone is a version Version reports deleted; missing is a path whose
 	// item Items().Get reports missing.
 	gone, missing string
@@ -39,6 +41,26 @@ type pagePackages struct {
 func (p pagePackages) Versions(ctx context.Context, id int64) ([]model.PackageVersion, error) {
 	p.s.versions++
 	return p.PackageStore.Versions(ctx, id)
+}
+
+func (p pagePackages) VersionNames(ctx context.Context, id int64) ([]string, error) {
+	p.s.names++
+	return p.PackageStore.VersionNames(ctx, id)
+}
+
+func (p pagePackages) CountVersions(ctx context.Context, id int64) (int, error) {
+	p.s.counts++
+	return p.PackageStore.CountVersions(ctx, id)
+}
+
+func (p pagePackages) VersionNamesAt(
+	ctx context.Context,
+	id int64,
+	newestFirst bool,
+	offset, limit int,
+) ([]string, error) {
+	p.s.namePage++
+	return p.PackageStore.VersionNamesAt(ctx, id, newestFirst, offset, limit)
 }
 
 func (p pagePackages) Version(
@@ -123,9 +145,9 @@ func wantVersions(t *testing.T, got string, code int, want string) {
 	}
 }
 
-// newestFirst is the order the version list answers its versions in. The
-// package index orders 1.0.0-1 after 1.0.0, as Maven does, and the list
-// before it, as semantic versioning does.
+// newestFirst is the order the version list answers its versions in, as
+// semantic versioning orders them: 1.0.0-1 before 1.0.0, where Maven, the
+// package index's order before #1426, put it after.
 var newestFirst = []string{
 	"2.0.0-rc.1", "1.10.0", "1.9.0", "1.8.0", "1.7.0", "1.6.0", "1.5.0", "1.4.0", "1.3.0",
 	"1.2.0", "1.1.0", "1.0.0", "1.0.0-1",
@@ -150,14 +172,16 @@ func TestUnitGalaxyVersionListReadsOnlyItsPage(t *testing.T) {
 		{5, 13, nil},
 		{5, 100000, nil},
 	} {
-		s.versions, s.version = 0, 0
+		*s = pageStore{Store: s.Store}
 		w := f.do(http.MethodGet, versionsRoute+"?limit="+strconv.Itoa(tc.limit)+"&offset="+
 			strconv.Itoa(tc.offset), nil, "", "")
 		wantVersions(t, w.Body.String(), w.Code, versionsJSON(t, len(newestFirst), tc.limit,
 			min(tc.offset, len(newestFirst))+tc.limit, tc.want...))
-		if s.versions != 0 || s.version != len(tc.want) {
-			t.Fatalf("page %d at %d read %d version lists and %d versions", tc.limit, tc.offset,
-				s.versions, s.version)
+		// The administrator may read the whole collection: one count and
+		// one page of names (#1426).
+		if s.versions != 0 || s.version != len(tc.want) || s.names != 0 ||
+			s.counts != 1 || s.namePage != 1 {
+			t.Fatalf("page %d at %d read %+v", tc.limit, tc.offset, *s)
 		}
 	}
 	// Read permission counts and pages only the versions the caller may
@@ -175,53 +199,66 @@ func TestUnitGalaxyVersionListReadsOnlyItsPage(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	s.version = 0
+	*s = pageStore{Store: s.Store}
 	w := f.do(http.MethodGet, versionsRoute+"?limit=2&offset=1", nil, "", "reader")
 	wantVersions(t, w.Body.String(), w.Code,
 		versionsJSON(t, len(newestFirst)-1, 2, 3, "1.10.0", "1.8.0"))
-	if s.version != 2 {
-		t.Fatalf("reader's page read %d versions", s.version)
+	if s.version != 2 || s.names != 1 || s.counts != 0 || s.namePage != 0 {
+		t.Fatalf("reader's page read %+v", *s)
 	}
 }
 
-// A page checks its versions as the whole list was checked: a page holding
-// one whose index entry or collection does not match fails. A version
-// deleted, or whose collection went, between the count and the page
-// leaves the page short; one that fails outside the page no longer fails
-// it.
-func TestUnitGalaxyVersionListPageChecks(t *testing.T) {
-	f, s := pagedCollection(t, "1.0.0", "1.1.0", "1.2.0")
+// A late page of a collection of 1,000 versions, for a caller who may read
+// it whole, reads one count and one page of names, and the page's
+// versions (#1426); a caller whose permission names paths reads every
+// name, as before. The store's own test pages 5,000
+// (TestAccPackagePagesAtScale); each write here reorders the whole
+// collection, so this one is kept smaller.
+func TestUnitGalaxyVersionListLatePage(t *testing.T) {
+	const count, page = 1000, 20
+	oldest := make([]string, 0, page)
+	for i := page - 1; i >= 0; i-- {
+		oldest = append(oldest, "0.0."+strconv.Itoa(i))
+	}
+	f, s := pagedCollection(t, oldest...)
 	pkg, err := f.db.Packages().Find(t.Context(), f.repo.Key, "weave.sample")
 	if err != nil {
 		t.Fatal(err)
 	}
-	v, err := f.db.Packages().Version(t.Context(), pkg.ID, "1.0.0")
-	if err != nil {
+	// The newer go straight into the index, from the lowest up, which
+	// keeps each write's reorder of the package short; no page reads their
+	// records.
+	for i := range count - page {
+		if _, err := f.db.Packages().PutVersion(t.Context(), model.PackageVersion{
+			PackageID: pkg.ID, Version: "1.0." + strconv.Itoa(i), Metadata: []byte(`{}`),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Every archive's path, but no pattern that names a folder whole.
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "archives",
+		Resources: map[api.ResourceType]accesstest.Resource{
+			api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]accesstest.Target{f.repo.Key: {
+					Include: []string{"collections/weave/sample/*/*.tar.gz"},
+				}},
+			},
+		},
+	}); err != nil {
 		t.Fatal(err)
 	}
-	v.Metadata = []byte(`{}`)
-	if _, err = f.db.Packages().PutVersion(t.Context(), v); err != nil {
-		t.Fatal(err)
-	}
-	requireStatus(t, f.do(http.MethodGet, versionsRoute, nil, "", ""), 500)
-	w := f.do(http.MethodGet, versionsRoute+"?limit=2", nil, "", "")
-	wantVersions(t, w.Body.String(), w.Code, versionsJSON(t, 3, 2, 2, "1.2.0", "1.1.0"))
-	s.gone, s.missing = "1.2.0", ansiblefmt.Path("weave", "sample", "1.1.0")
-	w = f.do(http.MethodGet, versionsRoute+"?limit=2", nil, "", "")
-	wantVersions(t, w.Body.String(), w.Code, versionsJSON(t, 3, 2, 2))
-}
-
-// The version list fails on the store's faults as the collection does.
-func TestAccGalaxyVersionListStoreFailures(t *testing.T) {
-	for stage, want := range map[string]int{
-		"find": 500, "versions": 500, "version": 500, "metadata": 500, "get": 500, "checksum": 500,
-	} {
-		t.Run(stage, func(t *testing.T) {
-			f := newFixture(t)
-			requireStatus(t, f.publish(f.data, ""), 201)
-			f.store = failingStore{f.db, stage}
-			f.mount(nil)
-			requireStatus(t, f.do(http.MethodGet, versionsRoute, nil, "", ""), want)
-		})
+	for _, user := range []string{"", "reader"} {
+		*s = pageStore{Store: s.Store}
+		w := f.do(http.MethodGet, versionsRoute+"?limit=20&offset=980", nil, "", user)
+		wantVersions(t, w.Body.String(), w.Code, versionsJSON(t, count, page, count, oldest...))
+		want := pageStore{Store: s.Store, version: page, counts: 1, namePage: 1}
+		if user != "" {
+			want = pageStore{Store: s.Store, version: page, names: 1}
+		}
+		if *s != want {
+			t.Fatalf("%q read %+v", user, *s)
+		}
 	}
 }

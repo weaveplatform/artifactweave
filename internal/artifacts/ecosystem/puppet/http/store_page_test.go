@@ -14,10 +14,15 @@ import (
 )
 
 // pageStore counts the package index reads that return whole version
-// records, and can report a version deleted or an archive missing.
+// records, and those of names: every version name of a module, a count or
+// a page of them, a tally of the repository's, and a page of its releases
+// or modules. It can report a version deleted or an archive missing.
 type pageStore struct {
 	pkgroute.Store
-	versions, version int
+	versions, version       int
+	names, counts, namePage int
+	tallies, releasePages   int
+	moduleCounts, modules   int
 	// gone is a version Version reports deleted; missing is a path whose
 	// item Items().Get reports missing.
 	gone, missing string
@@ -34,6 +39,58 @@ type pagePackages struct {
 func (p pagePackages) Versions(ctx context.Context, id int64) ([]artmodel.PackageVersion, error) {
 	p.s.versions++
 	return p.PackageStore.Versions(ctx, id)
+}
+
+func (p pagePackages) VersionNames(ctx context.Context, id int64) ([]string, error) {
+	p.s.names++
+	return p.PackageStore.VersionNames(ctx, id)
+}
+
+func (p pagePackages) CountVersions(ctx context.Context, id int64) (int, error) {
+	p.s.counts++
+	return p.PackageStore.CountVersions(ctx, id)
+}
+
+func (p pagePackages) VersionNamesAt(
+	ctx context.Context,
+	id int64,
+	newestFirst bool,
+	offset, limit int,
+) ([]string, error) {
+	p.s.namePage++
+	return p.PackageStore.VersionNamesAt(ctx, id, newestFirst, offset, limit)
+}
+
+func (p pagePackages) TallyVersions(
+	ctx context.Context,
+	key string,
+	limit int,
+) (port.VersionTally, error) {
+	p.s.tallies++
+	return p.PackageStore.TallyVersions(ctx, key, limit)
+}
+
+func (p pagePackages) ReleasesAt(
+	ctx context.Context,
+	key string,
+	offset, limit int,
+) ([]port.ReleaseName, error) {
+	p.s.releasePages++
+	return p.PackageStore.ReleasesAt(ctx, key, offset, limit)
+}
+
+func (p pagePackages) CountPackages(ctx context.Context, r port.PackageRange) (int, error) {
+	p.s.moduleCounts++
+	return p.PackageStore.CountPackages(ctx, r)
+}
+
+func (p pagePackages) PackagesAt(
+	ctx context.Context,
+	r port.PackageRange,
+	offset, limit int,
+) ([]artmodel.Package, error) {
+	p.s.modules++
+	return p.PackageStore.PackagesAt(ctx, r, offset, limit)
 }
 
 func (p pagePackages) Version(
@@ -80,9 +137,9 @@ func pagedModule(t *testing.T, versions ...string) (*fixture, *pageStore, map[st
 	return f, s, rels
 }
 
-// newestFirst is the order the release list answers widgetVersions in. The
-// package index orders 1.0.0-1 after 1.0.0, as Maven does, and the list
-// before it, as semantic versioning does.
+// newestFirst is the order the release list answers widgetVersions in, as
+// semantic versioning orders them: 1.0.0-1 before 1.0.0, where Maven, the
+// package index's order before #1426, put it after.
 var newestFirst = []string{
 	"2.0.0-rc.1", "1.10.0", "1.9.0", "1.8.0", "1.7.0", "1.6.0", "1.5.0", "1.4.0", "1.3.0",
 	"1.2.0", "1.1.0", "1.0.0", "1.0.0-1",
@@ -102,7 +159,9 @@ func pageJSON(rels map[string]listRelease, limit, offset, total int, versions ..
 // (#1404): every release is counted and ordered by its version, so the
 // total and the links are the whole list's, and only the page's releases
 // are read and checked against their archives. The answer is the one it
-// gave when it read every release.
+// gave when it read every release. A caller who may read the module whole
+// has the store count the names and read the page's (#1426); anyone else
+// has every name read.
 func TestUnitReleaseListReadsOnlyItsPage(t *testing.T) {
 	f, s, rels := pagedModule(t, newestFirst...)
 	for _, tc := range []struct {
@@ -114,13 +173,12 @@ func TestUnitReleaseListReadsOnlyItsPage(t *testing.T) {
 		{20, 0, newestFirst},
 		{5, 13, nil},
 	} {
-		s.versions, s.version = 0, 0
+		*s = pageStore{Store: s.Store}
 		wantBody(t, f.do("GET", base+"/v3/releases?module=acme-widget&limit="+
 			strconv.Itoa(tc.limit)+"&offset="+strconv.Itoa(tc.offset), "admin"),
 			pageJSON(rels, tc.limit, tc.offset, len(newestFirst), tc.want...))
-		if s.versions != 0 || s.version != len(tc.want) {
-			t.Fatalf("page %d at %d read %d version lists and %d versions", tc.limit, tc.offset,
-				s.versions, s.version)
+		if want := (pageStore{Store: s.Store, version: len(tc.want), counts: 1, namePage: 1}); *s != want {
+			t.Fatalf("page %d at %d read %+v", tc.limit, tc.offset, *s)
 		}
 	}
 	// Read permission counts and pages only the releases the caller may
@@ -128,11 +186,11 @@ func TestUnitReleaseListReadsOnlyItsPage(t *testing.T) {
 	f.grant(map[string]accesstest.Target{f.c.Key: {
 		Include: []string{"**"}, Exclude: []string{"**/acme-widget-1.9.0.tar.gz"},
 	}})
-	s.version = 0
+	*s = pageStore{Store: s.Store}
 	wantBody(t, f.do("GET", base+"/v3/releases?module=acme-widget&limit=2&offset=1", "viewer"),
 		pageJSON(rels, 2, 1, len(newestFirst)-1, "1.10.0", "1.8.0"))
-	if s.version != 2 {
-		t.Fatalf("viewer's page read %d versions", s.version)
+	if want := (pageStore{Store: s.Store, version: 2, names: 1}); *s != want {
+		t.Fatalf("viewer's page read %+v", *s)
 	}
 }
 
@@ -167,20 +225,36 @@ func TestUnitReleaseListPageChecks(t *testing.T) {
 
 // The whole-repository lists count and order every release by its version
 // alone and read only their page's: the release list the page's releases,
-// and the module list the releases of its page's modules.
+// and the module list the releases of its page's modules. For a caller who
+// may read the whole repository the store tallies the releases and pages
+// them (#1426); a caller whose permission names paths has every name read,
+// and gets the same answer.
 func TestUnitWholeListsReadOnlyTheirPage(t *testing.T) {
 	f, s, rels := pagedModule(t, newestFirst...)
 	beta := f.deployRelease(f.c, "acme-beta", "2.0.0", moduleArchive(t, "acme-beta", "2.0.0"))
-	s.versions, s.version = 0, 0
-	wantBody(t, f.do("GET", base+"/v3/releases?limit=2&offset=10", "admin"),
-		listJSON("/v3/releases", 2, 10, 14, releaseJSON(rels["1.2.0"]), releaseJSON(rels["1.1.0"])))
-	if s.versions != 0 || s.version != 2 {
-		t.Fatalf("release list read %d version lists and %d versions", s.versions, s.version)
-	}
-	s.versions, s.version = 0, 0
-	wantBody(t, f.do("GET", base+"/v3/modules?limit=1", "admin"),
-		listJSON("/v3/modules", 1, 0, 2, moduleJSON(beta)))
-	if s.versions != 1 || s.version != 0 {
-		t.Fatalf("module list read %d version lists and %d versions", s.versions, s.version)
+	f.grantRead("lister", "lister", f.c.Key, "acme-*/**")
+	for _, c := range []struct {
+		user              string
+		releases, modules pageStore
+	}{
+		{
+			"admin",
+			pageStore{version: 2, tallies: 1, releasePages: 1},
+			pageStore{versions: 1, tallies: 1, moduleCounts: 1, modules: 1},
+		},
+		{"lister", pageStore{version: 2, names: 2}, pageStore{versions: 1, names: 2}},
+	} {
+		*s = pageStore{Store: s.Store}
+		wantBody(t, f.do("GET", base+"/v3/releases?limit=2&offset=10", c.user),
+			listJSON("/v3/releases", 2, 10, 14, releaseJSON(rels["1.2.0"]), releaseJSON(rels["1.1.0"])))
+		if c.releases.Store = s.Store; *s != c.releases {
+			t.Fatalf("%s's release list read %+v", c.user, *s)
+		}
+		*s = pageStore{Store: s.Store}
+		wantBody(t, f.do("GET", base+"/v3/modules?limit=1", c.user),
+			listJSON("/v3/modules", 1, 0, 2, moduleJSON(beta)))
+		if c.modules.Store = s.Store; *s != c.modules {
+			t.Fatalf("%s's module list read %+v", c.user, *s)
+		}
 	}
 }

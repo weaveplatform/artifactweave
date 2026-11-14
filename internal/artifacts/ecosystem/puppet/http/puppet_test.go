@@ -709,6 +709,31 @@ func (f faultPackages) VersionNames(ctx context.Context, id int64) ([]string, er
 	return f.PackageStore.VersionNames(ctx, id)
 }
 
+// CountVersions and VersionNamesAt fail as VersionNames does, and count an
+// oversized index as it lists one: a whole reader's list counts and pages
+// the names in the store.
+func (f faultPackages) CountVersions(ctx context.Context, id int64) (int, error) {
+	if f.f.versions {
+		return 0, context.Canceled
+	}
+	if f.f.huge {
+		return 4097, nil
+	}
+	return f.PackageStore.CountVersions(ctx, id)
+}
+
+func (f faultPackages) VersionNamesAt(
+	ctx context.Context,
+	id int64,
+	newestFirst bool,
+	offset, limit int,
+) ([]string, error) {
+	if f.f.versions {
+		return nil, context.Canceled
+	}
+	return f.PackageStore.VersionNamesAt(ctx, id, newestFirst, offset, limit)
+}
+
 func (f faultPackages) Version(
 	ctx context.Context,
 	id int64,
