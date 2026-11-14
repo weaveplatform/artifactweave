@@ -568,17 +568,17 @@ push to main that changes that file, and by hand (`workflow_dispatch`).
 - It then checks that the copy can be pulled anonymously, as CI pulls it, and reports a
   refusal as a warning and in the run's summary.
 
-GHCR gives a newly pushed container package private visibility. GitHub's Actions guide says
-a package a workflow publishes with `GITHUB_TOKEN` inherits the visibility of the workflow's
-repository
+The first run, on PR #1501 (2026-11-14), created the package public and linked to this
+repository, so CI pulls it without credentials. GitHub's Actions guide says a package a
+workflow publishes with `GITHUB_TOKEN` inherits the visibility of the workflow's repository
 ([Publishing and installing a package with GitHub Actions](https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions)),
-but the Container registry guide says "When you first publish a package, the default
+while the Container registry guide says "When you first publish a package, the default
 visibility is private"
 ([Configuring a package's access control and visibility](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility)),
-and an organisation must allow public packages under Settings, Packages, "Package
-creation". This organisation already holds public packages, `ghcr.io/weaveplatform/artifactweave`
-among them, so it has allowed them. If the first run's summary reports a refusal, an
-organisation owner or the package's admin makes the package public once:
+and an organisation can forbid public packages under Settings, Packages, "Package
+creation". So a copy under a new package name, or after that setting changes, may come up
+private. If a run's summary reports a refusal, an organisation owner or the package's admin
+makes the package public once:
 
 1. Open <https://github.com/orgs/weaveplatform/packages/container/package/artifactweave-emulators%2Fazurite>.
 2. Choose **Package settings**.
