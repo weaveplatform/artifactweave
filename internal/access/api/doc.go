@@ -58,6 +58,9 @@
 //     switch, and rechecking a verified credential against current state
 //     (Current, CurrentRegistry and RestoreDownload).
 //   - Decider: the permission questions about one request's subject.
+//     RepoVisibility, an intersection of RepoSets, is its VisibleRepos
+//     answer: the repositories IsRepoVisible admits, described for a
+//     store's filter.
 //   - Basic and Bearer credentials as 7.x reads them: BasicCredentials
 //     decodes an Authorization value, IgnoredAuthorization reports the
 //     Basic values that carry no credential at all, BearerToken reads the
@@ -105,7 +108,10 @@
 //   - Keypair and Certificate never serialise a private key or passphrase
 //     (json:"-"); the stores seal them at rest (decision 0017).
 //   - A Decider answers exactly as the access module's evaluator does, and a
-//     token scope only removes actions (decision 0006).
+//     token scope only removes actions (decision 0006). VisibleRepos().Has
+//     agrees with IsRepoVisible on every stored repository, so a listing
+//     that filters in its store shows what one that asked about each
+//     repository would.
 //   - A decider answers only for the WithPrincipal call it was bound to
 //     (kernel.PrincipalBinding), never for a principal that another call
 //     stored, even one of equal value: a context derived with a later
@@ -163,8 +169,10 @@
 // Restrictions, Projects, Grants and AnonymousAccess, the Settings value, the
 // API aggregate, and the context accessors WithCaller, WithDecider and
 // DeciderFrom. Added by #1432: FoldUsername and SameUsername, the user name
-// rule that access/core/model applies. The target layout's hooks.go, with the token gate (P17), and
-// events.go, with the access events (P11), are not created yet.
+// rule that access/core/model applies. Added by #1408: RepoSet,
+// RepoVisibility and Decider.VisibleRepos. The target layout's hooks.go,
+// with the token gate (P17), and events.go, with the access events (P11),
+// are not created yet.
 //
 // # Testing
 //
@@ -179,6 +187,8 @@
 //   - TestUnitSubjectOf: the subject of a password, a token, a token with
 //     an empty scope, a groups-scoped token and the anonymous principal, as
 //     the evaluator has always started from it.
+//   - TestUnitRepoVisibilityHas: a set holds every repository, its classes'
+//     and its keys', and a visibility the intersection of its sets.
 //   - TestUnitDeciderContext: a decider answers for the WithPrincipal call
 //     it was bound to, through derived contexts and never after a later
 //     WithPrincipal; a nil or typed-nil decider hides an outer one.
