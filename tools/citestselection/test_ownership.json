@@ -176,6 +176,7 @@
       "oidc_test.go",
       "permissions_fault_test.go",
       "permissions_test.go",
+      "permissions_walk_test.go",
       "roles_status_test.go",
       "roles_test.go",
       "security_test.go",
