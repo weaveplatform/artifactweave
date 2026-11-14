@@ -90,6 +90,18 @@ func (p permFaultPerms) List(
 	return p.PermissionStore.List(ctx, pg) //nolint:wrapcheck // test double
 }
 
+// Page is the Access v2 list's read, which pages in the store rather than
+// listing every permission (#1408).
+func (p permFaultPerms) Page(
+	ctx context.Context,
+	q accesstest.PermissionQuery,
+) ([]accesstest.Permission, bool, error) {
+	if err := p.f.hit("page"); err != nil {
+		return nil, false, err
+	}
+	return p.PermissionStore.Page(ctx, q) //nolint:wrapcheck // test double
+}
+
 func (p permFaultPerms) ForPrincipal(
 	ctx context.Context,
 	user string,
@@ -185,7 +197,8 @@ func TestAccPermissionStoreFailures(t *testing.T) {
 		{"forprincipal", 1, http.MethodGet, permV2 + "/users/mgr", "admin", ""},
 		{"list", 0, http.MethodGet, permV1, "admin", ""},
 		{"list", 0, http.MethodGet, permV2, "admin", ""},
-		{"list", 0, http.MethodGet, permAcc, "admin", ""},
+		{"page", 0, http.MethodGet, permAcc, "admin", ""},
+		{"page", 0, http.MethodGet, permAcc + "?user=mgr", "admin", ""},
 		{"get", 0, http.MethodGet, permV1 + "/p", "admin", ""},
 		{"get", 0, http.MethodGet, permV2 + "/p", "admin", ""},
 		{"get", 0, http.MethodHead, permV2 + "/p", "admin", ""},

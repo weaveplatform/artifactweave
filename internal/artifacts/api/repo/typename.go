@@ -1,6 +1,10 @@
 package repo
 
-import "strings"
+import (
+	"slices"
+	"strings"
+	"unicode"
+)
 
 // packageTypeNames holds the spelling a listing shows for each package type:
 // the name of the package type in Artifactory's RepoType enumeration, not the
@@ -82,4 +86,41 @@ func PackageTypeName(packageType string) string {
 		return ""
 	}
 	return strings.ToUpper(t[:1]) + t[1:]
+}
+
+// PackageTypesNamed returns, sorted, the package types a listing's package
+// type filter names when it compares without regard to case both the
+// configured type and the name the listing shows, as Get Repositories
+// does: "yum" names rpm, and "MAVEN" maven. It lets a store filter by a
+// list of stored values in place of comparing each repository. Besides the
+// types with a listing name it holds name folded to lower-case ASCII,
+// which is the stored spelling of any type without one that equals name
+// without regard to case: a configured type is always lower case
+// (Validate checks it against AllowedPackageTypes).
+func PackageTypesNamed(name string) []PackageType {
+	var out []PackageType
+	for t, listed := range packageTypeNames {
+		if strings.EqualFold(string(t), name) || strings.EqualFold(listed, name) {
+			out = append(out, t)
+		}
+	}
+	if folded := foldASCII(name); strings.EqualFold(folded, name) {
+		out = append(out, PackageType(folded))
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+// foldASCII maps each rune of s to the lower-case ASCII letter its case
+// folding reaches, such as k for the Kelvin sign and s for the long s,
+// which strings.ToLower leaves alone, and any other rune to its lower case.
+func foldASCII(s string) string {
+	return strings.Map(func(r rune) rune {
+		for f := unicode.SimpleFold(r); f != r; f = unicode.SimpleFold(f) {
+			if 'a' <= f && f <= 'z' {
+				return f
+			}
+		}
+		return unicode.ToLower(r)
+	}, s)
 }

@@ -28,7 +28,9 @@
 // # Outputs
 //
 //   - Permissions in the permission store, ordered by name when listed, and
-//     those granting to given users or groups (Granting).
+//     those granting to given users or groups (Granting). Page reads either
+//     list a page at a time from the store, for the principals PrincipalsOf
+//     gathers as Granting does (#1408).
 //   - ErrInvalid with the message a handler returns after the sentinel,
 //     ErrNotFound, ErrConflict and ErrForbidden; store errors come back
 //     wrapped with "permission: ".
@@ -55,6 +57,8 @@
 //     #p9d-modular-monolith-migration, epic ACC
 //     (https://github.com/weaveplatform/artifactweave/issues/940).
 //   - https://github.com/weaveplatform/artifactweave/issues/1065
+//   - https://github.com/weaveplatform/artifactweave/issues/1408 (paging
+//     in the store).
 //
 // # Status
 //
@@ -73,6 +77,8 @@
 //     TestUnitFoldUsers.
 //   - username_test.go: TestUnitUserGrantsFold and
 //     TestUnitManagerOwnEntryFolds (user grants in any case, #1432).
+//   - page_test.go: TestUnitPrincipalsOfAndPage (a walk of Page at every
+//     page size visits what Granting collects).
 //   - fault_test.go: TestUnitStoreFailures.
 //
 // The tests run on the metadata store's in-memory store, with a stand-in

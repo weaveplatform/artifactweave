@@ -29,7 +29,10 @@
 //
 // # Outputs
 //
-//   - RepoStore with RepoFilter; ItemStore with Download, DeleteResult and
+//   - RepoStore with RepoFilter, and its Page with RepoListing, RepoSet,
+//     RepoSummary and RepoPage: one window of the repository list, its
+//     filters and the caller's visibility applied in the store (#1408);
+//     ItemStore with Download, DeleteResult and
 //     RepoUsage; BlobIndex with the sentinel ErrDeleting; ReplicaIndex;
 //     TrashStore; and PackageStore, which embeds PackageVersionNames: a
 //     package's version names alone, in Versions' order, which the Puppet,
@@ -108,6 +111,7 @@
 // 646), GitLFSLockStore (pull request 849) and BowerRegistrationStore (pull
 // request 912). Moved here in P9d, which added ArchivedItemStore and Store.
 // DockerPageStore pages the registry's tags lists and catalogs (#1402).
+// RepoStore.Page pages Get Repositories in the store (#1408).
 //
 // # Testing
 //

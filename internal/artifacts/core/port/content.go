@@ -20,6 +20,50 @@ type RepoFilter struct {
 	ProjectKey  string
 }
 
+// RepoSet is a set of repositories: every one, or those of the listed
+// classes together with those of the listed keys. The zero RepoSet holds
+// none.
+type RepoSet struct {
+	Every   bool
+	Classes []repo.Class
+	Keys    []string
+}
+
+// RepoListing asks RepoStore.Page for a window of the repository list
+// ordered by key. Visible narrows it to the repositories every one of its
+// sets holds, which is how a caller's visibility reaches the query; no set
+// lists every repository.
+type RepoListing struct {
+	Class      repo.Class
+	ProjectKey string
+	// PackageTypes, when not nil, lists only repositories of one of them.
+	PackageTypes []repo.PackageType
+	Visible      []RepoSet
+	// Limit caps the window, and 0 lists every matching repository. Offset
+	// skips that many matching repositories before a capped window; it
+	// needs a Limit, as Get Repositories' offset does.
+	Offset, Limit int
+	// Count asks for Total, the number of matching repositories on every
+	// page together.
+	Count bool
+}
+
+// RepoSummary is the part of a repository's configuration a list shows.
+type RepoSummary struct {
+	Key         string
+	Class       repo.Class
+	PackageType repo.PackageType
+	Description string
+}
+
+// RepoPage is one window of a RepoListing: its repositories, whether more
+// match after them, and the total when the listing asked for a count.
+type RepoPage struct {
+	Repos []RepoSummary
+	More  bool
+	Total int
+}
+
 // RepoStore persists repository configurations. Remote passwords and sensitive
 // HTTP header values are sealed outside their documents; the virtual member
 // list and the key pair references are mirrored into tables so Including and
@@ -37,6 +81,11 @@ type RepoStore interface {
 	// List returns every matching repository ordered by key. Artifactory
 	// lists repositories unpaged, so this does too.
 	List(ctx context.Context, f RepoFilter) ([]repo.Config, error)
+	// Page returns one window of the repositories l matches, ordered by key:
+	// the filters, the visibility, OFFSET and LIMIT apply in the store, which
+	// reads one repository past the window to tell whether more follow, and
+	// counts the matches only when l asks. It reads no secret.
+	Page(ctx context.Context, l RepoListing) (RepoPage, error)
 	// Including returns the keys of the virtual repositories that list key
 	// as a member, ordered.
 	Including(ctx context.Context, key string) ([]string, error)

@@ -10155,6 +10155,8 @@ paths:
                 type: array
           description: The matching repositories, as plain JSON or the vendor list media type when the client asks for it. With limit, only that page of them.
           headers:
+            Link:
+              $ref: '#/components/headers/LinkNext'
             X-Result-Limit:
               description: Sent only with limit. The limit asked for.
               schema:

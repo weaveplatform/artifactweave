@@ -79,6 +79,10 @@
 //   - folder_archive_policy_test.go: the folder archive download's policy
 //     (issue 1253).
 //   - multipart_test.go: the JFrog CLI's multipart upload.
+//   - repositories_paging_test.go and repositories_walk_test.go: Get
+//     Repositories' limit and offset (#1367), and its next link, followed
+//     from the first window to the last as an administrator, a partial
+//     reader and anonymous (#1408).
 //
 // # References
 //
