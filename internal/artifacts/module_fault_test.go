@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
@@ -22,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
@@ -31,12 +34,45 @@ var errFault = errors.New("injected store fault")
 
 // faultStore wraps a real store and fails the one call that fail names,
 // "Leases.Acquire", "Settings.Get", "Settings.Put" or "RemoteCache.Source",
-// with errFault. Every other call reaches the store, so the module runs as
-// it would up to the failing call. fail is fixed when the module is built:
-// the remote runtimes' workers read the store from their own goroutines.
+// with errFault, or "Repos.Get" or "Configs.List" with err. Every other
+// call reaches the store, so the module runs as it would up to the failing
+// call. fail is fixed when the module is built: the remote runtimes'
+// workers read the store from their own goroutines.
 type faultStore struct {
 	*inmem.Store
 	fail string
+	err  error
+}
+
+func (s faultStore) Repos() port.RepoStore { return faultRepos{s.Store.Repos(), s} }
+
+func (s faultStore) Configs() configdoc.ConfigStore { return faultConfigs{s.Store.Configs(), s} }
+
+type faultRepos struct {
+	port.RepoStore
+	s faultStore
+}
+
+func (r faultRepos) Get(ctx context.Context, key string) (repo.Config, error) {
+	if r.s.fail == "Repos.Get" {
+		return repo.Config{}, r.s.err
+	}
+	return r.RepoStore.Get(ctx, key)
+}
+
+type faultConfigs struct {
+	configdoc.ConfigStore
+	s faultStore
+}
+
+func (c faultConfigs) List(
+	ctx context.Context,
+	kind configdoc.ConfigKind,
+) ([]configdoc.ConfigDocument, error) {
+	if c.s.fail == "Configs.List" {
+		return nil, c.s.err
+	}
+	return c.ConfigStore.List(ctx, kind)
 }
 
 func (s faultStore) Leases() work.LeaseStore { return faultLeases{s.Store.Leases(), s.fail} }
@@ -300,10 +336,17 @@ type remoteFixture struct {
 // permissions cannot be read.
 func newRemoteFixture(t *testing.T, fail string) remoteFixture {
 	t.Helper()
+	return newRemoteFixtureFailing(t, fail, nil)
+}
+
+// newRemoteFixtureFailing is newRemoteFixture over a faultStore whose
+// "Repos.Get" or "Configs.List" fails with fault.
+func newRemoteFixtureFailing(t *testing.T, fail string, fault error) remoteFixture {
+	t.Helper()
 	ctx := t.Context()
 	inner := inmem.New()
 	m, err := New(Deps{
-		Store: faultStore{Store: inner, fail: fail},
+		Store: faultStore{Store: inner, fail: fail, err: fault},
 		Access: accessapi.API{
 			Authenticator: &accessapitest.Authenticator{},
 			Authorizer: &accessapitest.Authorizer{
@@ -459,6 +502,77 @@ func TestUnitRemoteCheckCurrentFencesTheRevision(t *testing.T) {
 		if !errors.Is(err, source.ErrSuperseded) {
 			t.Errorf("%s policy: CheckCurrent at an earlier revision = %v, want ErrSuperseded",
 				name, err)
+		}
+	}
+}
+
+// CheckCurrent re-reads the repository and the options built from it. A
+// read that fails supersedes the read, as one whose options changed,
+// unless the store failed to run its statement (kernel.ErrStore): that is
+// the server's storage fault, which the read answers 500 "internal error"
+// and the router logs, under both policies (#1489). Once the context has
+// ended, and as the read starts (Resolve), the failure answers as it did.
+func TestUnitRemoteCheckCurrentAnswersAStoreFailureAsAStorageFault(t *testing.T) {
+	stored := fmt.Errorf("sqlite: get: %w", errors.Join(kernel.ErrStore, errFault))
+	for _, fail := range []string{"Repos.Get", "Configs.List"} {
+		for _, tc := range []struct {
+			err   error
+			fault bool
+		}{{stored, true}, {errFault, false}} {
+			f := newRemoteFixtureFailing(t, fail, tc.err)
+			ctx := kernel.WithPrincipal(t.Context(), kernel.Principal{Name: "admin"})
+			ended, cancel := context.WithCancel(ctx)
+			cancel()
+			q := source.Request{Repo: f.repo, Resource: source.Resource{Path: "a/b.txt"}}
+			permit := source.Permit{Identity: f.id}
+			for name, p := range map[string]*remote.Policy{
+				"remote":   f.m.remoteSources.HTTP.(*maven.MavenBackend).Policy,
+				"registry": f.m.registrySources.HTTP.(*docker.RegistryContent).Policy,
+			} {
+				got := p.CheckCurrent(ctx, nil, q, permit, "a-revision")
+				var fault *item.StorageFault
+				if tc.fault != errors.As(got, &fault) ||
+					tc.fault &&
+						(!errors.Is(got, format.ErrStorageFault) || !errors.Is(got, kernel.ErrStore)) ||
+					!tc.fault && !errors.Is(got, source.ErrSuperseded) {
+					t.Errorf(
+						"%s %s policy, store failure %v: CheckCurrent = %v",
+						fail,
+						name,
+						tc.fault,
+						got,
+					)
+				}
+				if got = p.CheckCurrent(
+					ended,
+					nil,
+					q,
+					permit,
+					"a-revision",
+				); !errors.Is(
+					got,
+					source.ErrSuperseded,
+				) {
+					t.Errorf(
+						"%s %s policy, ended: CheckCurrent = %v, want ErrSuperseded",
+						fail,
+						name,
+						got,
+					)
+				}
+			}
+			if fail != "Repos.Get" {
+				continue
+			}
+			if _, got := f.m.remoteSources.Resolve(
+				ctx,
+				f.repo,
+			); !errors.Is(
+				got,
+				source.ErrSuperseded,
+			) {
+				t.Errorf("Resolve, store failure %v = %v, want ErrSuperseded", tc.fault, got)
+			}
 		}
 	}
 }

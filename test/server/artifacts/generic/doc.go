@@ -68,6 +68,11 @@
 //     SHA-1 as ETag, matched alone, never the upstream's (#1484); a HEAD
 //     answered from an upstream's HEAD without a checksum sends no ETag
 //     and is matched by its date alone (#1487).
+//   - remote_fence_fault_test.go: a generic and a Maven remote read whose
+//     authority fence meets a statement the database fails to run,
+//     reading the repository or its proxy configuration, answers 500
+//     "internal error", logged once; options that changed still answer
+//     503, and failed options as a read starts their 502 (#1489).
 //
 // # References
 //

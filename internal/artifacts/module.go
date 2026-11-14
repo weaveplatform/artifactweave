@@ -273,6 +273,22 @@ func logGC(log *slog.Logger) func(gc.Report, error) {
 	}
 }
 
+// fenceStoreFault is err, a failed read of the store inside a remote read's
+// authority fence (fence), as a storage fault when a statement the store
+// ran failed (kernel.ErrStore), and nil otherwise or once ctx has ended.
+// The read then answers 500 "internal error" and the router logs the
+// fault, as a failed store call elsewhere in a remote read does (#1470);
+// it answered 503 as a superseded read. No 7.x source has this fence;
+// 7.161.26 answers a failure of its own database as a server fault, never
+// as an upstream's or a changed configuration's [I]
+// (https://github.com/weaveplatform/artifactweave/issues/1489).
+func fenceStoreFault(ctx context.Context, fence bool, err error) error {
+	if !fence || err == nil || ctx.Err() != nil || !errors.Is(err, kernel.ErrStore) {
+		return nil
+	}
+	return item.MarkStorageFault(ctx, err, err) //nolint:wrapcheck // the store's own error, marked
+}
+
 // OpenRemoteSources shares the module's transport pool and ingestion service.
 // Protocol adapters remain opt-in; generic and Maven-family routes install this.
 // It reads the remote policy key, persisting one on the first start without a
@@ -292,9 +308,16 @@ func (m *Module) OpenRemoteSources(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("remote resolver: %w", err)
 	}
-	resolve := func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+	// identity is c's current source identity. In the authority fence a
+	// failed read of the repository is the server's fault when the store
+	// failed (fenceStoreFault); around the backend read the source service
+	// makes, it supersedes the read as it did.
+	identity := func(ctx context.Context, c repo.Config, fence bool) (model.SourceIdentity, error) {
 		current, err := m.store.Repos().Get(ctx, c.Key)
 		if err != nil {
+			if fault := fenceStoreFault(ctx, fence, err); fault != nil {
+				return model.SourceIdentity{}, fault
+			}
 			return model.SourceIdentity{}, source.ErrSuperseded
 		}
 		if port.RemotePolicyChanged(c, current) {
@@ -306,8 +329,11 @@ func (m *Module) OpenRemoteSources(ctx context.Context) error {
 		}
 		return id, nil
 	}
-	revalidatePrincipal := func(ctx context.Context, q source.Request, permit source.Permit, registry bool) error {
-		id, err := resolve(ctx, q.Repo)
+	resolve := func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+		return identity(ctx, c, false)
+	}
+	revalidatePrincipal := func(ctx context.Context, q source.Request, permit source.Permit, registry, fence bool) error {
+		id, err := identity(ctx, q.Repo, fence)
 		if err != nil {
 			return err
 		}
@@ -352,18 +378,27 @@ func (m *Module) OpenRemoteSources(ctx context.Context) error {
 		return q.Resource.CheckPolicy(q.Repo, path)
 	}
 	revalidate := func(ctx context.Context, q source.Request, permit source.Permit) error {
-		return revalidatePrincipal(ctx, q, permit, false)
+		return revalidatePrincipal(ctx, q, permit, false, false)
 	}
 	registryRevalidate := func(ctx context.Context, q source.Request, permit source.Permit) error {
-		return revalidatePrincipal(ctx, q, permit, true)
+		return revalidatePrincipal(ctx, q, permit, true, false)
 	}
-	checkCurrent := func(check func(context.Context, source.Request, source.Permit) error) func(context.Context, remote.Store, source.Request, source.Permit, string) error {
+	// checkCurrent is the authority fence (decision 0032): options that
+	// read but changed supersede the read, 503, and so does a failed read
+	// of them, unless the store failed to run its statement.
+	checkCurrent := func(registry bool) func(context.Context, remote.Store, source.Request, source.Permit, string) error {
 		return func(ctx context.Context, _ remote.Store, q source.Request, permit source.Permit, revision string) error {
-			if err := check(ctx, q, permit); err != nil {
+			if err := revalidatePrincipal(ctx, q, permit, registry, true); err != nil {
 				return err
 			}
 			opts, err := resolver.Options(ctx, q.Repo)
-			if err != nil || opts.Revision != revision {
+			if err != nil {
+				if fault := fenceStoreFault(ctx, true, upstream.StoreFault(err)); fault != nil {
+					return fault
+				}
+				return source.ErrSuperseded
+			}
+			if opts.Revision != revision {
 				return source.ErrSuperseded
 			}
 			return nil
@@ -376,13 +411,13 @@ func (m *Module) OpenRemoteSources(ctx context.Context) error {
 		Pool:            &m.remoteHTTP,
 		Options:         resolver.Options,
 		Key:             key,
-		CheckCurrent:    checkCurrent(revalidate),
+		CheckCurrent:    checkCurrent(false),
 		GitFetch:        cocoapods.FetchCocoaPodsGit,
 		ProjectResponse: nuget.ProjectEmptyFeed,
 	}
 	registryPolicy := &remote.Policy{
 		Store: m.store, Blobs: m.blobs, Items: m.items,
-		Options: resolver.Options, CheckCurrent: checkCurrent(registryRevalidate), Key: key,
+		Options: resolver.Options, CheckCurrent: checkCurrent(true), Key: key,
 		GitFetch: cocoapods.FetchCocoaPodsGit, ProjectResponse: nuget.ProjectEmptyFeed,
 	}
 	content := &docker.RegistryContent{

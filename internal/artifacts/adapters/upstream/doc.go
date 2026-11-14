@@ -32,8 +32,9 @@
 //
 //   - Pool, the remote.Upstream of ordinary remotes, with Client and
 //     NewClient; Resolver, NewResolver and ResolverOptions, which turn a
-//     repository into its remote.Options and credential revision, and
-//     ResolverStore, the store a Resolver reads.
+//     repository into its remote.Options and credential revision,
+//     ResolverStore, the store a Resolver reads, and StoreFault, the
+//     store's error behind options it failed to read.
 //   - RegistryPool, Registry, NewRegistry and RegistryOptions, the Docker
 //     registry clients, and RegistryClients, the remote.Registries over
 //     them; ErrRegistryChallenge.
@@ -100,6 +101,10 @@
 //     rebinding and the security transport's pools.
 //   - outbound_test.go: the outbound hooks on requests and redirects.
 //   - p2_child_auth_test.go: P2 child repositories and credentials.
+//   - store_fault_test.go: a statement the store fails to run as the
+//     resolver reads a repository, its proxy or its client certificate
+//     fails the options with remote.ErrConfiguration and keeps the store's
+//     error for StoreFault.
 //   - registry_test.go and registry_challenge_test.go: the registry
 //     exchange, its coalescing, denial, redirects and token faults, and the
 //     challenge grammar.

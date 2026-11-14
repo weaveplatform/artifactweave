@@ -111,11 +111,12 @@
 //     under concurrency, and the format hooks the remote wiring installs.
 //   - TestUnitRegisterWorkStopsAtTheItemServiceError,
 //     TestUnitOpenRemoteSourcesPolicyKeyFailures,
-//     TestUnitOpenRemoteSourcesRefusesABadPrivateOrigin and the four
+//     TestUnitOpenRemoteSourcesRefusesABadPrivateOrigin and the five
 //     TestUnitRemote tests, over a store with one failing call: each error
 //     path's error, a failed start that opens nothing and leaves the policy
 //     key and its lease as they were, and the remote reads' fences refusing
-//     a read that no longer stands.
+//     a read that no longer stands and answering a statement the store
+//     failed to run as the server's fault.
 //   - app's tests start the module through OpenRuntime, and the remote
 //     suites under test/server/artifacts read remote content through it.
 package artifacts
