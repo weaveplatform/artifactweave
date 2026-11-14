@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -182,19 +181,35 @@ func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 //
 //nolint:revive,tagliatelle // the generated element's field names and JSON keys
 type repoListEntry = struct {
-	Description *string `json:"description,omitempty"`
-	Key         string  `json:"key"`
-	PackageType string  `json:"packageType"`
-	Type        string  `json:"type"`
-	Url         string  `json:"url"`
+	Configuration *string `json:"configuration,omitempty"`
+	Description   *string `json:"description,omitempty"`
+	Key           string  `json:"key"`
+	PackageType   string  `json:"packageType"`
+	Type          string  `json:"type"`
+	Url           string  `json:"url"`
 }
 
-// repoEntry is the list entry of the repository c summarises.
+// repoEntry is the list entry of the repository c summarises. A remote's
+// url is its upstream URL and, when it shares its configuration, its
+// configuration is where to read it, as 7.161.26's
+// RepositoriesResource.addRemoteRepoDetails builds the entry
+// (getRepoConfigUrl); every other repository's url is its root here
+// (RepositoriesUtils.addNonRemoteRepoConfigDetails). The upstream URL loses
+// a user name and password written into it, which 7.x never keeps there
+// (HttpRepoDescriptor.processUrl).
 func repoEntry(base string, c port.RepoSummary) repoListEntry {
 	e := repoListEntry{
 		Key: c.Key, Type: strings.ToUpper(string(c.Class)),
 		PackageType: repo.PackageTypeName(string(c.PackageType)),
 		Url:         base + "/artifactory/" + c.Key,
+	}
+	if c.Class == repo.Remote {
+		e.Url = repo.WithoutCredentials(c.URL)
+		if c.Shared {
+			e.Configuration = new(
+				base + "/artifactory/api/repositories/" + c.Key + "/configuration",
+			)
+		}
 	}
 	if c.Description != "" {
 		d := c.Description
@@ -598,20 +613,14 @@ func configResponse(
 	return artgen.GetRepositoryConfiguration200JSONResponse(c)
 }
 
-// sharedFields are what a non-admin sees of a shared remote repository:
-// enough to point a client at the same upstream, nothing that configures
-// access.
-var sharedFields = []string{
-	"key", "rclass", "packageType", "description", "url", "repoLayoutRef",
-	"remoteRepoLayoutRef", "includesPattern", "excludesPattern",
-}
-
-// GetRemoteRepositoryConfiguration returns a remote repository's
-// configuration as 7.x's masked remote descriptor holds it (repo.Shared):
-// all of it to an administrator, the sharedFields subset to another
-// signed-in user when the repository shares its configuration, and nothing
-// to an anonymous caller. A key that is missing or names another class
-// answers 404.
+// GetRemoteRepositoryConfiguration returns the shared configuration of a
+// remote repository, its masked remote descriptor (repo.Descriptor), to any
+// signed-in caller. 7.161.26's RepositoriesResource admits ROLE_ADMIN and
+// ROLE_USER alike and RepoConfigurationResource.getRemoteDescriptor checks
+// nothing more, so a caller other than an administrator gets the whole
+// descriptor. A key that names no remote, or a remote whose
+// shareConfiguration is off, answers 404 with no body, administrators
+// included, as getRemoteDescriptor's Response.status(SC_NOT_FOUND) does.
 func (s ArtifactoryAPI) GetRemoteRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.GetRemoteRepositoryConfigurationRequestObject,
@@ -627,53 +636,21 @@ func (s ArtifactoryAPI) GetRemoteRepositoryConfiguration(
 	if p.Anonymous {
 		return nil, httpkit.Denied(p)
 	}
-	key := string(req.RemoteRepoName)
-	c, err := st.Repos().Get(ctx, key)
+	c, err := st.Repos().Get(ctx, string(req.RemoteRepoName))
 	switch {
-	case errors.Is(err, kernel.ErrNotFound), err == nil && c.Class != repo.Remote:
-		return nil, apierror.New(http.StatusNotFound,
-			fmt.Sprintf("Remote repository '%s' does not exist", key))
+	case errors.Is(err, kernel.ErrNotFound),
+		err == nil && (c.Class != repo.Remote || c.ShareConfiguration == nil || !*c.ShareConfiguration):
+		return artgen.GetRemoteRepositoryConfiguration404Response{}, nil
 	case err != nil:
 		return nil, s.InternalError(ctx, "get repository", err)
-	case !p.Admin && (c.ShareConfiguration == nil || !*c.ShareConfiguration):
-		return nil, httpkit.Denied(p)
 	}
-	doc, err := json.Marshal(repo.Shared(c))
-	if err != nil {
-		return nil, s.InternalError(ctx, "encode repository", err)
-	}
-	var fields map[string]any
-	if err := json.Unmarshal(doc, &fields); err != nil {
-		return nil, s.InternalError(ctx, "encode repository", err)
-	}
-	if !p.Admin {
-		maps.DeleteFunc(
-			fields,
-			func(name string, _ any) bool { return !slices.Contains(sharedFields, name) },
-		)
-	}
-	media := "application/json"
+	d := repo.Descriptor(c)
 	if httpkit.Accepts(ctx, mediaShared) {
-		media = mediaShared
+		return artgen.GetRemoteRepositoryConfiguration200ApplicationVndOrgJfrogArtifactoryRepositoriesSharedRemoteRepositoryConfigurationPlusJSONResponse(
+			d,
+		), nil
 	}
-	return sharedRemoteResponse{media: media, fields: fields}, nil
-}
-
-// sharedRemoteResponse writes the shared view itself: the generated
-// response types redeclare SharedRemoteRepositoryConfiguration and so lose
-// the method that encodes its additional properties, which here are nearly
-// every field.
-type sharedRemoteResponse struct {
-	media  string
-	fields map[string]any
-}
-
-func (r sharedRemoteResponse) VisitGetRemoteRepositoryConfigurationResponse(
-	w http.ResponseWriter,
-) error {
-	w.Header().Set("Content-Type", r.media)
-	w.WriteHeader(http.StatusOK)
-	return json.NewEncoder(w).Encode(r.fields) //nolint:wrapcheck // the strict server logs it
+	return artgen.GetRemoteRepositoryConfiguration200JSONResponse(d), nil
 }
 
 // GetBatchOfRepositoriesByName returns, keyed by name, the configurations

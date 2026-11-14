@@ -102,14 +102,22 @@ func (s *Smart) discover(
 	endpoint := peer.BaseURL + "/api/repositories/" + url.PathEscape(peer.Repository)
 	config, private, err := s.document(ctx, q, permit, opts, endpoint)
 	var failure *source.HTTPError
-	if errors.As(err, &failure) && failure.Status == http.StatusForbidden {
+	shared := errors.As(err, &failure) && failure.Status == http.StatusForbidden
+	if shared {
 		config, private, err = s.document(ctx, q, permit, opts, endpoint+"/configuration")
 	}
 	if err != nil {
 		return remote.SmartPeer{}, err
 	}
 	_ = json.Unmarshal(config["rclass"], &peer.Class)
-	if peer.Class == "" {
+	switch {
+	case peer.Class != "":
+	case shared:
+		// The shared configuration is a remote's descriptor, which has no
+		// class field, and its "type" is the package type: 7.x answers it
+		// for a remote repository only (getRemoteDescriptor).
+		peer.Class = repo.Remote
+	default:
 		_ = json.Unmarshal(config["type"], &peer.Class)
 	}
 	if err = smartCapabilities(q.Repo, peer); err != nil {

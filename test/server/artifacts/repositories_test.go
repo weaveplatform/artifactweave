@@ -1,6 +1,7 @@
 package artifacts_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -188,6 +189,58 @@ func TestAccListRepositories(t *testing.T) {
 	}
 }
 
+// A remote's entry carries its upstream URL, without a user name and password,
+// and, when the remote shares its configuration, where to read it; no other
+// entry has a configuration (7.161.26's
+// RepositoriesResource.addRemoteRepoDetails and
+// RepositoriesUtils.addNonRemoteRepoConfigDetails) (#1493). The streamed
+// and the paged list build the same entries.
+func TestAccListRemoteEntries(t *testing.T) {
+	w := newRepoWorld(t)
+	w.create(
+		repo.Config{
+			Key: "shared", Class: repo.Remote, URL: "https://u:p@up.example/m2",
+			ShareConfiguration: new(true),
+		},
+		repo.Config{Key: "private", Class: repo.Remote, URL: "https://up.example/npm"},
+		repo.Config{Key: "jars", Class: repo.Local, ShareConfiguration: new(true)},
+	)
+	want := map[string]map[string]any{
+		"shared": {
+			"key":           "shared",
+			"type":          "REMOTE",
+			"packageType":   "Generic",
+			"url":           "https://up.example/m2",
+			"configuration": "https://reg.example/artifactory/api/repositories/shared/configuration",
+		},
+		"private": {
+			"key": "private", "type": "REMOTE", "packageType": "Generic",
+			"url": "https://up.example/npm",
+		},
+		"jars": {
+			"key": "jars", "type": "LOCAL", "packageType": "Generic",
+			"url": "https://reg.example/artifactory/jars",
+		},
+	}
+	for _, query := range []string{"", "?limit=100"} {
+		var got []map[string]any
+		jsonBody(t, w.do("GET", "/artifactory/api/repositories"+query, "reader", ""), &got)
+		seen := 0
+		for _, e := range got {
+			key, _ := e["key"].(string)
+			if entry, ok := want[key]; ok {
+				seen++
+				if !reflect.DeepEqual(e, entry) {
+					t.Errorf("%q %s: %v, want %v", query, key, e, entry)
+				}
+			}
+		}
+		if seen != len(want) {
+			t.Errorf("%q: %d of %d entries in %v", query, seen, len(want), got)
+		}
+	}
+}
+
 func TestAccGetRepository(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(repo.Config{
@@ -344,56 +397,92 @@ func TestAccAllConfigurationsAndExistence(t *testing.T) {
 	}
 }
 
+// The shared remote configuration is the remote's masked descriptor, the
+// same for every signed-in caller: 7.161.26's RepositoriesResource admits
+// ROLE_ADMIN and ROLE_USER alike, and RepoConfigurationResource answers
+// the HttpRepoDescriptor with its credentials, proxy, local address and
+// property sets cleared (maskData) (#1493).
 func TestAccSharedRemoteConfiguration(t *testing.T) {
 	w := newRepoWorld(t)
-	shared := true
 	w.create(repo.Config{
 		Key: "up", Class: repo.Remote, URL: "https://up.example", Username: "u", Password: "p",
-		ShareConfiguration: &shared, Proxy: "corp", LocalAddress: "10.0.0.1",
+		ShareConfiguration: new(true), Proxy: "corp", LocalAddress: "10.0.0.1",
 		PropertySets: []string{"artifactory"},
+		CustomHTTPHeaders: []repo.CustomHTTPHeader{
+			{Name: "X-Token", Value: "secret", Sensitive: true}, {Name: "X-Team", Value: "build"},
+		},
 	})
-	var got map[string]any
-	rec := w.do(
-		"GET",
-		"/artifactory/api/repositories/up/configuration",
-		"reader",
-		"",
-		"Accept",
-		mediaShared,
-	)
-	jsonBody(t, rec, &got)
-	if rec.Header().Get("Content-Type") != mediaShared || got["key"] != "up" ||
-		got["url"] != "https://up.example" || got["username"] != nil || got["packageType"] != "generic" {
-		t.Fatalf("shared view %s", rec.Body)
+	want := `{"@class": "org.artifactory.descriptor.repo.HttpRepoDescriptor", "key": "up",
+		"allowAnyHostAuth": false, "socketTimeoutMillis": 15000,
+		"enableCookieManagement": false, "enableTokenAuthentication": false,
+		"disableProxy": false, "propagateQueryParams": false,
+		"disableUrlNormalization": false, "retrieveSha256FromServer": false,
+		"customHttpHeader": [{"name": "X-Token", "value": "", "sensitive": true},
+			{"name": "X-Team", "value": "build", "sensitive": false}],
+		"type": "Generic", "includesPattern": "**/*", "dockerApiVersion": "V2",
+		"forceNugetAuthentication": false, "forceConanAuthentication": false,
+		"ddebSupported": false, "signedUrlTtl": 90, "blackedOut": false,
+		"handleReleases": true, "handleSnapshots": true, "maxUniqueSnapshots": 0,
+		"maxUniqueTags": 0, "blockPushingSchema1": true, "suppressPomConsistencyChecks": true,
+		"archiveBrowsingEnabled": false, "priorityResolution": false,
+		"storeArtifactsLocally": true, "fetchJarsEagerly": false, "fetchSourcesEagerly": false,
+		"shareConfiguration": true, "url": "https://up.example", "hardFail": false,
+		"offline": false, "retrievalCachePeriodSecs": 7200, "metadataRetrievalTimeoutSecs": 60,
+		"assumedOfflinePeriodSecs": 300, "missedRetrievalCachePeriodSecs": 1800,
+		"unusedArtifactsCleanupPeriodHours": 0, "synchronizeProperties": false,
+		"listRemoteFolderItems": false, "bypassHeadRequests": false, "rejectInvalidJars": false,
+		"blockMismatchingMimeTypes": true, "repoLayoutRef": "maven-2-default",
+		"xray": {"enabled": false, "dataTtl": 90, "xrayNotAvailableMode": null},
+		"downloadRedirect": {"enabled": false}, "cdnRedirect": {"enabled": false},
+		"remoteRepoChecksumPolicyType": "GEN_IF_ABSENT",
+		"contentSynchronisation": {"enabled": false, "statistics": {"enabled": false},
+			"properties": {"enabled": false}, "source": {"originAbsenceDetection": false}}}`
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, []byte(want)); err != nil {
+		t.Fatal(err)
 	}
-	// 7.161.26 masks the remote descriptor it answers with for every
-	// caller: no username, password, proxy, local address or property sets
-	// (RepoConfigurationResource.maskData). It has the descriptor's
-	// defaults for what was never set (#1493).
-	jsonBody(t, w.do("GET", "/artifactory/api/repositories/up/configuration", "admin", ""), &got)
-	for _, f := range []string{"username", "password", "proxy", "localAddress", "propertySets"} {
-		if v, ok := got[f]; ok {
-			t.Errorf("admin view %s %v", f, v)
-		}
-	}
-	for f, want := range map[string]any{
-		"signedUrlTtl": float64(90), "dockerApiVersion": "V2", "blockPushingSchema1": true,
-		"maxUniqueTags": float64(0), "archiveBrowsingEnabled": false, "ddebSupported": false,
-		"propagateQueryParams": false, "retrieveSha256FromServer": false,
-		"customHttpHeaders": []any{},
+	const path = "/artifactory/api/repositories/up/configuration"
+	for _, tc := range []struct{ as, accept, media string }{
+		{"reader", mediaShared, mediaShared},
+		{"reader", "", "application/json"},
+		{"admin", "", "application/json"},
 	} {
-		if !reflect.DeepEqual(got[f], want) {
-			t.Errorf("admin view %s %#v, want %#v", f, got[f], want)
+		rec := w.do("GET", path, tc.as, "", "Accept", tc.accept)
+		if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != tc.media ||
+			rec.Body.String() != compact.String()+"\n" {
+			t.Errorf("%s %q: %d %s\n%s", tc.as, tc.accept, rec.Code,
+				rec.Header().Get("Content-Type"), rec.Body)
 		}
 	}
 	w.fail["get"] = true
-	if rec := w.do(
-		"GET",
-		"/artifactory/api/repositories/up/configuration",
-		"admin",
-		"",
-	); rec.Code != 500 {
+	if rec := w.do("GET", path, "admin", ""); rec.Code != 500 {
 		t.Fatalf("store failure %d", rec.Code)
+	}
+}
+
+// A key that names no remote, or a remote that does not share its
+// configuration, answers 404 with no body to every caller, administrators
+// included: getRemoteDescriptor answers Response.status(SC_NOT_FOUND) for
+// anything but a shared remote (#1493).
+func TestAccSharedRemoteConfigurationNotFound(t *testing.T) {
+	w := newRepoWorld(t)
+	w.create(
+		repo.Config{Key: "private", Class: repo.Remote, URL: "https://up.example"},
+		repo.Config{
+			Key: "off", Class: repo.Remote, URL: "https://up.example",
+			ShareConfiguration: new(false),
+		},
+		repo.Config{Key: "local", Class: repo.Local, ShareConfiguration: new(true)},
+	)
+	for _, key := range []string{"private", "off", "local", "missing"} {
+		for _, as := range []string{"admin", "reader"} {
+			rec := w.do("GET", "/artifactory/api/repositories/"+key+"/configuration", as, "")
+			if rec.Code != http.StatusNotFound || rec.Body.Len() != 0 ||
+				rec.Header().Get("Content-Type") != "" {
+				t.Errorf("%s as %s: %d %q %s", key, as, rec.Code,
+					rec.Header().Get("Content-Type"), rec.Body)
+			}
+		}
 	}
 }
 
@@ -1095,17 +1184,21 @@ func TestAccNuGetEmptyContextsSurviveDirectAndSharedConfiguration(t *testing.T) 
 	if rec.Code != 200 {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body)
 	}
-	for _, suffix := range []string{"", "/configuration"} {
-		var doc map[string]any
-		jsonBody(t, w.do("GET", p+suffix, "admin", ""), &doc)
-		if doc["feedContextPath"] != "" || doc["downloadContextPath"] != "" {
-			t.Fatal("empty context lost", doc)
-		}
+	var doc map[string]any
+	jsonBody(t, w.do("GET", p, "admin", ""), &doc)
+	if doc["feedContextPath"] != "" || doc["downloadContextPath"] != "" {
+		t.Fatal("empty context lost", doc)
 	}
-	var shared map[string]any
-	jsonBody(t, w.do("GET", p+"/configuration", "reader", ""), &shared)
-	if _, present := shared["feedContextPath"]; present {
-		t.Fatal("shared disclosure contract broadened", shared)
+	// The shared configuration is the remote descriptor, which holds the
+	// context paths in its nuget object (#1493); a reader gets the same.
+	for _, as := range []string{"admin", "reader"} {
+		var shared struct {
+			NuGet map[string]any `json:"nuget"`
+		}
+		jsonBody(t, w.do("GET", p+"/configuration", as, ""), &shared)
+		if shared.NuGet["feedContextPath"] != "" || shared.NuGet["downloadContextPath"] != "" {
+			t.Fatal("empty context lost in the shared configuration", as, shared)
+		}
 	}
 	for _, body := range []string{`{"description":"keep empty"}`, `{"feedContextPath":"custom","downloadContextPath":"download"}`, `{"feedContextPath":"","downloadContextPath":""}`} {
 		rec = w.do("POST", p, "admin", body)

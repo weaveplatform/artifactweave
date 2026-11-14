@@ -427,44 +427,6 @@ func TestUnitDockerRepositoriesBlockSchema1ByDefault(t *testing.T) {
 	}
 }
 
-// The shared remote configuration is the remote's configuration masked as
-// 7.161.26 masks its remote descriptor, with the descriptor's defaults for
-// what was never set (#1493).
-func TestUnitSharedIsTheMaskedDescriptor(t *testing.T) {
-	c := *repo.Defaults(&repo.Config{
-		Key: "maven-remote", Class: repo.Remote, PackageType: repo.Maven,
-		URL: "https://up.example", Username: "u", Password: "p", Proxy: "corp",
-		LocalAddress: "10.0.0.1", PropertySets: []string{"artifactory"},
-		ShareConfiguration: ptr(true),
-	})
-	want := readDoc(t, `{"key": "maven-remote", "rclass": "remote", "packageType": "maven",
-		"description": "", "notes": "", "includesPattern": "**/*", "excludesPattern": "",
-		"repoLayoutRef": "maven-2-default", "environments": [], "signedUrlTtl": 90,
-		"dockerApiVersion": "V2", "blockPushingSchema1": true, "maxUniqueTags": 0,
-		"archiveBrowsingEnabled": false, "ddebSupported": false,
-		"propagateQueryParams": false, "retrieveSha256FromServer": false,
-		"customHttpHeaders": [], "url": "https://up.example", "blackedOut": false,
-		"xrayIndex": false, "priorityResolution": false, "downloadRedirect": false,
-		"cdnRedirect": false, "handleReleases": true, "handleSnapshots": true,
-		"maxUniqueSnapshots": 0, "suppressPomConsistencyChecks": false,
-		"remoteRepoChecksumPolicyType": "generate-if-absent", "disableProxy": false,
-		"hardFail": false, "offline": false, "storeArtifactsLocally": true,
-		"socketTimeoutMillis": 15000, "retrievalCachePeriodSecs": 7200,
-		"missedRetrievalCachePeriodSecs": 1800, "metadataRetrievalTimeoutSecs": 60,
-		"assumedOfflinePeriodSecs": 300, "unusedArtifactsCleanupPeriodHours": 0,
-		"fetchJarsEagerly": false, "fetchSourcesEagerly": false, "rejectInvalidJars": false,
-		"shareConfiguration": true, "synchronizeProperties": false,
-		"blockMismatchingMimeTypes": true, "allowAnyHostAuth": false,
-		"enableCookieManagement": false, "enableTokenAuthentication": false,
-		"bypassHeadRequests": false, "listRemoteFolderItems": false,
-		"disableUrlNormalization": false, "externalDependenciesEnabled": false,
-		"forceNugetAuthentication": false, "forceP2Authentication": false,
-		"forceConanAuthentication": false}`)
-	if diff := cmp.Diff(want, fieldsOf(t, repo.Shared(c))); diff != "" {
-		t.Errorf("shared (-want +got):\n%s", diff)
-	}
-}
-
 // Shown never reaches a stored document, and an empty field outside it
 // stays out of a read.
 func TestUnitOnlyFullShowsEmptyFields(t *testing.T) {

@@ -17,7 +17,7 @@ func Public(c Config) Config {
 // password and the values of sensitive custom headers. An update that omits
 // the password, or sends a sensitive header back with an empty value, keeps
 // the stored secret (RestoreSecrets). The repositories API's reads send
-// Full and the shared remote configuration Shared, each of which starts
+// Full and the shared remote configuration Descriptor, each of which starts
 // from Masked.
 //
 // It also lists no environments as [] rather than leaving the key out, as
@@ -66,40 +66,6 @@ func Masked(c Config) Config {
 		}
 		c.CustomHTTPHeaders = hs
 	}
-	return c
-}
-
-// Shared returns what an administrator's read of the shared remote
-// configuration, GET /api/repositories/{key}/configuration, sends of a
-// remote repository. 7.161.26 answers it with the repository's remote
-// descriptor (RepoConfigurationResource.getRemoteDescriptor), which it
-// masks: it clears the username and password, the proxy, the local
-// address and the property sets (maskData). Shared clears the same, and
-// gives the descriptor's settings that have the same name here the
-// descriptor's defaults when they were never set: signedUrlTtl 90 and
-// dockerApiVersion V2 (RepoBaseDescriptor), blockPushingSchema1 true,
-// maxUniqueTags 0 and archiveBrowsingEnabled and ddebSupported false
-// (RealRepoDescriptor and RepoBaseDescriptor), propagateQueryParams and
-// retrieveSha256FromServer false and customHttpHeaders [] (HttpRepoDescriptor).
-// It holds none of the legacy enable<Type>Support flags. The descriptor's
-// own JSON shape (its "@class", "type" and nested objects) is not mirrored
-// [I].
-func Shared(c Config) Config {
-	c = Masked(c)
-	c.Username, c.Proxy, c.LocalAddress, c.PropertySets = "", "", "", nil
-	if c.SignedURLTTL == nil {
-		c.SignedURLTTL = new(DefaultSignedURLTTL)
-	}
-	if c.DockerAPIVersion == "" {
-		c.DockerAPIVersion = DockerV2
-	}
-	setFlex(&c.BlockPushingSchema1, true)
-	setInt(&c.MaxUniqueTags, 0)
-	setBool(&c.ArchiveBrowsingEnabled, false)
-	setBool(&c.DdebSupported, false)
-	setBool(&c.PropagateQueryParams, false)
-	setBool(&c.RetrieveSha256FromServer, false)
-	c.show("customHttpHeaders")
 	return c
 }
 

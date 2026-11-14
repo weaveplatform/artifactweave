@@ -54,11 +54,32 @@ type RepoListing struct {
 }
 
 // RepoSummary is the part of a repository's configuration a list shows.
+// A remote's entry shows its upstream URL and, when it shares its
+// configuration, where to read it (7.161.26's
+// RepositoriesResource.addRemoteRepoDetails), so URL and Shared are set for
+// a remote repository only.
 type RepoSummary struct {
 	Key         string
 	Class       repo.Class
 	PackageType repo.PackageType
 	Description string
+	URL         string
+	Shared      bool
+}
+
+// SummaryOf is the RepoSummary of the repository c.
+func SummaryOf(c repo.Config) RepoSummary {
+	s := RepoSummary{
+		Key:         c.Key,
+		Class:       c.Class,
+		PackageType: c.PackageType,
+		Description: c.Description,
+	}
+	if c.Class == repo.Remote {
+		s.URL = c.URL
+		s.Shared = c.ShareConfiguration != nil && *c.ShareConfiguration
+	}
+	return s
 }
 
 // RepoPage is one window of a RepoListing: its repositories, whether more
