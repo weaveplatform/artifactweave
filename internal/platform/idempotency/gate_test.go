@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -14,7 +15,10 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/idempotency"
 )
 
-const appendOnly = `{"errors":[{"message":"Idempotency-Key is supported only once, on build append","status":400}]}` + "\n"
+const (
+	appendOnly = `{"errors":[{"message":"Idempotency-Key is supported only once, on build append","status":400}]}` + "\n"
+	rule       = `{"errors":[{"message":"Idempotency-Key is supported only once, on an operation whose API description declares it","status":400}]}` + "\n"
+)
 
 // gated sends method and target through the gate over tbl with the given
 // key values, behind the Artifactory error envelope, and returns the answer;
@@ -46,22 +50,36 @@ func gated(
 	return rec
 }
 
-// mainGate is the gate as main wrote it by hand before the operation table
-// existed, kept here so that the table-driven gate is shown to answer
-// exactly as it did while build append is the only keyed operation.
-func mainGate(r *http.Request) bool {
+// declared is the keyed set written out by hand, so that the table-driven
+// gate is shown to accept a key on exactly the operations whose API
+// description declares it: build append, promotion and both deletes, each
+// with every path segment present.
+func declared(r *http.Request) bool {
 	values, present := r.Header[idempotency.Header]
 	if !present {
 		return true
 	}
-	const prefix = "/artifactory/api/build/append/"
-	parts := strings.Split(strings.TrimPrefix(r.URL.EscapedPath(), prefix), "/")
-	supported := r.Method == http.MethodPost && strings.HasPrefix(r.URL.EscapedPath(), prefix) &&
-		len(parts) == 2 && parts[0] != "" && parts[1] != ""
+	path := r.URL.EscapedPath()
+	segments := func(prefix string, n int) bool {
+		if !strings.HasPrefix(path, prefix) {
+			return false
+		}
+		parts := strings.Split(strings.TrimPrefix(path, prefix), "/")
+		return len(parts) == n && !slices.Contains(parts, "")
+	}
+	var supported bool
+	switch r.Method {
+	case http.MethodPost:
+		supported = segments("/artifactory/api/build/append/", 2) ||
+			segments("/artifactory/api/build/promote/", 2) ||
+			path == "/artifactory/api/build/delete"
+	case http.MethodDelete:
+		supported = segments("/artifactory/api/build/", 1)
+	}
 	return supported && len(values) == 1
 }
 
-func TestUnitGateAnswersAsMain(t *testing.T) {
+func TestUnitGateAcceptsDeclaredOperations(t *testing.T) {
 	targets := []string{
 		"/artifactory/api/build/append/app/1",
 		"/artifactory/api/build/append/team%2Fapp/1",
@@ -74,8 +92,16 @@ func TestUnitGateAnswersAsMain(t *testing.T) {
 		"/artifactory/api/build/append/",
 		"/artifactory/api/build/append",
 		"/artifactory/api/build",
+		"/artifactory/api/build/",
+		"/artifactory/api/build/app",
+		"/artifactory/api/build/team%2Fapp?buildNumbers=1,2",
 		"/artifactory/api/build/app/1",
+		"/artifactory/api/build/delete",
+		"/artifactory/api/build/delete/",
 		"/artifactory/api/build/promote/app/1",
+		"/artifactory/api/build/promote/app/1?project=p",
+		"/artifactory/api/build/promote//1",
+		"/artifactory/api/build/promote/app",
 		"/artifactory/api/security/token",
 		"/access/api/v1/tokens",
 		"/artifactory/libs-local/a.jar",
@@ -89,10 +115,10 @@ func TestUnitGateAnswersAsMain(t *testing.T) {
 					r.Header.Add(idempotency.Header, k)
 				}
 				rec := gated(t, operations.Table, method, target, keys...)
-				if got := rec.Code == http.StatusNoContent; got != mainGate(r) {
-					t.Fatalf("%s %s %q: passed %v, main %v", method, target, keys, got, !got)
+				if got := rec.Code == http.StatusNoContent; got != declared(r) {
+					t.Fatalf("%s %s %q: passed %v, declared %v", method, target, keys, got, !got)
 				}
-				if rec.Code == http.StatusBadRequest && rec.Body.String() != appendOnly {
+				if rec.Code == http.StatusBadRequest && rec.Body.String() != rule {
 					t.Fatalf("%s %s: %s", method, target, rec.Body)
 				}
 				if rec.Header().Get("RateLimit") != "" || rec.Header().Get("Retry-After") != "" {
@@ -123,7 +149,6 @@ func TestUnitGateWording(t *testing.T) {
 	}
 	unkeyedAppend := appendRow
 	unkeyedAppend.IdempotencyKey = false
-	rule := `{"errors":[{"message":"Idempotency-Key is supported only once, on an operation whose API description declares it","status":400}]}` + "\n"
 	for _, c := range []struct {
 		name string
 		tbl  []operations.Operation
@@ -173,7 +198,7 @@ func TestUnitGateEnvelope(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, r)
 	if rec.Code != http.StatusBadRequest ||
-		rec.Body.String() != "Idempotency-Key is supported only once, on build append\n" {
+		rec.Body.String() != "Idempotency-Key is supported only once, on an operation whose API description declares it\n" {
 		t.Fatalf("text profile: %d %q", rec.Code, rec.Body)
 	}
 }

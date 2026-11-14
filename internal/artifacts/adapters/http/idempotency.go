@@ -23,8 +23,18 @@ var errRequestType = errors.New("artifacts: replay binding got another operation
 // operation ID. The router gives them to the shared replay
 // (idempotency.Strict), which runs the handler as the effect.
 func (s ArtifactoryAPI) KeyedBindings() map[string]idempotency.Binding {
-	return map[string]idempotency.Binding{"appendBuild": s.appendBinding()}
+	return map[string]idempotency.Binding{
+		"appendBuild":          s.appendBinding(),
+		"deleteBuilds":         s.deleteBinding(),
+		"deleteBuildsMultiple": s.deleteMultipleBinding(),
+		"promoteBuild":         s.promoteBinding(),
+	}
 }
+
+// reportRetention is how long a keyed delete's or promotion's report is
+// kept: an hour past its receipt, so that a receipt still in force never
+// names a report pruned under a clock a little ahead of the replay's.
+const reportRetention = idempotency.Retention + time.Hour
 
 // appendResource is a keyed append's canonical resource: the project with
 // "default" resolved, and started at the store's microsecond precision, so
@@ -92,6 +102,182 @@ func (s ArtifactoryAPI) appendBinding() idempotency.Binding {
 	}
 }
 
+// deleteResource is a keyed delete's canonical resource: the build and the
+// runs its query selects, numbers trimmed as the delete reads them and none
+// when it deletes every run, so that equivalent spellings share a scope.
+type deleteResource struct {
+	Project string   `json:"project"`
+	Name    string   `json:"name"`
+	Numbers []string `json:"numbers"`
+	All     bool     `json:"all"`
+}
+
+func (s ArtifactoryAPI) deleteBinding() idempotency.Binding {
+	return idempotency.Binding{
+		Name: "delete",
+		Resource: func(ctx context.Context, request any) (any, error) {
+			req, ok := request.(artgen.DeleteBuildsRequestObject)
+			if !ok {
+				return nil, errRequestType
+			}
+			if _, _, _, err := s.buildCaller(ctx); err != nil {
+				return nil, err
+			}
+			d := deleteOf(req)
+			if d.All {
+				d.Numbers = nil
+			}
+			return deleteResource{
+				Project: build.ProjectKey(d.ProjectKey),
+				Name:    d.Name, Numbers: d.Numbers, All: d.All,
+			}, nil
+		},
+		// Deleting the runs' artifacts too changes what a delete does, not
+		// which runs it deletes.
+		Fingerprint: func(_ context.Context, request any) (any, error) {
+			req, ok := request.(artgen.DeleteBuildsRequestObject)
+			if !ok {
+				return nil, errRequestType
+			}
+			return struct {
+				Artifacts bool `json:"artifacts"`
+			}{deleteOf(req).Artifacts}, nil
+		},
+		Reload: func(ctx context.Context, request any, receipt idempotency.ReplayReceipt) (any, error) {
+			req, ok := request.(artgen.DeleteBuildsRequestObject)
+			if !ok {
+				return nil, errRequestType
+			}
+			msg, err := s.confirmDelete(ctx, deleteOf(req), receipt)
+			if err != nil {
+				return nil, err
+			}
+			return artgen.DeleteBuilds200TextResponse(msg), nil
+		},
+		Error: func(ctx context.Context, request any, err error) error {
+			req, _ := request.(artgen.DeleteBuildsRequestObject)
+			p, _ := kernel.FromContext(ctx)
+			return s.buildError(ctx, p, "", noBuild(req.BuildName), err)
+		},
+	}
+}
+
+// deleteMultipleBinding binds the body form of a delete, whose body names
+// the build and its runs and which the fingerprint digests whole, so its
+// key is scoped by the credential and the operation alone.
+func (s ArtifactoryAPI) deleteMultipleBinding() idempotency.Binding {
+	return idempotency.Binding{
+		Name: "delete",
+		Resource: func(ctx context.Context, request any) (any, error) {
+			if _, ok := request.(artgen.DeleteBuildsMultipleRequestObject); !ok {
+				return nil, errRequestType
+			}
+			if _, _, _, err := s.buildCaller(ctx); err != nil {
+				return nil, err
+			}
+			return struct{}{}, nil
+		},
+		Reload: func(ctx context.Context, request any, receipt idempotency.ReplayReceipt) (any, error) {
+			req, ok := request.(artgen.DeleteBuildsMultipleRequestObject)
+			if !ok {
+				return nil, errRequestType
+			}
+			msg, err := s.confirmDelete(ctx, deleteMultipleOf(req), receipt)
+			if err != nil {
+				return nil, err
+			}
+			return artgen.DeleteBuildsMultiple200TextResponse(msg), nil
+		},
+		Error: func(ctx context.Context, request any, err error) error {
+			req, _ := request.(artgen.DeleteBuildsMultipleRequestObject)
+			p, _ := kernel.FromContext(ctx)
+			// The strict server decodes the required body before any of
+			// this runs; only another operation's request has none.
+			var d build.Delete
+			if req.Body != nil {
+				d = deleteMultipleOf(req)
+			}
+			return s.buildError(ctx, p, d.ProjectKey, noBuild(d.Name), err)
+		},
+	}
+}
+
+// confirmDelete is a keyed delete's reload: the answer for the runs the
+// receipt's report lists, once the current credential may still delete
+// them.
+func (s ArtifactoryAPI) confirmDelete(
+	ctx context.Context,
+	d build.Delete,
+	receipt idempotency.ReplayReceipt,
+) (string, error) {
+	svc, p, _, err := s.buildCaller(ctx)
+	if err != nil {
+		return "", err
+	}
+	gone, err := svc.ConfirmDelete(ctx, d, receipt.ResourceID, s.currentBuildAccess(p))
+	if err != nil {
+		return "", err //nolint:wrapcheck // the binding's Error maps it
+	}
+	return deletedText(d.Name, gone), nil
+}
+
+// promoteResource is a keyed promotion's canonical resource: the project
+// with "default" resolved, and the build and number in the path. The body,
+// which says how to promote, is fingerprinted.
+type promoteResource struct {
+	Project string `json:"project"`
+	Name    string `json:"name"`
+	Number  string `json:"number"`
+}
+
+func (s ArtifactoryAPI) promoteBinding() idempotency.Binding {
+	return idempotency.Binding{
+		Name: "promotion",
+		Resource: func(ctx context.Context, request any) (any, error) {
+			req, ok := request.(artgen.PromoteBuildRequestObject)
+			if !ok {
+				return nil, errRequestType
+			}
+			// The handler refuses a body that is not JSON before it looks
+			// at the caller, and with an answer that is not an error, so
+			// such a request goes on to the handler, which gives it.
+			if promotionBody(req) != nil {
+				if _, _, _, err := s.buildCaller(ctx); err != nil {
+					return nil, err
+				}
+			}
+			return promoteResource{
+				Project: build.ProjectKey(httpkit.Deref(req.Params.Project)),
+				Name:    req.BuildName, Number: req.BuildNumber,
+			}, nil
+		},
+		Reload: func(ctx context.Context, request any, receipt idempotency.ReplayReceipt) (any, error) {
+			req, ok := request.(artgen.PromoteBuildRequestObject)
+			if !ok {
+				return nil, errRequestType
+			}
+			svc, p, _, err := s.buildCaller(ctx)
+			if err != nil {
+				return nil, err
+			}
+			msgs, err := svc.ConfirmPromote(ctx, build.Promotion{
+				ProjectKey: httpkit.Deref(req.Params.Project),
+				Name:       req.BuildName, Number: req.BuildNumber,
+			}, receipt.ResourceID, s.currentBuildAccess(p))
+			if err != nil {
+				return nil, err //nolint:wrapcheck // the binding's Error maps it
+			}
+			return artgen.PromoteBuild200JSONResponse(promotionReport(msgs)), nil
+		},
+		Error: func(ctx context.Context, request any, err error) error {
+			req, _ := request.(artgen.PromoteBuildRequestObject)
+			p, _ := kernel.FromContext(ctx)
+			project := httpkit.Deref(req.Params.Project)
+			return s.buildError(ctx, p, project, unpromoted(req), err)
+		},
+	}
+}
+
 // appendOf reads an append's run selection and modules from req, as
 // AppendBuild does, by p.
 func appendOf(
@@ -114,9 +300,9 @@ func appendOf(
 }
 
 // currentBuildAccess evaluates p's credential and permissions as they stand
-// when a keyed append's effect or reload runs, not the request's decider: a
-// replay must not recover an append that revoked access no longer allows
-// (decision 0043).
+// when a keyed build action's effect or reload runs, not the request's
+// decider: a replay must not recover an action that revoked access no
+// longer allows (decision 0043).
 func (s ArtifactoryAPI) currentBuildAccess(
 	p kernel.Principal,
 ) func(context.Context) (build.Access, error) {
@@ -132,7 +318,7 @@ func (s ArtifactoryAPI) currentBuildAccess(
 				errors.Is(err, kernel.ErrNotFound) {
 				return nil, build.ErrForbidden
 			}
-			return nil, fmt.Errorf("recheck append credential: %w", err)
+			return nil, fmt.Errorf("recheck build credential: %w", err)
 		}
 		a, err := itemkit.AccessFor(ctx, s.cfg.Access.Authorizer, current, nil)
 		return buildAccess{a}, err

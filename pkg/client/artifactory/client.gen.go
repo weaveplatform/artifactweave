@@ -6880,7 +6880,13 @@ type AppendBuildParams struct {
 	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
 	Project *string `form:"project,omitempty" json:"project,omitempty"`
 
-	// IdempotencyKey Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, retries with the same credential, canonical resource and identical body bytes return 204 without appending again. Reuse with different bytes returns 422. Replays remain bound to the original run and require current permission. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window.
+	// IdempotencyKey Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, a retry with the same key, credential, canonical resource and identical body bytes does not repeat the operation's effect: it answers the original success status, with the body built from the committed result after the current credential and permissions are checked again. Reuse with different bytes, or with a changed parameter that alters the effect, returns 422. A resource deleted since answers 404, one moved out of the request's scope 409. Only a success is kept, so a retry after a failure runs the operation again. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window. An operation that does not declare this parameter answers a key with 400.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// DeleteBuildsMultipleParams defines parameters for DeleteBuildsMultiple.
+type DeleteBuildsMultipleParams struct {
+	// IdempotencyKey Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, a retry with the same key, credential, canonical resource and identical body bytes does not repeat the operation's effect: it answers the original success status, with the body built from the committed result after the current credential and permissions are checked again. Reuse with different bytes, or with a changed parameter that alters the effect, returns 422. A resource deleted since answers 404, one moved out of the request's scope 409. Only a success is kept, so a retry after a failure runs the operation again. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window. An operation that does not declare this parameter answers a key with 400.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
@@ -6888,6 +6894,9 @@ type AppendBuildParams struct {
 type PromoteBuildParams struct {
 	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
 	Project *string `form:"project,omitempty" json:"project,omitempty"`
+
+	// IdempotencyKey Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, a retry with the same key, credential, canonical resource and identical body bytes does not repeat the operation's effect: it answers the original success status, with the body built from the committed result after the current credential and permissions are checked again. Reuse with different bytes, or with a changed parameter that alters the effect, returns 422. A resource deleted since answers 404, one moved out of the request's scope 409. Only a success is kept, so a retry after a failure runs the operation again. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window. An operation that does not declare this parameter answers a key with 400.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // RenameBuildParams defines parameters for RenameBuild.
@@ -6918,6 +6927,9 @@ type DeleteBuildsParams struct {
 
 	// DeleteAll Optional query parameter. 1 deletes every run of the build; 0, the default, deletes only buildNumbers.
 	DeleteAll *DeleteBuildsParamsDeleteAll `form:"deleteAll,omitempty" json:"deleteAll,omitempty"`
+
+	// IdempotencyKey Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, a retry with the same key, credential, canonical resource and identical body bytes does not repeat the operation's effect: it answers the original success status, with the body built from the committed result after the current credential and permissions are checked again. Reuse with different bytes, or with a changed parameter that alters the effect, returns 422. A resource deleted since answers 404, one moved out of the request's scope 409. Only a success is kept, so a retry after a failure runs the operation again. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window. An operation that does not declare this parameter answers a key with 400.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // DeleteBuildsParamsArtifacts defines parameters for DeleteBuilds.
@@ -9870,13 +9882,13 @@ type ClientInterface interface {
 	// with any type of body and a specified content type.
 	//
 	// Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
-	DeleteBuildsMultipleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DeleteBuildsMultipleWithBody(ctx context.Context, params *DeleteBuildsMultipleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteBuildsMultiple performs a POST /api/build/delete (the `DeleteBuildsMultiple` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
 	// Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
-	DeleteBuildsMultiple(ctx context.Context, body DeleteBuildsMultipleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DeleteBuildsMultiple(ctx context.Context, params *DeleteBuildsMultipleParams, body DeleteBuildsMultipleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PromoteBuildWithBody performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request,
 	// with any type of body and a specified content type.
@@ -13631,8 +13643,8 @@ func (c *Client) AppendBuild(ctx context.Context, buildName string, buildNumber 
 // with any type of body and a specified content type.
 //
 // Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
-func (c *Client) DeleteBuildsMultipleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteBuildsMultipleRequestWithBody(c.Server, contentType, body)
+func (c *Client) DeleteBuildsMultipleWithBody(ctx context.Context, params *DeleteBuildsMultipleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteBuildsMultipleRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -13647,8 +13659,8 @@ func (c *Client) DeleteBuildsMultipleWithBody(ctx context.Context, contentType s
 // Takes a body of the `application/json` content type.
 //
 // Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
-func (c *Client) DeleteBuildsMultiple(ctx context.Context, body DeleteBuildsMultipleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteBuildsMultipleRequest(c.Server, body)
+func (c *Client) DeleteBuildsMultiple(ctx context.Context, params *DeleteBuildsMultipleParams, body DeleteBuildsMultipleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteBuildsMultipleRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -22070,18 +22082,18 @@ func NewAppendBuildRequestWithBody(server string, buildName string, buildNumber 
 }
 
 // NewDeleteBuildsMultipleRequest calls the generic DeleteBuildsMultiple builder with application/json body
-func NewDeleteBuildsMultipleRequest(server string, body DeleteBuildsMultipleJSONRequestBody) (*http.Request, error) {
+func NewDeleteBuildsMultipleRequest(server string, params *DeleteBuildsMultipleParams, body DeleteBuildsMultipleJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewDeleteBuildsMultipleRequestWithBody(server, "application/json", bodyReader)
+	return NewDeleteBuildsMultipleRequestWithBody(server, params, "application/json", bodyReader)
 }
 
 // NewDeleteBuildsMultipleRequestWithBody constructs an http.Request for the DeleteBuildsMultiple method, with any body, and a specified content type
-func NewDeleteBuildsMultipleRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+func NewDeleteBuildsMultipleRequestWithBody(server string, params *DeleteBuildsMultipleParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -22105,6 +22117,21 @@ func NewDeleteBuildsMultipleRequestWithBody(server string, contentType string, b
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -22197,6 +22224,21 @@ func NewPromoteBuildRequestWithBody(server string, buildName string, buildNumber
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -22436,6 +22478,21 @@ func NewDeleteBuildsRequest(server string, buildName string, params *DeleteBuild
 	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
 	}
 
 	return req, nil
@@ -37062,13 +37119,13 @@ type ClientWithResponsesInterface interface {
 	// Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	DeleteBuildsMultipleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeleteBuildsMultipleResponse, error)
+	DeleteBuildsMultipleWithBodyWithResponse(ctx context.Context, params *DeleteBuildsMultipleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeleteBuildsMultipleResponse, error)
 
 	// DeleteBuildsMultipleWithResponse performs a POST /api/build/delete (the `DeleteBuildsMultiple` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
-	DeleteBuildsMultipleWithResponse(ctx context.Context, body DeleteBuildsMultipleJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteBuildsMultipleResponse, error)
+	DeleteBuildsMultipleWithResponse(ctx context.Context, params *DeleteBuildsMultipleParams, body DeleteBuildsMultipleJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteBuildsMultipleResponse, error)
 
 	// PromoteBuildWithBodyWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request,
 	// with any type of body and a specified content type.
@@ -73776,8 +73833,8 @@ func (c *ClientWithResponses) AppendBuildWithResponse(ctx context.Context, build
 // Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) DeleteBuildsMultipleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeleteBuildsMultipleResponse, error) {
-	rsp, err := c.DeleteBuildsMultipleWithBody(ctx, contentType, body, reqEditors...)
+func (c *ClientWithResponses) DeleteBuildsMultipleWithBodyWithResponse(ctx context.Context, params *DeleteBuildsMultipleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeleteBuildsMultipleResponse, error) {
+	rsp, err := c.DeleteBuildsMultipleWithBody(ctx, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -73788,8 +73845,8 @@ func (c *ClientWithResponses) DeleteBuildsMultipleWithBodyWithResponse(ctx conte
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
-func (c *ClientWithResponses) DeleteBuildsMultipleWithResponse(ctx context.Context, body DeleteBuildsMultipleJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteBuildsMultipleResponse, error) {
-	rsp, err := c.DeleteBuildsMultiple(ctx, body, reqEditors...)
+func (c *ClientWithResponses) DeleteBuildsMultipleWithResponse(ctx context.Context, params *DeleteBuildsMultipleParams, body DeleteBuildsMultipleJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteBuildsMultipleResponse, error) {
+	rsp, err := c.DeleteBuildsMultiple(ctx, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -82681,6 +82738,9 @@ func ParseDeleteBuildsMultipleResponse(rsp *http.Response) (*DeleteBuildsMultipl
 		}
 		response.JSON403 = &dest
 
+	case rsp.StatusCode == 422:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -82799,6 +82859,12 @@ func ParsePromoteBuildResponse(rsp *http.Response) (*PromoteBuildResponse, error
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 409:
+		break // No content-type
+
+	case rsp.StatusCode == 422:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -83141,6 +83207,9 @@ func ParseDeleteBuildsResponse(rsp *http.Response) (*DeleteBuildsResponse, error
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 422:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests

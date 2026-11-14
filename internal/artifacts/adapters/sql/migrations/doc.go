@@ -17,7 +17,9 @@
 //   - FS: a directory per dialect, sqlite and postgres, named like the dialect,
 //     of NNNN_name.sql files with "-- +up" and "-- +down" sections. The stream
 //     starts at 0001_baseline.sql; 0002_docker_page.sql adds the two partial
-//     indexes the registry's tags lists and catalogs page by (#1402).
+//     indexes the registry's tags lists and catalogs page by (#1402), and
+//     0005_build_reports.sql the table keyed build deletes and promotions
+//     keep their reports in for their replays (#1410).
 //
 // # Invariants
 //
@@ -29,14 +31,14 @@
 //     (TestAccSchemaGolden, on SQLite and PostgreSQL).
 //   - No foreign key leaves the stream (decision 0044, "No cross-module foreign
 //     keys"), so the stream migrates up and down on its own.
-//   - The stream owns 28 tables, which no other stream creates or references:
+//   - The stream owns 29 tables, which no other stream creates or references:
 //     blobs, repositories, repository_secrets, repository_members,
 //     repository_keypairs, repository_header_secrets, items, item_properties,
 //     item_stats, trash, packages, package_versions, package_version_files,
 //     blob_replicas, cold_blobs, cold_blob_replicas, archived_items, builds,
 //     build_modules, build_properties, build_artifacts, build_dependencies,
-//     build_promotions, build_retention, remote_sources, remote_cache,
-//     gitlfs_locks and bower_registrations.
+//     build_promotions, build_retention, build_reports, remote_sources,
+//     remote_cache, gitlfs_locks and bower_registrations.
 //
 // # References
 //
@@ -57,7 +59,7 @@
 // # Status
 //
 // Implemented P9d: the baseline (issue 994). 0002: the Docker page indexes
-// (issue 1402).
+// (issue 1402). 0005: the build reports (issue 1410).
 //
 // # Testing
 //

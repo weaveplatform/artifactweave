@@ -1207,6 +1207,8 @@ paths:
     post:
       description: Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
       operationId: deleteBuildsMultiple
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         content:
           application/json:
@@ -1228,6 +1230,8 @@ paths:
           $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
         '403':
           $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
+        '422':
+          description: This unexpired key was used with different request bytes or parameters.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '503':
@@ -1242,6 +1246,7 @@ paths:
       description: Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The body may use the vendor media type or application/json.
       operationId: promoteBuild
       parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
         - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped as %2F and is matched as a single path segment.
           in: path
           name: buildName
@@ -1293,6 +1298,10 @@ paths:
           $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
         '404':
           $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+        '409':
+          description: The run a key promoted has since moved to another build name or number.
+        '422':
+          description: This unexpired key was used with different request bytes or parameters.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '503':
@@ -1421,6 +1430,7 @@ paths:
       description: Deletes the listed runs of a build, or every run, optionally with their artifacts. Needs delete permission on the build.
       operationId: deleteBuilds
       parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
         - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped as %2F and is matched as a single path segment.
           in: path
           name: buildName
@@ -1471,6 +1481,8 @@ paths:
           $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
         '404':
           $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+        '422':
+          description: This unexpired key was used with different request bytes or parameters.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '503':
@@ -21145,7 +21157,7 @@ components:
         type: string
     IdempotencyKey:
       description: >-
-        Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, retries with the same credential, canonical resource and identical body bytes return 204 without appending again. Reuse with different bytes returns 422. Replays remain bound to the original run and require current permission. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window.
+        Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, a retry with the same key, credential, canonical resource and identical body bytes does not repeat the operation's effect: it answers the original success status, with the body built from the committed result after the current credential and permissions are checked again. Reuse with different bytes, or with a changed parameter that alters the effect, returns 422. A resource deleted since answers 404, one moved out of the request's scope 409. Only a success is kept, so a retry after a failure runs the operation again. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window. An operation that does not declare this parameter answers a key with 400.
       in: header
       name: Idempotency-Key
       x-artifactweave-extension: true

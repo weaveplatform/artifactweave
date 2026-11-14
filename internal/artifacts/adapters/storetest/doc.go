@@ -40,7 +40,8 @@
 //     BowerRegistrations, RemoteCache, RemoteCacheFences, RemoteCacheAtomic,
 //     RemoteCacheEvict, RemoteCacheConcurrent, RemoteCacheUsage,
 //     RemoteSmartState, ArchivedItems, Builds, BuildRuns, BuildDeletes,
-//     BuildRename, BuildPromotions, BuildFiles and BuildRetention.
+//     BuildRename, BuildPromotions, BuildFiles, BuildRetention and
+//     BuildReports.
 //   - LongText, the random text the long property cases store, which the
 //     server's long-property test shares.
 //

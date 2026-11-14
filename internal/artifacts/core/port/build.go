@@ -2,6 +2,7 @@ package port
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
@@ -89,6 +90,19 @@ type BuildStore interface {
 	// kernel.ErrNotFound when the run does not exist.
 	Promotions(ctx context.Context, buildID int64) ([]model.BuildPromotion, error)
 
+	// PutReport stores a keyed build action's report and returns its
+	// assigned, positive ID. kernel.ErrInvalid when the action is empty or
+	// Expires is not after Created.
+	PutReport(ctx context.Context, r model.BuildReport) (int64, error)
+	// ReportForUpdate locks and returns the report with id, expired or
+	// not. It requires an enclosing Tx, like GetForUpdate.
+	// kernel.ErrNotFound when there is none.
+	ReportForUpdate(ctx context.Context, id int64) (model.BuildReport, error)
+	// PruneReports removes at most limit reports whose Expires is at or
+	// before now, oldest expiry first, and returns how many it removed.
+	// A limit outside 1..kernel.MaxLimit is kernel.ErrInvalid.
+	PruneReports(ctx context.Context, now time.Time, limit int) (int64, error)
+
 	// FindArtifacts returns the build artifacts whose checksums match every
 	// non-empty field of c, across all projects, ordered by run ID, then
 	// module and file position. kernel.ErrInvalid when c has no checksum.
@@ -120,6 +134,19 @@ func NormaliseBuild(b model.Build) model.Build {
 		b.Modules[i].Properties = cleanBuildProperties(b.Modules[i].Properties)
 	}
 	return b
+}
+
+// CheckBuildReport refuses a report every backend refuses: one without an
+// action, or whose expiry is not after its creation at the stores'
+// microsecond precision, which PruneReports would remove at once.
+func CheckBuildReport(r model.BuildReport) error {
+	if r.Action == "" || r.Expires.UnixMicro() <= r.Created.UnixMicro() {
+		return fmt.Errorf(
+			"build report: an action and an expiry after its creation are required: %w",
+			kernel.ErrInvalid,
+		)
+	}
+	return nil
 }
 
 // cleanBuildProperties is CleanProperties, nil when no key has a value.

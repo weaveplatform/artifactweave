@@ -19,7 +19,8 @@ import (
 // fixture below that breaks it, so a new rule is added here and given one.
 var principleRules = []string{
 	ruleClassMissing, ruleClassTodo, ruleClassValue, ruleNaturalIdentifier, ruleNoneReason,
-	ruleKeyParameter, ruleCostAdmission, ruleAdmissionResponses, ruleAdmissionHeaders,
+	ruleKeyParameter, ruleKeyServed, ruleKeyStub, ruleCostAdmission, ruleAdmissionResponses,
+	ruleAdmissionHeaders,
 	ruleAdmissionEnvelope, ruleCollectionPagination, ruleCursorNext, rulePaginationDeclaration,
 }
 
@@ -42,7 +43,8 @@ const (
 )
 
 // validPaths breaks no rule: one operation of each class and shape the
-// guard accepts.
+// guard accepts. x-tier: stub marks a fixture operation a 501 stub serves
+// (fixtureServed).
 var validPaths = `
 /api/system/ping:
   get:
@@ -82,6 +84,14 @@ var validPaths = `
     parameters:
       - {name: buildName, in: path, required: true, schema: {type: string}}
       - $ref: '#/components/parameters/IdempotencyKey'` + admitted + `
+/api/build/promote/{buildName}:
+  post:
+    operationId: promoteStub
+    x-tier: stub
+    x-idempotency: key
+    x-cost: expensive
+    parameters:
+      - {name: buildName, in: path, required: true, schema: {type: string}}` + admitted + `
 /api/security/token:
   post:
     operationId: createToken
@@ -194,6 +204,7 @@ var principleFixtures = []struct {
 /api/x:
   put:
     operationId: x
+    x-tier: stub
     x-idempotency: key
     x-idempotency-natural: [route]
     x-cost: expensive` + admitted,
@@ -231,6 +242,30 @@ var principleFixtures = []struct {
     parameters:
       - {name: Idempotency-Key, in: header, schema: {type: string}}` + admitted,
 		[]string{ruleKeyParameter},
+	},
+	{
+		"served key operation without the key", `
+/api/build/promote/{buildName}:
+  post:
+    operationId: promoteBuild
+    x-idempotency: key
+    x-cost: expensive
+    parameters:
+      - {name: buildName, in: path, required: true, schema: {type: string}}` + admitted,
+		[]string{ruleKeyServed},
+	},
+	{
+		"stub with the key", `
+/api/build/promote/{buildName}:
+  post:
+    operationId: promoteBuild
+    x-tier: stub
+    x-idempotency: key
+    x-cost: expensive
+    parameters:
+      - {name: buildName, in: path, required: true, schema: {type: string}}
+      - $ref: '#/components/parameters/IdempotencyKey'` + admitted,
+		[]string{ruleKeyStub},
 	},
 	{
 		"cost other than admission's", `
@@ -403,6 +438,13 @@ var principleFixtures = []struct {
 	},
 }
 
+// fixtureServed serves every fixture operation that x-tier: stub does not
+// mark a stub.
+func fixtureServed(_ string, op *openapi3.Operation) bool {
+	tier, _ := op.Extensions["x-tier"].(string)
+	return tier != "stub"
+}
+
 // principleFixtureDoc is a spec served under /artifactory with paths and
 // the real shared components, so a fixture meets the declarations the
 // bundles reference.
@@ -447,7 +489,11 @@ func TestUnitAPIPrinciplesFixtures(t *testing.T) {
 	broken := map[string]bool{}
 	for _, f := range principleFixtures {
 		t.Run(f.name, func(t *testing.T) {
-			violations := checkAPIPrinciples("fixture", principleFixtureDoc(t, f.paths))
+			violations := checkAPIPrinciples(
+				"fixture",
+				principleFixtureDoc(t, f.paths),
+				fixtureServed,
+			)
 			var got []string
 			for _, v := range violations {
 				got = append(got, v.Rule)
