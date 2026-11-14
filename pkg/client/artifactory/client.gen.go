@@ -6695,6 +6695,24 @@ type ArtifactorySearchesApiInternalServerError = ErrorResponse
 // ArtifactorySearchesApiNotFound The error envelope used by every /artifactory response.
 type ArtifactorySearchesApiNotFound = ErrorResponse
 
+// ArtifactorySearchesApiRegistryBadRequest The registry error envelope of the OCI distribution specification, which a registry client reads.
+type ArtifactorySearchesApiRegistryBadRequest = RegistryErrorResponse
+
+// ArtifactorySearchesApiRegistryForbidden The registry error envelope of the OCI distribution specification, which a registry client reads.
+type ArtifactorySearchesApiRegistryForbidden = RegistryErrorResponse
+
+// ArtifactorySearchesApiRegistryInternalServerError The registry error envelope of the OCI distribution specification, which a registry client reads.
+type ArtifactorySearchesApiRegistryInternalServerError = RegistryErrorResponse
+
+// ArtifactorySearchesApiRegistryMethodNotAllowed The registry error envelope of the OCI distribution specification, which a registry client reads.
+type ArtifactorySearchesApiRegistryMethodNotAllowed = RegistryErrorResponse
+
+// ArtifactorySearchesApiRegistryNotFound The registry error envelope of the OCI distribution specification, which a registry client reads.
+type ArtifactorySearchesApiRegistryNotFound = RegistryErrorResponse
+
+// ArtifactorySearchesApiRegistryUnauthorized The registry error envelope of the OCI distribution specification, which a registry client reads.
+type ArtifactorySearchesApiRegistryUnauthorized = RegistryErrorResponse
+
 // ArtifactorySearchesApiUnauthorized The error envelope used by every /artifactory response.
 type ArtifactorySearchesApiUnauthorized = ErrorResponse
 
