@@ -72,11 +72,25 @@ type searchResponse struct {
 }
 
 func answer(ctx context.Context, vendor string, body any) searchResponse {
-	media := "application/json"
+	return searchResponse{media: searchMedia(ctx, vendor), body: body}
+}
+
+// searchMedia is the media type of a search's 200: vendor when the
+// client's Accept names it.
+func searchMedia(ctx context.Context, vendor string) string {
 	if httpkit.Accepts(ctx, vendor) {
-		media = vendor
+		return vendor
 	}
-	return searchResponse{media: media, body: body}
+	return "application/json"
+}
+
+// streamedResults are the options of a search whose {"results": [...]}
+// is written from its store pages (decision 0043, "Streaming complete
+// lists"), in the media type answer would choose.
+func streamedResults(ctx context.Context, vendor string) httpkit.ListOptions {
+	// A constant document, which always splits.
+	env, _ := httpkit.EnvelopeOf(results([]map[string]any{}), "results")
+	return httpkit.ListOptions{ContentType: searchMedia(ctx, vendor), Envelope: env}
 }
 
 func (r searchResponse) write(w http.ResponseWriter) error {
@@ -232,9 +246,30 @@ func (d resultDetail) include() []string {
 	return nil
 }
 
-// entries renders hits as uri results, widened to the file or folder info
+// entry renders a hit as a uri result, widened to the file or folder info
 // document and the item's properties as d asks. An item without properties
 // has no properties field.
+func (r *searchRun) entry(ctx context.Context, h aql.Hit, d resultDetail) (map[string]any, error) {
+	e := map[string]any{"uri": r.uri(ctx, h.Item)}
+	if d.shouldIncludeInfo {
+		c := r.Configs[h.Item.RepoKey]
+		v := storageView{
+			s: r.s, st: r.st, key: h.Item.ReportedRepoKey(), repo: c,
+			isCached: h.Item.Cached, acc: r.acc,
+		}
+		_, body, err := v.info(ctx, itemkit.Found{Repo: c, Item: h.Item})
+		if err != nil {
+			return nil, r.s.InternalError(ctx, "search result info", err)
+		}
+		e, _ = body.(map[string]any)
+	}
+	if d.shouldIncludeProperties && len(h.Properties) > 0 {
+		e["properties"] = h.Properties
+	}
+	return e, nil
+}
+
+// entries renders hits as entry renders each.
 func (r *searchRun) entries(
 	ctx context.Context,
 	hits []aql.Hit,
@@ -242,43 +277,24 @@ func (r *searchRun) entries(
 ) ([]map[string]any, error) {
 	out := make([]map[string]any, 0, len(hits))
 	for _, h := range hits {
-		e := map[string]any{"uri": r.uri(ctx, h.Item)}
-		if d.shouldIncludeInfo {
-			c := r.Configs[h.Item.RepoKey]
-			v := storageView{
-				s: r.s, st: r.st, key: h.Item.ReportedRepoKey(), repo: c,
-				isCached: h.Item.Cached, acc: r.acc,
-			}
-			_, body, err := v.info(ctx, itemkit.Found{Repo: c, Item: h.Item})
-			if err != nil {
-				return nil, r.s.InternalError(ctx, "search result info", err)
-			}
-			e, _ = body.(map[string]any)
-		}
-		if d.shouldIncludeProperties && len(h.Properties) > 0 {
-			e["properties"] = h.Properties
+		e, err := r.entry(ctx, h, d)
+		if err != nil {
+			return nil, err
 		}
 		out = append(out, e)
 	}
 	return out, nil
 }
 
-// uriSearch runs a search answered with uri results.
-func (r *searchRun) uriSearch(
+// uriEntry is entry as a streamed list renders each hit.
+func (r *searchRun) uriEntry(
 	ctx context.Context,
-	criteria aql.Node,
 	d resultDetail,
-	vendor string,
-) (searchResponse, error) {
-	hits, err := r.Collect(ctx, criteria, d.include(), r.UserLimit(), nil)
-	if err != nil {
-		return searchResponse{}, err
+) func(aql.Hit) (map[string]any, bool, error) {
+	return func(h aql.Hit) (map[string]any, bool, error) {
+		e, err := r.entry(ctx, h, d)
+		return e, err == nil, err
 	}
-	entries, err := r.entries(ctx, hits, d)
-	if err != nil {
-		return searchResponse{}, err
-	}
-	return answer(ctx, vendor, results(entries)), nil
 }
 
 // SearchArtifact answers the quick search: files whose name contains name,
@@ -297,9 +313,14 @@ func (s ArtifactoryAPI) SearchArtifact(
 		return nil, httpkit.BadRequestf("name must not be empty")
 	}
 	scope, _ := r.RepoScope(req.Params.Repos, false)
-	return r.uriSearch(ctx, search.All(search.Files(), scope, &aql.FieldCriterion{
-		Field: aql.FieldName, Op: aql.OpMatch, Text: "*" + name + "*",
-	}), detailOf(req.Params.XResultDetail), mediaArtifactSearch)
+	d := detailOf(req.Params.XResultDetail)
+	l, err := httpkit.StreamList(ctx, r.Pages(search.All(search.Files(), scope,
+		&aql.FieldCriterion{Field: aql.FieldName, Op: aql.OpMatch, Text: "*" + name + "*"},
+	), d.include(), r.UserLimit(), nil), r.uriEntry(ctx, d), streamedResults(ctx, mediaArtifactSearch))
+	if err != nil {
+		return nil, err //nolint:wrapcheck // Internal's error, already an answer
+	}
+	return streamed{l}, nil
 }
 
 // SearchProperty answers the property search: items, folders included,
@@ -319,8 +340,14 @@ func (s ArtifactoryAPI) SearchProperty(
 		return nil, err
 	}
 	scope, _ := r.RepoScope(req.Params.Repos, true)
-	return r.uriSearch(ctx, search.All(scope, criteria), detailOf(req.Params.XResultDetail),
-		mediaPropertySearch)
+	d := detailOf(req.Params.XResultDetail)
+	l, err := httpkit.StreamList(ctx,
+		r.Pages(search.All(scope, criteria), d.include(), r.UserLimit(), nil),
+		r.uriEntry(ctx, d), streamedResults(ctx, mediaPropertySearch))
+	if err != nil {
+		return nil, err //nolint:wrapcheck // Internal's error, already an answer
+	}
+	return streamed{l}, nil
 }
 
 // propertyCriteria reads every query parameter but repos as a property, as
@@ -417,8 +444,14 @@ func (s ArtifactoryAPI) SearchChecksum(
 		return nil, httpkit.BadRequestf("name one of md5, sha1 or sha256")
 	}
 	scope, _ := r.RepoScope(req.Params.Repos, true)
-	return r.uriSearch(ctx, search.All(append(crit, scope)...), detailOf(req.Params.XResultDetail),
-		mediaChecksumSearch)
+	d := detailOf(req.Params.XResultDetail)
+	l, err := httpkit.StreamList(ctx,
+		r.Pages(search.All(append(crit, scope)...), d.include(), r.UserLimit(), nil),
+		r.uriEntry(ctx, d), streamedResults(ctx, mediaChecksumSearch))
+	if err != nil {
+		return nil, err //nolint:wrapcheck // Internal's error, already an answer
+	}
+	return streamed{l}, nil
 }
 
 // SearchBadChecksum answers the bad checksum search: files whose checksum
@@ -442,20 +475,20 @@ func (s ArtifactoryAPI) SearchBadChecksum(
 		return nil, httpkit.BadRequestf("type must be md5 or sha1")
 	}
 	scope, _ := r.RepoScope(req.Params.Repos, true)
-	hits, err := r.Collect(ctx, search.All(search.Files(), scope), nil, r.Capped(badChecksumCap),
-		func(h aql.Hit) bool { return of(h.Item.Original) != of(h.Item.Actual) })
+	l, err := httpkit.StreamList(ctx,
+		r.Pages(search.All(search.Files(), scope), nil, r.Capped(badChecksumCap),
+			func(h aql.Hit) bool { return of(h.Item.Original) != of(h.Item.Actual) }),
+		func(h aql.Hit) (map[string]any, bool, error) {
+			return map[string]any{
+				"uri":       r.uri(ctx, h.Item),
+				"serverMd5": of(h.Item.Actual),
+				"clientMd5": of(h.Item.Original),
+			}, true, nil
+		}, streamedResults(ctx, mediaBadChecksumSearch))
 	if err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // Internal's error, already an answer
 	}
-	entries := make([]map[string]any, 0, len(hits))
-	for _, h := range hits {
-		entries = append(entries, map[string]any{
-			"uri":       r.uri(ctx, h.Item),
-			"serverMd5": of(h.Item.Actual),
-			"clientMd5": of(h.Item.Original),
-		})
-	}
-	return answer(ctx, mediaBadChecksumSearch, results(entries)), nil
+	return streamed{l}, nil
 }
 
 // window reads a search's [from, to] bounds; a missing to is now.
@@ -502,23 +535,18 @@ func (s ArtifactoryAPI) SearchCreation(
 	if len(missing) > 0 {
 		return nil, itemkit.NotFoundRepo(missing[0])
 	}
-	hits, err := r.Collect(
-		ctx,
-		search.All(search.Files(), scope, search.Within(aql.FieldCreated, from, to)),
-		nil,
-		r.UserLimit(),
-		nil,
-	)
+	l, err := httpkit.StreamList(ctx,
+		r.Pages(search.All(search.Files(), scope, search.Within(aql.FieldCreated, from, to)),
+			nil, r.UserLimit(), nil),
+		func(h aql.Hit) (map[string]any, bool, error) {
+			return map[string]any{
+				"uri": r.uri(ctx, h.Item), "created": httpkit.FormatTime(h.Item.Created),
+			}, true, nil
+		}, streamedResults(ctx, mediaCreationSearch))
 	if err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // Internal's error, already an answer
 	}
-	entries := make([]map[string]any, 0, len(hits))
-	for _, h := range hits {
-		entries = append(entries, map[string]any{
-			"uri": r.uri(ctx, h.Item), "created": httpkit.FormatTime(h.Item.Created),
-		})
-	}
-	return answer(ctx, mediaCreationSearch, results(entries)), nil
+	return streamed{l}, nil
 }
 
 // dateFields are the fields the dates search tests and returns.
@@ -579,34 +607,34 @@ func (s ArtifactoryAPI) SearchDates(
 		}
 	}
 	scope, _ := r.RepoScope(req.Params.Repos, false)
-	hits, err := r.Collect(
-		ctx,
-		search.All(search.Files(), scope, either),
-		include,
-		r.UserLimit(),
-		nil,
-	)
+	l, err := httpkit.StreamList(ctx,
+		r.Pages(search.All(search.Files(), scope, either), include, r.UserLimit(), nil),
+		func(h aql.Hit) (map[string]any, bool, error) {
+			return dateEntry(r.uri(ctx, h.Item), fields, h), true, nil
+		}, streamedResults(ctx, mediaDatesSearch))
 	if err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // Internal's error, already an answer
 	}
-	entries := make([]map[string]any, 0, len(hits))
-	for _, h := range hits {
-		e := map[string]any{"uri": r.uri(ctx, h.Item)}
-		for _, f := range fields {
-			switch f {
-			case "created":
-				putTime(e, f, h.Item.Created)
-			case "lastModified":
-				putTime(e, f, h.Item.Modified)
-			default:
-				if h.Stats != nil {
-					putTime(e, f, h.Stats.LastDownloaded)
-				}
+	return streamed{l}, nil
+}
+
+// dateEntry is a dates search result: the item's uri and the named date
+// fields it has.
+func dateEntry(uri string, fields []string, h aql.Hit) map[string]any {
+	e := map[string]any{"uri": uri}
+	for _, f := range fields {
+		switch f {
+		case "created":
+			putTime(e, f, h.Item.Created)
+		case "lastModified":
+			putTime(e, f, h.Item.Modified)
+		default:
+			if h.Stats != nil {
+				putTime(e, f, h.Stats.LastDownloaded)
 			}
 		}
-		entries = append(entries, e)
 	}
-	return answer(ctx, mediaDatesSearch, results(entries)), nil
+	return e
 }
 
 // instantLayouts are the ISO 8601 forms the dates search reads; a time
@@ -653,26 +681,25 @@ func (s ArtifactoryAPI) SearchUsage(
 		before = time.UnixMilli(*req.Params.CreatedBefore).UTC()
 	}
 	scope, _ := r.RepoScope(req.Params.Repos, false)
-	hits, err := r.Collect(ctx, search.All(
+	l, err := httpkit.StreamList(ctx, r.Pages(search.All(
 		search.Files(), scope,
 		&aql.FieldCriterion{Field: aql.FieldCreated, Op: aql.OpLt, Time: before},
 		aql.Or{
 			&aql.StatCriterion{Field: aql.StatDownloaded, Op: aql.OpEq, Null: true},
 			&aql.StatCriterion{Field: aql.StatDownloaded, Op: aql.OpLt, Time: since},
 		},
-	), []string{"stat"}, r.UserLimit(), nil)
+	), []string{"stat"}, r.UserLimit(), nil),
+		func(h aql.Hit) (map[string]any, bool, error) {
+			e := map[string]any{"uri": r.uri(ctx, h.Item)}
+			if h.Stats != nil {
+				putTime(e, "lastDownloaded", h.Stats.LastDownloaded)
+			}
+			return e, true, nil
+		}, streamedResults(ctx, mediaUsageSearch))
 	if err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // Internal's error, already an answer
 	}
-	entries := make([]map[string]any, 0, len(hits))
-	for _, h := range hits {
-		e := map[string]any{"uri": r.uri(ctx, h.Item)}
-		if h.Stats != nil {
-			putTime(e, "lastDownloaded", h.Stats.LastDownloaded)
-		}
-		entries = append(entries, e)
-	}
-	return answer(ctx, mediaUsageSearch, results(entries)), nil
+	return streamed{l}, nil
 }
 
 // SearchPattern answers the pattern search: the files of one local
@@ -706,7 +733,11 @@ func (s ArtifactoryAPI) SearchPattern(
 	if slices.Contains(segs, "") {
 		return nil, httpkit.BadRequestf("pattern %q has an empty path segment", pattern)
 	}
-	paths := []string{}
+	// A key that names no single repository the caller may see finds
+	// nothing: its walk is one empty page.
+	pages := kernel.NewPages(func(context.Context, kernel.Page) ([]aql.Hit, string, error) {
+		return nil, "", nil
+	}, 0)
 	scope, _ := r.RepoScope(&key, false)
 	if scope, ok := scope.(aql.Or); ok && len(scope) == 1 {
 		dir := kernel.RootPath
@@ -716,24 +747,26 @@ func (s ArtifactoryAPI) SearchPattern(
 		// $match's * crosses "/", so the query narrows by depth and globs,
 		// and the Ant pattern decides.
 		ant := antpath.CompilePattern(pattern)
-		hits, err := r.Collect(ctx, search.All(
+		pages = r.Pages(search.All(
 			search.Files(), scope,
 			&aql.FieldCriterion{Field: aql.FieldDepth, Op: aql.OpEq, Number: int64(len(segs))},
 			&aql.FieldCriterion{Field: aql.FieldPath, Op: aql.OpMatch, Text: dir},
 			&aql.FieldCriterion{Field: aql.FieldName, Op: aql.OpMatch, Text: segs[len(segs)-1]},
 		), nil, r.Capped(0), func(h aql.Hit) bool { return ant.Match(h.Item.FullPath()) })
-		if err != nil {
-			return nil, err
-		}
-		for _, h := range hits {
-			paths = append(paths, h.Item.FullPath())
-		}
 	}
-	return answer(ctx, mediaPatternSearch, map[string]any{
+	// A constant document, which always splits.
+	env, _ := httpkit.EnvelopeOf(map[string]any{
 		"repositoryUri": baseurl.From(ctx) + "/artifactory/" + key,
 		"sourcePattern": req.Params.Pattern,
-		"files":         paths,
-	}), nil
+		"files":         []string{},
+	}, "files")
+	l, err := httpkit.StreamList(ctx, pages,
+		func(h aql.Hit) (string, bool, error) { return h.Item.FullPath(), true, nil },
+		httpkit.ListOptions{ContentType: searchMedia(ctx, mediaPatternSearch), Envelope: env})
+	if err != nil {
+		return nil, err //nolint:wrapcheck // Internal's error, already an answer
+	}
+	return streamed{l}, nil
 }
 
 // KeepsSearchQuery reports the requests whose raw query the router's

@@ -199,6 +199,7 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 		apiReviewPolicy(&e)
 		out = append(out, e)
 	}
+	apiReviewCheckComplete(t, out)
 	slices.SortFunc(
 		out,
 		func(a, b apiReviewOperation) int { return strings.Compare(a.Route, b.Route) },
@@ -541,12 +542,95 @@ func apiReviewDerive(e *apiReviewOperation) {
 	case stub && c.pagination != "":
 		e.Pagination += "; declared " + c.pagination
 	case stub:
+	case c.pagination == "complete":
+		e.Pagination = c.pagingText() + ", " + apiReviewCompleteText(e) + "; " +
+			e.Family + ": " + e.Pagination
+		if apiReviewStreams(e) {
+			e.Evidence = append(e.Evidence, "internal/platform/httpkit/stream.go")
+		}
 	case c.pagination != "":
 		e.Pagination = c.pagingText() + "; " + e.Family + ": " + e.Pagination
 	case c.idempotency != "" || c.cost != "":
 		// A classified operation without x-pagination is not a collection
 		// (the guard holds the ones a schema shows).
 		e.Pagination = "not a collection"
+	}
+}
+
+// apiReviewStreams reports an operation whose handler writes its list
+// from store pages as it reads them: it hands the pages to
+// httpkit.StreamList (decision 0043, "Streaming complete lists").
+func apiReviewStreams(e *apiReviewOperation) bool {
+	return slices.Contains(e.Calls, "httpkit.StreamList")
+}
+
+// apiReviewCompleteText says how a served complete operation executes:
+// streamed, or collected for the reason apiReviewCollected records.
+func apiReviewCompleteText(e *apiReviewOperation) string {
+	if apiReviewStreams(e) {
+		return "streamed from store pages as they are read"
+	}
+	if reason := apiReviewCollected[e.Route]; reason != "" {
+		return "collected before it is written: " + reason
+	}
+	return "collected before it is written"
+}
+
+// apiReviewCollected are the served complete operations that still build
+// their whole answer before writing it (#1409), each with why: the list is
+// bounded by configuration or by the request, or the answer's order or
+// content is known only once every element is read, so writing it as it
+// is read would change the bytes.
+var apiReviewCollected = map[string]string{
+	"GET /access/api/v1/environments":                           "administrator-defined environments, which the store reads whole",
+	"GET /access/api/v1/oidc":                                   "administrator OIDC configurations, which the store reads whole",
+	"GET /access/api/v1/oidc/{provider_name}/identity_mappings": "one provider's identity mappings, administrator configuration the store reads whole",
+	"GET /access/api/v1/roles":                                  "administrator-defined roles, which the store reads whole",
+	"GET /artifactory/api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo}": "the files of one build run, which that run's record names",
+	"GET /artifactory/api/repositories/configurations":                                 "repository configurations, bounded by configuration and grouped by class",
+	"GET /artifactory/api/search/dependency":                                           "builds are named once each across their runs, and the store's dependency lookup is unpaged",
+	"GET /artifactory/api/search/gavc":                                                 "local hits merge with an upstream's answer, deduplicated by path, and the result limit applies after the merge",
+	"GET /artifactory/api/search/versions":                                             "versions are ordered newest first in Mercury order, known only once every version is read",
+	"GET /artifactory/api/security/keypair":                                            "administrator key pairs, which the store reads whole",
+	"GET /artifactory/api/storage/{repoKey}/{itemPath}":                                "a file list merges a virtual repository's members, deduplicated by path, and is sorted by relative uri once read",
+	"GET /artifactory/api/system/security/certificates":                                "administrator certificates, which the store reads whole",
+	"GET /artifactory/api/v2/repositories/batch":                                       "bounded by the repository names the request lists",
+	"GET /artifactory/api/v2/security/permissions/groups/{groupName}":                  "the permissions naming one principal, which authorization reads whole for every request that principal makes",
+	"GET /artifactory/api/v2/security/permissions/users/{userName}":                    "the permissions naming one principal, which authorization reads whole for every request that principal makes",
+	"GET /artifactory/api/vcs/branches/{repoKey}/{userOrg}/{repo}":                     "the Git host's reference listing, read whole within the configured reference caps",
+	"GET /artifactory/api/vcs/tags/{repoKey}/{userOrg}/{repo}":                         "the Git host's reference listing, read whole within the configured reference caps",
+	"POST /artifactory/api/docker/{repo-key}/v2/parentManifests":                       "manifest lists are grouped by digest with every tag holding them, known only once every tag of the image is read",
+	"POST /artifactory/api/search/buildArtifacts":                                      "the files of one build run, which that run's record names",
+}
+
+// apiReviewCheckComplete holds every served complete operation to the
+// rule #1409 settles: it streams from store pages, or apiReviewCollected
+// says why it does not. A reason left for an operation that streams, or
+// that no longer serves a complete list, is stale and fails too.
+func apiReviewCheckComplete(t *testing.T, ops []apiReviewOperation) {
+	t.Helper()
+	collected := map[string]bool{}
+	for i := range ops {
+		e := &ops[i]
+		if e.classes == nil || e.classes.pagination != "complete" ||
+			strings.HasPrefix(e.State, "stub:") {
+			continue
+		}
+		_, reason := apiReviewCollected[e.Route]
+		switch streams := apiReviewStreams(e); {
+		case streams && reason:
+			t.Errorf("%s streams its complete list; drop it from apiReviewCollected", e.Route)
+		case !streams && !reason:
+			t.Errorf("%s collects its complete list: stream it with httpkit.StreamList "+
+				"or record why in apiReviewCollected", e.Route)
+		case !streams:
+			collected[e.Route] = true
+		}
+	}
+	for route := range apiReviewCollected {
+		if !collected[route] {
+			t.Errorf("apiReviewCollected names %s, which serves no collected complete list", route)
+		}
 	}
 }
 
@@ -646,7 +730,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	}
 	if strings.HasPrefix(path, "/access/") ||
 		strings.HasPrefix(path, "/artifactory/api/security/") {
-		return "identity", "legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service", []string{
+		return "identity", "legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants", []string{
 			"internal/access/adapters/http/access_identity.go",
 			"internal/access/adapters/http/tokens.go",
 			"internal/access/core/identity/identity.go",
@@ -656,7 +740,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		}
 	}
 	if strings.HasPrefix(path, "/artifactory/api/build") {
-		return "build", "build names/numbers/runs retain complete legacy collections; store keysets may be collected; append/replay and run detail are singular", []string{
+		return "build", "build names and numbers retain complete legacy collections, written from store keyset pages; a run's files collect from that run; append/replay and run detail are singular", []string{
 			"internal/artifacts/adapters/http/builds.go",
 			"internal/artifacts/core/build/build.go",
 			"internal/artifacts/adapters/sql/builds.go",
@@ -681,7 +765,7 @@ func apiReviewPersistence(path string) (string, string, []string) {
 	}
 	if strings.HasPrefix(path, "/artifactory/api/search/") ||
 		strings.HasPrefix(path, "/artifactory/api/versions/") {
-		return "search", "AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise", []string{
+		return "search", "AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise", []string{
 			"internal/artifacts/adapters/http/searches.go",
 			"internal/artifacts/adapters/http/aql.go",
 			"internal/artifacts/adapters/sql/content_items.go",
@@ -795,8 +879,9 @@ func TestUnitAPIReviewDerivesFromClasses(t *testing.T) {
 			"/api/storage/{repoKey}",
 			"implemented",
 			want{
-				admission:  ordinary + "; ?list additionally selects expensive policy",
-				pagination: "complete: the whole collection in one answer; content-and-configuration: " + storageFamily,
+				admission: ordinary + "; ?list additionally selects expensive policy",
+				pagination: "complete: the whole collection in one answer, collected before it is written; " +
+					"content-and-configuration: " + storageFamily,
 			},
 		},
 		{"GET", "/api/search/cursor", "implemented", want{
@@ -843,6 +928,24 @@ func TestUnitAPIReviewDerivesFromClasses(t *testing.T) {
 				)
 			}
 		}
+	}
+	// A complete list whose handler hands its pages to httpkit.StreamList
+	// is streamed, and says so.
+	item := doc.Paths.Value("/api/storage/{repoKey}")
+	streamed := apiReviewOperation{
+		Route: "GET " + server + "/api/storage/{repoKey}", State: "implemented",
+		Calls:   []string{"httpkit.StreamList"},
+		classes: apiReviewClassesOf(item, item.Get),
+	}
+	apiReviewPolicy(&streamed)
+	if want := "complete: the whole collection in one answer, streamed from store pages as they are read; " +
+		"content-and-configuration: " + storageFamily; streamed.Pagination != want ||
+		!slices.Contains(streamed.Evidence, "internal/platform/httpkit/stream.go") {
+		t.Errorf(
+			"a streamed complete list: got %q, evidence %v",
+			streamed.Pagination,
+			streamed.Evidence,
+		)
 	}
 	// TODO(author) on a draft is no class yet: every heuristic stays.
 	got, was := entry(

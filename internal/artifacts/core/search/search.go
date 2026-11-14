@@ -147,7 +147,8 @@ func (r *SearchRun) Capped(limit int) int {
 // Collect runs criteria a page at a time, in item order, and returns the
 // hits the caller may read that keep accepts (nil accepts all), at most want
 // of them (-1 for all). Administrators read everything, as in AQL; anyone
-// else gets the rows Access.Readable keeps, so a page may yield fewer.
+// else gets the rows Access.Readable keeps, so a page may yield fewer. It
+// collects the pages Pages walks.
 func (r *SearchRun) Collect(
 	ctx context.Context,
 	criteria aql.Node,
@@ -156,34 +157,16 @@ func (r *SearchRun) Collect(
 	keep func(aql.Hit) bool,
 ) ([]aql.Hit, error) {
 	out := []aql.Hit{}
-	for offset := 0; ; offset += SearchPage {
-		q := &aql.Query{
-			Criteria: criteria, Include: include,
-			Offset: offset, HasOffset: true, Limit: SearchPage, HasLimit: true,
-		}
-		q.Resolve(r.Repos)
-		hits, err := r.st.Items().Search(ctx, q, aql.Options{Now: r.Now})
+	pages := r.Pages(criteria, include, want, keep)
+	for {
+		hits, ok, err := pages.Next(ctx)
 		if err != nil {
-			return nil, r.internal(ctx, "search", err)
+			return nil, err //nolint:wrapcheck // Internal's error, from the page function
 		}
-		read := len(hits)
-		if !r.Principal.Admin {
-			if hits, err = r.access.Readable(ctx, r.Configs, hits); err != nil {
-				return nil, r.internal(ctx, "search permissions", err)
-			}
-		}
-		for _, h := range hits {
-			if keep != nil && !keep(h) {
-				continue
-			}
-			out = append(out, h)
-			if len(out) == want {
-				return out, nil
-			}
-		}
-		if read < SearchPage {
+		if !ok {
 			return out, nil
 		}
+		out = append(out, hits...)
 	}
 }
 

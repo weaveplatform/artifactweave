@@ -217,57 +217,35 @@ func (s *Service) Run(
 	return b, nil
 }
 
-// Runs lists the runs of a build the caller may read, newest first.
-// ErrNotFound when the build has no runs, ErrForbidden when the caller may
-// read none.
+// Runs lists the runs of a build the caller may read, newest first, as
+// RunPages walks and keeps them. ErrNotFound when the build has no runs,
+// ErrForbidden when the caller may read none (NoRuns).
 func (s *Service) Runs(
 	ctx context.Context,
 	projectKey, name string,
 	a Access,
 ) ([]model.BuildRun, error) {
-	projectKey = ProjectKey(projectKey)
-	all, err := s.runs(ctx, projectKey, name)
+	pages, keep := s.RunPages(projectKey, name, a)
+	out, seen, err := kept(ctx, pages, keep)
 	if err != nil {
 		return nil, err
 	}
-	if len(all) == 0 {
-		return nil, fmt.Errorf("build: runs of %s: %w", name, ErrNotFound)
-	}
-	repoKey := model.BuildInfoRepo(projectKey)
-	var out []model.BuildRun
-	for _, r := range all {
-		if a.Build(repoKey, documentPath(r), false, api.ActionRead) {
-			out = append(out, r)
-		}
-	}
 	if len(out) == 0 {
-		return nil, ErrForbidden
+		return nil, NoRuns(name, seen)
 	}
 	return out, nil
 }
 
 // Names lists the build names of a project in which the caller may read a
-// run, ordered by name.
+// run, ordered by name, as NamePages walks and keeps them.
 func (s *Service) Names(
 	ctx context.Context,
 	projectKey string,
 	a Access,
 ) ([]model.BuildName, error) {
-	projectKey = ProjectKey(projectKey)
-	all, err := collect(s.Page, func(p kernel.Page) ([]model.BuildName, string, error) {
-		return s.Store.Builds().Names(ctx, projectKey, p)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("build: names: %w", err)
-	}
-	repoKey := model.BuildInfoRepo(projectKey)
-	var out []model.BuildName
-	for _, n := range all {
-		if a.Build(repoKey, model.EncodeBuildInfoSegment(n.Name), true, api.ActionRead) {
-			out = append(out, n)
-		}
-	}
-	return out, nil
+	pages, keep := s.NamePages(projectKey, a)
+	out, _, err := kept(ctx, pages, keep)
+	return out, err
 }
 
 // Append adds modules to a run.

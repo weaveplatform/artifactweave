@@ -2684,7 +2684,7 @@
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; identity: legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: administrator-defined environments, which the store reads whole; identity: legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
     "evidence": [
       "internal/access/adapters/http/access_identity.go",
       "internal/access/adapters/http/tokens.go",
@@ -2823,7 +2823,7 @@
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; identity: legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: administrator OIDC configurations, which the store reads whole; identity: legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
     "evidence": [
       "internal/access/adapters/http/access_identity.go",
       "internal/access/adapters/http/tokens.go",
@@ -2883,7 +2883,7 @@
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; identity: legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: one provider's identity mappings, administrator configuration the store reads whole; identity: legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
     "evidence": [
       "internal/access/adapters/http/access_identity.go",
       "internal/access/adapters/http/tokens.go",
@@ -3141,7 +3141,7 @@
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; identity: legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: administrator-defined roles, which the store reads whole; identity: legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
     "evidence": [
       "internal/access/adapters/http/access_identity.go",
       "internal/access/adapters/http/tokens.go",
@@ -3535,6 +3535,9 @@
     "contract": "A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens and tokens that are not revocable are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.",
     "handler": "internal/access/adapters/http/tokens.go: AccessService.GetTokens",
     "direct_calls": [
+      "httpkit.EnvelopeOf",
+      "httpkit.StreamList",
+      "s.internalError",
       "s.tokenAPI",
       "s.tokenAPI().visible"
     ],
@@ -3545,7 +3548,7 @@
     "response_collections": [
       "200 application/json.tokens[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; identity: legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; identity: legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
     "evidence": [
       "internal/access/adapters/http/access_identity.go",
       "internal/access/adapters/http/tokens.go",
@@ -3554,7 +3557,8 @@
       "internal/access/adapters/sql/identity.go",
       "internal/access/adapters/sql/projects.go",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -4375,10 +4379,13 @@
     "direct_calls": [
       "build.FormatStarted",
       "httpkit.Deref",
+      "httpkit.EnvelopeOf",
       "httpkit.PtrTo",
+      "httpkit.StreamList",
+      "s.InternalError",
       "s.buildCaller",
       "s.buildError",
-      "svc.Names"
+      "svc.NamePages"
     ],
     "review_family": "build",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
@@ -4387,14 +4394,15 @@
     "response_collections": [
       "200 application/json.builds[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; build: build names/numbers/runs retain complete legacy collections; store keysets may be collected; append/replay and run detail are singular",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; build: build names and numbers retain complete legacy collections, written from store keyset pages; a run's files collect from that run; append/replay and run detail are singular",
     "evidence": [
       "internal/artifacts/adapters/http/builds.go",
       "internal/artifacts/core/build/build.go",
       "internal/artifacts/adapters/sql/builds.go",
       "internal/app/builds_status_test.go",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -4406,11 +4414,17 @@
     "handler": "internal/artifacts/adapters/http/builds.go: ArtifactoryAPI.GetBuildRuns",
     "direct_calls": [
       "build.FormatStarted",
+      "build.NoRuns",
       "httpkit.Deref",
+      "httpkit.EnvelopeOf",
       "httpkit.PtrTo",
+      "httpkit.StreamList",
+      "l.Empty",
+      "l.Seen",
+      "s.InternalError",
       "s.buildCaller",
       "s.buildError",
-      "svc.Runs"
+      "svc.RunPages"
     ],
     "review_family": "build",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
@@ -4419,14 +4433,15 @@
     "response_collections": [
       "200 application/json.buildsNumbers[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; build: build names/numbers/runs retain complete legacy collections; store keysets may be collected; append/replay and run detail are singular",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; build: build names and numbers retain complete legacy collections, written from store keyset pages; a run's files collect from that run; append/replay and run detail are singular",
     "evidence": [
       "internal/artifacts/adapters/http/builds.go",
       "internal/artifacts/core/build/build.go",
       "internal/artifacts/adapters/sql/builds.go",
       "internal/app/builds_status_test.go",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -4488,7 +4503,7 @@
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; build: build names/numbers/runs retain complete legacy collections; store keysets may be collected; append/replay and run detail are singular",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: the files of one build run, which that run's record names; build: build names and numbers retain complete legacy collections, written from store keyset pages; a run's files collect from that run; append/replay and run detail are singular",
     "evidence": [
       "internal/artifacts/adapters/http/builds.go",
       "internal/artifacts/core/build/build.go",
@@ -7267,7 +7282,7 @@
       "200 application/vnd.org.jfrog.artifactory.repositories.RepositoryConfigurationsList+json.REMOTE[]",
       "200 application/vnd.org.jfrog.artifactory.repositories.RepositoryConfigurationsList+json.VIRTUAL[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; repository: legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: repository configurations, bounded by configuration and grouped by class; repository: legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/artifacts/adapters/http/repositories.go",
       "internal/artifacts/core/repos/repos.go",
@@ -7519,9 +7534,13 @@
     "contract": "Finds files whose name contains the given text. Only local repositories and remote caches are searched; a virtual repository key in repos is ignored. Anonymous callers may search when anonymous access is enabled. Each result is a file info URI unless X-Result-Detail asks for more.",
     "handler": "internal/artifacts/adapters/http/searches.go: ArtifactoryAPI.SearchArtifact",
     "direct_calls": [
+      "d.include",
       "httpkit.BadRequestf",
+      "httpkit.StreamList",
+      "r.Pages",
       "r.RepoScope",
-      "r.uriSearch",
+      "r.UserLimit",
+      "r.uriEntry",
       "s.newSearch",
       "search.All",
       "search.Files"
@@ -7534,14 +7553,15 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.ArtifactSearchResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
       "internal/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0012-search-and-aql.md",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -7553,8 +7573,9 @@
     "handler": "internal/artifacts/adapters/http/searches.go: ArtifactoryAPI.SearchBadChecksum",
     "direct_calls": [
       "httpkit.BadRequestf",
+      "httpkit.StreamList",
       "r.Capped",
-      "r.Collect",
+      "r.Pages",
       "r.RepoScope",
       "r.uri",
       "s.newSearch",
@@ -7569,14 +7590,15 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.BadChecksumSearchResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
       "internal/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0012-search-and-aql.md",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -7587,10 +7609,14 @@
     "contract": "Finds items whose content has the given checksum. Exactly one of md5, sha1 or sha256 should be given; when several are given all must match. The search covers local repositories, remote caches and virtual repositories. Anonymous callers may search when anonymous access is enabled.",
     "handler": "internal/artifacts/adapters/http/searches.go: ArtifactoryAPI.SearchChecksum",
     "direct_calls": [
+      "d.include",
       "expression.MatchString",
       "httpkit.BadRequestf",
+      "httpkit.StreamList",
+      "r.Pages",
       "r.RepoScope",
-      "r.uriSearch",
+      "r.UserLimit",
+      "r.uriEntry",
       "s.newSearch",
       "search.All",
       "search.Files",
@@ -7604,14 +7630,15 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.ChecksumSearchResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
       "internal/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0012-search-and-aql.md",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -7623,8 +7650,9 @@
     "handler": "internal/artifacts/adapters/http/searches.go: ArtifactoryAPI.SearchCreation",
     "direct_calls": [
       "httpkit.FormatTime",
+      "httpkit.StreamList",
       "itemkit.NotFoundRepo",
-      "r.Collect",
+      "r.Pages",
       "r.RepoScope",
       "r.UserLimit",
       "r.uri",
@@ -7644,14 +7672,15 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.ArtifactCreationResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
       "internal/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0012-search-and-aql.md",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -7663,7 +7692,8 @@
     "handler": "internal/artifacts/adapters/http/searches.go: ArtifactoryAPI.SearchDates",
     "direct_calls": [
       "httpkit.BadRequestf",
-      "r.Collect",
+      "httpkit.StreamList",
+      "r.Pages",
       "r.RepoScope",
       "r.UserLimit",
       "r.uri",
@@ -7685,14 +7715,15 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.ArtifactResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
       "internal/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0012-search-and-aql.md",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -7723,7 +7754,7 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.DependencyBuilds+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: builds are named once each across their runs, and the store's dependency lookup is unpaged; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -7773,7 +7804,7 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.GavcSearchResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: local hits merge with an upstream's answer, deduplicated by path, and the result limit applies after the merge; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -7853,8 +7884,11 @@
       "baseurl.From",
       "h.Item.FullPath",
       "httpkit.BadRequestf",
+      "httpkit.EnvelopeOf",
+      "httpkit.StreamList",
+      "kernel.NewPages",
       "r.Capped",
-      "r.Collect",
+      "r.Pages",
       "r.RepoScope",
       "s.newSearch",
       "search.All",
@@ -7875,14 +7909,15 @@
       "200 application/json.files[]",
       "200 application/vnd.org.jfrog.artifactory.search.PatternResultFileSet+json.files[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
       "internal/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0012-search-and-aql.md",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -7893,9 +7928,13 @@
     "contract": "Finds items by property values. Every query parameter except repos is read as a property key with a comma-separated list of values; a key without a value matches any value. The search covers local repositories, remote caches and virtual repositories. Anonymous callers may search when anonymous access is enabled.",
     "handler": "internal/artifacts/adapters/http/searches.go: ArtifactoryAPI.SearchProperty",
     "direct_calls": [
+      "d.include",
       "httpkit.RawSearchQuery",
+      "httpkit.StreamList",
+      "r.Pages",
       "r.RepoScope",
-      "r.uriSearch",
+      "r.UserLimit",
+      "r.uriEntry",
       "s.newSearch",
       "search.All"
     ],
@@ -7907,14 +7946,15 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.MetadataSearchResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
       "internal/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0012-search-and-aql.md",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -7925,7 +7965,8 @@
     "contract": "Finds items that have not been downloaded since an instant, which is the raw material for retention decisions. Only items created before createdBefore, or before notUsedSince when it is omitted, are considered. Only local repositories and remote caches are searched. A named user is required.",
     "handler": "internal/artifacts/adapters/http/searches.go: ArtifactoryAPI.SearchUsage",
     "direct_calls": [
-      "r.Collect",
+      "httpkit.StreamList",
+      "r.Pages",
       "r.RepoScope",
       "r.UserLimit",
       "r.uri",
@@ -7943,14 +7984,15 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.ArtifactUsageResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
       "internal/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0012-search-and-aql.md",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -7981,7 +8023,7 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.ArtifactVersionsResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: versions are ordered newest first in Mercury order, known only once every version is read; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -8089,9 +8131,10 @@
     "handler": "internal/access/adapters/http/security.go: SecurityAPI.GetGroups",
     "direct_calls": [
       "baseurl.From",
+      "httpkit.StreamList",
       "s.adminStore",
       "s.identity",
-      "s.identity().Groups",
+      "s.identity().GroupPages",
       "s.internalError"
     ],
     "review_family": "identity",
@@ -8102,7 +8145,7 @@
       "200 application/json[]",
       "200 application/vnd.org.jfrog.artifactory.security.Groups+json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; identity: legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; identity: legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
     "evidence": [
       "internal/access/adapters/http/access_identity.go",
       "internal/access/adapters/http/tokens.go",
@@ -8111,7 +8154,8 @@
       "internal/access/adapters/sql/identity.go",
       "internal/access/adapters/sql/projects.go",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -8169,7 +8213,7 @@
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; identity: legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: administrator key pairs, which the store reads whole; identity: legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
     "evidence": [
       "internal/access/adapters/http/access_identity.go",
       "internal/access/adapters/http/tokens.go",
@@ -8274,10 +8318,10 @@
     "contract": "Returns the names of users locked by the user lock policy. Admin only.",
     "handler": "internal/access/adapters/http/security.go: SecurityAPI.GetLockedOutUsers",
     "direct_calls": [
-      "artgen.GetLockedOutUsers200JSONResponse",
+      "httpkit.StreamList",
       "s.adminStore",
       "s.identity",
-      "s.identity().Locked",
+      "s.identity().LockedPages",
       "s.internalError"
     ],
     "review_family": "identity",
@@ -8287,7 +8331,7 @@
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; identity: legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; identity: legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
     "evidence": [
       "internal/access/adapters/http/access_identity.go",
       "internal/access/adapters/http/tokens.go",
@@ -8296,7 +8340,8 @@
       "internal/access/adapters/sql/identity.go",
       "internal/access/adapters/sql/projects.go",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -8307,9 +8352,10 @@
     "contract": "Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions.",
     "handler": "internal/access/adapters/http/permissions.go: SecurityAPI.GetPermissionTargets",
     "direct_calls": [
-      "artgen.GetPermissionTargets200JSONResponse",
+      "baseurl.From",
       "c.admin",
-      "c.svc.List",
+      "c.svc.Pages",
+      "httpkit.StreamList",
       "s.permissionError"
     ],
     "review_family": "identity",
@@ -8320,7 +8366,7 @@
       "200 application/json[]",
       "200 application/vnd.org.jfrog.artifactory.security.PermissionTargets+json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; identity: legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; identity: legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
     "evidence": [
       "internal/access/adapters/http/access_identity.go",
       "internal/access/adapters/http/tokens.go",
@@ -8329,7 +8375,8 @@
       "internal/access/adapters/sql/identity.go",
       "internal/access/adapters/sql/projects.go",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -8375,7 +8422,10 @@
     "handler": "internal/access/adapters/http/tokens.go: SecurityAPI.GetLegacyTokens",
     "direct_calls": [
       "fmt.Errorf",
+      "httpkit.EnvelopeOf",
+      "httpkit.StreamList",
       "kernel.RequireAdmin",
+      "s.internalError",
       "tokenAPI().visible"
     ],
     "review_family": "identity",
@@ -8385,7 +8435,7 @@
     "response_collections": [
       "200 application/json.tokens[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; identity: legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; identity: legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
     "evidence": [
       "internal/access/adapters/http/access_identity.go",
       "internal/access/adapters/http/tokens.go",
@@ -8394,7 +8444,8 @@
       "internal/access/adapters/sql/identity.go",
       "internal/access/adapters/sql/projects.go",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -8435,9 +8486,10 @@
     "handler": "internal/access/adapters/http/security.go: SecurityAPI.GetUsers",
     "direct_calls": [
       "baseurl.From",
+      "httpkit.StreamList",
       "s.adminStore",
       "s.identity",
-      "s.identity().Users",
+      "s.identity().UserPages",
       "s.internalError"
     ],
     "review_family": "identity",
@@ -8448,7 +8500,7 @@
       "200 application/json[]",
       "200 application/vnd.org.jfrog.artifactory.security.Users+json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; identity: legacy full lists/collection aggregates remain; source contract declares paged variants; underlying store pages do not bound a collecting service",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; identity: legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
     "evidence": [
       "internal/access/adapters/http/access_identity.go",
       "internal/access/adapters/http/tokens.go",
@@ -8457,7 +8509,8 @@
       "internal/access/adapters/sql/identity.go",
       "internal/access/adapters/sql/projects.go",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -8776,7 +8829,7 @@
       "200 application/vnd.org.jfrog.artifactory.storage.FileList+json.files[]",
       "200 application/vnd.org.jfrog.artifactory.storage.FolderInfo+json.children[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: a file list merges a virtual repository's members, deduplicated by path, and is sorted by relative uri once read; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
       "internal/app/router.go",
       "internal/artifacts/adapters/http/items.go",
@@ -9121,7 +9174,7 @@
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: administrator certificates, which the store reads whole; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
       "internal/app/router.go",
       "internal/artifacts/adapters/http/items.go",
@@ -9717,7 +9770,7 @@
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "complete: the whole collection in one answer; repository: legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: bounded by the repository names the request lists; repository: legacy arrays remain complete; store keysets are collected and filtered; not bounded by client page size",
     "evidence": [
       "internal/artifacts/adapters/http/repositories.go",
       "internal/artifacts/core/repos/repos.go",
@@ -9817,11 +9870,11 @@
     "contract": "Lists every target by name and detail URL. Admins and holders of the Manage Resources role see all; other users see the targets they hold Manage on.",
     "handler": "internal/access/adapters/http/permissions.go: SecurityAPI.GetPermissionTargetsV2",
     "direct_calls": [
-      "artgen.GetPermissionTargetsV2200JSONResponse",
+      "baseurl.From",
       "c.manages",
-      "c.svc.List",
-      "s.permissionError",
-      "slices.DeleteFunc"
+      "c.svc.Pages",
+      "httpkit.StreamList",
+      "s.permissionError"
     ],
     "review_family": "content-and-configuration",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
@@ -9831,7 +9884,7 @@
       "200 application/json[]",
       "200 application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "complete: the whole collection in one answer, streamed from store pages as they are read; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
       "internal/app/router.go",
       "internal/artifacts/adapters/http/items.go",
@@ -9839,7 +9892,8 @@
       "internal/artifacts/adapters/sql/content_items.go",
       "internal/access/adapters/sql/projects.go",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/platform/httpkit/stream.go"
     ]
   },
   {
@@ -9860,7 +9914,7 @@
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: the permissions naming one principal, which authorization reads whole for every request that principal makes; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
       "internal/app/router.go",
       "internal/artifacts/adapters/http/items.go",
@@ -9889,7 +9943,7 @@
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: the permissions naming one principal, which authorization reads whole for every request that principal makes; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
       "internal/app/router.go",
       "internal/artifacts/adapters/http/items.go",
@@ -10003,7 +10057,7 @@
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; native-vcs: native wire contract retained: complete indexes, catalog/offset/cursor variants and streaming files differ by route; see family review for exact execution and limits",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: the Git host's reference listing, read whole within the configured reference caps; native-vcs: native wire contract retained: complete indexes, catalog/offset/cursor variants and streaming files differ by route; see family review for exact execution and limits",
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/app/router.go",
@@ -10409,7 +10463,7 @@
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; native-vcs: native wire contract retained: complete indexes, catalog/offset/cursor variants and streaming files differ by route; see family review for exact execution and limits",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: the Git host's reference listing, read whole within the configured reference caps; native-vcs: native wire contract retained: complete indexes, catalog/offset/cursor variants and streaming files differ by route; see family review for exact execution and limits",
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/app/router.go",
@@ -10428,7 +10482,7 @@
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise",
+    "pagination_execution": "AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -16031,7 +16085,7 @@
     "response_collections": [
       "200 application/json.parentManifestLists[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; native-docker: native wire contract retained: complete indexes, catalog/offset/cursor variants and streaming files differ by route; see family review for exact execution and limits",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: manifest lists are grouped by digest with every tag holding them, known only once every tag of the image is read; native-docker: native wire contract retained: complete indexes, catalog/offset/cursor variants and streaming files differ by route; see family review for exact execution and limits",
     "evidence": [
       "docs/research/api-reliability/README.md#native-protocols",
       "internal/app/router.go",
@@ -17625,7 +17679,7 @@
     "response_collections": [
       "200 application/json.results[]"
     ],
-    "pagination_execution": "native (next none); search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise",
+    "pagination_execution": "native (next none); search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",
@@ -17669,7 +17723,7 @@
       "200 application/json.results[]",
       "200 application/vnd.org.jfrog.artifactory.search.BuildArtifactsSearchResult+json.results[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches collect authorized results from batches; no new keyset promise",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: the files of one build run, which that run's record names; search: AQL retains offset/limit/order/filter semantics and configured result/query caps; convenience searches over stored items write authorized results from batches as they are read, while gavc, versions and build searches collect; no new keyset promise",
     "evidence": [
       "internal/artifacts/adapters/http/searches.go",
       "internal/artifacts/adapters/http/aql.go",

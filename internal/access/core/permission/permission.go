@@ -146,6 +146,21 @@ func (s Service) List(ctx context.Context) ([]model.Permission, error) {
 	}
 }
 
+// Pages walks every permission a store page at a time, in List's order,
+// for a list written as it is read. A failed read carries List's prefix.
+func (s Service) Pages() *kernel.Pages[model.Permission] {
+	return kernel.NewPages(
+		func(ctx context.Context, p kernel.Page) ([]model.Permission, string, error) {
+			ps, next, err := s.Store.Permissions().List(ctx, p)
+			if err != nil {
+				return nil, "", fmt.Errorf("permission: list: %w", err)
+			}
+			return ps, next, nil
+		},
+		listPage,
+	)
+}
+
 // Get returns one permission.
 func (s Service) Get(ctx context.Context, name string) (model.Permission, error) {
 	p, err := s.Store.Permissions().Get(ctx, name)

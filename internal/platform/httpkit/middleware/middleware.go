@@ -53,6 +53,12 @@ func newRequestID() string {
 // handler noted a cause (NoteCause) logs at ERROR with it, and one that
 // authenticated names its user (NoteUser). The path is logged as redact
 // returns it, so a credential that a path names never reaches the log.
+//
+// A handler that aborts a response it has begun (http.ErrAbortHandler, as a
+// streamed download or list does when its source fails) is logged too, at
+// ERROR with aborted=true and the cause it noted, before the abort goes on
+// to net/http: without the line, the cause such a handler notes would
+// reach no log at all.
 func AccessLog(
 	logger *slog.Logger,
 	redact func(path string) string,
@@ -63,29 +69,64 @@ func AccessLog(
 			ww := chimiddleware.NewWrapResponseWriter(w, r.ProtoMajor)
 			var cause error
 			var user string
+			aborted := true
+			defer func() {
+				if !aborted {
+					return
+				}
+				rec := recover()
+				if rec == nil {
+					// runtime.Goexit, which a recover cannot stop: let it run.
+					return
+				}
+				if err, ok := rec.(error); ok && errors.Is(err, http.ErrAbortHandler) {
+					logRequest(logger, redact, r, ww, start, user, cause, true)
+				}
+				// Any other panic is RecoverPanic's to log and answer.
+				panic(rec)
+			}()
 			next.ServeHTTP(
 				ww,
 				r.WithContext(httpkit.WithUser(httpkit.WithCause(r.Context(), &cause), &user)),
 			)
-			attrs := []slog.Attr{
-				slog.String("method", r.Method),
-				slog.String("path", redact(r.URL.Path)),
-				slog.Int("status", ww.Status()),
-				slog.Int("bytes", ww.BytesWritten()),
-				slog.Duration("duration", time.Since(start)),
-				slog.String("request_id", httpkit.RequestIDFrom(r.Context())),
-			}
-			if user != "" {
-				attrs = append(attrs, slog.String("user", user))
-			}
-			level := slog.LevelInfo
-			if cause != nil {
-				level = slog.LevelError
-				attrs = append(attrs, slog.String("error", cause.Error()))
-			}
-			logger.LogAttrs(r.Context(), level, "request", attrs...)
+			aborted = false
+			logRequest(logger, redact, r, ww, start, user, cause, false)
 		})
 	}
+}
+
+// logRequest writes AccessLog's line for r.
+func logRequest(
+	logger *slog.Logger,
+	redact func(path string) string,
+	r *http.Request,
+	ww chimiddleware.WrapResponseWriter,
+	start time.Time,
+	user string,
+	cause error,
+	aborted bool,
+) {
+	attrs := []slog.Attr{
+		slog.String("method", r.Method),
+		slog.String("path", redact(r.URL.Path)),
+		slog.Int("status", ww.Status()),
+		slog.Int("bytes", ww.BytesWritten()),
+		slog.Duration("duration", time.Since(start)),
+		slog.String("request_id", httpkit.RequestIDFrom(r.Context())),
+	}
+	if user != "" {
+		attrs = append(attrs, slog.String("user", user))
+	}
+	level := slog.LevelInfo
+	if aborted {
+		level = slog.LevelError
+		attrs = append(attrs, slog.Bool("aborted", true))
+	}
+	if cause != nil {
+		level = slog.LevelError
+		attrs = append(attrs, slog.String("error", cause.Error()))
+	}
+	logger.LogAttrs(r.Context(), level, "request", attrs...)
 }
 
 // RecoverPanic turns a panic into a 500 using the request's error response

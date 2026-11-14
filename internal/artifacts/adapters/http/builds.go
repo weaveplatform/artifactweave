@@ -127,20 +127,24 @@ func (s ArtifactoryAPI) GetAllBuilds(
 		return nil, err
 	}
 	project := httpkit.Deref(req.Params.Project)
-	names, err := svc.Names(ctx, project, a)
+	env, err := httpkit.EnvelopeOf(artgen.GetAllBuilds200JSONResponse{
+		Uri: httpkit.PtrTo(buildURI(ctx)), Builds: &[]artgen.BuildSummary{},
+	}, "builds")
+	if err != nil {
+		return nil, s.InternalError(ctx, "list builds", err)
+	}
+	pages, keep := svc.NamePages(project, a)
+	l, err := httpkit.StreamList(ctx, pages,
+		func(n model.BuildName) (artgen.BuildSummary, bool, error) {
+			return artgen.BuildSummary{
+				Uri:         httpkit.PtrTo("/" + n.Name),
+				LastStarted: httpkit.PtrTo(build.FormatStarted(n.LastStarted)),
+			}, keep(n), nil
+		}, httpkit.ListOptions{Envelope: env})
 	if err != nil {
 		return nil, s.buildError(ctx, p, project, "", err)
 	}
-	list := make([]artgen.BuildSummary, 0, len(names))
-	for _, n := range names {
-		list = append(list, artgen.BuildSummary{
-			Uri: httpkit.PtrTo(
-				"/" + n.Name,
-			),
-			LastStarted: httpkit.PtrTo(build.FormatStarted(n.LastStarted)),
-		})
-	}
-	return artgen.GetAllBuilds200JSONResponse{Uri: httpkit.PtrTo(buildURI(ctx)), Builds: &list}, nil
+	return streamed{l}, nil
 }
 
 // UploadBuild publishes a build-info document and answers 204 with the
@@ -203,22 +207,27 @@ func (s ArtifactoryAPI) GetBuildRuns(
 		return nil, err
 	}
 	project := httpkit.Deref(req.Params.Project)
-	runs, err := svc.Runs(ctx, project, req.BuildName, a)
+	env, err := httpkit.EnvelopeOf(artgen.GetBuildRuns200JSONResponse{
+		Uri: httpkit.PtrTo(buildURI(ctx, req.BuildName)), BuildsNumbers: &[]artgen.BuildNumber{},
+	}, "buildsNumbers")
+	if err != nil {
+		return nil, s.InternalError(ctx, "list build runs", err)
+	}
+	pages, keep := svc.RunPages(project, req.BuildName, a)
+	l, err := httpkit.StreamList(ctx, pages,
+		func(r model.BuildRun) (artgen.BuildNumber, bool, error) {
+			return artgen.BuildNumber{
+				Uri:     httpkit.PtrTo("/" + r.Number),
+				Started: httpkit.PtrTo(build.FormatStarted(r.Started)),
+			}, keep(r), nil
+		}, httpkit.ListOptions{Envelope: env})
+	if err == nil && l.Empty() {
+		err = build.NoRuns(req.BuildName, l.Seen())
+	}
 	if err != nil {
 		return nil, s.buildError(ctx, p, project, noBuild(req.BuildName), err)
 	}
-	list := make([]artgen.BuildNumber, 0, len(runs))
-	for _, r := range runs {
-		list = append(list, artgen.BuildNumber{
-			Uri: httpkit.PtrTo(
-				"/" + r.Number,
-			),
-			Started: httpkit.PtrTo(build.FormatStarted(r.Started)),
-		})
-	}
-	return artgen.GetBuildRuns200JSONResponse{
-		Uri: httpkit.PtrTo(buildURI(ctx, req.BuildName)), BuildsNumbers: &list,
-	}, nil
+	return streamed{l}, nil
 }
 
 // GetBuildInfo returns a run's document. A diff asks for the Builds Diff
