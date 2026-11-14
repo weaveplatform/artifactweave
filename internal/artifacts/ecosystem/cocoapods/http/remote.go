@@ -345,9 +345,17 @@ func (h handler) remoteSpec(
 	name, version, publicKey string,
 ) {
 	defer result.Stream.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(result.Stream.Body, maxCDNMetadata+1))
-	if err != nil || len(data) > maxCDNMetadata {
-		h.k.Error(w, r, source.ErrInvalidResult)
+	data, err := pkgroute.ReadServed(
+		r.Context(),
+		result.Stream.Body,
+		maxCDNMetadata,
+		source.ErrInvalidResult,
+	)
+	if err == nil && len(data) > maxCDNMetadata {
+		err = source.ErrInvalidResult
+	}
+	if err != nil {
+		h.k.Error(w, r, err)
 		return
 	}
 	fields, target, checksum, err := sourceDetails(data, name, version)
@@ -413,8 +421,16 @@ func (h handler) remoteIndexRows(
 	p string,
 ) ([]string, error) {
 	defer result.Stream.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(result.Stream.Body, maxCDNMetadata+1))
-	if err != nil || len(data) > maxCDNMetadata {
+	data, err := pkgroute.ReadServed(
+		r.Context(),
+		result.Stream.Body,
+		maxCDNMetadata,
+		source.ErrInvalidResult,
+	)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
+	}
+	if len(data) > maxCDNMetadata {
 		return nil, source.ErrInvalidResult
 	}
 	var visible []string
@@ -483,10 +499,18 @@ func (h handler) remoteArchive(w http.ResponseWriter, r *http.Request, name, ver
 		h.k.Error(w, r, pkgroute.SourceError(source.ErrInvalidResult, false))
 		return
 	}
-	data, err := io.ReadAll(io.LimitReader(specResult.Stream.Body, maxCDNMetadata+1))
+	data, err := pkgroute.ReadServed(
+		r.Context(),
+		specResult.Stream.Body,
+		maxCDNMetadata,
+		source.ErrInvalidResult,
+	)
 	_ = specResult.Stream.Body.Close()
-	if err != nil || len(data) > maxCDNMetadata {
-		h.k.Error(w, r, pkgroute.SourceError(source.ErrInvalidResult, false))
+	if err == nil && len(data) > maxCDNMetadata {
+		err = source.ErrInvalidResult
+	}
+	if err != nil {
+		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
 	}
 	fields, target, checksum, err := sourceDetails(data, name, version)

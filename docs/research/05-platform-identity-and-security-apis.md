@@ -481,6 +481,26 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
 3. **`X-JFrog-Art-Api: <API key or reference token>`**. API keys: deprecation announced in
    7.47.10, creation disabled by default from 7.98, end of life at the end of 2024.
    artifactweave accepts reference tokens in this header and refuses to create API keys.
+   7.x also reads the header's older name, `X-Api-Key`, when `X-JFrog-Art-Api` is blank,
+   whenever it is sent, even empty (`AuthenticationFilterUtils.getApiKeyTokenKeyValue`,
+   7.161.26 open source), and refuses an access token sent in either
+   (`AccessTokenAuthenticationProviderV2.assertNotTokenWithApiKeyHeader`). The props filter
+   that reads them comes before the Basic filter (`AuthenticationFilterListSorter`) and
+   accepts every request that sends a key (`PropsAuthenticationFilter.acceptFilter`), so the
+   key alone authenticates such a request, whatever its `Authorization` header says. A
+   refused key answers 403 while either header is not blank: "Return 403 to any API client
+   that used the API Key header ... If not the client keeps asking for credentials
+   indefinitely on 401 responses"
+   (`ArtifactoryBasicAuthenticationEntryPoint.isAlreadyAuthedApiKeyRequest`), with the Basic
+   challenge the entry point adds to every answer that is not for the UI. Its message is the
+   provider's, which is not open source; artifactweave answers "Bad credentials" **[I]**, and
+   an `X-Api-Key` sent empty, read as a key but not one that turns the refusal into 403,
+   401 **[I]** ([#1464](https://github.com/weaveplatform/artifactweave/issues/1464)). The
+   same entry point answers 403 "if bad credentials error" to a client whose `User-Agent`
+   contains `nuget` in any case and that sent an `Authorization` or `X-NuGet-ApiKey` value
+   that is not blank (`isAlreadyAuthedNuGetRequest`), which artifactweave follows on every
+   route (decision [0038](decisions/0038-nuget.md),
+   [#1465](https://github.com/weaveplatform/artifactweave/issues/1465)).
    From 7.111.4 an administrator blocks existing API keys with a platform setting that is
    off by default ([7.111.4 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)); artifactweave never holds API keys, so none exist to
    block.
@@ -566,11 +586,12 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
    `old.check.for.oath.token.length` at its default), and
    `RequestUtils.getBearerAuthenticationValue` takes `bearer ` in any case followed by a value
    that is not blank. No filter of the open source chain reads another scheme, and the props
-   filter skips a blank `X-JFrog-Art-Api` (`getApiKeyTokenKeyValue`). The Basic filter also declines the anonymous user name, in any case, while
+   filter skips a blank `X-JFrog-Art-Api` for `X-Api-Key` (`getApiKeyTokenKeyValue`). The Basic filter also declines the anonymous user name, in any case, while
    anonymous access is off (`isAnonAccessEnabled() || !UserInfo.isAnonymous(username)`). So
    `AccessFilter.useAnonymousIfPossible` serves `Basic Og==`, a blank `Basic`, the Basic scheme
    in another case (`basic`, `BASIC`) or followed by a tab, `Bearer` with no token, another
-   scheme (`Negotiate`, `Token`, `Digest`) or a bare value, a blank `X-JFrog-Art-Api`, and,
+   scheme (`Negotiate`, `Token`, `Digest`) or a bare value, a blank `X-JFrog-Art-Api` without
+   `X-Api-Key`, and,
    while anonymous access is off, Basic credentials naming `anonymous` as a request without
    credentials: anonymous while
    anonymous access is on, 401 "Authentication is required" while it is off, and a ping
@@ -581,8 +602,8 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
    same on every route and counts no failed login for these values
    ([#1451](https://github.com/weaveplatform/artifactweave/issues/1451)); Cargo's and
    RubyGems' bare tokens are still read on their own paths. A credential in another header
-   still counts: the props filter reads `X-JFrog-Art-Api` whatever `Authorization` says
-   (`AuthenticationFilterUtils.getTokenKeyValue`), and the NuGet routes read `X-NuGet-ApiKey`
+   still counts: the props filter reads an API key before and whatever `Authorization` says
+   (item 3, `AuthenticationFilterUtils.getTokenKeyValue`), and the NuGet routes read `X-NuGet-ApiKey`
    when no `Authorization` value counts **[I]**. The Basic filter stands aside on
    `/api/docker/`, `/api/oci/`, `/api/nuget/` and `/api/vagrant/`
    (`RequestUtils.pkgEndpointMatchBasicAuth`), where filters outside the open source read

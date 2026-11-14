@@ -11,6 +11,8 @@
 //
 // # Inputs
 //
+//   - harness.NewRemoteWorld, for the remote whose database statement
+//     fails: the application runtime over SQLite with a fake upstream.
 //   - The production router from test/server/support/harness, through the
 //     harness's item world under the root's name (fixture_test.go,
 //     newItemWorld): the users reader, deployer and user, the deploy-libs
@@ -34,6 +36,9 @@
 //     not read, one whose own read permissions narrow what its members
 //     list, and the download policy on remote repositories and remote
 //     members.
+//   - remote_hook_fault_test.go: a remote tarball whose publication meets
+//     a statement the runtime's SQLite database refuses, under Hex's
+//     Deployed hook, answers 500 and caches nothing (issue 1470).
 //
 // # References
 //

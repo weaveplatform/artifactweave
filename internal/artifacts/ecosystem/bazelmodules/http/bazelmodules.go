@@ -403,8 +403,11 @@ func (h handler) remoteBytes(
 		return nil, result, invalid()
 	}
 	defer result.Stream.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(result.Stream.Body, metadataLimit+1))
-	if err != nil || len(data) > metadataLimit || validate(data) != nil {
+	data, err := pkgroute.ReadServed(r.Context(), result.Stream.Body, metadataLimit, invalid())
+	if err != nil {
+		return nil, result, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
+	}
+	if len(data) > metadataLimit || validate(data) != nil {
 		return nil, result, invalid()
 	}
 	result.Stream = nil

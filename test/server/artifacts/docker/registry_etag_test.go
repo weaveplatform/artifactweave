@@ -58,7 +58,8 @@ func wantAnswer(t *testing.T, label string, rec *httptest.ResponseRecorder, want
 // answers If-None-Match, in any form the item route takes, and
 // If-Modified-Since with 304, as 6.20's download does for a HEAD, and still
 // ignores Range, If-Range, If-Match and If-Unmodified-Since. A HEAD is never
-// redirected and never counted (#1317).
+// redirected and never counted (#1317). A list on one line matches
+// nothing, as on the item route since #1469.
 func TestAccRegistryBlobHeadSendsTheGetHeaders(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := t.Context()
@@ -118,7 +119,8 @@ func TestAccRegistryBlobHeadSendsTheGetHeaders(t *testing.T) {
 				{"If-None-Match bare", []string{"If-None-Match", sum.sha1}, answer{304, "", notModified}},
 				{"If-None-Match quoted", []string{"If-None-Match", `"` + sum.sha1 + `"`}, answer{304, "", notModified}},
 				{"If-None-Match weak", []string{"If-None-Match", "W/" + sum.sha1}, answer{304, "", notModified}},
-				{"If-None-Match list", []string{"If-None-Match", `"x", ` + sum.sha1}, answer{304, "", notModified}},
+				// 7.x's download compares the line as a whole (#1469).
+				{"If-None-Match list", []string{"If-None-Match", `"x", ` + sum.sha1}, answer{200, "", file}},
 				{"If-None-Match digest", []string{"If-None-Match", `"` + digest + `"`}, answer{200, "", file}},
 				{"If-None-Match other", []string{"If-None-Match", `"other"`}, answer{200, "", file}},
 				{"If-Modified-Since after", []string{"If-Modified-Since", afterChange}, answer{304, "", notModified}},
@@ -171,9 +173,9 @@ func TestAccRegistryBlobHeadSendsTheGetHeaders(t *testing.T) {
 // 7.55.8 answered a remote blob GET (RTFACT-29977), on its first fetch and
 // from the cache, stored or not, GET and HEAD alike. If-None-Match takes
 // it in the forms the item route takes; the digest, the ETag before, no
-// longer matches. A range gets the whole blob whatever If-Range names
-// (#1337). A remote manifest keeps its digest as ETag: no capture shows what
-// 7.x sends for one (#1317).
+// longer matches, nor does a list on one line (#1469). A range gets the
+// whole blob whatever If-Range names (#1337). A remote manifest keeps its
+// digest as ETag: no capture shows what 7.x sends for one (#1317).
 func TestAccRegistryRemoteBlobETagIsTheBareSHA1(t *testing.T) {
 	for _, store := range []bool{true, false} {
 		t.Run("store="+strconv.FormatBool(store), func(t *testing.T) {
@@ -235,7 +237,8 @@ func TestAccRegistryRemoteBlobETagIsTheBareSHA1(t *testing.T) {
 						{"If-None-Match bare", []string{"If-None-Match", sum.sha1}, answer{304, "", notModified}},
 						{"If-None-Match quoted", []string{"If-None-Match", `"` + sum.sha1 + `"`}, answer{304, "", notModified}},
 						{"If-None-Match weak", []string{"If-None-Match", `W/"` + sum.sha1 + `"`}, answer{304, "", notModified}},
-						{"If-None-Match list", []string{"If-None-Match", `"x", ` + sum.sha1}, answer{304, "", notModified}},
+						// 7.x's download compares the line as a whole (#1469).
+						{"If-None-Match list", []string{"If-None-Match", `"x", ` + sum.sha1}, answer{200, whole, file}},
 						{"If-None-Match digest", []string{"If-None-Match", `"` + digest + `"`}, answer{200, whole, file}},
 						// The Docker API answers a range with the whole
 						// blob (RTFACT-30157, #1337), and a HEAD ignores

@@ -98,6 +98,10 @@
 //     traversal.
 //   - download_policy_test.go: the download policy on local, virtual and
 //     remote repositories.
+//   - served_copy_fault_test.go: a cached CDN podspec, shard index or the
+//     podspec of a source archive whose copy fails a read answers 500, logs
+//     the fault once and stays cached, on the remote and through a virtual
+//     repository.
 //   - The @cocoapods acceptance scenarios
 //     (test/acceptance/features/cocoapods.feature) drive the pod client
 //     through the whole server.

@@ -312,6 +312,75 @@ func TestUnitUnauthorizedChallenges(t *testing.T) {
 	if got := rec.Header().Get("WWW-Authenticate"); got != "" {
 		t.Fatalf("a 403 challenged: %q", got)
 	}
+	// A 403 that asks for a challenge gets the profile's, as 7.x's entry
+	// point answers a refused API key; an upstream's refusal gets none.
+	for _, c := range []struct {
+		err  *Error
+		want string
+	}{
+		{&Error{Status: http.StatusForbidden, Message: "Bad credentials", Challenge: true}, BasicChallenge},
+		{&Error{Status: http.StatusUnauthorized, Message: "up", NoChallenge: true}, ""},
+		{&Error{Status: http.StatusForbidden, Message: "up", NoChallenge: true, Challenge: true}, ""},
+	} {
+		rec = httptest.NewRecorder()
+		Write(rec, ProfileArtifactory, c.err)
+		if got := rec.Header().Get("WWW-Authenticate"); got != c.want || rec.Code != c.err.Status {
+			t.Errorf("%+v: %d %q, want %q", c.err, rec.Code, got, c.want)
+		}
+	}
+}
+
+// TestUnitPubChallenge: under ProfilePub a 401 and a 403 carry the pub
+// repository specification's challenge, Bearer realm="pub" with the
+// error's message, which dart pub prints (#1279). The message is a
+// quoted-string of printable ASCII: quotes and backslashes are escaped, a
+// newline becomes a space and any other character a question mark. A 404,
+// an upstream's refusal and a challenge a handler set first are left alone.
+func TestUnitPubChallenge(t *testing.T) {
+	for _, c := range []struct {
+		err    *Error
+		preset string
+		want   string
+	}{
+		{
+			err:  New(http.StatusUnauthorized, "Authentication is required"),
+			want: `Bearer realm="pub", message="Authentication is required"`,
+		},
+		{
+			err:  New(http.StatusForbidden, "Forbidden"),
+			want: `Bearer realm="pub", message="Forbidden"`,
+		},
+		{
+			err:  &Error{Status: http.StatusForbidden, Message: "Bad credentials", Challenge: true},
+			want: `Bearer realm="pub", message="Bad credentials"`,
+		},
+		{
+			err:  New(http.StatusForbidden, "User is Locked.\nContact System Administrator to Unlock The Account."),
+			want: `Bearer realm="pub", message="User is Locked. Contact System Administrator to Unlock The Account."`,
+		},
+		{
+			err:  New(http.StatusUnauthorized, `say "hi" \ café`),
+			want: `Bearer realm="pub", message="say \"hi\" \\ caf?"`,
+		},
+		{err: New(http.StatusNotFound, "absent")},
+		{err: &Error{Status: http.StatusForbidden, Message: "upstream", NoChallenge: true}},
+		{err: &Error{Status: http.StatusUnauthorized, Message: "upstream", NoChallenge: true}},
+		{
+			err:    New(http.StatusUnauthorized, "token required"),
+			preset: `Bearer realm="other"`,
+			want:   `Bearer realm="other"`,
+		},
+	} {
+		rec := httptest.NewRecorder()
+		if c.preset != "" {
+			rec.Header().Set("WWW-Authenticate", c.preset)
+		}
+		Write(rec, ProfilePub, c.err)
+		if got := rec.Header().Values("WWW-Authenticate"); rec.Code != c.err.Status ||
+			strings.Join(got, "|") != c.want {
+			t.Errorf("%d %q: %d %q, want %q", c.err.Status, c.err.Message, rec.Code, got, c.want)
+		}
+	}
 }
 
 func TestUnitTerraformBackendEnvelope(t *testing.T) {

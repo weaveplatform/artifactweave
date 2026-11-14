@@ -4,7 +4,6 @@ import (
 	"io"
 	"net/http"
 	"path"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -15,32 +14,17 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
-// unevaluatedPreconditions are the conditional headers Artifactory's
-// download never reads. 7.x decides a download's conditional answer in
-// DownloadServiceImpl.isNotModified, from If-Modified-Since and
-// If-None-Match alone, before it serves a local, cached or remote file or
-// its checksum, GET or HEAD, and never answers 412 (DownloadServiceImpl
-// respond and isNotModified, Artifactory OSS 7.161.26 sources; 6.20 has
-// the same). No class in those sources reads If-Match or
-// If-Unmodified-Since. JFrog closed RTFACT-17259, which asked for both, as
-// "No plans to implement in near future". 7.125.6 put If-None-Match before
-// If-Modified-Since, as RFC 9110 orders them (RTDEV-64461), and named no
-// other precondition.
-var unevaluatedPreconditions = []string{"If-Match", "If-Unmodified-Since"}
-
-// withoutUnevaluatedPreconditions is r without unevaluatedPreconditions, so
-// that a file download answers neither with 412, whatever tag or date they
-// carry. http.ServeContent and answerPreconditions apply every RFC 9110
-// precondition, so without this a client sending back the bare SHA-1 it
-// was given as the ETag in If-Match would get 412 for a file that has not
-// changed. If-None-Match, If-Modified-Since and If-Range stay, and answer
-// as before. The copy leaves the caller's request as it was sent.
+// withoutUnevaluatedPreconditions is r without the conditional headers
+// Artifactory's download never reads, If-Match and If-Unmodified-Since
+// (pkgroute.UnevaluatedPreconditions), so that a file download answers
+// neither with 412, whatever tag or date they carry. If-None-Match,
+// If-Modified-Since and If-Range stay.
 func withoutUnevaluatedPreconditions(r *http.Request) *http.Request {
-	return withoutHeaders(r, unevaluatedPreconditions...)
+	return pkgroute.WithoutUnevaluatedPreconditions(r)
 }
 
 // downloadRequest is r as Artifactory's download reads it: without
-// unevaluatedPreconditions and, on a HEAD, without Range and If-Range. A
+// pkgroute.UnevaluatedPreconditions and, on a HEAD, without Range and If-Range. A
 // HEAD answers 200 with the whole length, never 206 or 416: 7.x answers a
 // HEAD through RequestResponseHelper.sendHeadResponse, which never reads
 // Range (7.161.26), and RFC 9110 section 14.2 has a server ignore Range on
@@ -188,53 +172,16 @@ func (w *checksumBodyWriter) Write(p []byte) (int, error) {
 
 // fileNotModified reports whether r's If-None-Match or If-Modified-Since
 // finds the file whose checksums are sums, and which last changed at
-// modified, unchanged, as 7.x's DownloadServiceImpl.isNotModified and
-// isNonMatch decide it (7.161.26). An If-None-Match decides alone: it
-// matches when one of its header lines, less a W/ prefix and its quotes,
-// is the file's SHA-1, so neither "*" nor a list of tags on one line
-// matches (ArtifactoryRequestBase.isNoneMatch and parseETagValue). A
-// request whose first X-Artifactory-If-None-Match-MD5 line is true, as
-// Commons Lang's BooleanUtils.toBoolean reads it, may name the MD5
-// instead (isSha1AndMd5NotMatch). Otherwise an If-Modified-Since matches
-// when the file has not changed since, to the second (isNewerThan).
+// modified, unchanged, as 7.x's DownloadServiceImpl.isNotModified decides
+// it for the file and for its checksum files alike
+// (pkgroute.FileNotModified): one If-None-Match line at a time, less a W/
+// prefix and its quotes, equal to the SHA-1, or to the MD5 when the
+// request asks with X-Artifactory-If-None-Match-MD5.
 func fileNotModified(r *http.Request, sums kernel.Checksums, modified time.Time) bool {
-	if tags := r.Header.Values("If-None-Match"); len(tags) > 0 {
-		md5 := ""
-		if flags := r.Header.Values("X-Artifactory-If-None-Match-MD5"); len(flags) > 0 &&
-			slices.Contains([]string{"true", "on", "yes", "y", "t"}, strings.ToLower(flags[0])) {
-			md5 = sums.MD5
-		}
-		for _, tag := range tags {
-			tag = strings.TrimSpace(tag)
-			if strings.HasPrefix(tag, "W/") {
-				tag = strings.ReplaceAll(tag, "W/", "")
-			}
-			tag = strings.ReplaceAll(tag, `"`, "")
-			if (sums.SHA1 != "" && tag == sums.SHA1) || (md5 != "" && tag == md5) {
-				return true
-			}
-		}
-		return false
-	}
-	since, err := http.ParseTime(r.Header.Get("If-Modified-Since"))
-	return err == nil && !modified.IsZero() && !modified.Truncate(time.Second).After(since)
+	return pkgroute.FileNotModified(r, []string{sums.SHA1}, sums.MD5, modified)
 }
 
-// withoutHeaders is r without the headers names, or r itself when it
-// carries none of them. The copy leaves the caller's request as it was
-// sent.
+// withoutHeaders is r without the headers names (pkgroute.WithoutHeaders).
 func withoutHeaders(r *http.Request, names ...string) *http.Request {
-	present := false
-	for _, k := range names {
-		present = present || len(r.Header.Values(k)) > 0
-	}
-	if !present {
-		return r
-	}
-	out := r.WithContext(r.Context())
-	out.Header = r.Header.Clone()
-	for _, k := range names {
-		out.Header.Del(k)
-	}
-	return out
+	return pkgroute.WithoutHeaders(r, names...)
 }

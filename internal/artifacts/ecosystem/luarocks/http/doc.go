@@ -78,7 +78,9 @@
 //     manifest whose cached copy fails a read while it is checked, or that
 //     the server's storage fails to write or publish, never the 502 of an
 //     upstream's bad content [I]
-//     (https://github.com/weaveplatform/artifactweave/issues/1269).
+//     (https://github.com/weaveplatform/artifactweave/issues/1269), and a
+//     manifest whose served copy fails a read as the route reads it
+//     (https://github.com/weaveplatform/artifactweave/issues/1462).
 //   - The download policy (decision 0032) is checked after Read permission
 //     at the path a client asks for. A local or federated manifest is a
 //     stored document 7.x reads through the download path, so a blackout,
@@ -164,6 +166,12 @@
 //     500 and caches nothing, and so does a rock whose copy, entry or
 //     transaction the storage fails to keep, or whose spool file cannot be
 //     made, while a bad upstream rock still answers 502.
+//   - remote_hook_fault_test.go (external): a remote rock whose version
+//     sync meets a statement the store failed to run answers 500, logs it
+//     once, caches nothing and leaves the circuit alone.
+//   - served_copy_fault_test.go (external): a cached remote manifest whose
+//     copy fails a read, as the cache checks it or as the route reads it,
+//     answers 500, logs the fault once and stays cached.
 //
 // The @luarocks acceptance scenarios drive the luarocks client against
 // local, federated, remote and virtual repositories.

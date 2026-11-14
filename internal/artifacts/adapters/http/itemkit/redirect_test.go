@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
@@ -92,7 +93,7 @@ func TestUnitWithoutUnevaluatedPreconditions(t *testing.T) {
 	if got := withoutUnevaluatedPreconditions(plain); got != plain {
 		t.Fatal("a request without If-Match or If-Unmodified-Since was copied")
 	}
-	for _, name := range unevaluatedPreconditions {
+	for _, name := range pkgroute.UnevaluatedPreconditions {
 		r := httptest.NewRequest(http.MethodGet, "/artifactory/libs-local/a.bin", nil)
 		r.Header.Add(name, "a")
 		r.Header.Add(name, "b")
@@ -126,7 +127,7 @@ func TestUnitDownloadRequest(t *testing.T) {
 			r.Header.Set(k, k)
 		}
 		got := downloadRequest(r)
-		for _, gone := range unevaluatedPreconditions {
+		for _, gone := range pkgroute.UnevaluatedPreconditions {
 			if got.Header.Get(gone) != "" {
 				t.Errorf("%s: %s kept", method, gone)
 			}

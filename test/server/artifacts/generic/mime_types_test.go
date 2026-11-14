@@ -309,7 +309,11 @@ func TestAccGenericRemoteMIMEBlocked(t *testing.T) {
 // TestAccGenericRemoteMetadataOverrideList: raw metadata a format adapter
 // expects as JSON, here an npm package document, is refused under a label
 // the override list names, which the list let through before #1316, and
-// served under it while the list names another type.
+// served under it while the list names another type. The refusal is the
+// adapter's own check of the metadata it expects, not 7.x's block list,
+// which checks the type of the URL asked for and so passes a document with
+// no extension, and keeps its 502 where a file without a format hint
+// answers 7.x's 409 (#1392).
 func TestAccGenericRemoteMetadataOverrideList(t *testing.T) {
 	w := newRemoteWorld(t)
 	w.c = *repo.Defaults(&repo.Config{

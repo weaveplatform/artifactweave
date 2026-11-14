@@ -423,11 +423,11 @@ func (s *Service) putFile(
 		Properties: d.Properties, Size: size, Checksums: actual,
 	}
 	if err := guardWrite(ctx, h, env, d.Repo, w); err != nil {
-		return model.Item{}, err
+		return model.Item{}, hookFault(ctx, d, err)
 	}
 	w, err := admit(ctx, h, env, d.Repo, w)
 	if err != nil {
-		return model.Item{}, err
+		return model.Item{}, hookFault(ctx, d, err)
 	}
 	d.Path, d.Properties = w.Path, w.Properties
 	stored, err := s.writeFile(ctx, d, fileWrite{
@@ -442,11 +442,11 @@ func (s *Service) putFile(
 		return model.Item{}, err
 	}
 	if err := h.Deployed(ctx, env, d.Repo, stored); err != nil {
-		return model.Item{}, err //nolint:wrapcheck // the format's own error
+		return model.Item{}, hookFault(ctx, d, err)
 	}
 	if err := s.annotated(ctx, h, env, d.Repo, stored,
 		format.Annotation{Set: d.Properties, At: now}); err != nil {
-		return model.Item{}, err
+		return model.Item{}, hookFault(ctx, d, err)
 	}
 	return stored, nil
 }

@@ -82,7 +82,9 @@ func TestAccProtocolErrorProfiles(t *testing.T) {
 
 // The authentication middleware's 401 and 403 on the pub, Swift and Agent
 // Packages paths answer in the protocol's envelope with its content type, and
-// pub's 401 with the Bearer realm="pub" challenge dart pub reads (#1249).
+// pub's 401 and 403 with the Bearer realm="pub" challenge carrying the
+// error's message, which the pub repository specification requires and dart
+// pub prints (#1249, #1279).
 // Their reindex operations keep Artifactory's envelope and Basic challenge,
 // and so do the binder's 400 for a reindex with an empty key and the
 // router's 404 for a bare prefix, which no middleware writes. Under /v2 a
@@ -95,14 +97,14 @@ func TestAccProtocolMiddlewareEnvelopes(t *testing.T) {
 		t.Fatal(err)
 	}
 	const (
-		pub      = "/artifactory/api/pub/libs-local/api/packages/widget"
-		swift    = "/artifactory/api/swift/libs-local/acme/widget"
-		apm      = "/artifactory/api/agentpackages/libs-local/v1/search"
-		locked   = `User is Locked.\nContact System Administrator to Unlock The Account.`
-		problem  = "application/problem+json; charset=utf-8"
-		pubType  = "application/vnd.pub.v2+json"
-		pubRealm = `Bearer realm="pub"`
+		pub     = "/artifactory/api/pub/libs-local/api/packages/widget"
+		swift   = "/artifactory/api/swift/libs-local/acme/widget"
+		apm     = "/artifactory/api/agentpackages/libs-local/v1/search"
+		locked  = `User is Locked.\nContact System Administrator to Unlock The Account.`
+		problem = "application/problem+json; charset=utf-8"
+		pubType = "application/vnd.pub.v2+json"
 	)
+	pubRealm := func(message string) string { return `Bearer realm="pub", message="` + message + `"` }
 	for _, c := range []struct {
 		method, path                 string
 		headers                      map[string]string
@@ -110,15 +112,25 @@ func TestAccProtocolMiddlewareEnvelopes(t *testing.T) {
 		contentType, challenge, body string
 	}{
 		{
-			http.MethodGet, pub, nil, 401, pubType, pubRealm,
+			http.MethodGet, pub, nil, 401, pubType, pubRealm("Authentication is required"),
 			`{"error":{"code":"UNAUTHORIZED","message":"Authentication is required"}}`,
 		},
 		{
-			http.MethodGet, pub, basic("admin", "wrong"), 401, pubType, pubRealm,
+			http.MethodGet, pub, basic("admin", "wrong"), 401, pubType, pubRealm("Bad credentials"),
 			`{"error":{"code":"UNAUTHORIZED","message":"Bad credentials"}}`,
 		},
 		{
-			http.MethodGet, pub, basic("locked", "pw"), 403, pubType, "",
+			http.MethodGet, pub,
+			map[string]string{"Authorization": "Bearer not-a-token"},
+			401,
+			pubType, pubRealm("Bad credentials"),
+			`{"error":{"code":"UNAUTHORIZED","message":"Bad credentials"}}`,
+		},
+		// The message's newline is a space in the challenge, a quoted-string
+		// of printable ASCII.
+		{
+			http.MethodGet, pub, basic("locked", "pw"), 403, pubType,
+			pubRealm("User is Locked. Contact System Administrator to Unlock The Account."),
 			`{"error":{"code":"FORBIDDEN","message":"` + locked + `"}}`,
 		},
 		{

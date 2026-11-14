@@ -469,6 +469,7 @@ func (p *Policy) upload(
 		MaxBytes:     limit,
 		CheckCurrent: func(ctx context.Context, _ item.Store) error { return p.Check(ctx, q, permit, revision) },
 		ClientAccept: clientAccept(q),
+		RequestURL:   requestURL(res),
 	}
 }
 
@@ -488,7 +489,11 @@ func headMIME(q source.Request, res *http.Response) error {
 	if r.ClientMIME == nil || r.ExpectedContentType != "" || len(r.ExpectedContentTypes) > 0 {
 		return nil
 	}
-	err := item.RefuseLabel(q.Repo, r.Path, res.Header.Get("Content-Type"), r.ClientMIME.Accept)
+	name := requestURL(res)
+	if name == "" {
+		name = r.Path
+	}
+	err := item.RefuseLabel(q.Repo, name, res.Header.Get("Content-Type"), r.ClientMIME.Accept)
 	return mimeRefusal(q, res, err)
 }
 

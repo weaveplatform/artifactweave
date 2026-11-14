@@ -37,7 +37,10 @@
 // # Outputs
 //
 //   - Store and New. The unit of work: Tx, AfterCommit and InTx. Statements:
-//     Q, Exec, ExecOne, InsertID, Exists, Rows, Wrap and LockClause. Sealed
+//     Q, Exec, ExecOne, InsertID, Exists, Rows, Wrap and LockClause. Wrap
+//     marks a driver error that is no verdict and no ended context as
+//     kernel.ErrStore, the store's own failure, and keeps its text
+//     (https://github.com/weaveplatform/artifactweave/issues/1470). Sealed
 //     columns: Seal and Unseal. And DB, Dialect and Close.
 //   - Module registration and key rotation: SealedColumn, FirstKey, Module
 //     and Reseal, which re-seals the columns the modules register under the
@@ -164,6 +167,9 @@
 //     run every helper through the SQL stores. TestAccSchemaGolden,
 //     TestAccLegacyHistoryRefused and TestAccStreamsMigrateAlone run the
 //     migrator over the modules' streams on the real engines.
+//   - TestUnitWrapMarksTheStoresOwnFailures: a statement the database fails
+//     to run is kernel.ErrStore with its text kept; a verdict and an ended
+//     context are not.
 //   - TestAccTxDroppedInnerErrorFailsOuter covers the nested case that the
 //     contract suite leaves out, and TestAccTxJoinsTheTransactionOfItsPool
 //     the pool the unit of work is keyed to.

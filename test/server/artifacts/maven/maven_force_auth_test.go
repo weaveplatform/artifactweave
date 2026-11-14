@@ -236,9 +236,12 @@ const badCredentialsBody = `{"errors":[{"message":"Bad credentials","status":401
 // as present (AuthenticationFilterUtils.isAuthHeaderPresent); and an
 // X-Api-Key header (getApiKeyTokenKeyValue). Authentication reads no
 // credential from the first two either, as 7.x's chain does, and serves
-// them as the anonymous user (#1451), as it does the last two; it answers
-// the unpadded value 401 "Bad credentials". The world is fresh, so no
-// earlier failed login suspends the anonymous user name (#1435).
+// them as the anonymous user (#1451), as it does the empty header; it
+// answers the unpadded value 401 "Bad credentials", and the X-Api-Key,
+// which 7.x's props filter reads as an API key that does not verify, 403
+// "Bad credentials" (isAlreadyAuthedApiKeyRequest, #1464). The world is
+// fresh, so no earlier failed login suspends the anonymous user name
+// (#1435).
 func TestAccMavenForceAuthenticationPassesOtherCredentialsOn(t *testing.T) {
 	w := forcedMavenWorld(t, true)
 	for _, tc := range []struct {
@@ -256,7 +259,10 @@ func TestAccMavenForceAuthenticationPassesOtherCredentialsOn(t *testing.T) {
 			http.StatusUnauthorized, badCredentialsBody,
 		},
 		{"Authorization", "", http.StatusOK, "jar"},
-		{"X-Api-Key", "key", http.StatusOK, "jar"},
+		{
+			"X-Api-Key", "key", http.StatusForbidden,
+			`{"errors":[{"message":"Bad credentials","status":403}]}` + "\n",
+		},
 	} {
 		rec := w.do(http.MethodGet, forcedJar, "", "", tc.header, tc.value)
 		if rec.Code != tc.code || rec.Body.String() != tc.body {

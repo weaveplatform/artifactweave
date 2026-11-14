@@ -191,10 +191,11 @@ func TestUnitRemoteComposerValidationEdges(t *testing.T) {
 	if got := registryURL("https://up.example/", ""); got != "https://up.example" {
 		t.Fatal(got)
 	}
-	if _, err := readMetadata(source.Result{}); err == nil {
+	if _, err := readMetadata(t.Context(), source.Result{}); err == nil {
 		t.Fatal("missing body accepted")
 	}
 	if _, err := readMetadata(
+		t.Context(),
 		source.Result{
 			Stream: &source.Stream{
 				Body: io.NopCloser(strings.NewReader(strings.Repeat("x", remoteMetadataLimit+1))),

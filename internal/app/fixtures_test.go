@@ -724,6 +724,8 @@ const (
 	secUnexpire = "/artifactory/api/security/users/authorization/unexpirePassword/"
 	secChangePw = "/artifactory/api/security/users/authorization/changePassword"
 	secAPIKey   = "/artifactory/api/security/apiKey"
+	sysEncrypt  = "/artifactory/api/system/encrypt"
+	sysDecrypt  = "/artifactory/api/system/decrypt"
 )
 
 // securityStatusRows covers the legacy security API. The rows create the
@@ -758,6 +760,8 @@ func securityStatusRows() []statusCase {
 		rotateKey = "PUT " + secAPIKey
 		getKey    = "GET " + secAPIKey
 		revokeKey = "DELETE " + secAPIKey
+		encrypt   = "POST " + sysEncrypt
+		decrypt   = "POST " + sysDecrypt
 		revokeFor = "DELETE " + secAPIKey + "/{username}"
 		newSec    = `{"name":"sec-user","email":"s@example.com","password":"Sec-pass1"}`
 	)
@@ -885,6 +889,17 @@ func securityStatusRows() []statusCase {
 		{revokeFor, secAPIKey + "/user", "admin", "", 200},
 		{revokeFor, secAPIKey + "/nobody", "admin", "", 404},
 		{revokeFor, secAPIKey + "/user", "user", "", 403},
+
+		// Key encryption answers an administrator DONE and changes nothing
+		// (#1385): 7.x's SystemResource is administrators' only.
+		{encrypt, sysEncrypt, "admin", "", 200},
+		{encrypt, sysEncrypt, "user", "", 403},
+		{encrypt, sysEncrypt, "", "", 401},
+		{encrypt, sysEncrypt, "anonymous", "", 401},
+		{decrypt, sysDecrypt, "admin", "", 200},
+		{decrypt, sysDecrypt, "user", "", 403},
+		{decrypt, sysDecrypt, "", "", 401},
+		{decrypt, sysDecrypt, "anonymous", "", 401},
 	}
 }
 

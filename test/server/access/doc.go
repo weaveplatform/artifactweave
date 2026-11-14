@@ -31,8 +31,10 @@
 //
 // Assertions only, one file per area:
 //   - auth_test.go: the status, challenge and error message of each
-//     authentication case, the error envelope of the /access routes, and
-//     what a request without credentials reaches once anonymous access is on.
+//     authentication case, the error envelope of the /access routes, what
+//     a request without credentials reaches once anonymous access is on,
+//     and the API key headers, read first and alone, with a refused key's
+//     403 (issue 1464).
 //   - access_test.go: path-level permissions, scoped token isolation,
 //     administrators through a group, and the permissions view's patterns.
 //   - tokens_test.go and token_auth_test.go: creating, listing, refreshing
@@ -40,7 +42,8 @@
 //     the encrypted password, and authentication by token.
 //   - security_test.go and access_identity_test.go: users, groups, locks,
 //     password expiry and policies, login suspension and the last
-//     administrator, in the legacy security API and Access.
+//     administrator, in the legacy security API and Access; and the key
+//     encryption operations, DONE for an administrator (issue 1385).
 //   - permissions_test.go: one permission in three APIs, MANAGE holders, and
 //     the Terraform provider's flows.
 //   - roles_test.go and roles_status_test.go: global roles and environments,

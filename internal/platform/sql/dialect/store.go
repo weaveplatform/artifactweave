@@ -79,7 +79,9 @@ func (s *Store) Q(ctx context.Context) Queryer { return query(ctx, s.db) }
 // Wrap maps a driver error onto the kernel sentinels and names the
 // operation: sql.ErrNoRows becomes kernel.ErrNotFound and a unique violation
 // the dialect recognises kernel.ErrConflict, each prefixed with op; any other
-// error is prefixed with the dialect's name and op. nil stays nil.
+// error is prefixed with the dialect's name and op and also marked
+// kernel.ErrStore, the store's own failure, unless its context ended. nil
+// stays nil.
 func (s *Store) Wrap(op string, err error) error {
 	switch {
 	case err == nil:
@@ -89,7 +91,7 @@ func (s *Store) Wrap(op string, err error) error {
 	case s.d.uniqueViolation(err):
 		return fmt.Errorf("%s: %w", op, kernel.ErrConflict)
 	default:
-		return fmt.Errorf("%s: %s: %w", s.d.Name, op, err)
+		return fmt.Errorf("%s: %s: %w", s.d.Name, op, markStore(err))
 	}
 }
 

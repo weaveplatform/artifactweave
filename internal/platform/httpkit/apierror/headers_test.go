@@ -42,7 +42,7 @@ func TestUnitProfileHeaders(t *testing.T) {
 	for p := ProfileArtifactory; p <= ProfilePub; p++ {
 		challenge := BasicChallenge
 		if p == ProfilePub {
-			challenge = `Bearer realm="pub"`
+			challenge = `Bearer realm="pub", message="Authentication is required"`
 		}
 		notFound := http.Header{"Content-Type": {contentTypes[p]}}
 		unauthorized := http.Header{

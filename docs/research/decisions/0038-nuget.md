@@ -322,6 +322,20 @@ the request's base URL (decision [0002](0002-spec-first-flat-crud-handwritten-it
     challenge, as wrong credentials do (RTDEV-37982). JFrog does not support a key alone
     (RTFACT-20340, R29 9). The client then retries with its stored credentials, if any.
   - The key is never logged. The access log records the user it named.
+- **A NuGet client's refused password** answers 403 "Bad credentials" with the Basic
+  challenge, not 401 (#1465). 7.161.26's entry point answers 403 when the failure is a wrong
+  password (`BadCredentialsException`), the `User-Agent` contains `nuget` in any case, and
+  `Authorization` or `X-NuGet-ApiKey` is not blank: "Return 403 to nuget client if bad
+  credentials error, if not the client keeps asking for credentials indefinitely on 401
+  responses" (`ArtifactoryBasicAuthenticationEntryPoint.isAlreadyAuthedNuGetRequest`). The
+  rule is the entry point's, so it holds on every route, not only the NuGet ones. A token that
+  does not verify, a key without a password and a request without credentials keep their 401.
+  `NuGet.Protocol`'s `HttpSourceAuthenticationHandler` asks its credential providers again on
+  a 401, up to four times, and on a 403 only for a source configured with `PromptOn403`, so a
+  403 ends the exchange. The 7.84.10 release note (RTDEV-37982) says a .NET client with wrong
+  credentials got 500 "instead of a 401", which reads as 401 being the answer since; the open
+  source entry point answers 403 to such a client, and artifactweave follows the source until
+  P19 compares them **[I]**.
 - **Bearer tokens** authenticate on the NuGet routes as everywhere else. RTFACT-29362 records
   7.50.3 refusing one there as anonymous, a bug closed without a fix (R29 9).
 - **Force authentication.** On a repository with `forceNugetAuthentication: true`, an anonymous

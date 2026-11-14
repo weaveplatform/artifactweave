@@ -41,6 +41,21 @@ func (s Remote) Read(
 	if s.Service == nil {
 		return source.Result{}, apierror.ErrNotImplemented
 	}
+	if resource.ClientMIME == nil && !resource.ChecksumOnly &&
+		resource.ExpectedContentType == "" && len(resource.ExpectedContentTypes) == 0 {
+		// 7.x refuses an upstream's label through
+		// HttpRepo.blockMismatchingMimeTypes on every remote read, whichever
+		// API asked for it, and answers 409, which its missed-retrieval
+		// cache remembers (7.161.26), as the item route answers it. A
+		// format route sends no Accept here, so the label is checked
+		// against the type of the URL asked for, as 7.x checks it without
+		// one: the native clients' Accept values, such as pip's text/html
+		// for its index, are not what they download [I]. A resource with a
+		// format hint keeps the adapter's own, stricter check of raw
+		// metadata and its 502, which is not 7.x's block list
+		// (https://github.com/weaveplatform/artifactweave/issues/1392).
+		resource.ClientMIME = &source.ClientMIME{}
+	}
 	p, _ := kernel.FromContext(r.Context())
 	d, _ := accessapi.DeciderFrom(r.Context())
 	result, err := s.Service.Read(r.Context(), source.Request{
@@ -234,6 +249,11 @@ func (e *sourceRefusal) Unwrap() []error { return []error{e.answer, e.rejection}
 // unknown-length body must not look like a successfully completed artifact.
 func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error {
 	defer func() { _ = s.Body.Close() }()
+	// A stream answers If-Match and If-Unmodified-Since as the cached copy
+	// it becomes does: never with 412, since 7.x's download reads neither
+	// (UnevaluatedPreconditions). Without this a remote file served from
+	// the upstream's stream answered 412 where its cached copy answers 200.
+	r = WithoutUnevaluatedPreconditions(r)
 	if r.Method == http.MethodHead {
 		// A HEAD answers 200 with the whole length, never 206 or 416, as the
 		// item kit's ServeFile answers one. 6.20's download answers a HEAD
@@ -261,6 +281,23 @@ func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error
 		h.Set("Content-Length", strconv.FormatInt(s.Size, 10))
 	}
 	SetChecksums(h, s.Checksums)
+	if s.Status == http.StatusOK && s.Checksums.SHA1 != "" {
+		// A stream with a SHA-1 is a file: the upstream's file, or a cached
+		// copy of it, which 7.x answers through its download as it answers
+		// a local file, so its conditional answer and its 416 are that
+		// download's (FileNotModified, RangeRefusalWriter). The ETag this
+		// response sends matches too: a client sends back the one it was
+		// given. A document a protocol builds per request carries no SHA-1
+		// and keeps http.ServeContent's answers, which no 7.x source shows
+		// for those routes [I].
+		tags := []string{s.Checksums.SHA1, ETagValue(s.ETag)}
+		if FileNotModified(r, tags, s.Checksums.MD5, s.Modified) {
+			WriteNotModified(w)
+			return nil
+		}
+		r = WithoutHeaders(r, "If-None-Match", "If-Modified-Since")
+		w = &RangeRefusalWriter{ResponseWriter: w}
+	}
 	// Validated temporary files and raw cached metadata are seekable. ServeContent
 	// evaluates downstream conditions and ranges against that complete response.
 	if seeker, ok := s.Body.(io.ReadSeeker); ok && s.Status == http.StatusOK {

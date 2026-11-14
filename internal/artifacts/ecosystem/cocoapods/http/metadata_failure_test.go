@@ -80,6 +80,10 @@ func TestAccMetadataRequiresStreamRepresentation(t *testing.T) {
 	}
 }
 
+// A podspec or index whose served copy fails a read stops the route before
+// any archive is fetched, and answers the server's 500 "internal error"
+// without the read's error: the copy the source service serves a route is
+// the server's cached or spooled file, not the upstream's stream (#1462).
 func TestAccMetadataReadFailuresPreventArchiveFetch(t *testing.T) {
 	for _, tc := range []struct{ repo, resource string }{
 		{"pods-remote", "sources/" + sourcePath("RemotePod", "2.0.0", ".tar.gz")},
@@ -98,7 +102,8 @@ func TestAccMetadataReadFailuresPreventArchiveFetch(t *testing.T) {
 				return metadataResult(body), nil
 			})
 			response := f.get(tc.repo, tc.resource)
-			if response.Code != http.StatusBadGateway || !body.closed.Load() || calls != 1 {
+			if response.Code != http.StatusInternalServerError || !body.closed.Load() ||
+				calls != 1 {
 				t.Fatalf(
 					"response = %d %s; closed = %t, calls = %d",
 					response.Code,

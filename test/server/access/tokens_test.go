@@ -725,6 +725,10 @@ func TestAccEncryptedPasswordFollowsThePassword(t *testing.T) {
 		}
 		return rec.Body.String()
 	}
+	// works answers what the encrypted password gets as a Basic password.
+	// As an X-JFrog-Art-Api key it gets the same, but that a refused key
+	// answers 403 where the refused password answers 401, as 7.x's entry
+	// point answers them (isAlreadyAuthedApiKeyRequest, #1464).
 	works := func(enc string) int {
 		t.Helper()
 		art := do(
@@ -735,17 +739,22 @@ func TestAccEncryptedPasswordFollowsThePassword(t *testing.T) {
 			map[string]string{"X-JFrog-Art-Api": enc},
 			"",
 		)
-		if pw := do(
+		pw := do(
 			t,
 			h,
 			http.MethodGet,
 			"/access/api/v1/tokens",
 			basic("user", enc),
 			"",
-		); pw.Code != art.Code {
+		)
+		want := pw.Code
+		if want == http.StatusUnauthorized {
+			want = http.StatusForbidden
+		}
+		if art.Code != want {
 			t.Fatalf("as X-JFrog-Art-Api %d, as a Basic password %d", art.Code, pw.Code)
 		}
-		return art.Code
+		return pw.Code
 	}
 	admin := func(method, path, body string) {
 		t.Helper()

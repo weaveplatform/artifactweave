@@ -102,7 +102,9 @@
 // Artifactory remotes), register_test.go (registration), the dependency_*
 // and dependencies_test.go files (the external dependency rewrite), and
 // archive_fault_test.go, failure_paths_test.go and source_fault_test.go
-// (corrupt archives and failing sources), and download_policy_test.go
-// (the blackout and the patterns of local, virtual, Artifactory and Git
-// remote repositories on every route, and of the dependency rewrite).
+// (corrupt archives and failing sources), served_copy_fault_test.go (a
+// cached catalog, search or refs copy that fails a read answers 500 and
+// stays cached), and download_policy_test.go (the blackout and the
+// patterns of local, virtual, Artifactory and Git remote repositories on
+// every route, and of the dependency rewrite).
 package bowerhttp

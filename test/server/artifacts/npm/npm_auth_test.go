@@ -225,8 +225,14 @@ func TestAccNPMUserPathsTakeNoCredentials(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Errorf("logout, %s: %d %s", name, rec.Code, rec.Body)
 		}
+		// A refused API key answers 403, as 7.x's entry point answers it
+		// (isAlreadyAuthedApiKeyRequest, #1464); the others 401.
+		want := http.StatusUnauthorized
+		if name == "bad api key" {
+			want = http.StatusForbidden
+		}
 		rec = do(t, w.h, "GET", "/artifactory/api/npm/npm-local/-/v1/search", headers, "")
-		if rec.Code != http.StatusUnauthorized {
+		if rec.Code != want {
 			t.Errorf("search, %s: %d %s", name, rec.Code, rec.Body)
 		}
 	}

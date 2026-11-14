@@ -587,7 +587,8 @@ func TestUnitAnonymousPublishRequiresBearerAuthentication(t *testing.T) {
 		}
 		rec := f.do(method, base+"/api/packages/versions/new", "", contentType, body)
 		if rec.Code != http.StatusUnauthorized ||
-			rec.Header().Get("WWW-Authenticate") != `Bearer realm="pub"` ||
+			rec.Header().Get("WWW-Authenticate") !=
+				`Bearer realm="pub", message="Authentication is required"` ||
 			!strings.Contains(rec.Body.String(), `"error"`) ||
 			strings.Contains(rec.Body.String(), "private_pub") {
 			t.Fatalf("anonymous %s: %d %s, challenge=%q", method, rec.Code,

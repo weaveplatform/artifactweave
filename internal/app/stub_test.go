@@ -130,6 +130,10 @@ var generatedRoutes = map[string]bool{
 	"POST /artifactory/api/storageinfo/calculate":    true,
 	"POST /artifactory/api/system/storage/optimize":  true,
 
+	// Key encryption, which answers DONE and changes nothing (#1385).
+	"POST /artifactory/api/system/encrypt": true,
+	"POST /artifactory/api/system/decrypt": true,
+
 	"GET /access/api/v1/environments":                                         true,
 	"POST /access/api/v1/environments":                                        true,
 	"DELETE /access/api/v1/environments/{environmentName}":                    true,

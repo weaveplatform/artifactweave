@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -54,6 +55,19 @@ type fixture struct {
 	db         serverStore
 	items      *item.Service
 	server     *httptest.Server
+	// faults are the errors the router kit logged as unexpected, which the
+	// server's goroutines append under faultsMu.
+	faultsMu sync.Mutex
+	faults   []error
+}
+
+// takeFaults returns the faults the router kit logged and forgets them.
+func (f *fixture) takeFaults() []error {
+	f.faultsMu.Lock()
+	defer f.faultsMu.Unlock()
+	faults := f.faults
+	f.faults = nil
+	return faults
 }
 
 func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.Service) *fixture {
@@ -118,6 +132,11 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 	})
 	pkgroute.Mount(r, pkgroute.Options{
 		Store: f.db, Items: func() *item.Service { return items },
+		Fault: func(_ *http.Request, e error) {
+			f.faultsMu.Lock()
+			defer f.faultsMu.Unlock()
+			f.faults = append(f.faults, e)
+		},
 		ItemError: func(_ context.Context, _ string, e error) error { return e },
 		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 			rc, _, e := blobs.Open(r.Context(), it.Actual.SHA256)

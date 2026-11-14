@@ -799,8 +799,16 @@ func (h handler) remoteJSON(
 		return source.Result{}, source.ErrInvalidResult
 	}
 	defer result.Stream.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(result.Stream.Body, maxPageBytes+1))
-	if err != nil || len(data) > maxPageBytes {
+	data, err := pkgroute.ReadServed(
+		r.Context(),
+		result.Stream.Body,
+		maxPageBytes,
+		source.ErrInvalidResult,
+	)
+	if err != nil {
+		return source.Result{}, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
+	}
+	if len(data) > maxPageBytes {
 		return source.Result{}, source.ErrInvalidResult
 	}
 	if err := validate(data); err != nil {
