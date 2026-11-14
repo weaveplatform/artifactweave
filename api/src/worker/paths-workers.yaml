@@ -638,6 +638,10 @@ paths:
       tags:
       - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/getworkeractions.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/execute/{workerKey}:
     post:
       description: 'Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}.
@@ -681,6 +685,9 @@ paths:
       tags:
       - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/executehttptriggeredworker.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/execution_history:
     get:
       description: 'Returns recorded executions, newest first. Successful runs are recorded only for workers with
@@ -744,6 +751,10 @@ paths:
       tags:
       - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/getworkerexecutionhistory.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/rerun/{workerKey}:
     post:
       description: Runs the worker's current script again with the input of a recorded execution. Any authenticated
@@ -796,6 +807,9 @@ paths:
       tags:
       - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/rerunworker.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/scaffold/tsconfig:
     get:
       description: Returns the TypeScript configuration worker scripts are compiled with. Platform administrators,
@@ -823,6 +837,8 @@ paths:
       tags:
       - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/getworkerscaffoldtsconfig.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/liveness:
     get:
       description: Answers when the Workers service is running. No authentication. The service is part of the
@@ -839,6 +855,8 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/checkworkersliveness.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/readiness:
     get:
       description: Answers when the Workers service can run workers. No authentication.
@@ -854,6 +872,8 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/checkworkersreadiness.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/test:
     post:
       description: 'Transpiles and runs a script that is not saved, with the given action and input, and returns
@@ -896,6 +916,9 @@ paths:
       tags:
       - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/executeworkertestgeneric.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/test/{workerKey}:
     post:
       description: 'Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid
@@ -947,6 +970,9 @@ paths:
       tags:
       - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/executeworkertest.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/workers:
     get:
       description: Returns every worker. Platform administrators only.
@@ -968,6 +994,10 @@ paths:
       tags:
       - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/getworkers.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Saves a new worker after transpiling its script. Platform administrators, or project administrators
         with projectKey for actions that support projects. A duplicate key is rejected with 400.
@@ -999,6 +1029,10 @@ paths:
       tags:
       - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/createworker.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/key
+      x-cost: expensive
     put:
       description: Changes an existing worker, identified by key in the body; a new script is transpiled before
         it is saved. Platform administrators only.
@@ -1025,6 +1059,10 @@ paths:
       tags:
       - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/updateworker.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/key
+      x-cost: expensive
   /api/v1/workers/{workerKey}:
     delete:
       description: Deletes a worker; its recorded executions are removed with it. Platform administrators only.
@@ -1049,6 +1087,10 @@ paths:
       tags:
       - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteworker.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:workerKey
+      x-cost: expensive
     get:
       description: Returns one worker, including its script. Platform administrators only.
       operationId: getWorker
@@ -1076,6 +1118,8 @@ paths:
       tags:
       - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/getworker.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v2/actions:
     get:
       description: 'Returns the metadata of each action this instance can trigger: sample input, TypeScript types,
@@ -1105,3 +1149,7 @@ paths:
       tags:
       - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/getworkeractionsmetadata.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
