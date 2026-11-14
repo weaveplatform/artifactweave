@@ -95,6 +95,7 @@ Feature: Storage API: item information, listings and properties
     Given the JFrog CLI is available
     When I run jf "rt sp props-local/ owner=platform --repo-only --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/storage/props-local?properties" as admin
     Then the response status is 200
     And the JSON field "properties.owner" equals "[platform]"
@@ -102,6 +103,7 @@ Feature: Storage API: item information, listings and properties
     Then the response status is 404
     When I run jf "rt delp props-local/ owner --repo-only --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/storage/props-local?properties" as admin
     Then the response status is 404
 
@@ -110,12 +112,14 @@ Feature: Storage API: item information, listings and properties
     Given the JFrog CLI is available
     When I run jf "rt sp props-local/dir/* team=core;env=prod --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/storage/props-local/dir/a.txt?properties" as admin
     Then the response status is 200
     And the JSON field "properties.team" equals "[core]"
     And the JSON field "properties.env" equals "[prod]"
     When I run jf "rt delp props-local/dir/* team --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/storage/props-local/dir/a.txt?properties" as admin
     Then the JSON field "properties.env" equals "[prod]"
     When I GET "/artifactory/api/storage/props-local/dir/a.txt?properties=team" as admin

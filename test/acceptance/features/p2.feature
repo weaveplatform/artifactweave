@@ -15,9 +15,11 @@ Feature: Eclipse P2 update sites
     Given the P2 repository is "p2-composite"
     When I run the Eclipse P2 director "list"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "org.eclipse.glsp.layout.source"
     When I run the Eclipse P2 director "install"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "p2-install/plugins/org.eclipse.glsp.layout.source_2.7.0.jar" exists
     And the installed P2 bundle matches the published SHA256
     And the Eclipse P2 child was fetched only by the registry
@@ -26,9 +28,11 @@ Feature: Eclipse P2 update sites
     And the P2 repository is "p2-composite-cache"
     When I run the Eclipse P2 director "list"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "org.eclipse.glsp.layout.source"
     When I run the Eclipse P2 director "install"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the installed P2 bundle matches the published SHA256
 
   Scenario: a virtual P2 repository keeps external remote and local Generic members ordered
@@ -56,9 +60,11 @@ Feature: Eclipse P2 update sites
     Given the P2 repository is "p2-ordered"
     When I run the Eclipse P2 director "list"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "org.eclipse.glsp.layout.source"
     When I run the Eclipse P2 director "install"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the installed P2 bundle matches the published SHA256
     And the Eclipse P2 child was fetched only by the registry
 
@@ -75,6 +81,7 @@ Feature: Eclipse P2 update sites
     Given the P2 repository is "p2-wrong-digest"
     When I run the Eclipse P2 director "install"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the file "p2-install/plugins/org.eclipse.glsp.layout.source_2.7.0.jar" does not exist
 
   Scenario: a remote P2 repository lists and installs a published Eclipse bundle
@@ -89,15 +96,18 @@ Feature: Eclipse P2 update sites
     Given the P2 repository is "p2-remote"
     When I run the Eclipse P2 director "list"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "org.eclipse.glsp.layout.source"
     When I run the Eclipse P2 director "install"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "p2-install/plugins/org.eclipse.glsp.layout.source_2.7.0.jar" exists
     And the installed P2 bundle matches the published SHA256
     Given the generic upstream stops
     And the P2 repository is "p2-remote-cache"
     When I run the Eclipse P2 director "list"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "org.eclipse.glsp.layout.source"
 
   Scenario: a virtual P2 repository serves a local Generic update site
@@ -119,9 +129,11 @@ Feature: Eclipse P2 update sites
     Given the P2 repository is "p2-virtual"
     When I run the Eclipse P2 director "list"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "org.eclipse.glsp.layout.source"
     When I run the Eclipse P2 director "install"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "p2-install/plugins/org.eclipse.glsp.layout.source_2.7.0.jar" exists
     And the installed P2 bundle matches the published SHA256
 
@@ -137,8 +149,10 @@ Feature: Eclipse P2 update sites
     Given the P2 repository is "p2-archive"
     When I run the Eclipse P2 director "list"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "org.eclipse.glsp.layout.source"
     When I run the Eclipse P2 director "install"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "p2-install/plugins/org.eclipse.glsp.layout.source_2.7.0.jar" exists
     And the installed P2 bundle matches the published SHA256

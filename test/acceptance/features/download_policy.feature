@@ -55,10 +55,12 @@ Feature: Downloads refused by a repository's configuration
     Then the response status is 200
     When I run jf "rt dl generic-local/keep/a.tmp {dir}/out/ --flat --fail-no-op --url {url} --user admin --password {password}"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the server answered 404 to GET "/artifactory/generic-local/keep/a.tmp"
     And the file "out/a.tmp" does not exist
     When I run jf "rt dl generic-local/keep/a.txt {dir}/out/ --flat --fail-no-op --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "a.txt" and "out/a.txt" are identical
     When I POST "/artifactory/api/repositories/generic-local" as admin with body:
       """
@@ -67,5 +69,6 @@ Feature: Downloads refused by a repository's configuration
     Then the response status is 200
     When I run jf "rt dl generic-local/keep/a.txt {dir}/again/ --flat --fail-no-op --url {url} --user admin --password {password}"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the server answered 404 to GET "/artifactory/generic-local/keep/a.txt"
     And the file "again/a.txt" does not exist

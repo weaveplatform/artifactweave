@@ -51,16 +51,20 @@ Feature: npm search, login and logout, and the JFrog CLI's npm configuration
       """
     When I run npm "publish ./acme"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "publish ./hidden"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # Found at once: the publish updated the index it searches.
     When I run npm "search widget"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "acme-widget"
     And the output contains "hidden-widget"
     And the output contains "Builds widgets"
     When I run npm "search --json builds"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "acme-widget"
     And the output does not contain "hidden-widget"
     # ann logs in with npm login. The web login it tries first is not
@@ -75,6 +79,7 @@ Feature: npm search, login and logout, and the JFrog CLI's npm configuration
       not-her-password
       """
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the server answered 401 to PUT "/artifactory/api/npm/npm-search/-/user/org.couchdb.user:ann"
     When I run npm "login", answering its prompts with:
       """
@@ -82,21 +87,26 @@ Feature: npm search, login and logout, and the JFrog CLI's npm configuration
       Ann-pass-1
       """
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 201 to PUT "/artifactory/api/npm/npm-search/-/user/org.couchdb.user:ann"
     And the file ".npmrc" contains "/artifactory/api/npm/npm-search/:_authToken="
     When I run npm "whoami"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "ann"
     When I run npm "search widget"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "acme-widget"
     And the output does not contain "hidden-widget"
     # npm logout revokes the token; the access log never records it.
     When I run npm "logout"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 200 to DELETE "/artifactory/api/npm/npm-search/-/user/token/[redacted]"
     When I run npm "whoami"
     Then the command fails
+    And the server answered no request with 500 since the last command
 
     Examples:
       | npm    |
@@ -123,10 +133,13 @@ Feature: npm search, login and logout, and the JFrog CLI's npm configuration
     # access token, which jf would write as _authToken itself.
     When I run jf "c add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --basic-auth-only --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "npm-config --server-id-resolve aw --repo-resolve npm-jf" in "app"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "npm install" in "app"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 200 to GET "/artifactory/api/npm/auth"
     And the file "app/node_modules/acme-jf/package.json" contains "1.0.0"
 
@@ -181,25 +194,34 @@ Feature: npm search, login and logout, and the JFrog CLI's npm configuration
       """
     When I run jf "c add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --basic-auth-only --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "npm-config --server-id-resolve aw --server-id-deploy aw --repo-resolve npm-jf --repo-deploy npm-jf" in "lib"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "npm-config --server-id-resolve aw --server-id-deploy aw --repo-resolve npm-jf --repo-deploy npm-jf" in "beta"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "npm-config --server-id-resolve aw --repo-resolve npm-jf" in "app"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "npm publish --build-name npm-accept --build-number 1" in "lib"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "npm publish --tag beta --build-name npm-accept --build-number 1" in "beta"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "npm install --build-name npm-accept --build-number 1" in "app"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "app/node_modules/acme-jf-lib/index.js" contains "published by jf"
     Given the JFrog CLI runs with "JFROG_RUN_NATIVE" set to "true"
     When I run jf "npm publish --build-name npm-accept --build-number 1" in "native"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 201 to PUT "/artifactory/api/npm/npm-jf/@acme/jf-native"
     When I run jf "rt bp npm-accept 1 --server-id aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/npm-accept/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules" has 4 entries

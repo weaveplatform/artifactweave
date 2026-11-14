@@ -13,16 +13,19 @@ Feature: Remote provider registry and mirror preserve upstream integrity
     And the upstream provider signature is "invalid"
     When I run terraform "init -backend=false -no-color"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the output contains "502"
     And the provider API rejects the invalid upstream signature
     Given the upstream provider signature is "valid"
     When I run terraform "init -backend=false -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "<verification>"
     And the file ".terraform.lock.hcl" contains "h1:"
     And the upstream provider signer and complete package were used
     When I run terraform "apply -auto-approve -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "1 added"
     Given the generic upstream stops
     When I POST "/artifactory/api/repositories/tf-providers" as admin with body:
@@ -33,9 +36,11 @@ Feature: Remote provider registry and mirror preserve upstream integrity
     When I forget Terraform's provider installation cache
     And I run terraform "init -backend=false -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file ".terraform.lock.hcl" contains "h1:"
     When I run terraform "apply -auto-approve -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "No changes"
 
     Examples:
@@ -52,14 +57,17 @@ Feature: Remote provider registry and mirror preserve upstream integrity
     And the upstream mirror archive is "tampered"
     When I run terraform "init -backend=false -no-color"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the output contains "502"
     Given the upstream mirror archive is "valid"
     When I run terraform "init -backend=false -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file ".terraform.lock.hcl" contains "h1:"
     And the upstream provider mirror metadata and archive were used
     When I run terraform "apply -auto-approve -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "1 added"
     Given the generic upstream stops
     When I POST "/artifactory/api/repositories/tf-providers" as admin with body:
@@ -70,7 +78,9 @@ Feature: Remote provider registry and mirror preserve upstream integrity
     When I forget Terraform's provider installation cache
     And I run terraform "init -backend=false -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file ".terraform.lock.hcl" contains "h1:"
     When I run terraform "apply -auto-approve -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "No changes"

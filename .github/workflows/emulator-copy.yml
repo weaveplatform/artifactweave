@@ -1,0 +1,159 @@
+name: ci | Copy emulator images
+
+# Copies Azurite, which Microsoft publishes only on mcr.microsoft.com, to the
+# project's own package on GHCR, so pkg/containertest has a second source when
+# MCR does not answer (#1463, #1321). pkg/containertest/emulators.go names the
+# image, its digest, the copy and the copy's tag; this reads them from there
+# and runs whenever that file changes, so a digest bump is copied by the pull
+# request that makes it. The job skips the copy when the tag already serves the
+# digest, and fails when the tag serves another one. docs/testing/ci.md,
+# "Azurite's copy", has the one-off step that makes a new package public.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - pkg/containertest/emulators.go
+      - .github/workflows/emulator-copy.yml
+  pull_request:
+    paths:
+      - pkg/containertest/emulators.go
+      - .github/workflows/emulator-copy.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Two runs for one digest would push the same bytes; one after the other, the
+# second finds the copy and stops.
+concurrency:
+  group: emulator-copy
+  cancel-in-progress: false
+
+jobs:
+  azurite:
+    name: Copy Azurite to GHCR
+    # A fork's pull request gets a read-only token and cannot push; the push
+    # to main after its merge makes the copy.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # Pushing ghcr.io/weaveplatform/artifactweave-emulators/azurite. A
+      # package first pushed with this token is linked to this repository,
+      # whose workflows then keep write access to it.
+      packages: write
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The registry features' pinned crane, checked against its published
+      # SHA-256. crane copy writes each manifest's bytes as fetched, so the
+      # index keeps its digest; a docker pull, tag and push would push one
+      # platform's manifest under a new digest.
+      - name: crane (pinned)
+        uses: ./.github/actions/registry-clients
+        with:
+          clients: crane
+
+      # A reworded line in emulators.go leaves a value empty: say so, rather
+      # than copy nothing or the wrong image.
+      - name: Read the image, digest and copy
+        id: pins
+        run: |
+          file=pkg/containertest/emulators.go
+          pin() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*$2\$/\\1/p" "$file"; }
+          digest=$(pin azuriteDigest '"\(sha256:[0-9a-f]\{64\}\)"')
+          source=$(pin AzuriteImage '"\([^"@]*\)@"[[:space:]]*+[[:space:]]*azuriteDigest')
+          copy=$(pin azuriteCopy '"\([^"]*\)"')
+          tag=$(pin azuriteCopyTag '"\([^"]*\)"')
+          for value in digest source copy tag; do
+            if [ "$(printf '%s\n' "${!value}" | grep -c .)" != 1 ]; then
+              echo "::error file=$file::found no single Azurite $value line in $file"
+              exit 1
+            fi
+          done
+          # GITHUB_TOKEN can push only to this organisation's packages; a
+          # copy named elsewhere would fail later with a less helpful error.
+          case "$copy" in
+            "ghcr.io/${GITHUB_REPOSITORY_OWNER}/"*) ;;
+            *) echo "::error file=$file::azuriteCopy $copy is not under ghcr.io/${GITHUB_REPOSITORY_OWNER}/"; exit 1 ;;
+          esac
+          {
+            echo "digest=$digest"
+            echo "source=$source"
+            echo "copy=$copy"
+            echo "tag=$tag"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GITHUB_TOKEN" |
+            "$ARTIFACTWEAVE_CRANE_BIN" auth login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Copy the digest unless the tag already serves it
+        env:
+          DIGEST: ${{ steps.pins.outputs.digest }}
+          SOURCE: ${{ steps.pins.outputs.source }}
+          COPY: ${{ steps.pins.outputs.copy }}
+          TAG: ${{ steps.pins.outputs.tag }}
+        run: |
+          crane="$ARTIFACTWEAVE_CRANE_BIN"
+          # crane logs a HEAD it retried as a GET on stderr; only stdout is
+          # the digest.
+          log=$(mktemp)
+          if served=$("$crane" digest "$COPY:$TAG" 2>"$log"); then
+            if [ "$served" != "$DIGEST" ]; then
+              echo "::error::$COPY:$TAG serves $served, not $DIGEST: move azuriteCopyTag with azuriteDigest in pkg/containertest/emulators.go"
+              exit 1
+            fi
+            echo "$COPY:$TAG already serves $DIGEST; nothing to copy."
+            exit 0
+          fi
+          echo "$COPY:$TAG is not there yet ($(tail -n 1 "$log")); copying $SOURCE@$DIGEST."
+          "$crane" copy "$SOURCE@$DIGEST" "$COPY:$TAG"
+          served=$("$crane" digest "$COPY:$TAG")
+          if [ "$served" != "$DIGEST" ]; then
+            echo "::error::after the copy, $COPY:$TAG serves $served, not $DIGEST"
+            exit 1
+          fi
+          echo "$COPY:$TAG now serves $DIGEST."
+
+      # CI pulls the copy without credentials, which GHCR allows only for a
+      # public package. A new package's visibility is set in its settings,
+      # which this token cannot change, so a refusal is reported for a person
+      # to act on rather than failing every later run.
+      - name: Check that the copy can be pulled anonymously
+        env:
+          DIGEST: ${{ steps.pins.outputs.digest }}
+          COPY: ${{ steps.pins.outputs.copy }}
+        run: |
+          anonymous=$(mktemp -d)
+          log=$(mktemp)
+          if served=$(DOCKER_CONFIG="$anonymous" "$ARTIFACTWEAVE_CRANE_BIN" digest "$COPY@$DIGEST" 2>"$log"); then
+            echo "An anonymous pull of $COPY@$DIGEST resolves $served."
+            exit 0
+          fi
+          answer=$(tail -n 1 "$log")
+          package=${COPY#ghcr.io/"${GITHUB_REPOSITORY_OWNER}"/}
+          echo "::warning::GHCR refuses an anonymous pull of $COPY@$DIGEST ($answer). Make the package public: docs/testing/ci.md, \"Azurite's copy\"."
+          {
+            echo "### Azurite's copy cannot be pulled anonymously"
+            echo
+            echo "GHCR answered: \`$answer\`"
+            echo
+            echo "An organisation owner or the package's admin makes it public once:"
+            echo "https://github.com/orgs/${GITHUB_REPOSITORY_OWNER}/packages/container/package/${package//\//%2F}"
+            echo "then Package settings, Danger Zone, Change visibility, Public."
+            echo "Until then pkg/containertest's TestAccAzuriteStartsFromItsCopy skips."
+          } >> "$GITHUB_STEP_SUMMARY"

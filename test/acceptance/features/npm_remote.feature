@@ -24,6 +24,7 @@ Feature: npm remote metadata and immutable tarballs
       """
     When I run npm "install --ignore-scripts --cache .npm-cold"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "node_modules/remote-demo/package.json" contains "1.0.0"
     And the file "node_modules/@acme/remote-scoped/package.json" contains "1.0.0"
     And the lockfile pins "remote-demo" to the tarball at "/artifactory/api/npm/npm-proxy/remote-demo/-/remote-demo-1.0.0.tgz"
@@ -38,6 +39,7 @@ Feature: npm remote metadata and immutable tarballs
     Then the response status is 200
     When I run npm "ci --ignore-scripts --cache .npm-second-empty-cache"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "node_modules/remote-demo/package.json" contains "1.0.0"
     And the file "node_modules/@acme/remote-scoped/package.json" contains "1.0.0"
     And the generic upstream received 1 GET requests for "/remote-demo/-/remote-demo-1.0.0.tgz"

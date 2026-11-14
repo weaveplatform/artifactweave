@@ -18,10 +18,13 @@ Feature: Signed Hex registry with Mix
     Then the response status is 201
     When I run mix "hex.repo add hex-local {authurl}/api/hex/hex-local --public-key=/work/hex-local.pem"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mix "deps.get"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mix "deps.compile"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "deps/decimal/mix.exs" exists
 
   Scenario: Virtual repository resolves an ordered local member
@@ -44,8 +47,10 @@ Feature: Signed Hex registry with Mix
     Then the response status is 201
     When I run mix "hex.repo add hex-virtual {authurl}/api/hex/hex-virtual --public-key=/work/hex-virtual.pem"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mix "deps.get"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "deps/decimal/mix.exs" exists
 
   @hex_remote
@@ -63,8 +68,10 @@ Feature: Signed Hex registry with Mix
     Given a Hex project for repository "hex-remote"
     When I run mix "hex.repo add hex-remote {authurl}/api/hex/hex-remote --public-key=/work/hex-remote.pem"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mix "deps.get"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "deps/decimal/mix.exs" exists
 
     And the generic upstream received 1 GET requests for "/hex/redirect/decimal-2.0.0.tar"
@@ -77,8 +84,10 @@ Feature: Signed Hex registry with Mix
     And the Hex client cache is cleared
     When I run mix "hex.repo add hex-remote {authurl}/api/hex/hex-remote --public-key=/work/hex-remote.pem"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mix "deps.get"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "deps/decimal/mix.exs" exists
 
   @hex_remote @hex_legacy
@@ -96,8 +105,10 @@ Feature: Signed Hex registry with Mix
     Given a Hex project for repository "hex-remote"
     When I run mix "hex.repo add hex-remote {authurl}/api/hex/hex-remote --public-key=/work/hex-remote.pem"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mix "deps.get"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "deps/decimal/mix.exs" exists
     When I POST "/artifactory/api/repositories/hex-remote" as admin with body:
       """
@@ -108,8 +119,10 @@ Feature: Signed Hex registry with Mix
     And the Hex client cache is cleared
     When I run mix "hex.repo add hex-remote {authurl}/api/hex/hex-remote --public-key=/work/hex-remote.pem"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mix "deps.get"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "deps/decimal/mix.exs" exists
 
   @hex_remote
@@ -137,8 +150,10 @@ Feature: Signed Hex registry with Mix
     Given a Hex project for repository "hex-virtual"
     When I run mix "hex.repo add hex-virtual {authurl}/api/hex/hex-virtual --public-key=/work/hex-virtual.pem"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mix "deps.get"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "deps/decimal/mix.exs" exists
 
   @hex_deps
@@ -156,10 +171,13 @@ Feature: Signed Hex registry with Mix
     Given a Hex Ecto project for repository "hex-remote"
     When I run mix "hex.repo add hex-remote {authurl}/api/hex/hex-remote --public-key=/work/hex-remote.pem"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mix "deps.get"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mix "deps.compile"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "deps/ecto/mix.exs" exists
     And the file "deps/telemetry/mix.exs" exists
     And the file "deps/decimal/mix.exs" exists

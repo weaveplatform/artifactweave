@@ -46,6 +46,7 @@ Feature: The package clients reach artifactweave
       """
     When I run npm "install acme-smoke@1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "node_modules/acme-smoke/package.json" contains "1.0.0"
     And the file "package-lock.json" contains "sha512-"
 
@@ -74,6 +75,7 @@ Feature: The package clients reach artifactweave
     # repository must hold only plugins, never this artifact.
     When I run mvn "-f lib/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-local"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/mvn-local/org/acme/smoke/lib/1.0.0/lib-1.0.0.jar" as admin
     Then the response status is 200
     When I GET "/artifactory/mvn-local/org/acme/smoke/lib/maven-metadata.xml" as admin
@@ -92,6 +94,7 @@ Feature: The package clients reach artifactweave
     # artifact can come from nowhere but artifactweave.
     When I run mvn "-s settings.xml -Dmaven.repo.local=/work/fresh -Dmaven.repo.local.tail={m2} org.apache.maven.plugins:maven-dependency-plugin:3.8.1:get -Dartifact=org.acme.smoke:lib:1.0.0 -DremoteRepositories=aw::default::{url}/mvn-local"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "fresh/org/acme/smoke/lib/1.0.0/lib-1.0.0.jar" exists
 
   # pip reads the index from the scenario's pip.conf and the project's page
@@ -121,6 +124,7 @@ Feature: The package clients reach artifactweave
     And the files "dist/acme_smoke-1.0.0-py3-none-any.whl" and "downloaded/acme_smoke-1.0.0-py3-none-any.whl" are identical
     When I run uv "pip install --no-deps --target site {authurl}/pypi-generic/simple/acme-smoke/acme_smoke-1.0.0-py3-none-any.whl"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "site/acme_smoke/__init__.py" contains "hello from artifactweave"
 
   # dotnet nuget push needs NuGet's publish service, which a generic
@@ -183,6 +187,7 @@ Feature: The package clients reach artifactweave
       """
     When I run dotnet "restore app/app.csproj"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "nupkgs/Acme.Smoke.1.0.0.nupkg" and ".nuget/packages/acme.smoke/1.0.0/acme.smoke.1.0.0.nupkg" are identical
     And the file "app/obj/project.assets.json" contains "Acme.Smoke/1.0.0"
 
@@ -204,21 +209,27 @@ Feature: The package clients reach artifactweave
     Then the response status is 200
     When I run helm "create acme"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run helm "package acme --destination charts"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run helm "repo index charts --url {url}/helm-generic"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I deploy the files under "charts" to "/artifactory/helm-generic" as admin
     And I run helm "repo add aw {url}/helm-generic --username admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # helm pull writes into an existing --destination only, so the first
     # pull lands in the scenario's directory and the second unpacks, which
     # creates its directory.
     When I run helm "pull aw/acme --version 0.1.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "charts/acme-0.1.0.tgz" and "acme-0.1.0.tgz" are identical
     When I run helm "pull {url}/helm-generic/acme-0.1.0.tgz --username admin --password {password} --untar --untardir by-url"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "by-url/acme/Chart.yaml" contains "name: acme"
 
   # terraform downloads a module source whose URL ends in .zip and unpacks
@@ -253,7 +264,9 @@ Feature: The package clients reach artifactweave
       """
     When I run terraform "-chdir=root init"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "root/.terraform/modules/greeting/main.tf" exists
     When I run terraform "-chdir=root apply -auto-approve"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "hello from artifactweave"

@@ -29,10 +29,13 @@ Feature: NIM metadata and its matching container use separate remote repositorie
     Given a layer "layer.tar.gz" holding "model.txt" with content "paired NIM image"
     When I run crane "auth login {host} -u admin -p {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "append -f layer.tar.gz -t {host}/nvcr-upstream/nim/meta/llama:1.3"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "pull --format oci {host}/nvcr-remote/nim/meta/llama:1.3 cold.tar"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I POST "/artifactory/api/repositories/nim-remote" as admin with body:
       """
       {"offline":true}
@@ -48,3 +51,4 @@ Feature: NIM metadata and its matching container use separate remote repositorie
     Then the response status is 200
     When I run crane "pull --format oci {host}/nvcr-remote/nim/meta/llama:1.3 offline.tar"
     Then the command succeeds
+    And the server answered no request with 500 since the last command

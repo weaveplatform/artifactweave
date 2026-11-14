@@ -196,12 +196,15 @@ Feature: Repositories API
       """
     When I run jf "rt repo-create {dir}/create.json --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt repo-update {dir}/update.json --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/repositories/jf-generic" as admin
     Then the JSON field "description" equals "updated by jf"
     When I run jf "rt repo-delete jf-generic --quiet --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   Scenario: A virtual repository may have no members, and each member has its package type
     When I PUT "/artifactory/api/repositories/npm-local" as admin with body:

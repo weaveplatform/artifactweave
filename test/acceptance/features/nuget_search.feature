@@ -36,14 +36,17 @@ Feature: NuGet clients discover packages through the v3 feed
       """
     When I run dotnet "package search Acme.Search --format json --take 10"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "Acme.Search"
     And the output contains "1.0.0"
     And the output does not contain "2.0.0-beta.1"
     When I run dotnet "package search Acme.Search --format json --prerelease"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "2.0.0-beta.1"
     When I run dotnet "package search Acme.Search --format json --exact-match"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "Acme.Search"
     And the output contains "1.0.0"
     And the output does not contain "2.0.0-beta.1"

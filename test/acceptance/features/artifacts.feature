@@ -62,15 +62,19 @@ Feature: Deploy and download generic artifacts
     And a file "big.bin" of 65536 bytes
     When I run jf "rt u {dir}/big.bin generic-local/a/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u {dir}/big.bin generic-local/b/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 201 to PUT "/artifactory/generic-local/b/big.bin"
     And the server never answered 404 to PUT "/artifactory/generic-local/b/big.bin"
     When I run jf "rt s generic-local/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "generic-local/b/big.bin"
     When I run jf "rt dl generic-local/a/big.bin {dir}/out/ --flat --split-count=2 --min-split=16 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "big.bin" and "out/big.bin" are identical
     And the server answered 206 to GET "/artifactory/generic-local/a/big.bin"
 
@@ -101,13 +105,16 @@ Feature: Deploy and download generic artifacts
     And a file "big.bin" of 65536 bytes
     When I run jf "rt u {dir}/big.bin hidden-local/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u {dir}/big.bin generic-local/mine/ --flat --url {url} --user deployer --password Deployer-pass1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 404 to PUT "/artifactory/generic-local/mine/big.bin"
     And the server answered 201 to PUT "/artifactory/generic-local/mine/big.bin"
     # Now a file the user may read holds the content, so the next one hits.
     When I run jf "rt u {dir}/big.bin generic-local/again/ --flat --url {url} --user deployer --password Deployer-pass1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 201 to PUT "/artifactory/generic-local/again/big.bin"
     And the server never answered 404 to PUT "/artifactory/generic-local/again/big.bin"
     When I GET "/artifactory/generic-local/mine/big.bin" as "deployer" with password "Deployer-pass1"
@@ -142,12 +149,16 @@ Feature: Deploy and download generic artifacts
     And a file "big.bin" of 65536 bytes
     When I run jf "rt u {dir}/small.txt generic-local/ci/ --flat --url {url} --user ci --password Ci-pass-1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u {dir}/big.bin generic-local/ci/ --flat --url {url} --user ci --password Ci-pass-1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u {dir}/small.txt generic-local/ci/ --flat --url {url} --user ci --password Ci-pass-1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u {dir}/big.bin generic-local/ci/ --flat --url {url} --user ci --password Ci-pass-1"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server never answered 403 to PUT "/artifactory/generic-local/ci/small.txt"
     And the server never answered 403 to PUT "/artifactory/generic-local/ci/big.bin"
     Given a file "small.txt" with content:
@@ -156,6 +167,7 @@ Feature: Deploy and download generic artifacts
       """
     When I run jf "rt u {dir}/small.txt generic-local/ci/ --flat --url {url} --user ci --password Ci-pass-1"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the server answered 403 to PUT "/artifactory/generic-local/ci/small.txt"
     When I GET "/artifactory/generic-local/ci/small.txt" as "ci" with password "Ci-pass-1"
     Then the response body is "small"

@@ -104,8 +104,10 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
       """
     When I run jf "rt u lib-1.0.pom mvn-jf/org/acme/lib/1.0/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u lib-1.0.jar mvn-jf/org/acme/lib/1.0/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/mvn-jf/org/acme/lib/maven-metadata.xml" as admin
     Then the response status is 200
     And the response body contains "<release>1.0</release>"
@@ -143,10 +145,13 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
       """
     When I run mvn "-f snap/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-snap"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mvn "-f snap/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-snap"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mvn "-f snap/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-snap"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # Two builds of a jar and a POM, and the snapshot folder's metadata.
     Then within 20 seconds the JSON field "children" of GET "/artifactory/api/storage/mvn-snap/org/acme/smoke/snap/1.0-SNAPSHOT" as admin has 5 entries
     When I GET "/artifactory/mvn-snap/org/acme/smoke/snap/1.0-SNAPSHOT/maven-metadata.xml" as admin
@@ -183,10 +188,13 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
       """
     When I run mvn "-f lib/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-local"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mvn "-f snap/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-local"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mvn "-f snap/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-local"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # Two unique builds of the jar and the POM beside the snapshot metadata,
     # which names the second.
     Then within 20 seconds the JSON field "children" of GET "/artifactory/api/storage/mvn-local/org/acme/smoke/snap/1.0-SNAPSHOT" as admin has 5 entries
@@ -209,6 +217,7 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
     # consumer compiles against both jars, so each must be the real one.
     When I run mvn "-f app/pom.xml -s settings.xml -C -Dmaven.repo.local=/work/fresh -Dmaven.repo.local.tail={m2} -Daw.url={url}/mvn-local package"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "fresh/org/acme/smoke/lib/1.0.0/lib-1.0.0.jar" exists
     And the file "fresh/org/acme/smoke/snap/1.0-SNAPSHOT/maven-metadata-aw.xml" contains "<buildNumber>2</buildNumber>"
 
@@ -241,8 +250,10 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
       """
     When I run mvn "-f snap/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-nonunique"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mvn "-f snap/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-nonunique"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # mvn sends unique names; the repository stores them as -SNAPSHOT, so
     # the folder holds one jar, one POM and the metadata.
     Then within 20 seconds the JSON field "children" of GET "/artifactory/api/storage/mvn-nonunique/org/acme/smoke/snap/1.0-SNAPSHOT" as admin has 3 entries
@@ -254,6 +265,7 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
     And the response body does not contain "<timestamp>"
     When I run mvn "-s settings.xml -C -Dmaven.repo.local=/work/fresh -Dmaven.repo.local.tail={m2} org.apache.maven.plugins:maven-dependency-plugin:3.8.1:get -Dartifact=org.acme.smoke:snap:1.0-SNAPSHOT -DremoteRepositories=aw::default::{url}/mvn-nonunique"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "fresh/org/acme/smoke/snap/1.0-SNAPSHOT/snap-1.0-SNAPSHOT.jar" exists
 
   @maven
@@ -281,8 +293,10 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
       """
     When I run mvn "-f lib/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-releases"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run mvn "-f snap/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-releases"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the output contains "409"
     When I GET "/artifactory/api/storage/mvn-releases/org/acme/smoke/snap" as admin
     Then the response status is 404
@@ -332,6 +346,7 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
       """
     When I run mvn "-s settings.xml -C -Dmaven.repo.local=/work/fresh -Dmaven.repo.local.tail={m2} org.apache.maven.plugins:maven-dependency-plugin:3.8.1:get -Dartifact=org.acme.trust:lib:1.0 -DremoteRepositories=aw::default::{url}/mvn-trust"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "fresh/org/acme/trust/lib/1.0/lib-1.0.jar" exists
 
   # jf mvn runs Maven with the JFrog Maven extractor, which deploys each
@@ -355,16 +370,22 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
     And the Maven project "snap" in "snap"
     When I run jf "c add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "mvnc --server-id-deploy aw --repo-deploy-releases mvn-jf --repo-deploy-snapshots mvn-jf" in "lib"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "mvnc --server-id-deploy aw --repo-deploy-releases mvn-jf --repo-deploy-snapshots mvn-jf" in "snap"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "mvn install -B -Dmaven.repo.local={dir}/jf-m2 -Dmaven.compiler.release=17 --build-name mvn-accept --build-number 1" in "lib"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "mvn install -B -Dmaven.repo.local={dir}/jf-m2 -Dmaven.compiler.release=17 --build-name mvn-accept --build-number 1" in "snap"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bp mvn-accept 1 --server-id aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/mvn-accept/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules" has 2 entries
@@ -429,12 +450,16 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
     And the JFrog CLI runs with "GRADLE_USER_HOME" set to "{dir}/.gradle"
     When I run jf "c add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "gradlec --server-id-deploy aw --repo-deploy gradle-local --deploy-maven-desc --use-wrapper=false --uses-plugin=false" in "glib"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "gradle artifactoryPublish --no-daemon --build-name gradle-accept --build-number 1" in "glib"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bp gradle-accept 1 --server-id aw"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/gradle-local/org/acme/gradle/glib/1.0.0/glib-1.0.0.jar" as admin
     Then the response status is 200
     When I GET "/artifactory/gradle-local/org/acme/gradle/glib/1.0.0/glib-1.0.0.pom" as admin

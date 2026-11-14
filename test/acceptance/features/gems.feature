@@ -16,9 +16,11 @@ Feature: Native RubyGems and Bundler repositories
     Given the RubyGems source is "<repo>"
     When I run Ruby "bundle" "install"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "Gemfile.lock" contains "rake (12.3.1)"
     When I run Ruby "gem" "install rake -v 12.3.1 --source {gemsource} --clear-sources --install-dir /work/gem-installed --no-document"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "gem-installed/gems/rake-12.3.1/README.rdoc" exists
 
     Examples:
@@ -45,9 +47,11 @@ Feature: Native RubyGems and Bundler repositories
     Given the RubyGems source is "gems-virtual"
     When I run Ruby "bundle" "install"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "Gemfile.lock" contains "rake (12.3.1)"
     When I run Ruby "gem" "install rake -v 12.3.1 --source {gemsource} --clear-sources --install-dir /work/gem-installed --no-document"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   Scenario: gem and Bundler install from a remote cache
     Given the registry is running
@@ -61,6 +65,8 @@ Feature: Native RubyGems and Bundler repositories
     Given the RubyGems source is "gems-remote"
     When I run Ruby "bundle" "install"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "Gemfile.lock" contains "rake (12.3.1)"
     When I run Ruby "gem" "install rake -v 12.3.1 --source {gemsource} --clear-sources --install-dir /work/gem-installed --no-document"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
