@@ -21,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
+	"github.com/weaveplatform/artifactweave/internal/platform/idempotency"
 )
 
 // The Builds API (decision 0014, research 22 §3): internal/artifacts/core/build
@@ -299,25 +300,23 @@ func (s ArtifactoryAPI) AppendBuild(
 	if err != nil {
 		return nil, err
 	}
-	project := httpkit.Deref(req.Params.Project)
-	if err := checkBuildRepo(project, req.Params.BuildRepo); err != nil {
-		return nil, err
-	}
-	at, err := started(req.Params.Started)
+	ap, err := appendOf(ctx, req, p)
 	if err != nil {
 		return nil, err
-	}
-	ap := build.Append{
-		ProjectKey: project, Name: req.BuildName, Number: req.BuildNumber, Started: at,
-		Modules: httpkit.RawBody(ctx), By: p.Name,
 	}
 	if req.Params.IdempotencyKey != nil {
-		err = s.appendOnce(ctx, svc, p, ap, *req.Params.IdempotencyKey)
-	} else {
-		err = svc.Append(ctx, ap, a)
+		// The shared replay runs this as the effect, inside its
+		// transaction, and maps the error with the binding's Error, which
+		// needs it unmapped to tell a spent budget (503) from the rest.
+		id, err := svc.AppendKeyed(ctx, ap, s.currentBuildAccess(p))
+		if err != nil {
+			return nil, err //nolint:wrapcheck // the binding's Error maps it
+		}
+		idempotency.Report(ctx, id)
+		return artgen.AppendBuild204Response{}, nil
 	}
-	if err != nil {
-		return nil, s.buildError(ctx, p, project, noRun(req.BuildName, req.BuildNumber), err)
+	if err := svc.Append(ctx, ap, a); err != nil {
+		return nil, s.buildError(ctx, p, ap.ProjectKey, noRun(req.BuildName, req.BuildNumber), err)
 	}
 	return artgen.AppendBuild204Response{}, nil
 }

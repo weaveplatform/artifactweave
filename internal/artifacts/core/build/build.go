@@ -17,7 +17,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
-	"github.com/weaveplatform/artifactweave/internal/platform/idempotency"
 )
 
 var (
@@ -46,13 +45,12 @@ type Access interface {
 
 // Store is what the build service reads and writes: the item service's
 // store, through which build-info documents and promotions write items
-// (item.Store), with the build records and the replay records that let a
-// retried request append once (decision 0014). Every call joins the
-// transaction ctx carries. Each composite store in app is a Store.
+// (item.Store), with the build records (decision 0014). Every call joins the
+// transaction ctx carries, a keyed append's replay transaction included.
+// Each composite store in app is a Store.
 type Store interface {
 	item.Store
 	Builds() port.BuildStore
-	Replays() idempotency.ReplayStore
 }
 
 // Service works on the builds of one store.

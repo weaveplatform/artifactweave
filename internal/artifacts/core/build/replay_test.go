@@ -27,6 +27,26 @@ func buildReplayRequest() idempotency.ReplayRequest {
 
 func currentBuildAccess(context.Context) (Access, error) { return everyone, nil }
 
+// appendOnce runs a keyed append as the router does: AppendKeyed as the
+// effect and ConfirmAppend as the reload, under the shared replay over the
+// service's store. replays is the store whose receipts it keeps, which a
+// faulty store wraps without changing.
+func appendOnce(
+	ctx context.Context,
+	s *Service,
+	replays idempotency.ReplayStore,
+	ap Append,
+	r idempotency.ReplayRequest,
+	current func(context.Context) (Access, error),
+) (idempotency.ReplayReceipt, error) {
+	return idempotency.Replay{Store: replays, Tx: s.Store}.Do(ctx, r, idempotency.Effect{
+		Run: func(ctx context.Context) (int64, error) { return s.AppendKeyed(ctx, ap, current) },
+		Reload: func(ctx context.Context, receipt idempotency.ReplayReceipt) error {
+			return s.ConfirmAppend(ctx, ap, receipt.ResourceID, current)
+		},
+	})
+}
+
 func TestUnitAppendOnce(t *testing.T) {
 	w := newWorld(t)
 	ctx := t.Context()
@@ -34,13 +54,13 @@ func TestUnitAppendOnce(t *testing.T) {
 	ap := Append{Name: "app", Number: "1", Modules: []byte(`[{"id":"added"}]`), By: "admin"}
 	r := buildReplayRequest()
 	for i := range 3 {
-		out, err := w.svc.AppendOnce(ctx, ap, r, currentBuildAccess)
+		out, err := appendOnce(ctx, w.svc, w.db.Replays(), ap, r, currentBuildAccess)
 		if err != nil || out.ResourceID != first.Run.ID || out.Replayed != (i > 0) {
 			t.Fatalf("attempt %d: %+v, %v", i, out, err)
 		}
 	}
 	later := w.publish(doc("app", "1", at(1)))
-	out, err := w.svc.AppendOnce(ctx, ap, r, currentBuildAccess)
+	out, err := appendOnce(ctx, w.svc, w.db.Replays(), ap, r, currentBuildAccess)
 	if err != nil || out.ResourceID != first.Run.ID {
 		t.Fatalf("replay changed its target: %+v, %v", out, err)
 	}
@@ -50,8 +70,10 @@ func TestUnitAppendOnce(t *testing.T) {
 			t.Fatalf("build %d: %+v, %v", id, got.Modules, err)
 		}
 	}
-	_, err = w.svc.AppendOnce(
+	_, err = appendOnce(
 		ctx,
+		w.svc,
+		w.db.Replays(),
 		ap,
 		r,
 		func(context.Context) (Access, error) { return only(api.ActionRead), nil },
@@ -62,7 +84,7 @@ func TestUnitAppendOnce(t *testing.T) {
 	if err := w.svc.Rename(ctx, "", "app", "moved", "admin", everyone); err != nil {
 		t.Fatal(err)
 	}
-	_, err = w.svc.AppendOnce(ctx, ap, r, currentBuildAccess)
+	_, err = appendOnce(ctx, w.svc, w.db.Replays(), ap, r, currentBuildAccess)
 	if !errors.Is(err, ErrConflict) {
 		t.Fatalf("replay after rename: %v", err)
 	}
@@ -75,7 +97,7 @@ func TestUnitAppendOnceRevalidationRollsBack(t *testing.T) {
 	ap := Append{Name: "app", Number: "1", Modules: []byte(`[{"id":"added"}]`)}
 	r := buildReplayRequest()
 	calls := 0
-	_, err := w.svc.AppendOnce(ctx, ap, r, func(context.Context) (Access, error) {
+	_, err := appendOnce(ctx, w.svc, w.db.Replays(), ap, r, func(context.Context) (Access, error) {
 		calls++
 		if calls == 2 {
 			return nil, ErrForbidden
@@ -89,7 +111,7 @@ func TestUnitAppendOnceRevalidationRollsBack(t *testing.T) {
 	if err != nil || len(b.Modules) != 0 {
 		t.Fatalf("rolled-back append: %v, %v", b.Modules, err)
 	}
-	out, err := w.svc.AppendOnce(ctx, ap, r, currentBuildAccess)
+	out, err := appendOnce(ctx, w.svc, w.db.Replays(), ap, r, currentBuildAccess)
 	if err != nil || out.Replayed {
 		t.Fatalf("receipt survived rollback: %+v, %v", out, err)
 	}
@@ -101,8 +123,10 @@ func TestUnitAppendOnceFailures(t *testing.T) {
 			w := newWorld(t)
 			w.publish(doc("app", "1", started0))
 			s := &Service{Store: faulty{w.db, fail}, Blobs: w.blobs, Formats: ecosystem.For}
-			_, err := s.AppendOnce(
+			_, err := appendOnce(
 				t.Context(),
+				s,
+				w.db.Replays(),
 				Append{Name: "app", Number: "1", Modules: []byte(`[]`)},
 				buildReplayRequest(),
 				currentBuildAccess,
@@ -114,13 +138,18 @@ func TestUnitAppendOnceFailures(t *testing.T) {
 	}
 	w := newWorld(t)
 	ap := Append{Name: "app", Number: "1", Modules: []byte(`[]`)}
-	_, err := w.svc.AppendOnce(t.Context(), ap, buildReplayRequest(), nil)
+	_, err := appendOnce(t.Context(), w.svc, w.db.Replays(), ap, buildReplayRequest(), nil)
 	if !errors.Is(err, ErrForbidden) {
 		t.Fatalf("missing revalidation: %v", err)
 	}
+	if err := w.svc.ConfirmAppend(t.Context(), ap, 1, nil); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("missing reload revalidation: %v", err)
+	}
 	w.publish(doc("app", "1", started0))
-	_, err = w.svc.AppendOnce(
+	_, err = appendOnce(
 		t.Context(),
+		w.svc,
+		w.db.Replays(),
 		ap,
 		buildReplayRequest(),
 		func(context.Context) (Access, error) { return nil, ErrForbidden },

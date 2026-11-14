@@ -15219,12 +15219,12 @@
     "contract": "Adds modules to an existing run and stores the extended document. Needs deploy and delete permission on the build.",
     "handler": "internal/artifacts/adapters/http/builds.go: ArtifactoryAPI.AppendBuild",
     "direct_calls": [
-      "httpkit.Deref",
-      "httpkit.RawBody",
-      "s.appendOnce",
+      "idempotency.Report",
       "s.buildCaller",
       "s.buildError",
-      "svc.Append"
+      "s.currentBuildAccess",
+      "svc.Append",
+      "svc.AppendKeyed"
     ],
     "review_family": "build",
     "effects": "append build modules and persist build-info metadata/blob",

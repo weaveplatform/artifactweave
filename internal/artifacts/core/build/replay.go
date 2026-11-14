@@ -6,72 +6,78 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
-	"github.com/weaveplatform/artifactweave/internal/platform/idempotency"
 )
 
-// AppendOnce commits the append and its receipt together. A replay stays bound
-// to the original run even when a newer run of the same number exists. The
-// caller supplies current authorization, not the evaluator cached at login.
-// Only metadata mutations and the existing immutable document-blob write run
-// here; no remote work is dispatched from the transaction.
-func (s *Service) AppendOnce(
+// AppendKeyed is a keyed append's effect, which the replay runs inside its
+// transaction (decision 0043, "Optional protected build append"). It locks
+// the run the request selects before anything else, so the receipt binds the
+// append to that run even when a newer run of the same number appears later,
+// appends to it with the access current gives, which the caller evaluates
+// from the credential as it stands now rather than the evaluator cached at
+// login, and returns the run's ID for the receipt. Only metadata mutations
+// and the existing immutable document-blob write run here; no remote work
+// is dispatched from the transaction.
+func (s *Service) AppendKeyed(
 	ctx context.Context,
 	ap Append,
-	r idempotency.ReplayRequest,
 	current func(context.Context) (Access, error),
-) (idempotency.ReplayReceipt, error) {
-	var receipt idempotency.ReplayReceipt
-	ap.Started = kernel.Normalise(ap.Started)
+) (int64, error) {
 	if current == nil {
-		return receipt, ErrForbidden
+		return 0, ErrForbidden
 	}
-	if _, err := s.Store.Replays().Prune(ctx, r.Now, 100); err != nil {
-		return receipt, fmt.Errorf("build: prune replay receipts: %w", err)
-	}
-	err := s.Store.Tx(ctx, func(ctx context.Context) error {
-		var err error
-		receipt, err = s.Store.Replays().Do(ctx, r, func(ctx context.Context) (int64, error) {
-			b, err := s.Store.Builds().
-				GetForUpdate(ctx, ProjectKey(ap.ProjectKey), ap.Name, ap.Number, ap.Started)
-			if err != nil {
-				return 0, fmt.Errorf("build: select append target: %w", err)
-			}
-			a, err := current(ctx)
-			if err != nil {
-				return 0, err
-			}
-			selected := ap
-			selected.Started = b.Started
-			return b.ID, s.Append(ctx, selected, a)
-		})
-		if err != nil {
-			return fmt.Errorf("build: protected append: %w", err)
-		}
-		b, err := s.Store.Builds().ByIDForUpdate(ctx, receipt.ResourceID)
-		if err != nil {
-			return fmt.Errorf("build: original append target: %w", err)
-		}
-		if b.ProjectKey != ProjectKey(ap.ProjectKey) || b.Name != ap.Name ||
-			b.Number != ap.Number ||
-			!ap.Started.IsZero() && !b.Started.Equal(ap.Started) {
-			return fmt.Errorf("build: original append target changed: %w", ErrConflict)
-		}
-		c, err := s.repository(ctx, b.ProjectKey)
-		if err != nil {
-			return err
-		}
-		a, err := current(ctx)
-		if err != nil {
-			return err
-		}
-		_, path := b.DocumentItem()
-		if !a.Build(c.Key, path, false, api.ActionWrite|api.ActionDelete) {
-			return ErrForbidden
-		}
-		return nil
-	})
+	b, err := s.Store.Builds().
+		GetForUpdate(ctx, ProjectKey(ap.ProjectKey), ap.Name, ap.Number, kernel.Normalise(ap.Started))
 	if err != nil {
-		return receipt, fmt.Errorf("build: append once: %w", err)
+		return 0, fmt.Errorf("build: select append target: %w", err)
 	}
-	return receipt, nil
+	a, err := current(ctx)
+	if err != nil {
+		return 0, err
+	}
+	selected := ap
+	selected.Started = b.Started
+	if err := s.Append(ctx, selected, a); err != nil {
+		return 0, err
+	}
+	return b.ID, nil
+}
+
+// ConfirmAppend is a keyed append's reload: it locks the run id names, which
+// the receipt holds, and confirms that it is still the run the request
+// addresses and that the credential, as current gives it now, may still
+// append to it. A run deleted since answers ErrNotFound, one renamed or
+// moved ErrConflict, and revoked access ErrForbidden, so that a replay never
+// outlives the access that made it.
+func (s *Service) ConfirmAppend(
+	ctx context.Context,
+	ap Append,
+	id int64,
+	current func(context.Context) (Access, error),
+) error {
+	if current == nil {
+		return ErrForbidden
+	}
+	started := kernel.Normalise(ap.Started)
+	b, err := s.Store.Builds().ByIDForUpdate(ctx, id)
+	if err != nil {
+		return fmt.Errorf("build: original append target: %w", err)
+	}
+	if b.ProjectKey != ProjectKey(ap.ProjectKey) || b.Name != ap.Name ||
+		b.Number != ap.Number ||
+		!started.IsZero() && !b.Started.Equal(started) {
+		return fmt.Errorf("build: original append target changed: %w", ErrConflict)
+	}
+	c, err := s.repository(ctx, b.ProjectKey)
+	if err != nil {
+		return err
+	}
+	a, err := current(ctx)
+	if err != nil {
+		return err
+	}
+	_, path := b.DocumentItem()
+	if !a.Build(c.Key, path, false, api.ActionWrite|api.ActionDelete) {
+		return ErrForbidden
+	}
+	return nil
 }

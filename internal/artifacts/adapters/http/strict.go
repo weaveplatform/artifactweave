@@ -12,7 +12,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/usage"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
-	"github.com/weaveplatform/artifactweave/internal/platform/idempotency"
 )
 
 // ArtifactoryAPI is the artifacts module's partial strict server: the
@@ -31,17 +30,16 @@ type ArtifactoryAPI struct {
 }
 
 // Store is what the artifacts handlers read and write, and what they hand
-// on: the item kit's store (itemkit.Store), the protocols' (pkgroute.Store,
-// through ProtocolOptions) and the build service's replay records
-// (build.Store), so that one value serves the kit, the handlers, the
-// searches and the build, trash, repository and usage services they build.
-// It names no access or configuration-module store: the handlers reach the
-// access module through Deps.Access. Each composite store in app is a
-// Store.
+// on: the item kit's store (itemkit.Store) and the protocols'
+// (pkgroute.Store, through ProtocolOptions), so that one value serves the
+// kit, the handlers, the searches and the build, trash, repository and usage
+// services they build. It names no access or configuration-module store: the
+// handlers reach the access module through Deps.Access. The receipts of
+// keyed operations belong to the shared replay, which the router builds over
+// its own store. Each composite store in app is a Store.
 type Store interface {
 	itemkit.Store
 	pkgroute.Store
-	Replays() idempotency.ReplayStore
 }
 
 // Deps is what the artifacts handlers need: the item kit's dependencies,
