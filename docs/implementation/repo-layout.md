@@ -57,6 +57,7 @@ internal/
     store/                     # the platform's own stores: inmem, sql, storetest
     tx/                        # the unit-of-work contract and its in-memory implementation
     gen/<service>/             # generated strict servers, one package per spec
+    gen/operations/            # the generated operation table and its chi lookup
     httpkit/                   # handler helpers, middleware, apierror, baseurl
     crypt/ keymaterial/        # sealed columns and the keyring; key pair and certificate checks
     work/ outbox/ idempotency/ apilimit/ settings/ instance/ configdoc/ archive/ archivecheck/
@@ -69,7 +70,7 @@ internal/
     adapters/                  # the composite stores: inmem, sql (sqlite, postgres)
     apptest/ storetest/        # test support that needs the composite stores
   layout/                      # repository-wide layout, documentation and guard tests
-  devtools/                    # openapibundle, specoracle, stubgen: libraries behind tools/
+  devtools/                    # openapibundle, optable, specoracle, stubgen: libraries behind tools/
 pkg/
   client/<service>/            # generated Go clients (oapi-codegen), used by tests
   containertest/               # gates the tests that start containers (Docker on Linux)
@@ -89,7 +90,7 @@ test/
   peers/                       # placeholder for multi-instance scenarios
   terraform/                   # run.sh and its helpers: apply the deploy/artifactweave scenarios
 tools/
-  openapi-bundle/ stubgen/ specoracle/  # spec generation and parity commands over internal/devtools
+  openapi-bundle/ stubgen/ optable/ specoracle/  # spec generation and parity commands over internal/devtools
   citestselection/             # CI profile, package and test selection; test_ownership.json
   testnames/                   # enforces TestUnit/TestAcc names and reviewed TestMain/fuzz owners
   formatinventory/             # validates the format inventory and generates the class/client matrix
@@ -195,7 +196,10 @@ it or record history.
 `make generate` bundles `api/src/<service>` into `api/<service>.openapi.yaml`, then
 generates the strict chi servers in `internal/platform/gen/<service>` and the clients in
 `pkg/client/<service>` with oapi-codegen. Generated files end in `.gen.go`, so lint and
-coverage exclusions match them; `stubgen` writes the 501 stubs beside each server.
+coverage exclusions match them; `stubgen` writes the 501 stubs beside each server, and
+`optable` the table of every operation's route pattern and classes in
+`internal/platform/gen/operations`, which admission and the `Idempotency-Key` gate read
+(decision 0043).
 `x-go-type-import` may name only `internal/kernel/wire` and
 `internal/artifacts/api/repo`. `make verify-generate` fails when the committed output
 differs from a fresh run.
