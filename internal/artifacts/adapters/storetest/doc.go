@@ -37,8 +37,8 @@
 //     PackageVersionNames' CountVersions and VersionNamesAt: Puppet's,
 //     Chef's and Ansible's versions read back newest first in their lists'
 //     order whatever the write order, and a repository's packages with a
-//     version counted, paged, tallied and listed by release, NuGet's by
-//     the versions their filters show (#1425, #1426). Its subtests,
+//     version, and their versions, counted, paged, tallied and listed by
+//     release, NuGet's by the versions their filters show (#1425, #1426). Its subtests,
 //     ListOrderKeys, PackagePages, NuGetShown and TallyAndReleases, run
 //     beside Run.
 //   - The subtests, one per concern, each on a store of its own: Blobs,
