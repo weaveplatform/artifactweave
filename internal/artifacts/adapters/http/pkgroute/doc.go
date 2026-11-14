@@ -138,7 +138,9 @@
 //     416 and Content-Range alone; a document a protocol builds per request
 //     keeps http.ServeContent's answers to both
 //     (https://github.com/weaveplatform/artifactweave/issues/1468,
-//     https://github.com/weaveplatform/artifactweave/issues/1469).
+//     https://github.com/weaveplatform/artifactweave/issues/1469). A file's
+//     ETag is its bare SHA-1, never the upstream's, unless the route chose
+//     its own (https://github.com/weaveplatform/artifactweave/issues/1484).
 //   - SourceError answers a failure of the server's own storage while it
 //     keeps a remote file (format.ErrStorageFault) as the router's
 //     internal fault, 500
@@ -193,7 +195,7 @@
 // read's policy path and a remote member's refusal against a fake source
 // boundary; source_result_test.go tests ServeResult from inside the
 // package; conditional_test.go covers ServeStream's conditional answers and
-// FileNotModified. Every
+// FileNotModified, and etag_test.go a file stream's SHA-1 ETag. Every
 // native protocol's route suite under test/server/artifacts reaches it
 // through the router.
 package pkgroute

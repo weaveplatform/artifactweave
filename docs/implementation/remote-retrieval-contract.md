@@ -227,6 +227,14 @@ serves only the MIME check and an adapter's own negotiation, such as Docker's; a
 route that builds its document per request keeps the type it sets
 ([#1477](https://github.com/weaveplatform/artifactweave/issues/1477)).
 
+Such a file answers with its SHA-1, bare, as its ETag, beside `X-Checksum-Sha1`,
+whether the upstream's answer or the cached copy serves it, and `If-None-Match` is
+matched against that SHA-1 alone: the upstream's `ETag` stays in the cache entry for the
+remote's own conditional request and never reaches a client, as 7.161.26's
+`RequestResponseHelper.setBasicHeaders` sets every downloaded resource's ETag to its
+SHA-1 ([#1484](https://github.com/weaveplatform/artifactweave/issues/1484)). A route
+that chooses its own validator, as the registry does for a manifest, keeps it.
+
 `storeArtifactsLocally=false` is a repository setting, and treated as nonpersistent. An
 upstream `Cache-Control: no-store` is not: the remote keeps that answer like any other,
 under the repository's retrieval cache period, and serves it offline and as failure-time

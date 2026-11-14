@@ -301,15 +301,31 @@ func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error
 	}
 	SetChecksums(h, s.Checksums)
 	if s.Status == http.StatusOK && s.Checksums.SHA1 != "" {
-		// A stream with a SHA-1 is a file: the upstream's file, or a cached
-		// copy of it, which 7.x answers through its download as it answers
-		// a local file, so its conditional answer and its 416 are that
-		// download's (FileNotModified, RangeRefusalWriter). The ETag this
-		// response sends matches too: a client sends back the one it was
-		// given. A document a protocol builds per request carries no SHA-1
-		// and keeps http.ServeContent's answers, which no 7.x source shows
-		// for those routes [I].
-		tags := []string{s.Checksums.SHA1, ETagValue(s.ETag)}
+		// A stream with a SHA-1 is a file: the upstream's file, or a
+		// cached copy of it, which 7.x answers through its download as it
+		// answers a local file, so its conditional answer and its 416 are
+		// that download's (FileNotModified, RangeRefusalWriter). A
+		// document a protocol builds per request carries no SHA-1 and
+		// keeps http.ServeContent's answers, which no 7.x source shows for
+		// those routes [I].
+		var tags []string
+		switch {
+		case s.ETag != "":
+			// A route that chose its own validator, as the registry
+			// chooses a manifest's digest, keeps it, and a client that
+			// sends it back is matched.
+			tags = []string{s.Checksums.SHA1, ETagValue(s.ETag)}
+		default:
+			// The file's ETag is its bare SHA-1, never the upstream's,
+			// which the policy keeps for its own conditional request:
+			// 7.161.26's RequestResponseHelper.setBasicHeaders sets every
+			// downloaded resource's ETag to its SHA-1, a remote one's
+			// included, so the first download and the cached copy send
+			// the same validator, matched alone
+			// (https://github.com/weaveplatform/artifactweave/issues/1484).
+			w, r = bareETag(w, r, s.Checksums.SHA1)
+			tags = []string{s.Checksums.SHA1}
+		}
 		if FileNotModified(r, tags, s.Checksums.MD5, s.Modified) {
 			WriteNotModified(w)
 			return nil

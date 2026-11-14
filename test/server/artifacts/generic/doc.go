@@ -63,6 +63,9 @@
 //     upstream's on a remote that stores nothing or a Maven metadata
 //     document the cache keeps without an item, answers with the type of
 //     its path, as its kept copy does, never the upstream's label (#1477).
+//   - remote_etag_test.go: a remote file, on a remote that stores it and
+//     one that does not, and a Maven metadata document, answer with their
+//     SHA-1 as ETag, matched alone, never the upstream's (#1484).
 //
 // # References
 //

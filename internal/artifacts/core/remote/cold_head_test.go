@@ -46,13 +46,15 @@ func TestAccPolicyColdHEADFillsTheCache(t *testing.T) {
 	meta := w.request("meta.txt", source.ResourceKindMetadata)
 	meta.Resource.Method = http.MethodHead
 	r, err = w.read(meta)
+	// The upstream's ETag stays in the entry, for the next conditional
+	// request, and off the stream, which answers with its SHA-1 (#1484).
 	if err != nil || r.Stream == nil || r.Stream.Body != http.NoBody || r.Stream.Size != 5 ||
-		r.Stream.ETag != `"one"` {
+		r.Stream.ETag != "" {
 		t.Fatalf("cold metadata HEAD: %+v, %v", r, err)
 	}
-	if _, err = w.db.RemoteCache().
-		Read(t.Context(), w.p.CacheKey(meta, "credential-1")); err != nil {
-		t.Fatalf("cold metadata HEAD kept nothing: %v", err)
+	if e, err := w.db.RemoteCache().
+		Read(t.Context(), w.p.CacheKey(meta, "credential-1")); err != nil || e.ETag != `"one"` {
+		t.Fatalf("cold metadata HEAD kept %+v: %v", e, err)
 	}
 	meta.Resource.Method = http.MethodGet
 	w.mustRead(meta, "index")
@@ -74,8 +76,12 @@ func TestAccPolicyExpiredHEADRefreshesTheCache(t *testing.T) {
 	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("newer"), ETag: `"two"`})
 	q.Resource.Method = http.MethodHead
 	r, err := w.read(q)
-	if err != nil || r.Stream == nil || r.Stream.Size != 5 || r.Stream.ETag != `"two"` {
+	if err != nil || r.Stream == nil || r.Stream.Size != 5 || r.Stream.ETag != "" {
 		t.Fatalf("expired HEAD: %+v, %v", r, err)
+	}
+	if e, err := w.db.RemoteCache().
+		Read(t.Context(), w.p.CacheKey(q, "credential-1")); err != nil || e.ETag != `"two"` {
+		t.Fatalf("expired HEAD kept %+v: %v", e, err)
 	}
 	gets := w.up.Count(http.MethodGet, "/meta.txt")
 	q.Resource.Method = http.MethodGet

@@ -459,7 +459,6 @@ func (p *Policy) resultFor(
 				Representation: source.Representation{
 					Size:              e.Blob.Size,
 					MediaType:         e.ContentType,
-					ETag:              e.ETag,
 					Modified:          modified,
 					Checksums:         e.Blob.Checksums,
 					OriginalChecksums: e.OriginalChecksums,
@@ -494,7 +493,6 @@ func (p *Policy) result(ctx context.Context, e model.RemoteCacheEntry) (source.R
 		Stream: &source.Stream{Body: body, Status: 200, Representation: source.Representation{
 			Size:              info.Size,
 			MediaType:         e.ContentType,
-			ETag:              e.ETag,
 			Modified:          modified,
 			Checksums:         e.Blob.Checksums,
 			OriginalChecksums: e.OriginalChecksums,

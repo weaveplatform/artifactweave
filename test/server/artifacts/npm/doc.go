@@ -29,6 +29,9 @@
 //   - TestAccNPMRemoteTarballTypedByPath fails while a tarball of a remote
 //     that stores nothing answers its upstream's label instead of the type
 //     its kept copy answers (issue 1477).
+//   - TestAccNPMRemoteTarballETagIsItsSHA1 and TestAccNPMRemoteKeysETagIsItsSHA1
+//     fail while a remote tarball or keys document answers with its
+//     upstream's ETag instead of its SHA-1, or matches it (issue 1484).
 //
 // # References
 //

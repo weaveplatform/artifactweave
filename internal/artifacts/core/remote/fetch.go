@@ -333,7 +333,6 @@ func (p *Policy) directOnce(
 					Checksums: claimed,
 					Size:      res.ContentLength,
 					MediaType: res.Header.Get("Content-Type"),
-					ETag:      res.Header.Get("ETag"),
 					Modified:  modified,
 				},
 			},
@@ -365,7 +364,6 @@ func (p *Policy) directOnce(
 				OriginalChecksums: transient.Declared,
 				Size:              transient.Info.Size,
 				MediaType:         u.ContentType,
-				ETag:              u.ETag,
 				Modified:          modified,
 				Checksums: kernel.Checksums{
 					SHA256: transient.Info.Digests.SHA256,

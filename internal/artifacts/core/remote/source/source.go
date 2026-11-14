@@ -256,8 +256,14 @@ type Representation struct {
 	// returns, which the MIME check and the registry's manifest
 	// negotiation read; a route serving a remote file answers the type of
 	// Path instead (pkgroute.ServeStream).
-	MediaType    string
-	Size         int64
+	MediaType string
+	Size      int64
+	// ETag is a validator the route chose for what it serves, such as the
+	// registry's manifest digest or a document it builds per request. The
+	// remote policy leaves it empty and keeps the upstream's ETag in its
+	// entry for its own conditional request, so a remote file answers with
+	// its SHA-1, as 7.161.26's RequestResponseHelper.setBasicHeaders sets
+	// every downloaded resource's ETag (pkgroute.ServeStream, #1484).
 	ETag         string
 	Modified     time.Time
 	Checksums    kernel.Checksums
