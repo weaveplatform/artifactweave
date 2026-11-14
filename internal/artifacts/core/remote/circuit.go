@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -83,9 +84,26 @@ func (p *Policy) changeState(
 		return p.Store.RemoteCache().PutState(tx, q.Repo.Key, state)
 	})
 	if err != nil {
-		return PolicyError(err)
+		return PolicyError(stateFault(ctx, err))
 	}
 	return nil
+}
+
+// stateFault is err, a failed read or write of the repository's
+// availability state, marked as the server's storage fault when a
+// statement the store ran failed (kernel.ErrStore): the read answers 500
+// "internal error" and the router logs it, as a failed store call
+// elsewhere in a remote read does (#1470), where it answered 502 as the
+// upstream's failure. It passes through PolicyError as it is and the
+// circuit does not count it. A store's verdict, such as kernel.ErrConflict
+// for a source replaced since the permit, is left to answer as it did. 7.x
+// keeps this state in memory, so no source says what a failed write of it
+// answers [I] (https://github.com/weaveplatform/artifactweave/issues/1489).
+func stateFault(ctx context.Context, err error) error {
+	if !errors.Is(err, kernel.ErrStore) {
+		return err
+	}
+	return item.MarkStorageFault(ctx, err, err) //nolint:wrapcheck // the store's own error, marked
 }
 
 // RecordFailure counts err against the repository's circuit when it is a

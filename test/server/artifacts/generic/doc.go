@@ -73,6 +73,12 @@
 //     reading the repository or its proxy configuration, answers 500
 //     "internal error", logged once; options that changed still answer
 //     503, and failed options as a read starts their 502 (#1489).
+//   - remote_circuit_fault_test.go: a generic remote read, on a remote
+//     that stores artifacts and one that does not, whose record of the
+//     upstream's 200 or 404 in the availability state meets a statement
+//     the database fails to run, answers 500 "internal error", logged once,
+//     with the circuit untouched; a source replaced meanwhile still
+//     answers 503 (#1489).
 //
 // # References
 //

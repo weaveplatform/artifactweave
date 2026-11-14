@@ -35,6 +35,10 @@
 //     TestAccNPMRemoteTarballHeadWithoutChecksumIsMatchedByDate while a
 //     tarball HEAD answered from the upstream's HEAD without a checksum is
 //     matched by Go's rules against the upstream's ETag (issue 1487).
+//   - TestAccNPMRemoteFailedAvailabilityWriteIsAServerFault fails while a
+//     remote tarball whose record of the upstream's 200 or 404 in the
+//     availability state meets a statement the database fails to run
+//     answers other than 500 "internal error", logged once (issue 1489).
 //
 // # References
 //
