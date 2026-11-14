@@ -18,7 +18,7 @@
 //     of NNNN_name.sql files with "-- +up" and "-- +down" sections. The stream
 //     starts at 0001_baseline.sql; 0002_docker_page.sql adds the two partial
 //     indexes the registry's tags lists and catalogs page by (#1402), and
-//     0005_build_reports.sql the table keyed build deletes and promotions
+//     0003_build_reports.sql the table keyed build deletes and promotions
 //     keep their reports in for their replays (#1410).
 //
 // # Invariants
