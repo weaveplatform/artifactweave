@@ -57,6 +57,11 @@
 //   - Core imports neither the transport (artifacts/adapters/upstream) nor
 //     Smart Remote; both import it.
 //   - Cache aliases and explicit offline mode make no upstream call.
+//   - A HEAD on a resource the cache keeps fills it as a GET does, in the
+//     GET's flight, and is answered from the kept copy; only a read that
+//     keeps nothing and a checksum request's HEAD send the upstream a
+//     HEAD, and nothing is published from an upstream HEAD alone
+//     (https://github.com/weaveplatform/artifactweave/issues/1391).
 //   - The sentinel texts, cache key terms and remote. log names stay
 //     byte-identical.
 //   - A failure of the server's own storage while the cache keeps a file
@@ -96,7 +101,8 @@
 //     upstream (fakeupstream) and a pool from upstreamtest: policy_test.go
 //     holds the policy fixture, with policy_fault_test.go,
 //     policy_format_test.go, cache_maintenance_test.go,
-//     metadata_response_test.go, module_location_test.go and
+//     metadata_response_test.go, module_location_test.go,
+//     cold_head_test.go, a HEAD that fills the cache, and
 //     storage_fault_test.go, a failed read, write or publication of the
 //     cache's own copy, a Hex tarball's Deployed hook among them; and
 //     discovery_test.go, discovery_contract_test.go, listing_test.go and

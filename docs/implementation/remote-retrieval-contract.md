@@ -141,7 +141,7 @@ fake time. [#621](https://github.com/weaveplatform/artifactweave/issues/621) and
 
 | ID | State and request | Upstream work | Response and stored transition |
 |---|---|---|---|
-| R1 | Unique bytes, absent; normal GET | HEAD then GET unless bypassed | Validate and atomically publish full body; then serve. Failure publishes nothing. |
+| R1 | Unique bytes, absent; normal GET or HEAD | HEAD then GET unless bypassed | Validate and atomically publish full body; then serve, a HEAD from the published file ([#1391](https://github.com/weaveplatform/artifactweave/issues/1391)). Failure publishes nothing. |
 | R2 | Unique bytes, usable hit | None | Serve indefinitely until explicit deletion or source change; TTL and zap do not refetch it. |
 | R3 | Mutable upstream metadata, absent | Bounded fetch | Commit complete raw representation and validators; derive downstream response. |
 | R4 | Mutable upstream metadata, fresh hit | None | Serve; client conditional GET/HEAD is evaluated against the downstream representation. |
@@ -153,7 +153,7 @@ fake time. [#621](https://github.com/weaveplatform/artifactweave/issues/621) and
 | R10 | Assumed-offline cooldown | No request until cooldown expires | `hardFail=false`: usable cached bytes or 502 on miss; `hardFail=true`: 502. One permitted demand at expiry probes; peers share it. A fresh/immutable hit that needs no upstream remains a hit. |
 | R11 | Timeout, disconnect, 429 or 5xx while refresh is needed | One bounded attempt; no per-waiter retry | `hardFail=false` may return last usable bytes. Otherwise sanitized failure below. Never create 404 or extend freshness. |
 | R12 | Upstream 401/403; invalid checksum, MIME or destination policy | No fallback to stale bytes for this normal read, except an item-route MIME refusal | Return sanitized failure; keep prior complete bytes for an authorized explicit cache read. No negative miss, no false successful refresh. An item-route read whose label 7.x's rule refuses is served its expired cached bytes, whatever `hardFail` says, and they are made fresh again, as 7.x's `RemoteRepoBase.internalGetInfo` and `getInfo` (`unexpireIfExists`) do; the refusal answers the path's next reads ([#1376](https://github.com/weaveplatform/artifactweave/issues/1376)). |
-| R13 | `storeArtifactsLocally=false`, normal online read | Fetch every request; bypass durable positive/negative cache | Stream transient content; do not create item, blob reference, raw metadata, package index or negative record. Existing cache is not erased; R8/R9 can still read it. |
+| R13 | `storeArtifactsLocally=false`, normal online read | Fetch every request, a HEAD with a HEAD only; bypass durable positive/negative cache | Stream transient content; do not create item, blob reference, raw metadata, package index or negative record. Existing cache is not erased; R8/R9 can still read it. |
 | R14 | Concurrent callers for identical identity and intent | One bounded fill/revalidation per process when storing | Each authorized waiter gets the result; cancellation detaches one waiter. Cancel the fill when the last waiter leaves. No-store bodies are not unbounded multicast buffers; each caller has its own bounded stream. |
 
 Mutable binary names (for example non-unique Maven snapshots) are explicitly classified
@@ -184,9 +184,27 @@ or authentication challenges as artifactweave credentials.
 | Unexpected 2xx, unsafe redirect or unsolicited 206 on full fetch | Not a full cacheable artifact; typed protocol error | 502 |
 | GET 200 or 304 whose stored or spooled copy fails to open or read while the format's check (`Validate`, `ValidateMetadata`, its inspection, a 304's re-admission, or a publication hook such as Hex's `Deployed`) reads it; or whose copy the blob store fails to write or commit, whose spool file cannot be written, or whose publication meets a failed store call (the fence, the item or entry write, the transaction's begin or commit) | The server's storage fault, not the upstream's: publish nothing, keep the prior entry, never trip assumed-offline; a failed read of the upstream's body stays the upstream's ([#1269](https://github.com/weaveplatform/artifactweave/issues/1269)) | 500 "internal error" [I] where the error on its own would answer a 502 with no fallback; a read or write that times out or ends short keeps its 504 or 502 and R11 fallback; the store's verdicts (not found, conflict, invalid) map as before |
 
-For downstream HEAD, never publish an item from upstream HEAD alone. The transport sends one HEAD for an explicit HEAD request, and the caller closes
-the response without publishing incomplete content. `bypassHeadRequests` suppresses
-only the preflight of a GET. [#621](https://github.com/weaveplatform/artifactweave/issues/621) may perform a full, validated GET when its download path needs
+A downstream HEAD on a remote that stores artifacts locally fills the cache as a GET
+does, in the GET's own flight (the upstream's HEAD, then its GET, unless
+`bypassHeadRequests`), and is answered from what it published: the file's own type,
+length, checksums and SHA-1 ETag, never the upstream's label or claimed checksums. An
+expired copy is refreshed the same way. 7.161.26's `DownloadServiceImpl.respond`
+answers a HEAD from the upstream's info alone only where the remote does not store
+artifacts locally, "otherwise download the artifact normally and return the full info
+for the head request", and a download that fails after the info request answers the
+HEAD as it answers the GET, since both take `respondFoundResource`. The HEAD's
+download is not a download in the statistics (`StatsServiceImpl.updateDownloadStatsIfNeeded`
+skips a HEAD) and does not touch the cleanup clock beyond the commit's own
+([#1391](https://github.com/weaveplatform/artifactweave/issues/1391)). A checksum
+request's HEAD (a `.md5`, `.sha1`, `.sha256` or `.sha512` path the item route answers
+from the file it names) downloads nothing: `respond` hands a checksum request, HEAD or
+GET, to `respondForChecksumRequest`, which answers from the file's info. A checksum
+request's GET still fills the cache with the file it names, a known difference from
+7.x, which answers that GET from the info too. Never publish an item from an upstream
+HEAD alone: a HEAD that downloads nothing (R13, a checksum request, a checksum-only or
+transient resource, or an answer the cache may not keep) sends the upstream one HEAD,
+and the caller closes the response without publishing anything from it.
+`bypassHeadRequests` suppresses only the preflight of a GET. [#621](https://github.com/weaveplatform/artifactweave/issues/621) may perform a full, validated GET when its download path needs
 computed hashes; that is an explicit fill, not proof that a HEAD cached bytes. A cold
 Range request with storage enabled fetches a complete 200 into the ordinary ingestion
 path, then serves the requested range; an upstream 206 is never labeled complete. A

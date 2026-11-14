@@ -131,6 +131,12 @@ type Resource struct {
 	// ChecksumOnly is the trusted generic cold SHA-256 sidecar route. It must
 	// remain transient and authorize the artifact it describes.
 	ChecksumOnly bool
+	// ChecksumRequest marks a read of the file a checksum request (a
+	// .sha1, .md5, .sha256 or .sha512 path) names. Its HEAD is answered
+	// from the upstream's info and keeps no body, where any other HEAD on
+	// a remote that stores artifacts locally downloads the file, as 7.x
+	// leaves checksum requests out of that download.
+	ChecksumRequest bool
 	// Mutable marks a refreshable artifact name, such as a non-unique Maven
 	// snapshot. It does not turn a binary into metadata for zap semantics.
 	Mutable     bool

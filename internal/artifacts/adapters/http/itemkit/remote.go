@@ -87,6 +87,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 			httpkit.WriteErr(w, r, ItemNotFound())
 			return true
 		}
+		resource.ChecksumRequest = sidecar != ""
 	}
 	// The copy the cache already holds is matched before the upstream is
 	// asked: a mismatch is not found, and the upstream is not asked, as
