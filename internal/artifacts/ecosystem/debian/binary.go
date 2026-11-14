@@ -48,6 +48,25 @@ type arMember struct {
 // ReadBinary validates the ordered ar members, bounded control metadata and
 // the data archive before any uploaded package can enter an apt index.
 func ReadBinary(ctx context.Context, body io.ReaderAt, size int64) (Binary, error) {
+	return readBinaryArchive(ctx, body, size, true)
+}
+
+// readBinaryArchive is ReadBinary with the metadata validation that
+// debian.metadata.validation turns off in 7.x (Settings). Without it, a
+// control field with no value, and a missing Maintainer or Description,
+// no longer make the package malformed: JFrog's "Use Debian Metadata
+// Validation" says the validation is what makes sure "none of the
+// relevant metadata fields are empty". Everything else is still checked
+// either way: the archive's structure and bounds, which no index can be
+// read from without, and a valid Package, Version and Architecture, which
+// name the package and the binary-<arch> index that lists it [I]. A field
+// with no value is left out of the package's stanza (binaryControl), as
+// 7.x wrote a stanza with no line for each field it found empty
+// (RTFACT-18754) [I], so the index still decodes for apt and for the
+// server's own reads.
+func readBinaryArchive(
+	ctx context.Context, body io.ReaderAt, size int64, validate bool,
+) (Binary, error) {
 	if size < 8 || size > maxBinarySize {
 		return Binary{}, fmt.Errorf("%w: archive size", errInvalidBinary)
 	}
@@ -96,15 +115,15 @@ func ReadBinary(ctx context.Context, body io.ReaderAt, size int64) (Binary, erro
 	if err := validateData(ctx, body, members[2]); err != nil {
 		return Binary{}, err
 	}
-	fields, err := parseControl(control)
+	fields, control, err := binaryControl(control, validate)
 	if err != nil {
 		return Binary{}, err
 	}
 	name, versionString, arch := fields["Package"], fields["Version"], fields["Architecture"]
 	if !packageName.MatchString(name) || versionString == "" ||
 		strings.ContainsAny(versionString, " \t\r\n/") ||
-		!architecture.MatchString(arch) || fields["Maintainer"] == "" ||
-		fields["Description"] == "" {
+		!architecture.MatchString(arch) ||
+		validate && (fields["Maintainer"] == "" || fields["Description"] == "") {
 		return Binary{}, fmt.Errorf("%w: mandatory control fields", errInvalidBinary)
 	}
 	return Binary{Name: name, Version: versionString, Architecture: arch, Control: control}, nil
@@ -237,30 +256,59 @@ func validateData(ctx context.Context, body io.ReaderAt, m arMember) error {
 }
 
 func parseControl(data []byte) (map[string]string, error) {
+	fields, _, err := binaryControl(data, true)
+	return fields, err
+}
+
+// binaryControl parses data, one control stanza, into its fields, and
+// returns the stanza a Packages index lists for it. With validate, a field
+// with no value on its first line is malformed and the stanza is data
+// itself. Without it, such a field is left out of both, with its
+// continuation lines: the server reads its own Packages indexes with
+// parseControl (ParsePackagesIndex), which refuses such a field, so a
+// stanza that kept one would leave the whole index out of a virtual
+// repository's view and a snapshot [I].
+func binaryControl(data []byte, validate bool) (map[string]string, []byte, error) {
 	if len(data) == 0 || len(data) > maxControlFile || bytes.IndexByte(data, 0) >= 0 {
-		return nil, fmt.Errorf("%w: control size or contents", errInvalidBinary)
+		return nil, nil, fmt.Errorf("%w: control size or contents", errInvalidBinary)
 	}
 	fields := map[string]string{}
+	seen := map[string]bool{}
+	var kept bytes.Buffer
 	var current string
-	for _, line := range strings.Split(strings.TrimSuffix(string(data), "\n"), "\n") {
-		line = strings.TrimSuffix(line, "\r")
+	skipped, dropped := false, false
+	for _, raw := range strings.Split(strings.TrimSuffix(string(data), "\n"), "\n") {
+		line := strings.TrimSuffix(raw, "\r")
 		if line == "" {
-			return nil, fmt.Errorf("%w: extra control stanza", errInvalidBinary)
+			return nil, nil, fmt.Errorf("%w: extra control stanza", errInvalidBinary)
 		}
 		if line[0] == ' ' || line[0] == '\t' {
 			if current == "" {
-				return nil, fmt.Errorf("%w: orphan continuation", errInvalidBinary)
+				return nil, nil, fmt.Errorf("%w: orphan continuation", errInvalidBinary)
 			}
-			fields[current] += "\n" + line
+			if !skipped {
+				fields[current] += "\n" + line
+				kept.WriteString(raw + "\n")
+			}
 			continue
 		}
 		key, value, ok := strings.Cut(line, ":")
-		_, duplicate := fields[key]
-		if !ok || key == "" || strings.TrimSpace(value) == "" || duplicate {
-			return nil, fmt.Errorf("%w: malformed or duplicate control field", errInvalidBinary)
+		empty := strings.TrimSpace(value) == ""
+		if !ok || key == "" || seen[key] || validate && empty {
+			return nil, nil, fmt.Errorf(
+				"%w: malformed or duplicate control field", errInvalidBinary,
+			)
+		}
+		seen[key], current, skipped = true, key, empty
+		if empty {
+			dropped = true
+			continue
 		}
 		fields[key] = strings.TrimLeft(value, " ")
-		current = key
+		kept.WriteString(raw + "\n")
 	}
-	return fields, nil
+	if !dropped {
+		return fields, data, nil
+	}
+	return fields, kept.Bytes(), nil
 }

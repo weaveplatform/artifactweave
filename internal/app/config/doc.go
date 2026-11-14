@@ -35,8 +35,8 @@
 //   - The module settings, which app reads module-owned keys through:
 //     Access (token.allow_basic_auth, environments.global_limit),
 //     Artifacts (the download, search, aql_timeout, build, deploy, npm,
-//     cran, huggingface, maven, nuget, remote, gc, conda, helm and pypi
-//     sections) and Configuration (docker.subdomain_match). The platform's
+//     cran, huggingface, maven, nuget, remote, gc, conda, debian, helm and
+//     pypi sections) and Configuration (docker.subdomain_match). The platform's
 //     keys (listen, base_url, data_dir, compat, database, blob, cold_blob,
 //     the master keys, bootstrap, log, work, api and xz) stay fields that
 //     app reads directly.

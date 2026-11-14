@@ -14,8 +14,10 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
@@ -376,4 +378,120 @@ func TestUnitForceAuthenticationCountsAnonymousCredentialsAsNone(t *testing.T) {
 		t.Errorf("unreadable setting: reached %v, %d %q; want 500", reached, rec.Code, rec.Body)
 	}
 	wantForced("unreadable setting", nil)
+}
+
+// aliasStore is an in-memory store whose remote cache lists, for an exact
+// path, the pages pages holds by the token that asks for them.
+type aliasStore struct {
+	*inmem.Store
+	pages map[string]aliasPage
+}
+
+type aliasPage struct {
+	entries []model.RemoteCacheEntry
+	next    string
+	err     error
+}
+
+func (s aliasStore) RemoteCache() port.RemoteCacheStore {
+	return aliasCache{RemoteCacheStore: s.Store.RemoteCache(), pages: s.pages}
+}
+
+type aliasCache struct {
+	port.RemoteCacheStore
+	pages map[string]aliasPage
+}
+
+func (c aliasCache) Exact(
+	_ context.Context, _, _ string, p kernel.Page,
+) ([]model.RemoteCacheEntry, string, error) {
+	page := c.pages[p.After]
+	return page.entries, page.next, page.err
+}
+
+// TestUnitAliasRemoteMetadata (#1382): a remote's -cache alias reads a
+// path through the remote source only when it is a Debian or RPM remote's
+// metadata and the cache holds a complete document for it without an
+// item; anything else is left to the item lookup, which answers as it did.
+// A store that cannot list the cache fails the read.
+func TestUnitAliasRemoteMetadata(t *testing.T) {
+	debianRemote := repo.Config{Key: "deb", Class: repo.Remote, PackageType: repo.Debian}
+	rpmRemote := repo.Config{Key: "rpm", Class: repo.Remote, PackageType: repo.RPM}
+	document := model.RemoteCacheEntry{Blob: blob.Blob{Checksums: kernel.Checksums{
+		SHA256: "0000000000000000000000000000000000000000000000000000000000000000",
+	}}}
+	backed := document
+	backed.ItemID = 7
+	held := map[string]aliasPage{"": {entries: []model.RemoteCacheEntry{document}}}
+	fault := errors.New("store fault")
+	for _, tc := range []struct {
+		name    string
+		c       repo.Config
+		cached  bool
+		path    string
+		pages   map[string]aliasPage
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "a held Release", c: debianRemote, cached: true, path: "dists/stable/Release",
+			pages: held, want: true,
+		},
+		{
+			name: "a held component file", c: debianRemote, cached: true,
+			path: "dists/stable/main/binary-amd64/Release", pages: held, want: true,
+		},
+		{
+			name: "held repodata", c: rpmRemote, cached: true, path: "repodata/repomd.xml",
+			pages: held, want: true,
+		},
+		{
+			name: "on a later page", c: debianRemote, cached: true, path: "dists/stable/InRelease",
+			pages: map[string]aliasPage{
+				"":      {entries: []model.RemoteCacheEntry{backed}, next: "later"},
+				"later": {entries: []model.RemoteCacheEntry{document}},
+			}, want: true,
+		},
+		{name: "nothing held", c: debianRemote, cached: true, path: "dists/stable/Release"},
+		{
+			name: "only an item-backed entry", c: debianRemote, cached: true,
+			path:  "dists/stable/Release",
+			pages: map[string]aliasPage{"": {entries: []model.RemoteCacheEntry{backed}}},
+		},
+		{name: "the remote itself", c: debianRemote, path: "dists/stable/Release", pages: held},
+		{
+			name: "a local repository", cached: true, path: "dists/stable/Release", pages: held,
+			c: repo.Config{Key: "deb-local", Class: repo.Local, PackageType: repo.Debian},
+		},
+		{name: "the repository root", c: debianRemote, cached: true, pages: held},
+		{
+			name: "a checksum file", c: debianRemote, cached: true,
+			path: "dists/stable/Release.sha256", pages: held,
+		},
+		{
+			name: "another package type", cached: true, path: "repodata/repomd.xml", pages: held,
+			c: repo.Config{Key: "gen", Class: repo.Remote, PackageType: repo.Generic},
+		},
+		{
+			name: "a package", c: debianRemote, cached: true,
+			path: "pool/main/a/alpha/alpha_1.0_amd64.deb", pages: held,
+		},
+		{
+			name: "a path the source refuses", c: debianRemote, cached: true,
+			path: "dists/stable/main/binary-amd64/Packagesx", pages: held,
+		},
+		{
+			name: "a listing fault", c: debianRemote, cached: true, path: "dists/stable/Release",
+			pages: map[string]aliasPage{"": {err: fault}}, wantErr: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			st := aliasStore{Store: inmem.New(), pages: tc.pages}
+			got, err := aliasRemoteMetadata(t.Context(), st, tc.c, tc.cached, tc.path)
+			if got != tc.want || (err != nil) != tc.wantErr ||
+				tc.wantErr && !errors.Is(err, fault) {
+				t.Fatalf("got %t, %v; want %t, error %t", got, err, tc.want, tc.wantErr)
+			}
+		})
+	}
 }

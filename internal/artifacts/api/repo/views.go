@@ -23,10 +23,28 @@ func Public(c Config) Config {
 // empty set and reads an absent key as null, so every plan would show a change.
 // It lists no property sets as [] too, as Artifactory's configuration samples
 // do, except on a virtual repository, whose configuration has no such field.
+//
+// A Debian repository that never set ddebSupported or debianTrivialLayout
+// reads them as false, the value it acts on (#1372). 7.161.26's
+// configuration model (RepositoryConfigurationBase, the base of every
+// class's) holds both with the default false; RTFACT-30304 shows
+// "ddebSupported" : false in a Debian remote's configuration, and the
+// Terraform provider's sample reads (samples/repository_remote/debian.json
+// and samples/generic-repo-local.json) give both false. No dump of a
+// virtual repository's read was found [I]. The v2 read keeps only what
+// Relevant keeps of them.
 func Masked(c Config) Config {
 	c.Password = ""
 	if c.Environments == nil {
 		c.Environments = []string{}
+	}
+	if c.PackageType == Debian {
+		if c.DdebSupported == nil {
+			c.DdebSupported = new(bool)
+		}
+		if c.DebianTrivialLayout == nil {
+			c.DebianTrivialLayout = new(bool)
+		}
 	}
 	// The provider's repositories has the same empty default and the same
 	// null reading of an absent key, so a virtual repository without
@@ -116,6 +134,11 @@ var relevance = []struct {
 		c.DebianTrivialLayout, c.OptionalIndexCompressionFormats = nil, nil
 		c.DebianDefaultArchitectures, c.DdebSupported = "", nil
 	}},
+	// 7.161.26's RepositoryConfigurationBase marks debianTrivialLayout
+	// @IncludeTypeSpecific(packageType = Debian, repoType = {LOCAL,
+	// FEDERATED}), so a Debian remote or virtual repository's v2 read
+	// leaves it out, and ddebSupported for every Debian class (#1372).
+	{nil, debianHosted, func(c *Config) { c.DebianTrivialLayout = nil }},
 	{[]PackageType{NuGet}, nil, func(c *Config) {
 		c.ForceNugetAuthentication = nil
 		c.FeedContextPath, c.DownloadContextPath = nil, nil
@@ -171,6 +194,12 @@ func Relevant(c Config) Config {
 		}
 	}
 	return c
+}
+
+// debianHosted reports a local or federated Debian repository, the classes
+// whose layout debianTrivialLayout sets.
+func debianHosted(c Config) bool {
+	return c.PackageType == Debian && (c.Class == Local || c.Class == Federated)
 }
 
 // npmHosted reports a local or federated npm repository, which applies the

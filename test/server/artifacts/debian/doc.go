@@ -1,9 +1,11 @@
 // Package debian runs the Debian snapshot routes of the assembled server,
 // with their read guards and their refusals of unavailable or corrupt
 // indexes, a remote Debian repository's relay of upstream files, its .ddeb
-// cache, its indexes cached as fetched, index reads with a query or matrix
-// parameters, a malformed package stored unindexed, and the async values of
-// the Debian reindex.
+// cache, its indexes cached as fetched, its component files and its -cache
+// alias's metadata, index reads with a query or matrix parameters, a
+// malformed package stored unindexed with and without metadata validation,
+// a Debian repository's configuration, and the async values of the Debian
+// reindex.
 //
 // # Role
 //
@@ -43,9 +45,21 @@
 //     by-hash copy served once cached to a caller who may read every
 //     package it lists.
 //   - debian_remote_as_fetched_test.go: a remote repository's index that
-//     does not decode served and cached as fetched, and left out by a
-//     virtual over it with one whose digest its Release does not give
-//     (#1356).
+//     does not decode served and cached as fetched, on the remote and its
+//     -cache alias, and left out by a virtual over it with one whose digest
+//     its Release does not give (#1356).
+//   - debian_remote_metadata_test.go: a remote repository's component
+//     Release, Packages.diff/Index and slash distribution Release asked of
+//     its upstream and served by a virtual over it (#1375), and a cached
+//     Release, InRelease, installer index or component file served by its
+//     -cache alias without asking the upstream (#1382).
+//   - debian_repository_config_test.go: ddebSupported taken by a Debian
+//     remote, and ddebSupported and debianTrivialLayout read as false by a
+//     Debian local, federated or remote repository that never set them
+//     (#1372).
+//   - debian_metadata_validation_test.go: a package with an empty
+//     Maintainer marked malformed with debian.metadata_validation on and
+//     indexed with it off, and an unreadable one marked either way (#1374).
 //   - debian_remote_ddeb_test.go: a remote repository's .ddeb served and
 //     cached, and a local or federated .ddeb deploy refused without
 //     ddebSupported (#1352).
@@ -78,8 +92,12 @@
 //     https://github.com/weaveplatform/artifactweave/issues/1331,
 //     https://github.com/weaveplatform/artifactweave/issues/1349,
 //     https://github.com/weaveplatform/artifactweave/issues/1352,
-//     https://github.com/weaveplatform/artifactweave/issues/1355 and
-//     https://github.com/weaveplatform/artifactweave/issues/1356
+//     https://github.com/weaveplatform/artifactweave/issues/1355,
+//     https://github.com/weaveplatform/artifactweave/issues/1356,
+//     https://github.com/weaveplatform/artifactweave/issues/1372,
+//     https://github.com/weaveplatform/artifactweave/issues/1374,
+//     https://github.com/weaveplatform/artifactweave/issues/1375 and
+//     https://github.com/weaveplatform/artifactweave/issues/1382
 //
 // # Status
 //

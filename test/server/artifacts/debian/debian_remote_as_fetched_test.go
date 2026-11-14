@@ -67,10 +67,8 @@ func asFetchedArchive(t *testing.T) (map[string][]byte, []string) {
 // A reader is served the upstream's bytes, the next caller and the -cache
 // alias are served the cached copy without asking the upstream again, and a
 // user without read permission is refused 403 and an anonymous caller 401
-// before the upstream is asked. The -cache alias answers 404 for an
-// installer index, as it does for a whole one and for a cached Release:
-// it serves no file the item route reads from the cache as metadata (found
-// while fixing #1356).
+// before the upstream is asked. The -cache alias serves an installer
+// index's cached copy too, where it answered 404 (#1382).
 func TestAccDebianRemoteCachesAnIndexItCannotDecodeAsFetched(t *testing.T) {
 	files, paths := asFetchedArchive(t)
 	for _, p := range paths {
@@ -80,13 +78,9 @@ func TestAccDebianRemoteCachesAnIndexItCannotDecodeAsFetched(t *testing.T) {
 				http.StatusForbidden, "Forbidden")
 			queryRefusal(t, w.Request(http.MethodGet, "/artifactory/remote/"+p, "", ""),
 				http.StatusUnauthorized, "Authentication is required")
-			callers := []struct{ caller, key string }{
+			for _, as := range []struct{ caller, key string }{
 				{"reader", "remote"}, {"admin", "remote"}, {"admin", "remote-cache"},
-			}
-			if debian.InstallerPackagesIndexPath(p) {
-				callers = callers[:2]
-			}
-			for _, as := range callers {
+			} {
 				r := w.Request(http.MethodGet, "/artifactory/"+as.key+"/"+p, as.caller, "")
 				if r.Code != http.StatusOK || r.Body.String() != string(files[p]) {
 					t.Errorf("%s %s answered %d %q, want 200 and the upstream's bytes",

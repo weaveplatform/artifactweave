@@ -55,6 +55,17 @@ func snapshotPath(p string) bool {
 // Serves reports whether t is the Debian package type.
 func Serves(t repo.PackageType) bool { return t == repo.Debian }
 
+// Settings are the Debian format's server-wide options (ecosystem.Settings).
+// The zero value is 7.x's default.
+type Settings struct {
+	// DisableMetadataValidation is 7.x's debian.metadata.validation=false
+	// (JFrog's "Use Debian Metadata Validation", on by default): a binary
+	// whose control data has a field with no value, or no Maintainer or
+	// Description, is indexed rather than marked malformed
+	// (readBinaryArchive).
+	DisableMetadataValidation bool
+}
+
 // Handler is the Debian format's hooks: it checks every binary (.deb,
 // .ddeb) and source (.dsc) package written to a Debian repository and the
 // coordinates it is deployed with, keeps the package index and deb.name and
@@ -62,8 +73,15 @@ func Serves(t repo.PackageType) bool { return t == repo.Debian }
 // cannot read with deb.index.status and leaves it out of both, keeps
 // snapshots immutable, and derives a local or federated repository's apt
 // metadata as queued work (KindIndex), signed when the repository names a
-// key pair.
-type Handler struct{ generic.Handler }
+// key pair. Settings say how strictly a binary's metadata is read.
+type Handler struct {
+	generic.Handler
+	Settings Settings
+}
+
+// validate reports whether h checks a binary's metadata fields
+// (readBinaryArchive).
+func (h Handler) validate() bool { return !h.Settings.DisableMetadataValidation }
 
 // inspection is a binary package read once per write. fault is why the
 // package is malformed, empty when binary holds its control data.
@@ -85,7 +103,7 @@ type sourceInspection struct {
 // write with no content digest, or whose source package is invalid, is
 // refused with 400; a binary package that cannot be read is kept as
 // malformed (readBinary).
-func (Handler) Inspect(
+func (h Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
 	_ repo.Config,
@@ -104,7 +122,7 @@ func (Handler) Inspect(
 	if !isBinary(w.Path) {
 		return inspection{}, nil
 	}
-	binary, fault, err := readBinary(ctx, env.Blobs, w.Checksums.SHA256)
+	binary, fault, err := readBinary(ctx, env.Blobs, w.Checksums.SHA256, h.validate())
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +145,7 @@ func (Handler) Inspect(
 // since it has none to compare. Admit repeats Inspect's checks unless
 // Inspect already read the same content at the same path. Any other file
 // passes.
-func (Handler) Admit(
+func (h Handler) Admit(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
@@ -185,7 +203,7 @@ func (Handler) Admit(
 	}
 	in, ok := env.Inspection.(inspection)
 	if !ok || in.sha != w.Checksums.SHA256 || in.path != w.Path {
-		in.binary, in.fault, err = readBinary(ctx, env.Blobs, w.Checksums.SHA256)
+		in.binary, in.fault, err = readBinary(ctx, env.Blobs, w.Checksums.SHA256, h.validate())
 		if err != nil {
 			return w, err
 		}
@@ -210,7 +228,7 @@ func (Handler) Admit(
 // replaced leaves the index too. A source package file (a .dsc, .diff.gz
 // or .tar.* archive) only queues the rebuild, which lists the source once
 // all its parts are stored. Folders and other files change nothing.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
+func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder {
 		return nil
 	}
@@ -220,7 +238,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it m
 	if !isBinary(it.FullPath()) {
 		return nil
 	}
-	b, fault, err := packageFor(ctx, env, it)
+	b, fault, err := packageFor(ctx, env, it, h.validate())
 	if err != nil {
 		return err
 	}
@@ -228,7 +246,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it m
 		return err
 	}
 	if fault == "" {
-		if err := syncVersion(ctx, env, c, b.Name, b.Version); err != nil {
+		if err := syncVersion(ctx, env, c, b.Name, b.Version, h.validate()); err != nil {
 			return err
 		}
 	}
@@ -254,7 +272,7 @@ func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it m
 // once per name and version, from that version's remaining binaries. A
 // version with none left is not its concern: the item service has already
 // pruned it.
-func (Handler) Deleted(
+func (h Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
@@ -265,7 +283,7 @@ func (Handler) Deleted(
 		if !isBinary(it.FullPath()) {
 			continue
 		}
-		b, fault, err := packageFor(ctx, env, it)
+		b, fault, err := packageFor(ctx, env, it, h.validate())
 		if err != nil {
 			return err
 		}
@@ -277,7 +295,7 @@ func (Handler) Deleted(
 			continue
 		}
 		seen[key] = true
-		if err := syncVersion(ctx, env, c, b.Name, b.Version); err != nil {
+		if err := syncVersion(ctx, env, c, b.Name, b.Version, h.validate()); err != nil {
 			return err
 		}
 	}
@@ -315,11 +333,14 @@ func (Handler) Classify(_ repo.Config, path string) format.Class {
 // and restores the deb.name and deb.version properties, or deb.index.status
 // on a malformed one, which it leaves out. A local or federated
 // repository's metadata rebuild is then queued.
-func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
-	return reindex(ctx, env, c, true)
+func (h Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
+	return reindex(ctx, env, c, true, h.validate())
 }
 
-func reindex(ctx context.Context, env format.Env, c repo.Config, writeProps bool) error {
+// reindex is Reindex, with the deb.name and deb.version properties
+// rewritten only when writeProps, and each binary's metadata checked as
+// validate says (readBinaryArchive).
+func reindex(ctx context.Context, env format.Env, c repo.Config, writeProps, validate bool) error {
 	items, err := files(ctx, env.Store, c)
 	if err != nil {
 		return err
@@ -329,7 +350,7 @@ func reindex(ctx context.Context, env format.Env, c repo.Config, writeProps bool
 		if !isBinary(it.FullPath()) {
 			continue
 		}
-		b, fault, err := packageFor(ctx, env, it)
+		b, fault, err := packageFor(ctx, env, it, validate)
 		if err != nil {
 			return err
 		}
@@ -382,6 +403,11 @@ func isSourceRelated(path string) bool {
 		strings.Contains(path, ".tar.")
 }
 
+// GeneratedPath reports whether path is one of the files under dists/ that
+// a local or federated repository derives (Classify): a Release, InRelease
+// or Release.gpg, or anything in a binary-<arch> or source folder.
+func GeneratedPath(path string) bool { return isGenerated(path) }
+
 func isGenerated(path string) bool {
 	return strings.HasPrefix(path, "dists/") &&
 		(strings.Contains(path, "/binary-") || strings.Contains(path, "/source/") ||
@@ -407,8 +433,8 @@ func (r readerAt) ReadAt(p []byte, off int64) (int, error) {
 	return io.ReadFull(r, p) //nolint:wrapcheck // adapting the blob read interface
 }
 
-// readBinary reads the binary package stored as sha. One that ReadBinary
-// refuses is malformed: readBinary returns why as fault, with no error, and
+// readBinary reads the binary package stored as sha, its metadata checked
+// as validate says (readBinaryArchive). One that it refuses is malformed: readBinary returns why as fault, with no error, and
 // the package is stored but never indexed (#1355). JFrog's Debian guide
 // ("Use Debian Metadata Validation") has 7.x keep a package that fails
 // validation out of the index and mark it with deb.index.status, and
@@ -417,8 +443,13 @@ func (r readerAt) ReadAt(p []byte, off int64) (int, error) {
 // unreadable control archive stored unindexed too, and JFrog's KB "How
 // Debian Repository metadata calculation works?" has a deploy queue the
 // indexing, which cannot refuse a deploy already made. So every fault is
-// treated alike [I]. A write with no content digest is still refused.
-func readBinary(ctx context.Context, blobs format.Blobs, sha string) (Binary, string, error) {
+// treated alike [I], whether or not validate is set: an archive that
+// cannot be read cannot be indexed either way, and no source says 7.x
+// marks it differently with debian.metadata.validation off [I]. A write
+// with no content digest is still refused.
+func readBinary(
+	ctx context.Context, blobs format.Blobs, sha string, validate bool,
+) (Binary, string, error) {
 	if sha == "" {
 		return Binary{}, "", format.Rejectf(
 			http.StatusBadRequest,
@@ -430,7 +461,7 @@ func readBinary(ctx context.Context, blobs format.Blobs, sha string) (Binary, st
 		return Binary{}, "", fmt.Errorf("debian: open package: %w", err)
 	}
 	defer func() { _ = r.Close() }()
-	b, err := ReadBinary(ctx, readerAt{r}, info.Size)
+	b, err := readBinaryArchive(ctx, readerAt{r}, info.Size, validate)
 	if errors.Is(err, errInvalidBinary) {
 		return Binary{}, err.Error(), nil
 	}
@@ -483,12 +514,14 @@ func sourceCoordinates(props model.Properties, source Source, cached bool) error
 }
 
 // packageFor is the binary package it stores, as readBinary reads it.
-func packageFor(ctx context.Context, env format.Env, it model.Item) (Binary, string, error) {
+func packageFor(
+	ctx context.Context, env format.Env, it model.Item, validate bool,
+) (Binary, string, error) {
 	if in, ok := env.Inspection.(inspection); ok &&
 		in.sha == it.Actual.SHA256 && in.path == it.FullPath() {
 		return in.binary, in.fault, nil
 	}
-	return readBinary(ctx, env.Blobs, it.Actual.SHA256)
+	return readBinary(ctx, env.Blobs, it.Actual.SHA256, validate)
 }
 
 // coordinates checks a package's deb.distribution, deb.component and
@@ -571,7 +604,9 @@ func setProperties(
 	return st.Items().PatchProperties(ctx, it.ID, set, remove, it.Updated) //nolint:wrapcheck
 }
 
-func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, version string) error {
+func syncVersion(
+	ctx context.Context, env format.Env, c repo.Config, name, version string, validate bool,
+) error {
 	items, err := files(ctx, env.Store, c)
 	if err != nil {
 		return err
@@ -581,7 +616,7 @@ func syncVersion(ctx context.Context, env format.Env, c repo.Config, name, versi
 		if !isBinary(it.FullPath()) {
 			continue
 		}
-		b, fault, err := packageFor(ctx, env, it)
+		b, fault, err := packageFor(ctx, env, it, validate)
 		if err != nil {
 			return err
 		}

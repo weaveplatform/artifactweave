@@ -5,6 +5,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/conda"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/helm"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/pypi"
@@ -22,8 +23,9 @@ func (c Config) Access() accessapi.Settings {
 
 // Artifacts returns the artifacts module's settings from the download,
 // search, aql_timeout, build, deploy, npm, cran, huggingface, maven, nuget,
-// remote, gc, conda, helm and pypi sections. Formats.TerraformBackend.Keys
-// stays nil: the keyring is not configuration, and app sets it.
+// remote, gc, conda, debian, helm and pypi sections.
+// Formats.TerraformBackend.Keys stays nil: the keyring is not
+// configuration, and app sets it.
 func (c Config) Artifacts() artifacts.Settings {
 	// The pointer is never nil: helm.Settings reads nil as its default,
 	// relative URLs, which would silently ignore relative_urls: false.
@@ -51,7 +53,10 @@ func (c Config) Artifacts() artifacts.Settings {
 		GCInterval:                     c.GC.Interval,
 		Formats: ecosystem.Settings{
 			Conda: conda.Settings{ShardsEnabled: c.Conda.ShardsEnabled},
-			Helm:  helm.Settings{RelativeURLs: &relativeURLs},
+			// Negated so that the zero debian.Settings is 7.x's default
+			// for callers built without configuration.
+			Debian: debian.Settings{DisableMetadataValidation: !c.Debian.MetadataValidation},
+			Helm:   helm.Settings{RelativeURLs: &relativeURLs},
 			NPM: npm.Settings{
 				TagLatestByPublish: c.NPM.TagLatestByPublish,
 				EnforcePath:        c.NPM.EnforcePath,
