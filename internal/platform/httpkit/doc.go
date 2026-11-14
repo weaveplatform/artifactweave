@@ -39,6 +39,8 @@
 //     kernel's principal helpers.
 //   - Routes: ChiPatterns and NotAPI. Pointers: Deref, DerefSlice and
 //     PtrTo, for the optional fields of generated types.
+//   - Paging: NextLink, the Link header naming a list's next page
+//     (decision 0043, "Paging classes and the next pointer").
 //
 // # Invariants
 //
@@ -81,7 +83,7 @@
 // user slots and the property search's raw query in later phases. P9d
 // (WEB-03) moved them here and turned the server's error-profile switch into
 // ordered rules carried on the request context; WEB-07 added the caller
-// checks.
+// checks, and #1408 NextLink.
 //
 // # Testing
 //
@@ -91,4 +93,6 @@
 // here cover the branches those suites do not reach: rule order and the
 // default, a request without rules, the context values on a bare context, the
 // pointers' nil cases, the route patterns and each caller check's answers.
+// TestUnitNextLink holds the next page's target to the client's path and
+// parameters, only the position changed.
 package httpkit
