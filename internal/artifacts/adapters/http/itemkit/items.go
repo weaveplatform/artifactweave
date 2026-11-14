@@ -136,7 +136,14 @@ func (s *Kit) ItemError(ctx context.Context, op string, err error) error {
 	case errors.Is(err, item.ErrConflict):
 		return apierror.New(http.StatusConflict, err.Error())
 	case errors.Is(err, item.ErrCollected):
-		return apierror.New(http.StatusServiceUnavailable, err.Error())
+		// The deploy lost its content to a collection that ran beside it,
+		// and the message asks for the deploy again, so the 503 reports a
+		// transient condition and hints a retry, as decision 0043's "Rate
+		// headers and Retry-After" asks (#1415). No 7.x source documents
+		// this answer [I].
+		e := apierror.New(http.StatusServiceUnavailable, err.Error())
+		e.RetryAfterSeconds = 1
+		return e
 	case errors.Is(err, item.ErrBadArchive):
 		return apierror.New(http.StatusBadRequest, err.Error())
 	case errors.Is(err, kernel.ErrInvalidItemPath):

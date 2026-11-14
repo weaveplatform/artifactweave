@@ -186,8 +186,12 @@ func TestAccSourceErrorEnvelopes(t *testing.T) {
 		if res.Code != tc.status {
 			t.Fatalf("%v: %d", tc.err, res.Code)
 		}
-		if tc.status == 429 && res.Header().Get("Retry-After") != "2" {
-			t.Fatal(res.Header())
+		// The upstream's own hint passes on with its 429; a read the source
+		// configuration superseded hints a repeat, which reads under the new
+		// configuration (#1415); no other failure hints one.
+		retry := map[int]string{429: "2", 503: "1"}[tc.status]
+		if res.Header().Get("Retry-After") != retry {
+			t.Fatal(tc.err, res.Header())
 		}
 	}
 	if pkgroute.SourceError(nil, false) != nil {
