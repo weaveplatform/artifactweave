@@ -461,9 +461,10 @@ func TestAccSharedRemoteConfiguration(t *testing.T) {
 }
 
 // A key that names no remote, or a remote that does not share its
-// configuration, answers 404 with no body to every caller, administrators
-// included: getRemoteDescriptor answers Response.status(SC_NOT_FOUND) for
-// anything but a shared remote (#1493).
+// configuration, answers 404 to every caller, administrators included:
+// getRemoteDescriptor answers Response.status(SC_NOT_FOUND) for anything but
+// a shared remote, and RestResponseFilter gives that entity-less response
+// the error envelope with the reason phrase (#1493).
 func TestAccSharedRemoteConfigurationNotFound(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(
@@ -477,8 +478,9 @@ func TestAccSharedRemoteConfigurationNotFound(t *testing.T) {
 	for _, key := range []string{"private", "off", "local", "missing"} {
 		for _, as := range []string{"admin", "reader"} {
 			rec := w.do("GET", "/artifactory/api/repositories/"+key+"/configuration", as, "")
-			if rec.Code != http.StatusNotFound || rec.Body.Len() != 0 ||
-				rec.Header().Get("Content-Type") != "" {
+			if rec.Code != http.StatusNotFound ||
+				rec.Body.String() != `{"errors":[{"message":"Not Found","status":404}]}`+"\n" ||
+				rec.Header().Get("Content-Type") != "application/json" {
 				t.Errorf("%s as %s: %d %q %s", key, as, rec.Code,
 					rec.Header().Get("Content-Type"), rec.Body)
 			}

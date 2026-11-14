@@ -619,8 +619,12 @@ func configResponse(
 // ROLE_USER alike and RepoConfigurationResource.getRemoteDescriptor checks
 // nothing more, so a caller other than an administrator gets the whole
 // descriptor. A key that names no remote, or a remote whose
-// shareConfiguration is off, answers 404 with no body, administrators
+// shareConfiguration is off, answers 404 to every caller, administrators
 // included, as getRemoteDescriptor's Response.status(SC_NOT_FOUND) does.
+// That response has no entity, so 7.x's RestResponseFilter, registered for
+// every REST resource (JerseyApplication), gives it the error envelope with
+// the reason phrase as its message: {"errors":[{"status":404,"message":
+// "Not Found"}]}.
 func (s ArtifactoryAPI) GetRemoteRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.GetRemoteRepositoryConfigurationRequestObject,
@@ -640,7 +644,7 @@ func (s ArtifactoryAPI) GetRemoteRepositoryConfiguration(
 	switch {
 	case errors.Is(err, kernel.ErrNotFound),
 		err == nil && (c.Class != repo.Remote || c.ShareConfiguration == nil || !*c.ShareConfiguration):
-		return artgen.GetRemoteRepositoryConfiguration404Response{}, nil
+		return nil, apierror.New(http.StatusNotFound, http.StatusText(http.StatusNotFound))
 	case err != nil:
 		return nil, s.InternalError(ctx, "get repository", err)
 	}

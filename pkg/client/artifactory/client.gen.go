@@ -55557,6 +55557,8 @@ type GetRemoteRepositoryConfigurationResponse struct {
 	ApplicationvndOrgJfrogArtifactoryRepositoriesSharedRemoteRepositoryConfigurationJSON200 *SharedRemoteRepositoryConfiguration
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
 	// JSON429 the response for an HTTP 429 `application/json` response
 	JSON429 *TooManyRequests
 	// JSON500 the response for an HTTP 500 `application/json` response
@@ -55582,6 +55584,11 @@ func (r GetRemoteRepositoryConfigurationResponse) GetApplicationvndOrgJfrogArtif
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
 func (r GetRemoteRepositoryConfigurationResponse) GetJSON401() *ErrorResponse {
 	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetRemoteRepositoryConfigurationResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
 }
 
 // GetJSON429 returns the response for an HTTP 429 `application/json` response
@@ -97104,8 +97111,12 @@ func ParseGetRemoteRepositoryConfigurationResponse(rsp *http.Response) (*GetRemo
 		}
 		response.JSON401 = &dest
 
-	case rsp.StatusCode == 404:
-		break // No content-type
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
